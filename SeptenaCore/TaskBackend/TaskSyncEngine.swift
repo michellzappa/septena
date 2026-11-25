@@ -56,6 +56,21 @@ final class TaskSyncEngine {
   var lastPull: Date?
   private(set) var lastError: String?
   private(set) var wsConnected = false
+  /// True when the server refused sync for this device (`402 device_not_syncing`
+  /// or `GET /v1/entitlement` says this device has no sync slot). The device
+  /// keeps working locally with no error banner (spec §6.3, §7).
+  private(set) var deviceNotSyncing = false
+  /// True when live WebSocket nudges are unavailable on the current plan
+  /// (`402 live_sync_not_in_plan` or `limits.liveSync == false`). Sync falls
+  /// back to polling `/v1/sync/pull` at most every 2 minutes while active
+  /// (spec §6.3, §6.4 finding 8).
+  private(set) var liveSyncBlocked = false
+  /// Attachments kept locally on this device because the server refused their
+  /// upload with `402 attachments_not_in_plan` or `attachment_quota`.
+  private(set) var localOnlyAttachmentIDs: Set<String> = []
+  /// Pulled attachment metadata rows whose bytes were never uploaded to the
+  /// server (`uploadedAt == null`) and are not on this device.
+  private(set) var elsewhereAttachmentIDs: Set<String> = []
   private(set) var isRunning = false
   private(set) var isSyncing = false
   /// Ops the backend rejected or dropped, and rows that fail the backend's
@@ -79,6 +94,8 @@ final class TaskSyncEngine {
   @ObservationIgnored private var socket: URLSessionWebSocketTask?
   @ObservationIgnored private var socketGeneration = 0
   @ObservationIgnored private var socketRetry: TimeInterval = 1
+  @ObservationIgnored private var lastSocketPlanRefresh: Date = .distantPast
+  @ObservationIgnored private var localOnlyAttachmentReasons: [String: String] = [:]
   @ObservationIgnored private var pollTask: Task<Void, Never>?
   /// Current fallback-poll interval; doubles after a failed run (see `pollLoop`).
   @ObservationIgnored private var pollBackoff: TimeInterval = 0
@@ -105,7 +122,12 @@ final class TaskSyncEngine {
   static let taskRefsReadyKey = "septena.taskSync.taskRefsReady"
   /// Backend user id of the last sign-in, compared on the next sign-in.
   static let lastUserKey = "septena.taskSync.lastUserID"
-  private static let issueCap = 200
+  @ObservationIgnored private static let issueCap = 200
+
+  /// Optional lifecycle hooks for remote push token registration/cleanup
+  /// (`SeptaskPushNotifications`), keeping `SeptenaCore` decoupled from app targets.
+  static var onSignInHook: (@MainActor () -> Void)?
+  static var beforeSignOutHook: (@MainActor () async -> Void)?
 
   private init() {}
 
@@ -139,33 +161,38 @@ final class TaskSyncEngine {
 
   /// Called from `SeptenaServices.start()`. No-op outside Septask.
   func start() {
-    #if SEPTASK
     guard !isRunning, !DemoSeedMode.isOn else { return }
-    guard store() != nil else { return }
+    guard let store = store() else { return }
     if !settingsReady || !taskRefsReady {
       // Pulls before this build skipped setting and reference rows, and
       // `since` moved past them. Read everything once, so the rows another
       // device or an agent wrote arrive.
       since = 0
     }
+    hydrateAttachmentLimitState(store: store)
     isRunning = true
     signedIn = TaskBackendClient.hasSession
+    deviceNotSyncing = PlanStatus.shared.deviceNotSyncing
+    liveSyncBlocked = !PlanStatus.shared.liveSyncAllowed
     refreshPendingCount()
     guard signedIn else {
       // Free no-account mode (docs/SYNC_SUBSCRIPTION_SPEC.md §3, §7): local
       // writes still land in the outbox so signing in later syncs them, but do
       // not spin up the network sync loop, poll timer or WebSocket.
       lastError = nil
+      deviceNotSyncing = false
+      liveSyncBlocked = false
       SeptenaLog.info("[TaskSync] started offline (no account) pending=\(pendingOps)")
       return
     }
     SeptenaLog.info("[TaskSync] started since=\(since) pending=\(pendingOps)")
     Task { @MainActor in
-      await self.runSync(reconcileFirst: true)
-      self.connectSocket()
+      if !self.deviceNotSyncing {
+        await self.runSync(reconcileFirst: true)
+        self.connectSocket()
+      }
     }
     startPolling()
-    #endif
   }
 
   func stop() {
@@ -185,13 +212,53 @@ final class TaskSyncEngine {
     signedIn = TaskBackendClient.hasSession
     guard signedIn else {
       lastError = nil
+      deviceNotSyncing = false
+      liveSyncBlocked = false
       return
     }
-    Task { @MainActor in
-      await self.runSync(reconcileFirst: true)
-      self.connectSocket()
+    if deviceNotSyncing {
+      // Re-check entitlement on foreground instead of firing wasted 402 sync
+      // calls; if the user upgraded or moved the slot, `applyPlanStatus`
+      // clears `deviceNotSyncing` and resumes sync right away.
+      Task { @MainActor in await PlanStatus.shared.refresh() }
+    } else {
+      Task { @MainActor in
+        await self.runSync(reconcileFirst: true)
+        self.connectSocket()
+      }
     }
     startPolling()
+  }
+
+  /// Applies fresh server plan limits from `PlanStatus.refresh()` (spec §6.3).
+  /// Resumes sync or live WebSocket when a limit lifts (upgrade, slot move)
+  /// and re-queues attachments that were held local on a free account.
+  func applyPlanStatus(deviceNotSyncing newDeviceNotSyncing: Bool,
+                       liveSyncAllowed: Bool,
+                       attachmentsAllowed: Bool) {
+    let wasDevicePaused = deviceNotSyncing
+    let wasLiveBlocked = liveSyncBlocked
+    deviceNotSyncing = newDeviceNotSyncing
+    liveSyncBlocked = !liveSyncAllowed
+
+    if deviceNotSyncing {
+      lastError = nil
+      disconnectSocket()
+      return
+    }
+    if liveSyncBlocked {
+      disconnectSocket()
+    }
+    if attachmentsAllowed {
+      requeuePlanBlockedAttachmentsIfNeeded()
+    }
+    guard isRunning, appActive, signedIn else { return }
+    if wasDevicePaused {
+      scheduleSync(after: 0)
+    }
+    if !liveSyncBlocked, (wasLiveBlocked || wasDevicePaused || !wsConnected) {
+      connectSocket()
+    }
   }
 
   /// Background: try once more to drain the outbox. iOS also closes the
@@ -209,17 +276,17 @@ final class TaskSyncEngine {
     pollTask?.cancel()
     pollTask = nil
     #endif
-    if signedIn, pendingOps > 0 { scheduleSync(after: 0) }
+    if signedIn, !deviceNotSyncing, pendingOps > 0 { scheduleSync(after: 0) }
   }
 
   // MARK: - Fallback poll
 
-  /// Pull interval while the live socket is down.
-  static let pollWhileSocketDown: TimeInterval = 120
+  /// Pull interval while the live socket is down (2 minutes, spec §6.4 finding 8).
+  static let pollWhileSocketDown: TimeInterval = TaskSyncPollPolicy.pollWhileSocketDown
   /// Safety pull while the socket is up, for a nudge the socket dropped.
-  static let pollWhileSocketUp: TimeInterval = 600
+  static let pollWhileSocketUp: TimeInterval = TaskSyncPollPolicy.pollWhileSocketUp
   /// Backoff cap after failed runs.
-  static let pollMax: TimeInterval = 900
+  static let pollMax: TimeInterval = TaskSyncPollPolicy.pollMax
 
   /// One poll loop per process while the engine runs (and, on iOS, while the
   /// app is in the foreground). Idempotent.
@@ -235,21 +302,35 @@ final class TaskSyncEngine {
   }
 
   /// Sleeps, then pulls when nothing else did recently. The interval is
-  /// short while the socket is down and long while it is up; a failed run
-  /// doubles it (capped at `pollMax`), a clean run resets it.
+  /// at most 2 minutes while live sync is unavailable or the socket is down,
+  /// and 10 minutes while the socket is up; a failed run doubles it (capped at
+  /// `pollMax`), a clean run resets it.
   private func pollLoop() async {
     while !Task.isCancelled {
-      let base = wsConnected ? Self.pollWhileSocketUp : Self.pollWhileSocketDown
-      let interval = min(Self.pollMax, max(base, pollBackoff))
+      let interval = TaskSyncPollPolicy.nextPollInterval(
+        wsConnected: wsConnected,
+        liveSyncBlocked: liveSyncBlocked,
+        pollBackoff: pollBackoff
+      )
       try? await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
       guard !Task.isCancelled, isRunning, appActive else { return }
       guard TaskBackendClient.hasSession else { continue }
+      // This device has no sync slot on the current plan: keep local edits in
+      // the outbox without hammering `/v1/sync/pull` or `/v1/sync/ws`.
+      if deviceNotSyncing { continue }
+      let base = TaskSyncPollPolicy.baseInterval(wsConnected: wsConnected, liveSyncBlocked: liveSyncBlocked)
       // A recent pull (nudge, push, foreground) already did this poll's job.
       if let lastPull, Date().timeIntervalSince(lastPull) < base * 0.8 { continue }
       await runSync(reconcileFirst: false)
       pollBackoff = lastError == nil ? 0 : min(Self.pollMax, max(base, pollBackoff) * 2)
-      // The socket may have given up while signed out or offline; retry it.
-      if !wsConnected { connectSocket() }
+      // The socket may have given up while signed out or offline; retry it
+      // only when live sync is allowed by the plan and this device is syncing.
+      if !wsConnected, TaskSyncPollPolicy.shouldConnectSocket(
+        isRunning: isRunning, appActive: appActive, signedIn: signedIn,
+        deviceNotSyncing: deviceNotSyncing, liveSyncBlocked: liveSyncBlocked
+      ) {
+        connectSocket()
+      }
     }
   }
 
@@ -265,7 +346,6 @@ final class TaskSyncEngine {
   /// against its shadow and queues the changed fields. Safe before `start()`:
   /// the outbox is persistent and drains once the engine runs.
   func captureLocalChange(_ entity: BackendEntity, id: String) {
-    #if SEPTASK
     guard !DemoSeedMode.isOn, let store = store() else { return }
     let lookup: (String) -> TaskSyncShadow? = { store.shadow($0) }
     switch entity {
@@ -279,8 +359,7 @@ final class TaskSyncEngine {
     case .convo, .turn, .setting: break
     }
     refreshPendingCount()
-    if isRunning, signedIn { scheduleSync(after: 0.8) }
-    #endif
+    if isRunning, signedIn, !deviceNotSyncing { scheduleSync(after: 0.8) }
   }
 
   /// True when a deleted area / project can come back under its own id: the
@@ -288,16 +367,12 @@ final class TaskSyncEngine {
   /// `deleteGrace`). False once the delete reached the backend, which never
   /// revives a deleted row — undo then has to mint a new id.
   func canRevive(_ entity: BackendEntity, _ id: String) -> Bool {
-    #if SEPTASK
     guard let store = store() else { return true }
     guard let shadow = store.shadow("\(entity.rawValue):\(id)"), shadow.gone else { return true }
     guard let last = store.lastRowOp(entity: entity.rawValue, rowID: id) else {
       return false
     }
     return last.kind == TaskSyncOpKind.delete && !last.sent
-    #else
-    return true
-    #endif
   }
 
   /// The id of the task's next reference to this key (§4): `n` counts the rows
@@ -307,7 +382,6 @@ final class TaskSyncEngine {
   /// (purged tombstones lower the count). Nil until the core mints ids.
   func nextTaskRefID(taskID: String, key: String) -> String? {
     var deleted = 0
-    #if SEPTASK
     if let store = store() {
       let entity = BackendEntity.taskRef
       deleted = store.goneShadows(entity: entity.rawValue).filter { shadow in
@@ -316,7 +390,6 @@ final class TaskSyncEngine {
           && !canRevive(entity, String(shadow.key.dropFirst(entity.rawValue.count + 1)))
       }.count
     }
-    #endif
     while let id = TaskRefCore.mintID(taskID: taskID, key: key, deletedCount: deleted) {
       if canRevive(.taskRef, id) { return id }
       deleted += 1
@@ -328,12 +401,8 @@ final class TaskSyncEngine {
   /// a delete must be sent rather than kept local. Septena never opens the
   /// store and answers true: its notes are dropped by the freeze anyway.
   func backendKnowsTask(_ id: String) -> Bool {
-    #if SEPTASK
     guard let store = store(), let shadow = store.shadow("task:\(id)") else { return false }
     return TaskSyncJSON.decode(shadow.fields)["_remote"] == .bool(true) || shadow.gone
-    #else
-    return true
-    #endif
   }
 
   /// Diffs every local row against its shadow and queues what differs. Picks
@@ -547,11 +616,11 @@ final class TaskSyncEngine {
                   store: store, lookup: lookup)
   }
 
-  /// Areas, projects, attachments: no soft delete; a missing row is a delete.
+  /// Every entity but tasks: no soft delete; a missing row is a delete.
   ///
-  /// An area or project delete is HELD for `deleteGrace`, like a task's: ⌘Z
-  /// on the delete re-creates the row under the same id
-  /// (`ProjectsMutator.revive`, `AreasMutator.revive`), and the backend never
+  /// The delete is HELD for `deleteGrace`, like a task's: ⌘Z on the delete
+  /// re-creates the row under the same id (`ProjectsMutator.revive`,
+  /// `AreasMutator.revive`, the `restore…` mutators), and the backend never
   /// revives a deleted row, so the delete must still be in the outbox for
   /// undo to cancel it.
   private func captureSimple(_ entity: BackendEntity, _ id: String,
@@ -561,9 +630,7 @@ final class TaskSyncEngine {
     let shadow = lookup(key)
     guard let plan else {
       if let shadow, !shadow.gone {
-        queueDeleteIfNeeded(entity, id,
-                            hold: entity == .project || entity == .area || entity == .checklistItem || entity == .taskRef || entity == .tag || entity == .attachment,
-                            store: store)
+        queueDeleteIfNeeded(entity, id, hold: true, store: store)
         shadow.gone = true
         store.saveSoon()
       }
@@ -579,16 +646,19 @@ final class TaskSyncEngine {
 
     // Re-created inside the grace period (undo): the backend never saw the
     // delete. Drop it and send only what differs from the last synced row.
-    if entity == .project || entity == .area || entity == .taskRef, shadow?.gone == true,
+    if let shadow, shadow.gone,
        let last = store.lastRowOp(entity: entity.rawValue, rowID: id),
        last.kind == TaskSyncOpKind.delete, !last.sent {
       store.remove(last)
-      shadow?.gone = false
-      var patch: [String: BackendJSON] = [:]
-      for (k, v) in mapped where (old[k] ?? .null).canonical != v.canonical { patch[k] = v }
-      if !patch.isEmpty { enqueueUpsert(entity, id, patch, store: store) }
-      writeShadow(shadow, key, old: old, new: mapped, store: store)
-      return
+      shadow.gone = false
+      store.saveSoon()
+      // A sync while the row was away drops its waiting upload. A file the
+      // plan refused stays local.
+      if entity == .attachment, old["_uploaded"] != .bool(true), old["_localOnly"] != .bool(true),
+         let a = fetchAttachment(id), a.localFilename != nil,
+         !store.ops(entity: entity.rawValue, rowID: id).contains(where: { $0.kind == TaskSyncOpKind.upload }) {
+        store.append(kind: TaskSyncOpKind.upload, entity: entity.rawValue, rowID: id, payload: [:])
+      }
     }
 
     if shadow == nil || shadow?.gone == true {
@@ -616,7 +686,14 @@ final class TaskSyncEngine {
       patch = patch.filter { $0.key == "role" || $0.key == "snapshot" || $0.key == "position" }
     }
     if !patch.isEmpty { enqueueUpsert(entity, id, patch, store: store) }
-    writeShadow(shadow, key, old: old, new: mapped, store: store)
+    var nextShadow = mapped
+    if entity == .attachment {
+      // Preserve local-only / server-upload state stored alongside the shadow.
+      for metaKey in ["_localOnly", "_localOnlyReason", "_uploaded"] {
+        if let v = old[metaKey] { nextShadow[metaKey] = v }
+      }
+    }
+    writeShadow(shadow, key, old: old, new: nextShadow, store: store)
   }
 
   // MARK: Queue helpers
@@ -816,6 +893,27 @@ final class TaskSyncEngine {
       if syncAgain { scheduleSync(after: 0) }
       return
     }
+    if let e = error as? TaskBackendError, case .limitReached(let limit) = e {
+      // HTTP 402 plan limits are expected free-tier boundaries (spec §6.3, §7),
+      // never a broken/red sync error state.
+      lastError = nil
+      retryDelay = 0
+      switch limit.kind {
+      case .deviceNotSyncing:
+        deviceNotSyncing = true
+        disconnectSocket()
+        SeptenaLog.info("[TaskSync] device not syncing (402 \(limit.error)); keeping \(pendingOps) ops local")
+      case .liveSyncNotInPlan:
+        liveSyncBlocked = true
+        disconnectSocket()
+        SeptenaLog.info("[TaskSync] live sync not in plan (402 \(limit.error)); using 2-minute poll")
+      case .attachmentsNotInPlan, .attachmentQuota, .historyEdge,
+           .connectorCap, .shareCreate, .other:
+        SeptenaLog.info("[TaskSync] plan limit reached (402 \(limit.error))")
+      }
+      PlanStatus.shared.noteLimitReached(limit)
+      return
+    }
     if let e = error as? TaskBackendError, e == .notSignedIn {
       signedIn = false
       lastError = e.errorDescription
@@ -918,7 +1016,17 @@ final class TaskSyncEngine {
       for op in batch { op.sent = true; op.attempts += 1 }
       store.saveNow()
 
-      switch try await client.push(batch.map(wireOp)) {
+      let outcome: TaskBackendClient.PushOutcome
+      do {
+        outcome = try await client.push(batch.map(wireOp))
+      } catch TaskBackendError.limitReached(let limit) {
+        // Refused before the server applied any op (e.g. 402 device_not_syncing):
+        // unseal the batch so further local edits coalesce cleanly while paused.
+        for op in batch { op.sent = false }
+        store.saveNow()
+        throw TaskBackendError.limitReached(limit)
+      }
+      switch outcome {
       case .ok(let response):
         // The core checks the answer covers the batch one for one, in
         // order; zip would pair results with the wrong ops otherwise.
@@ -1044,11 +1152,38 @@ final class TaskSyncEngine {
         store.remove(op)
         continue
       }
+      if PlanStatus.shared.enforced, !PlanStatus.shared.attachmentsAllowed {
+        // The server already reported 0 GB attachment allowance for this plan:
+        // keep the file on this device and mark it local without uploading bytes.
+        store.remove(op)
+        markAttachmentLocalOnly(id: op.rowID, reason: "attachments_not_in_plan",
+                                taskID: att.taskID, store: store)
+        store.saveNow()
+        continue
+      }
       op.sent = true
       op.attempts += 1
       do {
         try await client.uploadAttachment(id: op.rowID, fileURL: url, contentType: att.contentType)
         store.remove(op)
+        recordAttachmentUploadState(id: op.rowID, uploaded: true, hasLocalFile: true, store: store)
+      } catch TaskBackendError.limitReached(let limit) {
+        if limit.isAttachmentLimit {
+          // 402 attachments_not_in_plan / attachment_quota (spec §6.3, §7):
+          // keep the file on disk, mark it local so it is never retried
+          // endlessly or lost, and surface the file upsell without a sync error.
+          store.remove(op)
+          markAttachmentLocalOnly(id: op.rowID, reason: limit.error,
+                                  taskID: att.taskID, store: store)
+          PlanStatus.shared.noteLimitReached(limit)
+          SeptenaLog.info("[TaskSync] attachment \(op.rowID) kept local (402 \(limit.error))")
+        } else {
+          // e.g. 402 device_not_syncing: keep the upload queued for when this
+          // device syncs again, and let `handleSyncError` pause cleanly.
+          op.sent = false
+          store.saveNow()
+          throw TaskBackendError.limitReached(limit)
+        }
       } catch TaskBackendError.http(let status, let code) {
         if status == 404, op.attempts < 6 {
           op.notBefore = Date().addingTimeInterval(TimeInterval(30 * op.attempts))
@@ -1058,6 +1193,134 @@ final class TaskSyncEngine {
         }
       }
       store.saveNow()
+    }
+  }
+
+  // MARK: - Attachment local-only / elsewhere tracking (spec §6.3, §7)
+
+  /// True when an attachment's bytes were kept on this device after a 402
+  /// `attachments_not_in_plan` or `attachment_quota` response.
+  func isAttachmentLocalOnly(_ id: String) -> Bool {
+    localOnlyAttachmentIDs.contains(id)
+  }
+
+  /// True when this device has only the attachment's metadata row (no file on
+  /// disk) and the server row reported no uploaded bytes (`uploadedAt == nil`).
+  func isAttachmentElsewhere(_ entity: TaskAttachmentEntity) -> Bool {
+    if let url = TaskAttachmentFiles.url(for: entity),
+       FileManager.default.fileExists(atPath: url.path) {
+      return false
+    }
+    return elsewhereAttachmentIDs.contains(entity.id)
+  }
+
+  func clearAttachmentLimitState(id: String) {
+    localOnlyAttachmentIDs.remove(id)
+    localOnlyAttachmentReasons.removeValue(forKey: id)
+    elsewhereAttachmentIDs.remove(id)
+  }
+
+  func recordAttachmentUploadState(id: String, uploaded: Bool, hasLocalFile: Bool, store: TaskSyncStore) {
+    let key = "attachment:\(id)"
+    let shadow = store.shadow(key)
+    let old = shadow.map { TaskSyncJSON.decode($0.fields) } ?? [:]
+    var new = old
+    new["_uploaded"] = .bool(uploaded)
+    if uploaded {
+      new.removeValue(forKey: "_localOnly")
+      new.removeValue(forKey: "_localOnlyReason")
+      localOnlyAttachmentIDs.remove(id)
+      localOnlyAttachmentReasons.removeValue(forKey: id)
+      elsewhereAttachmentIDs.remove(id)
+    } else if !hasLocalFile {
+      elsewhereAttachmentIDs.insert(id)
+    } else {
+      elsewhereAttachmentIDs.remove(id)
+    }
+    writeShadow(shadow, key, old: old, new: new, store: store)
+  }
+
+  private func markAttachmentLocalOnly(id: String, reason: String, taskID: String?, store: TaskSyncStore) {
+    let key = "attachment:\(id)"
+    let shadow = store.shadow(key)
+    let old = shadow.map { TaskSyncJSON.decode($0.fields) } ?? [:]
+    var new = old
+    new["_localOnly"] = .bool(true)
+    new["_localOnlyReason"] = .string(reason)
+    new["_uploaded"] = .bool(false)
+    writeShadow(shadow, key, old: old, new: new, store: store)
+    localOnlyAttachmentIDs.insert(id)
+    localOnlyAttachmentReasons[id] = reason
+    elsewhereAttachmentIDs.remove(id)
+    if let taskID { TaskChange.post(taskID) }
+  }
+
+  private func hydrateAttachmentLimitState(store: TaskSyncStore) {
+    var localOnly = Set<String>()
+    var reasons: [String: String] = [:]
+    var elsewhere = Set<String>()
+    for (key, shadow) in store.allShadows() where key.hasPrefix("attachment:") && !shadow.gone {
+      let id = String(key.dropFirst("attachment:".count))
+      let fields = TaskSyncJSON.decode(shadow.fields)
+      if fields["_localOnly"] == .bool(true) {
+        localOnly.insert(id)
+        if let reason = fields["_localOnlyReason"]?.stringValue {
+          reasons[id] = reason
+        }
+      } else if fields["_uploaded"] == .bool(false) {
+        if let att = fetchAttachment(id),
+           let url = TaskAttachmentFiles.url(for: att),
+           FileManager.default.fileExists(atPath: url.path) {
+          continue
+        }
+        elsewhere.insert(id)
+      }
+    }
+    localOnlyAttachmentIDs = localOnly
+    localOnlyAttachmentReasons = reasons
+    elsewhereAttachmentIDs = elsewhere
+  }
+
+  /// When the user upgrades to a plan that allows server attachments, re-queue
+  /// files that were previously held local under `attachments_not_in_plan`.
+  private func requeuePlanBlockedAttachmentsIfNeeded() {
+    guard let store = store() else { return }
+    let candidates = localOnlyAttachmentIDs.filter {
+      let reason = localOnlyAttachmentReasons[$0]
+      return reason == nil || reason == "attachments_not_in_plan"
+    }
+    guard !candidates.isEmpty else { return }
+    var queuedAny = false
+    for id in candidates {
+      guard let att = fetchAttachment(id),
+            let url = TaskAttachmentFiles.url(for: att),
+            FileManager.default.fileExists(atPath: url.path) else {
+        localOnlyAttachmentIDs.remove(id)
+        localOnlyAttachmentReasons.removeValue(forKey: id)
+        continue
+      }
+      let key = "attachment:\(id)"
+      let shadow = store.shadow(key)
+      let old = shadow.map { TaskSyncJSON.decode($0.fields) } ?? [:]
+      var new = old
+      new.removeValue(forKey: "_localOnly")
+      new.removeValue(forKey: "_localOnlyReason")
+      writeShadow(shadow, key, old: old, new: new, store: store)
+      localOnlyAttachmentIDs.remove(id)
+      localOnlyAttachmentReasons.removeValue(forKey: id)
+      let alreadyQueued = store.ops(entity: BackendEntity.attachment.rawValue, rowID: id)
+        .contains { $0.kind == TaskSyncOpKind.upload }
+      if !alreadyQueued {
+        store.append(kind: TaskSyncOpKind.upload, entity: BackendEntity.attachment.rawValue,
+                     rowID: id, payload: [:])
+        queuedAny = true
+      }
+      TaskChange.post(att.taskID)
+    }
+    if queuedAny {
+      store.saveNow()
+      refreshPendingCount()
+      if isRunning, signedIn, !deviceNotSyncing { scheduleSync(after: 0.5) }
     }
   }
 
@@ -1078,20 +1341,28 @@ final class TaskSyncEngine {
   // MARK: - Live nudge (WebSocket, §6.3)
 
   func connectSocket() {
-    guard isRunning, appActive, signedIn, socket == nil else { return }
+    guard TaskSyncPollPolicy.shouldConnectSocket(
+      isRunning: isRunning, appActive: appActive, signedIn: signedIn,
+      deviceNotSyncing: deviceNotSyncing, liveSyncBlocked: liveSyncBlocked
+    ), socket == nil else { return }
     socketGeneration += 1
     let generation = socketGeneration
     Task { @MainActor in
       do {
         let request = try await self.client.webSocketRequest()
-        guard generation == self.socketGeneration, self.isRunning, self.socket == nil else { return }
+        guard generation == self.socketGeneration,
+              TaskSyncPollPolicy.shouldConnectSocket(
+                isRunning: self.isRunning, appActive: self.appActive, signedIn: self.signedIn,
+                deviceNotSyncing: self.deviceNotSyncing, liveSyncBlocked: self.liveSyncBlocked
+              ),
+              self.socket == nil else { return }
         let task = self.socketSession.webSocketTask(with: request)
         self.socket = task
         task.resume()
         self.receive(task, generation: generation)
         self.keepAlive(task, generation: generation)
       } catch {
-        self.socketFailed(generation: generation, error: error)
+        self.socketFailed(generation: generation, error: error, httpStatus: nil)
       }
     }
   }
@@ -1121,7 +1392,8 @@ final class TaskSyncEngine {
                 let nudge = try? JSONDecoder().decode(RevNudge.self, from: data) else { continue }
           if nudge.rev > self.since { self.scheduleSync(after: 0.3) }
         } catch {
-          self.socketFailed(generation: generation, error: error)
+          let status = (task.response as? HTTPURLResponse)?.statusCode
+          self.socketFailed(generation: generation, error: error, httpStatus: status)
           return
         }
       }
@@ -1136,23 +1408,54 @@ final class TaskSyncEngine {
         try? await Task.sleep(nanoseconds: 30_000_000_000)
         guard generation == self.socketGeneration else { return }
         do { try await task.send(.string("ping")) } catch {
-          self.socketFailed(generation: generation, error: error)
+          let status = (task.response as? HTTPURLResponse)?.statusCode
+          self.socketFailed(generation: generation, error: error, httpStatus: status)
           return
         }
       }
     }
   }
 
-  private func socketFailed(generation: Int, error: Error) {
+  private func socketFailed(generation: Int, error: Error, httpStatus: Int?) {
     guard generation == socketGeneration else { return }
+    let status = httpStatus ?? (socket?.response as? HTTPURLResponse)?.statusCode
     socket?.cancel(with: .abnormalClosure, reason: nil)
     socket = nil
     wsConnected = false
+    if status == 402 {
+      // HTTP 402 on `/v1/sync/ws` (`live_sync_not_in_plan` or
+      // `device_not_syncing`, spec §6.3, §6.4 finding 8): stop reconnecting
+      // the socket and fall back to polling `/v1/sync/pull` every 2 minutes.
+      liveSyncBlocked = true
+      socketRetry = 1
+      SeptenaLog.info("[TaskSync] live socket returned HTTP 402; falling back to 2-minute poll")
+      refreshPlanAfterSocketRefusal()
+      return
+    }
+    if let e = error as? TaskBackendError, case .limitReached(let limit) = e {
+      switch limit.kind {
+      case .deviceNotSyncing: deviceNotSyncing = true
+      case .liveSyncNotInPlan: liveSyncBlocked = true
+      default: break
+      }
+      socketRetry = 1
+      PlanStatus.shared.noteLimitReached(limit)
+      return
+    }
     if let e = error as? TaskBackendError, e == .notSignedIn {
       signedIn = false
       return
     }
-    guard isRunning, appActive else { return }
+    if (error as? URLError)?.code == .badServerResponse, !PlanStatus.shared.isPlus {
+      // Safety net when the handshake failed with a non-101 HTTP response and
+      // URLSession did not populate `task.response`: refresh plan limits so
+      // `liveSync: false` stops further reconnect attempts.
+      refreshPlanAfterSocketRefusal()
+    }
+    guard TaskSyncPollPolicy.shouldConnectSocket(
+      isRunning: isRunning, appActive: appActive, signedIn: signedIn,
+      deviceNotSyncing: deviceNotSyncing, liveSyncBlocked: liveSyncBlocked
+    ) else { return }
     let delay = socketRetry
     socketRetry = min(60, socketRetry * 2)
     Task { @MainActor in
@@ -1160,6 +1463,13 @@ final class TaskSyncEngine {
       guard generation == self.socketGeneration else { return }
       self.connectSocket()
     }
+  }
+
+  private func refreshPlanAfterSocketRefusal() {
+    let now = Date()
+    guard now.timeIntervalSince(lastSocketPlanRefresh) > 15 else { return }
+    lastSocketPlanRefresh = now
+    Task { @MainActor in await PlanStatus.shared.refresh() }
   }
 
   // MARK: - Account
@@ -1187,12 +1497,14 @@ final class TaskSyncEngine {
     lastError = nil
     // Today's upsell notices read the plan (spec §3.2).
     Task { @MainActor in await PlanStatus.shared.refresh() }
+    Self.onSignInHook?()
   }
 
   /// Ends the session on this device. Local tasks and the outbox stay: edits
   /// made while signed out are sent after the next sign-in, when the same
   /// account signs in again (`signIn` wipes them for another account).
   func signOut() async {
+    await Self.beforeSignOutHook?()
     syncTimer?.cancel()
     syncTimer = nil
     syncTimerDeadline = nil
@@ -1202,11 +1514,16 @@ final class TaskSyncEngine {
     await client.signOut()
     signedIn = TaskBackendClient.hasSession
     lastError = nil
+    deviceNotSyncing = false
+    liveSyncBlocked = false
+    localOnlyAttachmentIDs = []
+    localOnlyAttachmentReasons = [:]
+    elsewhereAttachmentIDs = []
     Task { @MainActor in await PlanStatus.shared.refresh() }
     // The launch snapshot shows this account's Today (#82).
     TodaySnapshotStore.invalidate()
     TasksWidgetSnapshotStore.invalidate()
-    #if os(iOS) && SEPTASK
+    #if os(iOS)
     WatchBridge.shared.accountChanged()
     #endif
   }
@@ -1266,6 +1583,7 @@ final class TaskSyncEngine {
     for t in (try? context.fetch(FetchDescriptor<TaskEntity>())) ?? [] { context.delete(t) }
     for p in (try? context.fetch(FetchDescriptor<ProjectEntity>())) ?? [] { context.delete(p) }
     for a in (try? context.fetch(FetchDescriptor<AreaEntity>())) ?? [] { context.delete(a) }
+    for t in (try? context.fetch(FetchDescriptor<TagEntity>())) ?? [] { context.delete(t) }
     _ = StoreHealth.save(context, op: "taskSync.wipe")
     // Account switch / delete: clear cached per-account synced settings and
     // smart-list mirrors so the previous account cannot leak into the next one.
@@ -1274,7 +1592,7 @@ final class TaskSyncEngine {
     // Account switch / delete: the launch snapshot holds the old rows (#82).
     TodaySnapshotStore.invalidate()
     TasksWidgetSnapshotStore.invalidate()
-    #if os(iOS) && SEPTASK
+    #if os(iOS)
     WatchBridge.shared.accountChanged()
     #endif
     store()?.deleteEverything()
@@ -1282,6 +1600,11 @@ final class TaskSyncEngine {
     settingsReady = false
     lastPull = nil
     lastError = nil
+    deviceNotSyncing = false
+    liveSyncBlocked = false
+    localOnlyAttachmentIDs = []
+    localOnlyAttachmentReasons = [:]
+    elsewhereAttachmentIDs = []
     issues = []
     refreshPendingCount()
     // The undo closures point at rows that no longer exist.
@@ -1306,11 +1629,9 @@ final class TaskSyncEngine {
   /// first settings pull has run; before that, `reconcileSettings` after
   /// the pull picks it up (and the backend's value wins if it has one).
   func captureSettings() {
-    #if SEPTASK
     guard !DemoSeedMode.isOn, settingsReady, let store = store() else { return }
-    if reconcileSettings(store: store), isRunning, signedIn { scheduleSync(after: 0.8) }
+    if reconcileSettings(store: store), isRunning, signedIn, !deviceNotSyncing { scheduleSync(after: 0.8) }
     refreshPendingCount()
-    #endif
   }
 
   /// Diffs each synced setting against its shadow and queues an upsert for
@@ -1319,7 +1640,6 @@ final class TaskSyncEngine {
   /// something was queued.
   @discardableResult
   func reconcileSettings(store: TaskSyncStore) -> Bool {
-    #if SEPTASK
     guard settingsReady, !settingsRefused else { return false }
     let current = SeptaskSyncedSettings.current()
     var queued = false
@@ -1335,9 +1655,6 @@ final class TaskSyncEngine {
       queued = true
     }
     return queued
-    #else
-    return false
-    #endif
   }
 
   private func enqueueSetting(_ key: String, _ value: BackendJSON, store: TaskSyncStore) {
@@ -1351,64 +1668,6 @@ final class TaskSyncEngine {
     }
   }
 
-  #if !SEPTASK
-  // MARK: - Septena-only: the rollback writer's helpers (TaskStoreRollback)
-  //
-  // Septask no longer compiles the rollback (it is backend-only); Septena
-  // still does, and these are all it calls.
-
-  /// Rollback step 1: try once to send what the outbox holds, so the backend
-  /// copy left behind is current. Failure is not fatal; the local rows are
-  /// what goes to CloudKit.
-  func flushBeforeRollback() async {
-    guard isRunning, store() != nil else { return }
-    await runSync(reconcileFirst: true)
-  }
-
-  /// Rollback's last step: the mode is cloudkit again.
-  func didRollBack() {
-    stop()
-    storeCache?.deleteEverything()
-    since = 0
-    refreshPendingCount()
-  }
-
-  /// CloudKit record names for every local row of the four task types.
-  func localTaskRecordNames() -> Set<String> {
-    var names = Set<String>()
-    for a in (try? main.fetch(FetchDescriptor<AreaEntity>())) ?? [] { names.insert(AreaCloudKitSchema.recordName(for: a.id)) }
-    for p in (try? main.fetch(FetchDescriptor<ProjectEntity>())) ?? [] { names.insert(ProjectCloudKitSchema.recordName(for: p.id)) }
-    for t in (try? main.fetch(FetchDescriptor<TaskEntity>())) ?? [] { names.insert(t.id) }
-    for a in (try? main.fetch(FetchDescriptor<TaskAttachmentEntity>())) ?? [] {
-      names.insert(TaskAttachmentCloudKitSchema.recordName(for: a.id))
-    }
-    return names
-  }
-
-  /// CloudKit record names of rows that were deleted while on the backend
-  /// and are no longer in SwiftData. The rollback writer deletes those
-  /// records, so CloudKit does not bring them back.
-  func goneRecordNames() -> Set<String> {
-    guard let store = storeCache ?? (try? TaskSyncStore()) else { return [] }
-    let present = localTaskRecordNames()
-    var names = Set<String>()
-    for (key, shadow) in store.allShadows() {
-      guard let colon = key.firstIndex(of: ":") else { continue }
-      let kind = String(key[..<colon])
-      let id = String(key[key.index(after: colon)...])
-      let name: String
-      switch kind {
-      case "task": name = id
-      case "area": name = AreaCloudKitSchema.recordName(for: id)
-      case "project": name = ProjectCloudKitSchema.recordName(for: id)
-      case "attachment": name = TaskAttachmentCloudKitSchema.recordName(for: id)
-      default: continue
-      }
-      if shadow.gone, !present.contains(name) { names.insert(name) }
-    }
-    return names
-  }
-  #endif
 }
 
 // MARK: - Attachment bytes on demand

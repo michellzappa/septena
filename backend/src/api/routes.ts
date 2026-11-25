@@ -7,6 +7,7 @@ import { isValidTz, todayYMD } from "../tz.js";
 import { MAX_ATTACHMENT_BYTES, zId } from "../store/columns.js";
 import { zPushBody, type Op } from "../store/ops.js";
 import type { ChangeEntry } from "../store/TaskStore.js";
+import { USER_ID_RE, accountStoreFor } from "../store/AccountStore.js";
 import { AppleIdentityError, userIdForAppleSub, verifyAppleIdentityToken } from "./appleIdentity.js";
 import { issueSession, refreshSession, revokeSession, storeFor, verifyAccessToken } from "./session.js";
 import {
@@ -22,6 +23,7 @@ import {
 } from "../shadow/oauth.js";
 import { disconnectFamily } from "../shadow/tokens.js";
 import {
+  TRIAL_ROW_ID,
   appAccountTokenFor,
   attachmentQuotaBytes,
   decide,
@@ -29,13 +31,15 @@ import {
   historyEdgeUpsell,
   isEnforcing,
   isRowActive,
+  markTrialUsed,
   planCheckFailed,
   planFor,
+  startTrialOnce,
   trialEndsAt,
-  trialRow,
   upsellLine,
   usageKeys,
   type LimitBreach,
+  type PlanFailureMode,
   type PlanState,
   rememberAppAccountToken,
   rememberOriginalTransaction,
@@ -62,8 +66,8 @@ type Vars = {
   sid: string | null;
   /// `X-Septena-Client`, when valid. Labels the device.
   client: string | null;
-  /// Set by `loadPlan`. null when the check failed in log-only mode: the call
-  /// then runs with no limits.
+  /// Set by `loadPlan`. null when the check failed and failed open (sync paths
+  /// or log-only mode): the call then runs with no limits.
   plan: PlanState | null;
 };
 type Ctx = Context<{ Bindings: Env; Variables: Vars }>;
@@ -100,10 +104,17 @@ api.post("/auth/apple", async (c) => {
   if (body instanceof Response) return body;
   try {
     const { sub } = await verifyAppleIdentityToken(body.identityToken, body.nonce, c.env.APPLE_AUDIENCES.split(","));
-    const userId = await userIdForAppleSub(sub);
+    const derivedUserId = await userIdForAppleSub(sub);
+    // Keep existing Apple accounts on their derived `u_` id while recording
+    // `apple:<sub>` -> `userId` in the global identity table (ADR 0016, #168).
+    const accounts = accountStoreFor(c.env);
+    const userId = accounts
+      ? (await accounts.resolveOrCreateIdentity("apple", sub, derivedUserId)).userId
+      : derivedUserId;
     // Every new account starts with 14 days of Plus (spec §3). Only the
-    // first sign-in writes the row; later sign-ins find it and do nothing.
-    const trialStarted = await storeFor(c.env, userId).startTrialOnce(trialRow());
+    // first sign-in writes the row; a KV marker keeps account deletion from
+    // granting a second trial (spec §6.4 finding 4).
+    const trialStarted = await startTrialOnce(c.env, userId);
     if (trialStarted) logEvent("trial_started", { userId });
     logEvent("api_signin", { ok: true });
     return c.json(await issueSession(c.env, userId));
@@ -171,19 +182,25 @@ function limitRefusal(c: Ctx, error: string, breach: LimitBreach) {
 }
 
 /// The caller's plan (docs/SYNC_SUBSCRIPTION_SPEC.md §6). Runs after
-/// requireUser. A failed check blocks only in enforce mode.
-async function loadPlan(c: Ctx, next: Next) {
-  try {
-    const plan = await planFor(c.env, c.get("userId"));
-    c.set("plan", plan);
-    // Before enforcement, every free-account sync call says so, as the old
-    // yes/no gate's would-block line did: spec §6.2 finds the user id here.
-    if (plan.plan === "free" && !isEnforcing(c.env)) logEvent("entitlement_free_account", { userId: c.get("userId") });
-  } catch (e) {
-    if (planCheckFailed(c.env, c.get("userId"), "plan", e) === "block") return c.json({ error: "plan_check_failed" }, 503);
-    c.set("plan", null);
-  }
-  await next();
+/// requireUser. Sync paths fail open (spec §6.4 finding 6) so a store hiccup
+/// never stops sync for paying users; attachments stay fail-closed in enforce
+/// mode.
+function loadPlan(mode: PlanFailureMode, surface: string) {
+  return async (c: Ctx, next: Next) => {
+    try {
+      const plan = await planFor(c.env, c.get("userId"));
+      c.set("plan", plan);
+      // Before enforcement, every free-account sync call says so, as the old
+      // yes/no gate's would-block line did: spec §6.2 finds the user id here.
+      if (plan.plan === "free" && !isEnforcing(c.env)) logEvent("entitlement_free_account", { userId: c.get("userId") });
+    } catch (e) {
+      if (planCheckFailed(c.env, c.get("userId"), surface, e, mode) === "block") {
+        return c.json({ error: "plan_check_failed" }, 503);
+      }
+      c.set("plan", null);
+    }
+    await next();
+  };
 }
 
 /// Server sync for this device (ADR 0023): the plan's device count. A device
@@ -209,17 +226,18 @@ async function apiHostOnly(c: Ctx, next: Next) {
   await next();
 }
 
-api.use("/sync/*", requireUser, loadPlan, requireSyncDevice);
-api.use("/attachments/*", requireUser, loadPlan, requireSyncDevice);
+api.use("/sync/*", requireUser, loadPlan("open", "sync"), requireSyncDevice);
+api.use("/attachments/*", requireUser, loadPlan("closed", "attachments"), requireSyncDevice);
 api.use("/account", requireUser);
+api.use("/devices/*", requireUser);
 api.use("/ical/settings", requireUser);
-api.use("/changes", requireUser, loadPlan, requireSyncDevice);
+api.use("/changes", requireUser, loadPlan("open", "changes"), requireSyncDevice);
 api.use("/pair/*", requireUser);
 api.use("/auth/device", requireUser);
 // The watch is a companion of a signed-in phone or Mac: it loads the plan
 // but takes no sync device slot of its own.
-api.use("/tasks", requireUser, loadPlan);
-api.use("/tasks/*", requireUser, loadPlan);
+api.use("/tasks", requireUser, loadPlan("open", "tasks"));
+api.use("/tasks/*", requireUser, loadPlan("open", "tasks"));
 api.use("/access", apiHostOnly, requireUser);
 api.use("/access/*", apiHostOnly, requireUser);
 api.use("/entitlement", apiHostOnly, requireUser);
@@ -262,7 +280,7 @@ api.get("/sync/pull", async (c) => {
   ));
 });
 
-api.get("/sync/ws", async (c) => {
+async function liveSocket(c: Ctx) {
   if (c.req.header("Upgrade") !== "websocket") return c.json({ error: "expected_websocket" }, 426);
   // Without live sync the app polls `/sync/pull` (spec §3).
   const plan = c.get("plan");
@@ -271,7 +289,9 @@ api.get("/sync/ws", async (c) => {
     if (decide(c.env, c.get("userId"), "sync_live", plan, breach) === "block") return limitRefusal(c, "live_sync_not_in_plan", breach);
   }
   return storeFor(c.env, c.get("userId")).fetch(c.req.raw);
-});
+}
+
+api.get("/sync/ws", liveSocket);
 
 // ---- change history (who changed what, with before/after values) ----
 
@@ -380,8 +400,46 @@ api.post("/auth/device", async (c) => {
   return c.json(await issueSession(c.env, userId));
 });
 
+// ---- APNs device push tokens (F1b #213, docs/TASK_FACTORY_SPEC.md §8) ----
+
+const zPushToken = z.string().regex(/^[0-9a-fA-F]{32,256}$/);
+const zPushTokenRegisterBody = z.object({
+  token: zPushToken,
+  platform: z.enum(["ios", "watchos"]).default("ios"),
+  sandbox: z.boolean().default(false),
+  deviceId: z.string().trim().min(1).max(128).optional(),
+}).strict();
+const zPushTokenDeleteBody = z.object({
+  token: zPushToken,
+}).strict();
+
+api.post("/devices/push-token", async (c) => {
+  const body = await parse(c, zPushTokenRegisterBody);
+  if (body instanceof Response) return body;
+  const saved = await storeFor(c.env, c.get("userId")).upsertPushToken({
+    token: body.token.toLowerCase(),
+    deviceId: body.deviceId ?? c.get("sid") ?? null,
+    platform: body.platform,
+    sandbox: body.sandbox,
+  });
+  logEvent("push_token_registered", { platform: saved.platform, sandbox: saved.sandbox });
+  return c.json({ ok: true, platform: saved.platform, sandbox: saved.sandbox }, 200, { "Cache-Control": "no-store" });
+});
+
+api.delete("/devices/push-token", async (c) => {
+  const body = await parse(c, zPushTokenDeleteBody);
+  if (body instanceof Response) return body;
+  const removed = await storeFor(c.env, c.get("userId")).deletePushToken(body.token.toLowerCase());
+  logEvent("push_token_deleted", { removed });
+  return c.body(null, 204);
+});
+
 // ---- task views and verbs for thin clients (src/api/tasksRest.ts) ----
 
+// The same socket for a companion device (docs/COMPANION_DEVICES_SPEC.md §4):
+// it has no task store, so it takes no sync device slot. It carries a revision
+// number only.
+api.get("/tasks/live", liveSocket);
 api.route("/tasks", tasksRest);
 
 api.post("/pair/approve", async (c) => {
@@ -465,8 +523,10 @@ api.get("/entitlement", async (c) => {
   const state = await planFor(c.env, userId, [keys.connectorWrites, keys.agentRuns]);
   const store = storeFor(c.env, userId);
   const sid = c.get("sid");
-  const devices = await store.deviceSummary(state.limits.devices);
   const now = Date.now();
+  const devices = await store.deviceSummary(state.limits.devices, now);
+  const syncingDevices = devices.filter((d) => d.syncing).length;
+  const hasFreeSlot = syncingDevices < (state.limits.devices ?? Infinity);
   return c.json({
     userId,
     appAccountToken,
@@ -484,9 +544,10 @@ api.get("/entitlement", async (c) => {
       agentRunsThisMonth: state.usage[keys.agentRuns],
     },
     device: {
-      // A device that never synced yet takes a free slot on its first sync.
-      syncing: sid ? (devices.find((d) => d.sid === sid)?.syncing ?? devices.filter((d) => d.syncing).length < (state.limits.devices ?? Infinity)) : true,
-      syncingDevices: devices.filter((d) => d.syncing).length,
+      // A device that holds a slot, or any device when a slot is free
+      // (including after 14 days of holder inactivity), syncs on its next call.
+      syncing: sid ? ((devices.find((d) => d.sid === sid)?.syncing ?? false) || hasFreeSlot) : true,
+      syncingDevices,
       knownDevices: devices.length,
     },
   });
@@ -494,13 +555,29 @@ api.get("/entitlement", async (c) => {
 
 /// Moves the sync slot to this device ("sync this device instead", spec
 /// §3.2). On a capped plan the device used least recently stops syncing and
-/// keeps its local data. Free on every plan.
+/// keeps its local data. Free on every plan, limited to one manual move per
+/// 24 hours on a capped plan (spec §6.4 finding 2).
 api.post("/entitlement/device", async (c) => {
   const sid = c.get("sid");
   if (!sid) return c.json({ error: "refresh_token_first" }, 409);
-  const store = storeFor(c.env, c.get("userId"));
-  await store.claimDeviceSlot(sid, c.get("client"));
-  logEvent("device_slot_claimed", { userId: c.get("userId") });
+  const userId = c.get("userId");
+  const store = storeFor(c.env, userId);
+  let plan: PlanState | null = null;
+  try {
+    plan = await planFor(c.env, userId);
+  } catch (e) {
+    // Sync of one device is free; a failed plan read lets the move through.
+    planCheckFailed(c.env, userId, "device_slot_move", e, "open");
+  }
+  const enforce = isEnforcing(c.env);
+  const res = await store.claimDeviceSlot(sid, c.get("client"), plan?.limits.devices ?? null, enforce);
+  if (!res.ok || res.wouldBlock) {
+    const breach: LimitBreach = { limit: "devices", upsell: "second_device" };
+    if (plan && decide(c.env, userId, "device_slot_move", plan, breach) === "block") {
+      return limitRefusal(c, "device_move_rate_limited", breach);
+    }
+  }
+  logEvent("device_slot_claimed", { userId, moved: res.ok ? res.moved : false });
   return c.json({ syncing: true });
 });
 
@@ -615,7 +692,7 @@ async function adminAllowed(c: Ctx): Promise<boolean> {
   return diff === 0;
 }
 
-const zUserId = z.string().regex(/^u_[A-Za-z0-9_-]{20,64}$/);
+const zUserId = z.string().regex(USER_ID_RE);
 const zGrantName = z.string().regex(/^[a-z0-9][a-z0-9._-]{0,39}$/);
 
 api.post("/admin/grants", async (c) => {
@@ -839,9 +916,14 @@ api.get("/ical/:tokenFile", async (c) => {
 api.delete("/account", async (c) => {
   const userId = c.get("userId");
   const store = storeFor(c.env, userId);
-  const ical = await store.getIcalFeed();
+  const [ical, entitlements] = await Promise.all([store.getIcalFeed(), store.entitlements()]);
   if (ical) await c.env.TOKENS.delete(icalKvKey(ical.tokenHash));
+  // Preserve `trial-used:<userId>` in KV across account deletion so re-signing
+  // up with the same Apple id never starts a second trial (spec §6.4 finding 4).
+  if (entitlements.some((r) => r.id === TRIAL_ROW_ID)) await markTrialUsed(c.env, userId);
   await store.deleteAccount();
+  const accounts = accountStoreFor(c.env);
+  if (accounts) await accounts.deleteIdentitiesForUser(userId);
   const prefix = `u/${userId}/`;
   let cursor: string | undefined;
   do {

@@ -23,15 +23,9 @@ enum TaskStoreMode: String, Sendable {
   case backend
 
   static var current: TaskStoreMode {
-    #if SEPTASK
     return .backend
-    #else
-    return SeptenaAppGroup.defaults.string(forKey: SettingsKey.taskStoreMode)
-      .flatMap(TaskStoreMode.init(rawValue:)) ?? .cloudkit
-    #endif
   }
 
-  #if SEPTASK
   /// Tells Septena on this device that the backend owns tasks, so it freezes
   /// the CloudKit task types. Idempotent; called at every Septask launch.
   static func markDeviceBackend() {
@@ -39,7 +33,6 @@ enum TaskStoreMode: String, Sendable {
     guard defaults.string(forKey: SettingsKey.taskStoreMode) != TaskStoreMode.backend.rawValue else { return }
     defaults.set(TaskStoreMode.backend.rawValue, forKey: SettingsKey.taskStoreMode)
   }
-  #endif
 
   /// The CloudKit record types the backend owns in `backend` mode.
   static let backendOwnedRecordTypes: Set<String> = [
@@ -58,31 +51,5 @@ enum TaskStoreMode: String, Sendable {
       || name.hasPrefix(TaskAttachmentCloudKitSchema.prefix) { return true }
     if name == SettingsCloudKitSchema.singletonID { return false }
     return !name.contains(":")
-  }
-}
-
-enum TaskStoreSwitchError: LocalizedError, Equatable {
-  case unavailable
-  case notSignedIn
-  case alreadyInMode
-  case busy
-  case cloudKitNotReady(String)
-  case pendingCloudKitChanges(Int)
-  case importRefused(String)
-  case storeUnavailable(String)
-  case rollbackFailed(String)
-
-  var errorDescription: String? {
-    switch self {
-    case .unavailable: return "Only the Septena task app can change where tasks sync."
-    case .notSignedIn: return "Sign in to the task backend first."
-    case .alreadyInMode: return "Tasks already sync this way."
-    case .busy: return "A switch is already running."
-    case .cloudKitNotReady(let why): return why
-    case .pendingCloudKitChanges(let n): return "\(n) task changes still wait to sync to iCloud. Try again when they are sent."
-    case .importRefused(let why): return why
-    case .storeUnavailable(let why): return "The sync queue could not be opened (\(why))."
-    case .rollbackFailed(let why): return "Copy back to iCloud did not finish: \(why)"
-    }
   }
 }

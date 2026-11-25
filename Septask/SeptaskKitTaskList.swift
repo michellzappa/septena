@@ -280,6 +280,10 @@ final class SeptaskKitTaskListController: NSViewController {
   private var foldingComposerIDs: Set<String> = []
   private var checklistCounts: [String: (done: Int, total: Int)] = [:]
   private var attachmentCounts: [String: Int] = [:]
+  /// The kind of a task's `from` reference, for the row icon.
+  private var fromRefKinds: [String: String] = [:]
+  /// The newest `issue` reference of the Review rows.
+  private var issueRefs: [String: TaskRefRow] = [:]
   private var tagsByID: [String: TaskTag] = [:]
   private var activeTagFilterIDs: Set<String> = []
 
@@ -303,6 +307,9 @@ final class SeptaskKitTaskListController: NSViewController {
   /// Tab pressed while the list holds focus — the window owns moving focus
   /// to the sidebar (see `focusList()`'s sibling, `focusSidebar()`).
   var onFocusSidebar: (() -> Void)?
+  /// True while the split view's sidebar is visible on screen. When true, the
+  /// page title renders as plain static text without a navigation dropdown.
+  private var isSidebarVisible = true
 
   private var context: ModelContext { LocalStore.shared.container.mainContext }
 
@@ -846,6 +853,21 @@ final class SeptaskKitTaskListController: NSViewController {
     refreshReminders()
   }
 
+  /// Update the page-title cell when the split view's sidebar collapses or
+  /// expands — showing the dropdown chevron/menu only when the sidebar is
+  /// hidden, without reloading the table or disturbing open edits.
+  func setSidebarVisible(_ visible: Bool) {
+    guard isSidebarVisible != visible else { return }
+    isSidebarVisible = visible
+    guard let row = rows.firstIndex(where: {
+      if case .screenTitle = $0 { return true }
+      return false
+    }),
+    let cell = tableView.view(atColumn: 0, row: row, makeIfNecessary: false) as? KitScreenTitleCell
+    else { return }
+    cell.setShowsNavMenu(!isSidebarVisible)
+  }
+
   /// Hide the window title while this page's own big title is on screen, show
   /// it once that title has scrolled out — the shell's only header. Pages with
   /// no `screenTitle` row (none today, but the row is optional) keep it shown.
@@ -1020,6 +1042,8 @@ final class SeptaskKitTaskListController: NSViewController {
     heldReload = false
     checklistCounts = LocalCache.checklistSummaryByTask(in: context)
     attachmentCounts = SeptenaServices.shared.taskAttachmentStore.attachmentCountsByTask()
+    fromRefKinds = LocalCache.fromRefKinds(in: context)
+    issueRefs = filter == .review ? LocalCache.newestIssueRefs(in: context) : [:]
     tagsByID = LocalCache.tagsByID(in: context)
 
     let locallyChanged = locallyChanged.union(takePendingReloadIDs())
@@ -2546,6 +2570,17 @@ final class SeptaskKitTaskListController: NSViewController {
     }
   }
 
+  /// Add Reference for the selected row, anchored to it.
+  func presentAddReference() {
+    commitComposerTextIfOpen()
+    guard TaskRefActions.canAdd, let task = actionableSelection.first,
+          case .rect(let rect, let host)? = selectedRowAnchor else {
+      NSSound.beep()
+      return
+    }
+    SeptaskKitAddReferencePopover.present(taskID: task.id, relativeTo: rect, of: host)
+  }
+
   private func toggleTagFilter(_ tagID: String) {
     if activeTagFilterIDs.contains(tagID) {
       activeTagFilterIDs.remove(tagID)
@@ -3689,9 +3724,17 @@ final class SeptaskKitTaskListController: NSViewController {
     // `heightOfRow` — `wireComposer` ran inside `viewFor:`, before the table
     // gave the cell its frame, so a title that wraps was still an unknown.
     // Without this the row opens one line tall and jumps on the next pass.
+    // Also flush the cell's initial layout with animations disabled BEFORE
+    // `animateComposerHeight` starts: otherwise its first Auto Layout pass
+    // runs inside the implicit-animation context and visibly shifts the title.
     if let cell = tableView.view(atColumn: 0, row: row, makeIfNecessary: false)
         as? KitComposerCell {
       composerRowHeight = cell.expandedHeight
+      NSAnimationContext.runAnimationGroup { ctx in
+        ctx.duration = 0
+        ctx.allowsImplicitAnimation = false
+        cell.layoutSubtreeIfNeeded()
+      }
     }
     refreshCardGeometry()
     tableView.scrollRowToVisible(row)
@@ -3781,8 +3824,8 @@ final class SeptaskKitTaskListController: NSViewController {
     // Put the row and its neighbours in their CLOSED look before the shrink,
     // the mirror of `beginComposing`, which applies the open look before it
     // grows. Done at the end instead, the composing card style rode the whole
-    // shrink and then everything snapped at once (neighbours rejoining,
-    // corners squaring, selection wash back): the janky fold.
+    // shrink and then everything snapped at once (glass backdrop restored,
+    // selection wash back): the janky fold.
     refreshCardGeometry()
     foldingComposerIDs.insert(taskId)
     animateComposerHeight(ofRow: row, animated: animated, reveal: false) { [weak self] in
@@ -4121,6 +4164,9 @@ final class SeptaskKitTaskListController: NSViewController {
         guard !selection.isEmpty else { return nil }
         let allStarred = selection.allSatisfy(\.starred)
         return .init(variant: allStarred ? .remove : .add) { self.toggleStarSelection() }
+      case "task.addReference":
+        guard single != nil, TaskRefActions.canAdd else { return nil }
+        return .init { self.presentAddReference() }
       case "task.tags", "task.when", "task.deadline": return .init { self.openPicker(action: id) }
       case "task.reminder":
         guard single != nil else { return nil }
@@ -4686,7 +4732,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
         return composerRowHeight ?? KitComposerCell.baseHeight
       }
       if filter == .review {
-        return KitReviewTaskCell.height(for: task,
+        return KitReviewTaskCell.height(for: task, issue: issueRefs[task.id],
                                         contextText: KitListPath.text(for: task, in: context),
                                         width: tableView.bounds.width)
       }
@@ -4744,39 +4790,20 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
     rowView.isEditingTitle = taskId != nil && taskId == editingTaskId
     if rows[row].isCardRow {
       rowView.isCard = true
-      // The open composer is its own rounded slice (Things' elevated edit
-      // card) — it breaks the card run so neighbors round off against it
-      // instead of squaring into a mid-card join that no longer exists.
-      // `!isComposingRow(...)`, NOT `task?.id != composingTaskId`. That
-      // comparison is the same `Optional == Optional` trap the comment above
-      // describes, and it was still live here: a TASKLESS card row (the
-      // reminder rows, the "New task" line, calendar events, the bulk-import
-      // line) has `task?.id == nil`, so with nothing composing the test read
-      // `nil != nil` → false → "my neighbour isn't on the card" → both rows
-      // rounded off and the Inbox rendered as two stacked cards with a gap
-      // instead of one run. Any run containing a taskless row was segmented.
-      let previousOnCard = row > 0
-        && rows[row - 1].isCardRow
-        && !isComposingRow(row - 1)
-      let nextOnCard = row + 1 < rows.count
-        && rows[row + 1].isCardRow
-        && !isComposingRow(row + 1)
-      rowView.isFirstInGroup = composing || !previousOnCard
-      rowView.isLastInGroup = composing || !nextOnCard
+      // Every card row — including an open inline composer (create or edit) —
+      // rides inside its continuous card run and inherits the corner rounding
+      // of its group position (top / middle / bottom / solo), so neither the
+      // composer nor its adjacent closed rows round off mid-group (#204).
+      let previousOnCard = row > 0 && rows[row - 1].isCardRow
+      let nextOnCard = row + 1 < rows.count && rows[row + 1].isCardRow
+      rowView.isFirstInGroup = !previousOnCard
+      rowView.isLastInGroup = !nextOnCard
     } else {
       rowView.isCard = false
     }
     applySelectionJoins(rowView, atRow: row)
     applyDropLine(rowView, atRow: row)
     rowView.needsDisplay = true
-  }
-
-  /// Is the row at `index` the one currently expanded into the composer?
-  /// False for every taskless row, which is the point — see the note in
-  /// `applyCardGeometry`.
-  private func isComposingRow(_ index: Int) -> Bool {
-    guard let composingTaskId, let id = rows[index].task?.id else { return false }
-    return id == composingTaskId
   }
 
   /// Selection-run joins for contiguous multi-select rounding. Only joins
@@ -5282,10 +5309,11 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       let identifier = NSUserInterfaceItemIdentifier("screenTitleCell")
       let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? KitScreenTitleCell
         ?? KitScreenTitleCell(identifier: identifier)
-      cell.configure(title: title, icon: icon)
-      // The title IS the navigation dropdown (Things-style) — same contract
-      // as SwiftUI's `TaskNavMenu`. Built fresh per click via the closure
-      // rather than once here, so it can never show a stale structure.
+      cell.configure(title: title, icon: icon, showsNavMenu: !isSidebarVisible)
+      // The title IS the navigation dropdown (Things-style) when the sidebar is
+      // collapsed — same contract as SwiftUI's `TaskNavMenu`. Built fresh per
+      // click via the closure rather than once here, so it can never show a
+      // stale structure.
       cell.onOpenNavMenu = { [weak self] in self?.buildNavMenu() }
       if case .area(let areaID) = filter {
         cell.onPickGlyph = { [weak self] anchor in
@@ -5408,7 +5436,8 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
         let identifier = NSUserInterfaceItemIdentifier("reviewTaskCell")
         let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? KitReviewTaskCell
           ?? KitReviewTaskCell(identifier: identifier)
-        cell.configure(with: task, contextText: KitListPath.text(for: task, in: context))
+        cell.configure(with: task, issue: issueRefs[task.id],
+                       contextText: KitListPath.text(for: task, in: context))
         cell.onAccept = { [weak self] id in self?.acceptReviewTask(id: id) }
         cell.onSendBack = { [weak self] id in self?.openSendBack(taskID: id) }
         return cell
@@ -5420,6 +5449,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
                      contextText: taskContextText(for: task),
                      checklistSummary: checklistCounts[task.id],
                      attachmentCount: attachmentCounts[task.id] ?? 0,
+                     fromKind: fromRefKinds[task.id].map(RegistryTaskReferences.kind),
                      tags: LocalCache.resolvedTags(for: task, tagsByID: tagsByID))
       cell.configureSuggestion(suggestion) { [weak self] in
         self?.applyFilingSuggestion(taskID: task.id)
@@ -5538,8 +5568,9 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
   private let agentGlyph = NSImageView()
   private let chip = KitChipView()
   private let statusChip = KitChipView()
-  private let issueChip = KitChipView()
   private let suggestionChip = KitSuggestionChipView()
+  /// The item the task was created from (its `from` reference).
+  private let fromGlyph = NSImageView()
   private let scheduleGlyph = NSImageView()
   private let detail = NSTextField(labelWithString: "")
   private let reminderGlyph = NSImageView()
@@ -5615,6 +5646,14 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     // The row's accessibility label speaks the provenance (`TaskA11y.rowLabel`).
     agentGlyph.kitA11yIgnore()
     agentGlyph.isHidden = true
+
+    fromGlyph.translatesAutoresizingMaskIntoConstraints = false
+    fromGlyph.contentTintColor = SeptaskKitTheme.iconMuted
+    fromGlyph.setContentHuggingPriority(.required, for: .horizontal)
+    fromGlyph.setContentCompressionResistancePriority(.required, for: .horizontal)
+    // The row's accessibility label speaks it, as for the agent glyph.
+    fromGlyph.kitA11yIgnore()
+    fromGlyph.isHidden = true
 
     detail.lineBreakMode = .byClipping
     detail.isEditable = false
@@ -5719,10 +5758,10 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     let trailingShove = NSView()
     trailingShove.setContentHuggingPriority(.defaultLow, for: .horizontal)
     trailingShove.setContentCompressionResistancePriority(.fittingSizeCompression, for: .horizontal)
-    let trailing = NSStackView(views: [trailingShove, suggestionChip, issueChip, chip, statusChip,
+    let trailing = NSStackView(views: [trailingShove, suggestionChip, chip, statusChip,
                                       tagStack, attachmentGlyph, attachmentLabel,
                                       checklistGlyph, checklistLabel, reminderGlyph, reminderLabel,
-                                      scheduleGlyph, detail, repeatGlyph, starGlyph, notesGlyph, agentGlyph])
+                                      scheduleGlyph, detail, repeatGlyph, starGlyph, fromGlyph, notesGlyph, agentGlyph])
     trailing.orientation = .horizontal
     trailing.alignment = .centerY
     trailing.distribution = .fill
@@ -5744,7 +5783,6 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     trailing.kitA11yIgnore()
     chip.kitA11yIgnore()
     statusChip.kitA11yIgnore()
-    issueChip.kitA11yIgnore()
 
     addSubview(checkbox)
     addSubview(title)
@@ -5829,6 +5867,7 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
                  contextText: String?,
                  checklistSummary: (done: Int, total: Int)? = nil,
                  attachmentCount: Int = 0,
+                 fromKind: RegistryTaskReferenceKind? = nil,
                  tags: [TaskTag] = []) {
     taskId = task.id
     plainTitle = task.title
@@ -5842,7 +5881,7 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
       agentGlyph.isHidden = true
       chip.isHidden = true
       statusChip.isHidden = true
-      issueChip.isHidden = true
+      fromGlyph.isHidden = true
       tagStack.isHidden = true
       attachmentGlyph.isHidden = true
       attachmentLabel.isHidden = true
@@ -5896,7 +5935,7 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     }
     // The whole row fades, checkbox included: same curve as `CheckableRow`.
     let fade = CGFloat(TaskFade.rowOpacity(checkbox.tenureFill))
-    for view in [checkbox, title, notesGlyph, agentGlyph, chip, statusChip, issueChip, suggestionChip,
+    for view in [checkbox, title, notesGlyph, agentGlyph, fromGlyph, chip, statusChip, suggestionChip,
                  tagStack, attachmentGlyph, attachmentLabel, checklistGlyph, checklistLabel,
                  reminderGlyph, reminderLabel, scheduleGlyph, detail, repeatGlyph, starGlyph] as [NSView] {
       view.alphaValue = fade
@@ -5936,18 +5975,15 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     // SwiftUI row): an agent-authored row never also wears the notes glyph.
     notesGlyph.isHidden = !hasNotes || task.isAgentAuthored
     agentGlyph.isHidden = !task.isAgentAuthored
+    fromGlyph.isHidden = fromKind == nil
+    fromGlyph.image = fromKind.flatMap {
+      NSImage(systemSymbolName: $0.sfSymbol, accessibilityDescription: nil)?
+        .withSymbolConfiguration(.init(pointSize: 10, weight: .regular))
+    }
     // The chip and the inline title suffix answer the SAME question — "which
     // list is this in" — so a row never wears both. The suffix wins where it
     // is shown (flat Today): it sits on the title line where the eye already
     // is, and a pill repeating it on the far right is noise, not emphasis.
-    if let issue = task.linkedIssue {
-      issueChip.isHidden = false
-      issueChip.configure(symbol: issue.symbolName, title: issue.shortLabel)
-      issueChip.toolTip = "\(issue.fullLabel) (\(issue.owner)/\(issue.repo))"
-    } else {
-      issueChip.isHidden = true
-      issueChip.toolTip = nil
-    }
     if let chipValue, contextText == nil {
       chip.isHidden = false
       chip.configure(symbol: chipValue.symbol, title: chipValue.title)
@@ -6019,7 +6055,8 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     setAccessibilityLabel(TaskA11y.rowLabel(title: task.title,
                                             hasNotes: hasNotes,
                                             isHeading: false,
-                                            addedBy: task.isAgentAuthored ? task.addedByPhrase : nil))
+                                            addedBy: task.isAgentAuthored ? task.addedByPhrase : nil,
+                                            createdFrom: fromKind?.label))
     setAccessibilityRoleDescription(nil)
   }
 
@@ -6139,7 +6176,10 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     title.isEditable = true
     // Truncation while the field editor is attached makes AppKit fight the
     // insertion-point scroll — the caret jumps to the far right as you type
-    // or arrow through a long title. Clip for the duration of the edit.
+    // or arrow through a long title. Clip and scroll horizontally for the
+    // duration of the edit so a long title never reflows vertically.
+    title.usesSingleLineMode = true
+    title.cell?.isScrollable = true
     title.lineBreakMode = .byClipping
     title.cell?.truncatesLastVisibleLine = false
     // Keep the configure-time font (taskTitle / heading) on the plain string
@@ -6154,17 +6194,22 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     window?.makeFirstResponder(title)
     // Field editor inherits the text field's frame (now full-width via the
     // trailing pin) and defaults to an opaque white fill — clear it so rename
-    // reads as in-row text, same as the composer title. Also re-assert font:
-    // the shared field editor can carry a stale face from a prior edit.
+    // reads as in-row text, same as the composer title. Also re-assert font
+    // and container geometry: the window's shared field editor can carry a
+    // stale face or textContainerInset from another control in the window,
+    // which visibly shifted the title vertically on first responder.
     if let editor = title.currentEditor() as? NSTextView {
       editor.drawsBackground = false
       editor.backgroundColor = .clear
       editor.insertionPointColor = .labelColor
+      editor.textContainerInset = .zero
+      editor.textContainer?.lineFragmentPadding = 2
       editor.font = font
       editor.typingAttributes = [
         .font: font,
         .foregroundColor: NSColor.labelColor,
       ]
+      editor.enclosingScrollView?.contentView.scroll(to: .zero)
       editor.selectAll(nil)
     }
   }
@@ -6179,6 +6224,8 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     guard editing else { return }
     editing = false
     title.isEditable = false
+    title.usesSingleLineMode = false
+    title.cell?.isScrollable = false
     title.lineBreakMode = .byTruncatingTail
     title.cell?.truncatesLastVisibleLine = true
     onRename?(taskId, title.stringValue)
@@ -6195,6 +6242,8 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     editing = false
     _ = title.abortEditing()
     title.isEditable = false
+    title.usesSingleLineMode = false
+    title.cell?.isScrollable = false
     title.lineBreakMode = .byTruncatingTail
     title.cell?.truncatesLastVisibleLine = true
     return text
@@ -6411,29 +6460,36 @@ final class KitEventCell: NSTableCellView {
 // MARK: - Project/area screen title
 
 /// The page's own big title — an area's emoji/dot or a project's completion
-/// ring, plus its name at a larger rung than an in-list group header. The
-/// title IS the navigation dropdown (Things-style, matching SwiftUI's
-/// `TaskNavMenu`/`ScreenTitleMenuLabel`) — clicking it (or the trailing
-/// chevron) jumps anywhere without the sidebar.
+/// ring, plus its name at a larger rung than an in-list group header. When the
+/// sidebar is collapsed (`showsNavMenu == true`), the title IS the navigation
+/// dropdown (Things-style, matching SwiftUI's `TaskNavMenu`/
+/// `ScreenTitleMenuLabel`); when the sidebar is visible, it renders as a plain
+/// static heading without the chevron or menu popup.
 @MainActor
 final class KitScreenTitleCell: NSTableCellView {
   private let icon = NSImageView()
   private let emoji = NSTextField(labelWithString: "")
-  /// The title + chevron ARE the control — a real `NSButton`, not a label with
-  /// hand-tracked mouse handling. Three attempts to make a custom view receive
-  /// this click failed at the event layer (a click recognizer, then
-  /// mouseDown/mouseUp overrides, then a `hitTest` override); an `NSControl`
-  /// is what `NSTableView` is built to host in a cell, and it brings its own
-  /// tracking, highlight, accessibility, and keyboard activation. This is the
-  /// "use standard components, never get creative" rule in CLAUDE.md, arrived
-  /// at the hard way.
+  /// The title + chevron ARE the control when the sidebar is collapsed — a real
+  /// `NSButton`, not a label with hand-tracked mouse handling. Three attempts
+  /// to make a custom view receive this click failed at the event layer (a
+  /// click recognizer, then mouseDown/mouseUp overrides, then a `hitTest`
+  /// override); an `NSControl` is what `NSTableView` is built to host in a
+  /// cell, and it brings its own tracking, highlight, accessibility, and
+  /// keyboard activation. This is the "use standard components, never get
+  /// creative" rule in CLAUDE.md, arrived at the hard way.
   private let button = NSButton()
+  /// Plain static heading shown instead of `button` while the sidebar is
+  /// visible on screen — full-strength label ink, no chevron, no press
+  /// highlight, and static-text accessibility.
+  private let titleLabel = NSTextField(labelWithString: "")
+  private var showsNavMenu = false
   /// Glyph CENTER on the checkbox axis (`SeptaskKitLayout.leadingGlyphCenterX`).
   private var leadingConstraint: NSLayoutConstraint!
   /// Title button leading, pinned to the content inset — independent of the
   /// glyph, so re-centering the glyph never moves the title.
   private var buttonLeadingConstraint: NSLayoutConstraint!
   private var trailingConstraint: NSLayoutConstraint!
+  private var labelTrailingConstraint: NSLayoutConstraint!
   /// Builds the dropdown fresh on every click — see the call site's comment
   /// on why this isn't built once and cached. Optional-returning to match
   /// the `[weak self]` closure the controller wires it up with.
@@ -6474,6 +6530,14 @@ final class KitScreenTitleCell: NSTableCellView {
     // the same jumps are already on the menu bar. Matches the checkbox.
     button.refusesFirstResponder = true
     button.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+    button.isHidden = true
+
+    titleLabel.translatesAutoresizingMaskIntoConstraints = false
+    titleLabel.font = Self.font
+    titleLabel.textColor = .labelColor
+    titleLabel.lineBreakMode = .byTruncatingTail
+    titleLabel.maximumNumberOfLines = 1
+    titleLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
     glyphButton.translatesAutoresizingMaskIntoConstraints = false
     glyphButton.isBordered = false
@@ -6491,6 +6555,7 @@ final class KitScreenTitleCell: NSTableCellView {
     addSubview(icon)
     addSubview(emoji)
     addSubview(button)
+    addSubview(titleLabel)
     addSubview(glyphButton)
     leadingConstraint = icon.centerXAnchor.constraint(
       equalTo: leadingAnchor,
@@ -6499,6 +6564,8 @@ final class KitScreenTitleCell: NSTableCellView {
       equalTo: leadingAnchor,
       constant: KitCardRowView.horizontalInset + SeptaskKitLayout.screenTitleLeading)
     trailingConstraint = button.trailingAnchor.constraint(
+      lessThanOrEqualTo: trailingAnchor, constant: -(KitCardRowView.horizontalInset + 8))
+    labelTrailingConstraint = titleLabel.trailingAnchor.constraint(
       lessThanOrEqualTo: trailingAnchor, constant: -(KitCardRowView.horizontalInset + 8))
     NSLayoutConstraint.activate([
       leadingConstraint,
@@ -6513,6 +6580,9 @@ final class KitScreenTitleCell: NSTableCellView {
       glyphButton.heightAnchor.constraint(equalToConstant: 28),
       button.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -8),
       trailingConstraint,
+      titleLabel.leadingAnchor.constraint(equalTo: button.leadingAnchor),
+      titleLabel.firstBaselineAnchor.constraint(equalTo: button.firstBaselineAnchor),
+      labelTrailingConstraint,
     ])
   }
 
@@ -6524,7 +6594,7 @@ final class KitScreenTitleCell: NSTableCellView {
 
   /// Fired by the button's own target/action — no hand-tracked mouse handling.
   @objc private func openNavMenu() {
-    guard let menu = onOpenNavMenu?() else { return }
+    guard showsNavMenu, let menu = onOpenNavMenu?() else { return }
     // Dropped from the button's own bottom-left, the standard pull-down
     // geometry. `popUp(positioning:at:in:)` takes the point in the anchor
     // view's coordinates; `NSButton` is unflipped, so its bottom edge is y=0.
@@ -6535,11 +6605,12 @@ final class KitScreenTitleCell: NSTableCellView {
 
   /// The pointing-hand cursor is the platform's "this is a link/button"
   /// signal — matches `KitGroupHeaderCell`'s navigable headers. Scoped to the
-  /// BUTTON's frame now, not the whole cell: the cursor should promise a click
-  /// only where one actually lands. (The old whole-cell rect was what made the
-  /// dead title look live for three rounds of debugging.)
+  /// BUTTON's frame now, not the whole cell, and only active while the nav
+  /// dropdown is enabled (sidebar collapsed).
   override func resetCursorRects() {
-    addCursorRect(button.frame, cursor: .pointingHand)
+    if showsNavMenu {
+      addCursorRect(button.frame, cursor: .pointingHand)
+    }
   }
 
   /// Same width-dependent centered-column margin as every other row.
@@ -6548,16 +6619,33 @@ final class KitScreenTitleCell: NSTableCellView {
     leadingConstraint.constant = inset + SeptaskKitLayout.leadingGlyphCenterX
     buttonLeadingConstraint.constant = inset + SeptaskKitLayout.screenTitleLeading
     trailingConstraint.constant = -(inset + 8)
+    labelTrailingConstraint.constant = -(inset + 8)
     super.layout()
   }
 
-  func configure(title titleText: String, icon iconKind: SeptaskKitTaskListController.GroupIcon) {
+  func setShowsNavMenu(_ shows: Bool) {
+    guard showsNavMenu != shows else { return }
+    showsNavMenu = shows
+    button.isHidden = !shows
+    titleLabel.isHidden = shows
+    window?.invalidateCursorRects(for: self)
+  }
+
+  func configure(title titleText: String,
+                 icon iconKind: SeptaskKitTaskListController.GroupIcon,
+                 showsNavMenu: Bool) {
     // `attributedTitle`, not `title`: a borderless NSButton otherwise paints
     // its label in the control's default color, which loses the page title's
-    // full-strength ink.
-    button.attributedTitle = NSAttributedString(
+    // full-strength ink. Populate both the button and the static label so
+    // their baselines always match with zero shift when toggling the sidebar.
+    let attributed = NSAttributedString(
       string: titleText,
       attributes: [.font: Self.font, .foregroundColor: NSColor.labelColor])
+    button.attributedTitle = attributed
+    titleLabel.attributedStringValue = attributed
+    self.showsNavMenu = showsNavMenu
+    button.isHidden = !showsNavMenu
+    titleLabel.isHidden = showsNavMenu
     emoji.isHidden = true
     icon.isHidden = false
     switch iconKind {
@@ -6574,8 +6662,8 @@ final class KitScreenTitleCell: NSTableCellView {
         .withSymbolConfiguration(.init(pointSize: 14, weight: .medium))
       icon.contentTintColor = SeptaskKitTheme.inkSecondary
     }
-    // The BUTTON is the accessibility element now — it carries the press
-    // action natively, so the cell doesn't need to fake one.
+    // The visible control (`button` when the dropdown is active, `titleLabel`
+    // otherwise) is the accessibility element directly.
     setAccessibilityElement(false)
     button.setAccessibilityLabel(TaskA11y.navigationTitle(titleText))
     // A reused cell carries a stale cursor rect otherwise — matches

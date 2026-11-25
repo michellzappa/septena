@@ -316,7 +316,13 @@ struct AreaDetailView: View {
       VStack(alignment: .leading, spacing: 0) {
         VStack(alignment: .leading, spacing: 10) {
           HStack(spacing: Theme.iconTextGap) {
-            Button { showingEmojiEditor = true } label: {
+            Button {
+              notesFocused = false
+              #if os(iOS)
+              Haptics.press()
+              #endif
+              showingEmojiEditor = true
+            } label: {
               AreaIcon(diameter: Theme.checkboxTap,
                        emoji: draftEmoji.isEmpty ? nil : draftEmoji)
                 .frame(width: Theme.checkboxTap, height: Theme.checkboxTap)
@@ -324,12 +330,15 @@ struct AreaDetailView: View {
                 .inlineHover(capsule: true)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Emoji")
             .popover(isPresented: $showingEmojiEditor) {
               EmojiPickerContent(emoji: $draftEmoji) { commitEmoji($0) }
             }
             ClickToEditTitle(placeholder: "Area", text: $draftName,
                              onCommit: { commitName($0) }) {
-              TaskNavMenu { NavMenuChevron() }
+              if nav.showsTitleNavMenu(usesPushNavigation: usesPushNavigation) {
+                TaskNavMenu { NavMenuChevron() }
+              }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
           }
@@ -376,7 +385,7 @@ struct AreaDetailView: View {
     }
     .septenaToastOverlay(store: toastStore)
     .septenaInlineTitle()
-    #if os(iOS) && SEPTASK
+    #if os(iOS)
     .toolbar {
       if !usesPushNavigation {
         ToolbarItem(placement: .topBarTrailing) { QuickFindToolbarButton() }
@@ -567,6 +576,7 @@ struct AreaDetailView: View {
 struct ProjectDetailView: View {
   let project: Project
   @Environment(DayClock.self) private var clock
+  @Environment(NavigationState.self) private var nav
   @Environment(ProjectsMutator.self) private var projectsMutator
   @Environment(\.dismiss) private var dismiss
   @Environment(\.modelContext) private var modelContext
@@ -636,7 +646,9 @@ struct ProjectDetailView: View {
               .offset(x: -Theme.checkboxLeadingNudge)
             ClickToEditTitle(placeholder: "Project", text: $draftName,
                              onCommit: { commitNameTo($0) }) {
-              TaskNavMenu { NavMenuChevron() }
+              if nav.showsTitleNavMenu(usesPushNavigation: usesPushNavigation) {
+                TaskNavMenu { NavMenuChevron() }
+              }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
           }
@@ -734,11 +746,7 @@ struct ProjectDetailView: View {
   /// just like macOS.
   @ToolbarContentBuilder
   private var projectDetailToolbar: some ToolbarContent {
-    #if os(iOS) && !SEPTASK
-    if !usesPushNavigation {
-      ToolbarItem(placement: .primaryAction) { projectOverflowMenu }
-    }
-    #elseif os(iOS) && SEPTASK
+    #if os(iOS)
     if !usesPushNavigation {
       ToolbarItem(placement: .topBarTrailing) { projectOverflowMenu }
       ToolbarItem(placement: .topBarTrailing) { QuickFindToolbarButton() }

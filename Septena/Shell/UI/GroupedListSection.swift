@@ -17,84 +17,7 @@ extension View {
   }
 }
 
-/// Plain grouped-list section title — "Tasks Today", "Coaches", "Suggested", …
-@ViewBuilder
-func sectionGroupHeader(_ title: String) -> some View {
-  Text(title).sectionGroupHeaderTitleStyle()
-}
-
 // MARK: - Section wrapper
-
-/// Header chrome for a grouped `List` section. macOS parks the header in the
-/// scroll content (Tasks rhythm); iOS uses the native `Section` header slot.
-@ViewBuilder
-func groupedListSectionHeader<Content: View>(@ViewBuilder content: () -> Content) -> some View {
-  #if os(macOS)
-  content()
-    .textCase(nil)
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .padding(.leading, TaskCardMetrics.headerLeading)
-    .padding(.trailing, TaskCardMetrics.margin)
-    .padding(.top, 24)
-    .padding(.bottom, 8)
-  #else
-  content()
-    .textCase(nil)
-  #endif
-}
-
-/// Grouped `List` section without a footer — Next open blocks, suggestions, …
-@ViewBuilder
-func groupedListSection<Header: View, Content: View>(
-  @ViewBuilder header: () -> Header,
-  @ViewBuilder content: () -> Content
-) -> some View {
-  #if os(macOS)
-  Section {
-    groupedListSectionHeader(content: header)
-      .listRowInsets(EdgeInsets())
-      .listRowSeparator(.hidden)
-      .listRowBackground(Color.clear)
-      .selectionDisabled()
-    content()
-  }
-  #else
-  Section {
-    content()
-  } header: {
-    groupedListSectionHeader(content: header)
-  }
-  #endif
-}
-
-/// Grouped `List` section with explanatory footer copy — Coach bands.
-@ViewBuilder
-func groupedListSection<Header: View, Footer: View, Content: View>(
-  @ViewBuilder header: () -> Header,
-  @ViewBuilder footer: () -> Footer,
-  @ViewBuilder content: () -> Content
-) -> some View {
-  #if os(macOS)
-  Section {
-    groupedListSectionHeader(content: header)
-      .listRowInsets(EdgeInsets())
-      .listRowSeparator(.hidden)
-      .listRowBackground(Color.clear)
-      .selectionDisabled()
-    content()
-  } footer: {
-    footer()
-  }
-  #else
-  Section {
-    content()
-  } header: {
-    groupedListSectionHeader(content: header)
-  } footer: {
-    footer()
-  }
-  #endif
-}
 
 // MARK: - Quick add
 
@@ -162,32 +85,5 @@ struct HeaderQuickAddButton: View {
                   relativeTo: .title2)
       .foregroundStyle(accent ?? Theme.inkSecondary)
       .contentShape(Circle())
-  }
-}
-
-/// Grouped-list section title with an optional trailing quick-add "+".
-struct ListSectionHeaderTitle: View {
-  let title: String
-  var onAdd: (() -> Void)? = nil
-  var addAccessibilityLabel: String = "Add"
-  var accent: Color? = nil
-  var keyboardShortcut: KeyEquivalent? = nil
-  var keyboardModifiers: EventModifiers = .command
-
-  var body: some View {
-    if let onAdd {
-      HStack {
-        sectionGroupHeader(title)
-        Spacer()
-        HeaderQuickAddButton(accessibilityLabel: addAccessibilityLabel,
-                             action: onAdd,
-                             accent: accent,
-                             placement: .listSectionHeader,
-                             keyboardShortcut: keyboardShortcut,
-                             keyboardModifiers: keyboardModifiers)
-      }
-    } else {
-      sectionGroupHeader(title)
-    }
   }
 }

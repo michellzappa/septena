@@ -1048,19 +1048,6 @@
           ]
         },
         {
-          "id": "companion",
-          "header": "Septena Life",
-          "items": [
-            {
-              "kind": "customSurface",
-              "surface": "septena_life_link",
-              "label": "Open Septena Life",
-              "detail": "Septena Life is the companion app for habits, training, food, sleep, mood, and health.",
-              "icon": "settings.companion_app"
-            }
-          ]
-        },
-        {
           "id": "advanced_link",
           "items": [
             { "kind": "pageLink", "page": "advanced", "label": "Advanced", "icon": "settings.advanced", "featureId": "settings.display" }

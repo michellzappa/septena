@@ -112,9 +112,9 @@ makes SwiftUI/SwiftData/Observation 10–50× slower on-device. Trade-off:
 step-debugging is imprecise (locals "optimized out"). For a true breakpoint
 session, temporarily flip Debug back to `-Onone`.
 
-There's no `.env`. The only build-time credential is the optional Withings dev
-pair: copy `Config/Secrets.example.xcconfig` → `Config/Secrets.xcconfig`
-(gitignored). The app builds and runs fine without it.
+There's no `.env`. Signing and update keys come from the optional
+`Config/Secrets.xcconfig` (gitignored; template `Config/Secrets.example.xcconfig`).
+The app builds fine without it.
 
 ## Versioning & changelog
 
@@ -175,8 +175,10 @@ leave it alone. (Never rewrite shared history.)
 
 **A request goes to closure** (global `~/.claude/CLAUDE.md`, "A new request:
 take it to closure", 2026-11-24): a `wt/<name>` branch in a worktree off fresh
-`origin/main`, push, PR, green CI, merge, deploy the backend when it changed
-(`cd backend && pnpm run deploy`), report. That short-lived PR branch is
+`origin/main`, push, PR, green CI, merge, deploy, report. Deployment
+is continuous (mz, 2026-11-24): CI deploys the Worker from `main`
+(`backend.yml`), and the site is deployed after every push to its `main`. Do
+not ask first; check the Deploy job. Store releases stay mz's. That short-lived PR branch is
 sanctioned; the rules below forbid long-lived forks.
 
 **Default to committing on `main`. Do NOT create branches unless the user
@@ -242,98 +244,53 @@ commit on the branch first (or let the cron do it).
 
 - **Mutators are the write boundary.** Views and App Intents must not write
   SwiftData entities directly when a mutator exists (`TaskMutator`,
-  `ChecklistMutator`, `GoalMutator`, `NutritionMutator`, …). The mutator does the
-  optimistic local update, queues the CloudKit change, saves context, and posts
-  the right notifications.
-- **Section identity vs. behavior are separate sources of truth.**
-  Identity → `SeptenaCore/Sections/SectionManifest.swift` (`SectionManifest.all`,
-  UI-free, in SeptenaCore). Behavior → a `SectionPlugin` in
-  `Septena/Shell/Sections/Plugins/<Name>Plugin.swift`, registered in
-  `SectionRegistry.all`. Joined by the string `key`.
+  `AreasMutator`, `ProjectsMutator`). The mutator does the optimistic local
+  update, queues the change for the task backend, saves context, and posts the
+  right notifications.
+- **There are no sections.** The life OS (sections, plugins, dashboards,
+  HealthKit and provider imports) left in ADR 0017. It lives in
+  `michellzappa/septena-life` and under the tag `septena-life-archive`. Do not
+  add section code, life-OS copy or a link to Septena Life.
 - **Undo is ONE shared stack** (`SeptenaCore/TaskUndo.swift`), wrapping a single
   process-wide `UndoManager`. Every task surface points at it — the AppKit
   table, the SwiftUI lists, and iOS shake / three-finger undo (the app
   delegates override `UIResponder.undoManager`, the last stop in the responder
   chain, so a focused text field still wins for typing). **Record explicitly at
   the user gesture, never inside a mutator**: the mutators also run for
-  CloudKit applies, the 30-day purge, recurrence spawning, and the watch, so
+  backend applies, the 30-day purge, recurrence spawning, and the watch, so
   recording there would put sync traffic on the undo stack and let ⌘Z "undo" an
   edit another device made.
-- **Disabling a section hides surfaces; it must never delete user data.**
-- **Section colors and enabled state are user/account data** (`SectionEntity`),
-  not hardcoded catalog facts. `SectionTheme` is the color access point for UI.
 - **Read `DayClock.today` / `DayClock.now` in views**, never `Date()` directly —
-  this is what makes day-rollover and time-travel work.
+  this is what makes day rollover work.
 - **App Intents must `await SeptenaServices.shared.start()` before mutating**
   (they can run background-launched).
-- **CloudKit push is not enough** — foreground fetch remains the reliable refresh
-  path; don't rely on remote-notification delivery for correctness.
-- **Next-feed membership is declared once** in `SeptenaCore/NextBlocks.swift`
-  (compiled into iOS + watch + mac so they can't disagree). Same single-source
-  rule for `NextWire.swift` / `DayBucket.swift`.
+- **The app does not use iCloud.** It syncs with `api.septena.app` through
+  `TaskSyncEngine` (ADR 0002). `CKEngine` never starts; it remains only because
+  the mutators still take it as a parameter. Do not build on it.
 
-## Section-shaped work
+## The Septask targets
 
-Adding or auditing a section? Follow `docs/ADDING_A_SECTION.md` — it's the
-surface-by-surface checklist (manifest row, plugin, `SectionDrawer`-wrapped
-destination, dashboard tile via `HomepageDomain` + `WeekDashboardView`,
-quick-add, time travel, MCP skill, goals, flourish, import/export, Next feed,
-watch). The classic bug: a section with a manifest row + destination but **no
-`HomepageDomain` case**, so its dashboard tile silently never renders.
+The product is Septena; the code targets keep the working names `Septask` (iOS),
+`SeptaskMac` and `SeptaskWatch` (`docs/SEPTASK.md`).
 
-## Septask — the second app target
-
-Septask is the focused task app over the SAME private CloudKit task data:
-same repo, same shared sources, a different composition root (plan + phase
-findings: `docs/SEPTASK.md`). Four app schemes now exist: `Septena`,
-`SeptenaMac`, `Septask`, `SeptaskMac`.
-
-- **Shared folders own behavior; the roots own composition.** `SeptenaCore`,
-  `Shell/Tasks`, `Shell/Sidebar`, `Shell/UI` (and listed shared files)
-  compile into both apps — edit once, both change. App-level chrome lives in
-  the roots (`Septena/App/App.swift` vs `Septask/SeptaskApp.swift`), which is
-  the ONE place that isn't shared: window styles, scenes, commands, and
-  environment injection must be kept in parity deliberately (the
-  hidden-title-bar sidebar drift came from exactly this).
-- **Septask-specific exceptions, three sizes:** (1) `#if SEPTASK` inside a
-  shared file for small branches (the target sets that compilation
-  condition); (2) a Septask-only implementation in `Septask/` (settings
-  shell, welcome, root navigation) — composition only, never task business logic;
-  (3) a `project.yml` exclude when a file shouldn't compile at all.
-  **Never copy a task file into `Septask/` to tweak it** — copies drift.
-- **After touching shared code, build all four schemes.** The compiler
+- **Shared folders own behavior; the root owns composition.** `SeptenaCore`,
+  `Septena/Shell/Tasks`, `Shell/Sidebar` and `Shell/UI` hold task behavior for
+  iOS and Mac. `Septask/` holds the app entry, launch, settings shell, root
+  navigation and the AppKit shell, never task business logic.
+- **Never copy a task file into `Septask/` to tweak it**: copies drift.
+- **No new `#if SEPTASK`.** The condition is always set in the app targets. It
+  stays in `project.yml` only until the last open branch that uses it lands.
+- **After touching shared code, build `Septask` and `SeptaskMac`.** The compiler
   catches type-level seams, but NOT the runtime one: a shared view reading a
-  new `@Environment(X.self)` crashes at launch in whichever app forgot to
-  inject it. The required-injection list lives in `docs/SEPTASK.md` ("P1
-  Findings").
+  new `@Environment(X.self)` crashes at launch if a root forgot to inject it.
+  Add it to `septenaSharedEnvironment` (`Septena/Shell/UI/SharedAppEnvironment.swift`).
 - **Keep the `Septask` and `SeptaskMac` source lists in `project.yml` in
-  lockstep** — they must stay identical (new shared-file inclusions go in
-  both).
-- Septask runs `RuntimeProfile.tasksOnly` (task/area/project mutators only,
-  no provider stores) but still mirrors the WHOLE zone locally — CKSyncEngine
-  fetches per-zone; non-task records are applied and invisible.
+  lockstep.**
 - The Septask icon is generated, not drawn: recipe in `docs/SEPTASK.md`
   ("Icon Notes").
 
 ## Known traps (from prior sessions)
 
-- **"Week" = trailing 7 days** (today + previous 6), never the calendar week.
-  Use `sinceDate(daysBack: 6)`.
-- **~~`WeekDashboardView.loadAll()` caps at ≤4 parallel HTTP calls~~ — RETIRED.**
-  This rule blamed a shared `SeptenaClient`, which no longer exists (it went
-  with the FastAPI migration). Each provider owns a private `URLSession` — there
-  is no `URLSession.shared` in the app — and every provider store is a
-  synchronous `@MainActor` method, so concurrent fetches can't interleave a
-  write to the shared SwiftData context. New launch-time fetches do NOT need to
-  be serialized on principle. Safety here is enforced by the compiler now:
-  `SWIFT_STRICT_CONCURRENCY: targeted` (project.yml), which the tree builds
-  clean under. If a launch-time crash ever does reappear, chase it as a real
-  race with the checker turned up — don't reinstate a parallelism cap.
-- **MCP gateway filters string date ranges client-side** — the CloudKit schema is
-  auto-managed and Dashboard indexes are off-limits.
-- **CloudKit Prod schema deploy is additive-only** and deploying schema does NOT
-  move data (Prod private DB starts empty). See `docs/CloudKitSchema.md` (the
-  authoritative 27-record field table) and the prod-cutover plan.
 - **macOS keyboard & focus in a `NavigationSplitView`** (a concrete case of the
   "use standard SwiftUI, never get creative" rule under Conventions): unmodified
   keys (Return, arrows) and `.onKeyPress` / unmodified `.keyboardShortcut` are
@@ -508,32 +465,29 @@ findings: `docs/SEPTASK.md`). Four app schemes now exist: `Septena`,
 2. `docs/DesignSpec.md` — the canonical design system (typography, color, the
    three-tier iconography rule, row anatomy, spacing, motion). When it conflicts
    with code, the code is wrong.
-3. `docs/CloudKitSchema.md` — field-by-field record-type table.
-4. `docs/IDENTIFIERS.md` — stable id/title model and wire contracts across app,
-   CloudKit, and the MCP gateway.
-5. `README.md` — full architecture narrative.
-6. `docs/*_HANDOFF.md`, `docs/*_PLAN.md`, `docs/BET1_*` — historical
-   migration/feature notes. **Often stale; verify against code before acting.**
+3. `docs/IDENTIFIERS.md` — stable id/title model and wire contracts across app,
+   backend, and MCP.
+4. `README.md` — architecture overview.
+5. `docs/*_HANDOFF.md`, `docs/*_PLAN.md` — historical migration/feature notes. **Often stale; verify against code before acting.**
 
 ## Layout map
 
-- `SeptenaCore/` — models, SwiftData (`Persistence.swift`), CloudKit
-  (`CloudKit/CKEngine.swift`), providers (Oura/Withings/GitHub/HealthKit/…),
-  mutators, `SeptenaServices.swift` (process-wide runtime singleton).
-- `Septena/App/` — entry (`App.swift`), root tabs, App Intents, watch bridge.
-- `Septena/Shell/` — dashboards, settings, tasks, goals, intelligence, shared UI.
-- `Septena/Sections/` — per-section destination views and sheets.
+- `SeptenaCore/` — models, SwiftData (`Persistence.swift`), task sync
+  (`TaskBackend/`), import, mutators, `SeptenaServices.swift` (process-wide
+  runtime singleton).
+- `Septena/App/` — navigation state and the shared content view.
+- `Septena/Shell/` — tasks, sidebar, settings, on-device AI, shared UI.
 - `Septask/` — Septask's composition root only (app entry, welcome, settings
   shell, root navigation, assets, entitlements). Task behavior never lives here.
   iPhone has NO tab bar: the list is the root of one navigation stack
   (ADR 0024). Never add one back, in the app or in any mock.
-- `SeptenaWatch/` + `SeptenaWatchComplication/` — watch app & complications
-  (**hand-wired per section**, not manifest-driven, except the shared Next feed).
-- `SeptenaWidgets/`, `SeptenaLiveActivitiesExtension/` — extensions.
+- `SeptaskWatch/` + `SeptaskWatchComplication/` — watch app & complication
+  (`docs/WATCH.md`). `SeptaskWidgets/`, `ShareExtension/` — extensions.
+- `android/` — the Android app. `core/` — the shared Rust core. `backend/` — the
+  task backend and MCP server. `registry/` — copy, actions and settings.
 - `appstore/` — App Store packaging (iPhone/iPad/Mac/Watch): copy in
   `docs/APPSTORE.md`, panel visuals in `appstore/panels.config.mjs`, surfaces in
-  `appstore/devices.mjs`. `appstore/capture.sh <device>` shoots raw screens
-  (iPhone/iPad via `SeptenaUITests`, Mac via `SeptenaMacUITests`), `npm run all`
+  `appstore/devices.mjs`. `appstore/capture.sh <device>` shoots raw screens, `npm run all`
   renders + validates, and the website's `/about/brand#app-store` is the review
   page (no viewer in this repo), and `appstore/upload.sh` uploads through
   fastlane deliver. It is outward-facing: run it only when mz asks; never a
@@ -596,9 +550,7 @@ findings: `docs/SEPTASK.md`). Four app schemes now exist: `Septena`,
   "selected") (`Theme.listSelectionFill`, `SeptaskKitTheme.listSelectionFill`),
   never a solid bar with white text. Selected chips use a **wash plus matching ink**
   (`SelectableChip` / `SelectableChipStyle`), contrast-safe for any tint in both
-  appearances. Related trap: `Color.accentColor` only means "the section color"
-  *inside* a `SectionDrawer` — a view pushed from a settings pane gets the
-  platform accent instead, so it must read `theme.color(for: "<key>")` explicitly.
+  appearances.
 - **Motion is gated centrally — never bare `withAnimation` / `.animation(_:value:)`.**
   Use `a11yAnimate(_:) { … }` (drop-in for `withAnimation`, no environment
   needed), `A11yMotion.run` (when `@Environment(\.a11yMotion)` is already in
@@ -652,18 +604,15 @@ findings: `docs/SEPTASK.md`). Four app schemes now exist: `Septena`,
   journal) is specified in `docs/MAKER_IDENTITY.md` — pull facts and copy blocks
   from there, never invent maker claims. Every claim must trace to its data row;
   the banned list (no "late nights" etc.) is binding.
-- Don't add FastAPI/server client code — the repo is CloudKit-first; remaining
-  FastAPI references are migration history slated for cleanup.
 - **One MCP server: the task backend connector.** It is
   `api.septena.app/mcp`, served from `backend/src/shadow/mcp.ts` (Cloudflare
   Worker / TS). The in-app macOS server (`SeptenaCore/MCP/`) was removed on
   2026-11-21 (commit `7b101882`), and the old CloudKit gateway
   (`mcp.septena.app`) was decommissioned on 2026-11-20. Docs that still
   describe "two servers, edited in lockstep" are history. An MCP tool change
-  lands in `backend/` plus the docs and skill briefs in the same change. The
-  brief at `backend/skill.md` is generated from
-  `SectionRegistry.fullSkillMarkdown()`, so keep the plugin briefs in sync
-  with the backend's tools. The agent loop (`tasks_claim`, `tasks_release`,
+  lands in `backend/` plus the docs and skill briefs in the same change. Keep
+  `backend/skill.md` and `Septena/Shell/Tasks/TasksSkill.swift` (the brief in
+  Settings ▸ MCP Skills) in sync with the backend's tools. The agent loop (`tasks_claim`, `tasks_release`,
   `tasks_agent_events`, `tasks_activity`) lives in `src/shadow/agent.ts`: a
   claim needs the Durable Object's single writer, and its rules (leases, the
   human-only stop, pause, run budget) are enforced in `TaskStore`, not in tool

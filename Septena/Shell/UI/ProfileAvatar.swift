@@ -52,7 +52,7 @@ struct ProfileAvatar: View {
 /// profile names its plan either way (ADR 0023).
 struct FreeAccountBadge: View {
   var body: some View {
-    Text("Free")
+    Text(RegistryPlans.card("free")?.title ?? "")
       .font(.caption2.weight(.semibold))
       .foregroundStyle(.secondary)
       .padding(.horizontal, 8)

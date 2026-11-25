@@ -39,12 +39,12 @@ GitHub labels: `spec`, `adr`, `ready-for-agent`, `needs-mz`, and one
 Septena and Septask leave iCloud. Data moves to the own backend
 (`api.septena.app`). See [ADR 0002](adr/0002-own-backend-replaces-icloud.md).
 The backend source is the Cloudflare Worker in `../backend/` (it also serves
-the MCP gateway on `mcp.septena.app`).
+MCP at `api.septena.app/mcp`).
 New specs design for the backend only. Docs that assume CloudKit is the
 product are stale on that point, even when the rest still holds.
 
-The task app (working name Septask) ships as **Septena** and is the primary
-product, with a paid sync subscription. The life OS becomes **Septena Life**.
+This repo is the task app, **Septena** (working name Septask), with a paid sync
+subscription. The life OS left on 2026-11-21 ([ADR 0017](adr/0017-move-septena-life-out-of-repo.md)).
 See [ADR 0007](adr/0007-septena-is-the-task-app.md).
 
 ## Index
@@ -61,7 +61,7 @@ See [ADR 0007](adr/0007-septena-is-the-task-app.md).
 | Doc | Status |
 |---|---|
 | [SEPTASK_BACKEND.md](SEPTASK_BACKEND.md) | building (migration track) |
-| [REPO_SPLIT_PLAN.md](REPO_SPLIT_PLAN.md) | proposal (#84): Septena Life moves to `septena-life` |
+| [REPO_SPLIT_PLAN.md](REPO_SPLIT_PLAN.md) | done (ADR 0017) — historical |
 | [SYNC_SUBSCRIPTION_SPEC.md](SYNC_SUBSCRIPTION_SPEC.md) | proposed (launch track) |
 | [IDENTIFIERS.md](IDENTIFIERS.md) | current |
 | [CloudKitSchema.md](CloudKitSchema.md) | current until the iCloud exit, then historical |
@@ -78,6 +78,7 @@ See [ADR 0007](adr/0007-septena-is-the-task-app.md).
 | [GITHUB_SPEC.md](GITHUB_SPEC.md) | dropped (ADR 0033) |
 | [TASK_REFERENCES_SPEC.md](TASK_REFERENCES_SPEC.md) | building (ADR 0031, ADR 0033; first release #386, #387) |
 | [PROJECT_SHARING_SPEC.md](PROJECT_SHARING_SPEC.md) | accepted |
+| [PUBLIC_LINKS_SPEC.md](PUBLIC_LINKS_SPEC.md) | proposal (#22, phase S4 of project sharing) |
 | [TASK_FACTORY_SPEC.md](TASK_FACTORY_SPEC.md) | accepted |
 | [TASK_FADE_SPEC.md](TASK_FADE_SPEC.md) | accepted (§6 amended by ADR 0014) |
 | [INBOX_ZERO_MOTION_SPEC.md](INBOX_ZERO_MOTION_SPEC.md) | accepted (#298) |
@@ -98,9 +99,10 @@ See [ADR 0007](adr/0007-septena-is-the-task-app.md).
 | [ATTACHMENTS_MAC_PARITY_SPEC.md](ATTACHMENTS_MAC_PARITY_SPEC.md) | proposal (#131) |
 | [TASK_TIMES_AND_ICAL_SPEC.md](TASK_TIMES_AND_ICAL_SPEC.md) | proposal (#128) |
 | [INLINE_CAPTURE_PARSING_SPEC.md](INLINE_CAPTURE_PARSING_SPEC.md) | proposal (#133) |
+| [RAMBLE_MODE_SPEC.md](RAMBLE_MODE_SPEC.md) | proposal (#211, ADR 0035): on-device voice capture and task-notes enrichment with shared confirm step |
 | [EMAIL_TO_TASK_SPEC.md](EMAIL_TO_TASK_SPEC.md) | proposal (#134) |
 | [NATIVE_PROJECT_SHARING_SPEC.md](NATIVE_PROJECT_SHARING_SPEC.md) | superseded by PROJECT_SHARING_SPEC |
-| [COMPANION_DEVICES_SPEC.md](COMPANION_DEVICES_SPEC.md) | proposal (ADR 0034, ADR 0035): needs-you feed, limited session, live nudge, voice for the watch and the desk orb |
+| [COMPANION_DEVICES_SPEC.md](COMPANION_DEVICES_SPEC.md) | building (ADR 0034, ADR 0035): needs-you views, limited session, live nudge, voice for the watch and the desk orb |
 | [WEB_CLIENT_SPEC.md](WEB_CLIENT_SPEC.md) | proposal (#21); WB2 uses the Rust core's WASM (ADR 0025) |
 | [CLOUDFLARE_ACCOUNT_MOVE.md](CLOUDFLARE_ACCOUNT_MOVE.md) | accepted; ADR 0018 |
 | [ANDROID_CLIENT_SPEC.md](ANDROID_CLIENT_SPEC.md) | accepted (#20); shared Kotlin core for Windows; rules move to the Rust core in C1 (ADR 0025) |
@@ -132,6 +134,7 @@ See [ADR 0007](adr/0007-septena-is-the-task-app.md).
 
 | Doc | Status |
 |---|---|
+| [CONNECTOR_DIRECTORY_SUBMISSION.md](CONNECTOR_DIRECTORY_SUBMISSION.md) | ready for mz to submit (#85): Claude & ChatGPT directory packet |
 | [agent-provenance-spec.md](agent-provenance-spec.md) | superseded in part (permanent provenance shipped 2026-11-24) |
 | [agent-provenance-gateway-handoff.md](agent-provenance-gateway-handoff.md) | landed — historical |
 | [CORE_AI_iOS27_PREP.md](CORE_AI_iOS27_PREP.md) | research, pre-implementation |
@@ -144,33 +147,17 @@ See [ADR 0007](adr/0007-septena-is-the-task-app.md).
 |---|---|
 | [DesignSpec.md](DesignSpec.md) | canonical |
 | [FEATURE_MAP.md](FEATURE_MAP.md) | generated: feature status per platform |
-| [PAGE_CHROME_SPEC.md](PAGE_CHROME_SPEC.md), [DRAWER_MODES_SPEC.md](DRAWER_MODES_SPEC.md), [GLASS_DOTS_SPEC.md](GLASS_DOTS_SPEC.md), [WAKING_DAY_WHEEL.md](WAKING_DAY_WHEEL.md) | mixed: see each status line |
+| [PAGE_CHROME_SPEC.md](PAGE_CHROME_SPEC.md), [GLASS_DOTS_SPEC.md](GLASS_DOTS_SPEC.md) | mixed: see each status line |
 | [SETTINGS_UX_SPEC.md](SETTINGS_UX_SPEC.md) | proposal (task app Settings IA + `registry/settings.json` v2, S0–S3) |
 | [CUSTOMIZATION_SPEC.md](CUSTOMIZATION_SPEC.md) | building (#196, ADR 0019; procedural Header Wash textures + exotic-fruit accents, C0–C4) |
 | [SETTINGS_FLATTEN_SPEC.md](SETTINGS_FLATTEN_SPEC.md) | superseded by SETTINGS_UX_SPEC.md |
-| [SETTINGS_REORG_PROPOSAL.md](SETTINGS_REORG_PROPOSAL.md) | life app; mostly built |
-| [FRONT_DOOR_IDENTITY.md](FRONT_DOOR_IDENTITY.md) | roadmap |
 | [LOCALIZATION_PLAN.md](LOCALIZATION_PLAN.md) | pt-BR pilot done |
 
-### Septena sections (life OS)
+### Life OS
 
-[ADDING_A_SECTION.md](ADDING_A_SECTION.md) (checklist, current),
-[SECTION_DRY_AUDIT.md](SECTION_DRY_AUDIT.md),
-[BUCKET_CONSISTENCY_SPEC.md](BUCKET_CONSISTENCY_SPEC.md),
-[ACTIVITY_CLOUD_HISTORY_PLAN.md](ACTIVITY_CLOUD_HISTORY_PLAN.md),
-[CONSUMABLES_PLAN.md](CONSUMABLES_PLAN.md) / [study](CONSUMABLES_GENERALIZATION_STUDY.md) (historical),
-[GOAL_MILESTONES_PLAN.md](GOAL_MILESTONES_PLAN.md) (shipped),
-[PINNED_GOALS_PLAN.md](PINNED_GOALS_PLAN.md),
-[MARKERS_PLAN.md](MARKERS_PLAN.md),
-[CAPTURE_DISCOVERY_SPEC.md](CAPTURE_DISCOVERY_SPEC.md),
-[SELF_DISCOVERY_PLAN.md](SELF_DISCOVERY_PLAN.md),
-[PRACTITIONER_REPORTS_SPEC.md](PRACTITIONER_REPORTS_SPEC.md) / [prototype](PRACTITIONER_REPORTS_PROTOTYPE.md),
-[PER_SET_LOGGING_SPEC.md](PER_SET_LOGGING_SPEC.md),
-[TRAINING_PT_SPEC.md](TRAINING_PT_SPEC.md),
-[MUSCLE_TAXONOMY_16.md](MUSCLE_TAXONOMY_16.md),
-[GUT_SYMPTOMS_MIGRATION_PLAN.md](GUT_SYMPTOMS_MIGRATION_PLAN.md),
-[NUTRITION_MIGRATION_HANDOFF.md](NUTRITION_MIGRATION_HANDOFF.md),
-[TRAINING_MIGRATION_HANDOFF.md](TRAINING_MIGRATION_HANDOFF.md) (historical).
+The docs that cover only the life OS were removed on 2026-11-24 (an exception to
+rule 4, because the product left the repo). They are in
+`michellzappa/septena-life` and under the tag `septena-life-archive`.
 
 ### Product and identity
 

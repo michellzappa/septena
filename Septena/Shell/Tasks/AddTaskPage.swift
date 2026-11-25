@@ -84,7 +84,7 @@ struct AddTaskPage: View {
   }
 
   var body: some View {
-    let tint = AddInfoSection.tasks.accent(theme: theme)
+    let tint = theme.accent
     List {
       if hostsTitleField {
         Section {
@@ -190,7 +190,6 @@ struct AddTaskPage: View {
       name: RegistryActions.title("app.newTask"),
       ids: [created.id], mutator: mutator,
       rebuild: { [mutator] in [saved.create(via: mutator).id] })
-    AddInfoSection.tasks.notifyTilesChanged()
     Haptics.commit()
     dismiss()
   }
@@ -201,7 +200,6 @@ struct AddTaskPage: View {
     TaskUndo.recordScheduleChange(
       name: RegistryActions.title("task.toggleToday", .add),
       before: [before], context: modelContext, mutator: mutator)
-    AddInfoSection.tasks.notifyTilesChanged()
     Haptics.commit()
     dismiss()
   }

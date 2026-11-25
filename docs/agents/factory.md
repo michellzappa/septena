@@ -60,12 +60,12 @@ Set up 2026-11-19 so planned work keeps moving without mz.
   (`ln -s /Users/mz/Dev/Septena/septena-mcp-gateway/node_modules backend/node_modules`,
   gitignored) instead of `pnpm install`: an install downloads packages, and
   downloads need mz's yes. Once that checkout is archived, ask mz before the
-  first `pnpm install --frozen-lockfile`. Deploys run from `backend/`
-  (`./node_modules/.bin/wrangler deploy`). One Worker serves both `api.septena.app` and the LIVE
-  connector `mcp.septena.app`, so `wrangler deploy` unattended only when the
-  change cannot alter any `mcp.septena.app` response (host-dispatched `api`
-  routes only). Anything else: leave it undeployed and say so first in the
-  report. Never switch mz's connector to the backend (that is M1.9).
+  first `pnpm install --frozen-lockfile`. Deployment is continuous (mz,
+  2026-11-24): a push to `main` that changes `backend/` or `registry/` deploys
+  the Worker from CI (`.github/workflows/backend.yml`). Do not ask and do not
+  wait for mz; check that the Deploy job passed and report it. A change that
+  must not be live yet does not go on `main`. Store releases and production
+  switches (`ENTITLEMENT_ENFORCE`) stay mz's. Never switch mz's connector to the backend (that is M1.9).
 
 ## 1. Load state
 

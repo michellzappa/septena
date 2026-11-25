@@ -78,34 +78,12 @@ extension View {
     #endif
   }
 
-  @ViewBuilder
-  func septenaHideNavBar() -> some View {
-    #if os(iOS)
-    self.toolbar(.hidden, for: .navigationBar)
-    #else
-    self
-    #endif
-  }
-
   /// Always-visible search bar. On iOS 26 the system places `.searchable`
   /// in the new bottom field by default, which is what we want — `.automatic`
   /// lets the platform pick. macOS slots it into the toolbar.
   @ViewBuilder
   func septenaAlwaysVisibleSearch(text: Binding<String>) -> some View {
     self.searchable(text: text)
-  }
-
-  /// URL-style text field tweaks (no autocap, URL keyboard, URL content type).
-  /// No-op on macOS where the AppKit text field already handles this sensibly.
-  @ViewBuilder
-  func septenaURLField() -> some View {
-    #if os(iOS)
-    self.autocapitalization(.none)
-      .keyboardType(.URL)
-      .textContentType(.URL)
-    #else
-    self
-    #endif
   }
 
   /// macOS-only Esc-to-cancel hook. `.onExitCommand` is the AppKit-correct
@@ -134,26 +112,6 @@ extension View {
     #endif
   }
 
-  /// Run `action` on a primary double-click. macOS only — iOS opens via a
-  /// single tap. Like `septenaOnRightClick`, the catcher sits as an overlay
-  /// that claims ONLY double-click (`clickCount >= 2`) events; single clicks
-  /// fall through to SwiftUI underneath. Use this for rows in plain
-  /// VStack/LazyVStack layouts (e.g. the drawer's `DrawerSection`).
-  ///
-  /// NOT for rows inside a native `List(selection:)`: there NSTableView's
-  /// `mouseDown` runs its own event-tracking loop that swallows the second
-  /// click before this overlay can re-hit-test it, so the catcher never fires.
-  /// In a List, reach for `.onTapGesture(count: 2)` — it sees the double-click
-  /// and still lets single clicks drive native selection.
-  @ViewBuilder
-  func septenaOnDoubleClick(_ action: @escaping () -> Void) -> some View {
-    #if os(macOS)
-    self.overlay(DoubleClickCatcher(action: action).allowsHitTesting(true))
-    #else
-    self
-    #endif
-  }
-
   /// Native `List(selection:)` row highlight on macOS and iPad, in the user accent.
   /// The app root tints with the section accent; without an explicit override
   /// here the selection capsule reads as meaningless blue. iPhone compact keeps
@@ -164,37 +122,6 @@ extension View {
     self.tint(Theme.selectionAccent)
     #elseif os(iOS)
     self.modifier(NeutralListSelectionOnPad())
-    #else
-    self
-    #endif
-  }
-
-  /// Task list chrome: `.inset` capsule rows on macOS and iPad regular width.
-  /// iPhone compact stays `.plain` (selection is edit-mode circles only).
-  @ViewBuilder
-  func septenaTaskListStyle() -> some View {
-    #if os(macOS)
-    self.listStyle(.inset)
-    #elseif os(iOS)
-    self.modifier(TaskListStyleOnPad())
-    #else
-    self
-    #endif
-  }
-
-  /// Neutral fill behind a selected `List(selection:)` row. Native UIKit/AppKit
-  /// paints accent blue by default; pair with `septenaSuppressListCellSelection`.
-  @ViewBuilder
-  func selectableListRow(tag: String, isSelected: Bool) -> some View {
-    modifier(SelectableListRowChrome(tag: tag, isSelected: isSelected))
-  }
-
-  /// Pointer-hover wash for a native grouped-list cell. Used by Coach rows on
-  /// iOS; macOS list rows own hover via `taskCardChrome` / `septenaHomeListRow`.
-  @ViewBuilder
-  func pointerListRow(isSelected: Bool = false) -> some View {
-    #if os(iOS)
-    modifier(PointerListRowChrome(isSelected: isSelected))
     #else
     self
     #endif
@@ -233,39 +160,6 @@ private struct PointerListRowBackground: View {
           .fill(Color.primary.opacity(Theme.pointerHoverOpacity))
       }
     }
-  }
-}
-
-/// Next `List(selection:)` row — grouped fill, tag, selection suppression, and
-/// pointer-hover wash.
-private struct SelectableListRowChrome: ViewModifier {
-  let tag: String
-  let isSelected: Bool
-  @State private var hovered = false
-
-  func body(content: Content) -> some View {
-    content
-      .listRowBackground(PointerListRowBackground(isSelected: isSelected,
-                                                  hovered: hovered))
-      .listRowInsets(EdgeInsets())
-      .tag(tag)
-      .septenaSuppressListCellSelection()
-      .onHover { hovered = $0 }
-  }
-}
-
-/// Coach / auxiliary grouped-list row — same hover as Next, without selection.
-private struct PointerListRowChrome: ViewModifier {
-  let isSelected: Bool
-  @State private var hovered = false
-
-  func body(content: Content) -> some View {
-    content
-      .listRowBackground(PointerListRowBackground(isSelected: isSelected,
-                                                  hovered: hovered))
-      .listRowInsets(EdgeInsets())
-      .septenaSuppressListCellSelection()
-      .onHover { hovered = $0 }
   }
 }
 
@@ -309,18 +203,6 @@ private struct NeutralListSelectionOnPad: ViewModifier {
       content.tint(Theme.selectionAccent)
     } else {
       content
-    }
-  }
-}
-
-/// iPad regular width uses inset capsule rows like macOS; iPhone uses plain.
-private struct TaskListStyleOnPad: ViewModifier {
-  @Environment(\.horizontalSizeClass) private var hSize
-  func body(content: Content) -> some View {
-    if hSize == .regular {
-      content.listStyle(.inset)
-    } else {
-      content.listStyle(.plain)
     }
   }
 }
@@ -439,44 +321,6 @@ struct RightClickCatcher: NSViewRepresentable {
       // Forward up the responder chain so SwiftUI's contextMenu still
       // opens — without this, returning self in hitTest would swallow it.
       nextResponder?.rightMouseDown(with: event)
-    }
-  }
-}
-
-/// Transparent AppKit view that fires `action` on a primary double-click and
-/// otherwise gets out of the way. `hitTest(_:)` claims only `leftMouseDown`
-/// events whose `clickCount >= 2`, so the first click of the gesture (and
-/// every single click) falls through to the SwiftUI `List` beneath and still
-/// drives native row selection.
-struct DoubleClickCatcher: NSViewRepresentable {
-  let action: () -> Void
-
-  func makeNSView(context: Context) -> NSView { Catcher(action: action) }
-  func updateNSView(_ nsView: NSView, context: Context) {
-    (nsView as? Catcher)?.action = action
-  }
-
-  final class Catcher: NSView {
-    var action: () -> Void
-    init(action: @escaping () -> Void) {
-      self.action = action
-      super.init(frame: .zero)
-    }
-    required init?(coder: NSCoder) { fatalError() }
-
-    override func hitTest(_ point: NSPoint) -> NSView? {
-      guard super.hitTest(point) != nil else { return nil }
-      guard let event = NSApp.currentEvent else { return nil }
-      switch event.type {
-      case .leftMouseDown where event.clickCount >= 2:
-        return self
-      default:
-        return nil
-      }
-    }
-
-    override func mouseDown(with event: NSEvent) {
-      if event.clickCount >= 2 { action() }
     }
   }
 }
@@ -633,54 +477,8 @@ extension View {
 }
 
 extension View {
-  /// Shared page geometry for the four top-level surfaces (Week, Next,
-  /// Tasks sidebar, Coach). Applied to the root content stack inside the
-  /// surface's ScrollView — the single choke point for how a tab meets the
-  /// screen edges, so the four can't drift apart:
-  ///   • `Theme.pageGutter` leading/trailing on iPhone (wide panes use
-  ///     `.septenaTabScrollInsets` on the scroll view instead),
-  ///   • `Theme.pageTop` below the nav bar (pass `top: 0` when the
-  ///     surface's sections pad their own tops, e.g. the Next feed),
-  ///   • `Theme.pageBottom` scroll-past air above the tab bar.
-  /// Backgrounds stay per-surface (the Tasks sidebar differs on macOS).
-  @ViewBuilder
-  func septenaSurface(top: CGFloat = Theme.pageTop, includesHorizontal: Bool = true) -> some View {
-    if includesHorizontal {
-      self
-        .padding(.horizontal, Theme.pageGutter)
-        .padding(.top, top)
-        .padding(.bottom, Theme.pageBottom)
-    } else {
-      self
-        .padding(.top, top)
-        .padding(.bottom, Theme.pageBottom)
-    }
-  }
-
-  /// Cap and center the content column on wide panes (iPad regular, macOS).
-  /// iPhone compact is unchanged. Pass `contentGutter` when rows already
-  /// carry an outer margin (Tasks cards, macOS grouped rows).
-  func septenaWideContentMargins(contentGutter: CGFloat = 0) -> some View {
-    septenaTabScrollInsets(top: 0, contentGutter: contentGutter)
-  }
-
-  /// Grouped-gray canvas for home-tab List / ScrollView roots. Pair with
-  /// `.scrollContentBackground(.hidden)` on List surfaces and
-  /// `.scrollEdgeEffectStyle(.soft, for: .top)` (`.septenaTabPage` applies both).
-  func homeTabScrollSurface() -> some View {
-    background { Theme.groupedBackground.ignoresSafeArea() }
-  }
 
   #if os(macOS)
-  /// macOS grouped-list cell: plain List row shaped as a Tasks-style card slice.
-  func septenaHomeListRow(index: Int, count: Int, isSelected: Bool = false) -> some View {
-    self
-      .listRowInsets(EdgeInsets())
-      .listRowSeparator(.hidden)
-      .listRowBackground(Color.clear)
-      .septenaSuppressListCellSelection()
-      .taskCardChrome(TaskCardPosition(index: index, count: count), isSelected: isSelected)
-  }
   #endif
 
   /// Apply the Septena sheet chrome — thin-material glass background plus a
@@ -709,45 +507,6 @@ extension View {
     #else
     self.background(.thinMaterial, in: Capsule())
     #endif
-  }
-
-  /// Liquid-glass track for a segmented bar (iPad tab switcher). Layers the
-  /// Discovery underlay beneath `.glassEffect` so the track darkens against
-  /// scrolling content — bare `glassCapsule()` alone reads too faint. Pair
-  /// with `GlassEffectContainer`, per-segment `glassEffectID`, and
-  /// `glassSegmentSelectionUnderlay` on the active segment.
-  @ViewBuilder
-  func glassSegmentTrack() -> some View {
-    #if os(iOS)
-    self
-      .background(Color.secondary.opacity(0.10), in: Capsule())
-      .glassEffect(.regular.interactive(), in: .capsule)
-    #else
-    self.background(.thinMaterial, in: Capsule())
-    #endif
-  }
-
-  /// Sliding active-segment tint inside `glassSegmentTrack()`. iOS 26 pattern:
-  /// a faint accent wash *under* the track glass (Discovery / segmented-picker
-  /// style) — not an opaque fill on top. The single outer `.glassEffect`
-  /// carries the Liquid Glass look; this underlay darkens the selected slot.
-  func glassSegmentSelectionUnderlay(
-    isSelected: Bool,
-    tint: Color,
-    in namespace: Namespace.ID,
-    id: String = "glassSegmentSelection"
-  ) -> some View {
-    background {
-      if isSelected {
-        Capsule()
-          #if os(iOS)
-          .fill(tint.opacity(0.18))
-          #else
-          .fill(Theme.listSelectionFill)
-          #endif
-          .matchedGeometryEffect(id: id, in: namespace)
-      }
-    }
   }
 
   /// Liquid-glass fill for a floating *circular* control (toolbar glyph
@@ -805,59 +564,7 @@ private struct PointerHoverWash<S: Shape>: ViewModifier {
   }
 }
 
-/// Dashboard tile affordance — macOS: faint wash; iOS/iPadOS: system highlight
-/// lift for pointer / Apple Pencil hover (no darken).
-private struct TilePointerAffordance<S: Shape>: ViewModifier {
-  let shape: S
-
-  func body(content: Content) -> some View {
-    #if os(iOS)
-    content.hoverEffect(.highlight)
-    #else
-    content.modifier(PointerHoverWash(shape: shape))
-    #endif
-  }
-}
-
-/// `tileHover`'s conditional form — see that function's doc comment for why
-/// this is a modifier rather than an `if enabled { … }` branch at the call
-/// site.
-private struct TileHoverIf: ViewModifier {
-  let cornerRadius: CGFloat
-  let enabled: Bool
-
-  func body(content: Content) -> some View {
-    if enabled {
-      content.tileHover(cornerRadius: cornerRadius)
-    } else {
-      content
-    }
-  }
-}
-
 extension View {
-  /// Universal pointer / Apple-Pencil-hover for tappable custom surfaces
-  /// (dashboard tiles, cards, log rows). System controls get hover for free;
-  /// `.buttonStyle(.plain)` opts out, so tappable-but-plain surfaces must
-  /// request it back. macOS: faint background wash; iOS: system highlight lift.
-  ///
-  /// Scope: rectangular tappable *surfaces* (tiles / cards / full-width rows),
-  /// not inline text buttons or chevrons — use `inlineHover` for those.
-  func tileHover(cornerRadius: CGFloat = Theme.cornerRadius) -> some View {
-    let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-    return modifier(TilePointerAffordance(shape: shape))
-  }
-
-  /// `tileHover`, gated on a per-instance condition — for a tap target that's
-  /// only sometimes interactive (a chart that flips metrics for strength
-  /// exercises but no-ops for cardio/mobility). A bare `if enabled { ... }`
-  /// branch at the call site would change which concrete view type each branch
-  /// produces, which can reset state/identity for the content underneath;
-  /// wrapping in a `ViewModifier` keeps identity stable and just toggles the
-  /// wash's opacity.
-  func tileHover(cornerRadius: CGFloat = Theme.cornerRadius, enabled: Bool) -> some View {
-    modifier(TileHoverIf(cornerRadius: cornerRadius, enabled: enabled))
-  }
 
   /// Alias for list rows — faint wash at the row radius (not the tile highlight).
   func rowHover(cornerRadius: CGFloat = Theme.cornerRadiusSmall) -> some View {
@@ -881,16 +588,6 @@ extension View {
   }
 }
 
-/// Zero-effect button style. Suppresses the brief label tint that SwiftUI's
-/// default `.plain` style applies on click — useful when a row already shows
-/// "I was tapped" via a persistent background pill, so the extra flash adds
-/// nothing but visual noise.
-struct InertButtonStyle: ButtonStyle {
-  func makeBody(configuration: Configuration) -> some View {
-    configuration.label
-  }
-}
-
 /// Plain button with cross-platform pointer hover for full-width tappable rows.
 /// Drop-in for `.buttonStyle(.plain)` on navigation rows, picker sheets, and
 /// any surface where `.buttonStyle(.plain)` opts out of the system hover.
@@ -905,29 +602,6 @@ struct PlainHoverRowButtonStyle: ButtonStyle {
   }
 }
 
-/// Inline edit/new-task card chrome. Both platforms render a white card
-/// floating above the off-white page; macOS adds a margin so the card reads
-/// as its own object (compact), iOS keeps it full-bleed for a list feel.
-struct InlineCardChrome: ViewModifier {
-  func body(content: Content) -> some View {
-    #if os(macOS)
-    // No outer padding — the card occupies the same x/y rectangle as the
-    // closed row it's replacing, so the title doesn't shift right or down
-    // when entering edit mode. Rounded corners + shadow stay so it still
-    // reads as a card lifted off the list.
-    content
-      .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
-      .shadow(color: .black.opacity(0.07), radius: 5, x: 0, y: 1)
-    #else
-    // iOS: clip to rounded rect so the card reads as a contained
-    // surface, not a full-bleed rectangle, and the shadow has shape.
-    content
-      .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
-      .shadow(color: .black.opacity(0.06), radius: 4, x: 0, y: 0)
-    #endif
-  }
-}
-
 // MARK: - macOS 26 API compatibility
 //
 // Liquid Glass button styles and scroll-edge effects are macOS 26 / iOS 26
@@ -936,15 +610,6 @@ struct InlineCardChrome: ViewModifier {
 // macOS 15 floor, where they degrade to the pre-Glass system styles.
 
 extension View {
-  /// `.buttonStyle(.glass)` on 26+, the bordered system style below it.
-  @ViewBuilder
-  func glassButtonStyleCompat() -> some View {
-    if #available(macOS 26.0, iOS 26.0, *) {
-      self.buttonStyle(.glass)
-    } else {
-      self.buttonStyle(.bordered)
-    }
-  }
 
   /// `.buttonStyle(.glassProminent)` on 26+, `.borderedProminent` below it.
   /// Call sites tint these for white ink; `.borderedProminent` also draws a

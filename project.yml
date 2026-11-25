@@ -61,14 +61,10 @@ settings:
       SWIFT_OPTIMIZATION_LEVEL: "-Osize"
 
 targets:
-  # Septask — the focused task app over the same private task data
-  # (docs/SEPTASK.md). Same SeptenaCore sources compiled in, different
-  # composition root: the SEPTASK compilation condition flips
-  # RuntimeProfile.current to .tasksOnly so SeptenaServices binds only the
-  # task/area/project mutators and never touches life-OS subsystems or
-  # third-party provider stores. Septask.entitlements is hand-maintained
-  # (same iCloud container/zone as Septena — CloudKit is the convergence
-  # point between the two apps; the SwiftData mirrors stay separate).
+  # The iOS task app, Septena (docs/SEPTASK.md). The target keeps its working
+  # name. Septask.entitlements is hand-maintained.
+  # `SEPTASK` is set for every app target and no source branches on its absence:
+  # the life OS left in ADR 0017. Do not add new `#if SEPTASK` switches.
   Septask:
     type: application
     platform: iOS
@@ -86,41 +82,25 @@ targets:
       - path: Septena/App/ContentView.swift
       - path: Septena/App/NavigationState.swift
       - path: Septena/App/ShortcutAction.swift
-      - path: Septena/App/SeptenaTab.swift
-      - path: Septena/App/OpenNewTaskRouting.swift
       - path: Septena/Shell/Settings/SettingsKeys.swift
       # Supporter-finish constants used by LogCommit's celebration variant.
       - path: Septena/Shell/Settings/SeptenaPlus.swift
-      # P3: the AI/Claude pane (SettingsView deep links and the hosted
-      # gateway row inside are #if !SEPTASK-gated; Septask's Claude row opens
-      # the task backend pane), and the hex→Color
-      # helper the shared palette picker rides.
       - path: Septena/Shell/Settings/AISettingsPane.swift
       - path: Septena/Shell/Settings/SettingsChrome.swift
-      - path: Septena/Shell/Settings/SettingsColor.swift
       - path: Septena/Shell/Settings/SettingsStore.swift
       - path: Septena/Shell/Settings/ConnectedAppsDetails.swift
       # Shared string catalog — localizes the whole reused task UI (already
       # translated) and collects Septask-only strings for translation.
       - path: Septena/Localizable.xcstrings
-      - path: Septena/Shell/Capture/AddInfo/AddInfoSection.swift
       - path: Septena/Shell/Capture/AddInfo/AddInfoRouter.swift
       - path: Septena/Shell/Capture/AddInfo/AddInfoRow.swift
       - path: Septena/Shell/Capture/QuickFindView.swift
       # Drawer chrome: task views use its shared plumbing (`macSheetFrame`,
       # the `usesPushNavigation` / `rowHInset` environment keys).
       - path: Septena/Shell/Sections/SectionDrawer.swift
-      - path: Septena/Shell/Sections/TimeTravelSheet.swift
       - path: Septena/Shell/Intelligence/OnDeviceReasoningProvider.swift
       - path: Septena/Shell/Intelligence/OnDeviceAI.swift
       - path: Septena/Shell/Intelligence/Components/FlowLayout.swift
-      # Shell/Dashboard files are included by file, never by folder — the
-      # rest of Shell/Dashboard reaches into surfaces Septask doesn't compile.
-      # The Next feed's files (NextItemsSection, NextSuggestionsSection, and
-      # the mood / nutrition suggestion destinations) left with Septask's
-      # Next page on 2026-11-19 (life-OS content, not tasks). The last one,
-      # ClaudeReconnectCue, left with the hosted-gateway connection, so
-      # Septask now compiles no Shell/Dashboard file.
     dependencies:
       - package: SeptenaSharedCore
       - target: SeptaskShare
@@ -137,8 +117,7 @@ targets:
       - target: SeptaskWatch
         embed: true
         codeSign: true
-      # MealPhotoModelAnalyzer (meal-photo macro estimation) imports
-      # FoundationModels — same dependency the other three app targets carry.
+      # On-device reasoning (Shell/Intelligence).
       - sdk: FoundationModels.framework
     info:
       path: Septask/Info.plist
@@ -273,7 +252,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.septena.tasks.share
         GENERATE_INFOPLIST_FILE: NO
         CODE_SIGN_ENTITLEMENTS: ShareExtension/SeptaskShare.entitlements
-        SWIFT_ACTIVE_COMPILATION_CONDITIONS: "SHARE_EXTENSION SHARE_DESTINATION_SEPTASK"
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: "SHARE_EXTENSION"
 
   # Home Screen & Lock Screen widgets for Septask iOS (docs/TASK_WIDGETS_SPEC.md, #161).
   # Shares sources in lockstep with SeptaskMacWidgets; compiles only pure-Foundation
@@ -390,30 +369,23 @@ targets:
       - path: Septena/App/ContentView.swift
       - path: Septena/App/NavigationState.swift
       - path: Septena/App/ShortcutAction.swift
-      - path: Septena/App/SeptenaTab.swift
-      - path: Septena/App/OpenNewTaskRouting.swift
       - path: Septena/Shell/Settings/SettingsKeys.swift
       - path: Septena/Shell/Settings/SeptenaPlus.swift
       - path: Septena/Shell/Settings/AISettingsPane.swift
       - path: Septena/Shell/Settings/SettingsChrome.swift
-      - path: Septena/Shell/Settings/SettingsColor.swift
       - path: Septena/Shell/Settings/SettingsStore.swift
       - path: Septena/Shell/Settings/ConnectedAppsDetails.swift
       # Shared string catalog — localizes the whole reused task UI (already
       # translated) and collects Septask-only strings for translation.
       - path: Septena/Localizable.xcstrings
-      - path: Septena/Shell/Capture/AddInfo/AddInfoSection.swift
       - path: Septena/Shell/Capture/AddInfo/AddInfoRouter.swift
       - path: Septena/Shell/Capture/AddInfo/AddInfoRow.swift
       - path: Septena/Shell/Capture/QuickFindView.swift
       - path: Septena/Shell/Sections/SectionDrawer.swift
-      - path: Septena/Shell/Sections/TimeTravelSheet.swift
       - path: Septena/Shell/Intelligence/OnDeviceReasoningProvider.swift
       - path: Septena/Shell/Intelligence/OnDeviceAI.swift
       - path: Septena/Shell/Intelligence/Components/FlowLayout.swift
-      # Standalone icns generated from the same disc geometry + Septena's
-      # icns alpha mask (identical corner rounding) — see the SeptenaMac
-      # comment for why a pre-built icns and not the asset catalog.
+      # A pre-built icns, so the corner rounding matches the Mac alpha mask.
       - path: Septask/AppIcon.icns
         type: file
     dependencies:
@@ -593,6 +565,10 @@ targets:
       - path: SeptenaCore/TaskFade.swift
       - path: SeptenaCore/SharedCoreBridge.swift
       - path: SeptenaCore/TasksWidgetWire.swift
+      - path: SeptenaCore/TaskBackend/TaskBackendLimits.swift
+      - path: SeptenaCore/TaskBackend/TaskBackendWire.swift
+      - path: SeptenaCore/TaskBackend/TaskSyncSettings.swift
+      - path: SeptenaCore/AppSettings.swift
       - path: SeptenaCore/Generated/RegistryConstants.swift
     dependencies:
       - package: SeptenaSharedCore

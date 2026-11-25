@@ -16,6 +16,8 @@ import Security
 
 enum TaskBackendError: LocalizedError, Equatable {
   case notSignedIn
+  /// HTTP 402 plan-limit refusal (`{ error, limit, upsell, message }`, spec §6.3).
+  case limitReached(BackendLimitError)
   case http(status: Int, code: String)
   case badResponse(String)
   case network(String)
@@ -23,6 +25,7 @@ enum TaskBackendError: LocalizedError, Equatable {
   var errorDescription: String? {
     switch self {
     case .notSignedIn: return "Not signed in to Septena sync."
+    case .limitReached(let limit): return limit.userMessage
     case .http(let status, let code): return "The server answered \(status) (\(code))."
     case .badResponse(let what): return "The server sent a reply the app couldn’t read (\(what))."
     case .network(let what): return "Network error: \(what)"
@@ -383,6 +386,36 @@ actor TaskBackendClient {
     guard status == 204 || status == 200 else { throw Self.httpError(status, data) }
   }
 
+  // MARK: - APNs Push Tokens (F1b #213)
+
+  /// Registers this device's APNs hex token (`POST /v1/devices/push-token`)
+  /// so agent question turns can deliver push notifications.
+  func registerPushToken(
+    _ hexToken: String,
+    platform: String = "ios",
+    sandbox: Bool,
+    deviceId: String? = nil
+  ) async throws {
+    struct Payload: Encodable {
+      let token: String
+      let platform: String
+      let sandbox: Bool
+      let deviceId: String?
+    }
+    let body = try JSONEncoder().encode(
+      Payload(token: hexToken.lowercased(), platform: platform, sandbox: sandbox, deviceId: deviceId)
+    )
+    let (data, status) = try await authed(path: "/v1/devices/push-token", method: "POST", body: body)
+    guard status == 200 || status == 204 else { throw Self.httpError(status, data) }
+  }
+
+  /// Removes a previously registered APNs token (`DELETE /v1/devices/push-token`).
+  func deletePushToken(_ hexToken: String) async throws {
+    let body = try JSONEncoder().encode(["token": hexToken.lowercased()])
+    let (data, status) = try await authed(path: "/v1/devices/push-token", method: "DELETE", body: body)
+    guard status == 204 || status == 200 else { throw Self.httpError(status, data) }
+  }
+
   // MARK: - HTTP
 
   /// Sends with a bearer token. On 401 it refreshes once and retries. A
@@ -448,6 +481,9 @@ actor TaskBackendClient {
   }
 
   private static func httpError(_ status: Int, _ data: Data) -> TaskBackendError {
+    if status == 402 {
+      return .limitReached(BackendLimitError.decode(from: data))
+    }
     let code = (try? JSONDecoder().decode(BackendErrorBody.self, from: data))?.error ?? "no detail"
     return .http(status: status, code: code)
   }

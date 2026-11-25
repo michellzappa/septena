@@ -27,26 +27,12 @@ enum KeyboardShortcutsCatalogue {
   // Septask's plain ⌘-digit smart lists (its Go menu), numbered by the
   // user's sidebar.
   @MainActor private static var navigation: KeyboardShortcutGroup {
-    #if SEPTASK
     let prefs = SmartListPreferences.shared
     let digits = prefs.digitShortcuts
     let items: [KeyboardShortcut2] = prefs.enabledDestinations.compactMap { dest in
       digits[dest.id].map { KeyboardShortcut2(keys: $0.keycaps, label: dest.title) }
     }
     return KeyboardShortcutGroup(title: "Navigation", shortcuts: items)
-    #else
-    KeyboardShortcutGroup(title: "Navigation", shortcuts: [
-      KeyboardShortcut2(keys: ["⌘", "1"], label: "Week tab"),
-      KeyboardShortcut2(keys: ["⌘", "2"], label: "Next tab"),
-      KeyboardShortcut2(keys: ["⌘", "3"], label: "Tasks tab"),
-      KeyboardShortcut2(keys: ["⌘", "4"], label: "Goals tab"),
-      KeyboardShortcut2(keys: ["⌥", "⌘", "1"], label: TaskFilter.triage.title),
-      KeyboardShortcut2(keys: ["⌥", "⌘", "2"], label: TaskFilter.today.title),
-      KeyboardShortcut2(keys: ["⌥", "⌘", "3"], label: "Next list"),
-      KeyboardShortcut2(keys: ["⌥", "⌘", "4"], label: TaskFilter.upcoming.title),
-      KeyboardShortcut2(keys: ["⌥", "⌘", "5"], label: "Unscheduled"),
-    ])
-    #endif
   }
 
   private static var currentPlatformKey: String {
@@ -65,17 +51,7 @@ enum KeyboardShortcutsCatalogue {
   }
 
   private static var generalGroup: KeyboardShortcutGroup {
-    #if SEPTASK
     KeyboardShortcutGroup(title: "General", shortcuts: fromRegistry(RegistryActions.shortcutsGeneral))
-    #else
-    KeyboardShortcutGroup(title: "General", shortcuts: [
-      KeyboardShortcut2(keys: ["⌘", "I"], label: quickCaptureLabel),
-      KeyboardShortcut2(keys: ["⌘", "⇧", "F"], label: "Quick Find"),
-      KeyboardShortcut2(keys: ["⌃", "⌘", "S"], label: "Show / hide sidebar"),
-      KeyboardShortcut2(keys: ["⌘", ","], label: "Settings"),
-      KeyboardShortcut2(keys: ["⌘", "⇧", "/"], label: "Keyboard shortcuts (this sheet)"),
-    ])
-    #endif
   }
 
   /// Row commands are GENERATED from `RegistryActions` so
@@ -95,11 +71,7 @@ enum KeyboardShortcutsCatalogue {
   }
 
   private static var quickCaptureLabel: String {
-    #if SEPTASK
     "Quick add: new task"
-    #else
-    "Add Info — quick capture"
-    #endif
   }
 
   @MainActor static var groups: [KeyboardShortcutGroup] { [

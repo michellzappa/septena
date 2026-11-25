@@ -141,7 +141,7 @@ link pauses until another member reconnects it.
 | S1 | Share / invite / accept / leave / unshare UI on iOS and Mac. Editor and owner roles. | mz and one other person run one shared project for a week. |
 | S2 | Viewer role, activity list, assignee avatars, push notification on assignment. | — |
 | S3 | Agents on shared projects (§6), linked + shared (§7). | An agent works a task in a shared project; only the assigning member gets its questions. |
-| S4 | Public web link (view / edit) — separate spec first. | — |
+| S4 | Public web link (view / edit): [PUBLIC_LINKS_SPEC.md](PUBLIC_LINKS_SPEC.md). | — |
 
 ## 10. Open questions for mz
 

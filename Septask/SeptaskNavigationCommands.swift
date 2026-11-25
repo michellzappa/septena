@@ -186,6 +186,7 @@ private struct SeptaskTaskMenu: View {
     case "task.toggleStar": return .toggleStar
     case "task.tags": return .editTags
     case "task.addChecklistItem": return .addChecklistItem
+    case "task.addReference": return TaskRefActions.canAdd ? .addReference : nil
     case "task.when": return .when
     case "task.deadline": return .deadline
     case "task.reminder": return .reminder
@@ -537,7 +538,7 @@ private struct SeptaskUndoRedoCommands: View {
 
   var body: some View {
     Group {
-      Button(undoName.isEmpty ? "Undo" : "Undo \(undoName)") { perform(undo: true) }
+      Button(undoName.isEmpty ? RegistryActions.title("app.undo") : "\(RegistryActions.title("app.undo")) \(undoName)") { perform(undo: true) }
         .keyboardShortcut("z", modifiers: .command)
       Button(redoName.isEmpty ? "Redo" : "Redo \(redoName)") { perform(undo: false) }
         .keyboardShortcut("z", modifiers: [.command, .shift])

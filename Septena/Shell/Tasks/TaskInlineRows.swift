@@ -8,15 +8,16 @@ struct QuickAddTriggerRow: View {
   @Environment(\.rowVInset) private var rowVInset
 
   var body: some View {
-    HStack(alignment: .firstTextBaseline, spacing: Theme.iconTextGap) {
+    HStack(alignment: .rowTitleCenter, spacing: Theme.iconTextGap) {
       TaskCheckbox(isDone: false, dashed: TaskRowFlags.languageV2,
                    isToday: false, onToggle: {})
         .allowsHitTesting(false)
-        .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
+        .alignmentGuide(.rowTitleCenter) { d in d[VerticalAlignment.center] }
       Text("New task")
         .font(.septenaTaskTitle)
         .foregroundStyle(Theme.inkSecondary)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: Theme.checkboxTap, alignment: .leading)
+        .alignmentGuide(.rowTitleCenter) { d in d[VerticalAlignment.center] }
     }
     .padding(.horizontal, rowHInset)
     .padding(.vertical, rowVInset)

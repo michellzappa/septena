@@ -75,7 +75,6 @@ final class SmartListPreferences {
     self.hidden = Self.sanitizeHidden(savedHidden)
     self.placement = Self.sanitizePlacement(savedPlacement)
 
-    #if SEPTASK
     syncObserver = NotificationCenter.default.addObserver(
       forName: .septaskSettingsPulled, object: nil, queue: .main
     ) { [weak self] _ in
@@ -83,7 +82,6 @@ final class SmartListPreferences {
         self?.adoptSynced(SeptaskSyncedSettings.current())
       }
     }
-    #endif
   }
 
   // MARK: - Resolution (registry-driven)
@@ -377,21 +375,11 @@ final class SmartListPreferences {
   private func pushSynced() {
     guard !isAdoptingSynced else { return }
     let context = LocalStore.shared.container.mainContext
-    #if SEPTASK
     var s = SettingsMirror.loadSettings(context: context) ?? SeptaskSyncedSettings.empty
     s.smartListOrder = order
     s.smartListHidden = hidden
     s.smartListPlacement = placement
     SettingsMirror.upsert(settings: s, context: context, engine: nil)
-    #else
-    var s = SettingsMirror.loadSettings(context: context)
-      ?? AppSettings(sectionOrder: nil, targets: nil, units: nil, time: nil,
-                     theme: nil, eink: nil, nutrition: nil, hkSync: nil)
-    s.smartListOrder = order
-    s.smartListHidden = hidden
-    s.smartListPlacement = placement
-    SettingsMirror.upsert(settings: s, context: context, engine: SeptenaServices.shared.ckEngine)
-    #endif
   }
 
   private func notifyChanged() {

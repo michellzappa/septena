@@ -423,7 +423,7 @@ in-app server (`SeptenaCore/MCP/`) and the hosted gateway, plus skill briefs.
 2. **Default collapsed or expanded?** Lean **collapsed-with-count by default**,
    auto-expand only when the agent has high-confidence proposals ready (so the
    "accept all" moment is one tap from open). Mirrors the drawer-modes
-   empty-nudge philosophy ([docs/DRAWER_MODES_SPEC.md](docs/DRAWER_MODES_SPEC.md)).
+   empty-nudge philosophy.
 3. **Cap & overflow.** Show top N rows + "12 more" so a fat band never becomes a
    wall. N = ? (lean 5). Sort: agent-proposed-with-disposition first (one-tap
    wins), naked captures second.

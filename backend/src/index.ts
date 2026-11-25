@@ -13,6 +13,7 @@ import { initCore } from "./core/index.js";
 initCore(coreWasm);
 
 export { TaskStore } from "./store/TaskStore.js";
+export { AccountStore } from "./store/AccountStore.js";
 export { PairingStore } from "./shadow/PairingStore.js";
 
 const app = new Hono<{ Bindings: Env }>();

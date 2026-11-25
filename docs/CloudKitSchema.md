@@ -1,5 +1,8 @@
 # CloudKit Schema Manifest
 
+> **Historical.** The task app does not use CloudKit (ADR 0002), and the life OS
+> record types left with ADR 0017.
+
 > **Source of truth:** the Swift `*CloudKitSchema` enums + their `makeRecord`/`apply`
 > functions. This doc is **derived from code** (baseline commit `671d48b`, 2026-06-06;
 > Intake section reconciled to the generalized-consumables model 2026-06-18) and is

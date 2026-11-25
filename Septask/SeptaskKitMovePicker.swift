@@ -67,19 +67,7 @@ final class SeptaskKitMovePicker {
   // MARK: - Filtering
 
   private func reloadProgress() {
-    var done: [String: Int] = [:]
-    var total: [String: Int] = [:]
-    for task in LocalCache.tasksWithProject(in: context) {
-      guard let pid = task.project else { continue }
-      switch task.status {
-      case .done: done[pid, default: 0] += 1; total[pid, default: 0] += 1
-      case .open: total[pid, default: 0] += 1
-      case .cancelled: break
-      }
-    }
-    progressByProject = total.reduce(into: [:]) { acc, kv in
-      acc[kv.key] = Double(done[kv.key] ?? 0) / Double(kv.value)
-    }
+    progressByProject = LocalCache.projectCompletionRatios(in: context)
   }
 
   private func reloadRows() {
@@ -249,7 +237,7 @@ final class SeptaskKitMovePicker {
         emoji.isHidden = true
         title.font = SeptaskKitTheme.taskTitle
       case .area:
-        if let emojiGlyph {
+        if let emojiGlyph, !emojiGlyph.isEmpty {
           emoji.stringValue = emojiGlyph
           emoji.isHidden = false
           icon.isHidden = true

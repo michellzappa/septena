@@ -51,6 +51,9 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   private let historyButton = NSButton()
   private let attachmentsLabel = NSTextField(labelWithString: "")
   private let attachmentsView = KitAttachmentsView()
+  private let referencesLabel = NSTextField(labelWithString: "")
+  private let referencesView = KitReferencesView()
+  private let addReferenceButton = NSButton()
   private let placeholder = NSTextField(labelWithString: String(localized: "No Selection",
                                                                  comment: "SeptaskKit: inspector empty"))
   private let form = NSStackView()
@@ -167,6 +170,7 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     }
     for (button, action) in [(addChecklistButton, #selector(addChecklistStep)),
                              (attachFileButton, #selector(attachFile)),
+                             (addReferenceButton, #selector(addReference)),
                              (historyButton, #selector(toggleHistory))] {
       button.bezelStyle = .rounded
       button.target = self
@@ -210,6 +214,7 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
         }
       case .checklist: last = addChecklistBlock(block)
       case .attachments: last = addAttachmentsBlock(block)
+      case .references: last = addReferencesBlock(block)
       case .conversation:
         if conversationPlaced {
           last = nil
@@ -228,6 +233,7 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
       case .attributes: pageOnlyViews[.attributes] = orderedAttributeButtons
       case .checklist: pageOnlyViews[.checklist] = [checklistLabel, addChecklistButton, checklistView]
       case .attachments: pageOnlyViews[.attachments] = [attachmentsLabel, attachmentsView, attachFileButton]
+      case .references: pageOnlyViews[.references] = [referencesLabel, referencesView, addReferenceButton]
       case .history: pageOnlyViews[.history] = [historyButton, historyView]
       case .header, .notes, .conversation, .provenance: break
       }
@@ -416,6 +422,34 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     return attachFileButton
   }
 
+  /// References (docs/TASK_REFERENCES_SPEC.md §8). Every view of the block is
+  /// hidden on a task that has none: Add Reference is in the task's menu then.
+  private func addReferencesBlock(_ block: RegistryTaskPageBlock) -> NSView {
+    styleHeading(referencesLabel, block)
+    referencesView.translatesAutoresizingMaskIntoConstraints = false
+    addReferenceButton.title = RegistryActions.title("task.addReference")
+    form.addArrangedSubview(referencesLabel)
+    form.addArrangedSubview(referencesView)
+    form.addArrangedSubview(addReferenceButton)
+    fillWidth(referencesView)
+    return addReferenceButton
+  }
+
+  private func refreshReferences(_ next: SeptenaTask) {
+    referencesView.configure(rows: LocalCache.taskRefRows(forTaskID: next.id, in: context))
+    referencesLabel.isHidden = referencesView.isEmpty
+    referencesView.isHidden = referencesView.isEmpty
+    addReferenceButton.isHidden = referencesView.isEmpty || !TaskRefActions.canAdd
+    // The section gap follows the last view that shows.
+    form.setCustomSpacing(addReferenceButton.isHidden ? 14 : form.spacing, after: referencesView)
+  }
+
+  @objc private func addReference() {
+    guard let task else { return }
+    SeptaskKitAddReferencePopover.present(taskID: task.id, relativeTo: addReferenceButton.bounds,
+                                          of: addReferenceButton)
+  }
+
   /// The conversation, under the Discuss heading: the pane has no Discuss
   /// row, so the heading carries the Discuss attribute's registry label and
   /// the block sits directly under the attribute rows (see `loadView`), the
@@ -540,6 +574,7 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
       if let next {
         reloadTextIfIdle(next)
         refreshReadOnlyFields(next)
+        refreshReferences(next)
         refreshConversation(next)
         historyButton.isHidden = !historyView.configure(taskID: next.id)
         applyDepth(for: next)
@@ -577,6 +612,7 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     attachmentsView.configure(taskID: next.id)
     updateAttachmentsVisibility()
     refreshReadOnlyFields(next)
+    refreshReferences(next)
     refreshConversation(next)
     historyButton.isHidden = !historyView.configure(taskID: next.id)
     applyDepth(for: next)
@@ -598,6 +634,7 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
       for views in pageOnlyViews.values { views.forEach { $0.isHidden = false } }
       updateChecklistVisibility()
       updateAttachmentsVisibility()
+      refreshReferences(task)
       historyButton.isHidden = !historyView.configure(taskID: task.id)
     }
     showsReviewDepth = review
@@ -686,7 +723,7 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
       reminderButton.title = RegistryActions.alternateTitles["task.reminder"]?["addTitle"]
         ?? RegistrySurfaces.taskAttribute("reminder").label
     }
-    listButton.title = listDescription(for: next)
+    updateListButton(for: next)
 
     let repeatValue = next.recurrence.map { rule in
       let paused = next.recurrencePaused
@@ -762,19 +799,29 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     isEditingTitle || isEditingNotes || conversationView.isEditingReply
   }
 
-  private func listDescription(for task: SeptenaTask) -> String {
+  private func updateListButton(for task: SeptenaTask) {
     let snapshot = StructureCache.snapshot(in: context)
+    listButton.imagePosition = .imageLeading
     if let id = task.project,
        let project = snapshot.projects.first(where: { $0.id == id }) {
-      return String(localized: "In \(project.title)",
-                    comment: "SeptaskKit: inspector list affiliation")
+      let progress = LocalCache.projectCompletionRatios(in: context)[project.id] ?? 0
+      listButton.image = KitGlyph.progress(progress, tint: SeptaskKitTheme.inkSecondary, diameter: 12)
+      listButton.title = String(localized: "In \(project.title)",
+                                comment: "SeptaskKit: inspector list affiliation")
+      return
     }
     if let id = task.area,
        let area = snapshot.areas.first(where: { $0.id == id }) {
-      return String(localized: "In \(area.title)",
-                    comment: "SeptaskKit: inspector list affiliation")
+      listButton.image = KitGlyph.area(emoji: area.emoji, diameter: 14)
+      listButton.title = String(localized: "In \(area.title)",
+                                comment: "SeptaskKit: inspector list affiliation")
+      return
     }
-    return String(localized: "No list", comment: "SeptaskKit: inspector list affiliation")
+    listButton.image = KitGlyph.symbol(RegistrySurfaces.taskAttribute("list").sfSymbol,
+                                       color: SeptaskKitTheme.iconMuted,
+                                       cacheTag: "iconMuted",
+                                       size: 14)
+    listButton.title = String(localized: "No list", comment: "SeptaskKit: inspector list affiliation")
   }
 
   // MARK: - Commits

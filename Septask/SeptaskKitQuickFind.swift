@@ -86,8 +86,7 @@ final class SeptaskKitQuickFind {
 
   func show() {
     surface.show(anchor: .window,
-                 placeholder: String(localized: "Search tasks, projects, areas…",
-                                     comment: "SeptaskKit: quick find placeholder"))
+                 placeholder: RegistrySurfaces.quickFindPlaceholder)
   }
 
   // MARK: - Search

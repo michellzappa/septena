@@ -508,31 +508,16 @@ final class SettingsEntity {
   }
 }
 
+/// Left over from the life OS (ADR 0017). Nothing reads or writes it. It stays
+/// in the schema so existing stores open without a migration.
 @Model
 final class SectionEntity {
   @Attribute(.unique) var id: String
   var title: String
   var color: String
-  /// Whether the section is visible on the dashboard and Settings sidebar.
-  /// Disabling never deletes the row or any per-section data; toggling
-  /// back on restores the previous title/color customizations.
   var isEnabled: Bool = true
-  /// Whether this section contributes events to the Today log. Only
-  /// meaningful for sections the manifest marks as `appearsInToday`.
-  /// Independent of `isEnabled` so a section can stay visible on the
-  /// dashboard but be muted from the Today timeline (or vice versa).
   var showInToday: Bool = true
-  /// Whether this section's entries are exposed to Spotlight / Siri / Apple
-  /// Intelligence (the on-device semantic index). Default true — everything is
-  /// discoverable unless the user opts the section out in Settings. Independent
-  /// of `isEnabled` and `showInToday`. Absence in a CKRecord decodes as true, so
-  /// existing rows are discoverable with no migration. See
-  /// docs/SPOTLIGHT_READABILITY_PLAN.md.
   var showInSpotlight: Bool = true
-  /// Set to true once the section's onboarding flow has completed (or
-  /// been skipped) for this user. Distinguishes "first ever enable"
-  /// (which should run onboarding) from a later toggle off → on. Stays
-  /// true forever once set; data is never lost on disable.
   var hasOnboarded: Bool = false
   var updatedAt: Date
   /// CKRecord system-fields blob. Same contract as the other mirrored
@@ -779,18 +764,6 @@ extension Area {
     self.init(id: e.id, title: e.title, context: e.context, emoji: e.emoji,
               position: e.position,
               updatedAt: e.updatedAt)
-  }
-}
-
-extension SectionConfig {
-  init(_ e: SectionEntity) {
-    self.init(key: e.id,
-              label: e.title,
-              color: e.color,
-              isEnabled: e.isEnabled,
-              showInToday: e.showInToday,
-              showInSpotlight: e.showInSpotlight,
-              hasOnboarded: e.hasOnboarded)
   }
 }
 

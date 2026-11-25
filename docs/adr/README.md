@@ -15,7 +15,7 @@ a new ADR and set the old one to `superseded by NNNN`.
 | [0007](0007-septena-is-the-task-app.md) | Septena is the task app; the life OS becomes Septena Life | accepted |
 | [0008](0008-agent-loop-rules-live-in-the-store.md) | Agent loop rules live in the store; the human holds the stop | accepted |
 | [0009](0009-trustable-private-ai.md) | Run AI on tasks with checkable privacy guarantees | proposed |
-| [0010](0010-free-server-tier-with-limits.md) | Offer a free server tier with limits; paid lifts them | accepted, device count amended by 0023 |
+| [0010](0010-free-server-tier-with-limits.md) | Offer a free server tier with limits; paid lifts them | accepted, amended by 0023 (devices) and 0036 (agents, live sync, Logbook) |
 | [0011](0011-self-hostable-backend.md) | Keep the backend self-hostable on the user's own Cloudflare account | accepted |
 | [0012](0012-project-notes-are-agent-context.md) | Project notes are the context agents read first | accepted |
 | [0013](0013-native-windows-app-on-the-android-code.md) | Build the Windows app on the Android client's Kotlin code | accepted, W0 amended by 0025 |
@@ -28,7 +28,7 @@ a new ADR and set the old one to `superseded by NNNN`.
 | [0020](0020-registry-owns-copy-and-translations.md) | The registry owns shared copy and its translations; shells render it | accepted |
 | [0021](0021-one-import-engine-with-source-adapters.md) | One import engine, with source adapters behind a versioned bundle | accepted |
 | [0022](0022-marketing-scenes-come-from-the-native-app.md) | Marketing scenes come from the native app | rejected |
-| [0023](0023-sync-across-devices-is-plus.md) | Make sync across devices the paid line (amends 0010) | accepted |
+| [0023](0023-sync-across-devices-is-plus.md) | Make sync across devices the paid line (amends 0010) | accepted, amended by 0036 (agents) |
 | [0024](0024-no-iphone-tab-bar.md) | No tab bar on iPhone: the list is the root of one navigation stack | accepted |
 | [0025](0025-shared-rust-core.md) | Put task rules and sync decisions in one shared Rust core | accepted (amends 0013 W0, 0015) |
 | [0026](0026-plus-on-any-store-stripe-for-web.md) | Sell Plus on any store, one account entitlement, Stripe for web | accepted |
@@ -40,6 +40,8 @@ a new ADR and set the old one to `superseded by NNNN`.
 | [0033](0033-no-github-integration-issue-links-are-references.md) | Drop the GitHub integration; issue links are references | accepted |
 | [0034](0034-companion-devices-get-a-limited-session.md) | Give companion devices a limited session and a small verb set | proposed |
 | [0035](0035-companion-voice-is-push-to-talk-and-confirmed.md) | Make companion voice push-to-talk, unstored and confirmed | proposed |
+| [0036](0036-plan-ladder-one-agent-then-three.md) | Four plan levels: an account adds the server, Plus adds more than one (amends 0010, 0023) | accepted, presentation amended by 0037 |
+| [0037](0037-show-free-plus-and-planned-pro.md) | Show three plans: Free, Plus and a planned Pro (amends 0036) | accepted |
 
 ## Template
 

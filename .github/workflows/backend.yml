@@ -77,8 +77,11 @@ jobs:
       run:
         working-directory: backend
     steps:
+      # The default working directory (backend/) exists only after the
+      # checkout, so this step runs from the workspace root.
       - name: Token present
         id: token
+        working-directory: .
         run: |
           if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
             echo "::warning::Secret CLOUDFLARE_API_TOKEN is missing. The Worker was not deployed."

@@ -1,4 +1,9 @@
 import SwiftUI
+#if os(macOS)
+import AppKit
+#elseif canImport(UIKit)
+import UIKit
+#endif
 
 // Menus rendered from `registry/actions.json` (ADR 0015, ADR 0020, #177).
 //
@@ -125,20 +130,30 @@ indirect enum RegistryMenuNode: Identifiable {
   }
 }
 
+/// Dynamic list icon for area / project destination slots so dropdown menus
+/// display the same custom emoji, fallback area dot, or project progress ring
+/// as the sidebar.
+enum RegistryMenuIcon: Equatable {
+  case area(emoji: String?)
+  case project(progress: Double)
+}
+
 struct RegistryMenuEntry {
   let id: String
   let title: String
   let sfSymbol: String?
+  var listIcon: RegistryMenuIcon? = nil
   var shortcut: RegistryShortcut?
   var isDestructive = false
   var isOn = false
   var perform: (() -> Void)?
 
   /// A slot entry: a dynamic item (a destination, a text size step).
-  static func slot(id: String, title: String, sfSymbol: String? = nil, isOn: Bool = false,
+  static func slot(id: String, title: String, sfSymbol: String? = nil,
+                   listIcon: RegistryMenuIcon? = nil, isOn: Bool = false,
                    perform: (() -> Void)?) -> RegistryMenuNode {
     .item(RegistryMenuEntry(id: "slot.\(id)", title: title, sfSymbol: sfSymbol,
-                            shortcut: nil, isOn: isOn, perform: perform))
+                            listIcon: listIcon, shortcut: nil, isOn: isOn, perform: perform))
   }
 }
 
@@ -266,7 +281,7 @@ private struct RegistryMenuButton: View {
     if entry.isOn {
       // A checked item: a Toggle draws the native checkmark in a menu.
       Toggle(isOn: Binding(get: { true }, set: { _ in entry.perform?() })) {
-        Text(entry.title)
+        itemLabel
       }
       .keyboardShortcut(entry.shortcut?.keyboardShortcut)
       .disabled(entry.perform == nil)
@@ -274,14 +289,160 @@ private struct RegistryMenuButton: View {
       Button(role: entry.isDestructive ? .destructive : nil) {
         entry.perform?()
       } label: {
-        if let sfSymbol = entry.sfSymbol {
-          Label(entry.title, systemImage: sfSymbol)
-        } else {
-          Text(entry.title)
-        }
+        itemLabel
       }
       .keyboardShortcut(entry.shortcut?.keyboardShortcut)
       .disabled(entry.perform == nil)
     }
   }
+
+  @ViewBuilder
+  private var itemLabel: some View {
+    if let listIcon = entry.listIcon {
+      Label {
+        Text(entry.title)
+      } icon: {
+        RegistryMenuGlyph.iconView(for: listIcon)
+      }
+    } else if let sfSymbol = entry.sfSymbol {
+      Label(entry.title, systemImage: sfSymbol)
+    } else {
+      Text(entry.title)
+    }
+  }
+}
+
+@MainActor
+private enum RegistryMenuGlyph {
+  @ViewBuilder
+  static func iconView(for listIcon: RegistryMenuIcon) -> some View {
+    switch listIcon {
+    case .area(let emoji):
+      if let emoji, !emoji.isEmpty {
+        emojiImage(emoji)
+      } else {
+        areaDotImage
+      }
+    case .project(let progress):
+      projectProgressImage(progress)
+    }
+  }
+
+  #if os(macOS)
+  private static func emojiImage(_ text: String) -> some View {
+    let size: CGFloat = 15
+    let img = NSImage(size: NSSize(width: size, height: size), flipped: false) { rect in
+      let attr = NSAttributedString(string: text, attributes: [.font: NSFont.systemFont(ofSize: size * 0.8)])
+      let glyphSize = attr.size()
+      attr.draw(at: NSPoint(x: rect.midX - glyphSize.width / 2,
+                            y: rect.midY - glyphSize.height / 2))
+      return true
+    }
+    img.isTemplate = false
+    return Image(nsImage: img).renderingMode(.original)
+  }
+
+  private static var areaDotImage: some View {
+    let size: CGFloat = 14
+    let inset = size * (5.0 / 16)
+    let img = NSImage(size: NSSize(width: size, height: size), flipped: false) { rect in
+      NSColor.black.setFill()
+      NSBezierPath(ovalIn: rect.insetBy(dx: inset, dy: inset)).fill()
+      return true
+    }
+    img.isTemplate = true
+    return Image(nsImage: img).renderingMode(.template)
+  }
+
+  private static func projectProgressImage(_ value: Double) -> some View {
+    let clamped = value.isFinite ? max(0, min(1, value)) : 0
+    let diameter: CGFloat = 12
+    let lineWidth = diameter * (2.5 / 14)
+    let canvas = diameter + lineWidth
+    let img = NSImage(size: NSSize(width: canvas, height: canvas), flipped: false) { rect in
+      let circle = NSRect(x: lineWidth / 2, y: lineWidth / 2, width: diameter, height: diameter)
+      let track = NSBezierPath(ovalIn: circle)
+      track.lineWidth = lineWidth
+      NSColor.black.withAlphaComponent(0.25).setStroke()
+      track.stroke()
+      if clamped > 0 {
+        let arc = NSBezierPath()
+        arc.appendArc(withCenter: NSPoint(x: rect.midX, y: rect.midY),
+                      radius: diameter / 2,
+                      startAngle: 90,
+                      endAngle: 90 - 360 * CGFloat(clamped),
+                      clockwise: true)
+        arc.lineWidth = lineWidth
+        arc.lineCapStyle = .round
+        NSColor.black.setStroke()
+        arc.stroke()
+      }
+      return true
+    }
+    img.isTemplate = true
+    return Image(nsImage: img).renderingMode(.template)
+  }
+  #elseif canImport(UIKit)
+  private static func emojiImage(_ text: String) -> some View {
+    let size: CGFloat = 18
+    let renderer = UIGraphicsImageRenderer(size: CGSize(width: size, height: size))
+    let img = renderer.image { _ in
+      let attr = NSAttributedString(string: text, attributes: [.font: UIFont.systemFont(ofSize: size * 0.78)])
+      let glyphSize = attr.size()
+      attr.draw(at: CGPoint(x: (size - glyphSize.width) / 2,
+                            y: (size - glyphSize.height) / 2))
+    }.withRenderingMode(.alwaysOriginal)
+    return Image(uiImage: img).renderingMode(.original)
+  }
+
+  private static var areaDotImage: some View {
+    let size: CGFloat = 16
+    let inset = size * (5.0 / 16)
+    let renderer = UIGraphicsImageRenderer(size: CGSize(width: size, height: size))
+    let img = renderer.image { ctx in
+      UIColor.black.setFill()
+      ctx.cgContext.fillEllipse(in: CGRect(x: inset, y: inset,
+                                           width: size - inset * 2, height: size - inset * 2))
+    }.withRenderingMode(.alwaysTemplate)
+    return Image(uiImage: img).renderingMode(.template)
+  }
+
+  private static func projectProgressImage(_ value: Double) -> some View {
+    let clamped = value.isFinite ? max(0, min(1, value)) : 0
+    let diameter: CGFloat = 14
+    let lineWidth: CGFloat = 2.4
+    let canvas = diameter + lineWidth
+    let renderer = UIGraphicsImageRenderer(size: CGSize(width: canvas, height: canvas))
+    let img = renderer.image { ctx in
+      let cg = ctx.cgContext
+      let center = CGPoint(x: canvas / 2, y: canvas / 2)
+      let radius = diameter / 2
+      cg.setLineWidth(lineWidth)
+      cg.setStrokeColor(UIColor.black.withAlphaComponent(0.25).cgColor)
+      cg.addArc(center: center, radius: radius, startAngle: 0, endAngle: .pi * 2, clockwise: false)
+      cg.strokePath()
+      if clamped > 0 {
+        cg.setLineCap(.round)
+        cg.setStrokeColor(UIColor.black.cgColor)
+        let start = -CGFloat.pi / 2
+        let end = start + CGFloat(clamped) * .pi * 2
+        cg.addArc(center: center, radius: radius, startAngle: start, endAngle: end, clockwise: false)
+        cg.strokePath()
+      }
+    }.withRenderingMode(.alwaysTemplate)
+    return Image(uiImage: img).renderingMode(.template)
+  }
+  #else
+  private static func emojiImage(_ text: String) -> some View {
+    Text(text)
+  }
+
+  private static var areaDotImage: some View {
+    Image(systemName: RegistryIcons.sfSymbol(for: "place.area"))
+  }
+
+  private static func projectProgressImage(_ value: Double) -> some View {
+    Image(systemName: RegistryIcons.sfSymbol(for: "place.project"))
+  }
+  #endif
 }

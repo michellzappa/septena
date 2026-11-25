@@ -12,14 +12,7 @@ struct ContentView: View {
   var body: some View {
     @Bindable var nav = nav
     layout(path: $nav.path)
-      #if SEPTASK
       .tint(AppearancePreferences.shared.accentSwiftUIColor)
-      #else
-      .tint(theme.accent)
-      #endif
-      // Settings / QuickFind / AddInfo sheets are mounted at the
-      // RootTabView level (so they work from Week / Next, not just the
-      // Tasks tab which hosts ContentView).
   }
 
   @ViewBuilder
@@ -64,12 +57,6 @@ struct ContentView: View {
     } detail: {
       destination(for: route)
         .id(route.id)
-        #if os(iOS) && !SEPTASK
-        // Same as the sidebar column: one global overlay toggle on Septena's
-        // iPad Tasks tab. Septask has no window-level overlay bar, so it keeps
-        // the native system sidebar toggle on iPad and unfolded iPhone Duo.
-        .toolbar(removing: .sidebarToggle)
-        #endif
     }
     // A task manager needs its sidebar to reserve real layout space: opening
     // it should push the list/detail across, rather than floating over and
@@ -100,13 +87,9 @@ struct ContentView: View {
     switch route {
     case .filter(let f):  TaskListView(filter: f)
     case .next:
-      #if SEPTASK
       // Septask has no Next page (removed 2026-11-19). Nothing routes here;
       // a stray `.next` lands on Today rather than an empty pane.
       TaskListView(filter: .today)
-      #else
-      NextView()
-      #endif
     case .project(let id): ProjectRouteDestination(id: id).id(route.id)
     case .area(let id):    AreaRouteDestination(id: id).id(route.id)
   }

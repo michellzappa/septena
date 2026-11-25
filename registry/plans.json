@@ -1,11 +1,11 @@
 {
   "version": 1,
-  "description": "Plans and pricing for Septena, the task app (ADR 0010, ADR 0023). One source for the pricing page, the in-app Septena Plus page and the upsell moments. `limits` holds the machine values per plan; the server plan table reads the same values. `cells` is the copy for each level, and the generator checks that every numeric limit appears in its cell.",
+  "description": "Plans and pricing for Septena, the task app (ADR 0010, ADR 0023, ADR 0036, ADR 0037). One source for the pricing page, the in-app Septena Plus page and the upsell moments. `limits` holds the machine values per plan; the server plan table reads the same values. `cells` is the copy for each level, and the generator checks that every numeric limit appears in its cell.",
   "featureId": "sync.backend",
   "name": "Septena Plus",
   "shortName": "Plus",
   "headline": "Free on one device. Plus on all of them.",
-  "subhead": "Every task feature is free on the device you use. Plus syncs your list to all your devices and keeps its full history and files. It also lets your agents work without a daily cap.",
+  "subhead": "Every task feature is free on the device you use. A free account adds a backup and lets you connect one agent. Plus covers all your devices, three agents, synced files and a longer history.",
   "checkout": {
     "open": false,
     "notice": "Subscriptions open at App Store launch."
@@ -40,41 +40,50 @@
   ],
   "priceFootnote": "Prices include VAT where it applies. Outside the euro area, the App Store charges its matching local price.",
   "levels": [
-    { "id": "device", "title": "This device", "detail": "No account" },
-    { "id": "account", "title": "Free account", "detail": "Sign in with Apple" },
-    { "id": "plus", "title": "Plus", "detail": "€60 a year or €7 a month" }
+    { "id": "free", "title": "Free", "detail": "€0" },
+    { "id": "plus", "title": "Plus", "detail": "€60 a year or €7 a month" },
+    { "id": "pro", "title": "Pro", "detail": "Planned: €120 a year or €14 a month" }
   ],
+  "ladderHeadline": "Free on one device. Plus on all of them. Pro for all your agents.",
+  "cardRows": ["devices", "connected", "files", "history"],
+  "accountNote": "Backup, history and your agent need a free account. The app does not.",
+  "agentNote": "An agent is an AI you connect to your list, such as Claude.",
+  "fullApp": {
+    "title": "Every plan has the full task app",
+    "points": [
+      "Today with its Inbox, Upcoming, Anytime, Faded and Logbook",
+      "Areas, projects, sections, notes and attachments",
+      "When dates, deadlines and repeats",
+      "Task conversations with the on-device model",
+      "Import from Things and Apple Reminders",
+      "Export everything as plain JSON"
+    ]
+  },
   "cards": [
     {
       "id": "free",
       "title": "Free",
       "icon": "plans.free",
       "priceLabel": "€0",
-      "detail": "The full task app on one iPhone, iPad or Mac. You do not need an account.",
-      "points": [
-        "Today with its Inbox, Upcoming, Anytime, Faded and Logbook",
-        "Areas, projects, sections, notes and attachments",
-        "When dates, deadlines and repeats",
-        "Task conversations with the on-device model",
-        "Import from Things and Apple Reminders",
-        "Export everything as plain JSON"
-      ],
-      "footnote": "Sign in for a free account. The server then keeps a backup of that device, and you can try agents on real tasks."
+      "detail": "The full task app on one iPhone, iPad or Mac. You do not need an account."
     },
     {
       "id": "plus",
       "title": "Septena Plus",
       "icon": "settings.plus",
       "highlighted": true,
-      "detail": "Plus is the same app on every device, and nothing in it is capped.",
-      "points": [
-        "Live sync on every iPhone, iPad and Mac",
-        "A year of change history, and 90 days to restore deleted tasks",
-        "Files and images synced, up to 10 GB",
-        "Your agents work your tasks without a daily cap",
-        "Early builds on TestFlight"
-      ],
+      "detail": "Your list on every device, updated live.",
       "footnote": "Everything in Free is included."
+    },
+    {
+      "id": "pro",
+      "title": "Septena Pro",
+      "icon": "list.anytime",
+      "status": "planned",
+      "priceLabel": "€120 a year",
+      "priceDetail": "Or €14 a month.",
+      "detail": "For people who run many agents on one list.",
+      "footnote": "Everything in Plus is included."
     }
   ],
   "outcomes": [
@@ -84,10 +93,10 @@
       "title": "Your list everywhere",
       "detail": "The same tasks on your phone, tablet and Mac, updated as you type.",
       "rows": [
-        { "id": "devices", "label": "Devices", "limit": "devices", "featureId": "sync.backend", "cells": { "device": "1, not synced", "account": "1, backed up", "plus": "All your devices" } },
-        { "id": "live", "label": "Sync speed", "limit": "liveSync", "featureId": "sync.backend", "cells": { "device": false, "account": "Every few minutes", "plus": "Live" } },
-        { "id": "new_device", "label": "Move to a new device", "featureId": "sync.backend", "cells": { "device": "Export and import", "account": true, "plus": true } },
-        { "id": "watch", "label": "Apple Watch through the server", "cells": { "device": false, "account": false, "plus": true } }
+        { "id": "devices", "label": "Devices", "limit": "devices", "featureId": "sync.backend", "cells": { "free": "1", "plus": "All your devices", "pro": "All your devices" } },
+        { "id": "backup", "label": "Backup on our server", "featureId": "sync.backend", "cells": { "free": true, "plus": true, "pro": true } },
+        { "id": "new_device", "label": "Move to a new device", "featureId": "sync.backend", "cells": { "free": true, "plus": true, "pro": true } },
+        { "id": "beta", "label": "Early builds on TestFlight", "cells": { "free": false, "plus": true, "pro": true } }
       ]
     },
     {
@@ -96,11 +105,10 @@
       "title": "Nothing lost",
       "detail": "See who changed what and bring back what you deleted. Your files open on every device.",
       "rows": [
-        { "id": "history", "label": "Change history", "limit": "changeLogDays", "featureId": "task.history", "cells": { "device": "On this device", "account": "30 days", "plus": "365 days" } },
-        { "id": "logbook", "label": "Logbook", "limit": "logbookDays", "featureId": "lists.logbook", "cells": { "device": "All", "account": "Last 90 days", "plus": "All" } },
-        { "id": "deleted", "label": "Recently Deleted", "limit": "recentlyDeletedDays", "featureId": "lists.recently-deleted", "cells": { "device": "30 days", "account": "30 days", "plus": "90 days" } },
-        { "id": "files", "label": "Files and images", "limit": "attachmentsGB", "featureId": "task.attachments", "cells": { "device": "On this device", "account": "On the device that added them", "plus": "Synced, up to 10 GB" } },
-        { "id": "export", "label": "Export as JSON", "cells": { "device": true, "account": true, "plus": true } }
+        { "id": "history", "label": "Change history", "limit": "changeLogDays", "featureId": "task.history", "cells": { "free": "30 days", "plus": "365 days", "pro": "365 days" } },
+        { "id": "deleted", "label": "Recently Deleted", "limit": "recentlyDeletedDays", "featureId": "lists.recently-deleted", "cells": { "free": "30 days", "plus": "30 days", "pro": "30 days" } },
+        { "id": "files", "label": "Files", "limit": "attachmentsGB", "featureId": "task.attachments", "cells": { "free": "On your device", "plus": "10 GB synced", "pro": "50 GB synced" } },
+        { "id": "export", "label": "Export as JSON", "cells": { "free": true, "plus": true, "pro": true } }
       ]
     },
     {
@@ -109,22 +117,19 @@
       "title": "Help that keeps working",
       "detail": "Connect Claude or another agent to your list. It asks before it acts, and you can stop it at any time.",
       "rows": [
-        { "id": "connector", "label": "Claude connector", "limit": "connectorWritesPerDay", "featureId": "agents.connector", "cells": { "device": false, "account": "Reads, and 25 changes a day", "plus": "No daily cap" } },
-        { "id": "runs", "label": "Agent runs", "limit": "agentRunsPerMonth", "featureId": "lists.agent", "cells": { "device": false, "account": "10 a month", "plus": "Within a monthly run budget" } },
-        { "id": "share", "label": "Shared projects", "limit": "createShares", "status": "planned", "cells": { "device": false, "account": "Join", "plus": "Create and invite" } }
+        { "id": "connected", "label": "Agents", "limit": "connectedAgents", "featureId": "agents.connector", "cells": { "free": "1", "plus": "3", "pro": "No limit" } },
+        { "id": "share", "label": "Shared projects", "limit": "createShares", "status": "planned", "cells": { "free": "Join", "plus": "Create and invite", "pro": "Create and invite" } }
       ]
     }
   ],
   "limits": {
     "account": {
       "devices": 1,
-      "liveSync": false,
+      "liveSync": true,
       "changeLogDays": 30,
-      "logbookDays": 90,
       "recentlyDeletedDays": 30,
       "attachmentsGB": 0,
-      "connectorWritesPerDay": 25,
-      "agentRunsPerMonth": 10,
+      "connectorWritesPerDay": 500,
       "connectedAgents": 1,
       "createShares": false,
       "linkedProjects": 1
@@ -133,12 +138,10 @@
       "devices": null,
       "liveSync": true,
       "changeLogDays": 365,
-      "logbookDays": null,
-      "recentlyDeletedDays": 90,
+      "recentlyDeletedDays": 30,
       "attachmentsGB": 10,
       "connectorWritesPerDay": null,
-      "agentRunsPerMonth": null,
-      "connectedAgents": null,
+      "connectedAgents": 3,
       "createShares": true,
       "linkedProjects": null
     }
@@ -153,8 +156,7 @@
     { "id": "second_device", "title": "This device is not syncing", "detail": "A free account syncs one device. Plus syncs all of them. You can also move your free account to this device." },
     { "id": "history_edge", "title": "Older changes are hidden", "detail": "A free account shows 30 days of history. Plus shows a full year." },
     { "id": "file_elsewhere", "title": "This file is on another device", "detail": "Plus syncs files and images to all your devices." },
-    { "id": "agent_runs", "title": "Agent runs resume on the 1st", "detail": "Your free account used its 10 runs this month. The work waits for you. Plus runs it now." },
-    { "id": "connector_cap", "title": "Daily change limit reached", "detail": "A free account allows 25 agent changes a day. Plus has no daily cap." },
+    { "id": "connector_cap", "title": "Daily change limit reached", "detail": "A free account allows 500 agent changes a day. Your agent can make changes again tomorrow. Plus has no daily limit." },
     { "id": "share_create", "title": "Sharing a project needs Plus", "detail": "Anyone can join a shared project for free. Plus lets you create one and invite people." },
     { "id": "trial_end", "title": "Your 14 days of Plus have ended", "detail": "Your account is now a free account. One device keeps syncing. Your tasks on every device stay where they are." }
   ],

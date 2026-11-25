@@ -111,7 +111,8 @@ async function connectorPlan(env: Env, userId: string, surface: string): Promise
   try {
     return { state: await planFor(env, userId, [usageKeys.connectorWrites(), usageKeys.agentRuns()]), block: false };
   } catch (e) {
-    return { state: null, block: planCheckFailed(env, userId, surface, e) === "block" };
+    // Connector writes and agent claims stay fail-closed (spec §6.4 finding 6).
+    return { state: null, block: planCheckFailed(env, userId, surface, e, "closed") === "block" };
   }
 }
 
@@ -273,18 +274,11 @@ async function callTool(
     const args = zAgentArgs[name as AgentToolName].safeParse(params.arguments ?? {});
     if (!args.success) return invalidArgs(id, args.error, era);
     // A release always works: it hands the task back. A claim is one agent
-    // run (a renewal is not). History reads show the plan's window.
+    // run (a renewal is not): counted, not capped. History reads show the plan's window.
     let historySince: string | null = null;
     if (name === "tasks_claim" || name === "tasks_history" || name === "tasks_activity") {
       const { state, block } = await connectorPlan(env, grant.userId, name);
       if (block) return rpcResult(id, { isError: true, content: [{ type: "text", text: PLAN_CHECK_FAILED_MESSAGE }] }, era);
-      if (state && name === "tasks_claim") {
-        const breach: LimitBreach | null = atCap(state.usage[usageKeys.agentRuns()], state.limits.agentRunsPerMonth)
-          ? { limit: "agentRunsPerMonth", upsell: "agent_runs" } : null;
-        if (decide(env, grant.userId, "mcp_claim", state, breach) === "block") {
-          return rpcResult(id, { isError: true, content: [{ type: "text", text: limitMessage(breach!) }] }, era);
-        }
-      }
       historySince = historyCutoff(env, state?.limits ?? null);
     }
     const result = await runAgentTool(store, grant.clientId, name as AgentToolName, args.data as Record<string, unknown>, historySince);
@@ -545,11 +539,12 @@ export async function listTasks(
     };
   }
   if (view === "review") {
-    const { rows, notes, total } = await store.readReviewTasks(limit);
+    const { rows, notes, ats, total } = await store.readReviewTasks(limit);
     const tasks = rows.map((row) => {
       const out = withChecklist(taskOut(row));
       const note = notes[out.id];
-      return stripDays(note ? { ...out, reviewNote: note } : out);
+      const at = ats[out.id];
+      return stripDays({ ...out, ...(note ? { reviewNote: note } : {}), ...(at ? { reviewAt: at } : {}) });
     });
     return { tasks, total, truncated: total > rows.length };
   }
@@ -635,7 +630,7 @@ export async function searchTasks(store: StoreRpc, timeZone: string, a: SearchAr
 
 /// A TaskStore task row in the live `tasks_list` shape (tools/taskShared.ts
 /// TaskOut), key order included.
-function taskOut(r: Row, tagMap?: Map<string, string>): TaskOut {
+export function taskOut(r: Row, tagMap?: Map<string, string>): TaskOut {
   const unit = str(r.recurrenceUnit);
   const resolvedTags = Array.isArray(r.tags) && tagMap
     ? (r.tags as unknown[])

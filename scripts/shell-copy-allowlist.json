@@ -13,36 +13,6 @@
       "reasonId": "predates-rule"
     },
     {
-      "file": "Septena/Shell/Capture/QuickFindView.swift",
-      "literal": "Search Tasks",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Capture/QuickFindView.swift",
-      "literal": "Find any task, project, or area.",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Sections/SectionDrawer.swift",
-      "literal": "Couldn't load",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Sections/SectionDrawer.swift",
-      "literal": "Try again",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Sections/SectionDrawer.swift",
-      "literal": "Free-form content",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Sections/SectionDrawer.swift",
-      "literal": "Inset 14h / 12v from the rounded edge.",
-      "reasonId": "predates-rule"
-    },
-    {
       "file": "Septena/Shell/Sections/SectionDrawer.swift",
       "literal": "Discard",
       "reasonId": "predates-rule"
@@ -50,31 +20,6 @@
     {
       "file": "Septena/Shell/Sections/SectionDrawer.swift",
       "literal": "Keep Editing",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Sections/TimeTravelSheet.swift",
-      "literal": "Date",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Sections/TimeTravelSheet.swift",
-      "literal": "Pick a Date…",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Sections/TimeTravelSheet.swift",
-      "literal": "View This Day",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Sections/TimeTravelSheet.swift",
-      "literal": "Jump to Today",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Sections/TimeTravelSheet.swift",
-      "literal": "Time Travel",
       "reasonId": "predates-rule"
     },
     {
@@ -169,11 +114,6 @@
     },
     {
       "file": "Septena/Shell/Sidebar/SidebarView.swift",
-      "literal": "Task Settings",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Sidebar/SidebarView.swift",
       "literal": "Area",
       "reasonId": "predates-rule"
     },
@@ -195,16 +135,6 @@
     {
       "file": "Septena/Shell/Tasks/ConversationCard.swift",
       "literal": "Agent work stopped",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Tasks/ConversationCard.swift",
-      "literal": "Resume",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Tasks/ConversationCard.swift",
-      "literal": "Stop",
       "reasonId": "predates-rule"
     },
     {
@@ -399,27 +329,7 @@
     },
     {
       "file": "Septena/Shell/Tasks/TaskListView.swift",
-      "literal": "Sign in to iCloud",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Tasks/TaskListView.swift",
-      "literal": "Your tasks sync through iCloud. Sign in from the Settings app to see them here.",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Tasks/TaskListView.swift",
-      "literal": "Getting your data",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Tasks/TaskListView.swift",
       "literal": "Add Section",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Tasks/TaskPatternsSection.swift",
-      "literal": "Check a few things off and your completion pattern shows up here.",
       "reasonId": "predates-rule"
     },
     {
@@ -568,26 +478,6 @@
       "reasonId": "predates-rule"
     },
     {
-      "file": "Septena/Shell/Tasks/TasksQuickAddMenu.swift",
-      "literal": "Create in Inbox…",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Tasks/TasksQuickAddMenu.swift",
-      "literal": "Go to Today",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Tasks/TasksQuickAddMenu.swift",
-      "literal": "Today",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/UI/Accessibility.swift",
-      "literal": "Undo",
-      "reasonId": "predates-rule"
-    },
-    {
       "file": "Septena/Shell/UI/AppIconPickerSection.swift",
       "literal": "App Icon",
       "reasonId": "predates-rule"
@@ -623,11 +513,6 @@
       "reasonId": "predates-rule"
     },
     {
-      "file": "Septena/Shell/UI/DayBucketHeader.swift",
-      "literal": "Now",
-      "reasonId": "predates-rule"
-    },
-    {
       "file": "Septena/Shell/UI/EmojiPicker.swift",
       "literal": "Emoji",
       "reasonId": "predates-rule"
@@ -635,11 +520,6 @@
     {
       "file": "Septena/Shell/UI/EmojiPicker.swift",
       "literal": "More…",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/UI/ProfileAvatar.swift",
-      "literal": "Free",
       "reasonId": "predates-rule"
     },
     {
@@ -780,16 +660,6 @@
     {
       "file": "Septask/SeptaskSettingsView.swift",
       "literal": "Smart Lists",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septask/SeptaskSignIn.swift",
-      "literal": "Sign out",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septask/SeptaskSignIn.swift",
-      "literal": "Sync",
       "reasonId": "predates-rule"
     },
     {

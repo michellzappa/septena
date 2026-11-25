@@ -8,6 +8,7 @@ import AppKit
 ///
 /// Menus are built fresh on every open from the current selection, so no item
 /// state is cached and nothing needs revalidating.
+@MainActor
 enum KitRegistryMenu {
   static func build(_ nodes: [RegistryMenuNode]) -> NSMenu {
     let menu = NSMenu()
@@ -39,6 +40,7 @@ enum KitRegistryMenu {
 }
 
 /// An `NSMenuItem` that runs a closure. The item is its own target.
+@MainActor
 final class KitClosureMenuItem: NSMenuItem {
   private let handler: (() -> Void)?
 
@@ -48,7 +50,14 @@ final class KitClosureMenuItem: NSMenuItem {
     target = self
     isEnabled = entry.perform != nil
     state = entry.isOn ? .on : .off
-    image = entry.sfSymbol.flatMap { NSImage(systemSymbolName: $0, accessibilityDescription: nil) }
+    switch entry.listIcon {
+    case .area(let emoji):
+      image = KitGlyph.area(emoji: emoji, diameter: 14)
+    case .project(let progress):
+      image = KitGlyph.progress(progress, tint: SeptaskKitTheme.inkSecondary, diameter: 12)
+    case nil:
+      image = entry.sfSymbol.flatMap { NSImage(systemSymbolName: $0, accessibilityDescription: nil) }
+    }
     if let shortcut = entry.shortcut {
       keyEquivalent = shortcut.appKitKeyEquivalent
       keyEquivalentModifierMask = shortcut.appKitModifiers

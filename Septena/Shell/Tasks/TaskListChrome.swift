@@ -138,24 +138,18 @@ private struct TaskCardChrome: ViewModifier {
   @State private var hovered = false
   @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
   @Environment(\.colorScheme) private var colorScheme
-  #if SEPTASK
   private let appearance = AppearancePreferences.shared
-  #endif
 
+  /// Every row — including an open inline composer (create or edit) — inherits
+  /// its card position's corner rounding (top / middle / bottom / solo) so it
+  /// stays flush with adjacent closed rows instead of rounding all four corners
+  /// mid-group (#204).
   private var effectiveShape: UnevenRoundedRectangle {
-    #if os(iOS)
-    isEditing ? TaskCardPosition.solo.cardShape : position.cardShape
-    #else
     position.cardShape
-    #endif
   }
 
   private var useLiquidGlass: Bool {
-    #if SEPTASK
     return appearance.hasActiveTexture && !reduceTransparency && !isEditing
-    #else
-    return false
-    #endif
   }
 
   func body(content: Content) -> some View {
@@ -1121,16 +1115,8 @@ struct QuickDropProjectTray: View {
 
   private func areaDropRow(_ area: Area) -> some View {
     HStack(spacing: 8) {
-      if let emoji = area.emoji, !emoji.isEmpty {
-        Text(emoji)
-          .scaledFont(size: 14)
-          .frame(width: 20, alignment: .center)
-      } else {
-        Image(systemName: "square.stack.3d.up")
-          .scaledFont(size: 13, weight: .medium)
-          .foregroundStyle(Theme.inkSecondary)
-          .frame(width: 20, alignment: .center)
-      }
+      AreaIcon(tint: Theme.inkSecondary, diameter: 16, emoji: area.emoji)
+        .frame(width: 20, alignment: .center)
       Text(area.title)
         .font(.septenaTaskTitle.weight(.semibold))
         .foregroundStyle(Theme.inkPrimary)
