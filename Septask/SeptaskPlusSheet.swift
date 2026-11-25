@@ -226,7 +226,7 @@ private struct PlusOwnedView: View {
     case "apple": return RegistryPlans.Paywall.ownedApple
     case "stripe": return RegistryPlans.Paywall.ownedWeb
     case "google": return RegistryPlans.Paywall.ownedGoogle
-    default: return RegistryPlans.Paywall.ownedGrant
+    default: return PlanStatus.shared.isPro ? RegistryPlans.Paywall.ownedGrantPro : RegistryPlans.Paywall.ownedGrant
     }
   }
 }

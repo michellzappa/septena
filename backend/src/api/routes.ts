@@ -40,6 +40,7 @@ import {
   appAccountTokenFor,
   attachmentQuotaBytes,
   decide,
+  grantRow,
   historyCutoff,
   historyEdgeUpsell,
   isEnforcing,
@@ -888,23 +889,15 @@ api.post("/admin/grants", async (c) => {
     userId: zUserId,
     name: zGrantName,
     note: z.string().max(200).optional(),
+    plan: z.enum(["plus", "pro"]).default("plus"),
     expiresAt: z.string().datetime().optional(),
   }).strict());
   if (body instanceof Response) return body;
   const now = Date.now();
   const store = storeFor(c.env, body.userId);
-  await store.putEntitlement({
-    id: `grant:${body.name}`,
-    source: "grant",
-    productId: null,
-    expiresAt: body.expiresAt ? Date.parse(body.expiresAt) : null,
-    originalTransactionId: null,
-    status: "active",
-    environment: null,
-    note: body.note ?? null,
-    signedAt: now,
-  }, "admin");
-  logEvent("entitlement_grant", { userId: body.userId, name: body.name });
+  const expiresAt = body.expiresAt ? Date.parse(body.expiresAt) : null;
+  await store.putEntitlement(grantRow(`grant:${body.name}`, body.plan, expiresAt, body.note ?? null, now), "admin");
+  logEvent("entitlement_grant", { userId: body.userId, name: body.name, plan: body.plan });
   const rows = await store.entitlements();
   return c.json({ active: rows.some((r) => isRowActive(r, now)), entitlements: rows });
 });
