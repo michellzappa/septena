@@ -23,7 +23,8 @@ import {
   zPairDenyBody,
   zPairInspectBody,
 } from "../shadow/oauth.js";
-import { disconnectFamily } from "../shadow/tokens.js";
+import { MCP_READ_SCOPE, disconnectFamily, hasScope, verifyMcpAccess } from "../shadow/tokens.js";
+import { MAX_AGENT_WEBHOOKS, validateWebhookUrl } from "./agentWake.js";
 import {
   TRIAL_ROW_ID,
   appAccountTokenFor,
@@ -179,6 +180,38 @@ async function requireUser(c: Ctx, next: Next) {
   await next();
 }
 
+/// Accepts either an app session bearer token (`sa1.*`) or an MCP OAuth access
+/// token (`sm1.*`) with `tasks:read` scope. Used by the agent wake event stream
+/// so both the app and background runners can subscribe.
+async function requireAgentOrUser(c: Ctx, next: Next) {
+  const header = c.req.header("Authorization") ?? "";
+  const token = header.startsWith("Bearer ") ? header.slice(7) : "";
+  if (!token) return c.json({ error: "unauthorized" }, 401, { "WWW-Authenticate": "Bearer" });
+
+  if (token.startsWith("sm1.")) {
+    const grant = await verifyMcpAccess(c.env, token);
+    if (!grant) return c.json({ error: "unauthorized" }, 401, { "WWW-Authenticate": "Bearer" });
+    if (!hasScope(grant, MCP_READ_SCOPE)) {
+      return c.json({ error: "insufficient_scope", scope: MCP_READ_SCOPE }, 403);
+    }
+    c.set("userId", grant.userId);
+    c.set("sid", null);
+    c.set("client", null);
+    c.set("actor", `mcp:${grant.clientId}`);
+    await next();
+    return;
+  }
+
+  const claims = await verifyAccessToken(c.env, token);
+  if (!claims) return c.json({ error: "unauthorized" }, 401, { "WWW-Authenticate": "Bearer" });
+  const client = zClientName.safeParse(c.req.header("X-Septena-Client"));
+  c.set("userId", claims.userId);
+  c.set("sid", claims.sid);
+  c.set("client", client.success ? client.data : null);
+  c.set("actor", `app:${client.success ? client.data : "unknown"}`);
+  await next();
+}
+
 /// A refusal for a broken limit (enforce mode only): 402 with the limit, the
 /// upsell moment (spec §3.2) and its words.
 function limitRefusal(c: Ctx, error: string, breach: LimitBreach) {
@@ -246,6 +279,9 @@ api.use("/tasks", requireUser, loadPlan("open", "tasks"));
 api.use("/tasks/*", requireUser, loadPlan("open", "tasks"));
 api.use("/access", apiHostOnly, requireUser);
 api.use("/access/*", apiHostOnly, requireUser);
+api.use("/agent/events/*", apiHostOnly, requireAgentOrUser);
+api.use("/agent/webhooks", apiHostOnly, requireUser);
+api.use("/agent/webhooks/*", apiHostOnly, requireUser);
 api.use("/entitlement", apiHostOnly, requireUser);
 api.use("/entitlement/*", apiHostOnly, requireUser);
 api.use("/webhooks/*", apiHostOnly);
@@ -926,6 +962,64 @@ api.get("/ical/:tokenFile", async (c) => {
       "Content-Disposition": 'inline; filename="septena-tasks.ics"',
     },
   });
+});
+
+// ---- agent wake transport (docs/TASK_FACTORY_SPEC.md §4, §8, issue #5) ----
+// Multi-user wake plumbing backed by the user's TaskStore DO:
+//   - GET  /v1/agent/events/stream  — SSE (`text/event-stream`) or WebSocket
+//     upgrade with `since` / `Last-Event-ID` replay + live push + heartbeats.
+//   - GET  /v1/agent/webhooks       — list registered outbound webhooks.
+//   - POST /v1/agent/webhooks       — register a signed outbound HTTPS webhook.
+//   - DELETE /v1/agent/webhooks/:id — remove a webhook.
+
+api.get("/agent/events/stream", async (c) => {
+  const rawCursor = c.req.query("since") ?? c.req.header("Last-Event-ID");
+  if (rawCursor !== undefined && rawCursor !== "") {
+    if (!/^\d+$/.test(rawCursor) || !Number.isSafeInteger(Number(rawCursor))) {
+      return c.json({ error: "invalid_request" }, 400);
+    }
+  }
+  return storeFor(c.env, c.get("userId")).fetch(c.req.raw);
+});
+
+const zCreateWebhookBody = z.object({
+  url: z.string().min(1).max(2048),
+  secret: z.string().min(16).max(256).optional(),
+  enabled: z.boolean().optional(),
+}).strict();
+
+api.get("/agent/webhooks", async (c) => {
+  const webhooks = await storeFor(c.env, c.get("userId")).listAgentWebhooks();
+  return c.json({ webhooks }, 200, { "Cache-Control": "no-store" });
+});
+
+api.post("/agent/webhooks", async (c) => {
+  const body = await parse(c, zCreateWebhookBody);
+  if (body instanceof Response) return body;
+  const validated = validateWebhookUrl(body.url);
+  if (!validated.ok) {
+    return c.json({ error: "invalid_webhook_url", reason: validated.reason }, 400);
+  }
+  const secret = body.secret ?? `whsec_${randomId(32)}`;
+  const res = await storeFor(c.env, c.get("userId")).createAgentWebhook(
+    validated.url,
+    secret,
+    body.enabled ?? true,
+  );
+  if (!res.ok) {
+    return c.json({ error: "webhook_limit_reached", max: MAX_AGENT_WEBHOOKS }, 409);
+  }
+  logEvent("agent_webhook_created", { webhookId: res.webhook.id });
+  return c.json(res.webhook, 201, { "Cache-Control": "no-store" });
+});
+
+api.delete("/agent/webhooks/:id", async (c) => {
+  const id = zId.safeParse(c.req.param("id"));
+  if (!id.success) return c.json({ error: "invalid_request" }, 400);
+  const removed = await storeFor(c.env, c.get("userId")).deleteAgentWebhook(id.data);
+  if (!removed) return c.json({ error: "not_found" }, 404);
+  logEvent("agent_webhook_deleted", { webhookId: id.data });
+  return c.body(null, 204);
 });
 
 // ---- account deletion (§10) ----

@@ -149,6 +149,7 @@ export async function createTestTaskStore(existing?: DatabaseSync, envOverrides:
   let alarm: number | null = null;
   let inTx = false;
   const pendingWaitUntil: Promise<unknown>[] = [];
+  const sockets: Array<{ ws: WebSocket; tags: string[] }> = [];
 
   const ctx = {
     storage: {
@@ -180,18 +181,25 @@ export async function createTestTaskStore(existing?: DatabaseSync, envOverrides:
       pendingWaitUntil.push(Promise.resolve(p));
     },
     setWebSocketAutoResponse() {},
-    getWebSockets() { return []; },
+    acceptWebSocket(ws: WebSocket, tags?: string[]) {
+      sockets.push({ ws, tags: tags ?? [] });
+    },
+    getWebSockets(tag?: string) {
+      if (!tag) return sockets.map((s) => s.ws);
+      return sockets.filter((s) => s.tags.includes(tag)).map((s) => s.ws);
+    },
   };
+
+  async function flushWaitUntil(): Promise<void> {
+    while (pendingWaitUntil.length > 0) {
+      const batch = pendingWaitUntil.splice(0, pendingWaitUntil.length);
+      await Promise.allSettled(batch);
+    }
+  }
 
   // Expose an RPC-like async proxy matching `StoreRpc` as well as direct calls.
   const store = new TaskStore(ctx as never, envOverrides as never);
-  const flushWaitUntil = async () => {
-    while (pendingWaitUntil.length > 0) {
-      const batch = pendingWaitUntil.splice(0, pendingWaitUntil.length);
-      await Promise.all(batch);
-    }
-  };
-  return { store, db, flushWaitUntil };
+  return { store, db, flushWaitUntil, sockets };
 }
 
 /// Creates a real `AccountStore` instance backed by an in-memory SQLite
