@@ -3480,6 +3480,12 @@
       "surfaces.taskAttributes.discuss.workingLabel"
     ]
   },
+  "This Apple ID's Plus belongs to another Septena account. Sign in to that account to use it.": {
+    "text": "This Apple ID's Plus belongs to another Septena account. Sign in to that account to use it.",
+    "paths": [
+      "plans.paywall.ownedOtherAccount"
+    ]
+  },
   "This account is already set up. Your tasks are syncing to this device.": {
     "text": "This account is already set up. Your tasks are syncing to this device.",
     "paths": [

@@ -7,6 +7,7 @@
 
 import Foundation
 import Observation
+import StoreKit
 
 /// Wire shape of `GET /v1/entitlement` (backend/src/api/routes.ts).
 struct BackendEntitlement: Decodable, Sendable {
@@ -97,6 +98,9 @@ final class PlanStatus {
   /// exists, none is active, and no other row ever existed.
   private(set) var trialEnded = false
   @ObservationIgnored private var lastLimitRefreshAt: Date = .distantPast
+  /// This Apple ID holds a verified Plus entitlement whose `appAccountToken`
+  /// belongs to another Septena account (spec §6.4 finding 7).
+  private(set) var plusOwnedByAnotherAccount = false
 
   private init() {}
 
@@ -108,11 +112,12 @@ final class PlanStatus {
     }
   }
 
-  /// The account may buy Plus here: signed in and not already paying from
-  /// any source. The trial may buy; billing then starts that day.
+  /// The account may buy Plus here: signed in, not already paying from
+  /// any source, and this Apple ID does not already hold Plus for another
+  /// Septena account. The trial may buy; billing then starts that day.
   var canPurchase: Bool {
     switch plan {
-    case .free, .trial: return appAccountToken != nil
+    case .free, .trial: return appAccountToken != nil && !plusOwnedByAnotherAccount
     default: return false
     }
   }
@@ -168,6 +173,7 @@ final class PlanStatus {
       serverBlockedDevice = false
       syncThisDeviceLimitMessage = nil
       trialEnded = false
+      plusOwnedByAnotherAccount = false
       return
     }
     do {
@@ -188,6 +194,24 @@ final class PlanStatus {
     } catch {
       lastError = error.localizedDescription
     }
+    plusOwnedByAnotherAccount = await Self.checkPlusOwnedByAnotherAccount(accountToken: appAccountToken)
+  }
+
+  private static func checkPlusOwnedByAnotherAccount(accountToken: UUID?) async -> Bool {
+    guard let accountToken else { return false }
+    var entitlements: [StoreEntitlementSummary] = []
+    for await result in Transaction.currentEntitlements {
+      guard case .verified(let transaction) = result else { continue }
+      entitlements.append(StoreEntitlementSummary(
+        productID: transaction.productID,
+        appAccountToken: transaction.appAccountToken
+      ))
+    }
+    return PlusAccountOwnership.isOwnedByAnotherAccount(
+      entitlements: entitlements,
+      plusProductIDs: PlusStore.productIDs,
+      accountToken: accountToken
+    )
   }
 
   /// Records a live HTTP 402 plan-limit refusal from any backend call

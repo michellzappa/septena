@@ -80,7 +80,11 @@ final class PlusStore {
       switch await deliver(verification) {
       case .recorded: outcome = .success
       case .retryLater: outcome = .serverRetry
-      case .refused: outcome = .failed
+      case .refused:
+        // If StoreKit holds Plus for another Septena account, leave outcome
+        // clear so the sheet shows the wrong-account message instead of a
+        // generic failure (spec §6.4 finding 7).
+        outcome = PlanStatus.shared.plusOwnedByAnotherAccount ? nil : .failed
       }
     case .success(.pending):
       outcome = .pending
@@ -121,10 +125,14 @@ final class PlusStore {
         await transaction.finish()
         await PlanStatus.shared.refresh()
         return .recorded
-      case 400, 403, 422:
-        // The server will never accept this one (bad signature, another
-        // account, a product it does not sell). Finishing it does not end
-        // the subscription; it stops StoreKit from handing it back forever.
+      case 403:
+        await transaction.finish()
+        await PlanStatus.shared.refresh()
+        return .refused
+      case 400, 422:
+        // The server will never accept this one (bad signature, a product it
+        // does not sell). Finishing it does not end the subscription; it stops
+        // StoreKit from handing it back forever.
         await transaction.finish()
         return .refused
       default:

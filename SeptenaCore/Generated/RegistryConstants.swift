@@ -2000,6 +2000,7 @@ enum RegistryPlans {
     static var ownedWeb: String { RegistryL10n.t("You have Plus through the web. Manage it at septena.app.") }
     static var ownedGoogle: String { RegistryL10n.t("You have Plus through Google Play. Manage it in Google Play.") }
     static var ownedGrant: String { RegistryL10n.t("Plus is on for this account.") }
+    static var ownedOtherAccount: String { RegistryL10n.t("This Apple ID's Plus belongs to another Septena account. Sign in to that account to use it.") }
     static var syncThisDeviceFailed: String { RegistryL10n.t("Septena could not reach the server. Try again in a moment.") }
     static var done: String { RegistryL10n.t("Done") }
   }
