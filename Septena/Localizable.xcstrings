@@ -5759,6 +5759,18 @@
     "Missed" : {
 
     },
+    "MIT License" : {
+      "comment" : "Generated from registry settings.pages.about.sections.open_source.items.0.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Licença MIT"
+          }
+        }
+      }
+    },
     "Mixed" : {
       "localizations" : {
         "pt-BR" : {
@@ -7026,6 +7038,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Abrir no Calendário"
+          }
+        }
+      }
+    },
+    "Open source" : {
+      "comment" : "Generated from registry settings.pages.about.sections.open_source.items.0.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Código aberto"
           }
         }
       }

@@ -114,11 +114,11 @@ const VISUAL = {
   },
   // Slide 8: yours, built in the open. No screen: one symbol per claim
   // (mz, 2026-11-23). Every claim is in the store description (YOURS, BUILT
-  // IN THE OPEN) and the Privacy & Data page; icons are Lucide names.
+  // IN THE OPEN) and the About / Privacy & Data pages; icons are Lucide names.
   open:           {
     fruit: "haskap", texture: "ridges",
     // Each promise traces to the store description (YOURS, BUILT IN THE OPEN)
-    // or the Privacy & Data page (registry/settings.json). Sync needs an
+    // or the About / Privacy & Data pages (registry/settings.json). Sync needs an
     // account, so "no account" is said as "start without one".
     claims: [
       { icon: "code", title: "Open source, MIT License", body: "Every line of the apps and the sync server is public.", wide: true, dark: true },
