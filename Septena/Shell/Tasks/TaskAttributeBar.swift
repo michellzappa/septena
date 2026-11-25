@@ -147,6 +147,8 @@ struct TaskAttributeBar: View {
   @State private var addingReference = false
   /// The links of the draft's text that are not references yet.
   @State private var suggestions: [TaskRefRows.Offer] = []
+  /// The other open tasks that point at the same things.
+  @State private var alsoIn: [TaskRefLookup.Other] = []
   /// The Checklist pill was tapped on a task with no steps yet. A task WITH
   /// steps shows its checklist without this (same as the Mac composer).
   @State private var checklistOpened = false
@@ -320,8 +322,8 @@ struct TaskAttributeBar: View {
 
   @ViewBuilder
   private func suggestionChips(for task: SeptenaTask) -> some View {
-    if !suggestions.isEmpty {
-      TaskReferenceSuggestions(offers: suggestions) { offer in
+    if !suggestions.isEmpty || !alsoIn.isEmpty {
+      TaskReferenceSuggestions(offers: suggestions, others: alsoIn) { offer in
         // Any result but a new reference reads the store again, too.
         _ = TaskRefActions.add(offer.input, to: task.id)
         reloadSuggestions()
@@ -332,10 +334,13 @@ struct TaskAttributeBar: View {
   private func reloadSuggestions() {
     guard showsReferences, let task = discussTask, task.deletedAt == nil else {
       suggestions = []
+      alsoIn = []
       return
     }
     let next = TaskRefActions.suggestions(taskID: task.id, title: draft.title, notes: draft.notes)
     if next != suggestions { suggestions = next }
+    let others = TaskRefActions.alsoIn(taskID: task.id, title: draft.title, notes: draft.notes)
+    if others != alsoIn { alsoIn = others }
   }
 
   /// A page section: the block's registry heading over its content.

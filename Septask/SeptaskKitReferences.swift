@@ -10,7 +10,8 @@ import SwiftData
 // MARK: - Block
 
 /// The rows of one task's references, then the links of its text that are not
-/// references yet (`TaskRefRows.suggestions`). The host hides it when it is empty.
+/// references yet (`TaskRefRows.suggestions`), then the other open tasks that
+/// point at the same things. The host hides it when it is empty.
 @MainActor
 final class KitReferencesView: NSView {
   /// `rows` in the inspector; `chips` in the composer, drawn as its attachments are.
@@ -20,7 +21,8 @@ final class KitReferencesView: NSView {
   private let stack = NSStackView()
   private var rows: [TaskRefRow] = []
   private var suggestions: [TaskRefRows.Offer] = []
-  var isEmpty: Bool { rows.isEmpty && suggestions.isEmpty }
+  private var others: [TaskRefLookup.Other] = []
+  var isEmpty: Bool { rows.isEmpty && suggestions.isEmpty && others.isEmpty }
   /// The content's height, for a host that computes its own (the composer).
   var preferredHeight: CGFloat { isEmpty ? 0 : ceil(stack.fittingSize.height) }
   /// A click on a suggestion.
@@ -44,14 +46,26 @@ final class KitReferencesView: NSView {
 
   required init?(coder: NSCoder) { fatalError("KitReferencesView is code-only") }
 
-  func configure(rows next: [TaskRefRow], suggestions offers: [TaskRefRows.Offer]) {
-    guard next != rows || offers != suggestions else { return }
+  func configure(rows next: [TaskRefRow], suggestions offers: [TaskRefRows.Offer],
+                 others nextOthers: [TaskRefLookup.Other]) {
+    guard next != rows || offers != suggestions || nextOthers != others else { return }
     rows = next
     suggestions = offers
+    others = nextOthers
     stack.kitReplaceArrangedSubviews(with: rows.map { KitReferenceRowView(row: $0, isChip: style == .chips) },
                                      fillsWidth: style == .rows)
     stack.kitAddArrangedSubviews(suggestions.map { offer in
-      KitReferenceSuggestionButton(offer: offer) { [weak self] in self?.onTakeSuggestion?(offer) }
+      KitReferenceChipButton(title: offer.title, symbol: "plus", isDashed: true,
+                             label: RegistryTaskReferences.suggestion(name: offer.title)) { [weak self] in
+        self?.onTakeSuggestion?(offer)
+      }
+    }, fillsWidth: false)
+    stack.kitAddArrangedSubviews(others.map { other in
+      let title = RegistryTaskReferences.alsoIn(name: other.title)
+      return KitReferenceChipButton(title: title, symbol: RegistryTaskReferences.kind("task").sfSymbol,
+                                    isDashed: false, label: title) {
+        TaskRefActions.openTask(other.id, navigation: nil)
+      }
     }, fillsWidth: false)
   }
 
@@ -59,7 +73,8 @@ final class KitReferencesView: NSView {
   func reload(taskID: String, title: String, notes: String?) {
     let context = LocalStore.shared.container.mainContext
     configure(rows: LocalCache.taskRefRows(forTaskID: taskID, in: context),
-              suggestions: TaskRefActions.suggestions(taskID: taskID, title: title, notes: notes))
+              suggestions: TaskRefActions.suggestions(taskID: taskID, title: title, notes: notes),
+              others: TaskRefActions.alsoIn(taskID: taskID, title: title, notes: notes))
   }
 }
 
@@ -191,22 +206,23 @@ private final class KitReferenceHitButton: NSButton {
   override func menu(for event: NSEvent) -> NSMenu? { menuProvider?() }
 }
 
-/// One suggested link: a faint dashed chip with a plus. A click adds it.
+/// A faint chip under the rows: a suggested link, dashed with a plus, or
+/// another task that points at the same thing.
 @MainActor
-private final class KitReferenceSuggestionButton: NSButton {
+private final class KitReferenceChipButton: NSButton {
   private let onPress: () -> Void
   private let outline = CAShapeLayer()
 
-  init(offer: TaskRefRows.Offer, onPress: @escaping () -> Void) {
+  init(title text: String, symbol: String, isDashed: Bool, label: String, onPress: @escaping () -> Void) {
     self.onPress = onPress
     super.init(frame: .zero)
     translatesAutoresizingMaskIntoConstraints = false
     isBordered = false
     refusesFirstResponder = true
-    title = offer.title
+    title = text
     font = SeptaskKitTheme.chip
     contentTintColor = SeptaskKitTheme.inkSecondary
-    image = NSImage(systemSymbolName: "plus", accessibilityDescription: nil)?
+    image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)?
       .withSymbolConfiguration(.init(pointSize: 10, weight: .regular))
     imagePosition = .imageLeading
     imageHugsTitle = true
@@ -214,17 +230,16 @@ private final class KitReferenceSuggestionButton: NSButton {
     setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
     target = self
     action = #selector(press)
-    let label = RegistryTaskReferences.suggestion(name: offer.title)
     toolTip = label
     setAccessibilityLabel(label)
     wantsLayer = true
     outline.fillColor = nil
     outline.lineWidth = 0.75
-    outline.lineDashPattern = [3, 3]
+    outline.lineDashPattern = isDashed ? [3, 3] : nil
     layer?.addSublayer(outline)
   }
 
-  required init?(coder: NSCoder) { fatalError("KitReferenceSuggestionButton is code-only") }
+  required init?(coder: NSCoder) { fatalError("KitReferenceChipButton is code-only") }
 
   /// Room for the outline around the title.
   override var intrinsicContentSize: NSSize {
