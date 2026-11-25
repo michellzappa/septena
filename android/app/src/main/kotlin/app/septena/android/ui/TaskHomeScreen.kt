@@ -47,6 +47,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -55,6 +56,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -112,6 +114,7 @@ import app.septena.ui.TaskRowMenuAction
 import app.septena.ui.TaskSelection
 import app.septena.ui.insertionPosition
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @Composable
@@ -522,6 +525,7 @@ fun TaskHomeScreen(
                     onCreateProject = { title ->
                         homeViewModel.createProject(title) { created -> selectHomeLocation(created) }
                     },
+                    onRefresh = graph.sync::syncAndWait,
                 )
             } else {
                 TaskHomeScaffold(
@@ -883,6 +887,8 @@ private fun TaskHomeScaffold(
     var selectionPicker by remember { mutableStateOf<SelectionPicker?>(null) }
     var allOnToday by remember { mutableStateOf(false) }
     var activeSweepItems by remember { mutableStateOf<List<FadeSweepItem>?>(null) }
+    val pullScope = rememberCoroutineScope()
+    var isPullRefreshing by remember { mutableStateOf(false) }
     val magicPlusDrag = remember { MagicPlusDragState() }
     val reorderDrag = remember { TaskReorderDragState() }
     val context = LocalContext.current
@@ -1278,91 +1284,107 @@ private fun TaskHomeScaffold(
                     )
                 },
             ) { contentPadding ->
-                when (val location = state.location) {
-                    is TaskHomeLocation.Area -> AreasProjectsScreen(
-                        graph = graph,
-                        destination = AreasProjectsDestination.Area(location.id),
-                        modifier = Modifier.padding(contentPadding),
-                        starredOnly = state.starredOnly,
-                        completeTitle = completeTitle,
-                        todayTitle = todayTitle,
-                        fadedTitle = fadedTitle,
-                        headerContent = sectionHeader,
-                        rowMenuGroups = rowMenuGroups,
-                        rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
-                        onComplete = onComplete,
-                        onTaskAction = onTaskAction,
-                        selection = selection,
-                        onOpenProject = { projectId ->
-                            val project = state.projects.firstOrNull {
-                                (it.location as? TaskHomeLocation.Project)?.id == projectId
-                            }?.location ?: TaskHomeLocation.Project(projectId, "")
-                            onSelectHomeLocation(project)
-                        },
-                        onOpenTask = onOpenTask,
-                        onMagicPlusDrop = { draft -> quickAddDraft = draft },
-                    )
-                    is TaskHomeLocation.Project -> AreasProjectsScreen(
-                        graph = graph,
-                        destination = AreasProjectsDestination.Project(location.id),
-                        modifier = Modifier.padding(contentPadding),
-                        starredOnly = state.starredOnly,
-                        completeTitle = completeTitle,
-                        todayTitle = todayTitle,
-                        fadedTitle = fadedTitle,
-                        headerContent = sectionHeader,
-                        onComplete = onComplete,
-                        onOpenTask = onOpenTask,
-                        rowMenuGroups = rowMenuGroups,
-                        rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
-                        onTaskAction = onTaskAction,
-                        selection = selection,
-                        newSectionTrigger = newSectionTrigger,
-                        onMagicPlusDrop = { draft -> quickAddDraft = draft },
-                    )
-                    is TaskHomeLocation.SmartList -> {
-                        val isTodayList = location.destinationId == RegistryDestinationIds.TODAY
-                        val isReviewList = location.destinationId == RegistryDestinationIds.REVIEW
-                        val showingDeletedTab = location.destinationId == RegistryDestinationIds.LOGBOOK &&
-                            logbookShowingDeleted
-                        val displayedTasks = if (showingDeletedTab) state.deletedTasks else state.tasks
-                        val reviewAcceptTitle = remember(languageTag) {
-                            RegistryCatalog.actionTitle(RegistryActionIds.TASK_ACCEPT_REVIEW, languageTag = languageTag).orEmpty()
+                PullToRefreshBox(
+                    isRefreshing = isPullRefreshing,
+                    onRefresh = {
+                        if (!isPullRefreshing) {
+                            isPullRefreshing = true
+                            pullScope.launch {
+                                try {
+                                    graph.sync.syncAndWait()
+                                } finally {
+                                    isPullRefreshing = false
+                                }
+                            }
                         }
-                        val reviewSendBackTitle = remember(languageTag) {
-                            RegistryCatalog.actionTitle(RegistryActionIds.TASK_SEND_BACK_REVIEW, languageTag = languageTag).orEmpty()
-                        }
-                        val canReorderList = location.destinationId in setOf(
-                            RegistryDestinationIds.TODAY,
-                            RegistryDestinationIds.INBOX,
-                            RegistryDestinationIds.ANYTIME,
-                            RegistryDestinationIds.STARRED,
-                        )
-                        val inboxPositions = state.inboxTasks.map { it.position }
-                        val taskPositions = displayedTasks.map { it.position }
-                        TaskHomeContent(
+                    },
+                    modifier = Modifier.fillMaxSize().padding(contentPadding),
+                ) {
+                    when (val location = state.location) {
+                        is TaskHomeLocation.Area -> AreasProjectsScreen(
+                            graph = graph,
+                            destination = AreasProjectsDestination.Area(location.id),
+                            modifier = Modifier.fillMaxSize(),
+                            starredOnly = state.starredOnly,
                             completeTitle = completeTitle,
-                            emptyTitle = emptyTitle,
-                            emptyDescription = emptyDescription,
-                            inboxBandTitle = inboxTitle,
                             todayTitle = todayTitle,
-                            todayTint = MaterialTheme.colorScheme.secondary,
                             fadedTitle = fadedTitle,
-                            showFadedIndicator = location.destinationId != RegistryDestinationIds.FADED && !showingDeletedTab,
-                            isDarkTheme = isDark,
-                            hasActiveTexture = appearance.hasActiveTexture,
                             headerContent = sectionHeader,
-                            hasLoaded = state.hasLoaded,
-                            isToday = isTodayList,
-                            inboxTasks = state.inboxTasks,
-                            tasks = displayedTasks,
-                            calendarEvents = calendarEvents,
-                            canQuickAdd = state.canQuickAdd,
-                            canComplete = state.canComplete,
-                            errorMessage = state.errorMessage,
                             rowMenuGroups = rowMenuGroups,
                             rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
-                            modifier = Modifier.padding(contentPadding),
+                            onComplete = onComplete,
+                            onTaskAction = onTaskAction,
+                            selection = selection,
+                            onOpenProject = { projectId ->
+                                val project = state.projects.firstOrNull {
+                                    (it.location as? TaskHomeLocation.Project)?.id == projectId
+                                }?.location ?: TaskHomeLocation.Project(projectId, "")
+                                onSelectHomeLocation(project)
+                            },
+                            onOpenTask = onOpenTask,
+                            onMagicPlusDrop = { draft -> quickAddDraft = draft },
+                        )
+                        is TaskHomeLocation.Project -> AreasProjectsScreen(
+                            graph = graph,
+                            destination = AreasProjectsDestination.Project(location.id),
+                            modifier = Modifier.fillMaxSize(),
+                            starredOnly = state.starredOnly,
+                            completeTitle = completeTitle,
+                            todayTitle = todayTitle,
+                            fadedTitle = fadedTitle,
+                            headerContent = sectionHeader,
+                            onComplete = onComplete,
+                            onOpenTask = onOpenTask,
+                            rowMenuGroups = rowMenuGroups,
+                            rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
+                            onTaskAction = onTaskAction,
+                            selection = selection,
+                            newSectionTrigger = newSectionTrigger,
+                            onMagicPlusDrop = { draft -> quickAddDraft = draft },
+                        )
+                        is TaskHomeLocation.SmartList -> {
+                            val isTodayList = location.destinationId == RegistryDestinationIds.TODAY
+                            val isReviewList = location.destinationId == RegistryDestinationIds.REVIEW
+                            val showingDeletedTab = location.destinationId == RegistryDestinationIds.LOGBOOK &&
+                                logbookShowingDeleted
+                            val displayedTasks = if (showingDeletedTab) state.deletedTasks else state.tasks
+                            val reviewAcceptTitle = remember(languageTag) {
+                                RegistryCatalog.actionTitle(RegistryActionIds.TASK_ACCEPT_REVIEW, languageTag = languageTag).orEmpty()
+                            }
+                            val reviewSendBackTitle = remember(languageTag) {
+                                RegistryCatalog.actionTitle(RegistryActionIds.TASK_SEND_BACK_REVIEW, languageTag = languageTag).orEmpty()
+                            }
+                            val canReorderList = location.destinationId in setOf(
+                                RegistryDestinationIds.TODAY,
+                                RegistryDestinationIds.INBOX,
+                                RegistryDestinationIds.ANYTIME,
+                                RegistryDestinationIds.STARRED,
+                            )
+                            val inboxPositions = state.inboxTasks.map { it.position }
+                            val taskPositions = displayedTasks.map { it.position }
+                            TaskHomeContent(
+                                completeTitle = completeTitle,
+                                emptyTitle = emptyTitle,
+                                emptyDescription = emptyDescription,
+                                inboxBandTitle = inboxTitle,
+                                todayTitle = todayTitle,
+                                todayTint = MaterialTheme.colorScheme.secondary,
+                                fadedTitle = fadedTitle,
+                                showFadedIndicator = location.destinationId != RegistryDestinationIds.FADED && !showingDeletedTab,
+                                isDarkTheme = isDark,
+                                hasActiveTexture = appearance.hasActiveTexture,
+                                headerContent = sectionHeader,
+                                hasLoaded = state.hasLoaded,
+                                isToday = isTodayList,
+                                inboxTasks = state.inboxTasks,
+                                tasks = displayedTasks,
+                                calendarEvents = calendarEvents,
+                                canQuickAdd = state.canQuickAdd,
+                                canComplete = state.canComplete,
+                                errorMessage = state.errorMessage,
+                                rowMenuGroups = rowMenuGroups,
+                                rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
+                                modifier = Modifier.fillMaxSize(),
                             selection = selection,
                             onComplete = onComplete,
                             onOpenTask = onOpenTask,
@@ -1466,6 +1488,7 @@ private fun TaskHomeScaffold(
                             onAcceptReview = if (isReviewList) homeViewModel::acceptReview else null,
                             onSendBackReview = if (isReviewList) onSendBackReview else null,
                         )
+                        }
                     }
                 }
             }

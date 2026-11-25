@@ -7,6 +7,7 @@ import app.septena.android.auth.SessionStore
 import app.septena.android.doing.DoController
 import app.septena.android.reminders.TaskReminderScheduler
 import app.septena.android.sync.SyncController
+import app.septena.android.sync.SyncLiveCoordinator
 import app.septena.android.ui.AppearanceStore
 import app.septena.core.ConversationMutator
 import app.septena.core.ConversationRules
@@ -34,6 +35,7 @@ import app.septena.store.db.SeptenaDatabase
 import app.septena.transport.SeptenaAccessClient
 import app.septena.transport.SeptenaAuthClient
 import app.septena.transport.SeptenaTaskBackendClient
+import app.septena.transport.SyncLiveSocket
 import app.septena.transport.UrlConnectionSyncTransport
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -93,6 +95,14 @@ class AndroidAppGraph(application: Application) {
     val attachments = TaskAttachmentStore(application, taskStore, registryEntityMutator, clock, taskBackend)
     val accountWipe = AccountWipe(application, taskStore, attachments, taskUndoHistory)
     val sync = SyncController(TaskSyncEngine(taskStore, transport, clock), appScope, afterSync = ::afterSync)
+    private val liveSocket = SyncLiveSocket(credentials, clientVersion)
+    val liveSync = SyncLiveCoordinator(
+        sync = sync,
+        signedIn = credentials.signedIn,
+        currentCursor = { taskStore.syncCursor() },
+        connectSocket = liveSocket::connectAndListen,
+        scope = appScope,
+    )
     val appearance = AppearanceStore(deviceSettings, syncedSettings, syncedSettingsMutator, sync, clock, appScope)
     val firstRun = FirstRunState(application, taskStore, syncedSettings, syncedSettingsMutator, clock)
 
