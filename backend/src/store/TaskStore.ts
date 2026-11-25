@@ -237,6 +237,30 @@ export type TaskLinkRow = {
   issue: { key: string; snapshot: RefSnapshot | null } | null;
 };
 
+/// What a new task was made from (docs/TASK_REFERENCES_SPEC.md §6.2).
+/// `fromKeys` are the keys of its `from` references, in normal form.
+export interface Capture {
+  taskId: string;
+  fromKeys: string[];
+  allowDuplicate: boolean;
+}
+
+/// The task a capture met: the newest one made from one of its keys.
+export interface CaptureHit {
+  id: string;
+  title: string;
+  status: string;
+  area: string | null;
+  project: string | null;
+  /// Open and not faded. Everything else is closed.
+  active: boolean;
+  keys: string[];
+}
+
+export type CaptureOutcome =
+  | { existing: CaptureHit }
+  | { existing: null; results: OpResult[]; followUp: { id: string; title: string } | null };
+
 /// A task that points at a key (`findByRef`).
 export type RefHit = {
   id: string;
@@ -1442,6 +1466,79 @@ export class TaskStore extends DurableObject<Env> {
       faded: r.fadedAt !== null, role: r.role ?? "about",
     }));
     return { tasks, total };
+  }
+
+  // ---- capture (§6.2) ----
+
+  /// Creates a task made from items outside Septena, unless an active task is
+  /// made from one of them: then nothing is created and that task is the
+  /// answer. When only closed tasks have a key, the new task gets a
+  /// `follow_up` reference to the closed one. There is no await between the
+  /// lookup and the insert, so two captures of one item can never both create.
+  captureTask(ops: Op[], actor: string, capture: Capture): CaptureOutcome {
+    const hit = this.captureHit(capture.fromKeys);
+    if (hit?.active && !capture.allowDuplicate) {
+      this.stampSeen(hit, actor);
+      return { existing: hit };
+    }
+    let followUpAt = -1;
+    if (hit && !hit.active) {
+      const key = `task:${hit.id}`;
+      const refOps = ops.filter((op) => op.op === "upsert" && op.entity === "taskRef");
+      if (!refOps.some((op) => op.op === "upsert" && op.fields.key === key)) {
+        followUpAt = ops.length;
+        ops = [...ops, {
+          clientOpId: `${ops[0].clientOpId}-follow`, op: "upsert", entity: "taskRef", id: taskRefId(capture.taskId, key, 0),
+          fields: { taskId: capture.taskId, key, role: "follow_up", position: (refOps.length + 1) * 1024, createdAt: new Date().toISOString() },
+        }];
+      }
+    }
+    const { results } = this.push(ops, actor).result;
+    if (hit && this.liveTask(capture.taskId)) this.stampSeen(hit, actor);
+    return {
+      existing: null, results,
+      followUp: hit && results[followUpAt]?.status === "applied" ? { id: hit.id, title: hit.title } : null,
+    };
+  }
+
+  /// The task made from one of these keys: an active one first, then the most
+  /// recently touched. A deleted task is not a hit. Only a `from` reference
+  /// counts, so a task that is about the item never blocks one made from it.
+  private captureHit(keys: string[]): CaptureHit | null {
+    if (keys.length === 0) return null;
+    const from = `FROM task_refs r JOIN tasks t ON t.id = r.taskId
+      WHERE r.key IN (${keys.map(() => "?").join(", ")}) AND r.role = 'from' AND r.deletedAt IS NULL
+        AND t.deletedAt IS NULL AND (t.kind IS NULL OR t.kind != 'heading')`;
+    const row = this.sql.exec<Record<string, string | null>>(
+      `SELECT t.id, t.title, t.status, t.area, t.project, t.fadedAt ${from}
+       ORDER BY (t.status = 'open' AND t.fadedAt IS NULL) DESC, COALESCE(t.touchedAt, t.createdAt) DESC, t.rev DESC LIMIT 1`,
+      ...keys,
+    ).toArray()[0];
+    if (!row) return null;
+    const matched = this.sql.exec<{ key: string }>(`SELECT r.key ${from} AND t.id = ?`, ...keys, row.id).toArray();
+    return {
+      id: row.id as string, title: row.title ?? "", status: row.status ?? "open", area: row.area, project: row.project,
+      active: row.status === "open" && row.fadedAt === null, keys: matched.map((m) => m.key),
+    };
+  }
+
+  /// Stamps the references a capture met, with a "captured again" entry in
+  /// the task's history. Not for an agent on a stopped task or while agents
+  /// are paused (ADR 0008).
+  private stampSeen(hit: CaptureHit, actor: string): void {
+    if (isAgentActor(actor) && (this.readSetting("agentsPaused") === true || this.convoStopped(hit.id))) return;
+    const now = new Date().toISOString();
+    this.ctx.storage.transactionSync(() => {
+      for (const key of hit.keys) {
+        const ref = this.sql.exec<{ id: string; lastSeenAt: string | null }>(
+          "SELECT id, lastSeenAt FROM task_refs WHERE taskId = ? AND key = ? AND deletedAt IS NULL", hit.id, key,
+        ).one();
+        const rev = this.nextRev();
+        this.sql.exec("UPDATE task_refs SET lastSeenAt = ?, rev = ?, updatedAt = ? WHERE id = ?", now, rev, now, ref.id);
+        this.log(rev, "task", hit.id, "capture", ["lastSeenAt"], null, actor, now, { lastSeenAt: [ref.lastSeenAt, now] });
+      }
+    });
+    this.broadcast(this.meta("rev"));
   }
 
   /// The lowest order key across live tasks, or null when there is none:

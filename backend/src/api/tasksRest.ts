@@ -378,11 +378,13 @@ tasksRest.post("/", async (c) => {
     title: z.string().trim().min(1).max(500),
     when: zWhen.default("inbox"),
     refs: zRefs.optional(),
+    allow_duplicate: z.boolean().optional(),
   }).strict());
   if (body instanceof Response) return body;
   const ctx = await writeContext(c);
   const args: Record<string, unknown> = { title: body.title };
   if (body.refs) args.refs = body.refs;
+  if (body.allow_duplicate) args.allow_duplicate = true;
   if (body.when === "today") args.today = true;
   if (body.when === "tomorrow") args.scheduled = addDaysYMD(todayYMD(ctx.timeZone), 1);
   return run(c, ctx, "tasks_create", args, 201);
@@ -526,7 +528,8 @@ async function attempt(c: Ctx, name: string, write: () => Promise<object>, okSta
   try {
     const result = await write();
     logEvent("tasks_rest", { tool: name, ok: true });
-    return c.json(result, okStatus);
+    // A capture that met an existing task created nothing (§6.2).
+    return c.json(result, (result as { placement?: string }).placement === "existing" ? 200 : okStatus);
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     logEvent("tasks_rest", { tool: name, ok: false });

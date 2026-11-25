@@ -210,7 +210,11 @@ is on an active task returns that task and `placement: "existing"`. With
 `allow_duplicate: true` it creates the task. This part is #496, and an item
 whose proposal the user turned down is #497 (ADR 0038); neither waits for
 forwarded mail. Duplicate checks apply to `from`
-references only. A user who adds an `about` reference by hand is never blocked.
+references only, on the new task and on the existing one. A user who adds an
+`about` reference by hand is never blocked. `tasks_create` with a `thread` key
+that is on an active task returns that task and adds no reference to it: the
+added `email` reference and the reply mark belong to forwarded mail (#388) and
+§6.3.
 
 ### 6.3 Thread activity
 

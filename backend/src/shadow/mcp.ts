@@ -73,7 +73,8 @@ const INSTRUCTIONS =
   "tasks and their conversations. It is the same data the user's Septena app shows, " +
   "and changes reach the app within seconds.\n\n" +
   "Before you create a task, call tasks_search to check that it does not exist yet. When the task comes from an " +
-  "email, an issue or a web page, call tasks_find_by_ref with its link first, and pass the link in `refs`.\n\n" +
+  "email, an issue or a web page, call tasks_find_by_ref with its link first, and pass the link in `refs`. Use role `from` for the item " +
+  "you made the task from: a second create from the same item returns the task that exists (placement `existing`).\n\n" +
   "Septena sets no limit on parallel calls. Some agent hosts refuse calls beyond their own limit (for example " +
   "\"too many calls already running\"): create many tasks one after another or in small groups, and call " +
   "tasks_search before you retry a refused create, so it does not land twice.\n\n" +

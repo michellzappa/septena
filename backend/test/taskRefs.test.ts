@@ -144,6 +144,115 @@ describe("MCP references", () => {
   });
 });
 
+describe("capture without duplicates (§6.2, #496)", () => {
+  type Created = { id: string; placement: string; matched_keys?: string[]; follow_up?: { id: string }; refs?: { key: string }[] };
+  const MAIL = { key: "email:<a@Example.com>", role: "from" };
+  const setup = async () => {
+    const h = await harness();
+    const create = async (args: Record<string, unknown> = {}) =>
+      await h.run("tasks_create", { title: "Answer", refs: [MAIL], ...args }) as unknown as Created;
+    const open = () => h.store.readTasks("open", 10).total;
+    const seen = (id: string) => h.store.readTaskRefs(id)[0].lastSeenAt as string | null;
+    const set = (id: string, fields: Record<string, unknown>) => h.push(HUMAN, { op: "upsert", entity: "task", id, fields });
+    return { ...h, create, open, seen, set };
+  };
+
+  it("a second create from the same item returns the task, also in parallel", async () => {
+    const h = await setup();
+    const [a, b] = await Promise.all([h.create(), h.create({ title: "Other words" })]);
+    assert.equal(h.open(), 1);
+    assert.deepEqual([a.placement, b.placement].sort(), ["existing", "inbox_proposal"]);
+    assert.equal(a.id, b.id);
+    const again = await h.create({ refs: [{ key: "message://%3Ca@EXAMPLE.com%3E", role: "from" }] });
+    assert.equal(again.placement, "existing");
+    assert.deepEqual(again.matched_keys, ["email:a@example.com"]);
+  });
+
+  it("stamps the reference and the task's history says captured again", async () => {
+    const h = await setup();
+    const { id } = await h.create();
+    assert.equal(h.seen(id), null);
+    const rev = h.store.head();
+    await h.create();
+    assert.ok(h.seen(id));
+    assert.equal(h.store.head(), rev + 1);
+    const entry = h.store.history(null, id, null, 1)[0];
+    assert.deepEqual([entry.op, entry.actor, entry.diff?.lastSeenAt?.[0]], ["capture", AGENT, null]);
+    const { runAgentTool } = await import("../src/shadow/agent.ts");
+    const { activity } = await runAgentTool(h.rpc, "c", "tasks_activity", { id }) as { activity: { what: string }[] };
+    assert.equal(activity[0].what, "captured again");
+    assert.equal(h.pulled(true).length, 1);
+  });
+
+  it("allow_duplicate creates the task", async () => {
+    const h = await setup();
+    const a = await h.create();
+    const b = await h.create({ allow_duplicate: true });
+    assert.notEqual(a.id, b.id);
+    assert.equal(b.placement, "inbox_proposal");
+    assert.equal(b.follow_up, undefined);
+    assert.ok(h.seen(a.id));
+  });
+
+  it("only from references match: about never blocks, on either side", async () => {
+    const h = await setup();
+    const about = await h.create({ refs: [{ ...MAIL, role: "about" }] });
+    const from = await h.create();
+    assert.notEqual(from.id, about.id);
+    assert.equal(from.follow_up, undefined);
+    assert.notEqual((await h.create({ refs: [{ ...MAIL, role: "about" }] })).placement, "existing");
+    assert.equal(h.open(), 3);
+  });
+
+  it("only closed tasks have the key: a new task with a follow_up reference", async () => {
+    for (const closed of [{ status: "done" }, { status: "cancelled" }, { fadedAt: "2026-11-20T10:00:00Z" }]) {
+      const h = await setup();
+      const old = await h.create();
+      h.set(old.id, closed);
+      const next = await h.create();
+      assert.equal(next.placement, "inbox_proposal");
+      assert.equal(next.follow_up?.id, old.id);
+      assert.deepEqual(h.keys(next.id), ["email:a@example.com", `task:${old.id}`]);
+      assert.equal(h.store.readTaskRefs(next.id)[1].role, "follow_up");
+      assert.ok(h.seen(old.id));
+      assert.equal(h.seen(next.id), null);
+      // The new task is the active one now.
+      assert.equal((await h.create()).id, next.id);
+    }
+  });
+
+  it("a deleted task gets no stamp and no follow_up", async () => {
+    const h = await setup();
+    const old = await h.create();
+    h.push(HUMAN, { op: "delete", entity: "task", id: old.id });
+    const next = await h.create();
+    assert.equal(next.follow_up, undefined);
+    assert.deepEqual(h.keys(next.id), ["email:a@example.com"]);
+  });
+
+  it("several active tasks: the most recently touched one", async () => {
+    const h = await setup();
+    const a = await h.create();
+    const b = await h.create({ allow_duplicate: true });
+    h.set(b.id, { touchedAt: "2026-11-25T10:00:00.000Z" });
+    h.set(a.id, { touchedAt: "2026-11-25T11:00:00.000Z" });
+    h.set(b.id, { title: "a later write that is not a touch" });
+    assert.equal((await h.create()).id, a.id);
+  });
+
+  it("an agent does not stamp a stopped task, or while agents are paused", async () => {
+    const h = await setup();
+    const { id } = await h.create();
+    h.push(HUMAN, { op: "upsert", entity: "convo", id, fields: { stoppedAt: "2026-11-25T10:00:00Z" } });
+    assert.equal((await h.create()).placement, "existing");
+    assert.equal(h.seen(id), null);
+    h.push(HUMAN, { op: "upsert", entity: "convo", id, fields: { stoppedAt: null } });
+    h.push(HUMAN, { op: "upsert", entity: "setting", id: "agentsPaused", fields: { value: true } });
+    assert.equal((await h.create()).placement, "existing");
+    assert.equal(h.seen(id), null);
+  });
+});
+
 describe("TaskStore references", () => {
   it("normalises the key, derives the kind and keeps one live row per task and key", async () => {
     const h = await harness();

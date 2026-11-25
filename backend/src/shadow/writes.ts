@@ -33,7 +33,7 @@ import { SURFACES_CATALOG } from "../generated/registries.js";
 // container errors, conversation normalizing, warnings) is the SAME functions,
 // imported from there.
 //
-// Every call is ONE push: one transaction in the user's Durable Object, one
+// Every call is ONE push (a create with a `from` reference is ONE captureTask): one transaction in the user's Durable Object, one
 // `{rev}` nudge to the user's connected app sockets (TaskStore.push
 // broadcasts whenever an op applied). The actor in the change log is
 // `mcp:claude`. clientOpIds are minted here, random per call, one per op.
@@ -63,7 +63,7 @@ type StoreMethod =
   | "readTaskRefs" | "findByRef" | "newRefId"
   | "readChecklistItems" | "readChecklistItem" | "readChecklistCounts"
   | "readTags" | "readTagByName"
-  | "readOrderTop" | "readSetting" | "push" | "claim" | "release" | "agentEvents" | "history" | "head"
+  | "readOrderTop" | "readSetting" | "push" | "captureTask" | "claim" | "release" | "agentEvents" | "history" | "head"
   | "addUsage" | "connectionName"
   | "readNote" | "noteRevisions" | "readContainer" | "readContainerTasks";
 export type StoreRpc = {
@@ -119,6 +119,7 @@ export const zWriteArgs = {
     checklist: z.array(z.string().min(1).max(2000)).max(200).optional(),
     tags: z.array(z.string().trim().min(1).max(TAG_NAME_MAX)).max(MAX_TAGS_PER_TASK).optional(),
     refs: zRefs.optional(),
+    allow_duplicate: z.boolean().optional(),
     origin: z.enum(["user_request", "agent_suggestion"]).optional(),
   }),
   tasks_complete: z.object({ id: zId }),
@@ -316,14 +317,19 @@ export async function runWriteTool(ctx: WriteContext, name: WriteToolName, args:
 /// /v1/sync/push uses, so this path can never store what an app push could
 /// not.
 async function push(store: StoreRpc, actor: string | undefined, ops: NewOp[]): Promise<OpResult[]> {
+  const { result } = await store.push(mintOps(ops), actor ?? MCP_ACTOR);
+  return result.results;
+}
+
+/// The ops with their clientOpIds, checked.
+function mintOps(ops: NewOp[]): Op[] {
   const base = `mcp-${randomId(12)}`;
   const withIds = ops.map((op, i) => ({ ...op, clientOpId: `${base}-${i}` })) as Op[];
   const parsed = zPushBody.safeParse({ ops: withIds });
   if (!parsed.success) {
     throw new Error(`Invalid task fields: ${parsed.error.issues.slice(0, 5).map((i) => `${i.path.slice(2).join(".")} ${i.message}`).join("; ")}`);
   }
-  const { result } = await store.push(withIds, actor ?? MCP_ACTOR);
-  return result.results;
+  return withIds;
 }
 
 const applied = (r: OpResult | undefined) => r?.status === "applied";
@@ -605,7 +611,27 @@ async function createTask(ctx: WriteContext, input: CreateTaskInput) {
   const refOpIdx = ops.length;
   refs.forEach((ref, i) => ops.push(refInsert(id, taskRefId(id, ref.ref.key, 0), ref, (i + 1) * ORDER_GAP, now)));
 
-  const results = await push(store, ctx.actor, ops);
+  // A task made from an item outside Septena: the store checks for one that
+  // exists in the same call as the insert (§6.2).
+  const fromKeys = refs.filter((ref) => ref.role === "from").map((ref) => ref.ref.key);
+  let results: OpResult[];
+  let followUp: { id: string; title: string } | null = null;
+  if (fromKeys.length > 0) {
+    const outcome = await store.captureTask(
+      mintOps(ops), ctx.actor ?? MCP_ACTOR, { taskId: id, fromKeys, allowDuplicate: input.allow_duplicate === true },
+    );
+    if (outcome.existing) {
+      const { id: existingId, title, status, area, project, keys } = outcome.existing;
+      return {
+        id: existingId, title, placement: "existing", status,
+        ...(area ? { area } : {}), ...(project ? { project } : {}), matched_keys: keys,
+      };
+    }
+    results = outcome.results;
+    followUp = outcome.followUp;
+  } else {
+    results = await push(store, ctx.actor, ops);
+  }
   const r = results[taskOpIdx];
   if (!applied(r)) throw new Error(`Task was not created: ${r?.status === "rejected" ? r.reason : r?.status ?? "no result"}`);
   return {
@@ -616,6 +642,7 @@ async function createTask(ctx: WriteContext, input: CreateTaskInput) {
     ...(resolvedTagNames.length > 0 ? { tags: resolvedTagNames } : {}),
     ...(createdChecklist.length > 0 ? { checklist: createdChecklist } : {}),
     ...refResult(refs, results.slice(refOpIdx)),
+    ...(followUp ? { follow_up: followUp } : {}),
   };
 }
 
