@@ -43,6 +43,7 @@ enum SeptaskLaunch {
       SeptaskPushNotifications.shared.start()
       TasksWidgetSnapshotPublisher.shared.drainPendingCompletions(using: services.taskMutator)
       TasksWidgetSnapshotPublisher.shared.start()
+      SeptaskAppShortcuts.updateAppShortcutParameters()
       #if os(iOS)
       // The next cold launch draws Today from this file (#82). macOS draws
       // its AppKit list without `TaskListView`, so it has no reader.
@@ -332,13 +333,14 @@ enum SeptaskDeepLinkRouter {
     }
   }
 
-  private static func destinationFilter(forTaskID taskID: String, context: ModelContext) -> TaskFilter {
+  static func destinationFilter(forTaskID taskID: String, context: ModelContext) -> TaskFilter {
     let tid = taskID
     if let entity = StoreHealth.fetch(context, FetchDescriptor<TaskEntity>(
       predicate: #Predicate { $0.id == tid && $0.deletedAt == nil }
     )).first {
       let task = SeptenaTask(entity)
       if task.status != .open { return .logbook }
+      if task.isFaded { return .faded }
       if task.isOnToday { return .today }
       if let p = task.project { return .project(p) }
       if let a = task.area { return .area(a) }
@@ -347,6 +349,64 @@ enum SeptaskDeepLinkRouter {
       return .unscheduled
     }
     return .today
+  }
+
+  static func destinationRoute(forTaskID taskID: String, context: ModelContext) -> Route {
+    let filter = destinationFilter(forTaskID: taskID, context: context)
+    switch filter {
+    case .project(let pid): return .project(id: pid)
+    case .area(let aid):    return .area(id: aid)
+    default:                return .filter(filter)
+    }
+  }
+
+  /// Navigation action initiated by an `openAppWhenRun = true` App Intent.
+  enum PendingIntentAction: Equatable {
+    case showToday
+    case openTaskConversation(taskID: String)
+  }
+
+  /// Stashed on iOS when an App Intent triggers cold launch before
+  /// `SeptaskMainWindow.task` wires `SeptaskAppDelegate.navigation`.
+  private static var pendingIntentAction: PendingIntentAction?
+
+  static func consumePendingIntentAction() -> PendingIntentAction? {
+    defer { pendingIntentAction = nil }
+    return pendingIntentAction
+  }
+
+  static func apply(_ action: PendingIntentAction, navigation: NavigationState, context: ModelContext) {
+    navigation.presentedModal = nil
+    navigation.showSettings = false
+    switch action {
+    case .showToday:
+      navigation.go(to: .filter(.today))
+    case .openTaskConversation(let taskID):
+      let dest = destinationRoute(forTaskID: taskID, context: context)
+      navigation.revealTask(id: taskID, in: dest, opensPage: true)
+    }
+  }
+
+  static func routeFromIntent(_ action: PendingIntentAction) {
+    #if os(iOS)
+    if let nav = SeptaskAppDelegate.navigation {
+      apply(action, navigation: nav, context: LocalStore.shared.container.mainContext)
+    } else {
+      pendingIntentAction = action
+    }
+    #else
+    NSApp.activate(ignoringOtherApps: true)
+    SeptaskKitWindowController.show()
+    guard let shell = SeptaskKitWindowController.existing else { return }
+    switch action {
+    case .showToday:
+      shell.go(to: .today)
+    case .openTaskConversation(let taskID):
+      let context = LocalStore.shared.container.mainContext
+      let dest = destinationFilter(forTaskID: taskID, context: context)
+      shell.openTaskConversation(id: taskID, in: dest)
+    }
+    #endif
   }
 
   static func handle(_ url: URL, navigation: NavigationState, context: ModelContext) {

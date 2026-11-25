@@ -112,6 +112,7 @@
 		36FDEE4B559BEE283F1892B8 /* TaskSyncApply.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6066BCBF19FFC0F308332140 /* TaskSyncApply.swift */; };
 		3775E5B14D097A0EEEC728A6 /* SharedCoreBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A82E1287187B196B8EB6C85 /* SharedCoreBridge.swift */; };
 		37D36A4792F578FB21B2EE40 /* ThingsImportTestFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0546FA3A26D7FAFC642688C5 /* ThingsImportTestFixtures.swift */; };
+		37E02149C3EF1D7298A6810B /* SeptaskAppIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73D0BA8B5D233BE1E0CC086A /* SeptaskAppIntents.swift */; };
 		381C31B4815244EBDA43D21E /* TaskListChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B423CA3E56845C72374F434 /* TaskListChrome.swift */; };
 		385F2F36B8A5E69A2A3940AB /* Outbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD295FAB7B881CAC43EE8C34 /* Outbox.swift */; };
 		386157A887E032273284ED60 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = D09BA73660B9E4E0E7ECF146 /* Sparkle */; };
@@ -402,6 +403,7 @@
 		C0095611815A4ED532A7F5F1 /* TaskHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18E48AC7FB126378FB07EF7F /* TaskHistory.swift */; };
 		C111A4010844A4EB34C21208 /* Telemetry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44C7B41F8744B2EADC170EC8 /* Telemetry.swift */; };
 		C13DD2378BFE3A4F22E8906F /* KeyboardShortcutsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77CBA2864F5274550A0F0C0D /* KeyboardShortcutsView.swift */; };
+		C154A256D280C1462944CEA0 /* SeptaskAppIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73D0BA8B5D233BE1E0CC086A /* SeptaskAppIntents.swift */; };
 		C198BDE12989B374F22532AA /* TaskSyncApply.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6066BCBF19FFC0F308332140 /* TaskSyncApply.swift */; };
 		C23DB117D9740A048D5DA42B /* TaskReads.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CBF0DAD74F9392D507229CE /* TaskReads.swift */; };
 		C249F4333211620355AC9D66 /* SelectionLanguage.swift in Sources */ = {isa = PBXBuildFile; fileRef = C376673AF35159635AFCE207 /* SelectionLanguage.swift */; };
@@ -755,6 +757,7 @@
 		7027B881D1D8B1B09B105034 /* CalendarBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarBridge.swift; sourceTree = "<group>"; };
 		71CFE4AE152FD96C898F836E /* WatchAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchAPI.swift; sourceTree = "<group>"; };
 		7256E038ADBC6321AF6725E5 /* AddTaskPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddTaskPage.swift; sourceTree = "<group>"; };
+		73D0BA8B5D233BE1E0CC086A /* SeptaskAppIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeptaskAppIntents.swift; sourceTree = "<group>"; };
 		74F4EE63016DB289C085D209 /* TaskListContextMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskListContextMenu.swift; sourceTree = "<group>"; };
 		76231AABEF5BE123AB6E9298 /* SeptaskClaudePairingPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeptaskClaudePairingPane.swift; sourceTree = "<group>"; };
 		762554058A70DE3414314DC5 /* TaskComposer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskComposer.swift; sourceTree = "<group>"; };
@@ -1413,6 +1416,7 @@
 				C9D6916E979E5B0D7497CAEF /* ResponseCache.swift */,
 				0CCB7FC718FE03FDE35241D1 /* SectionSkill.swift */,
 				C03DC46C772E45B60ECB7343 /* SectionTheme.swift */,
+				73D0BA8B5D233BE1E0CC086A /* SeptaskAppIntents.swift */,
 				E8E948081C6B9369ABF8424C /* SeptaskDiagnostics.swift */,
 				82BF482D659A5EF073C91300 /* SeptenaAppGroup.swift */,
 				5D227602C1039FA2206A539A /* SeptenaServices.swift */,
@@ -2090,6 +2094,7 @@
 				6B1E64B448EA957290627776 /* SeptaskAdvancedPane.swift in Sources */,
 				416A4031BF28B8ECF3B34835 /* SeptaskAgentsPane.swift in Sources */,
 				9B57E911758285B10B14B99C /* SeptaskApp.swift in Sources */,
+				37E02149C3EF1D7298A6810B /* SeptaskAppIntents.swift in Sources */,
 				AECBC3A483834EA26EA2E8D5 /* SeptaskApproveSignIn.swift in Sources */,
 				F5B04DE0FCF2E4DB06853B36 /* SeptaskClaudePairingPane.swift in Sources */,
 				839B69FDD1BA61E250B2BCC8 /* SeptaskDataTransfer.swift in Sources */,
@@ -2358,6 +2363,7 @@
 				8AD0982CB98F89B2F2B1906C /* SeptaskAdvancedPane.swift in Sources */,
 				8BF3602457D864A01C1CD82E /* SeptaskAgentsPane.swift in Sources */,
 				A7DC150F03AAF93F61060775 /* SeptaskApp.swift in Sources */,
+				C154A256D280C1462944CEA0 /* SeptaskAppIntents.swift in Sources */,
 				952CAF642EE6E32D3D41778A /* SeptaskApproveSignIn.swift in Sources */,
 				203CB6D04E79B51DF71F582D /* SeptaskClaudePairingPane.swift in Sources */,
 				EBA09C6EFB94C489E9A5260D /* SeptaskDataTransfer.swift in Sources */,

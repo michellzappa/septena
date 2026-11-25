@@ -167,6 +167,13 @@ private struct SeptaskMainWindow: View {
         if let pending = SeptaskAppDelegate.consumePendingShortcut() {
           navigation.pendingShortcut = pending
         }
+        if let intentAction = SeptaskDeepLinkRouter.consumePendingIntentAction() {
+          SeptaskDeepLinkRouter.apply(
+            intentAction,
+            navigation: navigation,
+            context: localStore.container.mainContext
+          )
+        }
         // A Home Screen quick action targets the foreground window. Updating
         // this reference when a scene activates keeps the delegate's warm path
         // aligned with that window while the underlying navigation stays local.

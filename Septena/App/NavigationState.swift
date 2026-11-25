@@ -125,12 +125,13 @@ enum TaskDestinations {
 final class NavigationState {
   var path: [Route] = []
 
-  /// One-shot request from task search. The receiving task list waits until it
-  /// has loaded the matching route, then reveals the exact row and clears it.
+  /// One-shot request from task search or App Intents. The receiving task list
+  /// waits until it has loaded the matching route, then reveals the exact row
+  /// (and optionally opens its task page / conversation) and clears it.
   struct TaskReveal: Equatable {
     let taskID: String
     let routeID: String
-    /// Also open the task page (a reference to another task).
+    /// Also open the task page (a reference to another task or App Intent).
     var opensPage = false
   }
   var pendingTaskReveal: TaskReveal?
@@ -147,10 +148,11 @@ final class NavigationState {
 
   /// Navigate to a task's owning list and reveal that specific task once the
   /// destination has rendered. Search uses this rather than merely opening the
-  /// containing project or smart list.
-  func revealTask(id: String, in route: Route) {
+  /// containing project or smart list; App Intents can also pass `opensPage: true`
+  /// to land directly on the task page and conversation.
+  func revealTask(id: String, in route: Route, opensPage: Bool = false) {
     go(to: route)
-    pendingTaskReveal = TaskReveal(taskID: id, routeID: route.id)
+    pendingTaskReveal = TaskReveal(taskID: id, routeID: route.id, opensPage: opensPage)
   }
   /// One-shot trigger: when set to true, the currently-visible
   /// TaskListView starts a new inline task (same flow as Command-N) on its
