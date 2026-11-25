@@ -488,6 +488,13 @@
       "availability": { "selection": "none", "platforms": ["android"] },
       "featureId": "settings.display"
     },
+    "app.help": {
+      "title": "Septena Help",
+      "icon": "settings.help",
+      "role": "default",
+      "availability": { "selection": "none", "platforms": ["macos", "ipados", "web", "windows"] },
+      "featureId": "settings.display"
+    },
     "app.keyboardShortcuts": {
       "title": "Keyboard Shortcuts",
       "icon": "settings.about",
@@ -709,7 +716,7 @@
         { "kind": "action", "id": "task.delete" }
       ]
     },
-    { "id": "help", "title": "Help", "system": "help", "items": [{ "kind": "action", "id": "app.keyboardShortcuts" }] }
+    { "id": "help", "title": "Help", "system": "help", "items": [{ "kind": "action", "id": "app.help" }, { "kind": "action", "id": "app.keyboardShortcuts" }] }
   ],
   "shortcutsSheet": [
     {

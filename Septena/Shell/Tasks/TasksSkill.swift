@@ -110,6 +110,11 @@ enum TasksSkill {
       tasks_list(view: "anytime")
       ```
 
+      ### How the app works (help)
+      - When the user asks how to do something in Septena, what a word means, or why something does not work, read `https://septena.app/help.md`. It lists every help page as Markdown, and `https://septena.app/llms-full.txt` has them all in one file. Answer from those pages with the app's own menu names.
+      - When the pages do not answer it, say so and point to `https://septena.app/support`. Never guess a menu, a shortcut or a feature.
+      - You cannot press buttons in the app. Tell the user where to tap, or make the change with a tool when one exists.
+
       ### Verification habit
       If you're about to tell the user "I added/moved/scheduled X," and routing matters, list the destination view first to confirm X is actually there. `tasks_create` and `tasks_update` return success on any schema-valid write — they don't validate that the result matches user intent.
 

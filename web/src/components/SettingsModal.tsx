@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Check, Download, Laptop, LogOut, PauseCircle, PlayCircle, ShieldCheck, Sparkles, Trash2, X } from "lucide-react";
-import { DESIGN_TOKENS, REGISTRY_LANGUAGES, registryText } from "@/lib/generated/registries";
+import { DESIGN_TOKENS, HELP_URL, REGISTRY_LANGUAGES, registryText } from "@/lib/generated/registries";
 import { exportAsCsv, exportAsJson, exportAsMarkdown } from "@/lib/export";
 import type { SeptenaApiClient } from "@/lib/api/client";
 import type { WebSyncEngine } from "@/lib/sync/engine";
@@ -108,14 +108,24 @@ export function SettingsModal({
           <h2 className="text-base font-semibold text-[var(--text-primary)]">
             {registryText("Settings", language)}
           </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg p-1 text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"
-            aria-label="Close settings"
-          >
-            <X className="h-4 w-4" />
-          </button>
+          <div className="flex items-center gap-3">
+            <a
+              href={HELP_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            >
+              {registryText("Help", language)}
+            </a>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg p-1 text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"
+              aria-label="Close settings"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </div>
 
         <div className="flex gap-1 border-b border-[var(--border-subtle)] px-4 py-2 text-xs">
