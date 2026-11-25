@@ -1907,6 +1907,8 @@ enum RegistrySurfaces {
   static let agentPromptReviewKicker: String = RegistryL10n.t("Review requested")
   static let agentPromptReviewFallback: String = RegistryL10n.t("Ready for review")
   static let agentPromptAcceptedLabel: String = RegistryL10n.t("Accepted")
+  /// The weekly fade sweep's title (`surfaces.json` `fadeSweep`).
+  static let fadeSweepTitle: String = RegistryL10n.t("Faded Tasks")
   /// Quick Find copy (`surfaces.json` `quickFind`).
   static let quickFindPlaceholder: String = RegistryL10n.t("Search tasks, projects, areas…")
   static let quickFindEmptyTitle: String = RegistryL10n.t("Search Tasks")
@@ -2020,6 +2022,14 @@ enum RegistryTaskReferences {
   static let failedMessage: String = RegistryL10n.t("Couldn’t add the reference.")
   /// The most links of one task's title and notes that show as suggestions.
   static let maxSuggestions = 3
+}
+
+/// The notes on a project's or an area's page (`registry/surfaces.json` `placeNotes`).
+enum RegistryPlaceNotes {
+  /// Lines of the folded notes.
+  static let previewLines = 3
+  static let showMoreTitle: String = RegistryL10n.t("Show more")
+  static let showLessTitle: String = RegistryL10n.t("Show less")
 }
 
 /// Sign-in by device approval (`registry/surfaces.json` `deviceSignIn`).

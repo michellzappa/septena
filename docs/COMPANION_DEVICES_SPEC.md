@@ -82,6 +82,12 @@ first, at most 50 plus `total`. Each row is a `clientTask` with two more fields,
 store already has both columns. A spawned repeat occurrence is not in the
 list: nobody added it. Nor is an import.
 
+### 7. Do (ADR 0041)
+
+Not built. `GET /v1/tasks` adds `doing`; a companion may start a Do, stop it and
+confirm it. The routes and the orb's behavior are in `docs/DO_SPEC.md` §7. CD2
+puts these routes on its list.
+
 ## Phases
 
 | Phase | What | Needs |

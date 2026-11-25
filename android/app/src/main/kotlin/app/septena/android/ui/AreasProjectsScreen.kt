@@ -1,7 +1,5 @@
 package app.septena.android.ui
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,11 +15,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -35,6 +29,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -43,15 +38,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -67,7 +59,6 @@ import app.septena.core.generated.RegistryTaskAttributeIds
 import app.septena.core.stringValue
 import app.septena.ui.ChevronRightGlyph
 import app.septena.ui.MoreDotsGlyph
-import app.septena.ui.PlusSmallGlyph
 import app.septena.ui.ProjectProgressRingGlyph
 import app.septena.ui.TaskCardMetrics
 import app.septena.ui.TaskCardPosition
@@ -118,9 +109,6 @@ fun AreasProjectsScreen(
     var emojiPickerOpen by rememberSaveable(destination.key) { mutableStateOf(false) }
     var notesDraft by rememberSaveable(destination.key) { mutableStateOf("") }
     var notesFocused by remember(destination.key) { mutableStateOf(false) }
-    var areaTaskDraft by rememberSaveable(destination.key) { mutableStateOf("") }
-    var projectTaskDraft by rememberSaveable(destination.key) { mutableStateOf("") }
-    var sectionTaskDrafts by remember(destination.key) { mutableStateOf(emptyMap<String, String>()) }
 
     LaunchedEffect(destination) { viewModel.select(destination) }
     LaunchedEffect(state.destination, state.notes) {
@@ -192,35 +180,19 @@ fun AreasProjectsScreen(
                                 .fillMaxWidth()
                                 .padding(horizontal = TaskCardMetrics.ContentInset, vertical = 10.dp),
                         ) {
-                            Box(modifier = Modifier.fillMaxWidth()) {
-                                if (notesDraft.isEmpty()) {
-                                    Text(
-                                        text = notesLabel,
-                                        fontSize = 14.5.sp,
-                                        lineHeight = 20.sp,
-                                        color = mutedInk.copy(alpha = 0.55f),
-                                    )
-                                }
-                                BasicTextField(
+                            key(destination.key) {
+                                PlaceNotesField(
                                     value = notesDraft,
                                     onValueChange = { notesDraft = it },
-                                    textStyle = MaterialTheme.typography.bodyMedium.copy(
-                                        fontSize = 14.5.sp,
-                                        lineHeight = 20.sp,
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                    ),
-                                    cursorBrush = SolidColor(accent),
-                                    minLines = 1,
-                                    maxLines = 8,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .semantics { contentDescription = notesLabel }
-                                        .onFocusChanged { focus ->
-                                            if (notesFocused && !focus.isFocused && notesDraft != state.notes) {
-                                                viewModel.saveNotes(notesDraft)
-                                            }
-                                            notesFocused = focus.isFocused
-                                        },
+                                    label = notesLabel,
+                                    languageTag = languageTag,
+                                    focused = notesFocused,
+                                    onFocusedChange = { focused ->
+                                        if (notesFocused && !focused && notesDraft != state.notes) {
+                                            viewModel.saveNotes(notesDraft)
+                                        }
+                                        notesFocused = focused
+                                    },
                                 )
                             }
                             if (notesDirty) {
@@ -244,14 +216,14 @@ fun AreasProjectsScreen(
                     }
                 }
 
-                // Quiet action pills row (Emoji / Rename / + Project or + Section).
+                // Emoji, then the page's ⋯ menu (New Project or New Section, Rename), as on iPhone and Mac.
                 item(key = "place-actions") {
+                    var menuOpen by remember(destination.key) { mutableStateOf(false) }
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = TaskCardMetrics.Margin, vertical = 2.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         if (destination is AreasProjectsDestination.Area) {
                             AreaEmojiButton(
@@ -259,23 +231,55 @@ fun AreasProjectsScreen(
                                 accessibilityLabel = actionTitle(RegistryActionIds.AREA_CHANGE_EMOJI, languageTag),
                                 onClick = { emojiPickerOpen = true },
                             )
-                            PlaceActionChip(
-                                label = actionTitle(RegistryActionIds.AREA_NEW_PROJECT, languageTag),
-                                isDark = isDark,
-                                onClick = { dialog = PlacesDialog.CreateProject },
-                            )
-                        } else {
-                            PlaceActionChip(
-                                label = actionTitle(RegistryActionIds.SECTION_NEW, languageTag),
-                                isDark = isDark,
-                                onClick = { dialog = PlacesDialog.CreateSection },
-                            )
                         }
-                        PlaceActionChip(
-                            label = actionTitle(destination.renameAction(), languageTag),
-                            isDark = isDark,
-                            onClick = { dialog = PlacesDialog.RenamePlace(state.title) },
-                        )
+                        Spacer(modifier = Modifier.weight(1f))
+                        Box {
+                            val newTitle = actionTitle(
+                                if (destination is AreasProjectsDestination.Area) {
+                                    RegistryActionIds.AREA_NEW_PROJECT
+                                } else {
+                                    RegistryActionIds.SECTION_NEW
+                                },
+                                languageTag,
+                            )
+                            val renameTitle = actionTitle(destination.renameAction(), languageTag)
+                            IconButton(
+                                onClick = { menuOpen = true },
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .semantics { contentDescription = "$newTitle, $renameTitle" },
+                            ) {
+                                MoreDotsGlyph(tint = mutedInk.copy(alpha = 0.72f), size = 16.dp)
+                            }
+                            DropdownMenu(
+                                expanded = menuOpen,
+                                onDismissRequest = { menuOpen = false },
+                                shape = RoundedCornerShape(14.dp),
+                                containerColor = if (isDark) MaterialTheme.colorScheme.surfaceContainerHigh else Color(0xF7FFFFFF),
+                                tonalElevation = 0.dp,
+                                shadowElevation = 10.dp,
+                                modifier = Modifier.width(210.dp),
+                            ) {
+                                PlaceMenuItem(
+                                    title = newTitle,
+                                    onClick = {
+                                        menuOpen = false
+                                        dialog = if (destination is AreasProjectsDestination.Area) {
+                                            PlacesDialog.CreateProject
+                                        } else {
+                                            PlacesDialog.CreateSection
+                                        }
+                                    },
+                                )
+                                PlaceMenuItem(
+                                    title = renameTitle,
+                                    onClick = {
+                                        menuOpen = false
+                                        dialog = PlacesDialog.RenamePlace(state.title)
+                                    },
+                                )
+                            }
+                        }
                     }
                 }
 
@@ -454,19 +458,6 @@ fun AreasProjectsScreen(
                             )
                         }
                     }
-                    item(key = "area-quick-add") {
-                        InlineGlassQuickAddRow(
-                            draft = areaTaskDraft,
-                            onDraftChange = { areaTaskDraft = it },
-                            placeholder = actionTitle(RegistryActionIds.APP_QUICK_ADD, languageTag),
-                            isDark = isDark,
-                            hasActiveTexture = hasActiveTexture,
-                            onAdd = {
-                                viewModel.createTask(areaTaskDraft)
-                                areaTaskDraft = ""
-                            },
-                        )
-                    }
                 }
 
                 if (destination is AreasProjectsDestination.Project) {
@@ -562,19 +553,6 @@ fun AreasProjectsScreen(
                             )
                         }
                     }
-                    item(key = "project-quick-add") {
-                        InlineGlassQuickAddRow(
-                            draft = projectTaskDraft,
-                            onDraftChange = { projectTaskDraft = it },
-                            placeholder = actionTitle(RegistryActionIds.APP_QUICK_ADD, languageTag),
-                            isDark = isDark,
-                            hasActiveTexture = hasActiveTexture,
-                            onAdd = {
-                                viewModel.createTask(projectTaskDraft)
-                                projectTaskDraft = ""
-                            },
-                        )
-                    }
                     item(key = "sections-heading") {
                         Text(
                             text = surfaceText(RegistryPlacesScreenIds.SECTIONS_HEADING, "label", languageTag),
@@ -610,12 +588,6 @@ fun AreasProjectsScreen(
                                 fadedTitle = fadedTitle,
                                 isDark = isDark,
                                 hasActiveTexture = hasActiveTexture,
-                                taskDraft = sectionTaskDrafts[section.id].orEmpty(),
-                                onTaskDraftChange = { value -> sectionTaskDrafts = sectionTaskDrafts + (section.id to value) },
-                                onAddTask = {
-                                    viewModel.createTask(sectionTaskDrafts[section.id].orEmpty(), section.id)
-                                    sectionTaskDrafts = sectionTaskDrafts + (section.id to "")
-                                },
                                 onComplete = onComplete,
                                 onOpenTask = onOpenTask,
                                 rowMenuGroups = rowMenuGroups,
@@ -693,103 +665,21 @@ fun AreasProjectsScreen(
     }
 }
 
+/** One row of a place's or a section's menu. */
 @Composable
-private fun PlaceActionChip(
-    label: String,
-    isDark: Boolean,
-    onClick: () -> Unit,
-) {
-    val bg = if (isDark) Color.White.copy(alpha = 0.08f) else Color.White.copy(alpha = 0.72f)
-    val border = if (isDark) Color.White.copy(alpha = 0.12f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
-    Box(
+private fun PlaceMenuItem(title: String, onClick: () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
-            .clip(CircleShape)
-            .background(bg)
-            .border(0.65.dp, border, CircleShape)
+            .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            .padding(horizontal = 16.dp, vertical = 10.dp),
     ) {
         Text(
-            text = label,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Medium,
+            text = title,
+            fontSize = 15.sp,
             color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
         )
-    }
-}
-
-/** Calm translucent glass inline `+ New task` input matching iOS card rhythm. */
-@Composable
-private fun InlineGlassQuickAddRow(
-    draft: String,
-    onDraftChange: (String) -> Unit,
-    placeholder: String,
-    isDark: Boolean,
-    hasActiveTexture: Boolean,
-    onAdd: () -> Unit,
-) {
-    val accent = MaterialTheme.colorScheme.primary
-    val mutedInk = MaterialTheme.colorScheme.onSurfaceVariant
-    TaskCardSlice(
-        position = TaskCardPosition.Solo,
-        isSelected = false,
-        isDark = isDark,
-        hasActiveTexture = hasActiveTexture,
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = TaskCardMetrics.ContentInset, vertical = 10.dp),
-        ) {
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier.width(TaskCardMetrics.LeadingColumnWidth),
-            ) {
-                PlusSmallGlyph(tint = if (draft.isNotBlank()) accent else mutedInk.copy(alpha = 0.7f), size = 14.dp)
-            }
-            Spacer(modifier = Modifier.width(TaskCardMetrics.IconTextGap))
-            Box(modifier = Modifier.weight(1f)) {
-                if (draft.isEmpty()) {
-                    Text(
-                        text = placeholder,
-                        fontSize = 15.sp,
-                        lineHeight = 20.sp,
-                        color = mutedInk.copy(alpha = 0.60f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                BasicTextField(
-                    value = draft,
-                    onValueChange = onDraftChange,
-                    singleLine = true,
-                    textStyle = MaterialTheme.typography.bodyLarge.copy(
-                        fontSize = 15.sp,
-                        lineHeight = 20.sp,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    ),
-                    cursorBrush = SolidColor(accent),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(onDone = { if (draft.isNotBlank()) onAdd() }),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-            if (draft.isNotBlank()) {
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = placeholder,
-                    fontSize = 13.5.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = accent,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .clickable(onClick = onAdd)
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
-                )
-            }
-        }
     }
 }
 
@@ -848,9 +738,6 @@ private fun PlaceSectionBlock(
     fadedTitle: String,
     isDark: Boolean,
     hasActiveTexture: Boolean,
-    taskDraft: String,
-    onTaskDraftChange: (String) -> Unit,
-    onAddTask: () -> Unit,
     onComplete: (String) -> Unit,
     onOpenTask: (String) -> Unit,
     rowMenuGroups: List<List<TaskRowMenuAction>>,
@@ -927,6 +814,15 @@ private fun PlaceSectionBlock(
                     shadowElevation = 10.dp,
                     modifier = Modifier.width(210.dp),
                 ) {
+                    if (onMagicPlusDrop != null) {
+                        PlaceMenuItem(
+                            title = actionTitle(RegistryActionIds.SECTION_NEW_TASK, languageTag),
+                            onClick = {
+                                menuOpen = false
+                                onMagicPlusDrop(QuickAddDraft(projectId = projectId, headingId = section.id))
+                            },
+                        )
+                    }
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
@@ -1019,14 +915,6 @@ private fun PlaceSectionBlock(
                 )
             }
         }
-        InlineGlassQuickAddRow(
-            draft = taskDraft,
-            onDraftChange = onTaskDraftChange,
-            placeholder = actionTitle(RegistryActionIds.SECTION_NEW_TASK, languageTag),
-            isDark = isDark,
-            hasActiveTexture = hasActiveTexture,
-            onAdd = onAddTask,
-        )
     }
 }
 

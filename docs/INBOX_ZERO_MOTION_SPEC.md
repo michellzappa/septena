@@ -1,6 +1,6 @@
 # Inbox Zero Motion
 
-**Status:** accepted · **Date:** 2026-11-23 · **Issue:** [#298](https://github.com/michellzappa/septena/issues/298)
+**Status:** shipped — historical (2026-11-25, #464) · **Date:** 2026-11-23 · **Issue:** [#298](https://github.com/michellzappa/septena/issues/298)
 
 Rests on: [TRIAGE_BAND_SPEC.md](TRIAGE_BAND_SPEC.md) (the Inbox is a section on
 Today, never its own list), the motion rules in `AGENTS.md` ("Motion is gated

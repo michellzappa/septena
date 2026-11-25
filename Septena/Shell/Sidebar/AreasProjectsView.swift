@@ -36,9 +36,6 @@ struct ContainerNotesField: View {
   var focused: FocusState<Bool>.Binding
   var onShowHistory: (() -> Void)? = nil
 
-  /// Lines the blurred preview shows before the "Show more" toggle.
-  static let previewLines = 3
-
   @State private var expanded = false
   @State private var clampedHeight: CGFloat = 0
   @State private var fullHeight: CGFloat = 0
@@ -70,7 +67,7 @@ struct ContainerNotesField: View {
           Text(rendered)
             .font(.septenaNotes)
             .foregroundStyle(Theme.inkSecondary)
-            .lineLimit(expanded ? nil : Self.previewLines)
+            .lineLimit(expanded ? nil : RegistryPlaceNotes.previewLines)
             .frame(maxWidth: .infinity, alignment: .leading)
             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: {
               clampedHeight = $0
@@ -105,7 +102,7 @@ struct ContainerNotesField: View {
           a11yAnimate { expanded.toggle() }
         } label: {
           HStack(spacing: 4) {
-            Text(expanded ? "Show less" : "Show more")
+            Text(expanded ? RegistryPlaceNotes.showLessTitle : RegistryPlaceNotes.showMoreTitle)
             Image(systemName: expanded ? "chevron.up" : "chevron.down")
               .imageScale(.small)
           }
@@ -128,19 +125,10 @@ struct ContainerNotesField: View {
 
 /// Render the raw notes string for the blurred preview.
 ///
-/// Line-based on purpose: the user's line breaks survive exactly as typed
-/// (CommonMark would fold a single newline into a space and drop the gap
-/// between blocks, which ran "Goal" straight into its paragraph).
-///   • `#`/`##` lines → semibold headings; `###` (agent log bylines,
-///     `ContainerNotes`) → a quiet label.
-///   • `-`/`*`/`+` items → "•", task items → "☐"/"☑", `1.` kept as typed,
-///     `>` quotes → italic.
-///   • Everything else → inline markdown (**bold**, *italic*, `code`, links).
-///   • Runs of blank lines collapse to one; the blank line directly under a
-///     heading is dropped; a heading with nothing under it (an unfilled
-///     template section) is left out of the preview.
+/// `ContainerNotes.previewLines` reads the lines, for this shell and AppKit.
+/// `#`/`##` headings are semibold; `###` (agent log bylines) a quiet label.
 func markdownAttributed(_ raw: String) -> AttributedString {
-  let lines = notesPreviewLines(raw)
+  let lines = ContainerNotes.previewLines(raw)
   var out = AttributedString()
   for (index, line) in lines.enumerated() {
     if index > 0 { out += AttributedString("\n") }
@@ -149,70 +137,12 @@ func markdownAttributed(_ raw: String) -> AttributedString {
   return out
 }
 
-private enum NotesLine {
-  case heading(level: Int, text: String)
-  case blank
-  case body(String)
-}
-
-private func classifyNotesLine(_ line: String) -> NotesLine {
-  let trimmed = line.trimmingCharacters(in: .whitespaces)
-  if trimmed.isEmpty { return .blank }
-  if trimmed.hasPrefix("#") {
-    let hashes = trimmed.prefix(while: { $0 == "#" }).count
-    let rest = trimmed.dropFirst(hashes)
-    if hashes <= 6, let first = rest.first, first == " " || first == "\t" {
-      return .heading(level: hashes, text: rest.trimmingCharacters(in: .whitespaces))
-    }
-  }
-  return .body(line)
-}
-
-/// Normalize the line list: drop empty sections, collapse blank runs, trim
-/// blank lines at both ends and directly under a heading.
-private func notesPreviewLines(_ raw: String) -> [NotesLine] {
-  let source = raw.replacingOccurrences(of: "\r\n", with: "\n")
-    .components(separatedBy: "\n")
-    .map { classifyNotesLine($0.replacingOccurrences(of: "\\s+$", with: "", options: .regularExpression)) }
-
-  // A heading is empty when the next non-blank line is a heading of the same
-  // or a higher level, or the end of the notes.
-  var kept: [NotesLine] = []
-  for (index, line) in source.enumerated() {
-    if case .heading(let level, _) = line {
-      var hasContent = false
-      for next in source[(index + 1)...] {
-        switch next {
-        case .blank: continue
-        case .heading(let nextLevel, _): hasContent = nextLevel > level
-        case .body: hasContent = true
-        }
-        break
-      }
-      if !hasContent { continue }
-    }
-    kept.append(line)
-  }
-
-  var result: [NotesLine] = []
-  for line in kept {
-    if case .blank = line {
-      guard let last = result.last else { continue }
-      if case .blank = last { continue }
-      if case .heading = last { continue }
-    }
-    result.append(line)
-  }
-  while let last = result.last, case .blank = last { result.removeLast() }
-  return result
-}
-
-private func renderNotesLine(_ line: NotesLine) -> AttributedString {
+private func renderNotesLine(_ line: NotesPreviewLine) -> AttributedString {
   switch line {
   case .blank:
     return AttributedString("")
   case .heading(let level, let text):
-    var attr = inlineMarkdown(text)
+    var attr = ContainerNotes.inlineMarkdown(text)
     if level >= 3 {
       // `### <day> · <agent>` is how an agent log entry starts
       // (ContainerNotes): a quiet byline, not a section title.
@@ -223,36 +153,16 @@ private func renderNotesLine(_ line: NotesLine) -> AttributedString {
       attr.foregroundColor = Theme.inkPrimary
     }
     return attr
+  case .item(let depth, let marker, let text):
+    return AttributedString(String(repeating: "  ", count: depth) + marker + " ")
+      + ContainerNotes.inlineMarkdown(text)
+  case .quote(let text):
+    var attr = ContainerNotes.inlineMarkdown(text)
+    attr.font = Font.septenaNotes.italic()
+    return attr
   case .body(let text):
-    let indentWidth = text.prefix(while: { $0 == " " || $0 == "\t" }).count
-    let indent = String(repeating: "  ", count: min(indentWidth / 2, 4))
-    let content = text.trimmingCharacters(in: .whitespaces)
-
-    if let match = content.firstMatch(of: #/^[-*+]\s+\[([ xX])\]\s+(.*)$/#) {
-      let done = match.1 != " "
-      return AttributedString(indent + (done ? "☑ " : "☐ ")) + inlineMarkdown(String(match.2))
-    }
-    if let match = content.firstMatch(of: #/^[-*+]\s+(.*)$/#) {
-      return AttributedString(indent + "• ") + inlineMarkdown(String(match.1))
-    }
-    if let match = content.firstMatch(of: #/^(\d+[.)])\s+(.*)$/#) {
-      return AttributedString(indent + String(match.1) + " ") + inlineMarkdown(String(match.2))
-    }
-    if let match = content.firstMatch(of: #/^>\s?(.*)$/#) {
-      var attr = inlineMarkdown(String(match.1))
-      attr.font = Font.septenaNotes.italic()
-      return attr
-    }
-    return inlineMarkdown(content)
+    return ContainerNotes.inlineMarkdown(text)
   }
-}
-
-/// Inline markdown only (**bold**, *italic*, `code`, [links]); plain text
-/// when the parse fails.
-private func inlineMarkdown(_ text: String) -> AttributedString {
-  let options = AttributedString.MarkdownParsingOptions(
-    interpretedSyntax: .inlineOnlyPreservingWhitespace)
-  return (try? AttributedString(markdown: text, options: options)) ?? AttributedString(text)
 }
 
 // MARK: - Area detail (rename + project list + tasks scoped to area)

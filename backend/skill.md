@@ -45,6 +45,7 @@ A task can point at up to 20 items: an email, a mail thread, a calendar event, a
 - Pass `refs: [{key, role?, snapshot?}]` to `tasks_create` and `tasks_update`. `key` is a reference key (`email:<Message-ID>`, `thread:<root Message-ID>`, `event:<iCal UID>`, `issue:<owner>/<repo>#<n>`, `task:<task id>`, `url:<web URL>`), a web URL, or a `message://` link. Septena stores the normal form, so every spelling of one item is one key. An invalid key is an error.
 - `role`: `about` (default), `from` (the task was made from it), `blocked_by`, `follow_up`. The last two are labels.
 - **One item, one task.** When an active task has the same `from` key, `tasks_create` creates nothing and returns that task with `placement: "existing"` and `matched_keys`. Tell the user it exists; do not create it again. Pass `allow_duplicate: true` only when the user wants a second task. When only a closed task (done, cancelled or faded) has the key, the new task gets a `follow_up` reference to it, returned as `follow_up`. Other roles never block.
+- **Turned down stays turned down.** When the user deletes or drops your proposal before accepting it, a new suggestion with the same `from` key creates nothing and returns `placement: "dismissed"`. Do not propose it again, and do not reword it. `tasks_find_by_ref` says `dismissed: true` for such a key. A `user_request` is never blocked, and `allow_duplicate: true` overrides when the user asks.
 - Set `snapshot.title` when you know it. Septena never fetches a title. Never put message text in a snapshot.
 - `tasks_update`: `refs` adds, or updates by key; `refs_remove: [key]` removes. The other references stay.
 - **`tasks_find_by_ref(key)`** answers "which tasks point at this?", open tasks first. Call it before you create a task from an email, an issue or a page.
@@ -98,8 +99,8 @@ or as a *proposal*:
   — awaiting their tap. The gateway defaults to this (secure by default), so if
   you don't set `origin`, you are proposing.
 
-`tasks_create` returns `placement`: `"committed"`, `"inbox_proposal"` or `"existing"`
-(nothing was created: see References above).
+`tasks_create` returns `placement`: `"committed"`, `"inbox_proposal"`, `"existing"`
+or `"dismissed"` (the last two created nothing: see References above).
 
 For a **proposal**, the `today` / `scheduled` / `deadline` / `project` you set are
 the *proposed disposition* the user accepts with one tap — they do **not** move

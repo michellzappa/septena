@@ -80,8 +80,9 @@ See [ADR 0007](adr/0007-septena-is-the-task-app.md).
 | [PROJECT_SHARING_SPEC.md](PROJECT_SHARING_SPEC.md) | accepted |
 | [PUBLIC_LINKS_SPEC.md](PUBLIC_LINKS_SPEC.md) | proposal (#22, phase S4 of project sharing) |
 | [TASK_FACTORY_SPEC.md](TASK_FACTORY_SPEC.md) | accepted |
+| [DO_SPEC.md](DO_SPEC.md) | accepted (ADR 0041): Do one task, full on one device, a notice on the others, the orb takes over |
 | [TASK_FADE_SPEC.md](TASK_FADE_SPEC.md) | accepted (§6 amended by ADR 0014, proposals by ADR 0039) |
-| [INBOX_ZERO_MOTION_SPEC.md](INBOX_ZERO_MOTION_SPEC.md) | accepted (#298) |
+| [INBOX_ZERO_MOTION_SPEC.md](INBOX_ZERO_MOTION_SPEC.md) | shipped — historical (#298) |
 | [PROJECT_NOTES_SPEC.md](PROJECT_NOTES_SPEC.md) | accepted (ADR 0012) |
 | [TASK_PAGE_SPEC.md](TASK_PAGE_SPEC.md) | accepted (ADR 0029, #300) |
 | [AGENT_PROMPT_SPEC.md](AGENT_PROMPT_SPEC.md) | building (#396; Android Review rows #412) |
@@ -94,7 +95,7 @@ See [ADR 0007](adr/0007-septena-is-the-task-app.md).
 | [IOS_SWIPE_ACTIONS_SPEC.md](IOS_SWIPE_ACTIONS_SPEC.md) | superseded 2026-11-23 (swipes dropped) |
 | [MULTI_SELECT_SWIPE_AND_DRAG_SPEC.md](MULTI_SELECT_SWIPE_AND_DRAG_SPEC.md) | partly superseded 2026-11-23 (Select menu item replaces swipe-to-select) |
 | [TAGS_SPEC.md](TAGS_SPEC.md) | proposal (#96) |
-| [TASK_WIDGETS_SPEC.md](TASK_WIDGETS_SPEC.md) | proposal (#129) |
+| [TASK_WIDGETS_SPEC.md](TASK_WIDGETS_SPEC.md) | shipped — historical (#129) |
 | [STAR_PRIORITY_SPEC.md](STAR_PRIORITY_SPEC.md) | proposal (#127) |
 | [ATTACHMENTS_MAC_PARITY_SPEC.md](ATTACHMENTS_MAC_PARITY_SPEC.md) | proposal (#131) |
 | [TASK_TIMES_AND_ICAL_SPEC.md](TASK_TIMES_AND_ICAL_SPEC.md) | proposal (#128) |

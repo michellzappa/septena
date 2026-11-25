@@ -716,10 +716,8 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             proj.id to areaTitle
         }.toMap()
         val reviewFallback = RegistryCatalog.surface(RegistryTaskPageBlockIds.TASK_PAGE_CONVERSATION)
-            ?.fields?.get("reviewFallback")?.stringValue()?.takeIf(String::isNotBlank)
-            ?: "Ready for review"
-        val inboxLabel = RegistryCatalog.destinationTitle(RegistryDestinationIds.INBOX)?.takeIf(String::isNotBlank)
-            ?: "Inbox"
+            ?.fields?.get("reviewFallback")?.stringValue().orEmpty()
+        val inboxLabel = RegistryCatalog.destinationTitle(RegistryDestinationIds.INBOX).orEmpty()
         val convoStates = HashMap<String, app.septena.core.ConversationSnapshotState>(conversations.size)
         for ((id, convo) in conversations) {
             if (convo != null) {

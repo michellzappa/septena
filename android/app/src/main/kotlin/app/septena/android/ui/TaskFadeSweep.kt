@@ -35,8 +35,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.septena.core.JsonValue
 import app.septena.core.RegistryCatalog
+import app.septena.core.generated.RegistryDestinationIds
 import app.septena.core.generated.RegistryNoticeIds
 import app.septena.core.generated.RegistryRules
+import app.septena.core.generated.RegistrySurfaceIds
 import app.septena.core.stringValue
 import app.septena.ui.CheckmarkGlyph
 import app.septena.ui.TaskCardMetrics
@@ -124,7 +126,7 @@ object FadeSweepRules {
         listName: String?,
         scheduled: String?,
         now: Instant,
-        inboxLabel: String = "Inbox",
+        inboxLabel: String = RegistryCatalog.destinationTitle(RegistryDestinationIds.INBOX).orEmpty(),
         languageTag: String = "en",
         zoneId: ZoneId = ZoneId.systemDefault(),
     ): String {
@@ -149,7 +151,7 @@ object FadeSweepRules {
 
 /** Reads a localized string from the `fadeSweep` surface in `registry/surfaces.json`. */
 internal fun fadeSweepText(field: String, languageTag: String): String {
-    val raw = RegistryCatalog.surface("fadeSweep")?.fields?.get(field).stringValue()
+    val raw = RegistryCatalog.surface(RegistrySurfaceIds.FADE_SWEEP)?.fields?.get(field).stringValue()
     return registryText(raw, languageTag)
 }
 

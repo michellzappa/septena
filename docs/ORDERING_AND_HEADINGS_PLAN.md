@@ -138,7 +138,7 @@ members → `heading = nil`, move-to-project re-homes members); project-view
 grouped rendering (un-headed block + one card per heading, `projectGroupedRows`
 in `TaskListView.swift`) with a section-divider row (draggable + drop target,
 Rename / New Task / Delete context menu via standard `.alert`/`.confirmationDialog`
-— no inline-TextField-in-List) + "Add Section" foot button; heading drag
+— no inline-TextField-in-List) + "Add Section" foot button (removed 2026-11-25: New Section is in the ⋯ menu); heading drag
 (reorder headings among themselves; drop a task onto a heading or a row in its
 group files it via `handleGroupedTaskDrop`/`handleHeadingDrop` — cross-group
 filing falls out of reading the target row's `heading`). **Exclusion is one

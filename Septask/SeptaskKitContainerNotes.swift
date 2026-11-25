@@ -14,42 +14,132 @@ import SwiftUI
 
 @MainActor
 enum KitContainerNotes {
-  /// Rows of notes shown on the page before the rest truncates. The popover
-  /// shows all of it; a long agent log must not push the tasks off screen.
-  static let maxLines = 14
   static let topPad: CGFloat = 0
   static let bottomPad: CGFloat = 14
+  /// The Show more line under notes that are folded or unfolded.
+  static let toggleGap: CGFloat = 4
+  static var toggleHeight: CGFloat { ceil(SeptaskKitTheme.meta.boundingRectForFont.height) }
 
   static var bodyFont: NSFont { .systemFont(ofSize: SeptaskKitTheme.notesFontSize) }
   private static var headingFont: NSFont { .systemFont(ofSize: SeptaskKitTheme.notesFontSize, weight: .semibold) }
 
-  /// Notes as the page shows them: `#`/`##` lines as headings, `###` lines
-  /// (how an agent log entry starts: `### <day> · <agent>`) as a quiet
-  /// byline, the rest as body text. The placeholder when there is nothing.
+  /// Notes as the page shows them (`ContainerNotes.previewLines`): `#`/`##`
+  /// lines as headings, `###` lines (how an agent log entry starts:
+  /// `### <day> · <agent>`) as a quiet byline, list items with a hanging
+  /// indent. The placeholder when there is nothing.
   static func attributed(_ text: String, placeholder: String) -> NSAttributedString {
-    let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !trimmed.isEmpty else {
+    let lines = ContainerNotes.previewLines(text)
+    guard !lines.isEmpty else {
       return NSAttributedString(string: placeholder, attributes: [
         .font: bodyFont, .foregroundColor: NSColor.tertiaryLabelColor,
       ])
     }
     let out = NSMutableAttributedString()
-    let lines = trimmed.components(separatedBy: "\n")
     for (i, line) in lines.enumerated() {
-      let attrs: [NSAttributedString.Key: Any]
-      var shown = line
-      if line.hasPrefix("### ") {
-        shown = String(line.dropFirst(4))
-        attrs = [.font: SeptaskKitTheme.meta, .foregroundColor: SeptaskKitTheme.inkSecondary]
-      } else if line.hasPrefix("## ") || line.hasPrefix("# ") {
-        shown = String(line.drop(while: { $0 == "#" }).dropFirst())
-        attrs = [.font: headingFont, .foregroundColor: NSColor.labelColor]
-      } else {
-        attrs = [.font: bodyFont, .foregroundColor: SeptaskKitTheme.inkSecondary]
+      let shown = rendered(line)
+      if i < lines.count - 1 {
+        shown.append(NSAttributedString(string: "\n", attributes: [.font: bodyFont]))
       }
-      out.append(NSAttributedString(string: shown + (i < lines.count - 1 ? "\n" : ""), attributes: attrs))
+      // The break belongs to the paragraph it ends, so one style covers both.
+      shown.addAttribute(.paragraphStyle, value: paragraph(for: line),
+                         range: NSRange(location: 0, length: shown.length))
+      out.append(shown)
     }
     return out
+  }
+
+  private static func rendered(_ line: NotesPreviewLine) -> NSMutableAttributedString {
+    switch line {
+    case .blank:
+      return NSMutableAttributedString()
+    case .heading(let level, let text):
+      return level >= 3
+        ? inline(text, font: SeptaskKitTheme.meta, color: SeptaskKitTheme.inkSecondary)
+        : inline(text, font: headingFont, color: .labelColor)
+    case .item(_, let marker, let text):
+      let item = NSMutableAttributedString(string: marker + "\t", attributes: [
+        .font: bodyFont, .foregroundColor: SeptaskKitTheme.inkSecondary,
+      ])
+      item.append(inline(text, font: bodyFont, color: SeptaskKitTheme.inkSecondary))
+      return item
+    case .quote(let text):
+      return inline(text, font: NSFontManager.shared.convert(bodyFont, toHaveTrait: .italicFontMask),
+                    color: SeptaskKitTheme.inkSecondary)
+    case .body(let text):
+      return inline(text, font: bodyFont, color: SeptaskKitTheme.inkSecondary)
+    }
+  }
+
+  /// Word wrap on every line: the label's own `truncatesLastVisibleLine` draws
+  /// the ellipsis. A list item wraps under its text, not under its marker.
+  private static func paragraph(for line: NotesPreviewLine) -> NSParagraphStyle {
+    let style = NSMutableParagraphStyle()
+    style.lineBreakMode = .byWordWrapping
+    if case .item(let depth, let marker, _) = line {
+      let step = SeptaskKitTheme.notesFontSize
+      let markerWidth = (marker + " " as NSString).size(withAttributes: [.font: bodyFont]).width
+      let lead = CGFloat(depth) * step
+      let textStart = lead + max(step, ceil(markerWidth) + 2)
+      style.firstLineHeadIndent = lead
+      style.headIndent = textStart
+      style.tabStops = [NSTextTab(textAlignment: .left, location: textStart)]
+    }
+    return style
+  }
+
+  private static func inline(_ text: String, font: NSFont, color: NSColor) -> NSMutableAttributedString {
+    let out = NSMutableAttributedString()
+    let parsed = ContainerNotes.inlineMarkdown(text)
+    for run in parsed.runs {
+      let intent = run.inlinePresentationIntent ?? []
+      var runFont = font
+      if intent.contains(.code) {
+        runFont = .monospacedSystemFont(ofSize: font.pointSize * 0.92, weight: .regular)
+      }
+      if intent.contains(.stronglyEmphasized) {
+        runFont = NSFontManager.shared.convert(runFont, toHaveTrait: .boldFontMask)
+      }
+      if intent.contains(.emphasized) {
+        runFont = NSFontManager.shared.convert(runFont, toHaveTrait: .italicFontMask)
+      }
+      var attributes: [NSAttributedString.Key: Any] = [.font: runFont, .foregroundColor: color]
+      if run.link != nil { attributes[.underlineStyle] = NSUnderlineStyle.single.rawValue }
+      out.append(NSAttributedString(string: String(parsed[run.range].characters), attributes: attributes))
+    }
+    return out
+  }
+
+  /// One label setup for the row and for the measuring label, so a measured
+  /// height is the height the row draws.
+  static func style(_ label: NSTextField) {
+    label.isSelectable = false
+    label.lineBreakMode = .byWordWrapping
+    label.cell?.truncatesLastVisibleLine = true
+    label.cell?.wraps = true
+  }
+
+  private static let sizer: NSTextField = {
+    let label = NSTextField(wrappingLabelWithString: "")
+    style(label)
+    return label
+  }()
+
+  private static func labelHeight(_ string: NSAttributedString, width: CGFloat, lines: Int) -> CGFloat {
+    sizer.attributedStringValue = string
+    sizer.maximumNumberOfLines = lines
+    sizer.preferredMaxLayoutWidth = width
+    return ceil(sizer.intrinsicContentSize.height)
+  }
+
+  /// The folded or unfolded text's height, and whether folding cuts anything
+  /// off. Measured, not guessed from the line count: one paragraph wraps too.
+  static func layout(text: String, placeholder: String, rowWidth: CGFloat,
+                     expanded: Bool) -> (textHeight: CGFloat, hasToggle: Bool) {
+    let string = attributed(text, placeholder: placeholder)
+    let width = textWidth(rowWidth: rowWidth)
+    let full = labelHeight(string, width: width, lines: 0)
+    let folded = labelHeight(string, width: width, lines: RegistryPlaceNotes.previewLines)
+    return (expanded ? full : folded, full > folded + 1)
   }
 
   /// Text column width for a row of the given table width: from the page
@@ -59,19 +149,18 @@ enum KitContainerNotes {
     return max(120, rowWidth - inset * 2 - SeptaskKitLayout.screenTitleLeading - 8)
   }
 
-  static func height(text: String, placeholder: String, rowWidth: CGFloat) -> CGFloat {
-    let string = attributed(text, placeholder: placeholder)
-    let rect = string.boundingRect(
-      with: NSSize(width: textWidth(rowWidth: rowWidth), height: .greatestFiniteMagnitude),
-      options: [.usesLineFragmentOrigin, .usesFontLeading])
-    let cap = ceil(bodyFont.boundingRectForFont.height * CGFloat(maxLines))
-    return min(ceil(rect.height), cap) + topPad + bottomPad
+  static func height(text: String, placeholder: String, rowWidth: CGFloat, expanded: Bool) -> CGFloat {
+    let layout = layout(text: text, placeholder: placeholder, rowWidth: rowWidth, expanded: expanded)
+    return topPad + layout.textHeight + (layout.hasToggle ? toggleGap + toggleHeight : 0) + bottomPad
   }
 }
 
 // MARK: - Row cell
 
-/// The notes under a project's or an area's page title. Clicks go to a
+/// The notes under a project's or an area's page title, folded to
+/// `RegistryPlaceNotes.previewLines` with a Show more line, as on iPhone: a
+/// click on cut-off notes unfolds them, a click on whole notes edits them.
+/// Clicks go to a
 /// transparent full-bleed `NSButton`, for the reason spelled out on
 /// `KitNewTaskCell`: `NSTableView` claims clicks on label content, so only a
 /// real `NSControl` reliably receives them.
@@ -80,8 +169,14 @@ final class KitContainerNotesCell: NSTableCellView {
   private var hitPin: KitContentColumnPin!
   private let label = NSTextField(wrappingLabelWithString: "")
   private let hit = NSButton()
+  private let toggle = NSButton()
   private var leadingConstraint: NSLayoutConstraint!
   private var trailingConstraint: NSLayoutConstraint!
+  private var text = ""
+  private var placeholder = ""
+  private var expanded = false
+  /// Unfolds or folds the notes: the row's height changes with it.
+  var onToggle: (() -> Void)?
   /// Opens the editor, anchored to this cell.
   var onEdit: ((NSView) -> Void)?
   /// Opens the notes history sheet (available when signed in to the backend).
@@ -92,10 +187,7 @@ final class KitContainerNotesCell: NSTableCellView {
     self.identifier = identifier
 
     label.translatesAutoresizingMaskIntoConstraints = false
-    label.isSelectable = false
-    label.maximumNumberOfLines = KitContainerNotes.maxLines
-    label.lineBreakMode = .byTruncatingTail
-    label.cell?.truncatesLastVisibleLine = true
+    KitContainerNotes.style(label)
     label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
     label.kitA11yIgnore()
 
@@ -106,13 +198,24 @@ final class KitContainerNotesCell: NSTableCellView {
     hit.setButtonType(.momentaryChange)
     hit.refusesFirstResponder = true
     hit.target = self
-    hit.action = #selector(fire)
+    hit.action = #selector(pressText)
     hit.toolTip = String(localized: "Edit notes", comment: "SeptaskKit: tooltip on project or area notes")
     hit.kitA11yIgnore()
 
     addSubview(label)
-    // Last, so it layers above the text and takes every click in the row.
+    // Above the text, so it takes every click in the row but the toggle's.
     addSubview(hit)
+
+    toggle.translatesAutoresizingMaskIntoConstraints = false
+    toggle.isBordered = false
+    toggle.font = SeptaskKitTheme.meta
+    toggle.contentTintColor = SeptaskKitTheme.inkSecondary
+    toggle.imagePosition = .imageTrailing
+    toggle.imageHugsTitle = true
+    toggle.refusesFirstResponder = true
+    toggle.target = self
+    toggle.action = #selector(pressToggle)
+    addSubview(toggle)
     textField = label
 
     leadingConstraint = label.leadingAnchor.constraint(
@@ -124,6 +227,8 @@ final class KitContainerNotesCell: NSTableCellView {
       leadingConstraint,
       trailingConstraint,
       label.topAnchor.constraint(equalTo: topAnchor, constant: KitContainerNotes.topPad),
+      toggle.topAnchor.constraint(equalTo: label.bottomAnchor, constant: KitContainerNotes.toggleGap),
+      toggle.leadingAnchor.constraint(equalTo: label.leadingAnchor),
       hit.topAnchor.constraint(equalTo: topAnchor),
       hit.bottomAnchor.constraint(equalTo: bottomAnchor),
     ] + hitPin.constraints)
@@ -131,7 +236,16 @@ final class KitContainerNotesCell: NSTableCellView {
 
   required init?(coder: NSCoder) { fatalError("KitContainerNotesCell is code-only") }
 
-  func configure(text: String, placeholder: String) {
+  func configure(text: String, placeholder: String, expanded: Bool) {
+    self.text = text
+    self.placeholder = placeholder
+    self.expanded = expanded
+    label.maximumNumberOfLines = expanded ? 0 : RegistryPlaceNotes.previewLines
+    toggle.title = expanded ? RegistryPlaceNotes.showLessTitle : RegistryPlaceNotes.showMoreTitle
+    toggle.image = NSImage(systemSymbolName: expanded ? "chevron.up" : "chevron.down",
+                           accessibilityDescription: nil)?
+      .withSymbolConfiguration(.init(pointSize: 9, weight: .semibold))
+    needsLayout = true
     label.attributedStringValue = KitContainerNotes.attributed(text, placeholder: placeholder)
     let a11y = text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? placeholder : text
     kitA11yButton(label: String(localized: "Notes: \(a11y)",
@@ -146,7 +260,13 @@ final class KitContainerNotesCell: NSTableCellView {
     trailingConstraint.constant = -(inset + 8)
     label.preferredMaxLayoutWidth = KitContainerNotes.textWidth(rowWidth: bounds.width)
     hitPin.update(width: bounds.width)
+    toggle.isHidden = !hasToggle
     super.layout()
+  }
+
+  private var hasToggle: Bool {
+    KitContainerNotes.layout(text: text, placeholder: placeholder, rowWidth: bounds.width,
+                             expanded: expanded).hasToggle
   }
 
   override func accessibilityPerformPress() -> Bool {
@@ -155,7 +275,12 @@ final class KitContainerNotesCell: NSTableCellView {
   }
 
   override func resetCursorRects() {
-    addCursorRect(hit.frame, cursor: .iBeam)
+    if toggle.isHidden {
+      addCursorRect(hit.frame, cursor: .iBeam)
+    } else {
+      addCursorRect(hit.frame.intersection(label.frame), cursor: .iBeam)
+      addCursorRect(toggle.frame, cursor: .pointingHand)
+    }
   }
 
   override func menu(for event: NSEvent) -> NSMenu? {
@@ -173,6 +298,10 @@ final class KitContainerNotesCell: NSTableCellView {
     return menu
   }
 
+  @objc private func pressText() {
+    if !expanded, hasToggle { onToggle?() } else { onEdit?(self) }
+  }
+  @objc private func pressToggle() { onToggle?() }
   @objc private func fire() { onEdit?(self) }
   @objc private func openHistory() { onHistory?() }
 }

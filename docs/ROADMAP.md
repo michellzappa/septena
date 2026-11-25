@@ -26,6 +26,7 @@ on a listed issue without the label). Feature IDs: Starlings Docs
 | Switcher essentials, moving in & other clients (web, Android) | Starlings `/strategy/product-roadmap`, `docs/ANDROID_CLIENT_SPEC.md`, ADR 0016 sign-in | `track:clients` |
 | Companion devices (watch, desk orb) | `docs/COMPANION_DEVICES_SPEC.md`, ADR 0034, ADR 0035 | `track:clients` |
 | Task fade | `docs/TASK_FADE_SPEC.md`, ADR 0006 | `track:fade` |
+| Do (one task now) | `docs/DO_SPEC.md`, ADR 0041 | `track:clients` |
 | Project notes as agent context | `docs/PROJECT_NOTES_SPEC.md`, ADR 0012 | `track:factory` |
 | Launch — Septena name, free tier, paid sync, rate lock | `docs/SYNC_SUBSCRIPTION_SPEC.md`, ADR 0007, ADR 0010 | `track:launch` |
 | Engineering foundation — CI as the gate, the shared core, deploys | `docs/ENGINEERING_PLAN.md`, ADR 0025, ADR 0027 | `track:foundation` |
@@ -214,6 +215,9 @@ GitHub milestone: `"M5 Breadth"`.
 - #89 Siri, Shortcuts and App Intents · #90 Public API with keys
 - Companion devices: #430 CD0 added feed · #424 CD1 needs-you feed → #358 CD2 limited session →
   #425 CD3 live nudge · #426 CD4 voice (after ADR 0009)
+- Do (`docs/DO_SPEC.md`, ADR 0041): #515 D0 core → #516 D1 store → #517 D2 iPhone, iPad,
+  Mac, Android · #518 D3 watch · tinyseptena#18 D4 orb → #519 D5 Live Activity · #520 D6 Review ·
+  #521 D7 agent proposal · #522 D8 web
 - #65 Apple Watch · #51 Capture AI · #72–#74 Polish (drag to create, logbook by
   date, accessibility) · Public web links for projects (S4)
 
