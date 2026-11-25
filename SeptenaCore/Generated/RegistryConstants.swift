@@ -215,6 +215,7 @@ enum RegistryIcons {
     "settings.backend": "arrow.up.doc",
     "settings.animations": "party.popper",
     "settings.feedback": "paperplane",
+    "settings.open_source": "chevron.left.forwardslash.chevron.right",
     "settings.paste": "doc.on.clipboard",
     "settings.plus": "plus.circle.fill",
     "plans.free": "iphone",
@@ -647,6 +648,9 @@ enum RegistrySettings {
     RegistrySettingsPage(id: "about", title: RegistryL10n.t("About"), iconId: "settings.about", sfSymbol: "info.circle", depth: 1, platforms: nil, featureId: "settings.display", sections: [
       RegistrySettingsSection(id: "version", header: nil, footer: nil, platforms: nil, items: [
         RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "about_header", label: RegistryL10n.t("Tasks that think with you"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "settings.display"),
+      ]),
+      RegistrySettingsSection(id: "open_source", header: nil, footer: nil, platforms: nil, items: [
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "open_source", label: RegistryL10n.t("Open source"), detail: RegistryL10n.t("MIT License"), iconId: "settings.open_source", sfSymbol: "chevron.left.forwardslash.chevron.right", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "settings.display"),
       ]),
       RegistrySettingsSection(id: "actions", header: nil, footer: nil, platforms: nil, items: [
         RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "check_updates", label: RegistryL10n.t("Check for Updates…"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: ["macos", "windows"], featureId: "mac.updates"),
