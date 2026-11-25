@@ -49,6 +49,7 @@ const WHAT_TO_TEST = DEVICE_NOTE ? `Device build of ${DEVICE_NOTE}` : PUBLIC_WHA
 
 const PROCESS_TIMEOUT_MS = 45 * 60 * 1000;
 const POLL_MS = 30 * 1000;
+const ADD_ATTEMPTS = 10;
 
 const b64url = (buf) => Buffer.from(buf).toString("base64url");
 
@@ -136,9 +137,17 @@ async function main() {
   await ensureWhatToTest(buildId);
 
   if (!(internal && group.attributes.hasAccessToAllBuilds)) {
-    const add = await asc("POST", `/v1/betaGroups/${group.id}/relationships/builds`, {
-      data: [{ type: "builds", id: buildId }],
-    });
+    // App Store Connect can list a build as VALID and still answer 404 here for
+    // a short while (seen 2026-11-24 and 2026-11-25). Try again on 404 only.
+    let add;
+    for (let attempt = 1; attempt <= ADD_ATTEMPTS; attempt++) {
+      add = await asc("POST", `/v1/betaGroups/${group.id}/relationships/builds`, {
+        data: [{ type: "builds", id: buildId }],
+      });
+      if (add.status !== 404 || attempt === ADD_ATTEMPTS) break;
+      console.log(`build ${BUILD_NUMBER}: not ready for the group yet; waiting`);
+      await sleep(POLL_MS);
+    }
     if (!add.ok) throw new Error(`adding build to "${GROUP_NAME}" failed (${add.status}): ${errors(add)}`);
   }
   console.log(`build ${MARKETING_VERSION} (${BUILD_NUMBER}) is in "${GROUP_NAME}"`);
