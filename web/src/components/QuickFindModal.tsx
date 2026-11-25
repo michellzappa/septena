@@ -1,7 +1,22 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Calendar, CheckCircle2, Circle, Folder, Layers, Repeat, Search, Sparkles, Star, Tag } from "lucide-react";
+import {
+  Bot,
+  Calendar,
+  Check,
+  CheckCircle2,
+  Circle,
+  CircleDashed,
+  Eye,
+  Folder,
+  Layers,
+  Repeat,
+  Search,
+  Star,
+  Sun,
+  Tag,
+} from "lucide-react";
 import type { ActiveDestination, AreaRow, ProjectRow, SmartDestination, TagRow, TaskRow } from "@/lib/types";
 
 interface QuickFindModalProps {
@@ -164,11 +179,14 @@ export function QuickFindModal({
                 key = `smart:${item.id}`;
                 label = item.title;
                 meta = item.subtitle;
-                if (item.id === "today") icon = <Star className="h-3.5 w-3.5 text-[var(--today-gold)]" />;
+                if (item.id === "today") icon = <Sun className="h-3.5 w-3.5 text-[var(--today-gold)]" />;
+                else if (item.id === "review") icon = <Eye className="h-3.5 w-3.5 text-[var(--accent)]" />;
+                else if (item.id === "agent") icon = <Bot className="h-3.5 w-3.5 text-[var(--accent)]" />;
                 else if (item.id === "upcoming") icon = <Calendar className="h-3.5 w-3.5 text-[var(--text-muted)]" />;
                 else if (item.id === "repeating") icon = <Repeat className="h-3.5 w-3.5 text-[var(--text-muted)]" />;
-                else if (item.id === "agent" || item.id === "review") icon = <Sparkles className="h-3.5 w-3.5 text-[var(--accent)]" />;
-                else if (item.id === "logbook") icon = <CheckCircle2 className="h-3.5 w-3.5 text-[var(--text-muted)]" />;
+                else if (item.id === "starred") icon = <Star className="h-3.5 w-3.5 text-amber-500" />;
+                else if (item.id === "faded") icon = <CircleDashed className="h-3.5 w-3.5 text-[var(--text-muted)]" />;
+                else if (item.id === "logbook") icon = <Check className="h-3.5 w-3.5 text-[var(--text-muted)]" />;
                 else icon = <Layers className="h-3.5 w-3.5 text-[var(--text-muted)]" />;
               } else if (item.kind === "area") {
                 key = `area:${item.area.id}`;
