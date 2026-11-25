@@ -63,6 +63,27 @@ const APP_ONLY_TASK_FIELDS = ["touchedAt", "deferCount", "fadedAt", "dropReason"
 /// Per changed field: [before, after]. `null` means absent / cleared.
 export type ChangeDiff = Record<string, [unknown, unknown]>;
 
+/// What the admin page knows about one account (ADR 0043): counts, dates and
+/// plan rows, never content.
+export interface AccountSummary {
+  firstSeen: number | null;
+  lastChangeAt: number | null;
+  signedIn: boolean;
+  openTasks: number;
+  closedTasks: number;
+  projects: number;
+  areas: number;
+  sharedProjects: number;
+  files: number;
+  fileBytes: number;
+  devices: { client: string | null; version: string | null; firstSeen: number; lastSeen: number }[];
+  agents: { client: string; since: number; lastUsed: number }[];
+  agentChangesWeek: number;
+  webhooks: number;
+  failingWebhooks: number;
+  entitlements: Pick<EntitlementRow, "id" | "source" | "productId" | "expiresAt" | "status" | "environment" | "signedAt">[];
+}
+
 /// `GET /v1/access`: every place the account is signed in.
 export interface AccessSummary {
   devices: { sid: string; client: string | null; firstSeen: number; lastSeen: number; current: boolean; syncing: boolean }[];
@@ -554,6 +575,9 @@ export class TaskStore extends DurableObject<Env> {
     // The name the user gave an agent (pairing or Settings rename). Null =
     // the client's registered name.
     const connectionCols = this.sql.exec<{ name: string }>("PRAGMA table_info(connections)").toArray().map((r) => r.name);
+    // The app version a device last sent (`X-Septena-Version`).
+    const deviceCols = this.sql.exec<{ name: string }>("PRAGMA table_info(devices)").toArray().map((r) => r.name);
+    if (!deviceCols.includes("version")) this.sql.exec("ALTER TABLE devices ADD COLUMN version TEXT");
     if (!connectionCols.includes("label")) this.sql.exec("ALTER TABLE connections ADD COLUMN label TEXT");
   }
 
@@ -2402,9 +2426,9 @@ export class TaskStore extends DurableObject<Env> {
   /// has not synced for 14 days (spec §6.4 finding 1). It never pushes out an
   /// active holder (that is `claimDeviceSlot`), and an automatic take never
   /// counts against the 24-hour manual move cooldown.
-  deviceAccess(sid: string, client: string | null, cap: number | null, now = Date.now()): { syncing: boolean } {
+  deviceAccess(sid: string, client: string | null, cap: number | null, now = Date.now(), version: string | null = null): { syncing: boolean } {
     return this.ctx.storage.transactionSync(() => {
-      this.touchDevice(sid, client, now);
+      this.touchDevice(sid, client, now, version);
       const holders = cap === null ? null : this.slotHolders(cap, now);
       const syncing = holders === null || holders.includes(sid) || holders.length < cap!;
       if (syncing) this.sql.exec("UPDATE devices SET slotAt = ? WHERE sid = ?", this.nextSlotAt(now), sid);
@@ -2458,10 +2482,10 @@ export class TaskStore extends DurableObject<Env> {
     ).toArray().map((r) => ({ ...r, syncing: holders === null || holders.has(r.sid) }));
   }
 
-  private touchDevice(sid: string, client: string | null, now: number): void {
+  private touchDevice(sid: string, client: string | null, now: number, version: string | null = null): void {
     this.sql.exec(
-      "INSERT INTO devices (sid, client, firstSeen, lastSeen) VALUES (?, ?, ?, ?) ON CONFLICT(sid) DO UPDATE SET lastSeen = excluded.lastSeen, client = COALESCE(excluded.client, devices.client)",
-      sid, client, now, now,
+      "INSERT INTO devices (sid, client, firstSeen, lastSeen, version) VALUES (?, ?, ?, ?, ?) ON CONFLICT(sid) DO UPDATE SET lastSeen = excluded.lastSeen, client = COALESCE(excluded.client, devices.client), version = COALESCE(excluded.version, devices.version)",
+      sid, client, now, now, version,
     );
   }
 
@@ -2556,6 +2580,52 @@ export class TaskStore extends DurableObject<Env> {
 
   deleteEntitlement(id: string): boolean {
     return this.sql.exec("DELETE FROM entitlements WHERE id = ?", id).rowsWritten > 0;
+  }
+
+  // ---- admin summary (ADR 0043, src/admin/accounts.ts) ----
+
+  /// Counts, dates and plan rows for the admin page. Never content: no titles,
+  /// no notes, no file names, and no name the user typed (an agent shows its
+  /// client's registered name, not the user's label). Null = an empty store.
+  accountSummary(now = Date.now()): AccountSummary | null {
+    const count = (query: string, ...args: SqlStorageValue[]) => this.sql.exec<{ n: number }>(query, ...args).one().n;
+    const tasks = "SELECT COUNT(*) AS n FROM tasks WHERE deletedAt IS NULL AND COALESCE(kind, '') != 'heading' AND status";
+    const devices = this.sql.exec<{ client: string | null; version: string | null; firstSeen: number; lastSeen: number }>(
+      "SELECT client, version, firstSeen, lastSeen FROM devices d WHERE EXISTS (SELECT 1 FROM sessions s WHERE s.sid = d.sid) ORDER BY lastSeen DESC",
+    ).toArray().map((r) => ({ ...r }));
+    const agents = this.sql.exec<{ client: string; since: number; lastUsed: number }>(
+      "SELECT clientName AS client, createdAt AS since, lastUsed FROM connections WHERE lastUsed > ? ORDER BY lastUsed DESC", now - CONNECTION_TTL_MS,
+    ).toArray().map((r) => ({ ...r }));
+    const entitlements = this.entitlements().map((r) => ({
+      id: r.id, source: r.source, productId: r.productId, expiresAt: r.expiresAt, status: r.status,
+      environment: r.environment, signedAt: r.signedAt,
+    }));
+    const openTasks = count(`${tasks} = 'open'`);
+    const closedTasks = count(`${tasks} != 'open'`);
+    const signedIn = this.hasAppSession();
+    if (!signedIn && openTasks + closedTasks === 0 && entitlements.length === 0) return null;
+    const first = this.sql.exec<{ at: string | null }>("SELECT MIN(at) AS at FROM changes").one().at;
+    const last = this.sql.exec<{ at: string }>("SELECT at FROM changes ORDER BY rev DESC LIMIT 1").toArray()[0]?.at ?? null;
+    const starts = [first ? Date.parse(first) : 0, ...devices.map((d) => d.firstSeen), ...entitlements.filter((e) => e.source === "trial").map((e) => e.signedAt)]
+      .filter((t) => t > 0);
+    return {
+      firstSeen: starts.length ? Math.min(...starts) : null,
+      lastChangeAt: last ? Date.parse(last) : null,
+      signedIn,
+      openTasks,
+      closedTasks,
+      projects: count("SELECT COUNT(*) AS n FROM projects WHERE deletedAt IS NULL"),
+      areas: count("SELECT COUNT(*) AS n FROM areas WHERE deletedAt IS NULL"),
+      sharedProjects: this.shares.list().length,
+      files: count("SELECT COUNT(*) AS n FROM attachments WHERE deletedAt IS NULL AND uploadedAt IS NOT NULL"),
+      fileBytes: this.attachmentBytes(),
+      devices,
+      agents,
+      agentChangesWeek: count("SELECT COUNT(*) AS n FROM changes WHERE actor LIKE 'mcp:%' AND at > ?", new Date(now - 7 * DAY_MS).toISOString()),
+      webhooks: count("SELECT COUNT(*) AS n FROM agent_webhooks WHERE enabled = 1"),
+      failingWebhooks: count("SELECT COUNT(*) AS n FROM agent_webhooks WHERE enabled = 1 AND failureCount > 0"),
+      entitlements,
+    };
   }
 
   // ---- private read-only iCal feed (docs/TASK_TIMES_AND_ICAL_SPEC.md §3, #166) ----

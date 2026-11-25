@@ -235,6 +235,10 @@ does not cut sync); `grace` until the grace period end + 24 h;
 | `POST /v1/admin/grants` | `X-Admin-Token` | body `{userId, name, note?, expiresAt?}`; writes `grant:<name>` |
 | `DELETE /v1/admin/grants/:userId/:name` | `X-Admin-Token` | removes a grant |
 
+Plus links (ADR 0043) are the way to give Plus to people: make one at
+`https://api.septena.app/admin`. A claim writes a `grant:link-…` row. The
+`X-Admin-Token` routes stay for scripts.
+
 The admin routes answer 404 while the `ADMIN_TOKEN` secret is unset.
 
 **Verification.** No library: `backend/src/entitlement/appleJws.ts` does

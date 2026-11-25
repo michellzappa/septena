@@ -11,13 +11,22 @@ import type { Env } from "../env.js";
 // finishes the OAuth redirect. A Durable Object gives the poll and the approve
 // one strongly consistent view; the alarm wipes the object at expiry.
 
+export type PairPurpose = "connector" | "device" | "plus";
+
+/// What the approving app sees. The apps know two kinds; a Plus code asks for
+/// less than a device sign-in, so it shows as one.
+const approvalKind = (p: PendingAuth): "connector" | "device" =>
+  p.purpose === "plus" ? "device" : p.purpose ?? "connector";
+
 export interface PendingAuth {
   /// "connector" (absent on records written before 2026-11-22) finishes the
   /// MCP OAuth redirect; "device" mints an app session for a new device
   /// (ADR 0016, issue #170). Each finish path refuses the other purpose, so a
   /// connector code never mints an app session and a device code never mints
   /// MCP tokens.
-  purpose?: "connector" | "device";
+  /// "plus" claims a Plus link for the approving account (src/api/plusLinks.ts)
+  /// and mints nothing.
+  purpose?: PairPurpose;
   /// Random secret held only in the browser's cookie. Polling and finishing
   /// need it, so knowing the short code alone cannot complete the flow.
   pendingId: string;
@@ -92,7 +101,7 @@ export class PairingStore extends DurableObject<Env> {
     if (!p) return { outcome: "not_found" };
     const { approved, denied } = await this.isDecided();
     if (approved || denied) return { outcome: "already_used" };
-    return { outcome: "ok", purpose: p.purpose ?? "connector", clientName: p.clientName, expiresAt: p.expiresAt };
+    return { outcome: "ok", purpose: approvalKind(p), clientName: p.clientName, expiresAt: p.expiresAt };
   }
 
   /// Binds a user to the pending authorization. A code approves once: a
@@ -105,7 +114,7 @@ export class PairingStore extends DurableObject<Env> {
   ): Promise<{ outcome: ApproveOutcome; clientName?: string; purpose?: "connector" | "device" }> {
     const p = await this.live();
     if (!p) return { outcome: "not_found" };
-    const purpose = p.purpose ?? "connector";
+    const purpose = approvalKind(p);
     if (expectedPurpose !== purpose) return { outcome: "not_found" };
     const { approved, denied } = await this.isDecided();
     if (approved || denied) return { outcome: "already_used" };
@@ -120,7 +129,7 @@ export class PairingStore extends DurableObject<Env> {
   ): Promise<{ outcome: ApproveOutcome; clientName?: string; purpose?: "connector" | "device" }> {
     const p = await this.live();
     if (!p) return { outcome: "not_found" };
-    const purpose = p.purpose ?? "connector";
+    const purpose = approvalKind(p);
     if (expectedPurpose && expectedPurpose !== purpose) return { outcome: "not_found" };
     const { approved, denied } = await this.isDecided();
     if (approved || denied) return { outcome: "already_used" };
@@ -130,7 +139,7 @@ export class PairingStore extends DurableObject<Env> {
 
   async status(
     pendingId: string,
-    purpose: "connector" | "device" = "connector",
+    purpose: PairPurpose = "connector",
   ): Promise<{ status: PairStatus; clientName?: string; redirectUri?: string }> {
     const p = await this.live();
     if (!p || !constantTimeEqual(p.pendingId, pendingId) || (p.purpose ?? "connector") !== purpose) {
@@ -144,7 +153,7 @@ export class PairingStore extends DurableObject<Env> {
   /// One-shot: consumes a denied authorization and wipes the object.
   async consumeDenied(
     pendingId: string,
-    purpose: "connector" | "device" = "connector",
+    purpose: PairPurpose = "connector",
   ): Promise<boolean> {
     const p = await this.live();
     if (!p || !constantTimeEqual(p.pendingId, pendingId) || (p.purpose ?? "connector") !== purpose) return false;
@@ -158,7 +167,7 @@ export class PairingStore extends DurableObject<Env> {
   /// One-shot: returns the approved authorization and wipes the object.
   async take(
     pendingId: string,
-    purpose: "connector" | "device" = "connector",
+    purpose: PairPurpose = "connector",
   ): Promise<{ pending: PendingAuth; approval: PairApproval } | null> {
     const p = await this.live();
     if (!p || !constantTimeEqual(p.pendingId, pendingId) || (p.purpose ?? "connector") !== purpose) return null;

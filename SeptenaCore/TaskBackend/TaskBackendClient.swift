@@ -49,6 +49,13 @@ actor TaskBackendClient {
   #else
   static let clientName = "septask-ios"
   #endif
+  /// Sent as `X-Septena-Version`, so support can see which build a device runs.
+  static let clientVersion: String = {
+    let info = Bundle.main.infoDictionary
+    let version = info?["CFBundleShortVersionString"] as? String ?? "0"
+    let build = info?["CFBundleVersion"] as? String ?? "0"
+    return "\(version) (\(build))"
+  }()
   private static let refreshAccount = "com.septena.taskBackend.refreshToken"
 
   private let session: URLSession
@@ -275,6 +282,7 @@ actor TaskBackendClient {
     guard let url = parts.url else { throw TaskBackendError.badResponse("bad path") }
     var request = URLRequest(url: url)
     request.setValue(Self.clientName, forHTTPHeaderField: "X-Septena-Client")
+    request.setValue(Self.clientVersion, forHTTPHeaderField: "X-Septena-Version")
     request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
     return request
   }
@@ -534,6 +542,7 @@ actor TaskBackendClient {
     var request = URLRequest(url: url)
     request.httpMethod = method
     request.setValue(Self.clientName, forHTTPHeaderField: "X-Septena-Client")
+    request.setValue(Self.clientVersion, forHTTPHeaderField: "X-Septena-Version")
     request.setValue("application/json", forHTTPHeaderField: "Accept")
     if let auth { request.setValue("Bearer \(auth)", forHTTPHeaderField: "Authorization") }
     if let body {
