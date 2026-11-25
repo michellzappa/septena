@@ -761,6 +761,12 @@ struct ProjectDetailView: View {
   private var projectOverflowMenu: some View {
     OverflowMenu {
       Button {
+        nav.shouldCreateHeading = true
+      } label: {
+        Label(RegistryActions.title("section.new"), systemImage: "rectangle.split.1x2")
+      }
+      Divider()
+      Button {
         showingMoveToArea = true
       } label: {
         Label("Move to Area…", systemImage: "folder")
