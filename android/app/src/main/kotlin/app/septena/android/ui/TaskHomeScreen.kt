@@ -1074,6 +1074,7 @@ private fun TaskHomeScaffold(
             onOpenSettings = onOpenSettings,
         )
         val noticedDo = doing.current?.takeIf { doing.showsNotice }
+        val needsYou = doing.endedSince?.let { since -> state.agentRequestTimes.count { !it.isBefore(since) } } ?: 0
         if (noticedDo != null) {
             DoNoticeCard(
                 graph = graph,
@@ -1083,9 +1084,9 @@ private fun TaskHomeScaffold(
                 hasActiveTexture = appearance.hasActiveTexture,
                 modifier = Modifier.padding(bottom = 10.dp),
             )
-        } else if (doing.justEnded && state.reviewCount > 0) {
+        } else if (needsYou > 0) {
             FadeSweepBannerCard(
-                message = remember(languageTag, state.reviewCount) { DoCopy(languageTag).needsYou(state.reviewCount) },
+                message = remember(languageTag, needsYou) { DoCopy(languageTag).needsYou(needsYou) },
                 reviewLabel = RegistryCatalog.destinationTitle(RegistryDestinationIds.REVIEW, languageTag).orEmpty(),
                 dismissLabel = noticeDismissTitle(languageTag),
                 isDark = isDark,

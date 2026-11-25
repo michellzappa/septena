@@ -59,8 +59,8 @@ data class DoUiState(
     val fullSessionId: String? = null,
     /** The Do that just stopped here: the app offers "Where did you stop?". */
     val justStoppedSessionId: String? = null,
-    /** A Do just ended here: the app says what needs the user. */
-    val justEnded: Boolean = false,
+    /** The start of the Do that just ended here: the app says what came in since and needs the user. */
+    val endedSince: Instant? = null,
 ) {
     /** This device shows the Do screen. */
     val isFullHere: Boolean get() = current != null && !current.isStale && current.sessionId == fullSessionId
@@ -124,7 +124,7 @@ class DoController(
             ui.copy(
                 current = next,
                 fullSessionId = ui.fullSessionId?.takeIf { it == next?.sessionId },
-                justEnded = ui.justEnded || (before.isFullHere && next == null),
+                endedSince = ui.endedSince ?: before.current?.startedAt?.takeIf { before.isFullHere && next == null },
             )
         }
         saveFull()
@@ -158,7 +158,7 @@ class DoController(
         } else {
             sessions.begin(taskId, tasks) ?: return@gesture
         }
-        _ui.update { it.copy(fullSessionId = sessionId, justStoppedSessionId = null, justEnded = false) }
+        _ui.update { it.copy(fullSessionId = sessionId, justStoppedSessionId = null, endedSince = null) }
         refreshLocked()
         withContext(Dispatchers.Main) { onStarted() }
     }
@@ -166,13 +166,13 @@ class DoController(
     /** Done is the existing complete action. The task mutator ends the Do. */
     fun done(doing: DoState) = gesture {
         captureTaskEdit(doing.taskId) { tasks.complete(doing.taskId) }
-        _ui.update { it.copy(justEnded = true) }
+        _ui.update { it.copy(endedSince = doing.startedAt) }
     }
 
     /** Stop for now. Ends one Do by its id. */
     fun stop(doing: DoState) = gesture {
         if (!sessions.end(doing.sessionId, RegistryEntityEnums.DoExit.STOPPED)) return@gesture
-        _ui.update { it.copy(justStoppedSessionId = doing.sessionId, justEnded = true) }
+        _ui.update { it.copy(justStoppedSessionId = doing.sessionId, endedSince = doing.startedAt) }
     }
 
     /** Only a saved date ends the Do. Clear changes the task and the Do goes on. */
@@ -181,7 +181,7 @@ class DoController(
         captureTaskEdit(doing.taskId) { saved = tasks.setWhen(doing.taskId, day) != null }
         if (!saved || day == null) return@gesture
         sessions.end(doing.sessionId, RegistryEntityEnums.DoExit.LATER)
-        _ui.update { it.copy(justEnded = true) }
+        _ui.update { it.copy(endedSince = doing.startedAt) }
     }
 
     /** The stale question's Still on It. */
@@ -197,7 +197,7 @@ class DoController(
         if (!note.isNullOrBlank()) gesture { sessions.setNote(sessionId, note) }
     }
 
-    fun dismissNeedsYou() = _ui.update { it.copy(justEnded = false) }
+    fun dismissNeedsYou() = _ui.update { it.copy(endedSince = null) }
 
     /** Do Here: this device becomes the full one. */
     fun showHere() = setFull(_ui.value.current?.takeUnless { it.isStale }?.sessionId)
