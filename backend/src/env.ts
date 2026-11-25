@@ -1,6 +1,7 @@
 // Worker bindings — keep in sync with wrangler.toml.
 
 import type { TaskStore } from "./store/TaskStore.js";
+import type { ProjectStore } from "./store/ProjectStore.js";
 import type { AccountStore } from "./store/AccountStore.js";
 import type { PairingStore } from "./shadow/PairingStore.js";
 
@@ -51,6 +52,9 @@ export interface Env {
   /// Global identity table (`provider:subject` -> `userId`, ADR 0016 #168).
   /// Bound in wrangler.toml; optional on Env so isolated unit tests need not wire it.
   ACCOUNT_STORE?: DurableObjectNamespace<AccountStore>;
+  /// One object per shared project (ADR 0004). Optional so isolated unit tests
+  /// need not wire it.
+  PROJECT_STORE?: DurableObjectNamespace<ProjectStore>;
   ATTACHMENTS: R2Bucket;                         // attachment bytes, u/{userId}/att/{id}
   PAIRING: DurableObjectNamespace<PairingStore>; // one object per pending app-pairing code (src/shadow/)
 }

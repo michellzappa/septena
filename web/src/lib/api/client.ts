@@ -1,9 +1,13 @@
 import {
+  zAccessSummary,
+  zChangesResponse,
   zDeviceStartResponse,
   zPullResponse,
   zPushResponse,
   zSessionResponse,
   zWsTicketResponse,
+  type AccessSummary,
+  type ChangeEntry,
   type DeviceStartResponse,
   type OutboxOp,
   type PullResponse,
@@ -15,18 +19,20 @@ import {
 // API client for api.septena.app (docs/WEB_CLIENT_SPEC.md §4–§5).
 // - Access token stays in memory only (never localStorage/sessionStorage).
 // - Refresh token stays in an HttpOnly cookie on api.septena.app (/v1/auth).
-// - Single-flight refresh prevents concurrent 401s from double-rotating the cookie.
+// - Single-flight refresh prevents concurrent 401s from racing cookie rotation.
 
 const DEFAULT_API_BASE = "https://api.septena.app";
-const CLIENT_HEADER = "web 0.1.0";
+const CLIENT_HEADER = "web 0.2.0";
 
 export class ApiError extends Error {
   readonly status: number;
   readonly code: string;
-  constructor(status: number, code: string, message?: string) {
+  readonly rawBody: string;
+  constructor(status: number, code: string, message?: string, rawBody = "") {
     super(message ?? `${code} (${status})`);
     this.status = status;
     this.code = code;
+    this.rawBody = rawBody;
   }
 }
 
@@ -52,7 +58,6 @@ export class SeptenaApiClient {
   private setSession(session: SessionResponse): void {
     this.accessToken = session.accessToken;
     this.userId = session.userId;
-    // Refresh slightly before the 1-hour expiry.
     this.accessExpiresAt = Date.now() + Math.max(30, session.expiresIn - 120) * 1000;
   }
 
@@ -105,8 +110,9 @@ export class SeptenaApiClient {
       body: JSON.stringify({ clientName }),
     });
     if (!res.ok) {
-      const err = (await res.json().catch(() => ({}))) as { error?: string };
-      throw new ApiError(res.status, err.error ?? "device_start_failed");
+      const raw = await res.text().catch(() => "");
+      const err = parseErr(raw);
+      throw new ApiError(res.status, err.error ?? "device_start_failed", err.message, raw);
     }
     return zDeviceStartResponse.parse(await res.json());
   }
@@ -126,12 +132,13 @@ export class SeptenaApiClient {
     });
     if (res.status === 202) return { status: "pending" };
     if (res.status === 410) {
-      const err = (await res.json().catch(() => ({}))) as { error?: string };
+      const err = parseErr(await res.text().catch(() => ""));
       return { status: err.error === "denied" ? "denied" : "expired" };
     }
     if (!res.ok) {
-      const err = (await res.json().catch(() => ({}))) as { error?: string };
-      throw new ApiError(res.status, err.error ?? "device_poll_failed");
+      const raw = await res.text().catch(() => "");
+      const err = parseErr(raw);
+      throw new ApiError(res.status, err.error ?? "device_poll_failed", err.message, raw);
     }
     const session = zSessionResponse.parse(await res.json());
     this.setSession(session);
@@ -195,26 +202,32 @@ export class SeptenaApiClient {
     });
     const res = await this.authedFetch(`/v1/sync/pull?${qs.toString()}`, { method: "GET" });
     if (!res.ok) {
-      const err = (await res.json().catch(() => ({}))) as { error?: string; message?: string };
-      throw new ApiError(res.status, err.error ?? "pull_failed", err.message);
+      const raw = await res.text().catch(() => "");
+      const err = parseErr(raw);
+      throw new ApiError(res.status, err.error ?? "pull_failed", err.message, raw);
     }
     return zPullResponse.parse(await res.json());
   }
 
   async push(ops: OutboxOp[]): Promise<PushResponse> {
-    const wireOps = ops.map((o) =>
-      o.op === "delete"
-        ? { clientOpId: o.clientOpId, op: "delete", entity: o.entity, id: o.id }
-        : { clientOpId: o.clientOpId, op: "upsert", entity: o.entity, id: o.id, fields: o.fields },
-    );
+    const wireOps = ops.map((o) => {
+      if (o.op === "delete") {
+        return { clientOpId: o.clientOpId, op: "delete", entity: o.entity, id: o.id };
+      }
+      if (o.op === "appendTurn") {
+        return { clientOpId: o.clientOpId, op: "appendTurn", taskId: o.taskId, turn: o.turn };
+      }
+      return { clientOpId: o.clientOpId, op: "upsert", entity: o.entity, id: o.id, fields: o.fields };
+    });
     const res = await this.authedFetch("/v1/sync/push", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ops: wireOps }),
     });
     if (!res.ok) {
-      const err = (await res.json().catch(() => ({}))) as { error?: string; message?: string };
-      throw new ApiError(res.status, err.error ?? "push_failed", err.message);
+      const raw = await res.text().catch(() => "");
+      const err = parseErr(raw);
+      throw new ApiError(res.status, err.error ?? "push_failed", err.message, raw);
     }
     return zPushResponse.parse(await res.json());
   }
@@ -222,8 +235,9 @@ export class SeptenaApiClient {
   async wsTicket(): Promise<WsTicketResponse> {
     const res = await this.authedFetch("/v1/sync/ws-ticket", { method: "POST" });
     if (!res.ok) {
-      const err = (await res.json().catch(() => ({}))) as { error?: string };
-      throw new ApiError(res.status, err.error ?? "ws_ticket_failed");
+      const raw = await res.text().catch(() => "");
+      const err = parseErr(raw);
+      throw new ApiError(res.status, err.error ?? "ws_ticket_failed", err.message, raw);
     }
     return zWsTicketResponse.parse(await res.json());
   }
@@ -231,5 +245,110 @@ export class SeptenaApiClient {
   wsUrl(ticket: string): string {
     const base = this.apiBase.replace(/^http/, "ws");
     return `${base}/v1/sync/ws?ticket=${encodeURIComponent(ticket)}`;
+  }
+
+  async getAccessSummary(): Promise<AccessSummary> {
+    const res = await this.authedFetch("/v1/access", { method: "GET" });
+    if (!res.ok) {
+      const raw = await res.text().catch(() => "");
+      const err = parseErr(raw);
+      throw new ApiError(res.status, err.error ?? "access_failed", err.message, raw);
+    }
+    return zAccessSummary.parse(await res.json());
+  }
+
+  async revokeDevice(sid: string): Promise<void> {
+    const res = await this.authedFetch(`/v1/access/devices/${encodeURIComponent(sid)}`, { method: "DELETE" });
+    if (!res.ok) {
+      const raw = await res.text().catch(() => "");
+      const err = parseErr(raw);
+      throw new ApiError(res.status, err.error ?? "revoke_device_failed", err.message, raw);
+    }
+  }
+
+  async disconnectAgent(id: string): Promise<void> {
+    const res = await this.authedFetch(`/v1/access/connections/${encodeURIComponent(id)}`, { method: "DELETE" });
+    if (!res.ok) {
+      const raw = await res.text().catch(() => "");
+      const err = parseErr(raw);
+      throw new ApiError(res.status, err.error ?? "disconnect_agent_failed", err.message, raw);
+    }
+  }
+
+  async renameAgent(id: string, name: string | null): Promise<void> {
+    const res = await this.authedFetch(`/v1/access/connections/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    if (!res.ok) {
+      const raw = await res.text().catch(() => "");
+      const err = parseErr(raw);
+      throw new ApiError(res.status, err.error ?? "rename_agent_failed", err.message, raw);
+    }
+  }
+
+  async inspectPairingCode(code: string): Promise<{ kind: "connector" | "device"; client: string; expiresIn: number }> {
+    const res = await this.authedFetch("/v1/pair/inspect", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code }),
+    });
+    if (!res.ok) {
+      const raw = await res.text().catch(() => "");
+      const err = parseErr(raw);
+      throw new ApiError(res.status, err.error ?? "inspect_failed", err.message, raw);
+    }
+    return (await res.json()) as { kind: "connector" | "device"; client: string; expiresIn: number };
+  }
+
+  async approvePairingCode(code: string, kind: "connector" | "device", name?: string): Promise<void> {
+    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const body: Record<string, unknown> = { code, kind, timeZone };
+    if (kind === "connector" && name?.trim()) body.name = name.trim();
+    const res = await this.authedFetch("/v1/pair/approve", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const raw = await res.text().catch(() => "");
+      const err = parseErr(raw);
+      throw new ApiError(res.status, err.error ?? "approve_failed", err.message, raw);
+    }
+  }
+
+  async getChanges(entity: string, id: string, limit = 50): Promise<ChangeEntry[]> {
+    const qs = new URLSearchParams({ entity, id, limit: String(limit) });
+    const res = await this.authedFetch(`/v1/changes?${qs.toString()}`, { method: "GET" });
+    if (!res.ok) return [];
+    const parsed = zChangesResponse.safeParse(await res.json());
+    return parsed.success ? parsed.data.changes : [];
+  }
+
+  async downloadAttachment(id: string, filename: string): Promise<void> {
+    const res = await this.authedFetch(`/v1/attachments/${encodeURIComponent(id)}`, { method: "GET" });
+    if (!res.ok) {
+      const raw = await res.text().catch(() => "");
+      const err = parseErr(raw);
+      throw new ApiError(res.status, err.error ?? "download_failed", err.message, raw);
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  }
+}
+
+function parseErr(raw: string): { error?: string; message?: string } {
+  try {
+    return JSON.parse(raw) as { error?: string; message?: string };
+  } catch {
+    return {};
   }
 }

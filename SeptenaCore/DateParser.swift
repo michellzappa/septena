@@ -16,14 +16,11 @@ struct SeptenaDateParser {
   /// Parse what a person types into a day. Day precision only; returns the
   /// start of that day.
   ///
-  /// Accepts English, Brazilian Portuguese, and Dutch relative dates (today /
-  /// hoje / vandaag, tomorrow / amanhã / morgen, "in 3 days" / "em 3 dias" /
-  /// "over 3 dagen"), weekday names and their abbreviations (the next
-  /// occurrence after today; "next fri", "próxima sexta", and "volgende
-  /// vrijdag" too), "+N" (days), "+Nd" / "+Nw" / "+Nm", month-day in either
-  /// order ("dec 4", "4 de março", "4 maart", optional year, commas ignored),
+  /// Accepts English, Brazilian Portuguese, Dutch, French, German, and Spanish
+  /// relative dates, weekday names and abbreviations, "+N" (days), "+Nd" /
+  /// "+Nw" / "+Nm", month-day in either order (optional year, commas ignored),
   /// ISO "yyyy-mm-dd", and localized numeric dates. Month and weekday names
-  /// match English, Portuguese, Dutch, and the current locale.
+  /// match all supported locales and the current locale.
   static func parse(_ raw: String, today: Date, calendar: Calendar = .current) -> Date? {
     let text = raw.lowercased()
       .folding(options: .diacriticInsensitive, locale: .current)
@@ -37,10 +34,18 @@ struct SeptenaDateParser {
     }
 
     switch text {
-    case "today", "tod", "tdy", "now", "tonight", "hoje", "hj", "agora", "hoje a noite",
-         "vandaag", "nu", "vanavond":
+    case "today", "tod", "tdy", "now", "tonight",
+         "hoje", "hj", "agora", "hoje a noite",
+         "vandaag", "nu", "vanavond",
+         "aujourd'hui", "aujourd’hui", "maintenant", "ce soir",
+         "heute", "heute abend", "jetzt",
+         "hoy", "ahora", "esta noche":
       return start
-    case "tomorrow", "tom", "tmr", "tmrw", "tmw", "amanha", "morgen": return add(1, .day)
+    case "tomorrow", "tom", "tmr", "tmrw", "tmw", "amanha", "morgen", "demain", "manana":
+      return add(1, .day)
+    case "day after tomorrow", "depois de amanha", "overmorgen", "ubermorgen",
+         "apres-demain", "pasado manana":
+      return add(2, .day)
     default: break
     }
 
@@ -51,25 +56,28 @@ struct SeptenaDateParser {
     }
 
     // "in 3 days", "in 2 weeks", "in 1 month", "in 3d"
-    if text.hasPrefix("in ") || text.hasPrefix("em ") {
-      return relative(String(text.dropFirst(3)).replacingOccurrences(of: " ", with: ""),
+    for prefix in ["in ", "em ", "en "] where text.hasPrefix(prefix) {
+      return relative(String(text.dropFirst(prefix.count)).replacingOccurrences(of: " ", with: ""),
                       add: add)
     }
-    if text.hasPrefix("over ") {
-      return relative(String(text.dropFirst(5)).replacingOccurrences(of: " ", with: ""),
+    for prefix in ["over ", "dans "] where text.hasPrefix(prefix) {
+      return relative(String(text.dropFirst(prefix.count)).replacingOccurrences(of: " ", with: ""),
                       add: add)
     }
 
     // Weekday, optionally "next ..."
-    let weekdayText: String
-    if text.hasPrefix("next ") {
-      weekdayText = String(text.dropFirst(5))
-    } else if text.hasPrefix("proximo ") || text.hasPrefix("proxima ") {
-      weekdayText = String(text.dropFirst(8))
-    } else if text.hasPrefix("volgende ") {
-      weekdayText = String(text.dropFirst(9))
-    } else {
-      weekdayText = text
+    var weekdayText: String
+    let weekdayPrefixes = [
+      "next ", "proximo ", "proxima ", "volgende ", "prochain ", "prochaine ",
+      "nachsten ", "kommenden ", "kommende ",
+    ]
+    weekdayText = weekdayPrefixes.first(where: { text.hasPrefix($0) })
+      .map { String(text.dropFirst($0.count)) } ?? text
+    if weekdayText == text {
+      for suffix in [" prochain", " prochaine", " que viene"] where text.hasSuffix(suffix) {
+        weekdayText = String(text.dropLast(suffix.count))
+        break
+      }
     }
     if let weekday = weekdayNumber(weekdayText, calendar: calendar) {
       let current = calendar.component(.weekday, from: start)
@@ -85,15 +93,17 @@ struct SeptenaDateParser {
       return validDate(year: year, month: month, day: day, calendar: calendar)
     }
 
-    // Numeric dates follow day-first order for pt-BR and Dutch; other locales
-    // try US order first, falling back to day-first when that reading fails.
+    // Numeric dates follow day-first order for pt-BR, Dutch, French, German,
+    // and Spanish; other locales try US order first, then day-first.
     let slash = text.split(separator: "/")
     if slash.count == 3, slash[2].count == 4,
        let first = Int(slash[0]), let second = Int(slash[1]), let year = Int(slash[2]) {
       let localeID = (calendar.locale?.identifier ?? Locale.current.identifier)
         .replacingOccurrences(of: "-", with: "_")
         .lowercased()
-      let dayFirstOrder = localeID.hasPrefix("pt_br") || localeID.hasPrefix("nl")
+      let dayFirstOrder = ["pt_br", "nl", "fr", "de", "es"].contains {
+        localeID.hasPrefix($0)
+      }
       let month = dayFirstOrder ? second : first
       let day = dayFirstOrder ? first : second
       return validDate(year: year, month: month, day: day, calendar: calendar)
@@ -129,24 +139,105 @@ struct SeptenaDateParser {
   /// Returns nil if no repeat pattern detected.
   static func parseRepeatRule(_ input: String) -> String? {
     let lower = input.lowercased()
+      .folding(options: .diacriticInsensitive, locale: .current)
 
-    // Dutch interval phrases map to the same canonical English rule used by
-    // the existing recurrence pipeline.
-    let dutchIntervalPattern = #"elke (\d+) (dagen?|weken?|maanden?|jaren?)"#
-    if let match = lower.range(of: dutchIntervalPattern, options: .regularExpression) {
-      let parts = lower[match].split(separator: " ")
-      if parts.count == 3, let count = Int(parts[1]) {
-        let unit = parts[2]
+    // Localized interval phrases map to the canonical English recurrence
+    // rules consumed by the shared core.
+    let intervalPatterns = [
+      #"(?:elke|cada|alle) (\d+) (dagen?|weken?|maanden?|jaren?|dias?|semanas?|meses?|anos?|tage?n?|wochen?|monate?n?|jahre?n?)"#,
+      #"(?:tous les|toutes les) (\d+) (jours?|semaines?|mois|ans?)"#,
+      #"a cada (\d+) (dias?|semanas?|meses?|anos?)"#,
+    ]
+    for pattern in intervalPatterns {
+      if let match = lower.range(of: pattern, options: .regularExpression) {
+        let parts = lower[match].split(separator: " ")
+        guard let count = parts.compactMap({ Int($0) }).first,
+              let unit = parts.last else { continue }
+        let unitText = String(unit)
         let canonical: String
-        if unit.hasPrefix("dag") { canonical = "days" }
-        else if unit.hasPrefix("week") { canonical = "weeks" }
-        else if unit.hasPrefix("maand") { canonical = "months" }
-        else { canonical = "years" }
+        if unitText.hasPrefix("dag") || unitText.hasPrefix("dia")
+          || unitText.hasPrefix("jour") || unitText.hasPrefix("tag") {
+          canonical = "days"
+        } else if unitText.hasPrefix("week") || unitText.hasPrefix("semana")
+          || unitText.hasPrefix("semaine") || unitText.hasPrefix("woch") {
+          canonical = "weeks"
+        } else if unitText.hasPrefix("maand") || unitText.hasPrefix("mes")
+          || unitText.hasPrefix("monat") || unitText.hasPrefix("mois") {
+          canonical = "months"
+        } else {
+          canonical = "years"
+        }
         return "every \(count) \(canonical)"
       }
     }
 
     let patterns = [
+      ("chaque lundi", "every monday"),
+      ("chaque mardi", "every tuesday"),
+      ("chaque mercredi", "every wednesday"),
+      ("chaque jeudi", "every thursday"),
+      ("chaque vendredi", "every friday"),
+      ("chaque samedi", "every saturday"),
+      ("chaque dimanche", "every sunday"),
+      ("tous les lundis", "every monday"),
+      ("tous les mardis", "every tuesday"),
+      ("tous les mercredis", "every wednesday"),
+      ("tous les jeudis", "every thursday"),
+      ("tous les vendredis", "every friday"),
+      ("tous les samedis", "every saturday"),
+      ("tous les dimanches", "every sunday"),
+      ("jeden montag", "every monday"),
+      ("jeden dienstag", "every tuesday"),
+      ("jeden mittwoch", "every wednesday"),
+      ("jeden donnerstag", "every thursday"),
+      ("jeden freitag", "every friday"),
+      ("jeden samstag", "every saturday"),
+      ("jeden sonntag", "every sunday"),
+      ("cada lunes", "every monday"),
+      ("cada martes", "every tuesday"),
+      ("cada miercoles", "every wednesday"),
+      ("cada jueves", "every thursday"),
+      ("cada viernes", "every friday"),
+      ("cada sabado", "every saturday"),
+      ("cada domingo", "every sunday"),
+      ("todos los lunes", "every monday"),
+      ("todos los martes", "every tuesday"),
+      ("todos los miercoles", "every wednesday"),
+      ("todos los jueves", "every thursday"),
+      ("todos los viernes", "every friday"),
+      ("todos los sabados", "every saturday"),
+      ("todos los domingos", "every sunday"),
+      ("toda segunda-feira", "every monday"),
+      ("toda terca-feira", "every tuesday"),
+      ("toda quarta-feira", "every wednesday"),
+      ("toda quinta-feira", "every thursday"),
+      ("toda sexta-feira", "every friday"),
+      ("todo sabado", "every saturday"),
+      ("todo domingo", "every sunday"),
+      ("tous les jours", "every day"),
+      ("chaque jour", "every day"),
+      ("toutes les semaines", "every week"),
+      ("chaque semaine", "every week"),
+      ("tous les mois", "every month"),
+      ("chaque mois", "every month"),
+      ("tous les ans", "every year"),
+      ("chaque annee", "every year"),
+      ("jeden tag", "every day"),
+      ("jede woche", "every week"),
+      ("jeden monat", "every month"),
+      ("jedes jahr", "every year"),
+      ("cada dia", "every day"),
+      ("cada semana", "every week"),
+      ("cada mes", "every month"),
+      ("cada ano", "every year"),
+      ("todo dia", "every day"),
+      ("toda semana", "every week"),
+      ("todo mes", "every month"),
+      ("todo ano", "every year"),
+      ("diariamente", "daily"),
+      ("semanalmente", "weekly"),
+      ("mensualmente", "monthly"),
+      ("anualmente", "yearly"),
       ("elke maandag", "every monday"),
       ("elke dinsdag", "every tuesday"),
       ("elke woensdag", "every wednesday"),
@@ -171,6 +262,11 @@ struct SeptenaDateParser {
       ("every year", "every year"),
       ("every ", "every "), // catch-all
       ("elke ", "every "), // catch-all
+      ("cada ", "every "), // catch-all for Spanish recurrence phrases
+      ("chaque ", "every "), // catch-all for French recurrence phrases
+      ("jeden ", "every "), // catch-all for German recurrence phrases
+      ("jede ", "every "),
+      ("jedes ", "every "),
       ("dagelijks", "daily"),
       ("wekelijks", "weekly"),
       ("maandelijks", "monthly"),
@@ -200,8 +296,8 @@ struct SeptenaDateParser {
       }
     }
 
-    // "in X days" / "over X dagen" → repeat every X days
-    let intervalPattern = #"(?:in|over) (\d+) (?:days?|dagen?)"#
+    // "in X days" / "over X dagen" and localized equivalents → repeat every X days.
+    let intervalPattern = #"(?:in|over|em|en|dans) (\d+) (?:days?|dagen?|dias?|jours?|tage?n?)"#
     if let match = lower.range(of: intervalPattern, options: .regularExpression) {
       let nums = lower[match].components(separatedBy: " ").compactMap { Int($0) }
       if let n = nums.first { return "every \(n) days" }
@@ -212,17 +308,21 @@ struct SeptenaDateParser {
 
   // ─── Private helpers ──────────────────────────────────────────────────────
 
-  /// "3", "3d", "3days", "2w", "2weeks", "1m", "1month" and Portuguese
-  /// or Dutch day / week / month names → offset from today.
+  /// "3", "3d", "3days", "2w", "2weeks", "1m", "1month" and supported
+  /// locale day / week / month names → offset from today.
   private static func relative(_ text: String, add: (Int, Calendar.Component) -> Date?) -> Date? {
     let digits = text.prefix { $0.isNumber }
     guard let count = Int(digits) else { return nil }
     let unit = text.dropFirst(digits.count)
     switch unit {
-    case "", "d", "day", "days", "dia", "dias", "dag", "dagen": return add(count, .day)
-    case "w", "wk", "wks", "week", "weeks", "sem", "semana", "semanas", "weken":
+    case "", "d", "day", "days", "dia", "dias", "dag", "dagen", "jour", "jours",
+         "tag", "tage", "tagen":
+      return add(count, .day)
+    case "w", "wk", "wks", "week", "weeks", "sem", "semana", "semanas", "weken",
+         "semaine", "semaines", "woche", "wochen":
       return add(count * 7, .day)
-    case "m", "mo", "month", "months", "mes", "meses", "maand", "maanden":
+    case "m", "mo", "month", "months", "mes", "meses", "maand", "maanden", "mois",
+         "monat", "monate", "monaten":
       return add(count, .month)
     default: return nil
     }
@@ -241,6 +341,12 @@ struct SeptenaDateParser {
                                            "sabado"]
   private static let dutchWeekdays = ["zondag", "maandag", "dinsdag", "woensdag",
                                       "donderdag", "vrijdag", "zaterdag"]
+  private static let frenchWeekdays = ["dimanche", "lundi", "mardi", "mercredi",
+                                       "jeudi", "vendredi", "samedi"]
+  private static let germanWeekdays = ["sonntag", "montag", "dienstag", "mittwoch",
+                                       "donnerstag", "freitag", "samstag"]
+  private static let spanishWeekdays = ["domingo", "lunes", "martes", "miercoles",
+                                        "jueves", "viernes", "sabado"]
   private static let englishMonths = ["january", "february", "march", "april", "may", "june",
                                       "july", "august", "september", "october", "november",
                                       "december"]
@@ -250,12 +356,22 @@ struct SeptenaDateParser {
   private static let dutchMonths = ["januari", "februari", "maart", "april", "mei", "juni",
                                     "juli", "augustus", "september", "oktober", "november",
                                     "december"]
+  private static let frenchMonths = ["janvier", "fevrier", "mars", "avril", "mai", "juin",
+                                     "juillet", "aout", "septembre", "octobre", "novembre",
+                                     "decembre"]
+  private static let germanMonths = ["januar", "februar", "marz", "april", "mai", "juni",
+                                     "juli", "august", "september", "oktober", "november",
+                                     "dezember"]
+  private static let spanishMonths = ["enero", "febrero", "marzo", "abril", "mayo", "junio",
+                                      "julio", "agosto", "septiembre", "octubre", "noviembre",
+                                      "diciembre"]
 
   /// 1 = Sunday … 7 = Saturday (Calendar's numbering). A word matches a full
   /// name, or any prefix of at least three letters ("thu", "thurs").
   private static func weekdayNumber(_ word: String, calendar: Calendar) -> Int? {
     let localized = calendar.weekdaySymbols.map { fold($0) }
-    for names in [englishWeekdays, portugueseWeekdays, dutchWeekdays, localized] {
+    for names in [englishWeekdays, portugueseWeekdays, dutchWeekdays, frenchWeekdays,
+                  germanWeekdays, spanishWeekdays, localized] {
       if let index = names.firstIndex(where: { word.count >= 3 && $0.hasPrefix(word) }) {
         return index + 1
       }
@@ -267,7 +383,8 @@ struct SeptenaDateParser {
   private static func monthNumber(_ word: String, calendar: Calendar) -> Int? {
     let cleaned = word.hasSuffix(".") ? String(word.dropLast()) : word
     let localized = calendar.monthSymbols.map { fold($0) }
-    for names in [englishMonths, portugueseMonths, dutchMonths, localized] {
+    for names in [englishMonths, portugueseMonths, dutchMonths, frenchMonths,
+                  germanMonths, spanishMonths, localized] {
       if let index = names.firstIndex(where: { cleaned.count >= 3 && $0.hasPrefix(cleaned) }) {
         return index + 1
       }

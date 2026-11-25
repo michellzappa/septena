@@ -93,6 +93,15 @@ class_name = "AccountStore"
 tag = "v3-account-store"
 new_sqlite_classes = ["AccountStore"]
 
+# One object per shared project (ADR 0004, docs/PROJECT_SHARING_SPEC.md).
+[[durable_objects.bindings]]
+name = "PROJECT_STORE"
+class_name = "ProjectStore"
+
+[[migrations]]
+tag = "v4-project-store"
+new_sqlite_classes = ["ProjectStore"]
+
 # Attachment bytes. Create once: wrangler r2 bucket create septena-attachments
 [[r2_buckets]]
 binding = "ATTACHMENTS"

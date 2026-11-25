@@ -67,20 +67,8 @@
       "reason": "The server accepts any product under the sync prefix; the StoreKit work narrows it to these IDs.",
       "issue": "#46"
     },
-    "GENERIC_EMPTY_STATE": {
-      "reason": "For the web client's list views.",
-      "issue": "#21"
-    },
     "FIRST_RUN": {
       "reason": "For the web client's first run.",
-      "issue": "#21"
-    },
-    "REGISTRY_LANGUAGES": {
-      "reason": "For the web client's localized copy.",
-      "issue": "#21"
-    },
-    "registryText": {
-      "reason": "For the web client's localized copy.",
       "issue": "#21"
     }
   },
@@ -150,8 +138,8 @@
       "issue": "#244"
     },
     "RegistryEntityEnums.TelemetryLevel.*": {
-      "reason": "Privacy settings are not on Android yet.",
-      "issue": "#244"
+      "reason": "Retired setting (#436): the backend still accepts it from older builds, no client reads it.",
+      "issue": "#436"
     },
     "RegistryEntityEnums.ConvoAssignee.*": {
       "reason": "Task conversations are not on Android yet.",

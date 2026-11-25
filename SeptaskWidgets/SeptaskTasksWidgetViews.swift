@@ -98,7 +98,7 @@ private struct SmallTasksWidgetView: View {
         }
         Spacer(minLength: 0)
         if entry.list.count > 3 {
-          Text("+\(entry.list.count - 3) more")
+          Text(String(localized: "+\(entry.list.count - 3) more"))
             .font(.caption2)
             .foregroundStyle(.secondary)
         }
@@ -153,7 +153,7 @@ private struct LargeTasksWidgetView: View {
         }
         Spacer(minLength: 0)
         if entry.list.count > 9 {
-          Text("+\(entry.list.count - 9) more")
+          Text(String(localized: "+\(entry.list.count - 9) more"))
             .font(.caption2)
             .foregroundStyle(.secondary)
         }
@@ -284,9 +284,8 @@ private struct RedactedCountView: View {
 
   private var countPhrase: String {
     if list.count == 0 { return "All done" }
-    let noun = list.count == 1 ? "task" : "tasks"
-    if list.kind == .today { return "\(list.count) \(noun) today" }
-    return "\(list.count) \(noun)"
+    if list.kind == .today { return String(localized: "\(list.count) tasks today") }
+    return String(localized: "\(list.count) tasks")
   }
 
   var body: some View {
@@ -332,8 +331,7 @@ private struct AccessoryRectangularTasksView: View {
       }
 
       if entry.snapshot.isRedacted {
-        let noun = entry.list.count == 1 ? "task" : "tasks"
-        Text(entry.list.count == 0 ? "All done" : "\(entry.list.count) \(noun)")
+        Text(entry.list.count == 0 ? "All done" : String(localized: "\(entry.list.count) tasks"))
           .font(.caption)
           .foregroundStyle(.secondary)
       } else if entry.list.items.isEmpty {
@@ -380,8 +378,7 @@ private struct AccessoryInlineTasksView: View {
     if entry.list.count == 0 {
       Label("All done", systemImage: "checkmark.circle.fill")
     } else if entry.list.kind == .today {
-      let noun = entry.list.count == 1 ? "task" : "tasks"
-      Text("\(entry.list.count) \(noun) today")
+      Text(String(localized: "\(entry.list.count) tasks today"))
     } else {
       Text("\(entry.list.count) · \(entry.list.title)")
     }

@@ -20,7 +20,7 @@ that host gets `410 Gone`. LEARNINGS.md is mostly about that connector.
 |---|---|
 | `src/index.ts` | Routes. |
 | `src/api/` | `/v1` API, Sign in with Apple, app sessions. |
-| `src/store/` | `TaskStore` Durable Object (SQLite), columns, ops. |
+| `src/store/` | `TaskStore` Durable Object (SQLite), columns, ops. `ProjectStore`: one per shared project. |
 | `src/shadow/` | The MCP connector: handler, pairing OAuth, tokens, writes, agent loop. |
 | `src/tools/` | Task tool definitions (`taskTools.ts`), view rules (`taskShared.ts`), pure write logic (`writeTasks.ts`). |
 | `src/rpc.ts`, `src/protocol.ts` | JSON-RPC envelope, dual-era MCP protocol. |
@@ -29,7 +29,7 @@ that host gets `410 Gone`. LEARNINGS.md is mostly about that connector.
 
 `wrangler.toml` has no `[env.production]` block: its top-level config IS
 production (custom domain `api.septena.app`, the KV namespaces, the
-`TaskStore` and `PairingStore` Durable Objects). Deploy with:
+`TaskStore`, `PairingStore`, `AccountStore` and `ProjectStore` Durable Objects). Deploy with:
 
 ```sh
 pnpm run deploy

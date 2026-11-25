@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_today_name">Aujourd’hui</string>
+    <string name="widget_today_description">Les tâches du jour, à cocher d’un geste.</string>
+    <string name="widget_upcoming_name">À venir</string>
+    <string name="widget_upcoming_description">Les prochaines tâches planifiées.</string>
+    <string name="widget_add_task">Nouvelle tâche</string>
+    <string name="widget_complete_task">Terminer la tâche</string>
+    <string name="shortcut_inbox_label">Boîte de réception</string>
+    <string name="process_text_add_to_septena">Ajouter à Septena</string>
+    <string name="tile_quick_add_label">Nouvelle tâche</string>
+</resources>

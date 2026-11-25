@@ -46,6 +46,7 @@ a new ADR and set the old one to `superseded by NNNN`.
 | [0039](0039-unanswered-proposals-expire.md) | An unanswered agent proposal expires to the Faded pile | accepted |
 | [0040](0040-sessions-survive-lost-replies-and-end-on-reuse.md) | Sessions survive lost replies and end on reuse | accepted |
 | [0041](0041-do-is-one-task-now-on-every-screen.md) | Do is one task now, and every screen shows it (extends 0034) | accepted |
+| [0042](0042-members-keep-replicas-of-a-shared-project.md) | Members keep replicas of a shared project (amends 0004) | accepted |
 
 ## Template
 

@@ -156,7 +156,7 @@ artifact, acceptance, endstate) in a `task_convo` row. Exact split follows
 **settings** (added 2026-11-19): id (the setting key), value (JSON), rev,
 updatedAt, deletedAt. One row per key of `SETTING_VALUES` in the gateway's
 `src/store/columns.ts`; each key has its own Zod schema, and unknown keys are
-refused. Today: `welcomeName`, `telemetryLevel`, `calendarHiddenTitles`,
+refused. Today: `welcomeName`, `telemetryLevel` (retired, #436: accepted from older builds, read by none), `calendarHiddenTitles`,
 `rolledInDismissedOn`, `homeTimezone`. Settings are never deleted (a
 tombstone would drop every later write, §6.4); `value: null` clears one.
 Why key/value rows and not one row of columns: conflicts stay per key (two

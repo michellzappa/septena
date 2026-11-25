@@ -1,12 +1,43 @@
 import { ApiError, SeptenaApiClient } from "../api/client";
-import { applyDateAction, checkPullPage, ensureCoreReady, localTodayYMD, planPullRow } from "../core";
-import { LocalStore, pendingFieldsFor } from "../store/db";
-import type { NotSyncedItem, OutboxOp, StoreSnapshot, TaskRow } from "../types";
+import {
+  applyDateAction,
+  checkPullPage,
+  checklistOccurrenceId,
+  ensureCoreReady,
+  localTodayYMD,
+  nextOccurrenceDates,
+  nextScheduledDate,
+  occurrenceId,
+  parseRef,
+  planPullRow,
+  planPushResponse,
+  shiftReminderForRecurrence,
+  shiftReminderOnReschedule,
+  taskRefId,
+} from "../core";
+import { LocalStore, pendingFieldsFor, turnSyntheticId, type LocalMutation } from "../store/db";
+import type {
+  AreaRow,
+  ChecklistItemRow,
+  ConvoRow,
+  NotSyncedItem,
+  OrdinalWeekday,
+  OutboxOp,
+  ProjectRow,
+  StoreSnapshot,
+  SyncedEntity,
+  TagRow,
+  TaskRefRow,
+  TaskRow,
+  TurnRow,
+  WireTurn,
+} from "../types";
 
-// Sync engine & mutator boundary (docs/WEB_CLIENT_SPEC.md §6, SEPTASK_BACKEND.md §6).
+// Full WB2 sync engine & mutator boundary (docs/WEB_CLIENT_SPEC.md §6, SEPTASK_BACKEND.md §6).
 // - Mutators are the single write path: optimistic local IndexedDB write + queued outbox op.
-// - Push drains the outbox, then pull fetches the delta and merges through the shared WASM core.
-// - Works offline: writes queue in IndexedDB and drain automatically on reconnect.
+// - Every task rule (dates, recurrence spawning, reminder shifting, reference normalization)
+//   and every sync decision (checkPullPage, planPullRow, planPushResponse) runs through the
+//   shared Rust WASM core — zero duplicated logic in TypeScript.
 
 export interface SyncState {
   snapshot: StoreSnapshot;
@@ -25,9 +56,8 @@ function randomBase64Url(bytes: number): string {
   return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 }
 
-function newTaskId(): string {
-  // Compact URL-safe id matching registry/entities.json `id` pattern.
-  return `w_${randomBase64Url(12)}`;
+function newId(prefix: string): string {
+  return `${prefix}_${randomBase64Url(12)}`;
 }
 
 function newClientOpId(): string {
@@ -38,12 +68,34 @@ const EMPTY_SNAPSHOT: StoreSnapshot = {
   tasks: [],
   areas: [],
   projects: [],
+  checklistItems: [],
+  tags: [],
+  taskRefs: [],
+  convos: [],
+  turns: [],
+  attachments: [],
   settings: {},
   outbox: [],
   cursor: 0,
   userId: null,
   lastSyncedAt: null,
 };
+
+const SYNCED_ENTITY_SET = new Set<string>([
+  "task",
+  "area",
+  "project",
+  "checklistItem",
+  "tag",
+  "taskRef",
+  "convo",
+  "attachment",
+  "setting",
+]);
+
+function isSyncedEntity(e: string): e is SyncedEntity {
+  return SYNCED_ENTITY_SET.has(e);
+}
 
 export class WebSyncEngine {
   readonly api: SeptenaApiClient;
@@ -149,6 +201,10 @@ export class WebSyncEngine {
     });
   }
 
+  clearNotSynced(): void {
+    this.emit({ notSynced: [] });
+  }
+
   private onOnline = () => {
     this.emit({ online: true, lastError: null });
     void this.syncNow();
@@ -169,20 +225,33 @@ export class WebSyncEngine {
     try {
       this.channel?.postMessage({ type: "updated", at: Date.now() });
     } catch {
-      // Ignore BroadcastChannel errors on closed channels.
+      // Ignore closed BroadcastChannel.
     }
   }
 
-  // ---- Mutators (the single write boundary) ----
+  private async commit(mutations: LocalMutation[], ops: OutboxOp[]): Promise<void> {
+    await this.store.commitLocalAndQueue(mutations, ops);
+    await this.reloadFromDisk();
+    this.broadcastChange();
+    this.scheduleSync();
+  }
+
+  // ---- Task mutators ----
 
   async createTask(input: {
+    id?: string;
     title: string;
     notes?: string;
+    kind?: "heading" | null;
+    heading?: string | null;
     today?: boolean;
+    starred?: boolean;
     scheduled?: string | null;
     deadline?: string | null;
     area?: string | null;
     project?: string | null;
+    tags?: string[] | null;
+    position?: number | null;
   }): Promise<TaskRow> {
     await ensureCoreReady();
     const title = input.title.trim();
@@ -190,10 +259,12 @@ export class WebSyncEngine {
 
     const now = new Date().toISOString();
     const todayYMD = localTodayYMD();
-    const id = newTaskId();
+    const id = input.id ?? newId("w");
     const fields: Record<string, unknown> = {
       title,
       status: "open",
+      kind: input.kind ?? null,
+      heading: input.heading ?? null,
       created: todayYMD,
       createdAt: now,
       touchedAt: now,
@@ -201,19 +272,17 @@ export class WebSyncEngine {
       sourceClient: "web",
       today: Boolean(input.today),
       todaySetOn: input.today ? todayYMD : null,
+      starred: Boolean(input.starred),
       scheduled: input.scheduled ?? null,
       deadline: input.deadline ?? null,
       area: input.area ?? null,
       project: input.project ?? null,
+      tags: input.tags ?? null,
       notes: input.notes?.trim() ? input.notes.trim() : null,
+      ...(input.position !== undefined ? { position: input.position } : {}),
     };
 
-    const row: TaskRow = {
-      id,
-      title,
-      status: "open",
-      ...fields,
-    };
+    const row: TaskRow = { id, title, status: "open", ...fields };
     const op: OutboxOp = {
       clientOpId: newClientOpId(),
       op: "upsert",
@@ -222,24 +291,216 @@ export class WebSyncEngine {
       fields,
       queuedAt: Date.now(),
     };
-
-    await this.store.putLocalAndQueue("task", row, op);
-    await this.reloadFromDisk();
-    this.broadcastChange();
-    this.scheduleSync();
+    await this.commit([{ entity: "task", action: "put", id, row }], [op]);
     return row;
   }
 
-  async toggleTaskDone(task: TaskRow): Promise<void> {
+  private buildNextRecurrenceMutations(
+    task: TaskRow,
+    completedOn: string,
+    now: string,
+  ): { mutations: LocalMutation[]; ops: OutboxOp[]; spawnedTaskId: string | null } {
+    if (!task.recurrenceUnit || task.recurrencePaused) {
+      return { mutations: [], ops: [], spawnedTaskId: null };
+    }
+    const nextDay = nextScheduledDate({
+      completedOn,
+      scheduled: task.scheduled ?? null,
+      logicalScheduled: task.recurrenceAnchorDate ?? null,
+      rule: {
+        unit: task.recurrenceUnit,
+        interval: Math.max(1, task.recurrenceInterval ?? 1),
+        afterCompletion: Boolean(task.recurrenceAfterCompletion),
+        weekdays: task.recurrenceWeekdays ?? null,
+        monthDay: task.recurrenceMonthDay ?? null,
+        ordinalWeekday: task.recurrenceOrdinalWeekday ?? null,
+      },
+    });
+    if (!nextDay) return { mutations: [], ops: [], spawnedTaskId: null };
+
+    const newTaskID = occurrenceId(task.id, nextDay);
+    const dateFields = nextOccurrenceDates(task, nextDay, now);
+    const shiftedReminder = shiftReminderForRecurrence({
+      sourceReminderAt: task.reminderAt ?? null,
+      sourceScheduled: task.scheduled ?? null,
+      nextScheduled: nextDay,
+    });
+
+    const seriesId = task.recurrenceSeriesID ?? task.id;
+    const fields: Record<string, unknown> = {
+      title: task.title,
+      status: "open",
+      area: task.area ?? null,
+      project: task.project ?? null,
+      heading: task.heading ?? null,
+      notes: task.notes ?? null,
+      starred: Boolean(task.starred),
+      tags: task.tags ?? null,
+      startTime: task.startTime ?? null,
+      durationMinutes: task.durationMinutes ?? null,
+      timeZone: task.timeZone ?? null,
+      recurrenceUnit: task.recurrenceUnit,
+      recurrenceInterval: Math.max(1, task.recurrenceInterval ?? 1),
+      recurrenceAfterCompletion: Boolean(task.recurrenceAfterCompletion),
+      recurrencePaused: false,
+      recurrenceSeriesID: seriesId,
+      recurrenceAnchorDate: nextDay,
+      recurrenceWeekdays: task.recurrenceWeekdays ?? null,
+      recurrenceMonthDay: task.recurrenceMonthDay ?? null,
+      recurrenceOrdinalWeekday: task.recurrenceOrdinalWeekday ?? null,
+      reminderAt: shiftedReminder,
+      reminderMode: shiftedReminder ? (task.reminderMode ?? "floating") : null,
+      created: completedOn,
+      createdAt: now,
+      touchedAt: now,
+      source: "app",
+      sourceClient: "web",
+      ...dateFields,
+    };
+
+    const row: TaskRow = { id: newTaskID, title: task.title, status: "open", ...fields };
+    const queuedAt = Date.now();
+    const mutations: LocalMutation[] = [{ entity: "task", action: "put", id: newTaskID, row }];
+    const ops: OutboxOp[] = [
+      {
+        clientOpId: newClientOpId(),
+        op: "upsert",
+        entity: "task",
+        id: newTaskID,
+        fields,
+        queuedAt,
+      },
+    ];
+
+    // Carry checklist items (unchecked) via WASM checklistOccurrenceId.
+    const items = this.state.snapshot.checklistItems
+      .filter((c) => !c.deletedAt && c.taskId === task.id)
+      .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+    items.forEach((item, index) => {
+      const nextItemId = checklistOccurrenceId(newTaskID, index, item.id);
+      const itemFields: Record<string, unknown> = {
+        taskId: newTaskID,
+        title: item.title,
+        checked: false,
+        checkedAt: null,
+        position: item.position ?? index,
+        createdAt: now,
+      };
+      const nextItemRow: ChecklistItemRow = { id: nextItemId, taskId: newTaskID, title: item.title, ...itemFields };
+      mutations.push({ entity: "checklistItem", action: "put", id: nextItemId, row: nextItemRow });
+      ops.push({
+        clientOpId: newClientOpId(),
+        op: "upsert",
+        entity: "checklistItem",
+        id: nextItemId,
+        fields: itemFields,
+        queuedAt: queuedAt + index + 1,
+      });
+    });
+
+    // Carry `about` references onto the next occurrence.
+    const aboutRefs = this.state.snapshot.taskRefs.filter(
+      (r) => !r.deletedAt && r.taskId === task.id && (r.role ?? "about") === "about",
+    );
+    aboutRefs.forEach((ref, index) => {
+      const nextRefId = taskRefId(newTaskID, ref.key, 0);
+      const refFields: Record<string, unknown> = {
+        taskId: newTaskID,
+        key: ref.key,
+        role: "about",
+        snapshot: ref.snapshot ?? null,
+        position: ref.position ?? index,
+        createdAt: now,
+      };
+      const nextRefRow: TaskRefRow = { id: nextRefId, taskId: newTaskID, key: ref.key, kind: ref.kind, ...refFields };
+      mutations.push({ entity: "taskRef", action: "put", id: nextRefId, row: nextRefRow });
+      ops.push({
+        clientOpId: newClientOpId(),
+        op: "upsert",
+        entity: "taskRef",
+        id: nextRefId,
+        fields: refFields,
+        queuedAt: queuedAt + items.length + index + 2,
+      });
+    });
+
+    return { mutations, ops, spawnedTaskId: newTaskID };
+  }
+
+  async toggleTaskDone(task: TaskRow): Promise<{ spawnedTaskId: string | null }> {
     await ensureCoreReady();
     const now = new Date().toISOString();
+    const todayYMD = localTodayYMD();
     const nextStatus = task.status === "done" ? "open" : "done";
     const fields: Record<string, unknown> = {
       status: nextStatus,
       completedAt: nextStatus === "done" ? now : null,
       touchedAt: now,
+      ...(task.source === "mcp" && !task.acknowledgedAt ? { acknowledgedAt: now } : {}),
     };
-    await this.patchTask(task, fields);
+    const updated: TaskRow = { ...task, ...fields };
+    const mutations: LocalMutation[] = [{ entity: "task", action: "put", id: task.id, row: updated }];
+    const ops: OutboxOp[] = [
+      {
+        clientOpId: newClientOpId(),
+        op: "upsert",
+        entity: "task",
+        id: task.id,
+        fields,
+        queuedAt: Date.now(),
+      },
+    ];
+
+    let spawnedTaskId: string | null = null;
+    if (nextStatus === "done" && task.recurrenceUnit && !task.recurrencePaused) {
+      const nextOcc = this.buildNextRecurrenceMutations(task, todayYMD, now);
+      mutations.push(...nextOcc.mutations);
+      ops.push(...nextOcc.ops);
+      spawnedTaskId = nextOcc.spawnedTaskId;
+    }
+
+    await this.commit(mutations, ops);
+    return { spawnedTaskId };
+  }
+
+  async cancelTask(task: TaskRow): Promise<void> {
+    await ensureCoreReady();
+    const now = new Date().toISOString();
+    await this.patchTask(task, {
+      status: "cancelled",
+      completedAt: now,
+      dropReason: "user",
+      touchedAt: now,
+    });
+  }
+
+  async reopenTask(task: TaskRow): Promise<void> {
+    await ensureCoreReady();
+    const now = new Date().toISOString();
+    await this.patchTask(task, {
+      status: "open",
+      completedAt: null,
+      dropReason: null,
+      fadedAt: null,
+      touchedAt: now,
+    });
+  }
+
+  async keepFadedTask(task: TaskRow): Promise<void> {
+    await ensureCoreReady();
+    const now = new Date().toISOString();
+    await this.patchTask(task, { fadedAt: null, touchedAt: now });
+  }
+
+  async dropFadedTask(task: TaskRow): Promise<void> {
+    await ensureCoreReady();
+    const now = new Date().toISOString();
+    await this.patchTask(task, {
+      status: "cancelled",
+      completedAt: now,
+      dropReason: "faded",
+      touchedAt: now,
+    });
   }
 
   async toggleTaskToday(task: TaskRow): Promise<void> {
@@ -248,7 +509,17 @@ export class WebSyncEngine {
     const todayYMD = localTodayYMD();
     const datePatch = applyDateAction(task, { type: "toggleToday" }, todayYMD, now);
     if (Object.keys(datePatch).length === 0) return;
-    await this.patchTask(task, { ...datePatch, touchedAt: now });
+    await this.patchTask(task, {
+      ...datePatch,
+      touchedAt: now,
+      ...(task.source === "mcp" && !task.acknowledgedAt ? { acknowledgedAt: now } : {}),
+    });
+  }
+
+  async toggleTaskStar(task: TaskRow): Promise<void> {
+    await ensureCoreReady();
+    const now = new Date().toISOString();
+    await this.patchTask(task, { starred: !task.starred, touchedAt: now });
   }
 
   async setTaskScheduled(task: TaskRow, day: string | null): Promise<void> {
@@ -259,7 +530,19 @@ export class WebSyncEngine {
       ? applyDateAction(task, { type: "scheduleFor", day }, todayYMD, now)
       : applyDateAction(task, { type: "clearWhen" }, todayYMD, now);
     if (Object.keys(datePatch).length === 0) return;
-    await this.patchTask(task, { ...datePatch, touchedAt: now });
+
+    const shiftedReminder = shiftReminderOnReschedule({
+      reminderAt: task.reminderAt ?? null,
+      oldScheduled: task.scheduled ?? null,
+      newScheduled: day,
+    });
+
+    await this.patchTask(task, {
+      ...datePatch,
+      ...(task.reminderAt && shiftedReminder !== task.reminderAt ? { reminderAt: shiftedReminder } : {}),
+      touchedAt: now,
+      ...(task.source === "mcp" && !task.acknowledgedAt ? { acknowledgedAt: now } : {}),
+    });
   }
 
   async setTaskDeadline(task: TaskRow, day: string | null): Promise<void> {
@@ -271,6 +554,90 @@ export class WebSyncEngine {
     await this.patchTask(task, { ...datePatch, touchedAt: now });
   }
 
+  async setTaskTimeSlot(
+    task: TaskRow,
+    startTime: string | null,
+    durationMinutes: number | null,
+  ): Promise<void> {
+    await ensureCoreReady();
+    const now = new Date().toISOString();
+    const todayYMD = localTodayYMD();
+    const timeZone = startTime ? Intl.DateTimeFormat().resolvedOptions().timeZone : null;
+    const datePatch = applyDateAction(
+      task,
+      { type: "setTimeSlot", startTime, durationMinutes, timeZone },
+      todayYMD,
+      now,
+    );
+    await this.patchTask(task, { ...datePatch, touchedAt: now });
+  }
+
+  async setTaskRecurrence(
+    task: TaskRow,
+    rule: {
+      unit: "day" | "week" | "month" | "year" | null;
+      interval?: number;
+      afterCompletion?: boolean;
+      paused?: boolean;
+      weekdays?: number[] | null;
+      monthDay?: number | null;
+      ordinalWeekday?: OrdinalWeekday | null;
+    },
+  ): Promise<void> {
+    await ensureCoreReady();
+    const now = new Date().toISOString();
+    const todayYMD = localTodayYMD();
+    if (!rule.unit) {
+      await this.patchTask(task, {
+        recurrenceUnit: null,
+        recurrenceInterval: null,
+        recurrenceAfterCompletion: false,
+        recurrencePaused: false,
+        recurrenceAnchorDate: null,
+        recurrenceWeekdays: null,
+        recurrenceMonthDay: null,
+        recurrenceOrdinalWeekday: null,
+        touchedAt: now,
+      });
+      return;
+    }
+    const anchor = task.scheduled ?? todayYMD;
+    await this.patchTask(task, {
+      recurrenceUnit: rule.unit,
+      recurrenceInterval: Math.max(1, rule.interval ?? 1),
+      recurrenceAfterCompletion: Boolean(rule.afterCompletion),
+      recurrencePaused: Boolean(rule.paused),
+      recurrenceSeriesID: task.recurrenceSeriesID ?? task.id,
+      recurrenceAnchorDate: anchor,
+      scheduled: task.scheduled ?? anchor,
+      recurrenceWeekdays: rule.weekdays ?? null,
+      recurrenceMonthDay: rule.monthDay ?? null,
+      recurrenceOrdinalWeekday: rule.ordinalWeekday ?? null,
+      touchedAt: now,
+    });
+  }
+
+  async moveTask(
+    task: TaskRow,
+    target: { area: string | null; project: string | null; heading?: string | null },
+  ): Promise<void> {
+    await ensureCoreReady();
+    const now = new Date().toISOString();
+    const todayYMD = localTodayYMD();
+    const filePatch =
+      target.area || target.project
+        ? applyDateAction(task, { type: "fileFromTriage" }, todayYMD, now)
+        : {};
+    await this.patchTask(task, {
+      ...filePatch,
+      area: target.area,
+      project: target.project,
+      heading: target.heading ?? null,
+      touchedAt: now,
+      ...(task.source === "mcp" && !task.acknowledgedAt ? { acknowledgedAt: now } : {}),
+    });
+  }
+
   async updateTaskFields(task: TaskRow, fields: Record<string, unknown>): Promise<void> {
     await ensureCoreReady();
     const now = new Date().toISOString();
@@ -279,6 +646,9 @@ export class WebSyncEngine {
 
   async deleteTask(task: TaskRow): Promise<void> {
     await ensureCoreReady();
+    const now = new Date().toISOString();
+    // Soft-delete locally (tombstone on server keeps deletedAt for 30 days in Deleted).
+    const deletedRow: TaskRow = { ...task, deletedAt: now };
     const op: OutboxOp = {
       clientOpId: newClientOpId(),
       op: "delete",
@@ -286,10 +656,22 @@ export class WebSyncEngine {
       id: task.id,
       queuedAt: Date.now(),
     };
-    await this.store.putLocalAndQueue("task", null, op);
-    await this.reloadFromDisk();
-    this.broadcastChange();
-    this.scheduleSync();
+    await this.commit([{ entity: "task", action: "put", id: task.id, row: deletedRow }], [op]);
+  }
+
+  async restoreDeletedTask(task: TaskRow): Promise<TaskRow> {
+    // Re-insert as a fresh active task (server tombstones drop updates to deleted IDs).
+    return this.createTask({
+      title: task.title,
+      notes: task.notes ?? undefined,
+      today: Boolean(task.today),
+      starred: Boolean(task.starred),
+      scheduled: task.scheduled ?? null,
+      deadline: task.deadline ?? null,
+      area: task.area ?? null,
+      project: task.project ?? null,
+      tags: task.tags ?? null,
+    });
   }
 
   private async patchTask(task: TaskRow, fields: Record<string, unknown>): Promise<void> {
@@ -302,13 +684,343 @@ export class WebSyncEngine {
       fields,
       queuedAt: Date.now(),
     };
-    await this.store.putLocalAndQueue("task", updated, op);
-    await this.reloadFromDisk();
-    this.broadcastChange();
-    this.scheduleSync();
+    await this.commit([{ entity: "task", action: "put", id: task.id, row: updated }], [op]);
   }
 
-  // ---- Sync loop (push then pull, coordinated with Web Locks) ----
+  // ---- Checklists ----
+
+  async addChecklistItem(taskId: string, title: string): Promise<ChecklistItemRow> {
+    const trimmed = title.trim();
+    if (!trimmed) throw new Error("Checklist item title is required");
+    const existing = this.state.snapshot.checklistItems.filter((c) => !c.deletedAt && c.taskId === taskId);
+    const maxPos = existing.reduce((m, c) => Math.max(m, c.position ?? 0), -1);
+    const id = newId("chk");
+    const now = new Date().toISOString();
+    const fields: Record<string, unknown> = {
+      taskId,
+      title: trimmed,
+      checked: false,
+      checkedAt: null,
+      position: maxPos + 1,
+      createdAt: now,
+    };
+    const row: ChecklistItemRow = { id, taskId, title: trimmed, ...fields };
+    await this.commit(
+      [{ entity: "checklistItem", action: "put", id, row }],
+      [{ clientOpId: newClientOpId(), op: "upsert", entity: "checklistItem", id, fields, queuedAt: Date.now() }],
+    );
+    return row;
+  }
+
+  async toggleChecklistItem(item: ChecklistItemRow): Promise<void> {
+    const nextChecked = !item.checked;
+    const now = new Date().toISOString();
+    const fields: Record<string, unknown> = {
+      checked: nextChecked,
+      checkedAt: nextChecked ? now : null,
+    };
+    const row: ChecklistItemRow = { ...item, ...fields };
+    await this.commit(
+      [{ entity: "checklistItem", action: "put", id: item.id, row }],
+      [{ clientOpId: newClientOpId(), op: "upsert", entity: "checklistItem", id: item.id, fields, queuedAt: Date.now() }],
+    );
+  }
+
+  async deleteChecklistItem(item: ChecklistItemRow): Promise<void> {
+    await this.commit(
+      [{ entity: "checklistItem", action: "delete", id: item.id }],
+      [{ clientOpId: newClientOpId(), op: "delete", entity: "checklistItem", id: item.id, queuedAt: Date.now() }],
+    );
+  }
+
+  // ---- Tags ----
+
+  async createTag(name: string, color: string | null = null): Promise<TagRow> {
+    const trimmed = name.trim();
+    if (!trimmed) throw new Error("Tag name is required");
+    const existing = this.state.snapshot.tags.find(
+      (t) => !t.deletedAt && t.name.toLowerCase() === trimmed.toLowerCase(),
+    );
+    if (existing) return existing;
+    const id = newId("tag");
+    const pos = this.state.snapshot.tags.length;
+    const fields: Record<string, unknown> = { name: trimmed, color, position: pos };
+    const row: TagRow = { id, name: trimmed, color, position: pos };
+    await this.commit(
+      [{ entity: "tag", action: "put", id, row }],
+      [{ clientOpId: newClientOpId(), op: "upsert", entity: "tag", id, fields, queuedAt: Date.now() }],
+    );
+    return row;
+  }
+
+  async toggleTaskTag(task: TaskRow, tagId: string): Promise<void> {
+    const current = Array.isArray(task.tags) ? [...task.tags] : [];
+    const idx = current.indexOf(tagId);
+    if (idx === -1) current.push(tagId);
+    else current.splice(idx, 1);
+    await this.updateTaskFields(task, { tags: current.length ? current : null });
+  }
+
+  // ---- References (validated & normalized via shared Rust WASM core) ----
+
+  async addReference(taskId: string, rawInput: string): Promise<TaskRefRow> {
+    await ensureCoreReady();
+    const parsed = parseRef(rawInput.trim());
+    const deletedCount = this.state.snapshot.taskRefs.filter(
+      (r) => r.deletedAt && r.taskId === taskId && r.key === parsed.key,
+    ).length;
+    const id = taskRefId(taskId, parsed.key, deletedCount);
+    const now = new Date().toISOString();
+    const snapshot = {
+      title: parsed.rawId,
+      ...(parsed.url ? { url: parsed.url } : {}),
+      rawId: parsed.rawId,
+    };
+    const fields: Record<string, unknown> = {
+      taskId,
+      key: parsed.key,
+      role: "about",
+      snapshot,
+      createdAt: now,
+    };
+    const row: TaskRefRow = {
+      id,
+      taskId,
+      key: parsed.key,
+      kind: parsed.kind,
+      role: "about",
+      snapshot,
+      createdAt: now,
+    };
+    await this.commit(
+      [{ entity: "taskRef", action: "put", id, row }],
+      [{ clientOpId: newClientOpId(), op: "upsert", entity: "taskRef", id, fields, queuedAt: Date.now() }],
+    );
+    return row;
+  }
+
+  async removeReference(ref: TaskRefRow): Promise<void> {
+    await this.commit(
+      [{ entity: "taskRef", action: "delete", id: ref.id }],
+      [{ clientOpId: newClientOpId(), op: "delete", entity: "taskRef", id: ref.id, queuedAt: Date.now() }],
+    );
+  }
+
+  // ---- Areas & Projects ----
+
+  async createArea(title: string, emoji: string | null = null): Promise<AreaRow> {
+    const trimmed = title.trim();
+    if (!trimmed) throw new Error("Area title is required");
+    const id = newId("area");
+    const position = this.state.snapshot.areas.filter((a) => !a.deletedAt).length;
+    const fields: Record<string, unknown> = { title: trimmed, emoji, position };
+    const row: AreaRow = { id, title: trimmed, emoji, position };
+    await this.commit(
+      [{ entity: "area", action: "put", id, row }],
+      [{ clientOpId: newClientOpId(), op: "upsert", entity: "area", id, fields, queuedAt: Date.now() }],
+    );
+    return row;
+  }
+
+  async updateArea(area: AreaRow, fields: Record<string, unknown>): Promise<void> {
+    const row: AreaRow = { ...area, ...fields };
+    await this.commit(
+      [{ entity: "area", action: "put", id: area.id, row }],
+      [{ clientOpId: newClientOpId(), op: "upsert", entity: "area", id: area.id, fields, queuedAt: Date.now() }],
+    );
+  }
+
+  async deleteArea(area: AreaRow): Promise<void> {
+    await this.commit(
+      [{ entity: "area", action: "delete", id: area.id }],
+      [{ clientOpId: newClientOpId(), op: "delete", entity: "area", id: area.id, queuedAt: Date.now() }],
+    );
+  }
+
+  async createProject(title: string, areaId: string | null = null): Promise<ProjectRow> {
+    const trimmed = title.trim();
+    if (!trimmed) throw new Error("Project title is required");
+    const id = newId("proj");
+    const position = this.state.snapshot.projects.filter((p) => !p.deletedAt).length;
+    const fields: Record<string, unknown> = {
+      title: trimmed,
+      status: "active",
+      area: areaId,
+      created: localTodayYMD(),
+      position,
+    };
+    const row: ProjectRow = { id, title: trimmed, status: "active", area: areaId, position };
+    await this.commit(
+      [{ entity: "project", action: "put", id, row }],
+      [{ clientOpId: newClientOpId(), op: "upsert", entity: "project", id, fields, queuedAt: Date.now() }],
+    );
+    return row;
+  }
+
+  async updateProject(project: ProjectRow, fields: Record<string, unknown>): Promise<void> {
+    const row: ProjectRow = { ...project, ...fields };
+    await this.commit(
+      [{ entity: "project", action: "put", id: project.id, row }],
+      [{ clientOpId: newClientOpId(), op: "upsert", entity: "project", id: project.id, fields, queuedAt: Date.now() }],
+    );
+  }
+
+  async deleteProject(project: ProjectRow): Promise<void> {
+    await this.commit(
+      [{ entity: "project", action: "delete", id: project.id }],
+      [{ clientOpId: newClientOpId(), op: "delete", entity: "project", id: project.id, queuedAt: Date.now() }],
+    );
+  }
+
+  // ---- Agent Conversations (Review, Agent stages, Discuss) ----
+
+  private existingConvo(taskId: string): ConvoRow {
+    return this.state.snapshot.convos.find((c) => c.id === taskId) ?? { id: taskId };
+  }
+
+  private nextTurnSeq(taskId: string): number {
+    const turns = this.state.snapshot.turns.filter((t) => t.taskId === taskId);
+    return turns.reduce((m, t) => Math.max(m, t.seq), 0) + 1;
+  }
+
+  async assignTaskToAgent(taskId: string, assignee: "claude" | "me"): Promise<void> {
+    const convo = this.existingConvo(taskId);
+    const fields: Record<string, unknown> = {
+      assignee,
+      ...(assignee === "claude" ? { stoppedAt: null } : {}),
+    };
+    const row: ConvoRow = { ...convo, ...fields };
+    await this.commit(
+      [{ entity: "convo", action: "put", id: taskId, row }],
+      [{ clientOpId: newClientOpId(), op: "upsert", entity: "convo", id: taskId, fields, queuedAt: Date.now() }],
+    );
+  }
+
+  async stopAgentOnTask(taskId: string): Promise<void> {
+    const convo = this.existingConvo(taskId);
+    const fields = { stoppedAt: new Date().toISOString() };
+    await this.commit(
+      [{ entity: "convo", action: "put", id: taskId, row: { ...convo, ...fields } }],
+      [{ clientOpId: newClientOpId(), op: "upsert", entity: "convo", id: taskId, fields, queuedAt: Date.now() }],
+    );
+  }
+
+  async resumeAgentOnTask(taskId: string): Promise<void> {
+    const convo = this.existingConvo(taskId);
+    const fields = { stoppedAt: null };
+    await this.commit(
+      [{ entity: "convo", action: "put", id: taskId, row: { ...convo, ...fields } }],
+      [{ clientOpId: newClientOpId(), op: "upsert", entity: "convo", id: taskId, fields, queuedAt: Date.now() }],
+    );
+  }
+
+  async appendUserTurn(
+    taskId: string,
+    input: {
+      step?: WireTurn["step"];
+      chosen?: string | null;
+      otherText?: string | null;
+      inReplyTo?: number | null;
+      note?: string | null;
+    },
+  ): Promise<void> {
+    const now = new Date().toISOString();
+    const seq = this.nextTurnSeq(taskId);
+    const turn: WireTurn = {
+      role: "user",
+      step: input.step ?? (input.inReplyTo ? "decide" : "work"),
+      ...(input.chosen ? { chosen: input.chosen } : {}),
+      ...(input.otherText ? { otherText: input.otherText } : {}),
+      ...(input.inReplyTo ? { inReplyTo: input.inReplyTo } : {}),
+      ...(input.note ? { note: input.note } : {}),
+      ts: now,
+    };
+    const localTurn: TurnRow = {
+      id: turnSyntheticId(taskId, seq),
+      taskId,
+      seq,
+      ...turn,
+    };
+    const op: OutboxOp = {
+      clientOpId: newClientOpId(),
+      op: "appendTurn",
+      taskId,
+      turn,
+      queuedAt: Date.now(),
+    };
+    await this.commit([{ entity: "turn", action: "put", id: localTurn.id, row: localTurn }], [op]);
+  }
+
+  async acceptAgentReview(task: TaskRow): Promise<void> {
+    await ensureCoreReady();
+    const now = new Date().toISOString();
+    const todayYMD = localTodayYMD();
+    const convo = this.existingConvo(task.id);
+    const convoFields: Record<string, unknown> = { endState: "human_done" };
+    const taskFields: Record<string, unknown> = {
+      status: "done",
+      completedAt: now,
+      touchedAt: now,
+      ...(task.source === "mcp" && !task.acknowledgedAt ? { acknowledgedAt: now } : {}),
+    };
+
+    const mutations: LocalMutation[] = [
+      { entity: "convo", action: "put", id: task.id, row: { ...convo, ...convoFields } },
+      { entity: "task", action: "put", id: task.id, row: { ...task, ...taskFields } },
+    ];
+    const nowMs = Date.now();
+    const ops: OutboxOp[] = [
+      { clientOpId: newClientOpId(), op: "upsert", entity: "convo", id: task.id, fields: convoFields, queuedAt: nowMs },
+      { clientOpId: newClientOpId(), op: "upsert", entity: "task", id: task.id, fields: taskFields, queuedAt: nowMs + 1 },
+    ];
+
+    if (task.recurrenceUnit && !task.recurrencePaused) {
+      const nextOcc = this.buildNextRecurrenceMutations(task, todayYMD, now);
+      mutations.push(...nextOcc.mutations);
+      ops.push(...nextOcc.ops);
+    }
+
+    await this.commit(mutations, ops);
+  }
+
+  async sendBackAgentReview(task: TaskRow, note: string): Promise<void> {
+    const now = new Date().toISOString();
+    const convo = this.existingConvo(task.id);
+    const convoFields: Record<string, unknown> = {
+      endState: "open",
+      endStateNote: null,
+      stoppedAt: null,
+    };
+    const seq = this.nextTurnSeq(task.id);
+    const turn: WireTurn = {
+      role: "user",
+      step: "work",
+      note: note.trim() || "Sent back without a note.",
+      ts: now,
+    };
+    const localTurn: TurnRow = { id: turnSyntheticId(task.id, seq), taskId: task.id, seq, ...turn };
+    const nowMs = Date.now();
+    await this.commit(
+      [
+        { entity: "convo", action: "put", id: task.id, row: { ...convo, ...convoFields } },
+        { entity: "turn", action: "put", id: localTurn.id, row: localTurn },
+      ],
+      [
+        { clientOpId: newClientOpId(), op: "upsert", entity: "convo", id: task.id, fields: convoFields, queuedAt: nowMs },
+        { clientOpId: newClientOpId(), op: "appendTurn", taskId: task.id, turn, queuedAt: nowMs + 1 },
+      ],
+    );
+  }
+
+  async setSetting(key: string, value: unknown): Promise<void> {
+    const row = { id: key, value };
+    await this.commit(
+      [{ entity: "setting", action: "put", id: key, row }],
+      [{ clientOpId: newClientOpId(), op: "upsert", entity: "setting", id: key, fields: { value }, queuedAt: Date.now() }],
+    );
+  }
+
+  // ---- Sync loop (push with WASM bisection, then pull with WASM merge) ----
 
   scheduleSync(): void {
     if (this.stopped || !this.state.online) return;
@@ -363,37 +1075,77 @@ export class WebSyncEngine {
     }
   }
 
-  private async drainOutbox(): Promise<void> {
-    const snap = await this.store.loadSnapshot();
-    if (!snap.outbox.length) return;
-
-    const batch = snap.outbox.slice(0, 100);
-    const res = await this.api.push(batch);
-    const doneIds: string[] = [];
-    const newlyRejected: NotSyncedItem[] = [];
-
-    for (const r of res.results) {
-      if (r.status === "applied" || r.status === "noop" || r.status === "dropped") {
-        doneIds.push(r.clientOpId);
-      } else if (r.status === "rejected") {
-        doneIds.push(r.clientOpId);
-        const orig = batch.find((o) => o.clientOpId === r.clientOpId);
-        newlyRejected.push({
-          clientOpId: r.clientOpId,
-          entity: orig?.entity ?? "task",
-          id: orig?.id ?? "",
-          reason: r.reason,
-          at: Date.now(),
-        });
+  private async pushBatchWithBisection(batch: OutboxOp[]): Promise<void> {
+    if (!batch.length) return;
+    const sentIds = batch.map((o) => o.clientOpId);
+    try {
+      const res = await this.api.push(batch);
+      const plan = planPushResponse(sentIds, {
+        kind: "response",
+        resultIds: res.results.map((r) => r.clientOpId),
+      });
+      if (plan.plan === "fail") {
+        throw new Error(plan.reason);
       }
-    }
 
-    await this.store.removeOutboxOps(doneIds);
-    if (newlyRejected.length) {
-      this.emit({ notSynced: [...this.state.notSynced, ...newlyRejected].slice(-20) });
+      const doneIds: string[] = [];
+      const newlyRejected: NotSyncedItem[] = [];
+      for (const r of res.results) {
+        doneIds.push(r.clientOpId);
+        if (r.status === "rejected") {
+          const orig = batch.find((o) => o.clientOpId === r.clientOpId);
+          newlyRejected.push({
+            clientOpId: r.clientOpId,
+            entity: orig?.op === "appendTurn" ? "turn" : (orig?.entity ?? "task"),
+            id: orig?.op === "appendTurn" ? orig.taskId : (orig?.id ?? ""),
+            reason: r.reason,
+            at: Date.now(),
+          });
+        }
+      }
+      await this.store.removeOutboxOps(doneIds);
+      if (newlyRejected.length) {
+        this.emit({ notSynced: [...this.state.notSynced, ...newlyRejected].slice(-20) });
+      }
+    } catch (err) {
+      if (!(err instanceof ApiError)) throw err;
+      const plan = planPushResponse(sentIds, {
+        kind: "httpFailure",
+        status: err.status,
+        body: err.rawBody || err.message,
+      });
+      if (plan.plan === "bisect") {
+        await this.pushBatchWithBisection(batch.slice(0, plan.splitAt));
+        await this.pushBatchWithBisection(batch.slice(plan.splitAt));
+        return;
+      }
+      if (plan.plan === "rejectOne") {
+        const orig = batch.find((o) => o.clientOpId === plan.clientOpId);
+        await this.store.removeOutboxOps([plan.clientOpId]);
+        this.emit({
+          notSynced: [
+            ...this.state.notSynced,
+            {
+              clientOpId: plan.clientOpId,
+              entity: orig?.op === "appendTurn" ? "turn" : (orig?.entity ?? "task"),
+              id: orig?.op === "appendTurn" ? orig.taskId : (orig?.id ?? ""),
+              reason: plan.reason,
+              at: Date.now(),
+            },
+          ].slice(-20),
+        });
+        return;
+      }
+      throw err;
     }
-    if (snap.outbox.length > batch.length) {
-      await this.drainOutbox();
+  }
+
+  private async drainOutbox(): Promise<void> {
+    while (!this.stopped) {
+      const snap = await this.store.loadSnapshot();
+      if (!snap.outbox.length) return;
+      const batch = snap.outbox.slice(0, 100);
+      await this.pushBatchWithBisection(batch);
     }
   }
 
@@ -413,38 +1165,51 @@ export class WebSyncEngine {
         continue;
       }
       if (check.decision === "fail") {
-        throw new Error(check.reason ?? "Pull page check failed");
+        throw new Error(check.reason);
       }
 
-      const taskMap = new Map<string, Record<string, unknown>>(snap.tasks.map((t) => [t.id, t]));
-      const areaMap = new Map<string, Record<string, unknown>>(snap.areas.map((a) => [a.id, a]));
-      const projectMap = new Map<string, Record<string, unknown>>(snap.projects.map((p) => [p.id, p]));
-      const mutations: Array<{
-        entity: "task" | "area" | "project" | "setting";
-        action: "put" | "delete";
-        id: string;
-        row?: Record<string, unknown>;
-      }> = [];
+      const maps: Record<SyncedEntity, Map<string, Record<string, unknown>>> = {
+        task: new Map(snap.tasks.map((r) => [r.id, r])),
+        area: new Map(snap.areas.map((r) => [r.id, r])),
+        project: new Map(snap.projects.map((r) => [r.id, r])),
+        checklistItem: new Map(snap.checklistItems.map((r) => [r.id, r])),
+        tag: new Map(snap.tags.map((r) => [r.id, r])),
+        taskRef: new Map(snap.taskRefs.map((r) => [r.id, r])),
+        convo: new Map(snap.convos.map((r) => [r.id, r])),
+        attachment: new Map(snap.attachments.map((r) => [r.id, r])),
+        setting: new Map(Object.entries(snap.settings).map(([id, value]) => [id, { id, value }])),
+      };
+
+      const mutations: LocalMutation[] = [];
 
       for (const change of page.changes) {
         const entity = change.entity;
-        if (entity !== "task" && entity !== "area" && entity !== "project" && entity !== "setting") {
+        if (entity === "turn") {
+          const plan = planPullRow({
+            entity: "turn",
+            row: change.row,
+            current: null,
+            pendingFields: [],
+            pendingDelete: false,
+          });
+          if (plan.plan === "turn") {
+            const id = turnSyntheticId(plan.taskId, plan.seq);
+            mutations.push({
+              entity: "turn",
+              action: "put",
+              id,
+              row: { ...plan.row, id, taskId: plan.taskId, seq: plan.seq },
+            });
+          }
           continue;
         }
+
+        if (!isSyncedEntity(entity)) continue;
         const id = typeof change.row.id === "string" ? change.row.id : null;
         if (!id) continue;
 
-        const current =
-          entity === "task"
-            ? (taskMap.get(id) ?? null)
-            : entity === "area"
-              ? (areaMap.get(id) ?? null)
-              : entity === "project"
-                ? (projectMap.get(id) ?? null)
-                : id in snap.settings
-                  ? { id, value: snap.settings[id] }
-                  : null;
-
+        const entityMap = maps[entity];
+        const current = entityMap.get(id) ?? null;
         const { pendingFields, pendingDelete } = pendingFieldsFor(snap.outbox, entity, id);
         const plan = planPullRow({
           entity,
@@ -454,7 +1219,7 @@ export class WebSyncEngine {
           pendingDelete,
         });
 
-        if (plan.plan === "skip" || plan.plan === "turn" || plan.plan === "shadowOnly") {
+        if (plan.plan === "skip" || plan.plan === "shadowOnly" || plan.plan === "turn") {
           continue;
         }
         if (plan.plan === "tombstone") {
@@ -467,12 +1232,10 @@ export class WebSyncEngine {
               deletedAt: plan.deletedAt,
             };
             mutations.push({ entity, action: "put", id, row: deletedRow });
-            taskMap.set(id, deletedRow);
+            entityMap.set(id, deletedRow);
           } else {
             mutations.push({ entity, action: "delete", id });
-            if (entity === "task") taskMap.delete(id);
-            else if (entity === "area") areaMap.delete(id);
-            else if (entity === "project") projectMap.delete(id);
+            entityMap.delete(id);
           }
           continue;
         }
@@ -484,9 +1247,7 @@ export class WebSyncEngine {
             ...(plan.updatedAt ? { updatedAt: plan.updatedAt } : {}),
           };
           mutations.push({ entity, action: "put", id, row });
-          if (entity === "task") taskMap.set(id, row);
-          else if (entity === "area") areaMap.set(id, row);
-          else if (entity === "project") projectMap.set(id, row);
+          entityMap.set(id, row);
         }
       }
 

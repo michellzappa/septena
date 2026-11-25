@@ -2610,9 +2610,11 @@ function generateFeatureMap({ caps }) {
   return lines.join("\n");
 }
 
+const tsOutput = generateTS(bundle);
 const outputs = [
   ["SeptenaCore/Generated/RegistryConstants.swift", generateSwift(bundle)],
-  ["backend/src/generated/registries.ts", generateTS(bundle)],
+  ["backend/src/generated/registries.ts", tsOutput],
+  ["web/src/lib/generated/registries.ts", tsOutput],
   ["android/core/src/main/kotlin/app/septena/core/generated/RegistryConstants.kt", generateKotlinCore(bundle)],
   ["core/crates/septena-core/src/generated/registry.rs", generateRustCore(bundle)],
   ["docs/FEATURE_MAP.md", generateFeatureMap(bundle)],
