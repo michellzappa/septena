@@ -1,6 +1,6 @@
 # Task references — spec
 
-**Status:** building (R0, 2026-11-24). mz accepted the defaults of #296.
+**Status:** building (R0 #386, R1 #387 and the `tasks_create` duplicate check #496 shipped). mz accepted the defaults of #296.
 **First release = R0 + R1:** add a link or an email to a task, see it, open it. R2 to R4 come later and do not block it.
 Defaults that this doc adds are marked *(new)* in §13.
 **Decisions:** [ADR 0031](adr/0031-references-are-keyed-pointers.md),

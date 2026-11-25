@@ -1,6 +1,6 @@
 # Task app widgets (Today & Upcoming) — spec
 
-**Status:** proposal (2026-11-21). Defaults in §7 stand unless mz overrules.
+**Status:** shipped — historical (2026-11-22, #160 and #161).
 **Decisions:** [ADR 0002](adr/0002-own-backend-replaces-icloud.md), [ADR 0007](adr/0007-septena-is-the-task-app.md), [ADR 0015](adr/0015-shared-registries-for-cross-platform-clients.md).
 **Builds on:** `SeptenaCore/TasksWidgetBuilder.swift`, `SeptenaCore/TasksWidgetSnapshotStore.swift`, `SeptenaCore/TasksWidgetWire.swift`, `SeptenaCore/SeptenaAppGroup.swift`, `SeptenaCore/Outbox.swift`, `project.yml`.
 **Tracking issue:** [#129](https://github.com/michellzappa/septena/issues/129).
