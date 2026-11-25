@@ -171,7 +171,7 @@ function resolveCard(device, panel) {
   if (c.kind === "review") {
     const lines = el(c.element);
     const actions = lines.slice(-2);
-    return { ...base, title: lines[0], subtitle: lines[1], artifact: c.artifact && lines.length > 4 ? lines[2] : null, actions: actions.map((label, i) => ({ label, kind: i === actions.length - 1 ? "primary" : "tinted" })) };
+    return { ...base, title: lines[0], subtitle: lines[1], artifact: c.artifact && lines.length > 4 ? lines[2] : null, actions: actions.map((label, i) => ({ label, kind: label === "Accept" ? "primary" : "tinted" })) };
   }
   if (c.kind === "notice") {
     // A registry notice (registry/surfaces.json), its count from the screen.
