@@ -428,6 +428,7 @@
   },
   "taskDateBoard": {
     "id": "taskDateBoard",
+    "overdue": { "label": "Overdue" },
     "rows": [
       { "id": "dateBoard.tomorrow", "kind": "tomorrow", "label": "Tomorrow", "icon": "date.tomorrow", "attributes": ["when", "deadline"], "featureId": "task.when-deadline" },
       { "id": "dateBoard.calendar", "kind": "calendar", "label": "Pick another date", "valueLabel": "Pick another date ({date})", "icon": "action.when", "attributes": ["when", "deadline"], "featureId": "task.when-deadline" },

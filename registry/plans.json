@@ -78,7 +78,7 @@
     {
       "id": "pro",
       "title": "Septena Pro",
-      "icon": "list.anytime",
+      "icon": "plans.pro",
       "status": "planned",
       "priceLabel": "€120 a year",
       "priceDetail": "Or €14 a month.",

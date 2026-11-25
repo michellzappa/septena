@@ -7120,6 +7120,18 @@
         }
       }
     },
+    "Overdue" : {
+      "comment" : "Generated from registry surfaces.taskDateBoard.overdue.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atrasada"
+          }
+        }
+      }
+    },
     "Overdue app icon badge" : {
       "comment" : "Generated from registry settings.rootGroups.lists_root.items.6.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",

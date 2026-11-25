@@ -15,7 +15,9 @@ import app.septena.core.generated.RegistryDestinationIds
 import app.septena.core.generated.RegistryEntityEnums
 import app.septena.core.generated.RegistryEntityFields
 import app.septena.core.generated.RegistryEntityNames
+import app.septena.core.generated.RegistrySurfaceIds
 import app.septena.core.generated.RegistryTaskAttributeIds
+import app.septena.core.stringValue
 import java.time.Instant
 import java.time.LocalDate
 import java.util.Locale
@@ -50,7 +52,11 @@ internal object SeptenaWidgetLoader {
         val today = clock.today(now)
         val todayLabel = RegistryCatalog.destinationTitle(RegistryDestinationIds.TODAY, languageTag)
             ?.takeIf(String::isNotBlank).orEmpty()
-        val overdueLabel = RegistryCatalog.localizedString("Overdue", languageTag) ?: "Overdue"
+        val overdueLabel = (RegistryCatalog.surface(RegistrySurfaceIds.TASK_DATE_BOARD)?.fields?.get("overdue") as? JsonValue.ObjectValue)
+            ?.fields?.get("label")
+            .stringValue()
+            ?.let { RegistryCatalog.localizedString(it, languageTag) ?: it }
+            .orEmpty()
         val emptyLabel = RegistryCatalog.destinationEmptyTitle(RegistryDestinationIds.TODAY, languageTag)
             ?.takeIf(String::isNotBlank) ?: "All clear for today"
 
