@@ -32,15 +32,9 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
       return
     }
     let controller = SeptaskKitWindowController()
-    // Before any list content loads: an exception AppKit swallows there must
-    // not lose the window, and the next Dock click must front this shell, not
-    // build another one. The async call is the net for that exception; on the
-    // normal path the window is already on screen when it runs.
+    // Registered before any list content loads, so nothing that runs during
+    // that load can build a second shell.
     current = controller
-    DispatchQueue.main.async { [weak controller] in
-      guard let window = controller?.window, !window.isVisible else { return }
-      window.makeKeyAndOrderFront(nil)
-    }
     controller.restoreDestination()
     controller.window?.makeKeyAndOrderFront(nil)
     // After the window is on screen, so `makeFirstResponder` sticks: keyboard
@@ -250,6 +244,9 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
   /// First content load, called by `show()` once the shell is registered.
   private func restoreDestination() {
     guard let sidebar else { return }
+    // The sidebar's rows steer the list, so they must exist even if AppKit
+    // ever defers loading a collapsed sidebar (as it does the inspector).
+    sidebar.loadViewIfNeeded()
     // Restore the list that was showing last time; Today when it is gone.
     // That fallback also covers a saved "next" from before Septask's Next
     // page was removed (2026-11-19): no row has that key any more.

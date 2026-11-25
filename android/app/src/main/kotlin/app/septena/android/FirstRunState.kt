@@ -13,6 +13,7 @@ import app.septena.core.stringValue
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Whether this device still owes the user the first run (registry/surfaces.json `firstRun`), as on iOS
@@ -50,7 +51,19 @@ class FirstRunState(
         // pending and blocks the next sign-in.
         runCatching { graph.finishPendingWipe() }
         if (_phase.value != Phase.Unresolved) return
-        if (needsFirstRun() && graph.credentials.signedIn.value) runCatching { graph.sync.syncAndWait() }
+        if (needsFirstRun() && graph.credentials.signedIn.value) {
+            val answered = withTimeoutOrNull(PULL_WAIT_MS) {
+                graph.sync.syncAndWait()
+                true
+            }
+            if (answered == null) {
+                // No answer yet: open the task list, which fills when the sync lands, and decide on the next
+                // launch. The spinner must never be the whole app, and the welcome must not greet an account
+                // that may hold tasks.
+                _phase.value = Phase.Hidden
+                return
+            }
+        }
         grandfatherIfEstablished(graph)
         _phase.value = if (needsFirstRun()) Phase.Show else Phase.Hidden
     }
@@ -113,5 +126,6 @@ class FirstRunState(
         const val PREFS = "septena-first-run"
         const val KEY_COMPLETED = "completed"
         const val KEY_FORCE = "force"
+        const val PULL_WAIT_MS = 8_000L
     }
 }
