@@ -459,38 +459,33 @@ fn fields_of(task: &TaskSnapshot) -> TaskDateFields {
     }
 }
 
+/// One loop, not one comparison per field: the native slices are close to
+/// their size budget.
 fn patch(before: &TaskDateFields, after: TaskDateFields) -> TaskDatePatch {
-    let mut changed = Vec::new();
-    let mut note = |name: &str, differs: bool| {
-        if differs {
-            changed.push(name.to_string());
-        }
-    };
-    note("scheduled", before.scheduled != after.scheduled);
-    note("deadline", before.deadline != after.deadline);
-    note(
-        "deferredDeadline",
-        before.deferred_deadline != after.deferred_deadline,
-    );
-    note("today", before.today != after.today);
-    note("todaySetOn", before.today_set_on != after.today_set_on);
-    note("startTime", before.start_time != after.start_time);
-    note("durationMinutes", before.duration_minutes != after.duration_minutes);
-    note("timeZone", before.time_zone != after.time_zone);
-    note("reminderAt", before.reminder_at != after.reminder_at);
-    note(
-        "reminderSnoozedUntil",
-        before.reminder_snoozed_until != after.reminder_snoozed_until,
-    );
-    note(
-        "reminderDismissedAt",
-        before.reminder_dismissed_at != after.reminder_dismissed_at,
-    );
-    note(
-        "recurrenceAnchorDate",
-        before.recurrence_anchor_date != after.recurrence_anchor_date,
-    );
-    note("acknowledgedAt", before.acknowledged_at != after.acknowledged_at);
+    let texts = [
+        ("scheduled", &before.scheduled, &after.scheduled),
+        ("deadline", &before.deadline, &after.deadline),
+        ("deferredDeadline", &before.deferred_deadline, &after.deferred_deadline),
+        ("todaySetOn", &before.today_set_on, &after.today_set_on),
+        ("startTime", &before.start_time, &after.start_time),
+        ("timeZone", &before.time_zone, &after.time_zone),
+        ("reminderAt", &before.reminder_at, &after.reminder_at),
+        ("reminderSnoozedUntil", &before.reminder_snoozed_until, &after.reminder_snoozed_until),
+        ("reminderDismissedAt", &before.reminder_dismissed_at, &after.reminder_dismissed_at),
+        ("recurrenceAnchorDate", &before.recurrence_anchor_date, &after.recurrence_anchor_date),
+        ("acknowledgedAt", &before.acknowledged_at, &after.acknowledged_at),
+    ];
+    let mut changed: Vec<String> = texts
+        .iter()
+        .filter(|(_, old, new)| old != new)
+        .map(|(name, _, _)| name.to_string())
+        .collect();
+    if before.today != after.today {
+        changed.push("today".to_string());
+    }
+    if before.duration_minutes != after.duration_minutes {
+        changed.push("durationMinutes".to_string());
+    }
     TaskDatePatch { fields: after, changed }
 }
 
