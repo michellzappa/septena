@@ -8,37 +8,37 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 
 | Status | iPhone | iPad | Mac | Web | Android | Windows | Watch |
 |---|---|---|---|---|---|---|---|
-| ships | 54 | 55 | 55 | 0 | 51 | 0 | 1 |
-| partial | 1 | 1 | 1 | 0 | 2 | 0 | 3 |
-| planned | 0 | 0 | 0 | 52 | 1 | 55 | 1 |
+| ships | 54 | 55 | 55 | 33 | 51 | 0 | 1 |
+| partial | 1 | 1 | 1 | 4 | 2 | 0 | 3 |
+| planned | 0 | 0 | 0 | 15 | 1 | 55 | 1 |
 | - | 4 | 3 | 3 | 7 | 5 | 4 | 54 |
 
 | ID | Feature | iPhone | iPad | Mac | Web | Android | Windows | Watch |
 |---|---|---|---|---|---|---|---|---|
-| `lists.inbox` | Inbox band on Today | ships | ships | ships | planned | ships | planned | partial |
-| `lists.today` | Today | ships | ships | ships | planned | ships | planned | partial |
-| `lists.review` | Review (needs_verify) | ships | ships | ships | planned | ships | planned | - |
-| `lists.agent` | Agent (claimed and assigned work by stage) | ships | ships | ships | planned | ships | planned | - |
-| `lists.upcoming` | Upcoming | ships | ships | ships | planned | ships | planned | - |
-| `lists.anytime` | Anytime | ships | ships | ships | planned | ships | planned | - |
-| `lists.repeating` | Repeating | ships | ships | ships | planned | ships | planned | - |
-| `lists.logbook` | Logbook | ships | ships | ships | planned | ships | planned | - |
-| `lists.faded` | Faded pile | ships | ships | ships | planned | ships | planned | - |
-| `lists.starred` | Favorites list | ships | ships | ships | planned | ships | planned | - |
-| `lists.recently-deleted` | Recently Deleted (30 days) | ships | ships | ships | planned | ships | planned | - |
-| `places.areas` | Areas | ships | ships | ships | planned | ships | planned | - |
-| `places.projects` | Projects | ships | ships | ships | planned | ships | planned | - |
-| `places.sections` | Sections (headings) | ships | ships | ships | planned | ships | planned | - |
-| `task.when-deadline` | When and Deadline as separate dates | ships | ships | ships | planned | ships | planned | - |
-| `task.repeat` | Repeat from schedule or after completion, pause | ships | ships | ships | planned | ships | planned | - |
-| `task.notes` | Notes | ships | ships | ships | planned | ships | planned | - |
-| `task.attachments` | Attachments | ships | ships | ships | planned | ships | planned | - |
-| `task.references` | References: the email, link, issue or task that a task is about | ships | ships | ships | planned | ships | planned | - |
-| `task.history` | Per-task change history | ships | ships | ships | planned | ships | planned | - |
-| `task.provenance` | Who added a task: you or a named agent, on the row and the task page | ships | ships | ships | planned | ships | planned | - |
-| `task.aging` | Aging fade across open lists | ships | ships | ships | planned | ships | planned | - |
-| `task.checklists` | Checklists inside a task | ships | ships | ships | planned | ships | planned | - |
-| `task.tags` | Tags | ships | ships | ships | planned | ships | planned | - |
+| `lists.inbox` | Inbox band on Today | ships | ships | ships | ships | ships | planned | partial |
+| `lists.today` | Today | ships | ships | ships | ships | ships | planned | partial |
+| `lists.review` | Review (needs_verify) | ships | ships | ships | ships | ships | planned | - |
+| `lists.agent` | Agent (claimed and assigned work by stage) | ships | ships | ships | ships | ships | planned | - |
+| `lists.upcoming` | Upcoming | ships | ships | ships | ships | ships | planned | - |
+| `lists.anytime` | Anytime | ships | ships | ships | ships | ships | planned | - |
+| `lists.repeating` | Repeating | ships | ships | ships | ships | ships | planned | - |
+| `lists.logbook` | Logbook | ships | ships | ships | ships | ships | planned | - |
+| `lists.faded` | Faded pile | ships | ships | ships | ships | ships | planned | - |
+| `lists.starred` | Favorites list | ships | ships | ships | ships | ships | planned | - |
+| `lists.recently-deleted` | Recently Deleted (30 days) | ships | ships | ships | ships | ships | planned | - |
+| `places.areas` | Areas | ships | ships | ships | ships | ships | planned | - |
+| `places.projects` | Projects | ships | ships | ships | ships | ships | planned | - |
+| `places.sections` | Sections (headings) | ships | ships | ships | ships | ships | planned | - |
+| `task.when-deadline` | When and Deadline as separate dates | ships | ships | ships | ships | ships | planned | - |
+| `task.repeat` | Repeat from schedule or after completion, pause | ships | ships | ships | ships | ships | planned | - |
+| `task.notes` | Notes | ships | ships | ships | ships | ships | planned | - |
+| `task.attachments` | Attachments | ships | ships | ships | partial | ships | planned | - |
+| `task.references` | References: the email, link, issue or task that a task is about | ships | ships | ships | ships | ships | planned | - |
+| `task.history` | Per-task change history | ships | ships | ships | ships | ships | planned | - |
+| `task.provenance` | Who added a task: you or a named agent, on the row and the task page | ships | ships | ships | ships | ships | planned | - |
+| `task.aging` | Aging fade across open lists | ships | ships | ships | ships | ships | planned | - |
+| `task.checklists` | Checklists inside a task | ships | ships | ships | ships | ships | planned | - |
+| `task.tags` | Tags | ships | ships | ships | ships | ships | planned | - |
 | `task.share` | Share a task (title and notes) through the system share sheet | ships | ships | ships | planned | ships | planned | - |
 | `task.alerts` | Timed reminders | ships | ships | ships | planned | ships | planned | - |
 | `fade.sweep` | Fade pass, Faded pile and weekly sweep | ships | ships | ships | planned | ships | planned | - |
@@ -47,30 +47,30 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 | `capture.share-target` | Share into Inbox | ships | ships | - | planned | ships | planned | - |
 | `capture.quick-entry` | Quick Entry global panel | - | - | ships | - | - | planned | - |
 | `edit.filing-suggestion` | On-device filing suggestion | ships | ships | ships | - | ships | planned | - |
-| `edit.undo` | Shared undo history | ships | ships | ships | planned | ships | planned | - |
+| `edit.undo` | Shared undo history | ships | ships | ships | ships | ships | planned | - |
 | `edit.multi-select` | Select multiple tasks | ships | ships | ships | planned | ships | planned | - |
-| `find.quick-find` | Quick Find | ships | ships | ships | planned | ships | planned | - |
-| `task.page` | Task page (ADR 0029) | partial | partial | partial | planned | partial | planned | partial |
-| `mac.keyboard` | Keyboard-first shortcuts | - | ships | ships | planned | planned | planned | - |
+| `find.quick-find` | Quick Find | ships | ships | ships | ships | ships | planned | - |
+| `task.page` | Task page (ADR 0029) | partial | partial | partial | partial | partial | planned | partial |
+| `mac.keyboard` | Keyboard-first shortcuts | - | ships | ships | partial | planned | planned | - |
 | `mac.updates` | In-app updates (Sparkle) | - | - | ships | - | - | planned | - |
 | `calendar.events` | Calendar events in Today and Upcoming | ships | ships | ships | planned | ships | planned | - |
 | `import.reminders` | Apple Reminders into Inbox | ships | ships | ships | - | - | - | - |
 | `import.things` | One-time Things import | ships | ships | ships | - | - | - | - |
-| `ai.discuss` | Discuss: conversation on one task | ships | ships | ships | planned | partial | planned | - |
+| `ai.discuss` | Discuss: conversation on one task | ships | ships | ships | ships | partial | planned | - |
 | `ai.reach-dial` | Where AI runs | ships | ships | ships | planned | ships | planned | - |
 | `agents.connector` | Official MCP connector at api.septena.app/mcp | ships | ships | ships | planned | ships | planned | - |
 | `onboarding.first-run` | First run: welcome, account, move in, connect Claude | ships | ships | ships | planned | ships | planned | - |
-| `agents.stop-pause` | Stop one task, pause all agents | ships | ships | ships | planned | ships | planned | - |
-| `sync.backend` | Sync through api.septena.app | ships | ships | ships | planned | ships | planned | planned |
+| `agents.stop-pause` | Stop one task, pause all agents | ships | ships | ships | ships | ships | planned | - |
+| `sync.backend` | Sync through api.septena.app | ships | ships | ships | ships | ships | planned | planned |
 | `account.delete` | Delete account | ships | ships | ships | planned | ships | planned | - |
-| `task.times` | Start time and duration on a task | ships | ships | ships | planned | ships | planned | - |
+| `task.times` | Start time and duration on a task | ships | ships | ships | ships | ships | planned | - |
 | `calendar.feed` | Private read-only calendar feed (.ics) | ships | ships | ships | planned | ships | planned | - |
 | `widgets.tasks` | Today and Upcoming widgets | ships | ships | ships | - | ships | planned | - |
 | `watch.app` | Apple Watch app | - | - | - | - | - | - | ships |
-| `data.import-export` | Export as JSON, Markdown or CSV; import JSON with a preview | ships | ships | ships | planned | ships | planned | - |
-| `agents.list` | Connected agents: list, name, disconnect | ships | ships | ships | planned | ships | planned | - |
+| `data.import-export` | Export as JSON, Markdown or CSV; import JSON with a preview | ships | ships | ships | partial | ships | planned | - |
+| `agents.list` | Connected agents: list, name, disconnect | ships | ships | ships | ships | ships | planned | - |
 | `settings.display` | Display, badge and privacy preferences | ships | ships | ships | planned | ships | planned | - |
-| `appearance.accents` | Accent colors (Colorful and the fruit accents) | ships | ships | ships | planned | ships | planned | - |
+| `appearance.accents` | Accent colors (Colorful and the fruit accents) | ships | ships | ships | ships | ships | planned | - |
 | `appearance.textures` | Header textures with intensity and slow drift | ships | ships | ships | planned | ships | planned | - |
-| `appearance.mode` | Light, dark or system appearance | ships | ships | ships | planned | ships | planned | - |
-| `appearance.text-size` | Text size | ships | ships | ships | planned | ships | planned | - |
+| `appearance.mode` | Light, dark or system appearance | ships | ships | ships | ships | ships | planned | - |
+| `appearance.text-size` | Text size | ships | ships | ships | ships | ships | planned | - |

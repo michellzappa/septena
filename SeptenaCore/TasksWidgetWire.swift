@@ -113,7 +113,7 @@ public struct TasksWidgetSnapshot: Codable, Equatable, Sendable {
       ?? TasksWidgetListSummary(
         id: TasksWidgetListSummary.todayID,
         kind: .today,
-        title: "Today",
+        title: String(localized: "Today"),
         symbol: "star.fill",
         count: 0,
         items: []
@@ -152,11 +152,11 @@ public struct TasksWidgetSnapshot: Codable, Equatable, Sendable {
         TasksWidgetListSummary(
           id: TasksWidgetListSummary.todayID,
           kind: .today,
-          title: "Today",
+          title: String(localized: "Today"),
           symbol: "star.fill",
           count: 4,
           items: [
-            TasksWidgetTaskItem(id: "sample-1", title: "Review quarterly roadmap", isOverdue: true, subtitle: "Work", deadlineBadge: "Today"),
+            TasksWidgetTaskItem(id: "sample-1", title: "Review quarterly roadmap", isOverdue: true, subtitle: "Work", deadlineBadge: String(localized: "Today")),
             TasksWidgetTaskItem(id: "sample-2", title: "Dentist appointment", subtitle: "Health", timeBadge: "14:00–15:00"),
             TasksWidgetTaskItem(id: "sample-3", title: "Pick up coffee beans", subtitle: "Errands"),
             TasksWidgetTaskItem(id: "sample-4", title: "Send project update", isStarred: true, subtitle: "Work"),
@@ -165,28 +165,28 @@ public struct TasksWidgetSnapshot: Codable, Equatable, Sendable {
         TasksWidgetListSummary(
           id: TasksWidgetListSummary.upcomingID,
           kind: .upcoming,
-          title: "Upcoming",
+          title: String(localized: "Upcoming"),
           symbol: "calendar",
           count: 2,
           items: [
-            TasksWidgetTaskItem(id: "sample-5", title: "Renew passport", subtitle: "Tomorrow"),
+            TasksWidgetTaskItem(id: "sample-5", title: "Renew passport", subtitle: String(localized: "Tomorrow")),
             TasksWidgetTaskItem(id: "sample-6", title: "Team offsite prep", subtitle: "Nov 25"),
           ]
         ),
         TasksWidgetListSummary(
           id: TasksWidgetListSummary.inboxID,
           kind: .inbox,
-          title: "Inbox",
+          title: String(localized: "Inbox"),
           symbol: "tray.fill",
           count: 1,
           items: [
-            TasksWidgetTaskItem(id: "sample-7", title: "Book train tickets", subtitle: "Inbox"),
+            TasksWidgetTaskItem(id: "sample-7", title: "Book train tickets", subtitle: String(localized: "Inbox")),
           ]
         ),
         TasksWidgetListSummary(
           id: TasksWidgetListSummary.starredID,
           kind: .starred,
-          title: "Favorites",
+          title: String(localized: "Favorites"),
           symbol: "star",
           count: 1,
           items: [

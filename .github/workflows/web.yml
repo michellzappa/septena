@@ -8,12 +8,14 @@ on:
     branches: [main, "wt/**"]
     paths:
       - "web/**"
-      - "registry/conformance/**"
+      - "registry/**"
+      - "scripts/gen-registries.mjs"
       - ".github/workflows/web.yml"
   pull_request:
     paths:
       - "web/**"
-      - "registry/conformance/**"
+      - "registry/**"
+      - "scripts/gen-registries.mjs"
       - ".github/workflows/web.yml"
   workflow_dispatch:
 
