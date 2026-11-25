@@ -35,8 +35,8 @@ enum SeptaskLaunch {
     LaunchTrace.spanSync("launch.deferredWork") {
       SharedTaskCaptureImporter.importPending(using: services.taskMutator)
       SeptaskLegacyClaudeCleanup.runOnce()
-      // Weekly diagnostics retired 2026-11-22 (Privacy & Data ▸ Usage data is
-      // the one telemetry control). Clears any old opt-in and its pending batch.
+      // Weekly diagnostics retired 2026-11-22 and usage data 2026-11-25 (#436):
+      // the app sends neither. Clears any old opt-in and its pending batch.
       SeptaskDiagnosticsCoordinator.setEnabled(false)
       BadgeManager.shared.start(context: localStore.container.mainContext)
       TaskReminderScheduler.shared.start(context: localStore.container.mainContext)
@@ -60,7 +60,6 @@ enum SeptaskLaunch {
       AppearancePreferences.shared.adoptSynced(SeptaskSyncedSettings.current())
       SmartListPreferences.shared.adoptSynced(SeptaskSyncedSettings.current())
       settings.reconcileWelcomeName(context: context, engine: services.ckEngine)
-      settings.reconcileTelemetryLevel(context: context, engine: services.ckEngine)
       settings.reconcileHiddenCalendars(context: context, engine: services.ckEngine)
       // No `reconcileSupporter`: the supporter flag came from Septena through
       // CloudKit, and Septask no longer reads CloudKit. `engine` above is
