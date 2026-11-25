@@ -378,7 +378,11 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
   func toggleSidebar() {
     splitController?.toggleSidebar(nil)
   }
-  func toggleSidebarCounts() { sidebar?.toggleShowsCounts() }
+  func toggleSidebarCounts() {
+    sidebar?.toggleShowsCounts()
+    // An area page shows the same counts on its project rows.
+    list?.refreshViewOptions()
+  }
 
   /// Whether a Task-menu row command has a target. The menu acts on the pane
   /// that holds the keyboard: on the sidebar only Rename and Delete exist

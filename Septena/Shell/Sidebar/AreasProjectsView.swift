@@ -277,6 +277,7 @@ struct AreaDetailView: View {
   @State private var areas: [Area]
   @State private var projects: [Project]
   @State private var projectProgress: [String: Double] = [:]
+  @State private var projectOpenCounts: [String: Int] = [:]
   @State private var errorMessage: String?
   @State private var toastStore = SeptenaToastStore()
   @FocusState private var notesFocused: Bool
@@ -301,6 +302,7 @@ struct AreaDetailView: View {
     // sidebar / project detail — don't flash empty rings while load() runs.
     _projectProgress = State(initialValue:
       Self.cachedProjectProgress(areaId: area.id, context: ctx))
+    _projectOpenCounts = State(initialValue: LocalCache.projectOpenCounts(in: ctx))
   }
 
   /// done / (done + open) per project in this area. Tasks filed in a project
@@ -547,6 +549,7 @@ struct AreaDetailView: View {
         .scaledFont(size: 10, weight: .semibold)
         .foregroundStyle(Theme.iconMuted)
       Spacer()
+      SidebarCount(count: projectOpenCounts[project.id] ?? 0)
     }
     // `taskCardChrome` adds the outer card margin; this is the in-card content
     // inset, so the ring lands on the checkbox column of the card below.
@@ -563,6 +566,7 @@ struct AreaDetailView: View {
     areas = structure.areas
     projects = structure.projects
     projectProgress = Self.cachedProjectProgress(areaId: area.id, context: modelContext)
+    projectOpenCounts = LocalCache.projectOpenCounts(in: modelContext)
 
     // Rehydrate the notes field from the freshly-loaded area record. The
     // route in nav.path holds the snapshot from when the sidebar last

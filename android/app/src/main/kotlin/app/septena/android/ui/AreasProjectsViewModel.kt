@@ -426,7 +426,8 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                     val pid = task.project ?: continue
                     val prev = projectStats[pid] ?: (0 to 0)
                     when (task.status) {
-                        RegistryEntityEnums.TaskStatus.OPEN -> projectStats[pid] = (prev.first + 1) to prev.second
+                        // Faded open tasks leave every count and ring (docs/TASK_FADE_SPEC.md §4).
+                        RegistryEntityEnums.TaskStatus.OPEN -> if (!TaskFadeRules.isFaded(task.fadedAt)) projectStats[pid] = (prev.first + 1) to prev.second
                         RegistryEntityEnums.TaskStatus.DONE -> projectStats[pid] = prev.first to (prev.second + 1)
                     }
                 }
