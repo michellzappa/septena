@@ -165,7 +165,7 @@ export interface StoreSnapshot {
   lastSyncedAt: number | null;
 }
 
-export type SmartDestination = "inbox" | "today" | "upcoming" | "anytime" | "logbook";
+export type SmartDestination = "today" | "upcoming" | "anytime" | "logbook";
 
 export type ActiveDestination =
   | { kind: "smart"; id: SmartDestination }

@@ -89,7 +89,7 @@ saved after the batch, `resetRequired` handling and the Not synced list.
 
 The same scope as Android A2 and Windows W2:
 
-- Inbox band, Today, Upcoming, Anytime, Repeating, Logbook, Recently Deleted.
+- Today with the Inbox band at the top (no separate Inbox list, matching iOS/Mac), Upcoming, Anytime, Repeating, Logbook, Recently Deleted.
 - Areas, projects and sections.
 - When and Deadline, repeat, notes, Quick Find, one undo history.
 - Conversations with option pills; Stop on a task and Pause all agents.
