@@ -91,12 +91,13 @@ struct SeptaskSignInButton: View {
 /// Settings ▸ Account and the task backend pane: who is signed in, the sync
 /// state, and sign-in or sign-out.
 struct SeptaskSyncAccountSection: View {
+  private static let syncSection = RegistrySettings.section("sync", page: RegistrySettings.PageID.account)
   private var sync: TaskSyncEngine { .shared }
 
   var body: some View {
     Section {
       if sync.signedIn {
-        LabeledContent("Sync") {
+        LabeledContent(Self.syncSection?.header ?? "") {
           Text(statusLine).foregroundStyle(.secondary)
         }
         if let error = sync.lastError {
@@ -105,14 +106,16 @@ struct SeptaskSyncAccountSection: View {
         Button(role: .destructive) {
           Task { await sync.signOut() }
         } label: {
-          Label("Sign out", systemImage: "rectangle.portrait.and.arrow.right")
+          Label(RegistryActions.title("account.signOut"), systemImage: "rectangle.portrait.and.arrow.right")
         }
       } else {
         Text(signedOutLine).foregroundStyle(.secondary)
         SeptaskSignInButton()
       }
     } header: {
-      Text("Sync")
+      if let header = Self.syncSection?.header {
+        Text(header)
+      }
     } footer: {
       Text("Your tasks sync through Septena's own server at api.septena.app. Sign in with Apple once on each device.")
     }

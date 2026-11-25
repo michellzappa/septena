@@ -563,9 +563,16 @@ struct SeptaskSettingsView: View {
 
   private var liveSyncSummary: String {
     let sync = TaskSyncEngine.shared
+    if sync.deviceNotSyncing || PlanStatus.shared.deviceNotSyncing {
+      return RegistryPlans.Status.device
+    }
     if sync.isSyncing { return RegistrySettings.copy("syncStatus", "syncing") }
     if sync.pendingOps > 0 { return "\(sync.pendingOps) to send" }
-    return sync.wsConnected ? "Live" : RegistrySettings.copy("syncStatus", "offline")
+    if sync.wsConnected { return "Live" }
+    if sync.liveSyncBlocked, sync.lastError == nil {
+      return RegistrySettings.copy("syncStatus", "synced")
+    }
+    return RegistrySettings.copy("syncStatus", "offline")
   }
 
   private func statusText(for statusKey: String?) -> String? {
@@ -941,21 +948,6 @@ private struct SeptaskAboutPane: View {
       }
     case "send_feedback":
       Link(destination: URL(string: "mailto:mz@envisioning.com?subject=Septena%20feedback")!) {
-        label(item)
-      }
-    case "septena_life_link":
-      if let detail = item.detail {
-        Text(detail)
-          .font(.callout)
-          .foregroundStyle(.secondary)
-      }
-      Button {
-        openURL(URL(string: "septena://")!) { accepted in
-          if !accepted {
-            openURL(URL(string: "https://www.septena.app")!)
-          }
-        }
-      } label: {
         label(item)
       }
     default:

@@ -39,6 +39,12 @@ import UniformTypeIdentifiers
 @MainActor
 final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
 
+  /// Top-left origin matching `NSTableRowView`. `NSTableCellView` defaults to
+  /// non-flipped (bottom-left), which moves `topAnchor` by the entire height
+  /// delta while `noteHeightOfRows` animates the row open/closed and causes
+  /// the title and checkbox to visibly jump vertically during the transition.
+  override var isFlipped: Bool { true }
+
   /// Which pill was activated — the controller owns every mutation, this view
   /// only says what was asked for.
   enum Action {
@@ -116,6 +122,8 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
 
   private var leadingConstraint: NSLayoutConstraint!
   private var trailingConstraint: NSLayoutConstraint!
+  private var checkboxCenterYConstraint: NSLayoutConstraint!
+  private var columnTopConstraint: NSLayoutConstraint!
   private var titleHeightConstraint: NSLayoutConstraint!
   private var notesHeightConstraint: NSLayoutConstraint!
   private var checklistHeightConstraint: NSLayoutConstraint!
@@ -165,14 +173,55 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
   private static let bottomPadding: CGFloat = 10
   private static let interRowGap: CGFloat = 8
 
-  /// One line of title. The first line sits centered in the closed-row band
-  /// exactly where `SeptaskKitTaskCell`'s label draws, so opening the row
-  /// doesn't nudge the glyphs; every further wrapped line adds to the row
-  /// below it. This is the one knob if the open/closed title ever drifts.
+  /// One line of title. The first line's baseline aligns to `SeptaskKitTaskCell`'s
+  /// centered label to 0pt across every `SeptenaTypeScale` step so opening the
+  /// row never nudges the glyphs; every further wrapped line adds to the row
+  /// below it.
   static var titleLineHeight: CGFloat {
     ceil(NSLayoutManager().defaultLineHeight(for: SeptaskKitTheme.taskTitle))
   }
-  private static var titleTop: CGFloat { (SeptaskKitTheme.rowHeight - titleLineHeight) / 2 }
+
+  private struct TitleTopCacheKey: Equatable {
+    let fontSize: CGFloat
+    let rowHeight: CGFloat
+  }
+  private static var cachedTitleTop: (key: TitleTopCacheKey, value: CGFloat)?
+
+  /// Exact vertical offset from the cell's top to `titleScroll`'s top so the
+  /// first line's baseline matches `SeptaskKitTaskCell`'s vertically centered
+  /// `NSTextField` label at every text-size factor (including non-integer scale
+  /// steps where `NSTextFieldCell` and `NSLayoutManager.defaultLineHeight`
+  /// otherwise diverge by 0.5pt).
+  private static var titleTop: CGFloat {
+    let font = SeptaskKitTheme.taskTitle
+    let rowHeight = SeptaskKitTheme.rowHeight
+    let key = TitleTopCacheKey(fontSize: font.pointSize, rowHeight: rowHeight)
+    if let cached = cachedTitleTop, cached.key == key {
+      return cached.value
+    }
+    let probe = NSTextField(labelWithString: "Ag")
+    probe.font = font
+    probe.isBordered = false
+    probe.isBezeled = false
+    let labelHeight = probe.intrinsicContentSize.height
+    let labelBaselineFromTop = (rowHeight - labelHeight) / 2
+      + (labelHeight - probe.baselineOffsetFromBottom)
+
+    let storage = NSTextStorage(string: "Ag", attributes: [.font: font])
+    let container = NSTextContainer(size: CGSize(width: 200, height: CGFloat.greatestFiniteMagnitude))
+    container.lineFragmentPadding = 0
+    let manager = NSLayoutManager()
+    manager.addTextContainer(container)
+    storage.addLayoutManager(manager)
+    manager.ensureLayout(for: container)
+    let lineRect = manager.lineFragmentRect(forGlyphAt: 0, effectiveRange: nil)
+    let tvBaselineFromBottom = manager.typesetter.baselineOffset(in: manager, glyphIndex: 0)
+    let tvBaselineFromLineTop = lineRect.maxY - tvBaselineFromBottom
+
+    let value = labelBaselineFromTop - tvBaselineFromLineTop
+    cachedTitleTop = (key, value)
+    return value
+  }
 
   /// Row height for a one-line title with no notes — the controller's answer
   /// until the live cell has measured itself (`expandedHeight`).
@@ -326,9 +375,13 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     addSubview(column)
 
     leadingConstraint = checkbox.leadingAnchor.constraint(
-      equalTo: leadingAnchor, constant: KitCardRowView.horizontalInset + 6)
+      equalTo: leadingAnchor, constant: KitCardRowView.horizontalInset + SeptaskKitLayout.rowLeadingPad)
     trailingConstraint = column.trailingAnchor.constraint(
       equalTo: trailingAnchor, constant: -(KitCardRowView.horizontalInset + 8))
+    checkboxCenterYConstraint = checkbox.centerYAnchor.constraint(
+      equalTo: topAnchor, constant: SeptaskKitTheme.rowHeight / 2)
+    columnTopConstraint = column.topAnchor.constraint(
+      equalTo: topAnchor, constant: Self.titleTop)
     titleHeightConstraint = titleScroll.heightAnchor.constraint(
       equalToConstant: Self.titleLineHeight)
     notesHeightConstraint = notesScroll.heightAnchor.constraint(
@@ -338,14 +391,13 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     NSLayoutConstraint.activate([
       leadingConstraint,
       // Match `SeptaskKitTaskCell`: checkbox on the vertical center of a
-      // standard-height row, the title's FIRST line centered on it. Extra
-      // lines and the rest of the column add space BELOW this band.
-      checkbox.centerYAnchor.constraint(equalTo: topAnchor,
-                                        constant: SeptaskKitTheme.rowHeight / 2),
+      // standard-height row, the title's FIRST line baseline-locked to it.
+      // Extra lines and the rest of the column add space BELOW this band.
+      checkboxCenterYConstraint,
       checkbox.widthAnchor.constraint(equalToConstant: KitCheckboxView.tapSize),
       checkbox.heightAnchor.constraint(equalToConstant: KitCheckboxView.tapSize),
       column.leadingAnchor.constraint(equalTo: checkbox.trailingAnchor, constant: 7),
-      column.topAnchor.constraint(equalTo: topAnchor, constant: Self.titleTop),
+      columnTopConstraint,
       trailingConstraint,
 
       titleScroll.widthAnchor.constraint(equalTo: column.widthAnchor),
@@ -408,7 +460,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
 
   override func layout() {
     let inset = SeptaskKitLayout.inset(for: bounds.width)
-    leadingConstraint.constant = inset + 6
+    leadingConstraint.constant = inset + SeptaskKitLayout.rowLeadingPad
     trailingConstraint.constant = -(inset + 8)
     super.layout()
     // Width can change on window resize — re-wrap and grow/shrink both fields.
@@ -427,7 +479,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
   private var textColumnWidth: CGFloat? {
     guard bounds.width > 60 else { return nil }
     let inset = SeptaskKitLayout.inset(for: bounds.width)
-    return bounds.width - (inset + 6 + KitCheckboxView.tapSize + 7) - (inset + 8)
+    return bounds.width - (inset + SeptaskKitLayout.rowLeadingPad + KitCheckboxView.tapSize + 7) - (inset + 8)
   }
 
   // MARK: - Populate
@@ -440,14 +492,26 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     configuredTaskID = task.id
     committedTitle = task.title
     committedNotes = Self.normalizedNotes(task.notes)
+    // Refresh text-scale-dependent geometry on every reuse so a pooled cell
+    // stays baseline-locked to `SeptaskKitTaskCell` after Text Size changes.
+    checkboxCenterYConstraint.constant = SeptaskKitTheme.rowHeight / 2
+    columnTopConstraint.constant = Self.titleTop
+    column.setCustomSpacing(Self.titleTop + Self.interRowGap, after: titleScroll)
+    measuredTitleHeight = Self.titleLineHeight
+    titleHeightConstraint.constant = Self.titleLineHeight
+    titleView.font = SeptaskKitTheme.taskTitle
+    titleView.textContainerInset = .zero
+    titleView.textContainer?.lineFragmentPadding = 0
     titleView.textStorage?.setAttributedString(
       NSAttributedString(string: task.title, attributes: Self.titleAttributes))
     titleView.typingAttributes = Self.titleAttributes
+    titleScroll.contentView.scroll(to: .zero)
     let notes = task.notes ?? ""
     let fontSize = SeptaskKitTheme.notesFontSize
     notesView.textStorage?.setAttributedString(
       MarkdownNotesStyle.attributed(notes, fontSize: fontSize))
     notesView.typingAttributes = MarkdownNotesStyle.baseAttributes(fontSize: fontSize)
+    notesScroll.contentView.scroll(to: .zero)
     // An open row ALWAYS shows its notes field, empty or not: the open row is
     // the task's whole document, and a field that appears only once it has
     // content hides the fact that notes exist at all. The empty field's
@@ -575,6 +639,23 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     whenPill.isOn = task.scheduled != nil || task.today || task.startTime != nil
     deadlinePill.show(value: task.deadline.map(KitDayFormat.display))
     deadlinePill.isOn = task.deadline != nil
+    let ctx = LocalStore.shared.container.mainContext
+    let snapshot = StructureCache.snapshot(in: ctx)
+    if let projectID = task.project,
+       snapshot.projects.contains(where: { $0.id == projectID }) {
+      let progress = LocalCache.projectCompletionRatios(in: ctx)[projectID] ?? 0
+      listPill.iconProvider = { ink in
+        KitGlyph.progress(progress, tint: ink, diameter: 12)
+      }
+    } else if let areaID = task.area,
+              let area = snapshot.areas.first(where: { $0.id == areaID }) {
+      let emoji = area.emoji
+      listPill.iconProvider = { _ in
+        KitGlyph.area(emoji: emoji, diameter: 14)
+      }
+    } else {
+      listPill.iconProvider = nil
+    }
     listPill.show(value: listName)
     listPill.isOn = listName != nil
     repeatPill.show(value: task.recurrence?.shortLabel)
@@ -586,7 +667,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     starPill.isOn = task.starred
     let resolvedTags = LocalCache.resolvedTags(
       for: task,
-      tagsByID: LocalCache.tagsByID(in: LocalStore.shared.container.mainContext)
+      tagsByID: LocalCache.tagsByID(in: ctx)
     )
     tagPill.show(value: resolvedTags.isEmpty ? nil
       : resolvedTags.count == 1 ? resolvedTags[0].name
@@ -625,11 +706,13 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     // inherits a near-zero frame and you can only see the glyph you just
     // typed. Same guard, same reason as `SeptaskKitTaskCell.beginEditing`.
     layoutSubtreeIfNeeded()
+    titleScroll.contentView.scroll(to: .zero)
     window?.makeFirstResponder(titleView)
     // Caret at the end (Things), not AppKit's select-all block — a selected
     // title reads as a second surface, and one stray keystroke replaces it.
     let end = (titleView.string as NSString).length
     titleView.setSelectedRange(NSRange(location: end, length: 0))
+    titleScroll.contentView.scroll(to: .zero)
   }
 
   /// Title → notes while notes are on screen, straight to the rail otherwise;
@@ -744,7 +827,13 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     guard let manager = view.layoutManager, let container = view.textContainer else { return 0 }
     manager.ensureLayout(for: container)
     let used = manager.usedRect(for: container)
-    return ceil(used.height + view.textContainerInset.height * 2)
+    let height = ceil(used.height + view.textContainerInset.height * 2)
+    let minHeight = view === titleView ? Self.titleLineHeight : Self.notesMinHeight
+    let clamped = max(minHeight, height)
+    if abs(view.frame.size.height - clamped) > 0.5 || view.frame.origin != .zero {
+      view.frame = NSRect(x: 0, y: 0, width: width, height: clamped)
+    }
+    return height
   }
 
   // MARK: - Commit
@@ -1072,6 +1161,16 @@ final class KitPillButton: NSButton {
     }
   }
 
+  /// Optional dynamic icon override (e.g. area emoji/dot or project progress
+  /// ring on the List pill). Called on every `restyle()` so appearance switches
+  /// pick up the right ink color.
+  var iconProvider: (@MainActor (NSColor) -> NSImage?)? {
+    didSet {
+      restyle()
+      invalidateIntrinsicContentSize()
+    }
+  }
+
   /// The attribute's value (`nil` falls back to the registry label). The full
   /// "label: value" goes to the tooltip and VoiceOver.
   func show(value: String?) {
@@ -1181,8 +1280,14 @@ final class KitPillButton: NSButton {
         .foregroundColor: isOn ? SeptaskKitTheme.inkPrimary : SeptaskKitTheme.inkSecondary,
       ])
     contentTintColor = isOn ? SeptaskKitTheme.inkPrimary : SeptaskKitTheme.inkSecondary
-    // A pill that is on draws its filled symbol (DesignSpec: on = filled).
-    if let attribute { image = symbolImage(attribute.sfSymbol(on: isOn), ink: contentTintColor ?? .labelColor) }
+    // A pill that is on draws its filled symbol (DesignSpec: on = filled),
+    // unless a dynamic icon override (such as an area emoji or project ring)
+    // supplies the pill's leading glyph.
+    if let iconProvider {
+      image = iconProvider(contentTintColor ?? .labelColor)
+    } else if let attribute {
+      image = symbolImage(attribute.sfSymbol(on: isOn), ink: contentTintColor ?? .labelColor)
+    }
     isRestyling = false
     applyCapsule()
   }
@@ -1765,6 +1870,7 @@ enum KitAttachmentPasteHelper {
 @MainActor
 final class KitAttachmentsView: NSView {
   static let chipHeight: CGFloat = 24
+  private static let upsellHeight: CGFloat = 20
   private static let rowSpacing: CGFloat = 4
 
   var onChanged: (() -> Void)?
@@ -1772,16 +1878,35 @@ final class KitAttachmentsView: NSView {
   private let stack = NSStackView()
   private var taskID: String?
   private var items: [TaskAttachmentEntity] = []
+  private var explicitUpsell: RegistryPlanNote?
 
   private var store: TaskAttachmentStore { SeptenaServices.shared.taskAttachmentStore }
   private var mutator: TaskMutator { SeptenaServices.shared.taskMutator }
 
   var attachmentCount: Int { items.count }
 
+  private var hasLocalOnlyItems: Bool {
+    items.contains { TaskSyncEngine.shared.isAttachmentLocalOnly($0.id) }
+  }
+
+  private var hasElsewhereItems: Bool {
+    items.contains { TaskSyncEngine.shared.isAttachmentElsewhere($0) }
+  }
+
+  private var activeUpsell: RegistryPlanNote? {
+    if let explicitUpsell { return explicitUpsell }
+    if hasElsewhereItems || hasLocalOnlyItems { return RegistryPlans.upsell("file_elsewhere") }
+    return nil
+  }
+
   var preferredHeight: CGFloat {
     guard !items.isEmpty else { return 0 }
-    return CGFloat(items.count) * Self.chipHeight
+    var h = CGFloat(items.count) * Self.chipHeight
       + CGFloat(max(0, items.count - 1)) * Self.rowSpacing
+    if activeUpsell != nil {
+      h += Self.rowSpacing + Self.upsellHeight
+    }
+    return h
   }
 
   override init(frame frameRect: NSRect) {
@@ -1806,6 +1931,7 @@ final class KitAttachmentsView: NSView {
   required init?(coder: NSCoder) { fatalError("KitAttachmentsView is code-only") }
 
   func configure(taskID: String) {
+    if self.taskID != taskID { explicitUpsell = nil }
     self.taskID = taskID
     reload()
   }
@@ -1850,9 +1976,12 @@ final class KitAttachmentsView: NSView {
       v.removeFromSuperview()
     }
     for (idx, item) in items.enumerated() {
+      let baseSize = ByteCountFormatter.string(fromByteCount: item.byteCount, countStyle: .file)
+      let localOnly = TaskSyncEngine.shared.isAttachmentLocalOnly(item.id)
+      let sizeText = localOnly ? "\(baseSize) · \(RegistryPlans.Status.device)" : baseSize
       let chip = KitAttachmentChipView(
         filename: item.filename,
-        sizeText: ByteCountFormatter.string(fromByteCount: item.byteCount, countStyle: .file),
+        sizeText: sizeText,
         hasLocalFile: TaskAttachmentFiles.url(for: item).map { FileManager.default.fileExists(atPath: $0.path) } ?? false
       )
       chip.onQuickLook = { [weak self] in self?.quickLook(at: idx) }
@@ -1863,18 +1992,81 @@ final class KitAttachmentsView: NSView {
       chip.widthAnchor.constraint(lessThanOrEqualTo: stack.widthAnchor).isActive = true
       chip.heightAnchor.constraint(equalToConstant: Self.chipHeight).isActive = true
     }
+    if let moment = activeUpsell {
+      let row = upsellRowView(moment)
+      stack.addArrangedSubview(row)
+      row.widthAnchor.constraint(lessThanOrEqualTo: stack.widthAnchor).isActive = true
+      row.heightAnchor.constraint(equalToConstant: Self.upsellHeight).isActive = true
+    }
+  }
+
+  private func upsellRowView(_ moment: RegistryPlanNote) -> NSView {
+    let row = NSStackView()
+    row.orientation = .horizontal
+    row.alignment = .centerY
+    row.spacing = 6
+    let showElsewhereTitle = explicitUpsell != nil || hasElsewhereItems
+    let label = NSTextField(labelWithString: showElsewhereTitle ? moment.title : moment.detail)
+    label.font = SeptaskKitTheme.meta
+    label.textColor = SeptaskKitTheme.inkSecondary
+    label.lineBreakMode = .byTruncatingTail
+    label.maximumNumberOfLines = 1
+    let button = NSButton(title: RegistryPlans.Paywall.seePlus, target: self, action: #selector(seePlus))
+    button.bezelStyle = .inline
+    button.font = SeptaskKitTheme.meta
+    button.refusesFirstResponder = true
+    button.setContentCompressionResistancePriority(.required, for: .horizontal)
+    row.addArrangedSubview(label)
+    row.addArrangedSubview(button)
+    return row
+  }
+
+  @objc private func seePlus() {
+    guard let presenter = window?.contentViewController else { return }
+    SeptaskPlusSheet.present(upsellID: activeUpsell?.id ?? "file_elsewhere", from: presenter)
   }
 
   private func quickLook(at index: Int) {
-    let urls = items.compactMap { entity -> URL? in
-      guard let url = TaskAttachmentFiles.url(for: entity),
-            FileManager.default.fileExists(atPath: url.path) else { return nil }
-      return url
+    guard items.indices.contains(index) else { return }
+    let target = items[index]
+    if let url = TaskAttachmentFiles.url(for: target), FileManager.default.fileExists(atPath: url.path) {
+      let urls = items.compactMap { entity -> URL? in
+        guard let u = TaskAttachmentFiles.url(for: entity),
+              FileManager.default.fileExists(atPath: u.path) else { return nil }
+        return u
+      }
+      let startIdx = urls.firstIndex(of: url) ?? 0
+      KitQuickLookCoordinator.shared.preview(urls: urls, startingAt: startIdx)
+      return
     }
-    guard !urls.isEmpty else { return }
-    let targetURL = items.indices.contains(index) ? TaskAttachmentFiles.url(for: items[index]) : nil
-    let startIdx = targetURL.flatMap { urls.firstIndex(of: $0) } ?? 0
-    KitQuickLookCoordinator.shared.preview(urls: urls, startingAt: startIdx)
+    Task { @MainActor [weak self] in
+      guard let self else { return }
+      do {
+        if let downloaded = try await self.store.localFile(for: target) {
+          self.reload()
+          KitQuickLookCoordinator.shared.preview(urls: [downloaded], startingAt: 0)
+        } else if TaskSyncEngine.shared.isAttachmentElsewhere(target),
+                  let moment = RegistryPlans.upsell("file_elsewhere") {
+          self.explicitUpsell = moment
+          self.rebuild()
+          self.onChanged?()
+        }
+      } catch TaskBackendError.limitReached(let limit) {
+        PlanStatus.shared.noteLimitReached(limit)
+        self.explicitUpsell = limit.upsellNote ?? RegistryPlans.upsell("file_elsewhere")
+        self.rebuild()
+        self.onChanged?()
+      } catch TaskBackendError.http(let status, _) where status == 404 {
+        if !PlanStatus.shared.attachmentsAllowed || TaskSyncEngine.shared.isAttachmentElsewhere(target),
+           let moment = RegistryPlans.upsell("file_elsewhere") {
+          self.explicitUpsell = moment
+          self.rebuild()
+          self.onChanged?()
+        }
+      } catch {
+        KitAttachmentPasteHelper.presentError(error, in: self.window)
+      }
+    }
   }
 
   private func reveal(_ entity: TaskAttachmentEntity) {

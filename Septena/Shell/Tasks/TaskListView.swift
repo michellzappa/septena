@@ -222,13 +222,8 @@ struct TaskListView: View {
   }
 
   private var awaitingFirstPull: Bool {
-    #if SEPTASK
     let sync = TaskSyncEngine.shared
     return sync.signedIn && sync.since == 0 && sync.lastPull == nil && sync.lastError == nil
-    #else
-    // Septena Life says "Getting your data" (`emptyStateRow`).
-    return false
-    #endif
   }
 
   /// The Inbox — the unratified layer rendered as a section above Today (only on
@@ -261,7 +256,6 @@ struct TaskListView: View {
   /// reload here and run it once the editor folds (`listInputActive` falling
   /// edge), the way Things/Reminders never reshuffle the list while you type.
   @State private var pendingReloadWhileEditing = false
-
 
   /// One-shot amber flash when a task is pinned to Today (row wash + checkbox pulse).
   @State private var promoteFlash = PromoteFlashStore()
@@ -499,6 +493,10 @@ struct TaskListView: View {
   @State private var selectedTagIDs: Set<String> = []
   @State private var tagsByID: [String: TaskTag] = [:]
   @State private var checklistCounts: [String: (done: Int, total: Int)] = [:]
+  @State private var fromRefKinds: [String: String] = [:]
+  @State private var issueRefs: [String: TaskRefRow] = [:]
+  /// The task whose Add Reference sheet is open (row menu).
+  @State private var referenceTargetId: String?
 
   /// Pending Things-style choice when a fixed-schedule repeating task is
   /// moved. The date picker dismisses before this appears, so the decision is
@@ -597,7 +595,6 @@ struct TaskListView: View {
     return TaskDragIDs(ids: [task.id])
   }
 
-
   // Local semantic sorter — populates a "→ Suggested" chip on Inbox rows.
   @State private var suggestionEngine = SuggestionEngine.shared
   /// Per-row top filing suggestion — the "→ Suggested" capsule. Rebuilt by
@@ -640,6 +637,7 @@ struct TaskListView: View {
         repeatTargetId: $repeatTargetId,
         reminderTargetId: $reminderTargetId,
         tagsTargetIds: $tagsTargetIds,
+        referenceTargetId: $referenceTargetId,
         areas: areas,
         projects: projects,
         currentTask: currentTask,
@@ -669,14 +667,12 @@ struct TaskListView: View {
           }
         }
       }
-      #if SEPTASK
       .sheet(isPresented: Binding(
         get: { plusSheetUpsell != nil },
         set: { if !$0 { plusSheetUpsell = nil } }
       )) {
         SeptaskPlusSheet(upsellID: plusSheetUpsell)
       }
-      #endif
       .confirmationDialog(
         RegistryPrompts.prompt("rescheduleFixedRepeat").title,
         isPresented: Binding(
@@ -789,7 +785,7 @@ struct TaskListView: View {
   #endif
 
   private var showsEmbeddedNewTaskToolbar: Bool {
-    #if os(iOS) && SEPTASK
+    #if os(iOS)
     // Compact iPhone Septena uses the canonical bottom-right Magic Plus orb
     // for creation; top-right stays Search (and Project's overflow menu).
     // Split layouts (iPad / unfolded Duo) have no Magic Plus orb, so embedded
@@ -1199,7 +1195,6 @@ struct TaskListView: View {
     }
     scrollToTargetID = Self.quickAddScrollID
     scrollToTargetTick += 1
-    AddInfoSection.tasks.notifyTilesChanged()
   }
 
   /// ⌘N / + / sidebar "New Task" — open the list's contextual "New task"
@@ -1270,6 +1265,13 @@ struct TaskListView: View {
     guard LaunchPhase.shared.firstFrameDrawn, tagsByID.isEmpty, checklistCounts.isEmpty else { return }
     tagsByID = LocalCache.tagsByID(in: modelContext)
     checklistCounts = LocalCache.checklistSummaryByTask(in: modelContext)
+    refreshReferenceDecorations()
+  }
+
+  /// The `from` reference icon and the Review rows' issue: one read each.
+  private func refreshReferenceDecorations() {
+    fromRefKinds = LocalCache.fromRefKinds(in: modelContext)
+    issueRefs = filter == .review ? LocalCache.newestIssueRefs(in: modelContext) : [:]
   }
 
   private func refreshTodayNotices() {
@@ -1510,11 +1512,7 @@ struct TaskListView: View {
   /// (Mac), and the capture slot mounts only while an inline draft is open.
   /// The AppKit list makes the same choice (no "New task" line on Today).
   private var usesMagicPlusInsteadOfInboxTrigger: Bool {
-    #if SEPTASK
     true
-    #else
-    false
-    #endif
   }
 
   /// Inbox foot quick-add: in Septena it mounts only while an Inbox inline
@@ -2114,7 +2112,7 @@ struct TaskListView: View {
   /// embedded area / project pages all publish it into the nav bar. macOS has
   /// no slot there, so the SwiftUI Mac shell keeps the chip.
   private var starFilterInToolbar: Bool {
-    #if os(iOS) && SEPTASK
+    #if os(iOS)
     return true
     #else
     return false
@@ -2285,18 +2283,25 @@ struct TaskListView: View {
   @ViewBuilder
   private var titleRow: some View {
     if !embedded {
-      // The title IS the navigation dropdown (Things-style): tapping it opens
-      // the full destination menu so you can jump anywhere without the sidebar.
-      // The menu trigger is intrinsic-width; the Spacer fills the row so the
-      // title stays left-aligned without widening the dropdown to full width.
-      HStack(spacing: 0) {
-        TaskNavMenu {
-          ScreenTitleMenuLabel(icon: titleIcon, iconTint: titleTint, title: filter.title)
+      // The title is a navigation dropdown (Things-style) only when no sidebar
+      // is visible (compact stack or collapsed split sidebar). When the sidebar
+      // is already on screen, render the plain static `ScreenTitle`.
+      if nav.showsTitleNavMenu(usesPushNavigation: usesPushNavigation) {
+        // The menu trigger is intrinsic-width; the Spacer fills the row so the
+        // title stays left-aligned without widening the dropdown to full width.
+        HStack(spacing: 0) {
+          TaskNavMenu {
+            ScreenTitleMenuLabel(icon: titleIcon, iconTint: titleTint, title: filter.title)
+          }
+          Spacer(minLength: 0)
         }
-        Spacer(minLength: 0)
+        .plainListChrome()
+        .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
+      } else {
+        ScreenTitle(icon: titleIcon, iconTint: titleTint, title: filter.title)
+          .plainListChrome()
+          .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
       }
-      .plainListChrome()
-      .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
     } else {
       embeddedHeader()
         .plainListChrome()
@@ -2411,12 +2416,8 @@ struct TaskListView: View {
   /// first-class free mode (docs/SYNC_SUBSCRIPTION_SPEC.md §3, §7) and never
   /// shows a sign-in banner on Today.
   private var requiresSignIn: Bool {
-    #if SEPTASK
     let sync = TaskSyncEngine.shared
     return !sync.signedIn && sync.hadAccount
-    #else
-    false
-    #endif
   }
 
   @ViewBuilder
@@ -2429,7 +2430,6 @@ struct TaskListView: View {
       .buttonStyle(.bordered)
       .controlSize(.small)
     }
-    #if SEPTASK
     if notice.id == .signIn { SeptaskSignInButton(compact: true) }
     if let upsell = notice.upsellID {
       Button(notice.primaryTitle ?? RegistryPlans.Paywall.seePlus) {
@@ -2440,7 +2440,6 @@ struct TaskListView: View {
       .buttonStyle(.bordered)
       .controlSize(.small)
     }
-    #endif
   }
 
   /// Ticks or unticks a Get started step by hand, like a task's checkbox.
@@ -2457,13 +2456,11 @@ struct TaskListView: View {
     case .addTask:
       startCreate()
     case .connectAI, .importTasks:
-      #if SEPTASK
       let pageID = id == .connectAI
         ? RegistrySettings.PageID.claudePairing
         : RegistrySettings.PageID.importExport
       SeptaskSettingsLink.request(pageID)
       nav.showSettings = true
-      #endif
     }
   }
 
@@ -2488,39 +2485,7 @@ struct TaskListView: View {
 
   @ViewBuilder
   private var emptyStateRow: some View {
-    #if SEPTASK
     settledEmptyStateRow
-    #else
-    // A first sync on a new device pulls the whole account down. Until it
-    // lands the list is empty for a reason that has nothing to do with the
-    // user, so say that instead of "Nothing here yet" — and say it even where
-    // there IS an inline capture affordance, since the emptiness is what
-    // misleads, not the missing button.
-    if showsEmptyTaskList && iCloudSignedOut {
-      // No iCloud account: the first sync can never start, so "Getting your
-      // data" would spin forever. Say what is actually missing.
-      ContentUnavailableView {
-        Label("Sign in to iCloud", systemImage: "icloud.slash")
-      } description: {
-        Text("Your tasks sync through iCloud. Sign in from the Settings app to see them here.")
-      }
-      .frame(maxWidth: .infinity)
-      .padding(.top, 40)
-      .plainListChrome()
-    } else if showsEmptyTaskList && ckEngine.isBootstrapping {
-      ContentUnavailableView {
-        Label("Getting your data", systemImage: "icloud.and.arrow.down")
-      } description: {
-        Text(ckEngine.bootstrapStatusText)
-          .monospacedDigit()
-      }
-      .frame(maxWidth: .infinity)
-      .padding(.top, 40)
-      .plainListChrome()
-    } else {
-      settledEmptyStateRow
-    }
-    #endif
   }
 
   /// No usable iCloud account on this device (signed out, or blocked by a
@@ -2574,6 +2539,7 @@ struct TaskListView: View {
       let position = TaskCardPosition(index: idx, count: rows.count)
       ReviewTaskRow(
         task: task,
+        issue: issueRefs[task.id],
         isSelected: selection.contains(task.id),
         listLabel: reviewListLabel(task),
         onOpen: { openPage(task) },
@@ -2733,7 +2699,6 @@ struct TaskListView: View {
     model.noteCreated(draft.id)
     draftEditIds.insert(draft.id)
     Haptics.press()
-    AddInfoSection.tasks.notifyTilesChanged()
     Task {
       await load()
       if let loaded = items.first(where: { $0.id == draft.id }) {
@@ -2819,7 +2784,7 @@ struct TaskListView: View {
       let members = visibleItems.filter { $0.heading == heading.id }
       cardedRows(members, reorderable: true, grouped: true, magicContext: heading.title)
     }
-    #if !(os(iOS) && SEPTASK)
+    #if !os(iOS)
     // Septask iOS makes sections from the "+" (Magic Plus menu on iPhone, the
     // toolbar "+" menu on iPad), so the foot line would be a second entry.
     addSectionButton
@@ -3930,9 +3895,19 @@ struct TaskListView: View {
       Button {
         applySuggestion(task: task, suggestion: suggestion)
       } label: {
-        HStack(spacing: 3) {
-          Image(systemName: suggestion.kind == .project ? "number" : "folder")
-            .scaledFont(size: 10, weight: .semibold)
+        HStack(spacing: 4) {
+          switch suggestion.kind {
+          case .project:
+            ProjectProgressIcon(
+              progress: model.progressByProject[suggestion.id] ?? 0,
+              tint: Theme.inkSecondary,
+              diameter: 10,
+              lineWidth: 1.8
+            )
+          case .area:
+            let emoji = areas.first(where: { $0.id == suggestion.id })?.emoji
+            AreaIcon(tint: Theme.inkSecondary, diameter: 13, emoji: emoji)
+          }
           Text(suggestion.title)
             .scaledFont(size: 12, weight: .medium)
             .lineLimit(1)
@@ -4029,6 +4004,7 @@ struct TaskListView: View {
       checkboxDimmed: touchSelectionActive,
       accessory: accessory,
       checklistSummary: checklistCounts[task.id],
+      fromKind: fromRefKinds[task.id].map(RegistryTaskReferences.kind),
       tagChips: LocalCache.resolvedTags(for: task, tagsByID: tagsByID),
       titleMatchID: "edit-title-\(task.id)",
       checkboxMatchID: "edit-checkbox-\(task.id)",
@@ -4238,6 +4214,7 @@ struct TaskListView: View {
         onOpenTags: { target in
           tagsTargetIds = target.ids
         },
+        onAddReference: TaskRefActions.canAdd ? { task in referenceTargetId = task.id } : nil,
         onClearSchedule: { ids in clearSchedule(ids) },
         onOpenMove: { target in
           moveTargetIds = target.ids
@@ -4665,7 +4642,12 @@ struct TaskListView: View {
                           onDropIDs: (([String]) -> Bool)? = nil,
                           magicContext: String? = nil) -> some View {
     let rows = excludingQuickAddCapture(tasks)
-    let cardCount = rows.count + (appendQuickAdd ? 1 : 0)
+    let isEditingQuickAdd = appendQuickAdd
+      && quickAddShowsEditor
+      && quickAddCaptureTask.map { expandedEditId == $0.id } == true
+    let rendersQuickAdd = appendQuickAdd
+      && (!usesMagicPlusInsteadOfInboxTrigger || isEditingQuickAdd)
+    let cardCount = rows.count + (rendersQuickAdd ? 1 : 0)
     // Today rows reorder in Today's own order (#66). The row's reorder drop
     // also files a row dragged in from another group, so the row-level
     // group drop steps aside (the group headers keep theirs).
@@ -4684,9 +4666,10 @@ struct TaskListView: View {
       AnyView(taskRow(task, quickMenu: quickMenu?(task) ?? false)
         .taskCardChrome(position,
                         // An open inline editor keeps the clean card surface
-                        // instead of painting the whole editor in selection blue;
-                        // on iOS it lifts as a rounded focus card while siblings
-                        // fade back. Closed selected rows keep the selection fill.
+                        // and its grouped card corners instead of painting the
+                        // whole editor in selection blue; on iOS siblings fade
+                        // back while the editor stays crisp. Closed selected
+                        // rows keep the selection fill.
                         isSelected: isExpanded ? false : selection.contains(task.id),
                         isEditing: isExpanded)
         // After the chrome, so the iOS lift preview includes the card
@@ -4719,9 +4702,7 @@ struct TaskListView: View {
         .zIndex(isExpanded ? 1 : 0)
         .inlineEditDimmed(isInlineEditing && !isExpanded, onDismiss: collapseEdit))
     }
-    if appendQuickAdd {
-      let isEditingQuickAdd = quickAddShowsEditor
-        && quickAddCaptureTask.map { expandedEditId == $0.id } == true
+    if rendersQuickAdd {
       AnyView(quickAddLine(showsEditor: quickAddShowsEditor)
         .asListRow()
         // The quick-add trigger is a selectable row (it carries the sentinel id
@@ -5345,6 +5326,7 @@ struct TaskListView: View {
     if items.isEmpty { isLoading = true }
     checklistCounts = LocalCache.checklistSummaryByTask(in: modelContext)
     tagsByID = LocalCache.tagsByID(in: modelContext)
+    refreshReferenceDecorations()
     // Prune any selected tag filter whose tag was deleted or left this list.
     if !selectedTagIDs.isEmpty {
       let valid = Set(availableTagsInList.map(\.id))
@@ -5451,15 +5433,18 @@ struct TaskListView: View {
   private func consumePendingTaskReveal() {
     // On-screen only: Septask's iPhone tabs keep a second list for the same
     // route mounted (a hidden copy must leave the reveal to the visible one).
-    guard isOnScreen,
-          let reveal = nav.pendingTaskReveal,
+    // A list whose own task page covers it is off screen but still active: a
+    // reference on that page can point at another of its tasks.
+    guard let reveal = nav.pendingTaskReveal,
+          isOnScreen || (reveal.opensPage && pageTaskId != nil),
           reveal.routeID == navigationRouteID else { return }
 
-    if currentTask(id: reveal.taskID) != nil {
+    if let task = currentTask(id: reveal.taskID) {
       selection = [reveal.taskID]
       scrollToTargetID = reveal.taskID
       scrollToTargetTick += 1
       nav.pendingTaskReveal = nil
+      if reveal.opensPage { openPage(task) }
       return
     }
 

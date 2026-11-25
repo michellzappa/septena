@@ -1,20 +1,21 @@
 {
-  "1, backed up": {
-    "text": "1, backed up",
+  "1": {
+    "text": "1",
     "paths": [
-      "plans.outcomes.everywhere.rows.devices.cells.account"
+      "plans.outcomes.everywhere.rows.devices.cells.free",
+      "plans.outcomes.agents.rows.connected.cells.free"
     ]
   },
-  "1, not synced": {
-    "text": "1, not synced",
+  "3": {
+    "text": "3",
     "paths": [
-      "plans.outcomes.everywhere.rows.devices.cells.device"
+      "plans.outcomes.agents.rows.connected.cells.plus"
     ]
   },
-  "10 a month": {
-    "text": "10 a month",
+  "10 GB synced": {
+    "text": "10 GB synced",
     "paths": [
-      "plans.outcomes.agents.rows.runs.cells.account"
+      "plans.outcomes.nothing_lost.rows.files.cells.plus"
     ]
   },
   "1st": {
@@ -32,9 +33,9 @@
   "30 days": {
     "text": "30 days",
     "paths": [
-      "plans.outcomes.nothing_lost.rows.history.cells.account",
-      "plans.outcomes.nothing_lost.rows.deleted.cells.device",
-      "plans.outcomes.nothing_lost.rows.deleted.cells.account"
+      "plans.outcomes.nothing_lost.rows.history.cells.free",
+      "plans.outcomes.nothing_lost.rows.deleted.cells.free",
+      "plans.outcomes.nothing_lost.rows.deleted.cells.plus"
     ]
   },
   "365 days": {
@@ -55,14 +56,8 @@
       "surfaces.taskDetail.ordinals.3.title"
     ]
   },
-  "90 days": {
-    "text": "90 days",
-    "paths": [
-      "plans.outcomes.nothing_lost.rows.deleted.cells.plus"
-    ]
-  },
-  "A free account allows 25 agent changes a day. Plus has no daily cap.": {
-    "text": "A free account allows 25 agent changes a day. Plus has no daily cap.",
+  "A free account allows 500 agent changes a day. Your agent can make changes again tomorrow. Plus has no daily limit.": {
+    "text": "A free account allows 500 agent changes a day. Your agent can make changes again tomorrow. Plus has no daily limit.",
     "paths": [
       "plans.upsells.connector_cap.detail"
     ]
@@ -77,12 +72,6 @@
     "text": "A free account syncs one device. Plus syncs all of them. You can also move your free account to this device.",
     "paths": [
       "plans.upsells.second_device.detail"
-    ]
-  },
-  "A year of change history, and 90 days to restore deleted tasks": {
-    "text": "A year of change history, and 90 days to restore deleted tasks",
-    "paths": [
-      "plans.cards.plus.points.1"
     ]
   },
   "ABCD-EFGH": {
@@ -192,13 +181,26 @@
     "paths": [
       "actions.actions.app.quickAdd.addTitle",
       "actions.actions.app.shareCapture.add.title",
-      "surfaces.prompts.text.newSection.confirmTitle"
+      "surfaces.prompts.text.newSection.confirmTitle",
+      "surfaces.taskReferences.add.confirmTitle"
     ]
   },
   "Add Checklist Item": {
     "text": "Add Checklist Item",
     "paths": [
       "actions.actions.task.addChecklistItem.title"
+    ]
+  },
+  "Add Reference": {
+    "text": "Add Reference",
+    "paths": [
+      "actions.actions.task.addReference.shortTitle"
+    ]
+  },
+  "Add Reference…": {
+    "text": "Add Reference…",
+    "paths": [
+      "actions.actions.task.addReference.title"
     ]
   },
   "Add Reminder…": {
@@ -251,18 +253,6 @@
       "surfaces.prompts.text.nameAgent.placeholder"
     ]
   },
-  "Agent runs": {
-    "text": "Agent runs",
-    "paths": [
-      "plans.outcomes.agents.rows.runs.label"
-    ]
-  },
-  "Agent runs resume on the 1st": {
-    "text": "Agent runs resume on the 1st",
-    "paths": [
-      "plans.upsells.agent_runs.title"
-    ]
-  },
   "Agent tools": {
     "text": "Agent tools",
     "paths": [
@@ -273,14 +263,8 @@
     "text": "Agents",
     "paths": [
       "settings.rootGroups.ai_agents_root.items.1.label",
-      "settings.pages.agents.title"
-    ]
-  },
-  "All": {
-    "text": "All",
-    "paths": [
-      "plans.outcomes.nothing_lost.rows.logbook.cells.device",
-      "plans.outcomes.nothing_lost.rows.logbook.cells.plus"
+      "settings.pages.agents.title",
+      "plans.outcomes.agents.rows.connected.label"
     ]
   },
   "All dated tasks": {
@@ -363,12 +347,6 @@
       "settings.copy.access_devices.deviceWatch.label"
     ]
   },
-  "Apple Watch through the server": {
-    "text": "Apple Watch through the server",
-    "paths": [
-      "plans.outcomes.everywhere.rows.watch.label"
-    ]
-  },
   "Approve": {
     "text": "Approve",
     "paths": [
@@ -415,7 +393,7 @@
   "Areas, projects, sections, notes and attachments": {
     "text": "Areas, projects, sections, notes and attachments",
     "paths": [
-      "plans.cards.free.points.1"
+      "plans.fullApp.points.1"
     ]
   },
   "Attachments": {
@@ -434,6 +412,12 @@
     "text": "Açaí",
     "paths": [
       "tokens.fruitAccents.acai.name"
+    ]
+  },
+  "Backup on our server": {
+    "text": "Backup on our server",
+    "paths": [
+      "plans.outcomes.everywhere.rows.backup.label"
     ]
   },
   "Balanced": {
@@ -463,6 +447,12 @@
       "settings.copy.ai_explainer.localBody.label"
     ]
   },
+  "Blocked by": {
+    "text": "Blocked by",
+    "paths": [
+      "surfaces.taskReferences.roles.blocked_by.label"
+    ]
+  },
   "Bring in your tasks": {
     "text": "Bring in your tasks",
     "paths": [
@@ -486,6 +476,12 @@
     "text": "Calendar Feed (iCal)",
     "paths": [
       "settings.copy.calendar_detail.feedHeader.label"
+    ]
+  },
+  "Calendar event": {
+    "text": "Calendar event",
+    "paths": [
+      "surfaces.taskReferences.kinds.event.label"
     ]
   },
   "Cancel": {
@@ -576,12 +572,6 @@
     "text": "Classic Window",
     "paths": [
       "actions.actions.app.classicWindow.title"
-    ]
-  },
-  "Claude connector": {
-    "text": "Claude connector",
-    "paths": [
-      "plans.outcomes.agents.rows.connector.label"
     ]
   },
   "Claude is connected. Go back to your browser to finish.": {
@@ -769,6 +759,12 @@
       "actions.actions.task.copy.title"
     ]
   },
+  "Copy Link": {
+    "text": "Copy Link",
+    "paths": [
+      "actions.actions.task.reference.copyLink.title"
+    ]
+  },
   "Copy Skill": {
     "text": "Copy Skill",
     "paths": [
@@ -805,6 +801,12 @@
       "surfaces.deviceSignIn.copy.unreachable.label"
     ]
   },
+  "Couldn’t add the reference.": {
+    "text": "Couldn’t add the reference.",
+    "paths": [
+      "surfaces.taskReferences.add.failed.message"
+    ]
+  },
   "Couldn’t delete your account. Nothing was deleted.": {
     "text": "Couldn’t delete your account. Nothing was deleted.",
     "paths": [
@@ -828,6 +830,15 @@
     "text": "Create and invite",
     "paths": [
       "plans.outcomes.agents.rows.share.cells.plus"
+    ]
+  },
+  "Created from {name}": {
+    "text": "Created from {name}",
+    "placeholders": [
+      "name"
+    ],
+    "paths": [
+      "surfaces.taskReferences.createdFrom.format"
     ]
   },
   "Current device": {
@@ -1117,7 +1128,7 @@
   "Early builds on TestFlight": {
     "text": "Early builds on TestFlight",
     "paths": [
-      "plans.cards.plus.points.4"
+      "plans.outcomes.everywhere.rows.beta.label"
     ]
   },
   "Edit Details…": {
@@ -1132,6 +1143,18 @@
       "tokens.textures.ridges.tag"
     ]
   },
+  "Email": {
+    "text": "Email",
+    "paths": [
+      "surfaces.taskReferences.kinds.email.label"
+    ]
+  },
+  "Email thread": {
+    "text": "Email thread",
+    "paths": [
+      "surfaces.taskReferences.kinds.thread.label"
+    ]
+  },
   "Enter the code from the other device. If you're connecting Claude, the code is in your browser.": {
     "text": "Enter the code from the other device. If you're connecting Claude, the code is in your browser.",
     "paths": [
@@ -1144,20 +1167,20 @@
       "surfaces.prompts.error.title"
     ]
   },
-  "Every few minutes": {
-    "text": "Every few minutes",
-    "paths": [
-      "plans.outcomes.everywhere.rows.live.cells.account"
-    ]
-  },
   "Every new account starts with 14 days of Plus": {
     "text": "Every new account starts with 14 days of Plus",
     "paths": [
       "plans.trial.title"
     ]
   },
-  "Every task feature is free on the device you use. Plus syncs your list to all your devices and keeps its full history and files. It also lets your agents work without a daily cap.": {
-    "text": "Every task feature is free on the device you use. Plus syncs your list to all your devices and keeps its full history and files. It also lets your agents work without a daily cap.",
+  "Every plan has the full task app": {
+    "text": "Every plan has the full task app",
+    "paths": [
+      "plans.fullApp.title"
+    ]
+  },
+  "Every task feature is free on the device you use. A free account adds a backup and lets you connect one agent. Plus covers all your devices, three agents, synced files and a longer history.": {
+    "text": "Every task feature is free on the device you use. A free account adds a backup and lets you connect one agent. Plus covers all your devices, three agents, synced files and a longer history.",
     "paths": [
       "plans.subhead"
     ]
@@ -1168,10 +1191,10 @@
       "plans.cards.plus.footnote"
     ]
   },
-  "Export and import": {
-    "text": "Export and import",
+  "Everything in Plus is included.": {
+    "text": "Everything in Plus is included.",
     "paths": [
-      "plans.outcomes.everywhere.rows.new_device.cells.device"
+      "plans.cards.pro.footnote"
     ]
   },
   "Export as JSON": {
@@ -1183,7 +1206,7 @@
   "Export everything as plain JSON": {
     "text": "Export everything as plain JSON",
     "paths": [
-      "plans.cards.free.points.5"
+      "plans.fullApp.points.5"
     ]
   },
   "Export works on every plan. A limit hides older items. It never deletes them, and Plus shows them again.": {
@@ -1232,19 +1255,14 @@
   "File": {
     "text": "File",
     "paths": [
-      "actions.menuBar.file.title"
+      "actions.menuBar.file.title",
+      "surfaces.taskReferences.kinds.file.label"
     ]
   },
-  "Files and images": {
-    "text": "Files and images",
+  "Files": {
+    "text": "Files",
     "paths": [
       "plans.outcomes.nothing_lost.rows.files.label"
-    ]
-  },
-  "Files and images synced, up to 10 GB": {
-    "text": "Files and images synced, up to 10 GB",
-    "paths": [
-      "plans.cards.plus.points.2"
     ]
   },
   "Find any task, project, or area.": {
@@ -1259,16 +1277,28 @@
       "settings.copy.claude_connector.firstPrompt.label"
     ]
   },
+  "Follow-up to": {
+    "text": "Follow-up to",
+    "paths": [
+      "surfaces.taskReferences.roles.follow_up.label"
+    ]
+  },
+  "For people who run many agents on one list.": {
+    "text": "For people who run many agents on one list.",
+    "paths": [
+      "plans.cards.pro.detail"
+    ]
+  },
   "Free": {
     "text": "Free",
     "paths": [
+      "plans.levels.free.title",
       "plans.cards.free.title"
     ]
   },
   "Free account": {
     "text": "Free account",
     "paths": [
-      "plans.levels.account.title",
       "plans.status.free"
     ]
   },
@@ -1309,6 +1339,12 @@
     "text": "Get started with Septena",
     "paths": [
       "surfaces.notices.items.getStarted.title"
+    ]
+  },
+  "GitHub issue": {
+    "text": "GitHub issue",
+    "paths": [
+      "surfaces.taskReferences.kinds.issue.label"
     ]
   },
   "Give any task a Repeat rule and it will show up here.": {
@@ -1447,7 +1483,7 @@
   "Import from Things and Apple Reminders": {
     "text": "Import from Things and Apple Reminders",
     "paths": [
-      "plans.cards.free.points.4"
+      "plans.fullApp.points.4"
     ]
   },
   "Import from another app": {
@@ -1525,7 +1561,7 @@
   "Join": {
     "text": "Join",
     "paths": [
-      "plans.outcomes.agents.rows.share.cells.account"
+      "plans.outcomes.agents.rows.share.cells.free"
     ]
   },
   "Jot down the task. A few words are enough.": {
@@ -1562,12 +1598,6 @@
     "text": "Last",
     "paths": [
       "surfaces.taskDetail.ordinals.4.title"
-    ]
-  },
-  "Last 90 days": {
-    "text": "Last 90 days",
-    "paths": [
-      "plans.outcomes.nothing_lost.rows.logbook.cells.account"
     ]
   },
   "Last used {time}": {
@@ -1610,6 +1640,12 @@
       "settings.keys.pccReasoning.options.0.title"
     ]
   },
+  "Links in this task": {
+    "text": "Links in this task",
+    "paths": [
+      "surfaces.taskReferences.add.offers.title"
+    ]
+  },
   "List": {
     "text": "List",
     "paths": [
@@ -1622,23 +1658,10 @@
       "settings.rootGroups.lists_root.header"
     ]
   },
-  "Live": {
-    "text": "Live",
-    "paths": [
-      "plans.outcomes.everywhere.rows.live.cells.plus"
-    ]
-  },
-  "Live sync on every iPhone, iPad and Mac": {
-    "text": "Live sync on every iPhone, iPad and Mac",
-    "paths": [
-      "plans.cards.plus.points.0"
-    ]
-  },
   "Logbook": {
     "text": "Logbook",
     "paths": [
-      "destinations.destinations.logbook.title",
-      "plans.outcomes.nothing_lost.rows.logbook.label"
+      "destinations.destinations.logbook.title"
     ]
   },
   "Logbook is empty": {
@@ -1913,22 +1936,10 @@
       "destinations.destinations.starred.emptyState.title"
     ]
   },
-  "No account": {
-    "text": "No account",
-    "paths": [
-      "plans.levels.device.detail"
-    ]
-  },
   "No agent work": {
     "text": "No agent work",
     "paths": [
       "destinations.destinations.agent.emptyState.title"
-    ]
-  },
-  "No daily cap": {
-    "text": "No daily cap",
-    "paths": [
-      "plans.outcomes.agents.rows.connector.cells.plus"
     ]
   },
   "No matches": {
@@ -2111,17 +2122,9 @@
       "surfaces.firstRun.steps.welcome.points.0.title"
     ]
   },
-  "On the device that added them": {
-    "text": "On the device that added them",
-    "paths": [
-      "plans.outcomes.nothing_lost.rows.files.cells.account"
-    ]
-  },
   "On this device": {
     "text": "On this device",
     "paths": [
-      "plans.outcomes.nothing_lost.rows.history.cells.device",
-      "plans.outcomes.nothing_lost.rows.files.cells.device",
       "plans.status.device"
     ]
   },
@@ -2129,6 +2132,12 @@
     "text": "On this device · Sign in to sync",
     "paths": [
       "settings.copy.account_profile_card.signInToSync.label"
+    ]
+  },
+  "On your device": {
+    "text": "On your device",
+    "paths": [
+      "plans.outcomes.nothing_lost.rows.files.cells.free"
     ]
   },
   "On your iPhone, iPad or Mac, open Septena and go to Settings ▸ Account ▸ Approve a sign-in. Tap Scan Code and point the camera at this screen, or enter this code:": {
@@ -2177,13 +2186,8 @@
     "text": "Open",
     "paths": [
       "actions.actions.task.open.title",
+      "actions.actions.task.reference.open.title",
       "actions.actions.notice.openStep.title"
-    ]
-  },
-  "Open Septena Life": {
-    "text": "Open Septena Life",
-    "paths": [
-      "settings.pages.about.sections.companion.items.0.label"
     ]
   },
   "Open Today": {
@@ -2208,6 +2212,15 @@
     "text": "Open tasks without a date live here.",
     "paths": [
       "destinations.destinations.anytime.emptyState.detail"
+    ]
+  },
+  "Open {name}": {
+    "text": "Open {name}",
+    "placeholders": [
+      "name"
+    ],
+    "paths": [
+      "surfaces.taskReferences.open.format"
     ]
   },
   "Or press ⌃⌥Space anywhere on your Mac": {
@@ -2239,6 +2252,12 @@
     "text": "Paste",
     "paths": [
       "surfaces.taskAttributes.paste.label"
+    ]
+  },
+  "Paste a link": {
+    "text": "Paste a link",
+    "paths": [
+      "surfaces.taskReferences.add.placeholder"
     ]
   },
   "Paste into a model's context to teach it the task tools without connecting MCP.": {
@@ -2305,6 +2324,12 @@
       "plans.labels.planned"
     ]
   },
+  "Planned: €120 a year or €14 a month": {
+    "text": "Planned: €120 a year or €14 a month",
+    "paths": [
+      "plans.levels.pro.detail"
+    ]
+  },
   "Plus": {
     "text": "Plus",
     "paths": [
@@ -2332,12 +2357,6 @@
     "text": "Plus is on. Your other devices start syncing.",
     "paths": [
       "plans.paywall.success"
-    ]
-  },
-  "Plus is the same app on every device, and nothing in it is capped.": {
-    "text": "Plus is the same app on every device, and nothing in it is capped.",
-    "paths": [
-      "plans.cards.plus.detail"
     ]
   },
   "Plus syncs files and images to all your devices.": {
@@ -2411,6 +2430,12 @@
       "settings.copy.calendar_detail.feedToggle.label"
     ]
   },
+  "Pro": {
+    "text": "Pro",
+    "paths": [
+      "plans.levels.pro.title"
+    ]
+  },
   "Project": {
     "text": "Project",
     "paths": [
@@ -2478,12 +2503,6 @@
       "settings.copy.calendar_detail.feedFooter.label"
     ]
   },
-  "Reads, and 25 changes a day": {
-    "text": "Reads, and 25 changes a day",
-    "paths": [
-      "plans.outcomes.agents.rows.connector.cells.account"
-    ]
-  },
   "Ready for review": {
     "text": "Ready for review",
     "paths": [
@@ -2494,6 +2513,18 @@
     "text": "Recently Deleted",
     "paths": [
       "plans.outcomes.nothing_lost.rows.deleted.label"
+    ]
+  },
+  "Reference": {
+    "text": "Reference",
+    "paths": [
+      "surfaces.taskReferences.otherKind.label"
+    ]
+  },
+  "References": {
+    "text": "References",
+    "paths": [
+      "surfaces.taskPage.blocks.taskPage.references.label"
     ]
   },
   "Refreshes daily · pauses under Reduce Motion and Low Power.": {
@@ -2525,6 +2556,12 @@
     "text": "Reminder…",
     "paths": [
       "actions.actions.task.reminder.title"
+    ]
+  },
+  "Remove": {
+    "text": "Remove",
+    "paths": [
+      "actions.actions.task.reference.remove.title"
     ]
   },
   "Remove from Today": {
@@ -2839,18 +2876,6 @@
       "actions.menuBar.app.title"
     ]
   },
-  "Septena Life": {
-    "text": "Septena Life",
-    "paths": [
-      "settings.pages.about.sections.companion.header"
-    ]
-  },
-  "Septena Life is the companion app for habits, training, food, sleep, mood, and health.": {
-    "text": "Septena Life is the companion app for habits, training, food, sleep, mood, and health.",
-    "paths": [
-      "settings.pages.about.sections.companion.items.0.detail"
-    ]
-  },
   "Septena Plus": {
     "text": "Septena Plus",
     "paths": [
@@ -2860,10 +2885,22 @@
       "plans.cards.plus.title"
     ]
   },
+  "Septena Pro": {
+    "text": "Septena Pro",
+    "paths": [
+      "plans.cards.pro.title"
+    ]
+  },
   "Septena Window": {
     "text": "Septena Window",
     "paths": [
       "actions.actions.app.septenaWindow.title"
+    ]
+  },
+  "Septena can’t add this. Paste a web link or a mail link.": {
+    "text": "Septena can’t add this. Paste a web link or a mail link.",
+    "paths": [
+      "surfaces.taskReferences.add.invalid.message"
     ]
   },
   "Septena can’t use the camera": {
@@ -3016,12 +3053,6 @@
       "settings.copy.syncStatus.needsSignIn.label"
     ]
   },
-  "Sign in for a free account. The server then keeps a backup of that device, and you can try agents on real tasks.": {
-    "text": "Sign in for a free account. The server then keeps a backup of that device, and you can try agents on real tasks.",
-    "paths": [
-      "plans.cards.free.footnote"
-    ]
-  },
   "Sign in on {client}?": {
     "text": "Sign in on {client}?",
     "placeholders": [
@@ -3065,8 +3096,7 @@
   "Sign in with Apple": {
     "text": "Sign in with Apple",
     "paths": [
-      "surfaces.firstRun.steps.account.primary.title",
-      "plans.levels.account.detail"
+      "surfaces.firstRun.steps.account.primary.title"
     ]
   },
   "Sign in with Apple to keep your tasks on all your devices and to let Claude connect. Septena never sees your Apple password.": {
@@ -3131,6 +3161,12 @@
     "text": "Some tasks need thinking before you can act. Tap Discuss and talk them through, right on the task.",
     "paths": [
       "settings.copy.ai_explainer.intro.label"
+    ]
+  },
+  "Starlings record": {
+    "text": "Starlings record",
+    "paths": [
+      "surfaces.taskReferences.kinds.door.label"
     ]
   },
   "Still want any of them?": {
@@ -3200,22 +3236,10 @@
       "settings.copy.sync_diagnostics.issues.label"
     ]
   },
-  "Sync speed": {
-    "text": "Sync speed",
-    "paths": [
-      "plans.outcomes.everywhere.rows.live.label"
-    ]
-  },
   "Synced": {
     "text": "Synced",
     "paths": [
       "settings.copy.syncStatus.synced.label"
-    ]
-  },
-  "Synced, up to 10 GB": {
-    "text": "Synced, up to 10 GB",
-    "paths": [
-      "plans.outcomes.nothing_lost.rows.files.cells.plus"
     ]
   },
   "Syncing": {
@@ -3269,7 +3293,8 @@
   "Task": {
     "text": "Task",
     "paths": [
-      "actions.menuBar.task.title"
+      "actions.menuBar.task.title",
+      "surfaces.taskReferences.kinds.task.label"
     ]
   },
   "Task Details": {
@@ -3281,7 +3306,7 @@
   "Task conversations with the on-device model": {
     "text": "Task conversations with the on-device model",
     "paths": [
-      "plans.cards.free.points.3"
+      "plans.fullApp.points.3"
     ]
   },
   "Task deleted": {
@@ -3467,12 +3492,6 @@
       "settings.copy.delete_account.intro.label"
     ]
   },
-  "This device": {
-    "text": "This device",
-    "paths": [
-      "plans.levels.device.title"
-    ]
-  },
   "This device is not syncing": {
     "text": "This device is not syncing",
     "paths": [
@@ -3483,6 +3502,15 @@
     "text": "This file is on another device",
     "paths": [
       "plans.upsells.file_elsewhere.title"
+    ]
+  },
+  "This task already has {count} references.": {
+    "text": "This task already has {count} references.",
+    "placeholders": [
+      "count"
+    ],
+    "paths": [
+      "surfaces.taskReferences.add.limitReached.format"
     ]
   },
   "Thorough": {
@@ -3544,7 +3572,7 @@
   "Today with its Inbox, Upcoming, Anytime, Faded and Logbook": {
     "text": "Today with its Inbox, Upcoming, Anytime, Faded and Logbook",
     "paths": [
-      "plans.cards.free.points.0"
+      "plans.fullApp.points.0"
     ]
   },
   "Toggle Checklist Item": {
@@ -3719,6 +3747,12 @@
       "plans.promises.no_hostage.title"
     ]
   },
+  "Web page": {
+    "text": "Web page",
+    "paths": [
+      "surfaces.taskReferences.kinds.url.label"
+    ]
+  },
   "Wednesday": {
     "text": "Wednesday",
     "paths": [
@@ -3766,7 +3800,7 @@
   "When dates, deadlines and repeats": {
     "text": "When dates, deadlines and repeats",
     "paths": [
-      "plans.cards.free.points.2"
+      "plans.fullApp.points.2"
     ]
   },
   "When off, tasks appear in one list with their project or area underneath.": {
@@ -3797,12 +3831,6 @@
     "text": "Whose turn?",
     "paths": [
       "settings.copy.ai_explainer.turnHeader.label"
-    ]
-  },
-  "Within a monthly run budget": {
-    "text": "Within a monthly run budget",
-    "paths": [
-      "plans.outcomes.agents.rows.runs.cells.plus"
     ]
   },
   "Work": {
@@ -3939,12 +3967,6 @@
       "surfaces.firstRun.steps.welcome.points.1.title"
     ]
   },
-  "Your agents work your tasks without a daily cap": {
-    "text": "Your agents work your tasks without a daily cap",
-    "paths": [
-      "plans.cards.plus.points.3"
-    ]
-  },
   "Your attachments": {
     "text": "Your attachments",
     "paths": [
@@ -3981,16 +4003,16 @@
       "settings.pages.privacy.sections.data_locality.header"
     ]
   },
-  "Your free account used its 10 runs this month. The work waits for you. Plus runs it now.": {
-    "text": "Your free account used its 10 runs this month. The work waits for you. Plus runs it now.",
-    "paths": [
-      "plans.upsells.agent_runs.detail"
-    ]
-  },
   "Your list everywhere": {
     "text": "Your list everywhere",
     "paths": [
       "plans.outcomes.everywhere.title"
+    ]
+  },
+  "Your list on every device, updated live.": {
+    "text": "Your list on every device, updated live.",
+    "paths": [
+      "plans.cards.plus.detail"
     ]
   },
   "Your name": {
@@ -4239,7 +4261,14 @@
   "€0": {
     "text": "€0",
     "paths": [
+      "plans.levels.free.detail",
       "plans.cards.free.priceLabel"
+    ]
+  },
+  "€120 a year": {
+    "text": "€120 a year",
+    "paths": [
+      "plans.cards.pro.priceLabel"
     ]
   },
   "€5 a month. You save €24 against paying monthly.": {

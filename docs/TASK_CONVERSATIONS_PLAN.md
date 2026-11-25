@@ -92,7 +92,7 @@ resolution is data-dependent (see non-negotiable #6).
 
 6. **Size is discovered, not given — never assume question → build.** `confirm`
    resolves *meaning*; `ground` reveals *size*. The `Protocols` dry-run proved
-   it: one confirm tap → a 15-surface section build (`docs/ADDING_A_SECTION.md`).
+   it: one confirm tap → a 15-surface section build.
    When grounding finds an epic, the loop branches to `scope` (decompose /
    MVP-first / defer-as-note) and **must not march to `work`.** This is the
    confirm-gate one level up: confirm guards meaning, scope guards size; both are

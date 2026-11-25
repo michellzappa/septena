@@ -7,7 +7,7 @@ import { applyDateAction, nextOccurrenceDates, normalizeTaskDates, taskRefId, ta
 import { storeFor } from "../api/session.js";
 import { MAX_REFS_PER_TASK, MAX_TAGS_PER_TASK, TAG_NAME_MAX, zId } from "../store/columns.js";
 import { zPushBody, type Op, type OpResult } from "../store/ops.js";
-import { AGENT_WRITE_RULES, type Row, type TaskStore } from "../store/TaskStore.js";
+import { AGENT_WRITE_RULES, isAgentActor, type Row, type TaskStore } from "../store/TaskStore.js";
 import {
   type CreateTaskInput,
   type RecurrenceRuleInput,
@@ -59,7 +59,7 @@ const ORDER_GAP = 1024;
 /// The DO's methods as plain async calls. Typed from TaskStore's own
 /// declarations: the generated RPC stub type recurses too deep on JSON rows.
 type StoreMethod =
-  | "readTasks" | "readReviewTasks" | "readTask" | "readAreas" | "readProjects" | "readConvoCandidates" | "readTaskLinks"
+  | "readTasks" | "readReviewTasks" | "readOpenQuestions" | "readTask" | "readAreas" | "readProjects" | "readConvoCandidates" | "readTaskLinks"
   | "readTaskRefs" | "findByRef" | "newRefId"
   | "readChecklistItems" | "readChecklistItem" | "readChecklistCounts"
   | "readTags" | "readTagByName"
@@ -233,7 +233,7 @@ export interface WriteContext {
 /// The registry's name for an agent author when the connection has no
 /// client name (`surfaces.json` `taskPage.provenance.agentFallbackName`).
 const PROVENANCE_BLOCK = SURFACES_CATALOG.taskPage.blocks.find((b) => b.kind === "provenance");
-const AGENT_FALLBACK_NAME: string =
+export const AGENT_FALLBACK_NAME: string =
   PROVENANCE_BLOCK && "agentFallbackName" in PROVENANCE_BLOCK ? PROVENANCE_BLOCK.agentFallbackName : "Claude";
 
 /// The `sourceClient` an MCP-created task carries: the connector's client
@@ -788,7 +788,10 @@ async function completeTask(ctx: WriteContext, id: string) {
   // Don't batch a next-occurrence insert alongside a completion the store will
   // refuse (stopped or Claude-assigned): `ops[0]` still hits TaskStore so the
   // store remains the single enforcer, without leaving an orphan occurrence.
-  const canSpawnOccurrence = !current.convo?.stoppedAt && current.convo?.assignee !== "claude";
+  // The store refuses only agents: a person who completes the task here (the
+  // watch, the desk orb) keeps the series going.
+  const refusable = isAgentActor(ctx.actor ?? MCP_ACTOR);
+  const canSpawnOccurrence = !refusable || (!current.convo?.stoppedAt && current.convo?.assignee !== "claude");
   if (unit && src.recurrencePaused !== true && canSpawnOccurrence) {
     const interval = Number(src.recurrenceInterval ?? 1) || 1;
     const afterCompletion = src.recurrenceAfterCompletion === true;
@@ -995,6 +998,30 @@ async function threadAppend(
   requireApplied(results[0], input.id);
   const r = results[0];
   return { id: input.id, seq: r.status === "applied" ? r.seq : undefined };
+}
+
+/// The app's Send back (`TasksBackend.sendBackConvo`): the user's note as a
+/// turn, the task open again and back with the agent. One push.
+export async function sendBackReview(ctx: WriteContext, id: string, note: string): Promise<{ id: string; seq?: number }> {
+  const results = await push(ctx.store, ctx.actor, [
+    { op: "appendTurn", taskId: id, turn: { role: "user", step: "work", note, ts: new Date().toISOString() } },
+    { op: "upsert", entity: "convo", id, fields: { endState: "open", endStateNote: null, stoppedAt: null, assignee: "claude" } },
+  ]);
+  requireApplied(results[0], id);
+  requireApplied(results[1], id);
+  const r = results[0];
+  return { id, seq: r.status === "applied" ? r.seq : undefined };
+}
+
+/// The app's Accept on a review: complete the task, then acknowledge one an
+/// agent added (`TasksBackend.acknowledge`).
+export async function acceptReview(ctx: WriteContext, id: string): Promise<object> {
+  const before = await ctx.store.readTask(id);
+  const done = await completeTask(ctx, id);
+  if (before?.task.source === "mcp" && !before.task.acknowledgedAt) {
+    await push(ctx.store, ctx.actor, [{ op: "upsert", entity: "task", id, fields: { acknowledgedAt: new Date().toISOString() } }]);
+  }
+  return done;
 }
 
 async function writeConvo(ctx: WriteContext, id: string, fields: Record<string, unknown>): Promise<void> {

@@ -1,14 +1,14 @@
 import Foundation
 import Security
 
-/// One small home for the generic-password Keychain dance that every provider
-/// (Oura / GitHub / Readwise / Community) used to copy-paste verbatim.
+/// One small home for the generic-password Keychain dance that every credential
+/// reader shares.
 ///
-/// The one knob that matters here is `synchronizable`. Static personal-access
-/// tokens (Oura, GitHub, Readwise) are marked **synchronizable** so they ride
+/// The one knob that matters here is `synchronizable`. Static
+/// tokens are marked **synchronizable** so they ride
 /// iCloud Keychain to the user's other devices — end-to-end encrypted, Apple
-/// can't read them, and nothing touches a Septena server. OAuth credentials
-/// that rotate (Withings) stay device-local to avoid a single-use-refresh-token
+/// can't read them, and nothing touches a Septena server. Credentials
+/// that rotate stay device-local to avoid a single-use-refresh-token
 /// race between two synced devices, so they pass `synchronizable: false`.
 ///
 /// `kSecAttrSynchronizable` can't be flipped on an existing item via
@@ -23,8 +23,7 @@ import Security
 /// them: after the rename from Septask.app the task backend's refresh token
 /// asked for a password on every read, could not be replaced, and every new
 /// sign-in was lost at the next refresh. The data protection keychain scopes
-/// items by team and bundle id, so a rebuild or rename keeps them, and
-/// Septena and Septena Life no longer share one item. iOS ignores the key.
+/// items by team and bundle id, so a rebuild or rename keeps them. iOS ignores the key.
 public enum KeychainStore {
 
   /// Unsigned local builds have no application-identifier entitlement and

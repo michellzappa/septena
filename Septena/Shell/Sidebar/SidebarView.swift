@@ -316,13 +316,6 @@ struct SidebarRootView: View {
     #if os(iOS)
     .navigationBarTitleDisplayMode(.inline)
     #endif
-    #if !SEPTASK
-    // Septena iPad: the window-level overlay (`RootTabView`) owns the sole
-    // sidebar show/hide control — drop the system's auto-injected toggle so it
-    // doesn't duplicate beside Quick Find in this column's nav bar. Septask
-    // has no overlay bar and keeps the native system toggle.
-    .toolbar(removing: .sidebarToggle)
-    #endif
     .modifier(sidebarBehavior)
   }
 
@@ -381,7 +374,7 @@ struct SidebarRootView: View {
         }
         areaProjectSections()
       }
-      #if os(iOS) && SEPTASK
+      #if os(iOS)
       .onDrop(of: [.septenaTaskDragIDs],
               delegate: SidebarNewAreaDropDelegate {
                 Haptics.commit()
@@ -515,7 +508,6 @@ struct SidebarRootView: View {
         }
       }
     }
-    #if SEPTASK
     Button {
       SeptaskSettingsLink.request(RegistrySettings.PageID.smartLists)
       #if os(macOS)
@@ -526,7 +518,6 @@ struct SidebarRootView: View {
     } label: {
       Label("Customize Smart Lists…", systemImage: "slider.horizontal.3")
     }
-    #endif
   }
 
   #if os(iOS)
@@ -555,13 +546,11 @@ struct SidebarRootView: View {
       }
     }
     .frame(maxWidth: .infinity)
-    #if SEPTASK
     // Septask draws no floating chrome bar above the sidebar (iPadBarHeight == 0),
     // so on the two-column iPad canvas the 2×2 would sit flush to the top edge.
     // Give it a top margin matching its own left/right inset (the insetGrouped
     // gutter) so the grid is symmetric. iPhone/compact keeps its nav-bar spacing.
     .padding(.top, usesPushNavigation ? Theme.pageGutter : 0)
-    #endif
   }
   #endif
 
@@ -570,11 +559,7 @@ struct SidebarRootView: View {
   /// bar — its detail column owns "+" in its own nav bar so it stays visible
   /// even when the sidebar collapses on unfolded iPhone Duo / iPad.
   private var sidebarAddAction: PageAdd? {
-    #if SEPTASK
     return nil
-    #else
-    return usesPushNavigation ? .action { nav.requestNewTask() } : nil
-    #endif
   }
 
   @ViewBuilder
@@ -590,7 +575,6 @@ struct SidebarRootView: View {
     } label: {
       Label(RegistryActions.title("sidebar.newProject"), systemImage: "number")
     }
-    #if SEPTASK
     Divider()
     Button {
       SeptaskSettingsLink.request(RegistrySettings.PageID.smartLists)
@@ -602,21 +586,6 @@ struct SidebarRootView: View {
     } label: {
       Label("Customize Smart Lists…", systemImage: "slider.horizontal.3")
     }
-    #endif
-    #if !SEPTASK
-    Divider()
-    // Page-specific settings, in the same slot Next uses (just above the
-    // shared Settings row): deep-link to the top-level Settings ▸ Tasks
-    // pane. Rides `NavigationState` (iOS forwards it through the shared
-    // settings sheet). Septask has its own Settings shell, so the entry is
-    // compiled out there.
-    Button {
-      nav.settingsDestination = .tasks
-      nav.showSettings = true
-    } label: {
-      Label("Task Settings", systemImage: "checklist")
-    }
-    #endif
   }
 
   private var sidebarBehavior: some ViewModifier {
@@ -1219,13 +1188,14 @@ struct SidebarRootView: View {
   private func projectAreaDestinations(_ project: Project) -> [RegistryMenuNode] {
     var nodes: [RegistryMenuNode] = [
       RegistryMenuEntry.slot(id: "area.none", title: String(localized: "No Area"),
-                             isOn: project.area == nil,
+                             sfSymbol: "tray", isOn: project.area == nil,
                              perform: project.area == nil ? nil : { moveProject(project, to: nil) }),
     ]
     if !areas.isEmpty { nodes.append(.divider(id: "areas.divider")) }
     for area in areas {
       nodes.append(RegistryMenuEntry.slot(
-        id: "area.\(area.id)", title: area.title, isOn: project.area == area.id,
+        id: "area.\(area.id)", title: area.title,
+        listIcon: .area(emoji: area.emoji), isOn: project.area == area.id,
         perform: project.area == area.id ? nil : { moveProject(project, to: area.id) }))
     }
     return nodes
@@ -1688,47 +1658,6 @@ struct SmartListTile: View {
   }
 }
 
-/// Reminders-style colored rounded-square glyph: filled colored container
-/// with a white SF Symbol inside. Used both in smart-list rows and tiles.
-struct ColoredGlyph: View {
-  let icon: String
-  let color: Color
-  let size: CGFloat
-  /// Inner SF Symbol size as a fraction of `size`. Default `0.58` matches
-  /// the original tight-glyph look used in compact sidebar rows. Settings
-  /// rows pass a smaller ratio so the tile reads iOS-Settings-sized while
-  /// the glyph stays at its natural ~16pt mark.
-  var glyphRatio: CGFloat = 0.58
-  @Environment(\.colorScheme) private var colorScheme
-
-  /// Slight desaturation in dark mode keeps the small filled square from
-  /// glaring against a dark background; light mode renders full strength.
-  private var adaptedFill: Color {
-    color.opacity(colorScheme == .dark ? 0.78 : 1.0)
-  }
-
-  var body: some View {
-    let shape = RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
-    ZStack {
-      shape.fill(adaptedFill)
-      // Per-tile sheen, the modern iOS Settings look: a soft top-down
-      // gradient that lightens the top edge and gently deepens the bottom,
-      // giving each saturated square a little dimensionality. Drawn over
-      // the base fill so the color stays the source of truth.
-      shape.fill(
-        LinearGradient(
-          colors: [Color.white.opacity(0.26), .clear, Color.black.opacity(0.07)],
-          startPoint: .top, endPoint: .bottom
-        )
-      )
-      Image(systemName: icon)
-        .scaledFont(size: size * glyphRatio, weight: .semibold)
-        .foregroundStyle(.white)
-    }
-    .frame(width: size, height: size)
-  }
-}
-
 /// Soft tinted section icon — shared `SectionGlyph` in `SectionGlyph.swift`.
 
 struct SidebarAreaRow: View {
@@ -1924,14 +1853,16 @@ struct NewProjectSheet: View {
           TextField(RegistryPrompts.textPrompt("newProject").placeholder, text: $title)
         }
         Section("Area") {
-          Picker("Area", selection: $selectedAreaId) {
-            Text("None").tag(nil as String?)
-            ForEach(areas) { area in
-              Text(area.title).tag(area.id as String?)
-            }
+          Button { selectedAreaId = nil } label: {
+            areaOptionRow(title: nil, emoji: nil, selected: selectedAreaId == nil)
           }
-          .pickerStyle(.inline)
-          .labelsHidden()
+          .buttonStyle(PlainHoverRowButtonStyle())
+          ForEach(areas) { area in
+            Button { selectedAreaId = area.id } label: {
+              areaOptionRow(title: area.title, emoji: area.emoji, selected: selectedAreaId == area.id)
+            }
+            .buttonStyle(PlainHoverRowButtonStyle())
+          }
         }
       }
       // Grouped style keeps the macOS sheet from collapsing to no height
@@ -1953,6 +1884,30 @@ struct NewProjectSheet: View {
         }
       }
     }
+  }
+
+  @ViewBuilder
+  private func areaOptionRow(title: String?, emoji: String?, selected: Bool) -> some View {
+    HStack(spacing: 12) {
+      if let title {
+        AreaIcon(diameter: 15, emoji: emoji)
+          .frame(width: 22)
+        Text(title).foregroundStyle(Theme.inkPrimary)
+      } else {
+        Image(systemName: "tray")
+          .scaledFont(size: 15)
+          .foregroundStyle(Theme.iconMuted)
+          .frame(width: 22)
+        Text("None").foregroundStyle(Theme.inkPrimary)
+      }
+      Spacer()
+      if selected {
+        Image(systemName: "checkmark")
+          .scaledFont(size: 13, weight: .semibold)
+          .foregroundStyle(Theme.inkSecondary)
+      }
+    }
+    .contentShape(Rectangle())
   }
 }
 
@@ -2113,7 +2068,7 @@ private struct SidebarTaskDrop: ViewModifier {
   @State private var isTargeted = false
 
   func body(content: Content) -> some View {
-    #if os(iOS) && SEPTASK
+    #if os(iOS)
     let active = true
     #else
     let active = usesPushNavigation

@@ -269,11 +269,7 @@ public final class SeptaskDiagnosticsCoordinator {
     /// Septask has no hosted-gateway connection: Claude pairs with the task
     /// backend, and that pairing lives server-side, so the app reports false.
     private static var claudeConnected: Bool {
-        #if SEPTASK
         false
-        #else
-        ClaudeGatewayProvider.shared.isEnabled
-        #endif
     }
 
     private var appVersion: String {

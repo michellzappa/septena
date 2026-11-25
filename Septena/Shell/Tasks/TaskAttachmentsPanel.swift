@@ -10,15 +10,37 @@ import UIKit
 
 struct TaskAttachmentsPanel: View {
   let taskID: String
+  @Environment(\.modelContext) private var modelContext
   @State private var rows: [TaskAttachmentEntity] = []
   @State private var importing = false
   @State private var errorMessage: String?
+  /// Explicit 402 upsell surfaced when opening a remote attachment fails with
+  /// a plan limit (spec §6.3, §7).
+  @State private var limitUpsell: RegistryPlanNote?
+  @State private var upsellSeen = false
+  @State private var showingPlus = false
 
   private var store: TaskAttachmentStore { SeptenaServices.shared.taskAttachmentStore }
+
+  private var hasLocalOnlyRows: Bool {
+    rows.contains { TaskSyncEngine.shared.isAttachmentLocalOnly($0.id) }
+  }
+
+  private var hasElsewhereRows: Bool {
+    rows.contains { TaskSyncEngine.shared.isAttachmentElsewhere($0) }
+  }
+
+  private var activeUpsell: RegistryPlanNote? {
+    if let limitUpsell { return limitUpsell }
+    if hasElsewhereRows || hasLocalOnlyRows { return RegistryPlans.upsell("file_elsewhere") }
+    return nil
+  }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
       ForEach(rows, id: \.id) { attachment in
+        let localOnly = TaskSyncEngine.shared.isAttachmentLocalOnly(attachment.id)
+        let sizeText = ByteCountFormatter.string(fromByteCount: attachment.byteCount, countStyle: .file)
         HStack(spacing: 10) {
           if Self.isImage(attachment.contentType), let url = TaskAttachmentFiles.url(for: attachment) {
             AttachmentThumbnail(source: .file(url), key: attachment.id, side: 32)
@@ -30,7 +52,7 @@ struct TaskAttachmentsPanel: View {
           Button { open(attachment) } label: {
             VStack(alignment: .leading, spacing: 2) {
               Text(attachment.filename).lineLimit(1)
-              Text(ByteCountFormatter.string(fromByteCount: attachment.byteCount, countStyle: .file))
+              Text(localOnly ? "\(sizeText) · \(RegistryPlans.Status.device)" : sizeText)
                 .font(.caption).foregroundStyle(.secondary)
             }
           }
@@ -46,6 +68,10 @@ struct TaskAttachmentsPanel: View {
         .padding(.vertical, 3)
       }
 
+      if let moment = activeUpsell {
+        upsellLine(moment)
+      }
+
       Button { importing = true } label: {
         Label(rows.isEmpty ? "Choose File…" : "Add Another File…", systemImage: "plus")
       }
@@ -59,6 +85,7 @@ struct TaskAttachmentsPanel: View {
     .background(.quaternary, in: RoundedRectangle(cornerRadius: 10))
     .onAppear(perform: reload)
     .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in reload() }
+    .sheet(isPresented: $showingPlus) { SeptaskPlusSheet(upsellID: activeUpsell?.id ?? "file_elsewhere") }
     .fileImporter(isPresented: $importing, allowedContentTypes: [.item],
                   allowsMultipleSelection: true) { result in
       do {
@@ -71,7 +98,33 @@ struct TaskAttachmentsPanel: View {
     }
   }
 
-  private func reload() { rows = store.attachments(taskID: taskID) }
+  /// Quiet file-sync upsell line (spec §3.2, §7.1): shows detail until the
+  /// account has seen this moment, then keeps the title and "See Plus".
+  private func upsellLine(_ moment: RegistryPlanNote) -> some View {
+    let showElsewhereTitle = limitUpsell != nil || hasElsewhereRows
+    return VStack(alignment: .leading, spacing: 4) {
+      Text(showElsewhereTitle ? moment.title : RegistryPlans.Status.device)
+        .font(.caption)
+        .foregroundStyle(.secondary)
+      if !upsellSeen {
+        Text(moment.detail).font(.caption2).foregroundStyle(.secondary)
+      }
+      Button(RegistryPlans.Paywall.seePlus) {
+        TaskNotices.markUpsellSeen(moment.id, context: modelContext)
+        upsellSeen = true
+        showingPlus = true
+      }
+      .font(.caption)
+      .buttonStyle(.borderless)
+    }
+    .padding(.top, 2)
+  }
+
+  private func reload() {
+    rows = store.attachments(taskID: taskID)
+    let id = activeUpsell?.id ?? "file_elsewhere"
+    upsellSeen = SettingsMirror.upsellsSeen(context: modelContext).contains(id)
+  }
 
   /// `contentType` holds a UTI (`public.png`) for files added in the app and
   /// may hold a MIME type (`image/png`) for records from elsewhere.
@@ -91,13 +144,37 @@ struct TaskAttachmentsPanel: View {
   private func open(_ attachment: TaskAttachmentEntity) {
     Task { @MainActor in
       do {
-        guard let url = try await store.localFile(for: attachment) else { return }
+        guard let url = try await store.localFile(for: attachment) else {
+          if TaskSyncEngine.shared.isAttachmentElsewhere(attachment),
+             let moment = RegistryPlans.upsell("file_elsewhere") {
+            limitUpsell = moment
+            upsellSeen = SettingsMirror.upsellsSeen(context: modelContext).contains(moment.id)
+            errorMessage = nil
+          }
+          return
+        }
         errorMessage = nil
         #if os(macOS)
         NSWorkspace.shared.open(url)
         #else
         await UIApplication.shared.open(url)
         #endif
+      } catch TaskBackendError.limitReached(let limit) {
+        PlanStatus.shared.noteLimitReached(limit)
+        limitUpsell = limit.upsellNote ?? RegistryPlans.upsell("file_elsewhere")
+        if let id = limitUpsell?.id {
+          upsellSeen = SettingsMirror.upsellsSeen(context: modelContext).contains(id)
+        }
+        errorMessage = nil
+      } catch TaskBackendError.http(let status, _) where status == 404 {
+        if !PlanStatus.shared.attachmentsAllowed || TaskSyncEngine.shared.isAttachmentElsewhere(attachment),
+           let moment = RegistryPlans.upsell("file_elsewhere") {
+          limitUpsell = moment
+          upsellSeen = SettingsMirror.upsellsSeen(context: modelContext).contains(moment.id)
+          errorMessage = nil
+        } else {
+          errorMessage = TaskBackendError.http(status: 404, code: "not_found").errorDescription
+        }
       } catch {
         errorMessage = error.localizedDescription
       }

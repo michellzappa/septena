@@ -29,9 +29,7 @@ struct TaskHistoryPanel: View {
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .task(id: taskID) { await load() }
-    #if SEPTASK
     .sheet(isPresented: $showingPlus) { SeptaskPlusSheet(upsellID: edge?.id) }
-    #endif
   }
 
   @ViewBuilder private var content: some View {
@@ -56,7 +54,6 @@ struct TaskHistoryPanel: View {
       if !edgeSeen {
         Text(moment.detail).font(.caption2).foregroundStyle(.secondary)
       }
-      #if SEPTASK
       Button(RegistryPlans.Paywall.seePlus) {
         TaskNotices.markUpsellSeen(moment.id, context: modelContext)
         edgeSeen = true
@@ -64,7 +61,6 @@ struct TaskHistoryPanel: View {
       }
       .font(.caption)
       .buttonStyle(.borderless)
-      #endif
     }
   }
 
@@ -82,6 +78,17 @@ struct TaskHistoryPanel: View {
       failed = false
     } catch is CancellationError {
       return
+    } catch TaskBackendError.limitReached(let limit) {
+      PlanStatus.shared.noteLimitReached(limit)
+      rows = []
+      if let note = limit.upsellNote {
+        edge = note
+        edgeSeen = SettingsMirror.upsellsSeen(context: modelContext).contains(note.id)
+        failed = false
+      } else {
+        edge = nil
+        failed = true
+      }
     } catch {
       rows = []
       edge = nil

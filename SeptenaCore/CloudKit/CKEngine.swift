@@ -124,46 +124,12 @@ var accountStatus: CKAccountStatus = .couldNotDetermine
   private var lastSendFailureSummary: String?
 
 init() {
-    #if !SEPTASK
-    // Septask is CloudKit-free: no container, no account query (see
-    // `container`).
-    // The CKAccountChanged notification fires on an arbitrary thread, so
-    // bounce back to MainActor before touching `self`.
-    NotificationCenter.default.addObserver(
-      forName: .CKAccountChanged, object: nil, queue: nil
-    ) { [weak self] _ in
-      Task { @MainActor in await self?.refreshAccountStatus() }
-    }
-    Task { await refreshAccountStatus() }
-    #endif
   }
 
   /// Re-query the container for the user's iCloud status. Cheap; safe
   /// to call on every foreground transition.
   func refreshAccountStatus() async {
-    #if SEPTASK
     return
-    #else
-    do {
-      let status = try await container.accountStatus()
-      if status != accountStatus {
-        let label: String
-        switch status {
-        case .available:          label = "available"
-        case .noAccount:          label = "noAccount"
-        case .restricted:         label = "restricted"
-        case .couldNotDetermine:  label = "couldNotDetermine"
-        case .temporarilyUnavailable: label = "temporarilyUnavailable"
-        @unknown default:         label = "unknown(\(status.rawValue))"
-        }
-        logger.info("CKEngine account status: \(label, privacy: .public)")
-      }
-      accountStatus = status
-    } catch {
-      logger.error("accountStatus query failed: \(error.localizedDescription, privacy: .public)")
-      accountStatus = .couldNotDetermine
-    }
-    #endif
   }
 
   /// Boots the sync engine. Idempotent — safe to call repeatedly. No-op
@@ -171,47 +137,10 @@ init() {
   /// account status; we don't want to pay that cost until we're ready
   /// to actually sync).
 func start() {
-    #if SEPTASK
     // Septask is CloudKit-free (docs/SEPTASK_BACKEND.md §9, phase 4): no
     // engine, no zone fetch, no push registration.
     SeptenaLog.info("[CKEngine] start skipped: Septask does not use CloudKit")
     return
-    #else
-    guard engine == nil else { return }
-    // No persisted engine state means nothing has ever synced on this device,
-    // so the fetch below pulls the whole account rather than a delta.
-    let resumeState = loadStateSerialization()
-    isBootstrapping = (resumeState == nil)
-    bootstrapFetchedCount = 0
-    let configuration = CKSyncEngine.Configuration(
-      database: database,
-      stateSerialization: resumeState,
-      delegate: self
-    )
-    let engine = CKSyncEngine(configuration)
-    self.engine = engine
-    // Ensure the custom zone exists before any record-save fires.
-    // CKSyncEngine doesn't auto-create zones from referenced recordIDs
-    // — without this every saveRecord returns "Zone Not Found" (CKError
-    // 2036). Idempotent: if the zone is already on the server, the
-    // engine treats the pending change as a no-op and drops it.
-    let zone = CKRecordZone(zoneID: SeptenaCloudKit.zoneID)
-    engine.state.add(pendingDatabaseChanges: [.saveZone(zone)])
-    logger.info("CKEngine started: container=\(SeptenaCloudKit.containerIdentifier, privacy: .public) zone=\(SeptenaCloudKit.zoneName, privacy: .public)")
-    // Register for silent CK pushes so cross-device updates land in
-    // sub-second rather than waiting for the engine's periodic refresh.
-    // CKSyncEngine auto-creates its database subscription on first
-    // sync; all we need here is the OS-level push token registration.
-    registerForRemoteNotifications()
-    // Bootstrap pull: without this, a cold launch sees only whatever
-    // was already in SwiftData. Any record other devices wrote while
-    // we were closed would have to wait for an opportunistic push to
-    // arrive — APNs coalesces silent pushes aggressively, so don't
-    // rely on that as the only refresh path.
-    Task { [weak self] in
-      try? await self?.engine?.fetchChanges()
-    }
-    #endif
   }
 
   private func registerForRemoteNotifications() {

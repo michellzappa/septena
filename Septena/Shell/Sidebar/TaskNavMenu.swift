@@ -5,7 +5,11 @@ import SwiftData
 // Things-style title menu. It lists every sidebar destination (smart lists,
 // areas + their projects, top-level projects, Recently Deleted) and routes
 // via `NavigationState.go(to:)` on tap, so you can jump anywhere WITHOUT the
-// sidebar — collapsed via ⌘/ on macOS, and only a back-tap away on iPhone.
+// sidebar — shown only when the sidebar is hidden or unavailable (compact
+// stack on iPhone / narrow iPad, or collapsed via ⌘/ on iPad / macOS — see
+// `NavigationState.showsTitleNavMenu(usesPushNavigation:)`). When the sidebar
+// is visible, callers render the plain static `ScreenTitle` or omit the
+// trailing chevron.
 //
 // Single-source: destinations come from `StructureCache` (sidebar order via
 // `TaskStructureOrder`) and `TaskDestinations.sidebarRoutes`; every label /

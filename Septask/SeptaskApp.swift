@@ -137,11 +137,9 @@ private struct SeptaskMainWindow: View {
         guard let action else { return }
         switch action {
         case .newTask:
-          navigation.presentAddInfo(section: .tasks)
+          navigation.presentAddInfo()
         case .today:
           navigation.path = [.filter(.today)]
-        case .openSection:
-          break
         }
         navigation.pendingShortcut = nil
       }
@@ -217,7 +215,7 @@ private struct SeptaskMainWindow: View {
       },
       sidebarVisibility: navigation.sidebarVisibility,
       showQuickFind: { navigation.showQuickFind = true },
-      showQuickAdd: { navigation.presentAddInfo(section: .tasks) },
+      showQuickAdd: { navigation.presentAddInfo() },
       showSettings: { navigation.showSettings = true },
       showKeyboardShortcuts: { navigation.showKeyboardShortcuts = true }
     )

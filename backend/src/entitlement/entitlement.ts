@@ -104,18 +104,14 @@ export interface PlanLimits {
   /// Change history the reads show (`/v1/changes`, tasks_history,
   /// tasks_activity). null = everything the store keeps.
   changeLogDays: number | null;
-  /// Logbook window. Read by the apps; the server has no Logbook read.
-  logbookDays: number | null;
   /// Recently Deleted window. Read by the apps; the server has no Recently
   /// Deleted read.
   recentlyDeletedDays: number | null;
   /// Server attachment storage (R2). 0 = attachments stay on the device.
   attachmentsGB: number | null;
-  /// Connector write calls per UTC day; null = no cap.
+  /// Connector write calls per UTC day; null = no cap. An abuse cap, not a
+  /// plan feature (ADR 0036): it is not on the pricing page.
   connectorWritesPerDay: number | null;
-  /// New agent claims per UTC month; null = no cap (the per-task run budget
-  /// of ADR 0008 still applies).
-  agentRunsPerMonth: number | null;
   /// Connected agents (MCP connections used in the last 30 days); null = no
   /// cap. Log-only: a pairing past the limit logs `agent_limit_over` and
   /// still works.
@@ -176,12 +172,30 @@ export function decide(env: Env, userId: string, surface: string, state: PlanSta
   return enforce ? "block" : "allow";
 }
 
-/// A failed plan check. Log-only mode lets the call through with no limits;
-/// enforce mode blocks (fail closed).
-export function planCheckFailed(env: Env, userId: string, surface: string, e: unknown): "allow" | "block" {
+export type PlanFailureMode = "closed" | "open";
+
+/// A failed plan check. Sync lets the call through (fail open) so a store
+/// hiccup never blocks paying users (spec §6.4 finding 6). Writes that cost
+/// money (attachments, connector writes, agent claims) fail closed in enforce
+/// mode.
+export function planCheckFailed(
+  env: Env,
+  userId: string,
+  surface: string,
+  e: unknown,
+  mode: PlanFailureMode = "closed",
+): "allow" | "block" {
   const enforce = isEnforcing(env);
-  logEvent("entitlement_check_failed", { surface, userId, enforce, error: e instanceof Error ? e.message : String(e) });
-  return enforce ? "block" : "allow";
+  const action = mode === "open" || !enforce ? "allow" : "block";
+  logEvent("plan_check_failed", {
+    surface,
+    userId,
+    enforce,
+    mode,
+    action,
+    error: e instanceof Error ? e.message : String(e),
+  });
+  return action;
 }
 
 /// Counter keys. Days and months are UTC.
@@ -245,6 +259,32 @@ export async function appAccountTokenFor(userId: string): Promise<string> {
 
 const otxKey = (originalTransactionId: string) => `ent-otx:${originalTransactionId}`;
 const aatKey = (appAccountToken: string) => `ent-aat:${appAccountToken.toLowerCase()}`;
+/// Persistent marker written when an account starts its reverse trial. Account
+/// deletion does not remove it, so deleting and re-signing up with the same
+/// Apple id never grants a second trial (spec §6.4 finding 4).
+export const trialUsedKey = (userId: string) => `trial-used:${userId}`;
+
+export async function hasUsedTrial(env: Env, userId: string): Promise<boolean> {
+  return (await env.TOKENS.get(trialUsedKey(userId))) !== null;
+}
+
+export async function markTrialUsed(env: Env, userId: string): Promise<void> {
+  if ((await env.TOKENS.get(trialUsedKey(userId))) !== "1") {
+    await env.TOKENS.put(trialUsedKey(userId), "1");
+  }
+}
+
+/// Starts the 14-day reverse trial once per user id (spec §3, §6.4 finding 4).
+/// Checks the KV marker `trial-used:<userId>` first, then writes the trial row
+/// in the user's Durable Object and records the marker.
+export async function startTrialOnce(env: Env, userId: string, now = Date.now()): Promise<boolean> {
+  if (await hasUsedTrial(env, userId)) return false;
+  const started = await storeFor(env, userId).startTrialOnce(trialRow(now));
+  // Whether this call created the trial row or found an older one from before
+  // the KV marker existed, this user id has now used its trial.
+  await markTrialUsed(env, userId);
+  return started;
+}
 
 export async function rememberAppAccountToken(env: Env, userId: string, token: string): Promise<void> {
   if ((await env.TOKENS.get(aatKey(token))) !== userId) await env.TOKENS.put(aatKey(token), userId);

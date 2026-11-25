@@ -39,7 +39,7 @@ Then, for every open task:
 | Group | Rows |
 |---|---|
 | Triage | When…, Move ▸, Tags…, Deadline…, Star / Remove Star |
-| Edit | Open, Duplicate, Share…, Select (iPhone and iPad only) |
+| Edit | Open, Add Reference… (one task), Duplicate, Share…, Select (iPhone and iPad only) |
 | Close | Complete (two or more tasks only) |
 | Destructive | Delete |
 

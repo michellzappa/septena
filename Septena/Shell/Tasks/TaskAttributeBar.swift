@@ -41,6 +41,9 @@ struct TaskAttributeBar: View {
   /// its panel.
   var showsChecklist: Bool = true
   var showsAttachments: Bool = true
+  /// The task page's `references` block is on at this depth (page only). It
+  /// shows for a task that has references.
+  var showsReferences: Bool = false
   /// The task page's `history` block is on at this depth (page only).
   var showsHistory: Bool = false
   /// The task page's `conversation` block is on at this depth (page only).
@@ -97,6 +100,7 @@ struct TaskAttributeBar: View {
     let stepsDone: Int
     let stepsTotal: Int
     let attachments: Int
+    let hasReferences: Bool
 
     @MainActor init(task: SeptenaTask) {
       let ctx = LocalStore.shared.container.mainContext
@@ -106,6 +110,7 @@ struct TaskAttributeBar: View {
       stepsDone = steps.filter(\.checked).count
       stepsTotal = steps.count
       attachments = SeptenaServices.shared.taskAttachmentStore.attachmentCount(taskID: task.id)
+      hasReferences = LocalCache.hasTaskRefs(taskID: task.id, in: ctx)
     }
   }
 
@@ -121,6 +126,8 @@ struct TaskAttributeBar: View {
   @State private var editRevision = 0
   @State private var discussStarted: Bool
   @State private var discussWorking = false
+  /// The Add Reference sheet, from the References block.
+  @State private var addingReference = false
   /// The Checklist pill was tapped on a task with no steps yet. A task WITH
   /// steps shows its checklist without this (same as the Mac composer).
   @State private var checklistOpened = false
@@ -134,7 +141,7 @@ struct TaskAttributeBar: View {
        discussVisible: Binding<Bool> = .constant(false),
        moveFocus: ((Bool) -> Void)? = nil,
        showsChecklist: Bool = true, showsAttachments: Bool = true,
-       showsHistory: Bool = false, showsConversation: Bool = false,
+       showsReferences: Bool = false, showsHistory: Bool = false, showsConversation: Bool = false,
        leading: AnyView? = nil, layout: Layout = .rail) {
     _draft = draft
     self.areas = areas
@@ -148,6 +155,7 @@ struct TaskAttributeBar: View {
     self.moveFocus = moveFocus
     self.showsChecklist = showsChecklist
     self.showsAttachments = showsAttachments
+    self.showsReferences = showsReferences
     self.showsHistory = showsHistory
     self.showsConversation = showsConversation
     self.leading = leading
@@ -177,6 +185,12 @@ struct TaskAttributeBar: View {
       }
     }) { attr in
       pickerSheet(attr)
+    }
+    .sheet(isPresented: $addingReference) {
+      if let task = discussTask {
+        AddReferenceSheet(taskID: task.id)
+          .taskPickerChrome(TaskPickerDetents.standard)
+      }
     }
     // Keyboard Space / Return on a focused pill arrives here.
     .onChange(of: activate) { _, attr in
@@ -221,6 +235,12 @@ struct TaskAttributeBar: View {
       if showsAttachments, let task = discussTask {
         pageSection(.attachments) { TaskAttachmentsPanel(taskID: task.id) }
       }
+
+      if showsReferences, let task = discussTask, edit?.hasReferences == true {
+        pageSection(.references) {
+          TaskReferencesPanel(taskID: task.id) { addingReference = true }
+        }
+      }
     }
   }
 
@@ -229,7 +249,9 @@ struct TaskAttributeBar: View {
   private func rowCard(_ attr: Attribute, edit: EditOnlyState?) -> some View {
     VStack(alignment: .leading, spacing: 0) {
       AttributeRow(icon: attr.icon(on: isSet(attr, edit: edit)), label: attr.label,
-                   value: value(for: attr, edit: edit), isSet: isSet(attr, edit: edit),
+                   value: value(for: attr, edit: edit),
+                   valueIcon: attr == .list ? listRowValueIcon : nil,
+                   isSet: isSet(attr, edit: edit),
                    opensPicker: attr.presentsSheet,
                    isExpanded: expanded == attr,
                    isLoading: attr == .discuss && discussWorking,
@@ -297,7 +319,9 @@ struct TaskAttributeBar: View {
           if let leading { leading }
           ForEach(Attribute.rail) { attr in
             if shows(attr) {
-              AttributePill(icon: attr.icon(on: isSet(attr, edit: edit)), label: attr.label,
+              AttributePill(icon: attr.icon(on: isSet(attr, edit: edit)),
+                            leadingIcon: attr == .list ? listPillIcon : nil,
+                            label: attr.label,
                             value: value(for: attr, edit: edit), isSet: isSet(attr, edit: edit),
                             isActive: attr != .discuss && expanded == attr,
                             isLoading: attr == .discuss && discussWorking,
@@ -383,6 +407,30 @@ struct TaskAttributeBar: View {
     case .history:
       return nil
     }
+  }
+
+  /// Resolved destination for the `.list` pill / row icon so the selected
+  /// area emoji (or fallback dot) or project progress ring matches the sidebar.
+  private var listPillIcon: AnyView? {
+    listIcon(tint: Theme.inkPrimary)
+  }
+
+  private var listRowValueIcon: AnyView? {
+    listIcon(tint: Theme.inkSecondary)
+  }
+
+  private func listIcon(tint: Color) -> AnyView? {
+    if let projectId = draft.projectId,
+       projects.contains(where: { $0.id == projectId }) {
+      let progress = LocalCache.projectCompletionRatios(
+        in: LocalStore.shared.container.mainContext)[projectId] ?? 0
+      return AnyView(ProjectProgressIcon(progress: progress, tint: tint, diameter: 12, lineWidth: 2))
+    }
+    if let areaId = draft.areaId,
+       let area = areas.first(where: { $0.id == areaId }) {
+      return AnyView(AreaIcon(tint: tint, diameter: 16, emoji: area.emoji))
+    }
+    return nil
   }
 
   /// Whether a pill counts as "filled" — drives the accent tint.
@@ -581,6 +629,7 @@ private struct AttributeRow: View {
   let icon: String
   let label: String
   let value: String?
+  var valueIcon: AnyView? = nil
   let isSet: Bool
   let opensPicker: Bool
   /// The picker is open in this row's card: the chevron points down.
@@ -603,10 +652,13 @@ private struct AttributeRow: View {
         if isLoading {
           ProgressView().controlSize(.small)
         } else if let value {
-          Text(value)
-            .font(.septenaSidebarRow)
-            .foregroundStyle(isSet ? Theme.inkPrimary : Theme.inkSecondary)
-            .lineLimit(1)
+          HStack(spacing: 5) {
+            if let valueIcon { valueIcon }
+            Text(value)
+              .font(.septenaSidebarRow)
+              .foregroundStyle(isSet ? Theme.inkPrimary : Theme.inkSecondary)
+              .lineLimit(1)
+          }
         }
         if opensPicker {
           Image(systemName: "chevron.right")
@@ -627,6 +679,7 @@ private struct AttributeRow: View {
 
 private struct AttributePill: View {
   let icon: String
+  var leadingIcon: AnyView? = nil
   let label: String
   let value: String?
   let isSet: Bool
@@ -676,6 +729,8 @@ private struct AttributePill: View {
         if isLoading {
           ProgressView()
             .controlSize(.mini)
+        } else if let leadingIcon {
+          leadingIcon
         } else {
           Image(systemName: icon)
             .font(.system(size: 13, weight: .semibold))

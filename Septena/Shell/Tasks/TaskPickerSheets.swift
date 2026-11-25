@@ -959,19 +959,7 @@ struct MovePickerSheet: View {
   // done / (done + open) per project, mirroring the sidebar's aggregate so the
   // pie glyph reads identically here. Cancelled tasks count toward neither side.
   private func loadProgress() {
-    var done: [String: Int] = [:]
-    var total: [String: Int] = [:]
-    for t in LocalCache.tasksWithProject(in: modelContext) {
-      guard let pid = t.project else { continue }
-      switch t.status {
-      case .done: done[pid, default: 0] += 1; total[pid, default: 0] += 1
-      case .open: total[pid, default: 0] += 1
-      case .cancelled: break
-      }
-    }
-    progressByProject = total.reduce(into: [:]) { acc, kv in
-      acc[kv.key] = Double(done[kv.key] ?? 0) / Double(kv.value)
-    }
+    progressByProject = LocalCache.projectCompletionRatios(in: modelContext)
   }
 
   // MARK: - Row primitive
@@ -1019,7 +1007,7 @@ struct MovePickerSheet: View {
         .scaledFont(size: 16)
         .foregroundStyle(Theme.iconMuted)
     case .area:
-      AreaIcon(diameter: 14, lineWidth: 1.5, emoji: emoji)
+      AreaIcon(diameter: 16, lineWidth: 1.5, emoji: emoji)
     case .project:
       // Pie glyph — same component as sidebar / detail page, driven by the
       // project's real done/open ratio.

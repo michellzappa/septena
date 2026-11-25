@@ -54,6 +54,9 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
   /// Split-view resize observer (sidebar-hidden mirror). Process-lived like
   /// the window, but removed on close all the same.
   private var layoutObserver: NSObjectProtocol?
+  /// KVO observer on `sidebarItem.isCollapsed` so toggling the sidebar updates
+  /// both the View menu mirror and the task list's page-title dropdown live.
+  private var sidebarCollapseObservation: NSKeyValueObservation?
 
   private init() {
     let list = SeptaskKitTaskListController()
@@ -93,19 +96,6 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
       inspector?.show(task, isVisible: inspectorItem?.isCollapsed == false)
     }
     split.splitView.autosaveName = "SeptaskKitSplit"
-    // Keep the View menu's Show/Hide Sidebar title truthful however the pane
-    // collapsed (menu, ⌃⌘S, or dragging the divider shut).
-    layoutObserver = NotificationCenter.default.addObserver(
-      forName: NSSplitView.didResizeSubviewsNotification, object: split.splitView, queue: .main
-    ) { [weak sidebarItem] _ in
-      MainActor.assumeIsolated {
-        guard let sidebarItem else { return }
-        let hidden = sidebarItem.isCollapsed
-        if UserDefaults.standard.bool(forKey: SeptaskKitStateKey.sidebarHidden) != hidden {
-          UserDefaults.standard.set(hidden, forKey: SeptaskKitStateKey.sidebarHidden)
-        }
-      }
-    }
     // Same path Quick Find uses: steer the sidebar, which drives the list —
     // so a group-header click always leaves the two in agreement.
     list.onNavigate = { [weak sidebar] destination in sidebar?.select(destination) }
@@ -166,6 +156,26 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     self.inspector = inspector
     self.inspectorItem = inspectorItem
     self.toggleInspector = { [weak list] in list?.onToggleInspector?() }
+
+    // Keep the View menu's Show/Hide Sidebar title and the list's page-title
+    // dropdown truthful however the sidebar collapses or expands (menu, ⌘/,
+    // autosave restore, or dragging the divider shut).
+    sidebarCollapseObservation = sidebarItem.observe(
+      \.isCollapsed, options: [.initial, .new]
+    ) { [weak self, weak sidebarItem] _, _ in
+      MainActor.assumeIsolated {
+        guard let sidebarItem else { return }
+        self?.syncSidebarVisibility(hidden: sidebarItem.isCollapsed)
+      }
+    }
+    layoutObserver = NotificationCenter.default.addObserver(
+      forName: NSSplitView.didResizeSubviewsNotification, object: split.splitView, queue: .main
+    ) { [weak self, weak sidebarItem] _ in
+      MainActor.assumeIsolated {
+        guard let sidebarItem else { return }
+        self?.syncSidebarVisibility(hidden: sidebarItem.isCollapsed)
+      }
+    }
 
     // Wired after super.init — capturing `self` in the closures below would
     // be "used before super.init".
@@ -273,6 +283,16 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     if changed, detailHadFocus { focusDetail() }
   }
 
+  /// Mirror the sidebar's collapsed state to UserDefaults (for the View menu's
+  /// Show/Hide Sidebar title) and to the task list (which shows the page-title
+  /// navigation dropdown only while the sidebar is hidden).
+  private func syncSidebarVisibility(hidden: Bool) {
+    if UserDefaults.standard.bool(forKey: SeptaskKitStateKey.sidebarHidden) != hidden {
+      UserDefaults.standard.set(hidden, forKey: SeptaskKitStateKey.sidebarHidden)
+    }
+    list?.setSidebarVisible(!hidden)
+  }
+
   /// Give the keyboard to the detail pane — the task list.
   func focusDetail() {
     list?.focusList()
@@ -328,9 +348,10 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
   func focusWindow() { window?.makeKeyAndOrderFront(nil) }
 
   func go(to filter: TaskFilter) { sidebar?.select(filter) }
-  func revealTask(id taskId: String, in filter: TaskFilter) {
+  func revealTask(id taskId: String, in filter: TaskFilter, opensPage: Bool = false) {
     sidebar?.select(filter)
     list?.select(taskId: taskId)
+    if opensPage { setInspector(visible: true) }
   }
   func newTask() { list?.createTask() }
   func newProject() { sidebar?.newProject() }
@@ -362,7 +383,7 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     // ⌘K also ticks a selected Get started step; nothing else applies to one.
     if command == .toggleComplete { return list?.hasCompletableSelection ?? false }
     // `task.open` acts on one row, like the row menu item.
-    if command == .open { return list?.hasSingleActionableSelection ?? false }
+    if command == .open || command == .addReference { return list?.hasSingleActionableSelection ?? false }
     return list?.hasActionableSelection ?? false
   }
 
@@ -390,6 +411,7 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     case .toggleStar: list.toggleStarSelection()
     case .editTags: list.presentTagPopover()
     case .addChecklistItem: list.addChecklistItemToSelection()
+    case .addReference: list.presentAddReference()
     case .rename: list.beginEditSelectedRow()
     case .when: list.presentDatePopover(kind: .when)
     case .deadline: list.presentDatePopover(kind: .deadline)
@@ -407,7 +429,7 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
   }
 
   enum RowCommand {
-    case toggleComplete, cancel, toggleToday, toggleStar, editTags, addChecklistItem, rename, when, deadline, reminder, clearSchedule, delete
+    case toggleComplete, cancel, toggleToday, toggleStar, editTags, addChecklistItem, addReference, rename, when, deadline, reminder, clearSchedule, delete
     case duplicate, move, createNextCopy
     case repeatEditor
     case open
@@ -418,6 +440,8 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
   func windowWillClose(_ notification: Notification) {
     // ⌘W blurs nothing, so nothing commits on its own: save first.
     commitAllEdits()
+    sidebarCollapseObservation?.invalidate()
+    sidebarCollapseObservation = nil
     if let layoutObserver { NotificationCenter.default.removeObserver(layoutObserver) }
     layoutObserver = nil
     Self.current = nil

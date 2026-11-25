@@ -48,6 +48,6 @@ with a `New entry…` row** to the full editor (see `IntakeQuickLogSheet`,
 
 A new loggable section must wire **both**: a tile menu that follows the rule
 above (suggestions + one escape), and a `DrawerQuickAdd` that reaches the full
-editor. See `docs/ADDING_A_SECTION.md` for the rest of the surface checklist.
+editor.
 
 This is a UI contract only — it adds no MCP tools or wire fields.

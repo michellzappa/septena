@@ -13,11 +13,7 @@ final class ShareViewController: UIViewController {
       self?.extensionContext?.cancelRequest(withError: CocoaError(.userCancelled))
     }, onSave: { [weak self] capture in
       do {
-        #if SHARE_DESTINATION_SEPTASK
         try SharedTaskCaptureQueue.enqueue(capture, for: .septask)
-        #else
-        try SharedTaskCaptureQueue.enqueue(capture, for: .septena)
-        #endif
         self?.extensionContext?.completeRequest(returningItems: nil)
       } catch { self?.extensionContext?.cancelRequest(withError: error) }
     })

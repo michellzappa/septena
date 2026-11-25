@@ -15,6 +15,8 @@ struct TaskListModalPresenter: ViewModifier {
   @Binding var repeatTargetId: String?
   var reminderTargetId: Binding<String?> = .constant(nil)
   var tagsTargetIds: Binding<[String]> = .constant([])
+  /// The task whose Add Reference sheet is open.
+  var referenceTargetId: Binding<String?> = .constant(nil)
 
   /// Set by the When sheet's Repeat row: the Repeat sheet opens for this task
   /// once the When sheet has finished dismissing (two sheets can't overlap).
@@ -130,6 +132,15 @@ struct TaskListModalPresenter: ViewModifier {
         }
         .taskPickerChrome(TaskPickerDetents.standard)
       }
+      .sheet(isPresented: Binding(
+        get: { referenceTargetId.wrappedValue != nil },
+        set: { if !$0 { referenceTargetId.wrappedValue = nil } }
+      )) {
+        if let id = referenceTargetId.wrappedValue {
+          AddReferenceSheet(taskID: id)
+            .taskPickerChrome(TaskPickerDetents.standard)
+        }
+      }
   }
 
   private func openPendingRepeat() {
@@ -203,6 +214,8 @@ struct TaskListRowContextMenu: View {
   let onOpenDeadline: (TaskListView.ActionTarget) -> Void
   var onOpenReminder: ((SeptenaTask) -> Void)? = nil
   var onOpenTags: ((TaskListView.ActionTarget) -> Void)? = nil
+  /// Nil hides Add Reference.
+  var onAddReference: ((SeptenaTask) -> Void)? = nil
   var onClearSchedule: (([String]) -> Void)? = nil
   let onOpenMove: (TaskListView.ActionTarget) -> Void
   /// Move a task straight to a destination from the inline submenu, skipping the
@@ -283,6 +296,9 @@ struct TaskListRowContextMenu: View {
     case "task.tags":
       guard let onOpenTags else { return nil }
       return .init { onOpenTags(target) }
+    case "task.addReference":
+      guard let task = single, let onAddReference else { return nil }
+      return .init { onAddReference(task) }
     case "task.when":
       return .init { onOpenWhen(target) }
     case "task.deadline":
@@ -329,7 +345,7 @@ struct TaskListRowContextMenu: View {
     return [RegistryMenuEntry.slot(
       id: "fileSuggested",
       title: String(localized: "File in \(chip.title)"),
-      sfSymbol: chip.kind == .project ? "number" : "folder") {
+      listIcon: suggestionIcon(for: chip)) {
         onApplySuggestion(task, chip)
       }]
   }
@@ -343,7 +359,7 @@ struct TaskListRowContextMenu: View {
       nodes.append(RegistryMenuEntry.slot(
         id: "suggested",
         title: String(localized: "Suggested: \(suggestion.title)"),
-        sfSymbol: suggestion.kind == .project ? "number" : "folder") {
+        listIcon: suggestionIcon(for: suggestion)) {
           onApplySuggestion(task, suggestion)
         })
       nodes.append(.divider(id: "suggested.divider"))
@@ -356,22 +372,37 @@ struct TaskListRowContextMenu: View {
         })
     }
     if !moveAreas.isEmpty || !moveTopProjects.isEmpty {
+      let progressByProject = LocalCache.projectCompletionRatios(
+        in: LocalStore.shared.container.mainContext)
       nodes.append(.divider(id: "destinations.divider"))
       for area in moveAreas {
-        let title = (area.emoji?.isEmpty == false) ? "\(area.emoji ?? "")  \(area.title)" : area.title
-        nodes.append(RegistryMenuEntry.slot(id: "area.\(area.id)", title: title) {
+        nodes.append(RegistryMenuEntry.slot(
+          id: "area.\(area.id)", title: area.title,
+          listIcon: .area(emoji: area.emoji)) {
           onMoveTo(target, area.id, nil)
         })
       }
       for project in moveTopProjects {
         nodes.append(RegistryMenuEntry.slot(
           id: "project.\(project.id)", title: project.title,
-          sfSymbol: RegistryIcons.sfSymbol(for: "place.project")) {
+          listIcon: .project(progress: progressByProject[project.id] ?? 0)) {
             onMoveTo(target, nil, project.id)
           })
       }
     }
     return nodes
+  }
+
+  private func suggestionIcon(for suggestion: SuggestionEngine.Suggestion) -> RegistryMenuIcon {
+    switch suggestion.kind {
+    case .project:
+      let progress = LocalCache.projectCompletionRatios(
+        in: LocalStore.shared.container.mainContext)[suggestion.id] ?? 0
+      return .project(progress: progress)
+    case .area:
+      let emoji = moveAreas.first(where: { $0.id == suggestion.id })?.emoji
+      return .area(emoji: emoji)
+    }
   }
 
   /// Move to Section ▸ — No Section, then every heading of the project.

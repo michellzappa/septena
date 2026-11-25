@@ -551,7 +551,7 @@ function validateSurfaces(surfaces, icons, caps, plans) {
     assert(Array.isArray(b.depths) && b.depths.length > 0 && b.depths.every((d) => TASK_PAGE_DEPTHS.has(d)), `surfaces.json: taskPage block ${b.id} needs depths from ${[...TASK_PAGE_DEPTHS].join(", ")}`);
     assert(b.featureId in caps.capabilities, `surfaces.json: taskPage block ${b.id} unknown featureId "${b.featureId}"`);
     if (b.attribute !== undefined) assert(attrIds.has(b.attribute), `surfaces.json: taskPage block ${b.id} unknown attribute "${b.attribute}"`);
-    if (["checklist", "attachments", "conversation", "history"].includes(b.kind)) {
+    if (["checklist", "attachments", "references", "conversation", "history"].includes(b.kind)) {
       assert(typeof b.label === "string" || b.attribute !== undefined, `surfaces.json: taskPage block ${b.id} needs a label or an attribute`);
     }
     // The agent prompt copy (docs/AGENT_PROMPT_SPEC.md): the kickers, the
@@ -574,6 +574,24 @@ function validateSurfaces(surfaces, icons, caps, plans) {
   for (const kind of TASK_PAGE_BLOCK_KINDS) {
     assert(page.blocks.filter((b) => b.kind === kind).length === 1, `surfaces.json: taskPage needs exactly one "${kind}" block`);
   }
+}
+
+// References (docs/TASK_REFERENCES_SPEC.md §8): a label and an icon per key
+// kind, the fallback for a kind this build does not know, the labels of the
+// roles that show one, and the copy of Add Reference.
+function validateTaskReferences(surfaces, icons, caps, entities) {
+  const t = surfaces.taskReferences;
+  assert(t && t.featureId in caps.capabilities, "surfaces.json: taskReferences needs a known featureId");
+  for (const [kind, k] of [...Object.entries(t.kinds), ["otherKind", t.otherKind]]) {
+    assert(/^[a-z][a-z0-9_-]*$/i.test(kind), `surfaces.json: taskReferences kind "${kind}" is not a kind`);
+    assert(typeof k.label === "string" && k.label.length > 0, `surfaces.json: taskReferences ${kind} needs a label`);
+    assert(k.icon in icons.icons, `surfaces.json: taskReferences ${kind} unknown icon "${k.icon}"`);
+  }
+  for (const [role, r] of Object.entries(t.roles)) {
+    assert(entities.enums.taskRefRole.includes(role), `surfaces.json: taskReferences unknown role "${role}"`);
+    assert(typeof r.label === "string" && r.label.length > 0, `surfaces.json: taskReferences role ${role} needs a label`);
+  }
+  for (const [p, v] of stringsOf(t, "taskReferences")) assert(!/[–—]/.test(v), `surfaces.json: ${p} contains an em or en dash`);
 }
 
 // The date board (docs/TASK_ROW_MENU_SPEC.md): the rows under the day strip of
@@ -615,11 +633,12 @@ function checkOpensAttribute({ actions, surfaces }) {
     assert(openers.has(attr.id), `actions.json: popover attribute "${attr.id}" has no action with opensAttribute (ADR 0029: one picker per attribute)`);
   }
 }
-const TASK_PAGE_BLOCK_KINDS = new Set(["header", "notes", "attributes", "checklist", "attachments", "conversation", "provenance", "history"]);
+const TASK_PAGE_BLOCK_KINDS = new Set(["header", "notes", "attributes", "checklist", "attachments", "references", "conversation", "provenance", "history"]);
 const TASK_PAGE_DEPTHS = new Set(["inline", "page", "review"]);
 
 // ---- plans.json (ADR 0010, ADR 0023) ----
-const PLAN_LEVELS = ["device", "account", "plus"];
+// Pro is planned: the site shows it, the apps and the server do not (ADR 0037).
+const PLAN_LEVELS = ["free", "plus", "pro"];
 const PLAN_LIMIT_PLANS = ["account", "plus"];
 
 /** Every string in a JSON value, with its path. */
@@ -633,7 +652,7 @@ function stringsOf(node, p, out = []) {
 function validatePlans(plans, icons, caps) {
   assert(plans.version === 1, "plans.json: version must be 1");
   assert(plans.featureId in caps.capabilities, `plans.json: unknown featureId "${plans.featureId}"`);
-  for (const f of ["name", "shortName", "headline", "subhead"]) assert(typeof plans[f] === "string" && plans[f].length > 0, `plans.json: ${f} missing`);
+  for (const f of ["name", "shortName", "headline", "subhead", "ladderHeadline", "accountNote", "agentNote"]) assert(typeof plans[f] === "string" && plans[f].length > 0, `plans.json: ${f} missing`);
   // House rule: rendered copy has no em or en dashes.
   for (const [p, v] of stringsOf(plans, "plans")) assert(!/[–—]/.test(v), `plans.json: ${p} contains an em or en dash`);
   assert(typeof plans.checkout?.open === "boolean", "plans.json: checkout.open must be a boolean");
@@ -655,7 +674,8 @@ function validatePlans(plans, icons, caps) {
   assert(plans.prices.filter((x) => x.highlighted).length === 1, "plans.json: exactly one price must be highlighted");
 
   assert(JSON.stringify(plans.levels.map((l) => l.id)) === JSON.stringify(PLAN_LEVELS), `plans.json: levels must be ${PLAN_LEVELS.join(", ")}`);
-  assert(JSON.stringify(plans.cards.map((c) => c.id)) === JSON.stringify(["free", "plus"]), "plans.json: cards must be free, plus");
+  assert(JSON.stringify(plans.cards.map((c) => c.id)) === JSON.stringify(PLAN_LEVELS), `plans.json: cards must be ${PLAN_LEVELS.join(", ")}`);
+  assert(plans.cards.find((c) => c.id === "pro").status === "planned", "plans.json: the pro card must be planned");
   assert(plans.cards.filter((c) => c.highlighted).length === 1, "plans.json: exactly one card must be highlighted");
   for (const k of ["seePlus", "startTrial", "trialStarted", "trialBilling", "success", "pending", "serverRetry", "failed", "ownedApple", "ownedWeb", "ownedGoogle", "ownedGrant", "done"]) {
     assert(typeof plans.paywall?.[k] === "string" && plans.paywall[k].length > 0, `plans.json: paywall.${k} missing`);
@@ -690,7 +710,7 @@ function validatePlans(plans, icons, caps) {
         // The copy states the number the server enforces.
         for (const plan of PLAN_LIMIT_PLANS) {
           const v = lim[plan][r.limit];
-          const cell = r.cells[plan];
+          const cell = r.cells[plan === "account" ? "free" : plan];
           if (Number.isInteger(v) && v > 0) {
             assert(typeof cell === "string" && new RegExp(`(^|\\D)${v}(\\D|$)`).test(cell), `plans.json: row ${r.id} ${plan} cell must state the limit ${v}`);
           }
@@ -698,6 +718,8 @@ function validatePlans(plans, icons, caps) {
       }
     }
   }
+  for (const id of plans.cardRows) assert(rowIds.has(id), `plans.json: cardRows names unknown row "${id}"`);
+  assert(plans.fullApp?.title && plans.fullApp.points?.length > 0, "plans.json: fullApp needs title and points");
   for (const list of ["promises", "upsells"]) {
     const ids = new Set();
     for (const n of plans[list]) {
@@ -1592,6 +1614,12 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   for (const k of ["askKicker", "reviewKicker", "reviewFallback", "acceptedLabel"]) {
     lines.push(`  static let agentPrompt${k[0].toUpperCase()}${k.slice(1)}: String = ${L(convoBlock[k], convoBlock, k)}`);
   }
+  const qf = surfaces.quickFind;
+  lines.push("  /// Quick Find copy (`surfaces.json` `quickFind`).");
+  lines.push(`  static let quickFindPlaceholder: String = ${L(qf.placeholder, qf, "placeholder")}`);
+  lines.push(`  static let quickFindEmptyTitle: String = ${L(qf.emptyState.title, qf.emptyState, "title")}`);
+  lines.push(`  static let quickFindEmptyDetail: String = ${L(qf.emptyState.detail, qf.emptyState, "detail")}`);
+  lines.push(`  static let quickFindCompletedLabel: String = ${L(qf.completed.label, qf.completed, "label")}`);
   lines.push("  /// The block of `kind`. Each kind appears exactly once (the generator checks it).");
   lines.push("  static func taskPageBlock(_ kind: RegistryTaskPageBlockKind) -> RegistryTaskPageBlock {");
   lines.push("    guard let b = taskPageBlocks.first(where: { $0.kind == kind }) else { preconditionFailure(\"no task page block \\(kind)\") }");
@@ -1648,6 +1676,39 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  let editOnly: Bool");
   lines.push("  /// The block shows on `platform` when its capability ships there (ADR 0015).");
   lines.push("  func applies(to platform: String) -> Bool { RegistryCapabilities.isAvailable(featureId, on: platform) }");
+  lines.push("}");
+  lines.push("");
+
+  // 8a. References (surfaces.json `taskReferences`)
+  const refs = surfaces.taskReferences;
+  const refTmpl = (node) => L10N.swiftTemplate(BY_KEY, tmplKey(node.format, node, "format"));
+  const refKind = (id, k) => `RegistryTaskReferenceKind(id: ${swiftStr(id)}, label: ${L(k.label, k, "label")}, sfSymbol: ${swiftStr(icons.icons[k.icon].sfSymbol)})`;
+  lines.push("/// The label and the symbol of one reference kind (`surfaces.json` `taskReferences.kinds`).");
+  lines.push("struct RegistryTaskReferenceKind: Sendable, Hashable {");
+  lines.push("  let id: String");
+  lines.push("  let label: String");
+  lines.push("  let sfSymbol: String");
+  lines.push("}");
+  lines.push("");
+  lines.push("/// Task references (`surfaces.json` `taskReferences`, docs/TASK_REFERENCES_SPEC.md §8).");
+  lines.push("enum RegistryTaskReferences {");
+  lines.push("  static let kinds: [RegistryTaskReferenceKind] = [");
+  for (const [id, k] of Object.entries(refs.kinds)) lines.push(`    ${refKind(id, k)},`);
+  lines.push("  ]");
+  lines.push("  /// A kind this build does not know.");
+  lines.push(`  static let otherKind: RegistryTaskReferenceKind = ${refKind("", refs.otherKind)}`);
+  lines.push("  static func kind(_ id: String) -> RegistryTaskReferenceKind { kinds.first { $0.id == id } ?? otherKind }");
+  lines.push("  /// The label of a role that shows one, by role.");
+  lines.push(`  static let roleLabels: [String: String] = [${Object.entries(refs.roles).map(([id, r]) => `${swiftStr(id)}: ${L(r.label, r, "label")}`).join(", ")}]`);
+  for (const [name, node] of [["open", refs.open], ["createdFrom", refs.createdFrom], ["limitReached", refs.add.limitReached]]) {
+    const t = refTmpl(node);
+    lines.push(`  static func ${name}(${t.params}) -> String { ${t.body} }`);
+  }
+  for (const [name, node, field] of [
+    ["addPlaceholder", refs.add, "placeholder"], ["addConfirmTitle", refs.add, "confirmTitle"],
+    ["offersTitle", refs.add.offers, "title"], ["invalidMessage", refs.add.invalid, "message"],
+    ["failedMessage", refs.add.failed, "message"],
+  ]) lines.push(`  static let ${name}: String = ${L(node[field], node, field)}`);
   lines.push("}");
   lines.push("");
 
@@ -1745,7 +1806,6 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  /// Registry icon id (icons.json).");
   lines.push("  let icon: String");
   lines.push("  let detail: String");
-  lines.push("  let points: [String]");
   lines.push("  let footnote: String?");
   lines.push("  let highlighted: Bool");
   lines.push("}");
@@ -1754,8 +1814,7 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  let id: String");
   lines.push("  let label: String");
   lines.push("  let planned: Bool");
-  lines.push("  let device: RegistryPlanCell");
-  lines.push("  let account: RegistryPlanCell");
+  lines.push("  let free: RegistryPlanCell");
   lines.push("  let plus: RegistryPlanCell");
   lines.push("}");
   lines.push("");
@@ -1786,11 +1845,11 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   for (const pr of P.prices) lines.push(`    RegistryPlanPrice(id: ${swiftStr(pr.id)}, productId: ${swiftStr(pr.productId)}, amountMinor: ${pr.amountMinor}, currency: ${swiftStr(pr.currency)}, interval: ${swiftStr(pr.interval)}, highlighted: ${pr.highlighted}, label: ${L(pr.label, pr, "label")}, detail: ${L(pr.detail, pr, "detail")}),`);
   lines.push("  ] }");
   lines.push("  static var cards: [RegistryPlanCard] { [");
-  for (const c of P.cards) lines.push(`    RegistryPlanCard(id: ${swiftStr(c.id)}, title: ${L(c.title, c, "title")}, icon: ${swiftStr(c.icon)}, detail: ${L(c.detail, c, "detail")}, points: [${c.points.map((pt) => L(pt, null, null)).join(", ")}], footnote: ${LOpt(c.footnote, c, "footnote")}, highlighted: ${c.highlighted === true}),`);
+  for (const c of P.cards.filter((c) => c.status !== "planned")) lines.push(`    RegistryPlanCard(id: ${swiftStr(c.id)}, title: ${L(c.title, c, "title")}, icon: ${swiftStr(c.icon)}, detail: ${L(c.detail, c, "detail")}, footnote: ${LOpt(c.footnote, c, "footnote")}, highlighted: ${c.highlighted === true}),`);
   lines.push("  ] }");
   lines.push("  static var outcomes: [RegistryPlanOutcome] { [");
   for (const o of P.outcomes) {
-    const rows = o.rows.map((r) => `RegistryPlanRow(id: ${swiftStr(r.id)}, label: ${L(r.label, r, "label")}, planned: ${r.status === "planned"}, device: ${cellSwift(r.cells.device, r, "device")}, account: ${cellSwift(r.cells.account, r, "account")}, plus: ${cellSwift(r.cells.plus, r, "plus")})`).join(",\n      ");
+    const rows = o.rows.map((r) => `RegistryPlanRow(id: ${swiftStr(r.id)}, label: ${L(r.label, r, "label")}, planned: ${r.status === "planned"}, free: ${cellSwift(r.cells.free, r, "free")}, plus: ${cellSwift(r.cells.plus, r, "plus")})`).join(",\n      ");
     lines.push(`    RegistryPlanOutcome(id: ${swiftStr(o.id)}, icon: ${swiftStr(o.icon)}, title: ${L(o.title, o, "title")}, detail: ${L(o.detail, o, "detail")}, rows: [\n      ${rows},\n    ]),`);
   }
   lines.push("  ] }");
@@ -1799,6 +1858,7 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
     for (const n of P[list]) lines.push(`    RegistryPlanNote(id: ${swiftStr(n.id)}, title: ${L(n.title, n, "title")}, detail: ${L(n.detail, n, "detail")}),`);
     lines.push("  ] }");
   }
+  lines.push("  static func card(_ id: String) -> RegistryPlanCard? { cards.first { $0.id == id } }");
   lines.push("  static func upsell(_ id: String) -> RegistryPlanNote? { upsells.first { $0.id == id } }");
   lines.push("  /// The paywall's Terms of Use and Privacy Policy links (App Review 3.1.2).");
   lines.push(`  static let termsURL = URL(string: ${swiftStr(P.legal.terms)})!`);
@@ -2315,6 +2375,7 @@ validateSettings(settings, entities, icons, caps);
 const destIds = validateDestinations(dests, icons, caps);
 validateActions(actions, icons, caps, destIds);
 validateSurfaces(surfaces, icons, caps, plans);
+validateTaskReferences(surfaces, icons, caps, entities);
 checkOpensAttribute({ actions, surfaces });
 checkTaskDateBoard({ surfaces, icons, caps, actions });
 validateFirstRun(surfaces, icons, caps, settings);

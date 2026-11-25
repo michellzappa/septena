@@ -12,7 +12,7 @@ public struct ChangelogHighlight: Codable, Hashable, Identifiable, Sendable {
   public var title: String
   /// Optional sentence of context shown beneath the title.
   public var detail: String?
-  /// Optional `SectionManifest` key — drives the accent color on the row.
+  /// Optional area key from the changelog file.
   /// `nil` for app-wide changes.
   public var section: String?
 

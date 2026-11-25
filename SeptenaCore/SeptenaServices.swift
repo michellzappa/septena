@@ -84,28 +84,6 @@ final class SeptenaServices {
     self.projectsMutator = ProjectsMutator(context: context)
   }
 
-  func ensureSectionEnabled(_ key: String) {
-    SettingsMirror.setSectionEnabled(
-      key, true,
-      context: LocalStore.shared.container.mainContext,
-      engine: ckEngine)
-  }
-
-  func enabledSectionKeys() -> Set<String> {
-    let context = LocalStore.shared.container.mainContext
-    let sections = SettingsMirror.loadSections(context: context)
-    return Set(sections.filter(\.isEnabled).map(\.key))
-  }
-
-  static let alwaysAvailableSectionKeys: Set<String> = ["tasks"]
-
-  func isSectionEnabled(_ key: String) -> Bool {
-    if SectionManifest.isRetired(key) { return false }
-    if SectionManifest.byKey[key]?.activation == .always { return true }
-    if SeptenaServices.alwaysAvailableSectionKeys.contains(key) { return true }
-    return enabledSectionKeys().contains(key)
-  }
-
   /// True once the mutators are bound (`bindWriteBoundary`).
   private var writeBoundaryBound = false
 
@@ -135,9 +113,6 @@ final class SeptenaServices {
     let task = Task { @MainActor [self] in
       let context = LocalStore.shared.container.mainContext
 
-      LaunchTrace.spanSync("start.backfillSectionOnboarding") {
-        SettingsMirror.backfillHasOnboardedForLegacySections(context: context)
-      }
       TaskStoreMode.markDeviceBackend()
       LaunchTrace.spanSync("start.seedSyncedSettings") {
         SeptaskSyncedSettings.seedIfNeeded(from: SettingsMirror.loadCloudKitSettingsRow(context: context))

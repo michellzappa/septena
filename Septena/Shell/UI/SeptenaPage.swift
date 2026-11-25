@@ -40,24 +40,7 @@ enum PageChromeMetrics {
   /// task surface reserves 0 and content rests at the normal page top instead
   /// of ~62pt lower. The constant is gated at the source so all surfaces
   /// (`SelectableScrollList`, `pageChrome`, `septenaTabInset`) agree.
-  #if SEPTASK
   static let iPadBarHeight: CGFloat = 0
-  #else
-  static let iPadBarHeight: CGFloat = 74
-  #endif
-}
-
-extension SeptenaTab {
-  /// The `pageChrome` id each tab writes its chrome under (matches the `id:`
-  /// each tab passes to `.pageChrome(...)`). `goals` → "coach".
-  var chromeID: String {
-    switch self {
-    case .week:  return "week"
-    case .next:  return "next"
-    case .tasks: return "tasks"
-    case .goals: return "coach"
-    }
-  }
 }
 
 /// Per-tab "···" rows + "+" that the iPad top-bar overlay renders. On iPad each
@@ -107,76 +90,6 @@ struct PageAddButton: View {
     .tint(.primary)
   }
 }
-
-// Full-app tab chrome: rides TabSelection + SettingsStore, which Septask
-// doesn't compile (no tab bar there) — see docs/SEPTASK.md.
-#if !SEPTASK
-/// The section switcher as a centered segmented control — the Calendar pattern.
-/// On iPad the `TabView`'s own tab bar is hidden and this rides the navigation
-/// bar's `principal` slot, so the switcher sits on ONE row flanked by the gear
-/// (leading) and ···/+ (trailing), instead of the tab pill floating on a
-/// separate row above the actions. Bound to the shared `TabSelection`, so it
-/// drives the same content the (now hidden) tab bar would.
-struct TabSwitcher: View {
-  @Environment(TabSelection.self) private var tabSelection
-  @Environment(SettingsStore.self) private var settingsStore
-  @Environment(SectionTheme.self) private var theme
-  /// Drives the sliding active-tab bubble between segments.
-  @Namespace private var bubble
-
-  private var tasksEnabled: Bool {
-    if SectionManifest.isRetired("tasks") { return false }
-    return settingsStore.sections.first { $0.key == "tasks" }?.isEnabled ?? true
-  }
-
-  private var tabs: [(tab: SeptenaTab, title: String)] {
-    var t: [(SeptenaTab, String)] = [(.week, "Today"), (.next, "Next")]
-    if tasksEnabled { t.append((.tasks, "Tasks")) }
-    t.append((.goals, "Coach"))
-    return t
-  }
-
-  var body: some View {
-    #if os(iOS)
-    // iOS 26 Liquid Glass segmented bar: one `GlassEffectContainer` + track
-    // `.glassEffect`, per-segment `glassEffectID` for morphing, and a tinted
-    // underlay (not an opaque fill) for the sliding selection.
-    GlassEffectContainer {
-      segmentButtons
-        .padding(4)
-        .glassSegmentTrack()
-    }
-    #else
-    segmentButtons
-      .padding(4)
-      .glassSegmentTrack()
-    #endif
-  }
-
-  private var segmentButtons: some View {
-    HStack(spacing: 2) {
-      ForEach(tabs, id: \.tab) { item in
-        let selected = tabSelection.current == item.tab
-        Button {
-          if !selected { a11yAnimate(.snappy(duration: 0.28)) { tabSelection.current = item.tab } }
-        } label: {
-          Text(item.title)
-            .font(.body.weight(.semibold))
-            .foregroundStyle(selected ? AnyShapeStyle(theme.accent) : AnyShapeStyle(.secondary))
-            .padding(.horizontal, 18)
-            .padding(.vertical, 9)
-            .glassSegmentSelectionUnderlay(isSelected: selected, tint: theme.accent, in: bubble)
-            .contentShape(Capsule())
-        }
-        .buttonStyle(.plain)
-        #if os(iOS)
-        .glassEffectID(item.tab, in: bubble)
-        #endif
-      }
-    }
-  }
-}
-#endif
 
 // MARK: - Tab scroll insets (top chrome + wide horizontal)
 
@@ -288,45 +201,6 @@ extension View {
                                 wideContentGutter: wideContentGutter))
   }
 
-  /// Standard treatment for a top-level tab page's scroll view: nav title,
-  /// scroll surface, soft top edge, and the unified chrome (`.pageChrome`, which
-  /// also reserves the iPad bar inset via contentMargins). Apply to the page's
-  /// OWN List/ScrollView so the scroll modifiers land on it. Page-specific bits
-  /// (Today's sky background, Next's list selection) stay on the page.
-  func septenaTabPage(
-    id: String, title: String,
-    localActions: @escaping () -> AnyView? = { nil },
-    add: PageAdd? = nil,
-    showsGlobal: Bool = true,
-    scrollTopInset: CGFloat? = nil,
-    wideContentGutter: CGFloat = 0
-  ) -> some View {
-    self
-      .scrollContentBackground(.hidden)
-      .homeTabScrollSurface()
-      .softTopScrollEdgeEffectCompat()
-      .navigationTitle("")
-      #if os(iOS)
-      .navigationBarTitleDisplayMode(.inline)
-      #endif
-      .pageChrome(id: id, title: title, localActions: localActions,
-                  add: add, showsGlobal: showsGlobal,
-                  scrollTopInset: scrollTopInset,
-                  wideContentGutter: wideContentGutter)
-  }
-
-  /// iPad floating-bar top inset for scroll surfaces that don't publish chrome
-  /// themselves (e.g. Tasks split detail). Prefer `.septenaTabScrollInsets` when
-  /// both top and wide horizontal margins are needed.
-  func septenaTabInset(ownTopPadding: CGFloat = 0) -> some View {
-    #if os(iOS)
-    septenaTabScrollInsets(
-      top: max(0, PageChromeMetrics.iPadBarHeight - ownTopPadding))
-    #else
-    self
-    #endif
-  }
-
   /// Reports whether this tab is at its navigation root so `RootTabView` can
   /// hide the window-level chrome overlay when a section/detail is pushed.
   /// No-op off iOS.
@@ -423,7 +297,6 @@ private struct PageChromeModifier: ViewModifier {
     // instead of the window overlay. `usesPushNavigation` is true on iPad
     // regular regardless of column width.
     if usesPushNavigation {
-      #if SEPTASK
       // Septask never renders the floating iPad overlay bar — that lives only in
       // Septena's `RootTabView.iPadTabless`. Routing chrome there would strand the
       // gear/"+" off-screen AND leave an empty, background-hidden nav bar with no
@@ -434,19 +307,6 @@ private struct PageChromeModifier: ViewModifier {
       content
         .toolbar { chromeToolbar }
         .septenaTabScrollInsets(top: scrollTopInset ?? 0, contentGutter: wideContentGutter)
-      #else
-      // Septena iPad: chrome is the window-level overlay bar (RootTabView.iPadTabless),
-      // not nav-bar toolbar items — so it aligns to the content gutter and the
-      // Tasks sidebar can't shift it. Publish this page's "···"/"+" for the
-      // overlay to render; draw nothing in the (transparent) nav bar here.
-      content
-        .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
-        .septenaTabScrollInsets(
-          top: scrollTopInset ?? PageChromeMetrics.iPadBarHeight,
-          contentGutter: wideContentGutter)
-        .onAppear { publishIPadChrome() }
-        .onChange(of: nav.path.last?.id) { _, _ in publishIPadChrome() }
-      #endif
     } else {
       // iPhone: ···/+ live in the page's own nav bar (bottom tab bar stays).
       content
@@ -463,7 +323,6 @@ private struct PageChromeModifier: ViewModifier {
   @ToolbarContentBuilder
   private var chromeToolbar: some ToolbarContent {
     #if os(iOS)
-    #if SEPTASK
     if !usesPushNavigation {
       // iPhone (compact) Septena: top-left is Settings only on root pages
       // (pushed destinations keep the native Back button unobstructed);
@@ -492,14 +351,6 @@ private struct PageChromeModifier: ViewModifier {
         ToolbarItem(placement: .topBarTrailing) { PageAddButton(perform: run) }
       }
     }
-    #else
-    if showsGlobal || id == "tasks" {
-      ToolbarItem(placement: .topBarLeading) { iosLeadingChrome }
-    }
-    if let run = addClosure {
-      ToolbarItem(placement: .topBarTrailing) { PageAddButton(perform: run) }
-    }
-    #endif
     #else
     if id == "tasks" {
       // macOS split-view Tasks: the SIDEBAR column (no "+" action) owns the one

@@ -18,6 +18,7 @@ final class KitHistoryView: NSStackView {
   private var taskID: String?
   private var expanded = false
   private var loaded: String?
+  private var edgeUpsellID: String?
   private var loadTask: Task<Void, Never>?
 
   init() {
@@ -86,7 +87,14 @@ final class KitHistoryView: NSStackView {
       case .success(let page):
         self.render(TaskHistory.rows(page.changes, listTitle: self.listTitle),
                     edge: TaskHistory.edgeUpsell(page))
-      case .failure:
+      case .failure(let error):
+        if case TaskBackendError.limitReached(let limit) = error {
+          PlanStatus.shared.noteLimitReached(limit)
+          if let note = limit.upsellNote {
+            self.render([], edge: note)
+            return
+          }
+        }
         self.render([])
         self.status.stringValue = String(localized: "Couldn’t load history.", comment: "SeptaskKit: history error")
         self.status.isHidden = false
@@ -113,9 +121,12 @@ final class KitHistoryView: NSStackView {
       row.widthAnchor.constraint(equalTo: rows.widthAnchor).isActive = true
     }
     if let edge {
+      edgeUpsellID = edge.id
       let line = edgeView(edge)
       rows.addArrangedSubview(line)
       line.widthAnchor.constraint(equalTo: rows.widthAnchor).isActive = true
+    } else {
+      edgeUpsellID = nil
     }
   }
 
@@ -145,7 +156,7 @@ final class KitHistoryView: NSStackView {
 
   @objc private func seePlus() {
     guard let presenter = window?.contentViewController else { return }
-    SeptaskPlusSheet.present(upsellID: "history_edge", from: presenter)
+    SeptaskPlusSheet.present(upsellID: edgeUpsellID ?? "history_edge", from: presenter)
   }
 
   private static func rowView(_ item: TaskHistoryRow, now: Date) -> NSView {

@@ -40,6 +40,7 @@ enum SeptaskLaunch {
       SeptaskDiagnosticsCoordinator.setEnabled(false)
       BadgeManager.shared.start(context: localStore.container.mainContext)
       TaskReminderScheduler.shared.start(context: localStore.container.mainContext)
+      SeptaskPushNotifications.shared.start()
       TasksWidgetSnapshotPublisher.shared.drainPendingCompletions(using: services.taskMutator)
       TasksWidgetSnapshotPublisher.shared.start()
       #if os(iOS)
@@ -89,6 +90,7 @@ enum SeptaskLaunch {
     services.taskMutator.catchUpFixedSchedules()
     services.runFadePassIfDue()
     TaskReminderScheduler.shared.scheduleReconcile()
+    SeptaskPushNotifications.shared.syncRegistrationIfNeeded()
     TasksWidgetSnapshotPublisher.shared.drainPendingCompletions(using: services.taskMutator)
     TasksWidgetSnapshotPublisher.shared.schedulePublish()
     #if os(iOS)
@@ -351,20 +353,28 @@ enum SeptaskDeepLinkRouter {
     guard let link = TasksWidgetDeepLink.parse(url) else { return }
     switch link {
     case .quickAdd:
-      navigation.presentAddInfo(section: .tasks)
+      navigation.presentAddInfo()
     case .list(let id):
       navigation.go(to: route(forListID: id))
     case .task(let taskID):
-      let filter = destinationFilter(forTaskID: taskID, context: context)
-      let dest: Route
-      switch filter {
-      case .project(let pid): dest = .project(id: pid)
-      case .area(let aid):    dest = .area(id: aid)
-      default:                dest = .filter(filter)
-      }
-      navigation.pendingTaskReveal = NavigationState.TaskReveal(taskID: taskID, routeID: dest.id)
-      navigation.go(to: dest)
+      openTask(taskID, navigation: navigation, context: context)
     }
+  }
+
+  /// Show a task in the list that owns it. `opensPage` also opens its task
+  /// page (a reference to another task).
+  static func openTask(_ taskID: String, opensPage: Bool = false,
+                       navigation: NavigationState, context: ModelContext) {
+    let filter = destinationFilter(forTaskID: taskID, context: context)
+    let dest: Route
+    switch filter {
+    case .project(let pid): dest = .project(id: pid)
+    case .area(let aid):    dest = .area(id: aid)
+    default:                dest = .filter(filter)
+    }
+    navigation.pendingTaskReveal = NavigationState.TaskReveal(taskID: taskID, routeID: dest.id,
+                                                              opensPage: opensPage)
+    navigation.go(to: dest)
   }
 
   #if os(macOS)
@@ -380,10 +390,15 @@ enum SeptaskDeepLinkRouter {
     case .list(let id):
       shell.go(to: filter(forListID: id))
     case .task(let taskID):
-      let context = LocalStore.shared.container.mainContext
-      let dest = destinationFilter(forTaskID: taskID, context: context)
-      shell.revealTask(id: taskID, in: dest)
+      openTaskMac(taskID)
     }
+  }
+
+  static func openTaskMac(_ taskID: String, opensPage: Bool = false) {
+    guard let shell = SeptaskKitWindowController.existing else { return }
+    let context = LocalStore.shared.container.mainContext
+    shell.revealTask(id: taskID, in: destinationFilter(forTaskID: taskID, context: context),
+                     opensPage: opensPage)
   }
   #endif
 }

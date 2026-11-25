@@ -33,16 +33,10 @@ struct TaskListNotice<Actions: View>: View {
   @ViewBuilder var actions: Actions
   @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
   @Environment(\.colorScheme) private var colorScheme
-  #if SEPTASK
   private let appearance = AppearancePreferences.shared
-  #endif
 
   private var useLiquidGlass: Bool {
-    #if SEPTASK
     return appearance.hasActiveTexture && !reduceTransparency
-    #else
-    return false
-    #endif
   }
 
   var body: some View {

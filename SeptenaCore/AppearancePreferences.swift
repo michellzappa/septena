@@ -209,7 +209,6 @@ final class AppearancePreferences {
       ?? RegistrySettings.Defaults.textureMotion
     self.textureMotion = HeaderTextureMotion(rawValue: motionRaw) ?? .still
 
-    #if SEPTASK
     syncObserver = NotificationCenter.default.addObserver(
       forName: .septaskSettingsPulled, object: nil, queue: .main
     ) { [weak self] _ in
@@ -217,7 +216,6 @@ final class AppearancePreferences {
         self?.adoptSynced(SeptaskSyncedSettings.current())
       }
     }
-    #endif
 
     #if os(macOS)
     macThemeObserver = DistributedNotificationCenter.default().addObserver(
@@ -497,7 +495,6 @@ final class AppearancePreferences {
 
   private func pushSyncedIfEnabled() {
     guard !isAdoptingSynced, syncTheme else { return }
-    #if SEPTASK
     let context = LocalStore.shared.container.mainContext
     var s = SettingsMirror.loadSettings(context: context) ?? SeptaskSyncedSettings.empty
     s.accentColor = accentColorID
@@ -505,7 +502,6 @@ final class AppearancePreferences {
     s.textureIntensity = textureIntensity
     s.textureMotion = textureMotion.rawValue
     SettingsMirror.upsert(settings: s, context: context, engine: nil)
-    #endif
   }
 
   private func notifyChanged() {

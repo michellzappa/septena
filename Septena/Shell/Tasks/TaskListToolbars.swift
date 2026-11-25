@@ -182,7 +182,6 @@ struct TaskListStandaloneChrome: ViewModifier {
   func body(content: Content) -> some View {
     #if os(iOS)
     if usesPushNavigation {
-      #if SEPTASK
       // Septask has no floating window-level overlay bar (unlike Septena's
       // `RootTabView.iPadTabless`), so on iPad / unfolded iPhone Duo the
       // standalone detail column owns its own trailing action (New Task).
@@ -205,13 +204,6 @@ struct TaskListStandaloneChrome: ViewModifier {
           }
         }
       }
-      #else
-      // Septena iPad regular: the Tasks SIDEBAR publishes the window-level
-      // chrome (gear/···/+); the detail must NOT also publish (it would clobber
-      // the sidebar's entry). The bar inset lives on `SelectableScrollList`'s
-      // `ScrollView` via `iPadTabBarInsetOwnPadding`.
-      content
-      #endif
     } else if embedded {
       content.toolbar { embeddedStarItem }
     } else {
