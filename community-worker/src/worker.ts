@@ -1,6 +1,5 @@
 import { issueChallenge, rateLimited, verifyAttestation } from "./attest";
 import { bindAppleSub, mintSession, verifyAppleIdentityToken } from "./apple";
-import { telemetryAdmin } from "./admin";
 import { hmacUserHash, requireUser } from "./auth";
 import type { Env } from "./env";
 import { json, notFound, publicJson, readJson } from "./http";
@@ -101,10 +100,6 @@ async function route(req: Request, env: Env): Promise<Response> {
 
       const session = await mintSession(env, userHash, verified.sub!);
       return json({ sessionToken: session.token, expiresAt: session.expiresAt });
-    }
-
-    if (req.method === "GET" && path === "/admin/telemetry") {
-      return telemetryAdmin(req, env);
     }
 
     if (req.method === "GET" && path === "/api/me") {
