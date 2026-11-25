@@ -125,6 +125,8 @@ final class TaskSyncEngine {
   static let settingsReadyKey = "septena.taskSync.settingsReady"
   /// True once a pull that asked for references finished.
   static let taskRefsReadyKey = "septena.taskSync.taskRefsReady"
+  /// True once a pull that asked for Do sessions finished.
+  static let doSessionsReadyKey = "septena.taskSync.doSessionsReady"
   /// Backend user id of the last sign-in, compared on the next sign-in.
   static let lastUserKey = "septena.taskSync.lastUserID"
   @ObservationIgnored private static let issueCap = 200
@@ -168,8 +170,8 @@ final class TaskSyncEngine {
   func start() {
     guard !isRunning, !DemoSeedMode.isOn else { return }
     guard let store = store() else { return }
-    if !settingsReady || !taskRefsReady {
-      // Pulls before this build skipped setting and reference rows, and
+    if !settingsReady || !taskRefsReady || !doSessionsReady {
+      // Pulls before this build skipped setting, reference and Do rows, and
       // `since` moved past them. Read everything once, so the rows another
       // device or an agent wrote arrive.
       since = 0
@@ -360,6 +362,7 @@ final class TaskSyncEngine {
     case .attachment: captureAttachment(id, row: fetchAttachment(id), store: store, lookup: lookup)
     case .checklistItem: captureChecklistItem(id, row: fetchChecklistItem(id), store: store, lookup: lookup)
     case .taskRef: captureTaskRef(id, row: fetchTaskRef(id), store: store, lookup: lookup)
+    case .doSession: captureDoSession(id, row: fetchDoSession(id), store: store, lookup: lookup)
     case .tag: captureTag(id, row: fetchTag(id), store: store, lookup: lookup)
     case .convo, .turn, .setting: break
     }
@@ -422,6 +425,7 @@ final class TaskSyncEngine {
     let attachments = (try? main.fetch(FetchDescriptor<TaskAttachmentEntity>())) ?? []
     let checklistItems = (try? main.fetch(FetchDescriptor<TaskChecklistItemEntity>())) ?? []
     let taskRefs = (try? main.fetch(FetchDescriptor<TaskRefEntity>())) ?? []
+    let doSessions = (try? main.fetch(FetchDescriptor<DoSessionEntity>())) ?? []
     let tags = (try? main.fetch(FetchDescriptor<TagEntity>())) ?? []
     for a in areas { captureArea(a.id, row: a, store: store, lookup: lookup) }
     for p in projects { captureProject(p.id, row: p, store: store, lookup: lookup) }
@@ -433,13 +437,14 @@ final class TaskSyncEngine {
     for a in attachments { captureAttachment(a.id, row: a, store: store, lookup: lookup) }
     for item in checklistItems { captureChecklistItem(item.id, row: item, store: store, lookup: lookup) }
     for ref in taskRefs { captureTaskRef(ref.id, row: ref, store: store, lookup: lookup) }
+    for s in doSessions { captureDoSession(s.id, row: s, store: store, lookup: lookup) }
 
     // Rows the backend has that are gone here: hard-deleted without a capture.
     let present: [String: Set<String>] = [
       "task": Set(tasks.map(\.id)), "area": Set(areas.map(\.id)),
       "project": Set(projects.map(\.id)), "attachment": Set(attachments.map(\.id)),
       "checklistItem": Set(checklistItems.map(\.id)), "taskRef": Set(taskRefs.map(\.id)),
-      "tag": Set(tags.map(\.id)),
+      "doSession": Set(doSessions.map(\.id)), "tag": Set(tags.map(\.id)),
     ]
     for (key, shadow) in shadows where !shadow.gone {
       guard let colon = key.firstIndex(of: ":") else { continue }
@@ -453,6 +458,7 @@ final class TaskSyncEngine {
       case "attachment": captureAttachment(id, row: nil, store: store, lookup: lookup)
       case "checklistItem": captureChecklistItem(id, row: nil, store: store, lookup: lookup)
       case "taskRef": captureTaskRef(id, row: nil, store: store, lookup: lookup)
+      case "doSession": captureDoSession(id, row: nil, store: store, lookup: lookup)
       case "tag": captureTag(id, row: nil, store: store, lookup: lookup)
       default: break
       }
@@ -615,6 +621,12 @@ final class TaskSyncEngine {
                   store: store, lookup: lookup)
   }
 
+  private func captureDoSession(_ id: String, row: DoSessionEntity?, store: TaskSyncStore,
+                                lookup: (String) -> TaskSyncShadow?) {
+    captureSimple(.doSession, id, plan: row.map { TaskBackendMapping.doSession($0) },
+                  store: store, lookup: lookup)
+  }
+
   private func captureTag(_ id: String, row: TagEntity?, store: TaskSyncStore,
                           lookup: (String) -> TaskSyncShadow?) {
     captureSimple(.tag, id, plan: row.map { TaskBackendMapping.tag($0) },
@@ -689,6 +701,9 @@ final class TaskSyncEngine {
     if entity == .taskRef {
       // Task and key are fixed at insert (registry/entities.json, `updatable`).
       patch = patch.filter { $0.key == "role" || $0.key == "snapshot" || $0.key == "position" }
+    }
+    if entity == .doSession {
+      patch = patch.filter { !["taskId", "startedAt", "sourceClient"].contains($0.key) }
     }
     if !patch.isEmpty {
       enqueueUpsert(entity, id, entity == .project ? withNotesBase(patch, key: key, old: old) : patch, store: store)
@@ -829,6 +844,12 @@ final class TaskSyncEngine {
     return try? main.fetch(d).first
   }
 
+  func fetchDoSession(_ id: String) -> DoSessionEntity? {
+    var d = FetchDescriptor<DoSessionEntity>(predicate: #Predicate { $0.id == id })
+    d.fetchLimit = 1
+    return try? main.fetch(d).first
+  }
+
   func fetchTaskRef(_ id: String) -> TaskRefEntity? {
     var d = FetchDescriptor<TaskRefEntity>(predicate: #Predicate { $0.id == id })
     d.fetchLimit = 1
@@ -911,6 +932,7 @@ final class TaskSyncEngine {
         }
         if !settingsReady { settingsReady = true }
         if !taskRefsReady { taskRefsReady = true }
+        if !doSessionsReady { doSessionsReady = true }
         if reconcileSettings(store: store) { syncAgain = true }
         if reconcileFirst, Date().timeIntervalSince(lastReconcile) > 60 {
           reconcile(store: store)
@@ -1640,6 +1662,7 @@ final class TaskSyncEngine {
     }
     for c in (try? context.fetch(FetchDescriptor<TaskChecklistItemEntity>())) ?? [] { context.delete(c) }
     for r in (try? context.fetch(FetchDescriptor<TaskRefEntity>())) ?? [] { context.delete(r) }
+    for s in (try? context.fetch(FetchDescriptor<DoSessionEntity>())) ?? [] { context.delete(s) }
     for t in (try? context.fetch(FetchDescriptor<TaskEntity>())) ?? [] { context.delete(t) }
     for p in (try? context.fetch(FetchDescriptor<ProjectEntity>())) ?? [] { context.delete(p) }
     for a in (try? context.fetch(FetchDescriptor<AreaEntity>())) ?? [] { context.delete(a) }
@@ -1684,6 +1707,11 @@ final class TaskSyncEngine {
   var taskRefsReady: Bool {
     get { UserDefaults.standard.bool(forKey: Self.taskRefsReadyKey) }
     set { UserDefaults.standard.set(newValue, forKey: Self.taskRefsReadyKey) }
+  }
+
+  var doSessionsReady: Bool {
+    get { UserDefaults.standard.bool(forKey: Self.doSessionsReadyKey) }
+    set { UserDefaults.standard.set(newValue, forKey: Self.doSessionsReadyKey) }
   }
 
   /// `SettingsMirror.upsert` changed a synced setting. Queues it when the

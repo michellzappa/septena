@@ -23,6 +23,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import app.septena.android.AndroidAppGraph
+import app.septena.core.DoSession
+import app.septena.core.DoStamp
 import app.septena.core.JsonValue
 import app.septena.core.RegistryCatalog
 import app.septena.core.SyncRecord
@@ -31,7 +33,9 @@ import app.septena.core.WireTimestamp
 import app.septena.core.booleanValue
 import app.septena.core.generated.RegistryEntityEnums
 import app.septena.core.generated.RegistryEntityFields
+import app.septena.core.generated.RegistryEntityLimits
 import app.septena.core.generated.RegistryEntityNames
+import app.septena.core.longValue
 import app.septena.core.stringValue
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -49,10 +53,11 @@ data class ParsedTransferEnvelope(
     val tasks: List<Map<String, JsonValue>>,
     val tags: List<Map<String, JsonValue>>,
     val checklistItems: List<Map<String, JsonValue>>,
+    val doSessions: List<Map<String, JsonValue>> = emptyList(),
     val skippedCount: Int,
 ) {
     val supportedCount: Int
-        get() = areas.size + projects.size + tasks.size + tags.size + checklistItems.size
+        get() = areas.size + projects.size + tasks.size + tags.size + checklistItems.size + doSessions.size
 }
 
 /**
@@ -61,6 +66,8 @@ data class ParsedTransferEnvelope(
  */
 object TaskDataTransferCodec {
     const val ENVELOPE_VERSION = 1L
+    private const val DO_SESSION_TABLE = "do_session"
+    private const val DO_SESSION_TASK_KEY = "taskID"
 
     suspend fun exportJson(store: TaskStore, now: Instant, appVersion: String = "0.1.0"): String {
         val areas = store.records(RegistryEntityNames.AREA).filter { it.deletedAt == null }
@@ -68,6 +75,7 @@ object TaskDataTransferCodec {
         val tasks = store.records(RegistryEntityNames.TASK).filter { it.deletedAt == null }
         val checklistItems = store.records(RegistryEntityNames.CHECKLIST_ITEM).filter { it.deletedAt == null }
         val taskRefs = store.records(RegistryEntityNames.TASK_REF).filter { it.deletedAt == null }
+        val doSessions = store.records(RegistryEntityNames.DO_SESSION).filter { it.deletedAt == null }
         val tags = store.records(RegistryEntityNames.TAG).filter { it.deletedAt == null }
 
         fun rowObject(r: SyncRecord): JsonValue.ObjectValue {
@@ -83,6 +91,7 @@ object TaskDataTransferCodec {
             "task" to JsonValue.ArrayValue(tasks.map(::rowObject)),
             "checklist_item" to JsonValue.ArrayValue(checklistItems.map(::rowObject)),
             "task_ref" to JsonValue.ArrayValue(taskRefs.map(::rowObject)),
+            DO_SESSION_TABLE to JsonValue.ArrayValue(doSessions.map(::doSessionObject)),
             "tag" to JsonValue.ArrayValue(tags.map(::rowObject)),
         )
         return JsonValue.ObjectValue(
@@ -94,6 +103,60 @@ object TaskDataTransferCodec {
                 "tables" to JsonValue.ObjectValue(tables),
             ),
         ).canonicalJson()
+    }
+
+    /** The keys of Apple's `doSessionDict`. */
+    private fun doSessionObject(r: SyncRecord): JsonValue.ObjectValue {
+        val map = linkedMapOf<String, JsonValue>("id" to JsonValue.StringValue(r.id))
+        for ((field, value) in r.fields) {
+            if (value === JsonValue.Null) continue
+            when (field) {
+                RegistryEntityFields.DoSession.TASK_ID -> map[DO_SESSION_TASK_KEY] = value
+                RegistryEntityFields.DoSession.LAPSED ->
+                    map[field] = JsonValue.BooleanValue(DoSession.from(r)?.lapsed == true)
+                else -> map[field] = value
+            }
+        }
+        return JsonValue.ObjectValue(map)
+    }
+
+    /**
+     * The row that an import writes, or null when it cannot come back. An
+     * imported Do is history, so an open one ends where it started (as Apple).
+     */
+    private fun importedDoSession(row: Map<String, JsonValue>, taskId: String): Map<String, JsonValue>? {
+        fun stamp(field: String): JsonValue.StringValue? =
+            (row[field] as? JsonValue.StringValue)?.takeIf { DoStamp.instant(it.value) != null }
+        val started = stamp(RegistryEntityFields.DoSession.STARTED_AT) ?: return null
+        val ended = stamp(RegistryEntityFields.DoSession.ENDED_AT)
+        val exit = row[RegistryEntityFields.DoSession.EXIT].stringValue()
+            ?.takeIf { it in RegistryEntityEnums.all.getValue("doExit") }
+        return buildMap {
+            put(RegistryEntityFields.DoSession.TASK_ID, JsonValue.StringValue(taskId))
+            put(RegistryEntityFields.DoSession.STARTED_AT, started)
+            row[RegistryEntityFields.DoSession.PLANNED_MINUTES].longValue()?.let {
+                put(
+                    RegistryEntityFields.DoSession.PLANNED_MINUTES,
+                    JsonValue.IntegerValue(it.coerceIn(1L, RegistryEntityLimits.DO_PLANNED_MINUTES_MAX)),
+                )
+            }
+            stamp(RegistryEntityFields.DoSession.CONFIRMED_AT)?.let { put(RegistryEntityFields.DoSession.CONFIRMED_AT, it) }
+            put(RegistryEntityFields.DoSession.ENDED_AT, ended ?: started)
+            put(RegistryEntityFields.DoSession.EXIT, JsonValue.StringValue(exit ?: RegistryEntityEnums.DoExit.STOPPED))
+            put(
+                RegistryEntityFields.DoSession.LAPSED,
+                JsonValue.BooleanValue(ended == null || row[RegistryEntityFields.DoSession.LAPSED].booleanValue() == true),
+            )
+            row[RegistryEntityFields.DoSession.NOTE].stringValue()?.takeIf(String::isNotBlank)?.let {
+                put(
+                    RegistryEntityFields.DoSession.NOTE,
+                    JsonValue.StringValue(it.take(RegistryEntityLimits.DO_NOTE_MAX.toInt())),
+                )
+            }
+            row[RegistryEntityFields.DoSession.SOURCE_CLIENT]?.stringValue()?.takeIf(String::isNotBlank)?.let {
+                put(RegistryEntityFields.DoSession.SOURCE_CLIENT, JsonValue.StringValue(it))
+            }
+        }
     }
 
     suspend fun exportMarkdown(store: TaskStore): String {
@@ -190,7 +253,9 @@ object TaskDataTransferCodec {
             (tables[key] as? JsonValue.ArrayValue)?.values.orEmpty()
                 .mapNotNull { (it as? JsonValue.ObjectValue)?.fields }
 
-        val supportedKeys = setOf("area", "project", "task", "tag", "checklist_item", "task_ref", "task_attachment")
+        val supportedKeys = setOf(
+            "area", "project", "task", "tag", "checklist_item", "task_ref", DO_SESSION_TABLE, "task_attachment",
+        )
         val skipped = tables.entries
             .filter { it.key !in supportedKeys }
             .sumOf { (_, v) -> (v as? JsonValue.ArrayValue)?.values?.size ?: 0 }
@@ -203,6 +268,7 @@ object TaskDataTransferCodec {
             tasks = rowsOf("task"),
             tags = rowsOf("tag"),
             checklistItems = rowsOf("checklist_item"),
+            doSessions = rowsOf(DO_SESSION_TABLE),
             skippedCount = skipped,
         )
     }
@@ -257,10 +323,14 @@ object TaskDataTransferCodec {
             if (srcId != null) projectIdMap[srcId] = targetId
         }
 
+        val taskIdMap = linkedMapOf<String, String>()
         val existingTaskIds = graph.taskStore.records(RegistryEntityNames.TASK).mapTo(HashSet()) { it.id }
         for (row in envelope.tasks) {
             val srcId = row["id"].stringValue()
-            if (srcId != null && srcId in existingTaskIds) continue
+            if (srcId != null && srcId in existingTaskIds) {
+                taskIdMap[srcId] = srcId
+                continue
+            }
             val title = row["title"].stringValue()?.trim()?.takeIf(String::isNotEmpty) ?: continue
             val projId = row["project"].stringValue()?.let(projectIdMap::get)
             val areaId = if (projId == null) row["area"].stringValue()?.let(areaIdMap::get) else null
@@ -279,7 +349,16 @@ object TaskDataTransferCodec {
             if (row["status"].stringValue() == RegistryEntityEnums.TaskStatus.DONE) {
                 graph.taskMutator.complete(created.id)
             }
+            if (srcId != null) taskIdMap[srcId] = created.id
             imported += 1
+        }
+
+        for (row in envelope.doSessions) {
+            val id = row["id"].stringValue() ?: continue
+            val taskId = (row[DO_SESSION_TASK_KEY] ?: row[RegistryEntityFields.DoSession.TASK_ID]).stringValue()
+                ?.let(taskIdMap::get) ?: continue
+            val fields = importedDoSession(row, taskId) ?: continue
+            if (graph.doSessions.importEnded(id, fields)) imported += 1
         }
         return imported
     }

@@ -77,7 +77,7 @@ class TaskReminderScheduler(
 
         val previous = prefs.getStringSet(KEY_ARMED, emptySet()).orEmpty()
         for (taskId in previous - desiredIds) alarms.cancel(alarmIntent(taskId))
-        for ((taskId, fire) in desired) arm(taskId, fire)
+        for ((taskId, fire) in desired) arm(alarmIntent(taskId), fire)
         prefs.edit().putStringSet(KEY_ARMED, desiredIds).apply()
 
         // A banner for a task that no longer arms, or that was snoozed on
@@ -107,12 +107,7 @@ class TaskReminderScheduler(
         val copy = ReminderCopy.load(context)
         val title = record.fields[RegistryEntityFields.Task.TITLE].stringValue().orEmpty()
             .ifBlank { copy.notificationTitle }
-        val open = PendingIntent.getActivity(
-            context,
-            taskId.hashCode(),
-            Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-        )
+        val open = openApp(taskId.hashCode())
         // Android shows at most three action buttons: Complete and the two
         // shortest snoozes. Swiping the banner away dismisses the reminder,
         // as Apple's custom dismiss action does.
@@ -136,11 +131,44 @@ class TaskReminderScheduler(
         notifications.cancel(TAG_PREFIX + taskId, NOTIFICATION_ID)
     }
 
+    /** Arms the one alarm of the Do that this device shows (docs/DO_SPEC.md §4). Replaces an earlier one. */
+    fun armDoEnd(sessionId: String, at: Instant) {
+        notifications.cancel(DO_END_TAG, NOTIFICATION_ID)
+        arm(doEndIntent(sessionId), at)
+    }
+
+    fun cancelDoEnd() {
+        alarms.cancel(doEndIntent(""))
+        notifications.cancel(DO_END_TAG, NOTIFICATION_ID)
+    }
+
+    fun postDoEnd(title: String, text: String, at: Instant) {
+        if (!notificationsEnabled()) return
+        ensureChannel()
+        val notification = Notification.Builder(context, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(title)
+            .setContentText(text)
+            .setCategory(Notification.CATEGORY_REMINDER)
+            .setAutoCancel(true)
+            .setWhen(at.toEpochMilli())
+            .setShowWhen(true)
+            .setContentIntent(openApp(DO_END_TAG.hashCode()))
+            .build()
+        notifications.notify(DO_END_TAG, NOTIFICATION_ID, notification)
+    }
+
+    private fun openApp(requestCode: Int): PendingIntent = PendingIntent.getActivity(
+        context,
+        requestCode,
+        Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+    )
+
     private fun action(title: String, taskId: String, action: String): Notification.Action =
         Notification.Action.Builder(null as Icon?, title, ReminderActionReceiver.intent(context, taskId, action)).build()
 
-    private fun arm(taskId: String, fire: Instant) {
-        val intent = alarmIntent(taskId)
+    private fun arm(intent: PendingIntent, fire: Instant) {
         val at = fire.toEpochMilli()
         val exact = canScheduleExact() && runCatching {
             alarms.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, intent)
@@ -158,6 +186,16 @@ class TaskReminderScheduler(
         PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
     )
 
+    /** The same intent for every Do, so a new alarm replaces the last one. */
+    private fun doEndIntent(sessionId: String): PendingIntent = PendingIntent.getBroadcast(
+        context,
+        0,
+        Intent(context, ReminderAlarmReceiver::class.java)
+            .setAction(ReminderAlarmReceiver.ACTION_DO_END)
+            .putExtra(EXTRA_DO_SESSION_ID, sessionId),
+        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+    )
+
     private fun ensureChannel() {
         if (notifications.getNotificationChannel(CHANNEL_ID) != null) return
         val channel = NotificationChannel(
@@ -172,6 +210,8 @@ class TaskReminderScheduler(
         /** Headroom like Apple's 50 pending requests; the rest arm as these fire. */
         const val MAX_ARMED = 50
         const val EXTRA_TASK_ID = "app.septena.android.reminders.TASK_ID"
+        const val EXTRA_DO_SESSION_ID = "app.septena.android.reminders.DO_SESSION_ID"
+        private const val DO_END_TAG = "septena.do.plannedEnd"
         private const val CHANNEL_ID = "septena.task.reminder"
         private const val TAG_PREFIX = "septena.reminder."
         private const val NOTIFICATION_ID = 1

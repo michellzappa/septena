@@ -428,16 +428,16 @@ struct SidebarRootView: View {
     Section {
       ForEach(smartListSpecs, id: \.title) { spec in
         #if os(iOS)
-        compactRow { smartListRow(for: spec, position: .solo) }
+        compactRow { smartListRow(for: spec) }
         #else
-        compactRow(route: spec.route) { smartListRow(for: spec, position: .solo) }
+        compactRow(route: spec.route) { smartListRow(for: spec) }
         #endif
       }
     }
   }
 
   @ViewBuilder
-  private func smartListRow(for spec: SmartListSpec, position: TaskCardPosition) -> some View {
+  private func smartListRow(for spec: SmartListSpec) -> some View {
     #if os(macOS)
     navRow(spec.route) {
       SmartListRow(icon: spec.icon,
@@ -448,7 +448,7 @@ struct SidebarRootView: View {
     .contextMenu { smartListContextMenu(for: spec) }
     .modifier(SmartListTaskDrop(route: spec.route, mutator: taskMutator))
     #else
-    cardRow(spec.route, position: position) {
+    cardRow(spec.route) {
       SmartListRow(icon: spec.icon,
                    iconColor: spec.color,
                    title: spec.title,
@@ -751,19 +751,24 @@ struct SidebarRootView: View {
   }
 
   #if os(iOS)
-  /// An iOS sidebar row as one slice of its section's card — the same model
-  /// as a task row (`taskCardContextMenu`). The row paints its own fill
-  /// across the whole cell, and the context menu sits on that painted row
-  /// with the card-slice preview shape, so a long-press lifts the row as it
-  /// looks in place: same width, same corners, same fill. It used to lift a
-  /// separate padded preview, which the system drew as a floating pill.
+  /// An iOS sidebar row. The row paints its own fill across the whole cell,
+  /// and the context menu sits on that painted row, so a long-press lifts
+  /// what the cell shows, at the cell's width and height.
+  ///
+  /// Three rules keep the lift free of distortion:
+  ///  - The row is as tall as the cell. `List` stretches a cell to its
+  ///    minimum row height, so a shorter row lifts as a strip of the cell.
+  ///  - The base fill is opaque. The selection fill is a wash, and the cell
+  ///    background under it does not lift with the row.
+  ///  - The lift has the same corners on every row. A card slice (round top,
+  ///    square bottom) does not match the corners the system clips the cell
+  ///    to, so an area row changed shape as it lifted.
   ///
   /// The fill is the one selection token: selected, or pressed from
   /// touch-down (`NavigationPressStyle`).
   @ViewBuilder
   private func cardRow<Content: View, Menu: View>(
     _ route: Route,
-    position: TaskCardPosition,
     @ViewBuilder content: () -> Content,
     @ViewBuilder menu: @escaping () -> Menu
   ) -> some View {
@@ -773,11 +778,15 @@ struct SidebarRootView: View {
       navRow(route) {
         label
           .padding(.horizontal, 16)
-          .frame(maxWidth: .infinity, alignment: .leading)
+          .modifier(FillListCell())
           .contentShape(Rectangle())
       }
-      .background(SelectableListRowBackground(isSelected: selected || pressed))
-      .contentShape(.contextMenuPreview, position.cardShape)
+      .background {
+        Theme.cardSurface
+        SelectableListRowBackground(isSelected: selected || pressed)
+      }
+      .contentShape(.contextMenuPreview,
+                    RoundedRectangle(cornerRadius: TaskCardMetrics.radius, style: .continuous))
       .contextMenu(menuItems: menu)
     }
   }
@@ -874,16 +883,13 @@ struct SidebarRootView: View {
 
   @ViewBuilder
   private func areaProjectSections() -> some View {
-    // Each row knows its slice of the section's card, so a long-press lifts
-    // exactly that slice (`cardRow`).
     // A Magic Plus draft row is spliced in as a slot (`projectSlots` /
-    // `areaSlots`) and takes its own slice of the card.
+    // `areaSlots`).
     let looseRows = projectSlots(topLevelProjects, area: nil)
     if !looseRows.isEmpty {
       Section {
         ForEach(Array(looseRows.enumerated()), id: \.element.id) { idx, slot in
           projectSlotRow(slot, parent: nil,
-                         position: TaskCardPosition(index: idx, count: looseRows.count),
                          isLastInLastCard: areas.isEmpty && magicDraft == nil
                            && idx == looseRows.count - 1)
         }
@@ -899,17 +905,14 @@ struct SidebarRootView: View {
         let areaProjects = projects.filter { $0.area == area.id && $0.status == .active }
         let collapsed = collapsedAreas.contains(area.id)
         let rows = collapsed ? [] : projectSlots(areaProjects, area: area.id)
-        let rowCount = 1 + rows.count
         let isLastArea = index == areas.count - 1 && !magicDraftIsAreaAtEnd
         Section {
           compactRow(route: .area(id: area.id)) {
             areaRow(area, hasProjects: !areaProjects.isEmpty, collapsed: collapsed,
-                    position: TaskCardPosition(index: 0, count: rowCount),
                     isLastInLastCard: isLastArea && rows.isEmpty)
           }
           ForEach(Array(rows.enumerated()), id: \.element.id) { idx, row in
             projectSlotRow(row, parent: area.id,
-                           position: TaskCardPosition(index: idx + 1, count: rowCount),
                            isLastInLastCard: isLastArea && idx == rows.count - 1)
           }
         }
@@ -918,10 +921,8 @@ struct SidebarRootView: View {
     let bottomSpecs = bottomSmartListSpecs
     if !bottomSpecs.isEmpty {
       Section {
-        ForEach(Array(bottomSpecs.enumerated()), id: \.element.route.id) { idx, spec in
-          compactRow(route: spec.route) {
-            smartListRow(for: spec, position: TaskCardPosition(index: idx, count: bottomSpecs.count))
-          }
+        ForEach(bottomSpecs, id: \.route.id) { spec in
+          compactRow(route: spec.route) { smartListRow(for: spec) }
         }
       }
     }
@@ -958,9 +959,9 @@ struct SidebarRootView: View {
 
   /// The tappable row and its context menu; `areaRow` adds the drop targets.
   @ViewBuilder
-  private func areaRowBase(_ area: Area, hasProjects: Bool, collapsed: Bool, position: TaskCardPosition) -> some View {
+  private func areaRowBase(_ area: Area, hasProjects: Bool, collapsed: Bool) -> some View {
     #if os(iOS)
-    cardRow(.area(id: area.id), position: position) {
+    cardRow(.area(id: area.id)) {
       SidebarAreaRow(name: area.title, emoji: area.emoji, count: areaOpenCount[area.id] ?? 0,
                      isCollapsed: hasProjects ? collapsed : nil,
                      onToggleCollapse: hasProjects ? { toggleAreaCollapsed(area.id) } : nil)
@@ -982,8 +983,8 @@ struct SidebarRootView: View {
   /// its section's grouped card, projects underneath.
   @ViewBuilder
   private func areaRow(_ area: Area, hasProjects: Bool, collapsed: Bool,
-                       position: TaskCardPosition, isLastInLastCard: Bool) -> some View {
-    areaRowBase(area, hasProjects: hasProjects, collapsed: collapsed, position: position)
+                       isLastInLastCard: Bool) -> some View {
+    areaRowBase(area, hasProjects: hasProjects, collapsed: collapsed)
     // Drag-a-task-here re-home on co-visible sidebar+list (iPad/Mac).
     .modifier(SidebarTaskDrop(kind: .area(area.id), mutator: taskMutator) {
       newProjectInArea = area.id
@@ -1005,9 +1006,9 @@ struct SidebarRootView: View {
 
   /// The tappable row and its context menu; `projectRow` adds the drop targets.
   @ViewBuilder
-  private func projectRowBase(_ project: Project, position: TaskCardPosition) -> some View {
+  private func projectRowBase(_ project: Project) -> some View {
     #if os(iOS)
-    cardRow(.project(id: project.id), position: position) {
+    cardRow(.project(id: project.id)) {
       SidebarProjectRow(name: project.title,
                         progress: projectProgress[project.id] ?? 0,
                         count: projectOpenCount[project.id] ?? 0,
@@ -1028,8 +1029,8 @@ struct SidebarRootView: View {
 
   @ViewBuilder
   private func projectRow(_ project: Project, parent: String?, index: Int,
-                          position: TaskCardPosition, isLastInLastCard: Bool) -> some View {
-    projectRowBase(project, position: position)
+                          isLastInLastCard: Bool) -> some View {
+    projectRowBase(project)
     // Drag-a-task-here re-home on co-visible sidebar+list (iPad/Mac).
     .modifier(SidebarTaskDrop(kind: .project(project.id), mutator: taskMutator) {
       newProjectInArea = parent
@@ -1085,14 +1086,13 @@ struct SidebarRootView: View {
 
   @ViewBuilder
   private func projectSlotRow(_ slot: SidebarProjectSlot, parent: String?,
-                              position: TaskCardPosition,
                               isLastInLastCard: Bool) -> some View {
     switch slot {
     case .draft:
       compactRow { magicDraftRow(isArea: false) }
     case .project(let project, let index):
       compactRow(route: .project(id: project.id)) {
-        projectRow(project, parent: parent, index: index, position: position,
+        projectRow(project, parent: parent, index: index,
                    isLastInLastCard: isLastInLastCard)
       }
     }
@@ -1516,6 +1516,16 @@ struct SmartListRow: View {
 /// The card gap is the Magic Plus line's gap too (`MagicPlusListMetrics`).
 private enum IOSSidebarListMetrics {
   static let sectionSpacing: CGFloat = MagicPlusListMetrics.cardGap
+}
+
+/// Sizes a row to the whole list cell. It reads the minimum row height inside
+/// the cell, where `List` sets it.
+private struct FillListCell: ViewModifier {
+  @Environment(\.defaultMinListRowHeight) private var minRowHeight
+
+  func body(content: Content) -> some View {
+    content.frame(maxWidth: .infinity, minHeight: minRowHeight, alignment: .leading)
+  }
 }
 
 /// iPhone + iPad share the insetGrouped "bubble card" Tasks home — the same

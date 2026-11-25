@@ -766,6 +766,7 @@ struct TaskListView: View {
       delete: !hasTaskSelection ? nil : deleteSelected,
       clearSchedule: !hasTaskSelection ? nil : clearScheduleForSelected,
       editDetails: editDetailsSelectedAction,
+      doTask: doSelectedAction,
       duplicate: duplicateSelectedAction,
       copy: copySelectedAction
     ))
@@ -818,6 +819,7 @@ struct TaskListView: View {
       delete: !hasTaskSelection ? nil : deleteSelected,
       clearSchedule: !hasTaskSelection ? nil : clearScheduleForSelected,
       editDetails: editDetailsSelectedAction,
+      doTask: doSelectedAction,
       duplicate: duplicateSelectedAction,
       copy: copySelectedAction
     )
@@ -2166,6 +2168,7 @@ struct TaskListView: View {
       .contentShape(Rectangle())
     }
     .buttonStyle(PlainHoverRowButtonStyle())
+    .geometryGroup()
     .textCase(nil)
     .selectionDisabled()
   }
@@ -2544,10 +2547,12 @@ struct TaskListView: View {
     }
   }
 
-  /// Today's notices (sign in, rolled in, an explainer), decided once in
-  /// `TaskNotices` and read the same way by the AppKit list.
+  /// The Do notice, in every list as on the Mac and Android, then Today's
+  /// notices (sign in, rolled in, an explainer), decided once in `TaskNotices`
+  /// and read the same way by the AppKit list.
   @ViewBuilder
   private var noticesRow: some View {
+    doNoticeRow
     if filter == .today {
       ForEach(todayNotices) { notice in
         TaskListNotice(
@@ -2583,6 +2588,37 @@ struct TaskListView: View {
       .plainListChrome()
       .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
     }
+  }
+
+  /// What another device does now, or what this one does after Show List
+  /// (docs/DO_SPEC.md §5). A state of the account, so it leads the notices,
+  /// it cannot be dismissed, and it never counts as the one explainer.
+  @ViewBuilder
+  private var doNoticeRow: some View {
+    if DoFlow.isAvailable, DoStore.shared.showsNotice, let doing = DoStore.shared.current {
+      DoNotice(
+        doing: doing,
+        onDone: { finishDo(doing) },
+        onStop: { DoFlow.stop(doing, nav: nav) },
+        onLater: { DoFlow.openLater(doing, nav: nav) }
+      )
+      .transition(.opacity.combined(with: .move(edge: .top)))
+      .plainListChrome()
+      .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
+    }
+  }
+
+  /// Done from the notice: the row's own checkbox path when the row is in
+  /// this list, so it settles as usual.
+  private func finishDo(_ doing: DoState) {
+    nav.doExitSince = doing.startedAt
+    if let task = currentTask(id: doing.taskID), task.status == .open {
+      toggle(task)
+    } else {
+      DoFlow.complete(doing, mutator: mutator, accent: theme.color(for: "tasks"),
+                      logCommit: logCommit, context: modelContext)
+    }
+    DoFlow.offerNeedsYou(nav: nav, context: modelContext)
   }
 
   /// Today's notices, cached outside `body` so rendering never runs synchronous
@@ -3698,6 +3734,22 @@ struct TaskListView: View {
       before: undoBefore, context: modelContext, mutator: mutator)
   }
 
+  /// ⌘J — Do the one selected open task. Nil disables the command.
+  private var doSelectedAction: (() -> Void)? {
+    guard !showingRecentlyDeleted, hasTaskSelection else { return nil }
+    let ids = orderedActionIDs()
+    guard ids.count == 1, let task = currentTask(id: ids[0]), DoFlow.canDo(task) else { return nil }
+    return { beginDo(task) }
+  }
+
+  /// Starts a Do on this task. An open editor folds first, so it saves before
+  /// the Do screen reads the task.
+  private func beginDo(_ task: SeptenaTask) {
+    closeActiveEditIfNeeded()
+    if touchSelectionActive { clearSelection() }
+    DoFlow.begin(task.id)
+  }
+
   /// ⌘S — open the When (schedule) picker for the focused row.
   private func openWhenForSelected() {
     let ids = orderedActionIDs()
@@ -4335,6 +4387,7 @@ struct TaskListView: View {
       showsFadedIndicator: filter != .faded,
       isListSelected: selection.contains(task.id),
       checkboxDimmed: touchSelectionActive,
+      isSettling: model.settle.isSettling(task.id),
       accessory: accessory,
       checklistSummary: checklistCounts[task.id],
       fromKind: fromRefKinds[task.id].map(RegistryTaskReferences.kind),
@@ -4353,11 +4406,12 @@ struct TaskListView: View {
       },
       onTap: nil
     )
-    // Fade on insert/removal. The fade only plays inside an animated
-    // transaction; every settle-driven removal runs through `motion.run`, so
-    // Reduce Motion still gets an instant (un-animated) drop. A row coming
-    // back from its folding editor does not fade: a fade there cross-fades
-    // with the editor (the "flash"); see `foldingEditId`.
+    // Covers the row ↔ editor swap. The row's own arrival and exit is
+    // `rowTransition` on the card slice (`cardedRows`). Both only play inside
+    // an animated transaction, and those run through `motion.run`, so Reduce
+    // Motion still gets an instant drop. A row coming back from its folding
+    // editor does not fade: a fade there cross-fades with the editor (the
+    // "flash"); see `foldingEditId`.
     .transition(foldingEditId == task.id ? .identity : .opacity)
     // Open + selection gestures live on `selectableScrollRow` (applied via
     // `asTaskRow`): tap → open (touch), single-click → select / double-click →
@@ -4493,6 +4547,7 @@ struct TaskListView: View {
           guard case let .single(task) = target else { return nil }
           return filingChipSuggestion(for: task)
         }(),
+        onDo: { task in beginDo(task) },
         onDuplicate: { target in duplicate(target.ids) },
         onSelect: allowsTouchMultiSelect && !touchSelectionActive
           ? { task in beginTouchSelection(task.id) } : nil,
@@ -5024,6 +5079,7 @@ struct TaskListView: View {
         ))
         .zIndex(isExpanded ? 1 : 0)
         .inlineEditDimmed(isInlineEditing && !isExpanded, onDismiss: collapseEdit))
+        .transition(rowTransition(task, position))
     }
     if rendersQuickAdd {
       AnyView(quickAddLine(showsEditor: quickAddShowsEditor)
@@ -5040,6 +5096,14 @@ struct TaskListView: View {
         .zIndex(isEditingQuickAdd ? 1 : 0)
         .inlineEditDimmed(isInlineEditing && !isEditingQuickAdd, onDismiss: collapseEdit))
     }
+  }
+
+  /// The whole card slice leaves with `TaskListRowExit`. A row coming back from
+  /// its folding editor has no transition (see `foldingEditId`).
+  private func rowTransition(_ task: SeptenaTask, _ position: TaskCardPosition) -> AnyTransition {
+    foldingEditId == task.id
+      ? .identity
+      : AnyTransition(TaskListRowExit(fades: position == .solo))
   }
 
   /// Filters applied client-side before rendering:
@@ -5107,6 +5171,7 @@ struct TaskListView: View {
     }
     return groupHeaderBody(icon: icon, title: title, areaEmoji: areaEmoji,
                            projectProgress: projectProgress, onTap: onTap, onAdd: onAdd)
+      .geometryGroup()
       .textCase(nil)
       .selectionDisabled()
       .modifier(dropModifier)
@@ -5116,6 +5181,7 @@ struct TaskListView: View {
         onDropIDs: resolvedMagicDrop
       ))
       .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
+      .transition(TaskListRowExit(fades: true))
   }
 
   private func groupHeaderBody(icon: String?, title: String,
@@ -5465,7 +5531,7 @@ struct TaskListView: View {
     // posts can't yank it. After the beat the settle clears and the row fades
     // out IN PLACE and is gone (it lives on in the dedicated Logbook);
     // `endSettle` inside the animated transaction lets that removal play
-    // `.transition(.opacity)` and rows below slide up.
+    // `TaskListRowExit` and rows below slide up.
     // Uncomplete cancels the pending fade.
     //
     // Order matters: the pool filter is `status != .done || model.settle.isSettling`.

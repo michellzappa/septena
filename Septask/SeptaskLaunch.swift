@@ -255,6 +255,9 @@ final class SeptaskMacAppDelegate: NSObject, NSApplicationDelegate {
     // A fresh account gets the first run as a sheet on this window
     // (`SeptaskKitFirstRun.swift`); after it, the Get started checklist and
     // the sign-in notice (`TaskNotices`) hold whatever was skipped.
+    // Before the window: an open Do shows in its first frame, and the menu
+    // bar item with it (SeptaskKitDo.swift).
+    SeptaskKitDo.shared.start()
     SeptaskKitWindowController.show()
     Task { @MainActor in await SeptaskKitFirstRunWindow.presentIfNeeded() }
     // Sparkle starts scheduled checks when the controller is created. Local

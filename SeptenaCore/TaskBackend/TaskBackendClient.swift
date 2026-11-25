@@ -237,9 +237,9 @@ actor TaskBackendClient {
   }
 
   func pull(since: Int, limit: Int = RegistryEntityLimits.maxPull) async throws -> BackendPullResponse {
-    // `settings=1`, `checklists=1`, `tags=1` & `refs=1`: this client syncs those entities.
+    // `settings=1`, `checklists=1`, `tags=1`, `refs=1` & `doSessions=1`: this client syncs those entities.
     // Without them the server omits those rows so older builds decode cleanly.
-    let (data, status) = try await authed(path: "/v1/sync/pull?since=\(since)&limit=\(limit)&settings=1&checklists=1&tags=1&refs=1",
+    let (data, status) = try await authed(path: "/v1/sync/pull?since=\(since)&limit=\(limit)&settings=1&checklists=1&tags=1&refs=1&doSessions=1",
                                           method: "GET", body: nil)
     guard status == 200 else { throw Self.httpError(status, data) }
     return try decode(BackendPullResponse.self, from: data, what: "pull")

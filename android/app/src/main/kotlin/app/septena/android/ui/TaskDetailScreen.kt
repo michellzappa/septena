@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -41,6 +42,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
@@ -50,6 +52,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -96,6 +100,8 @@ import app.septena.ui.ChevronLeftGlyph
 import app.septena.ui.ChevronRightGlyph
 import app.septena.ui.CloseSmallGlyph
 import app.septena.ui.DeadlineFlagGlyph
+import app.septena.ui.DoGlyph
+import app.septena.ui.DoShowListGlyph
 import app.septena.ui.PlusSmallGlyph
 import app.septena.ui.RepeatSmallGlyph
 import app.septena.ui.SeptenaGlyph
@@ -160,6 +166,35 @@ private val SUPPORTED_DETAIL_ATTRIBUTES = setOf(
     RegistryTaskAttributeIds.REPEAT,
 )
 
+/** What the Do screen knows about the task it draws around. */
+class DoPageTask(
+    val hasNotesOrChecklist: Boolean,
+    val durationMinutes: Int?,
+    val isOpen: Boolean,
+    val canWrite: Boolean,
+)
+
+/**
+ * The Do screen (docs/DO_SPEC.md §4) is the task page with the blocks the user
+ * needs to work, and these parts around them. The page keeps the one renderer
+ * of each block and the one save path.
+ */
+class DoPage(
+    val showListTitle: String,
+    val actions: @Composable RowScope.() -> Unit,
+    val aboveTitle: @Composable () -> Unit,
+    val belowTitle: @Composable (DoPageTask) -> Unit,
+    /** Each exit calls `save` first, so typed text is never lost. */
+    val exits: @Composable (save: (then: () -> Unit) -> Unit) -> Unit,
+)
+
+private val DO_PAGE_BLOCKS = setOf(
+    TaskPageBlockKinds.NOTES,
+    TaskPageBlockKinds.CHECKLIST,
+    TaskPageBlockKinds.ATTACHMENTS,
+    TaskPageBlockKinds.REFERENCES,
+)
+
 /** Standalone task-detail surface styled with iOS-aligned translucent glass cards. */
 @Composable
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -171,6 +206,7 @@ fun TaskDetailScreen(
     initialAttribute: String? = null,
     onOpenTask: (String) -> Unit = {},
     openSendBackInitially: Boolean = false,
+    doPage: DoPage? = null,
 ) {
     val languageTag = LocalConfiguration.current.locales[0].toLanguageTag()
     val isDark = LocalSeptenaDarkTheme.current
@@ -197,6 +233,7 @@ fun TaskDetailScreen(
     var openPicker by remember(taskId, initialAttribute) { mutableStateOf(initialAttribute) }
     var tagFilterDraft by remember(taskId) { mutableStateOf("") }
     var showAddReferenceDialog by remember(taskId) { mutableStateOf(false) }
+    var doTitleEditing by remember(taskId) { mutableStateOf(false) }
 
     LaunchedEffect(graph, taskId, dataVersion) {
         val loaded = withContext(Dispatchers.IO) { loadTaskDetail(graph, taskId) }
@@ -259,18 +296,24 @@ fun TaskDetailScreen(
         return true
     }
 
-    fun saveAndLeave() {
+    fun saveThen(then: () -> Unit) {
+        if (data == null) return then()
         if (saving) return
         scope.launch {
             saving = true
             val saved = runCatching { saveTextFields() }.getOrElse { false }
             saving = false
-            if (saved) onBack() else saveFailed = true
+            if (saved) then() else saveFailed = true
         }
     }
 
-    fun handleBack() {
-        if (data == null) onBack() else saveAndLeave()
+    fun handleBack() = saveThen(onBack)
+
+    if (doPage != null) {
+        // Another device can end the Do while the user types here.
+        DisposableEffect(taskId) {
+            onDispose { if (textIsDirty) graph.launch { saveTextFields() } }
+        }
     }
 
     BackHandler(enabled = true, onBack = ::handleBack)
@@ -360,12 +403,16 @@ fun TaskDetailScreen(
     val canEdit = savedTask != null && !deleted && !saving
     val isTaskOpen = status == RegistryEntityEnums.TaskStatus.OPEN && !deleted
     val isReviewDepth = isTaskOpen && data?.needsReview == true
-    val pageBlocks = remember(languageTag, isReviewDepth) {
+    val isDoPage = doPage != null
+    val pageBlocks = remember(languageTag, isReviewDepth, isDoPage) {
         RegistryCatalog.taskPageBlocks(
-            if (isReviewDepth) TaskPageDepths.REVIEW else TaskPageDepths.PAGE,
+            if (isReviewDepth && !isDoPage) TaskPageDepths.REVIEW else TaskPageDepths.PAGE,
             languageTag = languageTag,
-        )
+        ).filter { !isDoPage || it.kind in DO_PAGE_BLOCKS }
     }
+    val doAction = RegistryCatalog.actionTitle(RegistryActionIds.TASK_DO, languageTag = languageTag).orEmpty()
+    val offersDo = !isDoPage && isTaskOpen && graph.doing.isAvailable &&
+        taskFields[RegistryEntityFields.Task.KIND].stringValue() != RegistryEntityEnums.TaskKind.HEADING
     val repeatSummary = labels.repeatUnits.firstOrNull { it.value == repeatUnit }?.title?.let { unitTitle ->
         if (repeatInterval > 1L) "$repeatInterval × $unitTitle" else unitTitle
     }
@@ -655,13 +702,27 @@ fun TaskDetailScreen(
                         IconButton(
                             onClick = ::handleBack,
                             enabled = !saving,
-                            modifier = Modifier.semantics { contentDescription = labels.back },
+                            modifier = Modifier.semantics { contentDescription = doPage?.showListTitle ?: labels.back },
                         ) {
-                            ChevronLeftGlyph(tint = MaterialTheme.colorScheme.onSurface)
+                            if (isDoPage) {
+                                DoShowListGlyph(tint = MaterialTheme.colorScheme.onSurface)
+                            } else {
+                                ChevronLeftGlyph(tint = MaterialTheme.colorScheme.onSurface)
+                            }
                         }
                     },
                     actions = {
-                        if (savedTask != null && !deleted) {
+                        doPage?.actions?.invoke(this)
+                        if (offersDo) {
+                            IconButton(
+                                onClick = { saveThen { graph.doing.begin(taskId, onStarted = onBack) } },
+                                enabled = canEdit,
+                                modifier = Modifier.semantics { contentDescription = doAction },
+                            ) {
+                                DoGlyph(tint = MaterialTheme.colorScheme.onSurface, size = 21.dp)
+                            }
+                        }
+                        if (savedTask != null && !deleted && !isDoPage) {
                             IconButton(
                                 onClick = ::toggleStarred,
                                 enabled = canEdit,
@@ -685,6 +746,7 @@ fun TaskDetailScreen(
                     },
                 )
             },
+            bottomBar = { doPage?.exits?.invoke(::saveThen) },
         ) { padding ->
             if (!hasLoaded) {
                 Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
@@ -705,6 +767,28 @@ fun TaskDetailScreen(
                             .navigationBarsPadding()
                             .padding(top = 4.dp, bottom = 48.dp),
                     ) {
+                        if (doPage != null) {
+                            doPage.aboveTitle()
+                            DoPageTitle(
+                                title = titleDraft,
+                                label = labels.field(RegistryTaskDetail.Fields.TITLE),
+                                editing = doTitleEditing && canEdit,
+                                onEdit = { doTitleEditing = true },
+                                onTitleChange = {
+                                    titleDraft = it.take(RegistryEntityLimits.TEXT_MAX.toInt())
+                                    textIsDirty = true
+                                    saveFailed = false
+                                },
+                            )
+                            doPage.belowTitle(
+                                DoPageTask(
+                                    hasNotesOrChecklist = notesDraft.isNotBlank() || data?.checklist.orEmpty().isNotEmpty(),
+                                    durationMinutes = durationMinutes,
+                                    isOpen = isTaskOpen,
+                                    canWrite = canEdit,
+                                ),
+                            )
+                        }
                         pageBlocks.forEachIndexed { blockIndex, block ->
                             val heading = RegistryCatalog.taskPageBlockHeading(block, languageTag)
                             val prevKind = pageBlocks.getOrNull(blockIndex - 1)?.kind
@@ -1403,6 +1487,40 @@ fun TaskDetailScreen(
             }
         }
     }
+}
+
+/** The Do screen's title: large, and a text field only after a tap. */
+@Composable
+private fun DoPageTitle(
+    title: String,
+    label: String,
+    editing: Boolean,
+    onEdit: () -> Unit,
+    onTitleChange: (String) -> Unit,
+) {
+    val style = MaterialTheme.typography.headlineMedium.copy(
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.onSurface,
+    )
+    val modifier = Modifier
+        .fillMaxWidth()
+        .padding(horizontal = TaskCardMetrics.HeaderLeading, vertical = 8.dp)
+    if (!editing) {
+        Text(text = title, style = style, modifier = Modifier.clickable(onClick = onEdit).then(modifier))
+        return
+    }
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
+    BasicTextField(
+        value = title,
+        onValueChange = onTitleChange,
+        textStyle = style,
+        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+        maxLines = 4,
+        modifier = modifier
+            .focusRequester(focus)
+            .semantics { contentDescription = label },
+    )
 }
 
 @Composable

@@ -64,7 +64,10 @@ struct TaskComposerCard: View {
   /// ScrollView (the list scrolls), autosaving on collapse.
   /// `.page` is the task page pushed onto the iPhone navigation stack (ADR
   /// 0029): every page block, no Cancel/Save chrome, autosaving on Back.
-  enum Presentation { case drawer, inline, page }
+  /// `.doing` is the task on the Do screen (docs/DO_SPEC.md §4): the page's
+  /// title, notes, checklist, attachments and references, without the
+  /// attribute rows. The host scrolls; the form autosaves.
+  enum Presentation { case drawer, inline, page, doing }
 
   let mode: Mode
   let areas: [Area]
@@ -113,6 +116,7 @@ struct TaskComposerCard: View {
   @Environment(\.modelContext) private var modelContext
   @Environment(\.dismiss) private var dismiss
   @Environment(\.adaptiveDetailClose) private var adaptiveClose
+  @Environment(\.scenePhase) private var scenePhase
   // Inspector (iPad/macOS) vs. bottom sheet (iPhone) — the same flag
   // `.adaptiveDetail` switches on. Edit mode only autofocuses in the inspector,
   // where the keyboard doesn't fight the half-height sheet detent.
@@ -150,6 +154,15 @@ struct TaskComposerCard: View {
   /// Single keyboard cursor across the whole form (title, pills, terminal
   /// actions). Replaces the old title-only `titleFocused` bool.
   @FocusState private var focus: TaskEditFocus?
+  #if os(iOS)
+  /// The inline title still has to open the keyboard. The inline title is a
+  /// UIKit text view with no `.focused(_, equals: .title)`, so SwiftUI drops a
+  /// programmatic `focus = .title` and a new task opened without a keyboard.
+  /// The text view reads this, becomes first responder and clears it. It lives
+  /// here, not in the view, so a row that scrolls out of the `LazyVStack` and
+  /// back does not take the keyboard again.
+  @State private var titleFocusPending = false
+  #endif
   /// One-shot trigger: set to a pill to make `TaskAttributeBar` run its
   /// `select` for that pill (keyboard Space/Return on a focused pill). The bar
   /// resets it to nil after acting.
@@ -185,6 +198,8 @@ struct TaskComposerCard: View {
   /// SuggestionEngine's learned area/project pick for the current title (the
   /// "Suggested" chip). Recomputed as the title changes; create-mode only.
   @State private var suggestedList: SuggestionEngine.Suggestion?
+  /// `.doing` only: the large title is a field after a tap.
+  @State private var titleEditing = false
   /// Mirrors whether the Discuss pill is on the rail (edit mode, no thread yet).
   @State private var discussKickoffVisible = false
   /// The clipboard held text when this blank new task opened, so the Paste
@@ -261,7 +276,16 @@ struct TaskComposerCard: View {
   /// Close: fold the inline editor (`onClose`) when hosted inline, else go
   /// through the docked-inspector hook with a sheet `dismiss()` fallback — the
   /// same close path `AdaptiveEditScaffold` uses, so terminal actions match.
-  private func close() { (onClose ?? adaptiveClose ?? { dismiss() })() }
+  private func close() {
+    // The Do screen stays: a save only ends the typing.
+    if presentation == .doing {
+      titleEditing = false
+      focus = nil
+      keyboardCloseInFlight = false
+      return
+    }
+    (onClose ?? adaptiveClose ?? { dismiss() })()
+  }
 
   /// Escape, and the keyboard toolbar's Done: save and close. Tapping away and
   /// scrolling away already save, so Escape must not be the one exit that asks
@@ -320,6 +344,24 @@ struct TaskComposerCard: View {
       .onDisappear {
         let landed = persistOnce()
         if !canSave || landed { onVanish?() }
+      }
+      // The Do screen can stay open for hours, so it does not wait for the
+      // teardown: a field that loses focus saves, and so does leaving the app.
+      .onChange(of: focus) { old, new in
+        guard presentation == .doing else { return }
+        if new != .title { titleEditing = false }
+        if old == .title || old == .notes { persistOnce() }
+      }
+      .onChange(of: scenePhase) { _, phase in
+        if presentation == .doing, phase != .active { persistOnce() }
+      }
+      // For the same reason it follows an edit from another device, while
+      // nothing here is being typed.
+      .onChange(of: editingTask) { _, _ in
+        guard presentation == .doing, focus == nil,
+              draft == (lastPersistedDraft ?? seededDraft) else { return }
+        seededIdentity = nil
+        seed()
       }
       .onChange(of: draft.title) { oldValue, newValue in
         // A title is one line, so a line break in the field is never text —
@@ -382,6 +424,29 @@ struct TaskComposerCard: View {
       .scrollDismissesKeyboard(.interactively)
       .navigationTitle(headerTitle)
       .septenaInlineTitle()
+      .toolbar {
+        if canDo {
+          ToolbarItem(placement: .primaryAction) { doButton }
+        }
+      }
+    case .doing:
+      formBody
+    }
+  }
+
+  /// `task.do` on the task page: one open, saved task.
+  private var canDo: Bool {
+    pageDepth == .page && !deferredCreate && editingTask.map(DoFlow.canDo) == true
+  }
+
+  private var doButton: some View {
+    Button {
+      guard let task = editingTask else { return }
+      persistOnce()
+      close()
+      DoFlow.begin(task.id)
+    } label: {
+      DoActionLabel(.taskDo)
     }
   }
 
@@ -392,6 +457,7 @@ struct TaskComposerCard: View {
   /// it, without the edit rows.
   private var pageDepth: RegistryTaskPageDepth {
     if presentation == .inline { return .inline }
+    if presentation == .doing { return .page }
     if editingTask?.conversation.needsHumanReview == true { return .review }
     return .page
   }
@@ -410,8 +476,14 @@ struct TaskComposerCard: View {
   /// The blocks to render, in registry order. A create, or an inline create
   /// held as a placeholder row, has no saved task, so `editOnly` blocks drop.
   private var pageBlocks: [RegistryTaskPageBlock] {
-    RegistrySurfaces.taskPageBlocks(pageDepth, on: RegistryPlatform.current,
-                                    isEditing: editingTask != nil && !deferredCreate)
+    let blocks = RegistrySurfaces.taskPageBlocks(pageDepth, on: RegistryPlatform.current,
+                                                 isEditing: editingTask != nil && !deferredCreate)
+    guard presentation == .doing else { return blocks }
+    // The attribute block stays as the host of the checklist, attachments and
+    // references; its rows do not show (`showsAttributes`).
+    return blocks.filter {
+      [.header, .notes, .attributes, .checklist, .attachments, .references].contains($0.kind)
+    }
   }
 
   /// One renderer per block kind. Each branch is type-erased: a large
@@ -452,19 +524,15 @@ struct TaskComposerCard: View {
         leading: showsPasteChip ? AnyView(pasteChip) : nil,
         // The quick edit keeps the pill rail; the page lays the attributes
         // out as a column of rows with checklist and attachments as sections.
-        layout: pageDepth == .page ? .rows : .rail
+        layout: pageDepth == .page ? .rows : .rail,
+        showsAttributes: presentation != .doing
       ))
     case .checklist, .attachments, .references:
       return AnyView(EmptyView()) // rendered by the attribute bar, see `.attributes`
     case .history:
       // On the page, history is its own section in registry order.
-      guard let task = editingTask, TaskHistory.isAvailable else { return AnyView(EmptyView()) }
-      return AnyView(VStack(alignment: .leading, spacing: 8) {
-        Text(block.label ?? "")
-          .font(.septenaLabel)
-          .foregroundStyle(Theme.inkSecondary)
-        TaskHistoryPanel(taskID: task.id)
-      })
+      guard let task = editingTask else { return AnyView(EmptyView()) }
+      return AnyView(TaskHistoryPanel(taskID: task.id, title: block.label ?? ""))
     case .conversation:
       // The page's attribute column holds it, inside the Discuss card.
       if pageDepth == .page && kinds.contains(.attributes) { return AnyView(EmptyView()) }
@@ -493,7 +561,8 @@ struct TaskComposerCard: View {
       isDirty: isDirty,
       discardTitle: isEditing ? "Discard changes?" : "Discard new task?",
       onSave: { persistOnce() },
-      onDiscard: { discard() }
+      onDiscard: { discard() },
+      trailing: canDo ? AnyView(doButton) : nil
     ) {
       ScrollView {
         formBody
@@ -602,6 +671,8 @@ struct TaskComposerCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .matchedHeroGeometry(titleMatchID, heroMatchNS, isSource: heroMatchIsSource)
       }
+    } else if presentation == .doing {
+      doingTitle
     } else {
       titleField
         .padding(.horizontal, 14)
@@ -609,6 +680,27 @@ struct TaskComposerCard: View {
         .background(Theme.secondaryGroupedBackground,
                     in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay(focusRing(visible: focus == .title, cornerRadius: 18))
+    }
+  }
+
+  /// The Do screen's large title. A tap turns it into the field.
+  @ViewBuilder
+  private var doingTitle: some View {
+    if titleEditing {
+      swiftUITitleField
+    } else {
+      Text(draft.title)
+        .font(.septenaScreenTitle)
+        .foregroundStyle(Theme.inkPrimary)
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+        .onTapGesture {
+          titleEditing = true
+          // The field joins the responder chain on the next turn.
+          DispatchQueue.main.async { focusTitle() }
+        }
+        .accessibilityAddTraits([.isHeader, .isButton])
     }
   }
 
@@ -631,6 +723,7 @@ struct TaskComposerCard: View {
             else if focus == .title { focus = nil }
           }
         ),
+        focusPending: $titleFocusPending,
         onSubmit: {
           if canSave { commit() } else if isCreating { close() }
         },
@@ -655,9 +748,9 @@ struct TaskComposerCard: View {
     // `lineLimit(2)` is a max, matching the closed row, so the field stays
     // one line until the title actually wraps.
     TextField("", text: $draft.title, axis: .vertical)
-      .lineLimit(2)
+      .lineLimit(presentation == .doing ? 6 : 2)
       .textFieldStyle(.plain)
-      .font(.septenaTaskTitle)
+      .font(presentation == .doing ? .septenaScreenTitle : .septenaTaskTitle)
       // Match the closed row's title `Text` box so the two center-align to the
       // same place: `.fixedSize` gives the field the same tight vertical box a
       // `Text` has, and the shared band (`Theme.checkboxTap`, centered) makes the
@@ -1150,6 +1243,12 @@ struct TaskComposerCard: View {
   /// or started typing.
   private func focusTitle() {
     guard focus != .title else { return }
+    #if os(iOS)
+    if presentation == .inline {
+      titleFocusPending = true
+      return
+    }
+    #endif
     focus = .title
     #if os(macOS)
     DispatchQueue.main.async { septenaMoveCursorToEnd() }
@@ -1308,6 +1407,10 @@ struct TaskComposerCard: View {
     if let task = editingTask {
       order += LocalCache.checklistItems(forTaskID: task.id, in: modelContext).map { .step($0.id) }
     }
+    // The Do screen has no rail, and its title is a field only after a tap.
+    if presentation == .doing {
+      return titleEditing ? order : order.filter { $0 != .title }
+    }
     // Rail order from the registry; edit-only pills join once a task exists.
     for attr in TaskAttributeBar.Attribute.rail {
       if attr == .discuss {
@@ -1378,6 +1481,31 @@ extension View {
 private final class InlineTitleUITextView: UITextView {
   var onTab: ((Bool) -> Void)?
   var onEscape: (() -> Void)?
+  /// Set while the composer asks for the keyboard. The request holds until the
+  /// view is in a window: before that, `becomeFirstResponder` does nothing.
+  var focusPending = false
+  var onFocusClaimed: (() -> Void)?
+
+  override func didMoveToWindow() {
+    super.didMoveToWindow()
+    claimFocusIfPending()
+  }
+
+  /// One runloop turn later, because SwiftUI may be updating views now and the
+  /// claim writes composer state.
+  func claimFocusIfPending() {
+    guard focusPending, window != nil else { return }
+    DispatchQueue.main.async { [weak self] in
+      guard let self, self.focusPending, self.window != nil else { return }
+      if !self.isFirstResponder {
+        guard self.becomeFirstResponder() else { return }
+        let end = ((self.text ?? "") as NSString).length
+        self.selectedRange = NSRange(location: end, length: 0)
+      }
+      self.focusPending = false
+      self.onFocusClaimed?()
+    }
+  }
 
   override var contentOffset: CGPoint {
     get { .zero }
@@ -1408,6 +1536,7 @@ private final class InlineTitleUITextView: UITextView {
 private struct InlineTitleTextView: UIViewRepresentable {
   @Binding var text: String
   @Binding var isFocused: Bool
+  @Binding var focusPending: Bool
   let onSubmit: () -> Void
   let onDone: () -> Void
   let onTab: (Bool) -> Void
@@ -1449,6 +1578,7 @@ private struct InlineTitleTextView: UIViewRepresentable {
     let coordinator = context.coordinator
     view.onTab = { forward in coordinator.parent.onTab(forward) }
     view.onEscape = { coordinator.parent.onEscape() }
+    view.onFocusClaimed = { coordinator.parent.focusPending = false }
 
     // SwiftUI's `.keyboard` toolbar does not attach to a UIKit text view, so
     // carry the same Done accessory bar as `TaskMarkdownNotesEditor`.
@@ -1491,6 +1621,9 @@ private struct InlineTitleTextView: UIViewRepresentable {
       }
       coordinator.lastRequestedFocus = isFocused
     }
+
+    view.focusPending = focusPending
+    view.claimFocusIfPending()
   }
 
   func sizeThatFits(_ proposal: ProposedViewSize,

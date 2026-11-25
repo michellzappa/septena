@@ -420,6 +420,19 @@ class SqlDelightTaskStore(private val database: SeptenaDatabase) : TaskStore {
     override suspend fun syncCursor(): Long =
         queries.selectSyncCursor().executeAsOneOrNull()?.toLongOrNull() ?: 0L
 
+    override suspend fun hasPulled(entity: String): Boolean =
+        queries.selectMetadata(pulledKey(entity)).executeAsOneOrNull() != null
+
+    override suspend fun markPulled(entity: String) {
+        queries.setMetadata(pulledKey(entity), "1")
+    }
+
+    override suspend fun rewindCursor() {
+        queries.setSyncCursor("0")
+    }
+
+    private fun pulledKey(entity: String): String = "pulled.$entity"
+
     override suspend fun resetForFullPull() {
         database.transaction {
             queries.resetRemoteRecords()

@@ -56,6 +56,7 @@ enum KitDrag {
 //   Return, ⌘↩, click-away, a list change and window close all SAVE and
 //   close. ⌘Z undoes the save (`TaskUndo`). Nothing discards typed text.
 //   ⌘↑ / ⌘↓ — move the selected task(s) one slot (manual-order lists only)
+//   ⌘J — Do the selected task (docs/DO_SPEC.md)
 //   ⌘⌫ — delete (soft; lands in Recently Deleted)
 //   ⌥⌘M — file into the suggested list (the "→ Suggested" capsule's pick)
 //   Space — deliberately unbound (the "Space completes the task" trap);
@@ -124,6 +125,9 @@ final class SeptaskKitTaskListController: NSViewController {
     /// Return, ⌘K, type-select, right-click) that is never a task. Every task
     /// command reads `task`, which is nil here, so it does nothing.
     case noticeStep(TaskNoticeStep)
+    /// A Do line on top of every list: the notice, the stale question or the
+    /// line after an exit (`KitDoNotice`). A press offers its actions.
+    case doNotice(KitDoNotice)
     /// An agent's proposed brief update, rendered directly above the notes row
     /// (`KitNotesProposalCell`, ADR 0012, #123). Not selectable.
     case notesProposal(isArea: Bool, id: String, currentNotes: String, proposal: NotesProposal)
@@ -147,6 +151,7 @@ final class SeptaskKitTaskListController: NSViewController {
       case .reminder(let item, _): return "reminder:" + item.id
       case .notice(let notice): return "notice:" + notice.id.rawValue
       case .noticeStep(let step): return step.selectionID
+      case .doNotice(let notice): return notice.key
       case .importAllReminders: return "import-all-reminders"
       case .notesProposal: return "notes-proposal"
       case .containerNotes: return "container-notes"
@@ -171,12 +176,18 @@ final class SeptaskKitTaskListController: NSViewController {
       return nil
     }
 
+    var doNotice: KitDoNotice? {
+      if case .doNotice(let notice) = self { return notice }
+      return nil
+    }
+
     /// Rows that draw on a card (tasks and events), vs. headers on the page.
     /// Project section headings sit BETWEEN cards (SwiftUI's `headingRow`),
     /// so they break the card run the same way a Today area/project header does.
     var isCardRow: Bool {
       switch self {
-      case .header, .screenTitle, .logbookBar, .tagFilterBar, .fadedFooter, .loggedFooter, .notesProposal, .containerNotes: return false
+      case .header, .screenTitle, .logbookBar, .tagFilterBar, .fadedFooter, .loggedFooter, .notesProposal, .containerNotes,
+           .doNotice: return false
       // A standalone notice sits on the page with its own card fill. A notice
       // with checklist steps (`Get started`) heads its steps' card so the
       // header and rows share one seamless frosted surface (matching iOS).
@@ -502,6 +513,7 @@ final class SeptaskKitTaskListController: NSViewController {
     tableView.doubleAction = #selector(beginEditFromDoubleClick)
     tableView.onToggleComplete = { [weak self] in self?.toggleCompleteSelection() }
     tableView.onToggleToday = { [weak self] in self?.toggleTodaySelection() }
+    tableView.onDo = { [weak self] in self?.startDo() }
     tableView.onBeginEdit = { [weak self] in self?.beginEditSelectedRow() }
     tableView.onCommitEditing = { [weak self] in self?.commitComposerEditing() }
     tableView.onOpenNotes = { [weak self] in self?.beginComposingSelectedRowInNotes() }
@@ -745,6 +757,17 @@ final class SeptaskKitTaskListController: NSViewController {
       forName: .septenaTaskViewOptionsChanged, object: nil, queue: .main
     ) { [weak self] _ in
       MainActor.assumeIsolated { self?.refreshViewOptions() }
+    })
+    // The current Do, and its minute (SeptaskKitDo.swift).
+    observers.append(NotificationCenter.default.addObserver(
+      forName: SeptaskKitDo.changed, object: nil, queue: .main
+    ) { [weak self] _ in
+      MainActor.assumeIsolated { self?.scheduleReload(locallyChanged: []) }
+    })
+    observers.append(NotificationCenter.default.addObserver(
+      forName: SeptaskKitDo.ticked, object: nil, queue: .main
+    ) { [weak self] _ in
+      MainActor.assumeIsolated { self?.refreshDoTime() }
     })
     // Pending Apple Reminders. `.EKEventStoreChanged` fires for every edit in
     // every list, so `refreshReminders` compares the resulting set and only
@@ -1164,7 +1187,8 @@ final class SeptaskKitTaskListController: NSViewController {
     let tagBarRows: [Row] = listTags.isEmpty
       ? []
       : [.tagFilterBar(tags: listTags, active: Array(activeTagFilterIDs).sorted())]
-    let titleRows: [Row] = (screenTitleRow().map { [$0] } ?? []) + logbookBarRows + tagBarRows
+    let doRows = KitDoNotice.current().map(Row.doNotice)
+    let titleRows: [Row] = (screenTitleRow().map { [$0] } ?? []) + doRows + logbookBarRows + tagBarRows
     var newRows: [Row]
     loggedClearIDs = []
     switch filter {
@@ -1340,7 +1364,7 @@ final class SeptaskKitTaskListController: NSViewController {
     applyInboxZeroOutcome(inboxZeroOutcome, inboxCount: currentInboxIDs.count)
     let hasContent = rows.contains { row in
       switch row {
-      case .screenTitle, .logbookBar: return false
+      case .screenTitle, .logbookBar, .doNotice: return false
       default: return true
       }
     }
@@ -1644,6 +1668,69 @@ final class SeptaskKitTaskListController: NSViewController {
     }
   }
 
+  // MARK: - Do (docs/DO_SPEC.md §4.1, §5)
+
+  /// The one selected task a Do can start on.
+  var startableTask: SeptenaTask? {
+    let selection = actionableSelection
+    guard selection.count == 1, let task = selection.first, task.status == .open,
+          task.deletedAt == nil else { return nil }
+    return task
+  }
+
+  /// ⌘J, the row menu and Task ▸ Do. A Do that was open ends, with no dialog.
+  func startDo() {
+    commitComposerTextIfOpen()
+    guard let task = startableTask else { NSSound.beep(); return }
+    SeptaskKitDo.shared.begin(taskID: task.id)
+  }
+
+  /// Done on a Do: the checkbox's own path.
+  func completeDoing(_ task: SeptenaTask) {
+    apply(completing: [task], reopening: [])
+  }
+
+  /// Later on a Do: the When popover for its task. Only a saved date ends the
+  /// Do. With no anchor it hangs off the notice, or off the top of the list.
+  func presentDoLater(_ doing: DoState, anchor: KitSurfaceAnchor? = nil) {
+    guard let task = LocalCache.task(id: doing.taskID, in: context) else { return }
+    presentDatePopover(kind: .when, anchor: anchor ?? doNoticeAnchor, tasks: [task]) {
+      DoStore.shared.endForLater(sessionID: doing.sessionID)
+    }
+  }
+
+  private var doNoticeAnchor: KitSurfaceAnchor {
+    guard let row = rows.firstIndex(where: { $0.doNotice?.state != nil }) else {
+      return .rect(NSRect(x: view.bounds.midX, y: view.bounds.maxY - view.safeAreaInsets.top,
+                          width: 1, height: 1), view)
+    }
+    tableView.scrollRowToVisible(row)
+    return .rect(tableView.rect(ofRow: row), tableView)
+  }
+
+  private func pressDoNotice(_ key: String) {
+    guard let row = rows.firstIndex(where: { $0.key == key }),
+          let notice = rows[row].doNotice else { return }
+    guard let doing = notice.state else {
+      SeptaskKitDo.shared.clearRequests()
+      onNavigate?(.filter(.review, title: TaskFilter.review.title))
+      return
+    }
+    let rect = tableView.rect(ofRow: row)
+    let inset = SeptaskKitLayout.inset(for: rect.width) + SeptaskKitLayout.rowLeadingPad
+    SeptaskKitDo.shared.menu(for: doing)
+      .popUp(positioning: nil, at: NSPoint(x: rect.minX + inset, y: rect.midY), in: tableView)
+  }
+
+  /// A new minute: only the notice row changes, so no reload.
+  private func refreshDoTime() {
+    guard let row = rows.firstIndex(where: { $0.doNotice?.state != nil }),
+          let notice = KitDoNotice.current().first(where: { $0.state != nil }),
+          rows[row] != .doNotice(notice) else { return }
+    rows[row] = .doNotice(notice)
+    tableView.reloadData(forRowIndexes: [row], columnIndexes: [0])
+  }
+
   /// The Plus sheet for an upsell moment (spec §3.2, §7.1). Opening it from
   /// the notice marks the moment seen, so the notice leaves Today.
   private func presentPlusSheet(upsellID: String) {
@@ -1904,7 +1991,7 @@ final class SeptaskKitTaskListController: NSViewController {
         ids.insert(task.id)
       case .header, .loggedFooter, .fadedFooter,
            .screenTitle, .logbookBar, .tagFilterBar, .projectTarget, .containerNotes,
-           .notice, .noticeStep, .event, .notesProposal:
+           .notice, .noticeStep, .doNotice, .event, .notesProposal:
         return ids
       }
     }
@@ -2594,15 +2681,10 @@ final class SeptaskKitTaskListController: NSViewController {
         tableView.insertRows(at: [offset], withAnimation: insertAnimation)
       }
     }
-    tableView.endUpdates()
-    // The insert/remove/move above can change which SURVIVING rows are now
-    // first/last in their card — refresh every on-screen row's geometry
-    // directly rather than relying on the content-diff below, which only
-    // catches a row whose own `Row` value changed (see the doc comment on
-    // `refreshCardGeometry`).
-    refreshCardGeometry()
-
-    // Surviving rows whose content changed (rename, date, today flag).
+    // Surviving rows whose content changed (rename, date, today flag). Their
+    // heights join THIS batch: noted after `endUpdates`, they started a second
+    // row animation on top of the first (a header's count or ring changes with
+    // every completion), and the rows no longer moved as one.
     let oldByKey = Dictionary(old.map { ($0.key, $0) }, uniquingKeysWith: { a, _ in a })
     var changed = IndexSet()
     for index in new.indices where !isPreserved(index) {
@@ -2610,9 +2692,16 @@ final class SeptaskKitTaskListController: NSViewController {
         changed.insert(index)
       }
     }
+    // Same cached-height rule as the equal-keys path above.
+    if !changed.isEmpty { tableView.noteHeightOfRows(withIndexesChanged: changed) }
+    tableView.endUpdates()
+    // The insert/remove/move above can change which SURVIVING rows are now
+    // first/last in their card — refresh every on-screen row's geometry
+    // directly rather than relying on the content-diff below, which only
+    // catches a row whose own `Row` value changed (see the doc comment on
+    // `refreshCardGeometry`).
+    refreshCardGeometry()
     if !changed.isEmpty {
-      // Same cached-height rule as the equal-keys path above.
-      tableView.noteHeightOfRows(withIndexesChanged: changed)
       tableView.reloadData(forRowIndexes: changed, columnIndexes: [0])
     }
   }
@@ -3329,12 +3418,16 @@ final class SeptaskKitTaskListController: NSViewController {
 
   /// Anchor a date popover to the focused row (or to `anchor`: a composer
   /// pill or an inspector row) and apply the choice to the whole actionable
-  /// selection. The ONE When / Deadline picker path (ADR 0029).
-  func presentDatePopover(kind: SeptaskKitDatePopover.Kind, anchor: KitSurfaceAnchor? = nil) {
+  /// selection. The ONE When / Deadline picker path (ADR 0029). Later on a Do
+  /// names its task (`tasks`), because the list may not show it, and hears of
+  /// a saved date (`onSaved`).
+  func presentDatePopover(kind: SeptaskKitDatePopover.Kind, anchor: KitSurfaceAnchor? = nil,
+                          tasks: [SeptenaTask]? = nil, onSaved: (() -> Void)? = nil) {
     commitComposerTextIfOpen()
-    let selection = actionableSelection
-    guard !selection.isEmpty, tableView.selectedRow >= 0 else { return }
-    guard case .rect(let anchorRect, let anchorView)? = anchor ?? selectedRowAnchor else { return }
+    let selection = tasks ?? actionableSelection
+    guard !selection.isEmpty, tasks != nil || tableView.selectedRow >= 0 else { return }
+    guard case .rect(let anchorRect, let anchorView)? = anchor ?? selectedRowAnchor,
+          anchorView.window != nil else { return }
 
     let initial: Date? = switch kind {
     case .when: KitDayFormat.date(fromWire: selection.first?.scheduled)
@@ -3365,13 +3458,15 @@ final class SeptaskKitTaskListController: NSViewController {
       } : nil,
       // Repeat lives in the When picker (docs/TASK_ROW_MENU_SPEC.md). The
       // title names the rule only when every selected row agrees on it.
-      repeatTitle: kind == .when
+      // The Repeat editor acts on the selection, so it is not offered for a
+      // task the caller named.
+      repeatTitle: kind == .when && tasks == nil
         ? TaskRepeatLabel.title(Set(selection.map(\.recurrence)).count == 1 ? selection.first?.recurrence : nil)
         : nil,
       // The Repeat editor hangs off the same control as this picker. In the
       // inspector, where When folds open under its row, Repeat folds open
       // under the Repeat row instead (the iOS task page does the same).
-      onRepeat: kind == .when ? { [weak self] in
+      onRepeat: kind == .when && tasks == nil ? { [weak self] in
         self?.presentRecurrencePanel(anchor: anchor?.inlineSibling(attribute: .repeat) ?? anchor)
       } : nil
     ) { [weak self] date, today in
@@ -3382,6 +3477,7 @@ final class SeptaskKitTaskListController: NSViewController {
       self.noteInboxGesture(ids: liveSel.map(\.id))
       let before = liveSel.map(self.scheduleSnapshot)
       var deferredTo: Date?
+      var saved = false
       for task in liveSel {
         switch kind {
         case .when:
@@ -3390,15 +3486,18 @@ final class SeptaskKitTaskListController: NSViewController {
             let target = KitDayFormat.todayDate()
             guard let mode = self.rescheduleMode(for: task, newDate: target) else { continue }
             self.mutator.apply(.putOnToday, to: task.id, mode: mode)
+            saved = true
           } else if let date {
             guard let mode = self.rescheduleMode(for: task, newDate: date) else { continue }
             self.mutator.apply(.scheduleFor(date), to: task.id, mode: mode)
             deferredTo = date
+            saved = true
           } else {
             self.mutator.apply(.clearWhenDate, to: task.id)
           }
         case .deadline:
           self.mutator.apply(.setDeadline(date), to: task.id)
+          saved = date != nil
         }
         self.refreshComposerRow(taskId: task.id)
       }
@@ -3409,6 +3508,7 @@ final class SeptaskKitTaskListController: NSViewController {
           ? String(localized: "Change When", comment: "SeptaskKit: undo action")
           : String(localized: "Change Deadline", comment: "SeptaskKit: undo action"),
         before: before)
+      if saved { onSaved?() }
       // The inspector shows the new date when it opened this picker.
       self.onStoreChanged?()
     }
@@ -3937,6 +4037,11 @@ final class SeptaskKitTaskListController: NSViewController {
     // button takes no Return.
     if rows.indices.contains(row), let notice = rows[row].standaloneNotice {
       noticePrimaryAction(notice.id)?()
+      return
+    }
+    // Return on a Do line offers what a click on it offers.
+    if rows.indices.contains(row), let notice = rows[row].doNotice {
+      pressDoNotice(notice.key)
       return
     }
     guard row >= 0, let task = rows[row].task else { return }
@@ -4517,6 +4622,9 @@ final class SeptaskKitTaskListController: NSViewController {
       case .taskToggleInfo:
         let visible = UserDefaults.standard.bool(forKey: SettingsKey.septaskInspectorVisible)
         return .init(variant: visible ? .active : .base) { self.onToggleInspector?() }
+      case .taskDo:
+        guard self.startableTask != nil else { return nil }
+        return .init { self.startDo() }
       case .taskDuplicate: return .init(variant: plural) { self.duplicateSelection() }
       case .taskToggleComplete:
         // Several tasks only: one task completes from its checkbox
@@ -5113,7 +5221,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
                  row: Int) -> String? {
     guard rows.indices.contains(row) else { return nil }
     return rows[row].task?.title ?? rows[row].noticeStep?.title
-      ?? rows[row].standaloneNotice?.title
+      ?? rows[row].standaloneNotice?.title ?? rows[row].doNotice?.title
   }
 
   func tableView(_ tableView: NSTableView, shouldSelectRow row: Int) -> Bool {
@@ -5126,7 +5234,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
     // not (it has no task and no step).
     if case .noticeStep = rows[row] { return true }
     // A standalone notice is a row too: ↑/↓ reach it, ⌘K dismisses it.
-    if rows[row].standaloneNotice != nil { return true }
+    if rows[row].standaloneNotice != nil || rows[row].doNotice != nil { return true }
     return rows[row].task != nil
   }
 
@@ -5204,6 +5312,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
     // Inline notices: one component, its height follows its content.
     case .notice(let notice): return KitNoticeCell.height(for: KitNotice(notice))
     case .noticeStep: return SeptaskKitTheme.rowHeight
+    case .doNotice(let notice): return KitNoticeCell.height(for: notice.notice)
     }
   }
 
@@ -5886,6 +5995,14 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       cell.isRowSelected = tableView.selectedRowIndexes.contains(row)
       cell.onPrimary = noticePrimaryAction(notice.id)
       cell.onDismiss = notice.dismissible ? { [weak self] in self?.dismissNotice(notice.id) } : nil
+      return cell
+
+    case .doNotice(let notice):
+      let cell = noticeCell(notice.notice)
+      cell.isRowSelected = tableView.selectedRowIndexes.contains(row)
+      cell.onPrimary = nil
+      cell.onDismiss = { SeptaskKitDo.shared.clearRequests() }
+      cell.onPress = { [weak self] in self?.pressDoNotice(notice.key) }
       return cell
 
     case .noticeStep(let step):
@@ -8152,6 +8269,8 @@ final class SeptaskKitTableView: NSTableView {
   }
   var onToggleComplete: (() -> Void)?
   var onToggleToday: (() -> Void)?
+  /// ⌘J — Do the selected task (docs/DO_SPEC.md §4.1).
+  var onDo: (() -> Void)?
   /// ⌘R — bare-title rename.
   var onBeginEdit: (() -> Void)?
   /// Return / double-click — the full inline composer.
@@ -8285,7 +8404,7 @@ final class SeptaskKitTableView: NSTableView {
         allowed = true            // ⌘↩ save + close, ⌘N save then create, ⌘, settings
       } else if (commandShift && key == "f") || (commandOption && key == "i") {
         allowed = true            // Quick Find, inspector: window-level, no row write
-      } else if (command && ["k", "t", "s", "m"].contains(key))
+      } else if (command && ["k", "t", "s", "m", "j"].contains(key))
                   || (commandShift && ["m", "d", "c"].contains(key))
                   || (commandOption && ["r", "s"].contains(key)) {
         allowed = composer        // act on the composing row (text saved first)
@@ -8355,6 +8474,7 @@ final class SeptaskKitTableView: NSTableView {
       return true
     case "k": onToggleComplete?(); return true
     case "t": onToggleToday?(); return true
+    case "j": onDo?(); return true
     case "r": onBeginEdit?(); return true
     case "n": onNewTask?(); return true
     case "s": onWhen?(); return true
