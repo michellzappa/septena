@@ -387,6 +387,15 @@ fun AreasProjectsScreen(
                                         )
                                     },
                                 )
+                                .taskReorderSectionDrop(
+                                    id = "reorder-area-tasks-${destination.id}",
+                                    enabled = true,
+                                    onDrop = { ids ->
+                                        val topPos = visibleAreaTasks.firstOrNull()?.position ?: 0.0
+                                        val newPositions = List(ids.size) { i -> topPos - (ids.size - i).toDouble() }
+                                        viewModel.reorderTasks(ids, newPositions)
+                                    },
+                                )
                                 .padding(
                                     start = TaskCardMetrics.HeaderLeading,
                                     end = TaskCardMetrics.Margin,

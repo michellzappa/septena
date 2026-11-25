@@ -3,6 +3,10 @@ package app.septena.android.ui
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Intent
+import android.database.ContentObserver
+import android.os.Handler
+import android.os.Looper
+import android.provider.CalendarContract
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -22,6 +26,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -31,15 +36,20 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PermanentDrawerSheet
 import androidx.compose.material3.PermanentNavigationDrawer
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -80,6 +90,7 @@ import app.septena.core.generated.RegistryActionIds
 import app.septena.core.generated.RegistryDestinationIds
 import app.septena.core.generated.RegistryNoticeIds
 import app.septena.core.generated.RegistryPlatformIds
+import app.septena.core.generated.RegistryPromptIds
 import app.septena.core.generated.RegistrySurfaceIds
 import app.septena.ui.CheckmarkGlyph
 import app.septena.ui.ChevronDownGlyph
@@ -118,11 +129,14 @@ fun TaskHomeScreen(
     var settingsOpen by rememberSaveable { mutableStateOf(false) }
     // On mobile, opens on Today with the Lists Homepage one Back away (Things / iOS `SeptaskRootView`).
     var showingListsHome by rememberSaveable { mutableStateOf(false) }
+    var logbookShowingDeleted by rememberSaveable { mutableStateOf(false) }
+    var pendingPurgeRequest by remember { mutableStateOf<PurgeTasksRequest?>(null) }
     var homeQuickAddDraft by remember { mutableStateOf<QuickAddDraft?>(null) }
     val factory = remember(graph) { TaskHomeViewModelFactory(graph) }
     val homeViewModel: TaskHomeViewModel = viewModel(factory = factory)
     val state by homeViewModel.state.collectAsStateWithLifecycle()
     val selectHomeLocation: (TaskHomeLocation) -> Unit = { location ->
+        logbookShowingDeleted = false
         homeViewModel.select(location)
         showingListsHome = false
     }
@@ -160,13 +174,13 @@ fun TaskHomeScreen(
     val languageTag = LocalConfiguration.current.locales[0].toLanguageTag()
     val wideLayout = LocalConfiguration.current.screenWidthDp >= 600
     val localContext = LocalContext.current
-    val rowMenuId = if ((state.location as? TaskHomeLocation.SmartList)?.destinationId == RegistryDestinationIds.RECENTLY_DELETED) {
-        "task.recentlyDeleted"
-    } else {
-        "task.row"
-    }
-    val rowMenuGroups = remember(rowMenuId, languageTag, state.location) {
-        taskRowMenuGroups(rowMenuId, (state.location as? TaskHomeLocation.SmartList)?.destinationId, languageTag)
+    val currentDestId = (state.location as? TaskHomeLocation.SmartList)?.destinationId
+    val showingDeleted = currentDestId == RegistryDestinationIds.RECENTLY_DELETED ||
+        (currentDestId == RegistryDestinationIds.LOGBOOK && logbookShowingDeleted)
+    val effectiveDestId = if (showingDeleted) RegistryDestinationIds.RECENTLY_DELETED else currentDestId
+    val rowMenuId = if (showingDeleted) "task.recentlyDeleted" else "task.row"
+    val rowMenuGroups = remember(rowMenuId, languageTag, effectiveDestId) {
+        taskRowMenuGroups(rowMenuId, effectiveDestId, languageTag)
     }
     val rowMenuAccessibilityLabel = remember(languageTag) {
         surfaceField(RegistrySurfaceIds.TASK_ROW_MENU, "accessibilityLabel", languageTag)
@@ -199,6 +213,9 @@ fun TaskHomeScreen(
             }
             actionId == RegistryActionIds.TASK_DELETE -> homeViewModel.delete(id)
             actionId == RegistryActionIds.TASK_RESTORE -> homeViewModel.restore(id)
+            actionId == RegistryActionIds.TASK_DELETE_PERMANENTLY -> {
+                pendingPurgeRequest = PurgeTasksRequest(listOf(id), RegistryPromptIds.DELETE_PERMANENTLY)
+            }
             actionId == RegistryActionIds.TASK_ACCEPT_REVIEW -> homeViewModel.acceptReview(id)
             actionId == RegistryActionIds.TASK_SEND_BACK_REVIEW -> openTaskSendBack(id)
             actionId == RegistryActionIds.TASK_KEEP_FADED -> homeViewModel.keepFaded(id)
@@ -276,16 +293,12 @@ fun TaskHomeScreen(
     val emptyTitle = if (state.starredOnly) {
         RegistryCatalog.destinationEmptyTitle(RegistryDestinationIds.STARRED, languageTag).orEmpty()
     } else {
-        (state.location as? TaskHomeLocation.SmartList)
-            ?.let { RegistryCatalog.destinationEmptyTitle(it.destinationId, languageTag) }
-            .orEmpty()
+        effectiveDestId?.let { RegistryCatalog.destinationEmptyTitle(it, languageTag) }.orEmpty()
     }
     val emptyDescription = if (state.starredOnly) {
         RegistryCatalog.destinationEmptyDetail(RegistryDestinationIds.STARRED, languageTag).orEmpty()
     } else {
-        (state.location as? TaskHomeLocation.SmartList)
-            ?.let { RegistryCatalog.destinationEmptyDetail(it.destinationId, languageTag) }
-            .orEmpty()
+        effectiveDestId?.let { RegistryCatalog.destinationEmptyDetail(it, languageTag) }.orEmpty()
     }
     val openQuickFindTarget: (QuickFindTarget) -> Unit = { target ->
         quickFindOpen = false
@@ -336,6 +349,32 @@ fun TaskHomeScreen(
             initialDraft = initialDraft,
             onDismiss = { homeQuickAddDraft = null },
             onAdd = { draft -> homeViewModel.quickAdd(draft) { homeQuickAddDraft = null } },
+        )
+    }
+
+    pendingPurgeRequest?.let { req ->
+        val prompt = remember(req.promptId, req.ids.size, languageTag) {
+            purgePromptCopy(req.promptId, req.ids.size, languageTag)
+        }
+        AlertDialog(
+            onDismissRequest = { pendingPurgeRequest = null },
+            title = { Text(prompt.title) },
+            text = if (prompt.message.isNotBlank()) { { Text(prompt.message) } } else null,
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        homeViewModel.purgeTasks(req.ids)
+                        pendingPurgeRequest = null
+                    },
+                ) {
+                    Text(prompt.confirmTitle, color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingPurgeRequest = null }) {
+                    Text(prompt.cancelTitle)
+                }
+            },
         )
     }
 
@@ -408,6 +447,14 @@ fun TaskHomeScreen(
                         onQuickFind = { quickFindOpen = true },
                         onOpenSettings = { settingsOpen = true },
                         onSelectHomeLocation = selectHomeLocation,
+                        logbookShowingDeleted = logbookShowingDeleted,
+                        onLogbookShowingDeletedChange = { logbookShowingDeleted = it },
+                        onRequestEmptyTrash = {
+                            val ids = state.deletedTasks.map { it.id }
+                            if (ids.isNotEmpty()) {
+                                pendingPurgeRequest = PurgeTasksRequest(ids, RegistryPromptIds.EMPTY_TRASH)
+                            }
+                        },
                         snackbarVisible = undoSnackbarHostState.currentSnackbarData != null,
                     )
                 }
@@ -482,6 +529,14 @@ fun TaskHomeScreen(
                     onQuickFind = { quickFindOpen = true },
                     onOpenSettings = { settingsOpen = true },
                     onSelectHomeLocation = selectHomeLocation,
+                    logbookShowingDeleted = logbookShowingDeleted,
+                    onLogbookShowingDeletedChange = { logbookShowingDeleted = it },
+                    onRequestEmptyTrash = {
+                        val ids = state.deletedTasks.map { it.id }
+                        if (ids.isNotEmpty()) {
+                            pendingPurgeRequest = PurgeTasksRequest(ids, RegistryPromptIds.EMPTY_TRASH)
+                        }
+                    },
                     snackbarVisible = undoSnackbarHostState.currentSnackbarData != null,
                 )
             }
@@ -793,6 +848,9 @@ private fun TaskHomeScaffold(
     onQuickFind: () -> Unit,
     onOpenSettings: () -> Unit,
     onSelectHomeLocation: (TaskHomeLocation) -> Unit,
+    logbookShowingDeleted: Boolean = false,
+    onLogbookShowingDeletedChange: (Boolean) -> Unit = {},
+    onRequestEmptyTrash: () -> Unit = {},
     snackbarVisible: Boolean = false,
 ) {
     var quickAddDraft by remember { mutableStateOf<QuickAddDraft?>(null) }
@@ -805,6 +863,7 @@ private fun TaskHomeScaffold(
     val context = LocalContext.current
     val dataVersion by graph.sync.dataVersion.collectAsStateWithLifecycle()
     val deviceSettingsVersion by graph.deviceSettings.changes.collectAsStateWithLifecycle()
+    var calendarRefreshTick by remember { mutableIntStateOf(0) }
     var calendarEvents by remember { mutableStateOf<List<CalendarAgendaRow>>(emptyList()) }
     val isDark = LocalSeptenaDarkTheme.current
     val appearance = LocalAppearance.current
@@ -812,18 +871,24 @@ private fun TaskHomeScaffold(
     val destinationId = (state.location as? TaskHomeLocation.SmartList)?.destinationId
     val canCreateHere = state.location !is TaskHomeLocation.SmartList || state.canQuickAdd
     val showStarFilterButton = destinationId != RegistryDestinationIds.STARRED &&
-        destinationId != RegistryDestinationIds.RECENTLY_DELETED
+        destinationId != RegistryDestinationIds.RECENTLY_DELETED &&
+        !(destinationId == RegistryDestinationIds.LOGBOOK && logbookShowingDeleted)
     val imeVisible = WindowInsets.isImeVisible
     val formLabels = remember(languageTag) { TaskFormLabels.fromRegistry(languageTag) }
     val selectToggleLabel = remember(languageTag) {
         RegistryCatalog.actionTitle(RegistryActionIds.TASK_SELECT, languageTag = languageTag).orEmpty()
     }
+    val effectiveSelectionDestId = if (destinationId == RegistryDestinationIds.LOGBOOK && logbookShowingDeleted) {
+        RegistryDestinationIds.RECENTLY_DELETED
+    } else {
+        destinationId
+    }
     val selection = TaskSelection(
         selectedIds = state.selectedIds,
-        enabled = remember(destinationId) {
+        enabled = remember(effectiveSelectionDestId) {
             RegistryActionResolver.isAvailable(
                 RegistryActionIds.TASK_SELECT,
-                RegistryActionContext(RegistryPlatformIds.ANDROID, destinationId, selectedCount = 1),
+                RegistryActionContext(RegistryPlatformIds.ANDROID, effectiveSelectionDestId, selectedCount = 1),
             )
         },
         toggleLabel = selectToggleLabel,
@@ -834,7 +899,27 @@ private fun TaskHomeScaffold(
         if (!magicPlusDrag.isDragging) magicPlusDrag.reset()
         if (!reorderDrag.isDragging) reorderDrag.reset()
     }
-    LaunchedEffect(destinationId, dataVersion, deviceSettingsVersion, languageTag) {
+    DisposableEffect(context, destinationId) {
+        val isTodayOrUpcoming = destinationId == RegistryDestinationIds.TODAY ||
+            destinationId == RegistryDestinationIds.UPCOMING
+        if (!isTodayOrUpcoming || !AndroidCalendarReader.hasPermission(context)) {
+            return@DisposableEffect onDispose {}
+        }
+        val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
+            override fun onChange(selfChange: Boolean) {
+                calendarRefreshTick += 1
+            }
+        }
+        val resolver = context.contentResolver
+        runCatching {
+            resolver.registerContentObserver(CalendarContract.Events.CONTENT_URI, true, observer)
+            resolver.registerContentObserver(CalendarContract.Instances.CONTENT_URI, true, observer)
+        }
+        onDispose {
+            runCatching { resolver.unregisterContentObserver(observer) }
+        }
+    }
+    LaunchedEffect(destinationId, dataVersion, deviceSettingsVersion, calendarRefreshTick, languageTag) {
         val isTodayOrUpcoming = destinationId == RegistryDestinationIds.TODAY ||
             destinationId == RegistryDestinationIds.UPCOMING
         if (!isTodayOrUpcoming || !AndroidCalendarReader.hasPermission(context)) {
@@ -993,6 +1078,53 @@ private fun TaskHomeScaffold(
                 onReview = { activeSweepItems = state.fadedSweepItems },
                 modifier = Modifier.padding(bottom = 10.dp),
             )
+        } else if (destinationId == RegistryDestinationIds.LOGBOOK &&
+            (state.deletedTasks.isNotEmpty() || logbookShowingDeleted)
+        ) {
+            val logbookLabel = remember(languageTag) {
+                RegistryCatalog.destinationTitle(RegistryDestinationIds.LOGBOOK, languageTag).orEmpty()
+            }
+            val deletedLabel = remember(languageTag) {
+                RegistryCatalog.destinationTitle(RegistryDestinationIds.RECENTLY_DELETED, languageTag).orEmpty()
+            }
+            val emptyTrashLabel = remember(languageTag) {
+                RegistryCatalog.actionTitle(RegistryActionIds.TASK_EMPTY_TRASH, languageTag = languageTag).orEmpty()
+            }
+            val deletedTabLabel = if (state.deletedTasks.isNotEmpty()) {
+                "$deletedLabel (${state.deletedTasks.size})"
+            } else {
+                deletedLabel
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = TaskCardMetrics.Margin, vertical = 4.dp)
+                    .padding(bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.weight(1f)) {
+                    SegmentedButton(
+                        selected = !logbookShowingDeleted,
+                        onClick = { onLogbookShowingDeletedChange(false) },
+                        shape = SegmentedButtonDefaults.itemShape(0, 2),
+                    ) {
+                        Text(logbookLabel, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    SegmentedButton(
+                        selected = logbookShowingDeleted,
+                        onClick = { onLogbookShowingDeletedChange(true) },
+                        shape = SegmentedButtonDefaults.itemShape(1, 2),
+                    ) {
+                        Text(deletedTabLabel, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+                if (logbookShowingDeleted && state.deletedTasks.isNotEmpty() && emptyTrashLabel.isNotBlank()) {
+                    TextButton(onClick = onRequestEmptyTrash) {
+                        Text(emptyTrashLabel, color = MaterialTheme.colorScheme.error, maxLines = 1)
+                    }
+                }
+            }
         }
     }
 
@@ -1138,6 +1270,9 @@ private fun TaskHomeScaffold(
                     is TaskHomeLocation.SmartList -> {
                         val isTodayList = location.destinationId == RegistryDestinationIds.TODAY
                         val isReviewList = location.destinationId == RegistryDestinationIds.REVIEW
+                        val showingDeletedTab = location.destinationId == RegistryDestinationIds.LOGBOOK &&
+                            logbookShowingDeleted
+                        val displayedTasks = if (showingDeletedTab) state.deletedTasks else state.tasks
                         val reviewAcceptTitle = remember(languageTag) {
                             RegistryCatalog.actionTitle(RegistryActionIds.TASK_ACCEPT_REVIEW, languageTag = languageTag).orEmpty()
                         }
@@ -1151,7 +1286,7 @@ private fun TaskHomeScaffold(
                             RegistryDestinationIds.STARRED,
                         )
                         val inboxPositions = state.inboxTasks.map { it.position }
-                        val taskPositions = state.tasks.map { it.position }
+                        val taskPositions = displayedTasks.map { it.position }
                         TaskHomeContent(
                             completeTitle = completeTitle,
                             emptyTitle = emptyTitle,
@@ -1160,14 +1295,14 @@ private fun TaskHomeScaffold(
                             todayTitle = todayTitle,
                             todayTint = MaterialTheme.colorScheme.secondary,
                             fadedTitle = fadedTitle,
-                            showFadedIndicator = location.destinationId != RegistryDestinationIds.FADED,
+                            showFadedIndicator = location.destinationId != RegistryDestinationIds.FADED && !showingDeletedTab,
                             isDarkTheme = isDark,
                             hasActiveTexture = appearance.hasActiveTexture,
                             headerContent = sectionHeader,
                             hasLoaded = state.hasLoaded,
                             isToday = isTodayList,
                             inboxTasks = state.inboxTasks,
-                            tasks = state.tasks,
+                            tasks = displayedTasks,
                             calendarEvents = calendarEvents,
                             canQuickAdd = state.canQuickAdd,
                             canComplete = state.canComplete,
@@ -1200,6 +1335,23 @@ private fun TaskHomeScaffold(
                                 { index, before ->
                                     quickAddDraft = defaultQuickAddDraft(location).copy(
                                         position = insertionPosition(taskPositions, index, before),
+                                        useTodayPosition = isTodayList,
+                                    )
+                                }
+                            } else null,
+                            onDropGroupHeader = if (state.canQuickAdd) {
+                                { targetLocationKey ->
+                                    val firstInGroupPos = displayedTasks
+                                        .firstOrNull { it.group?.targetLocationKey == targetLocationKey }
+                                        ?.position
+                                    val areaId = targetLocationKey.removePrefix("area:")
+                                        .takeIf { targetLocationKey.startsWith("area:") }
+                                    val projectId = targetLocationKey.removePrefix("project:")
+                                        .takeIf { targetLocationKey.startsWith("project:") }
+                                    quickAddDraft = defaultQuickAddDraft(location).copy(
+                                        areaId = areaId,
+                                        projectId = projectId,
+                                        position = firstInGroupPos?.let { it - 1.0 },
                                         useTodayPosition = isTodayList,
                                     )
                                 }
@@ -1326,7 +1478,7 @@ private fun taskRowMenuGroups(
     languageTag: String,
 ): List<List<TaskRowMenuAction>> {
     val supportedActions = if (menuId == "task.recentlyDeleted") {
-        setOf(RegistryActionIds.TASK_RESTORE)
+        setOf(RegistryActionIds.TASK_RESTORE, RegistryActionIds.TASK_DELETE_PERMANENTLY)
     } else {
         setOf(
             RegistryActionIds.TASK_ACCEPT_REVIEW,
@@ -1382,7 +1534,8 @@ private fun actionMenuIcon(actionId: String): TaskMenuActionIcon = when (actionI
     RegistryActionIds.TASK_DUPLICATE -> TaskMenuActionIcon.Duplicate
     RegistryActionIds.TASK_SHARE -> TaskMenuActionIcon.Share
     RegistryActionIds.TASK_SELECT -> TaskMenuActionIcon.Select
-    RegistryActionIds.TASK_DELETE -> TaskMenuActionIcon.Delete
+    RegistryActionIds.TASK_DELETE,
+    RegistryActionIds.TASK_DELETE_PERMANENTLY -> TaskMenuActionIcon.Delete
     RegistryActionIds.TASK_RESTORE -> TaskMenuActionIcon.Restore
     RegistryActionIds.TASK_ACCEPT_REVIEW,
     RegistryActionIds.TASK_KEEP_FADED -> TaskMenuActionIcon.Check
@@ -1391,6 +1544,65 @@ private fun actionMenuIcon(actionId: String): TaskMenuActionIcon = when (actionI
 }
 
 private enum class SelectionPicker { When, List }
+
+private data class PurgeTasksRequest(val ids: List<String>, val promptId: String)
+
+private data class PurgePromptCopy(
+    val title: String,
+    val message: String,
+    val confirmTitle: String,
+    val cancelTitle: String,
+)
+
+private fun purgePromptCopy(promptId: String, count: Int, languageTag: String): PurgePromptCopy {
+    val prompt = RegistryCatalog.surface(promptId)?.fields.orEmpty()
+    val rawTitle = prompt["title"]
+    val title = when (rawTitle) {
+        is JsonValue.ObjectValue -> {
+            val otherKey = rawTitle.fields["other"].stringValue().orEmpty()
+            val oneFallback = rawTitle.fields["one"].stringValue() ?: otherKey
+            localizedPlural(otherKey, oneFallback, otherKey, count, languageTag)
+        }
+        else -> {
+            val raw = rawTitle.stringValue().orEmpty()
+            (RegistryCatalog.localizedString(raw, languageTag) ?: raw).replace("{count}", count.toString())
+        }
+    }
+    val rawMessage = prompt["message"].stringValue().orEmpty()
+    val message = RegistryCatalog.localizedString(rawMessage, languageTag) ?: rawMessage
+    val rawConfirm = prompt["confirmTitle"].stringValue().orEmpty()
+    val confirmTitle = RegistryCatalog.localizedString(rawConfirm, languageTag) ?: rawConfirm
+    val promptsRoot = RegistryCatalog.document("surfaces").fields["prompts"] as? JsonValue.ObjectValue
+    val rawCancel = promptsRoot?.fields?.get("cancelTitle").stringValue().orEmpty()
+    val cancelTitle = RegistryCatalog.localizedString(rawCancel, languageTag) ?: rawCancel
+    return PurgePromptCopy(title = title, message = message, confirmTitle = confirmTitle, cancelTitle = cancelTitle)
+}
+
+private fun localizedPlural(
+    key: String,
+    oneFallback: String,
+    otherFallback: String,
+    count: Int,
+    languageTag: String,
+): String {
+    val translations = RegistryCatalog.document("localizations")
+    val locale = translations.fields.keys.firstOrNull { it.equals(languageTag, ignoreCase = true) }
+        ?: translations.fields.keys.firstOrNull {
+            it.substringBefore('-').equals(languageTag.substringBefore('-'), ignoreCase = true)
+        }
+    val selected = locale?.let { translations.fields[it] as? JsonValue.ObjectValue }
+    val entry = selected?.fields?.get(key)
+    val template = when (entry) {
+        is JsonValue.ObjectValue -> {
+            val forms = (entry.fields["forms"] as? JsonValue.ObjectValue)?.fields ?: entry.fields
+            if (count == 1) forms["one"].stringValue() ?: forms["other"].stringValue()
+            else forms["other"].stringValue()
+        }
+        is JsonValue.StringValue -> entry.value
+        else -> null
+    } ?: if (count == 1) oneFallback else otherFallback
+    return template.replace("{count}", count.toString())
+}
 
 private class TaskHomeViewModelFactory(
     private val graph: AndroidAppGraph,

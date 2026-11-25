@@ -323,11 +323,6 @@
       "reasonId": "predates-rule"
     },
     {
-      "file": "Septena/Shell/Tasks/TaskListView.swift",
-      "literal": "Add Section",
-      "reasonId": "predates-rule"
-    },
-    {
       "file": "Septena/Shell/Tasks/TaskPickerSheets.swift",
       "literal": "Notifications are off. Open Settings",
       "reasonId": "predates-rule"
