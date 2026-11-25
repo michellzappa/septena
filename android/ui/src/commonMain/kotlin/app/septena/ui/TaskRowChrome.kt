@@ -1735,7 +1735,8 @@ fun ReviewTaskCardRow(
                     onDismissRequest = { menuExpanded = false },
                     isDark = isDark,
                     groups = rowMenuGroups,
-                    task = task,
+                    isTaskStarred = task.isStarred,
+                    accessibilityLabel = rowMenuAccessibilityLabel,
                     onAction = { actionId -> onTaskAction(task.id, actionId) },
                 )
             }
