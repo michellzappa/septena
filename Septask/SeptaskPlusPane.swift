@@ -26,7 +26,7 @@ struct SeptaskPlusPane: View {
           LabeledContent {
             Text(line).foregroundStyle(.secondary)
           } label: {
-            Label(RegistryPlans.Copy.yourPlan, systemImage: Self.cardSymbol(status.isPlus ? "plus" : "free"))
+            Label(RegistryPlans.Copy.yourPlan, systemImage: planSymbol)
           }
         }
         // The second-device moment's quiet line (spec §3.2, §7.1): it stays
@@ -127,6 +127,12 @@ struct SeptaskPlusPane: View {
   }
 
   /// SF Symbol of a plan card's registry icon (plans.json `cards[].icon`).
+  /// Pro has no card in the apps: no store sells it (ADR 0037, ADR 0045).
+  private var planSymbol: String {
+    if status.isPro { return RegistryIcons.sfSymbols["plans.pro"] ?? "circle" }
+    return Self.cardSymbol(status.isPlus ? "plus" : "free")
+  }
+
   private static func cardSymbol(_ id: String) -> String {
     RegistryIcons.sfSymbols[RegistryPlans.card(id)?.icon ?? ""] ?? "circle"
   }

@@ -304,6 +304,10 @@ export class AccountStore extends DurableObject<Env> {
     });
   }
 
+  hasAccount(userId: string): boolean {
+    return this.sql.exec("SELECT 1 FROM account_index WHERE userId = ?", userId).toArray().length > 0;
+  }
+
   listAccounts(): AccountIndexRow[] {
     const providers = new Map<string, Set<string>>();
     for (const r of this.sql.exec<{ userId: string; provider: string }>("SELECT userId, provider FROM identities ORDER BY createdAt").toArray()) {

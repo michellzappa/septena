@@ -84,6 +84,9 @@ export interface ShareOp {
   id: string;
   deleted: boolean;
   fields: ShareFields;
+  /// The notes this write was made from, so that two members who edit them at
+  /// once both keep their words (`mergeText.ts`).
+  baseNotes?: string | null;
 }
 
 export interface ShareRow {
@@ -102,7 +105,11 @@ export type ShareDelivery =
   /// The member left, was removed, or the owner stopped sharing.
   | { shareId: string; userId: string; state: "ended"; keepCopy: boolean };
 
-export type SharePushResult = { ok: true } | { ok: false; reason: "not_member" };
+/// `keepCopy` is what the end of the membership said. A store that knows
+/// nothing about the member says true: never delete on a guess.
+export type ShareEnded = { ok: false; reason: "not_member"; keepCopy: boolean };
+export type SharePushResult = { ok: true } | ShareEnded;
+export type ShareRowsResult = { ok: true; rows: ShareRow[] } | ShareEnded;
 
 export const sharedColumn = (entity: SharedEntity, name: string) =>
   (ENTITIES[entity].columns as Record<string, import("./columns.js").Column>)[name];
@@ -134,6 +141,9 @@ export class ShareBook {
       );
       CREATE INDEX IF NOT EXISTS share_outbox_row ON share_outbox(shareId, entity, sharedId);
     `);
+    // The notes a queued write was made from, as JSON. Null = not a notes write.
+    const outboxCols = this.sql.exec<{ name: string }>("PRAGMA table_info(share_outbox)").toArray().map((r) => r.name);
+    if (!outboxCols.includes("baseNotes")) this.sql.exec("ALTER TABLE share_outbox ADD COLUMN baseNotes TEXT");
   }
 
   any(): boolean {
@@ -209,10 +219,13 @@ export class ShareBook {
     ).toArray();
   }
 
-  enqueue(shareId: string, entity: SharedEntity, sharedId: string, deleted: boolean, fields: ShareFields): void {
+  enqueue(
+    shareId: string, entity: SharedEntity, sharedId: string, deleted: boolean, fields: ShareFields, baseNotes?: string | null,
+  ): void {
     this.sql.exec(
-      "INSERT INTO share_outbox (shareId, opId, entity, sharedId, deleted, fields) VALUES (?, ?, ?, ?, ?, ?)",
+      "INSERT INTO share_outbox (shareId, opId, entity, sharedId, deleted, fields, baseNotes) VALUES (?, ?, ?, ?, ?, ?, ?)",
       shareId, randomId(12), entity, sharedId, deleted ? 1 : 0, JSON.stringify(fields),
+      baseNotes === undefined ? null : JSON.stringify(baseNotes),
     );
   }
 
@@ -224,6 +237,13 @@ export class ShareBook {
       "SELECT fields FROM share_outbox WHERE shareId = ? AND entity = ? AND sharedId = ?", shareId, entity, sharedId,
     )) for (const f of Object.keys(JSON.parse(r.fields) as ShareFields)) out.add(f);
     return out;
+  }
+
+  /// Words of this row that have not reached the ProjectStore: a new row, or an
+  /// edited title or notes.
+  hasUnsentText(shareId: string, sharedId: string, entity: SharedEntity = "task"): boolean {
+    const pending = this.pendingFields(shareId, entity, sharedId);
+    return pending.has("title") || pending.has("notes");
   }
 
   pendingShares(): string[] {
@@ -249,6 +269,14 @@ export class ShareBook {
     );
   }
 
+  /// These rows were fetched. Whatever they hold (a deleted row too), they are
+  /// not fetched again for the same reason.
+  unmask(shareId: string, rows: { entity: SharedEntity; id: string }[]): void {
+    for (const { entity, id } of rows) {
+      this.sql.exec("UPDATE share_ids SET masked = 0 WHERE shareId = ? AND entity = ? AND sharedId = ?", shareId, entity, id);
+    }
+  }
+
   maskedRows(shareId: string): { entity: SharedEntity; id: string }[] {
     return this.sql.exec<{ entity: SharedEntity; id: string }>(
       "SELECT entity, sharedId AS id FROM share_ids WHERE shareId = ? AND masked = 1 LIMIT ?", shareId, SHARE_BATCH,
@@ -256,14 +284,18 @@ export class ShareBook {
   }
 
   nextBatch(shareId: string): { through: number; ops: ShareOp[] } | null {
-    const rows = this.sql.exec<{ seq: number; opId: string; entity: SharedEntity; sharedId: string; deleted: number; fields: string }>(
-      "SELECT seq, opId, entity, sharedId, deleted, fields FROM share_outbox WHERE shareId = ? ORDER BY seq LIMIT ?", shareId, SHARE_BATCH,
+    const rows = this.sql.exec<{
+      seq: number; opId: string; entity: SharedEntity; sharedId: string; deleted: number; fields: string; baseNotes: string | null;
+    }>(
+      "SELECT seq, opId, entity, sharedId, deleted, fields, baseNotes FROM share_outbox WHERE shareId = ? ORDER BY seq LIMIT ?",
+      shareId, SHARE_BATCH,
     ).toArray();
     if (!rows.length) return null;
     return {
       through: rows[rows.length - 1].seq,
       ops: rows.map((r) => ({
         opId: r.opId, entity: r.entity, id: r.sharedId, deleted: r.deleted === 1, fields: JSON.parse(r.fields) as ShareFields,
+        ...(r.baseNotes === null ? {} : { baseNotes: JSON.parse(r.baseNotes) as string | null }),
       })),
     };
   }

@@ -36,8 +36,11 @@ internal sealed interface AccountPlan {
     /** The reverse trial: Plus limits, nothing paid. */
     data class Trial(val endsAtMs: Long) : AccountPlan
 
-    /** An active entitlement; [paidThroughMs] is null for a grant with no expiry. */
-    data class Plus(val paidThroughMs: Long?, val source: String) : AccountPlan
+    /**
+     * An active entitlement; [paidThroughMs] is null for a grant with no expiry. Pro
+     * (ADR 0045) has every Plus limit or more, so only the words differ.
+     */
+    data class Plus(val paidThroughMs: Long?, val source: String, val isPro: Boolean = false) : AccountPlan
 }
 
 /** Reads the plan from `GET /v1/entitlement`. The server decides access; this only reads its answer. */
@@ -59,6 +62,8 @@ internal class PlanSettingsModel(private val graph: AndroidAppGraph) {
         }
     }
 
+    val isPro: Boolean get() = (plan as? AccountPlan.Plus)?.isPro == true
+
     val isPlus: Boolean get() = plan is AccountPlan.Plus || plan is AccountPlan.Trial
 
     /** One status line for Settings (`statusKey: planStatus`), from plans.json `status`. */
@@ -67,8 +72,8 @@ internal class PlanSettingsModel(private val graph: AndroidAppGraph) {
         is AccountPlan.Free -> plansText(languageTag, "status", "free")
         is AccountPlan.Trial -> plansText(languageTag, "status", "trialEnds").replace("{date}", day(current.endsAtMs))
         is AccountPlan.Plus -> current.paidThroughMs?.let {
-            plansText(languageTag, "status", "paidThrough").replace("{date}", day(it))
-        } ?: plansText(languageTag, "status", "plus")
+            plansText(languageTag, "status", if (current.isPro) "proThrough" else "paidThrough").replace("{date}", day(it))
+        } ?: if (current.isPro) plansText(languageTag, "proName") else plansText(languageTag, "status", "plus")
         null -> null
     }
 
@@ -80,17 +85,20 @@ internal class PlanSettingsModel(private val graph: AndroidAppGraph) {
             if (!answer.active || live.isEmpty()) {
                 return AccountPlan.Free(lapsed = answer.rows.any { it.source != TRIAL })
             }
-            val paid = live.filter { it.source != TRIAL }
+            val isPro = answer.plan == PRO
+            // The words name the plan the account is on, so its rows give the date.
+            val paid = live.filter { if (isPro) it.plan == PRO else it.source != TRIAL }
             if (paid.isEmpty()) {
                 val end = answer.trialEndsAtMs ?: live.mapNotNull { it.expiresAtMs }.maxOrNull() ?: 0L
                 return AccountPlan.Trial(end)
             }
-            paid.firstOrNull { it.expiresAtMs == null }?.let { return AccountPlan.Plus(null, it.source) }
+            paid.firstOrNull { it.expiresAtMs == null }?.let { return AccountPlan.Plus(null, it.source, isPro) }
             val latest = paid.maxBy { it.expiresAtMs ?: 0L }
-            return AccountPlan.Plus(latest.expiresAtMs, latest.source)
+            return AccountPlan.Plus(latest.expiresAtMs, latest.source, isPro)
         }
 
         private const val TRIAL = "trial"
+        private const val PRO = "pro"
 
         private fun day(ms: Long): String = DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(ms))
     }
@@ -125,7 +133,11 @@ internal fun AccountProfileCard(
 ) {
     val title = name.trim().ifEmpty { settingsCopy(ACCOUNT_CARD, "yourProfile", languageTag) }
     val detail = if (signedIn) {
-        val plan = if (plans.isPlus) plansText(languageTag, "shortName") else plansText(languageTag, "status", "free")
+        val plan = when {
+            plans.isPro -> plansText(languageTag, "proName")
+            plans.isPlus -> plansText(languageTag, "shortName")
+            else -> plansText(languageTag, "status", "free")
+        }
         "$plan · ${syncStatusLine(signedIn = true, state = syncState, languageTag = languageTag)}"
     } else {
         settingsCopy(ACCOUNT_CARD, "signInToSync", languageTag)

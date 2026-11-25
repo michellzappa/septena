@@ -9,8 +9,9 @@ import { PLAN_LIMITS, PLAN_TRIAL_DAYS, PLAN_UPSELLS } from "../generated/registr
 // Rows live in the user's TaskStore Durable Object (`entitlements` table).
 // One row per source of access: `apple:<originalTransactionId>` for an App
 // Store subscription, `grant:<name>` for a hand-made grant (mz, testers,
-// press), `trial` for the 14-day reverse trial. The user is on Plus when ANY
-// row is active, else on the free account.
+// press), `trial` for the 14-day reverse trial. The user is on Pro when any
+// active row gives Pro, else on Plus when any row is active, else on the free
+// account.
 //
 // `resolvePlan` turns the rows into a plan id, and `PLAN_TABLE` maps the plan
 // to its limits (registry/plans.json `limits`, generated to PLAN_LIMITS).
@@ -32,6 +33,9 @@ export interface EntitlementRow {
   expiresAt: number | null;
   originalTransactionId: string | null;
   status: EntitlementStatus;
+  /// The plan the row gives. null or absent = Plus. Only grants give Pro
+  /// (ADR 0045): no store sells it.
+  plan?: PaidPlanId | null;
   /// Apple environment (Production / Sandbox); null for grants.
   environment: string | null;
   note: string | null;
@@ -73,7 +77,8 @@ export function isEnforcing(env: Env): boolean {
 /// The plans the server knows. The 14-day reverse trial (spec §3) is a
 /// `trial` entitlement row, so a trial account resolves to `plus` and gets
 /// the Plus limits with no plan of its own.
-export type PlanId = "free" | "plus";
+export type PaidPlanId = "plus" | "pro";
+export type PlanId = "free" | PaidPlanId;
 
 /// The reverse trial's row id. One per account, kept after it expires: its
 /// presence is the record that the account had its trial.
@@ -124,10 +129,12 @@ export interface PlanLimits {
 export const PLAN_TABLE: Record<PlanId, PlanLimits> = {
   free: PLAN_LIMITS.account,
   plus: PLAN_LIMITS.plus,
+  pro: PLAN_LIMITS.pro,
 };
 
 export function resolvePlan(rows: EntitlementRow[], now = Date.now()): PlanId {
-  return rows.some((r) => isRowActive(r, now)) ? "plus" : "free";
+  const active = rows.filter((r) => isRowActive(r, now));
+  return active.some((r) => r.plan === "pro") ? "pro" : active.length ? "plus" : "free";
 }
 
 export interface PlanState {
@@ -308,4 +315,20 @@ export async function userForTransaction(
   if (byOtx) return byOtx;
   if (appAccountToken) return env.TOKENS.get(aatKey(appAccountToken));
   return null;
+}
+
+// ---- grants ----
+
+/// A hand-made grant row (admin page, plan links, `/v1/admin/grants`).
+export function grantRow(
+  id: `grant:${string}`,
+  plan: PaidPlanId,
+  expiresAt: number | null,
+  note: string | null,
+  now = Date.now(),
+): Omit<EntitlementRow, "updatedAt"> {
+  return {
+    id, source: "grant", productId: null, expiresAt, originalTransactionId: null, status: "active",
+    plan, environment: null, note, signedAt: now,
+  };
 }
