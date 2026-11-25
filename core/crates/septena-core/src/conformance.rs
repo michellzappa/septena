@@ -21,6 +21,7 @@ pub struct ConformanceReport {
 /// The fixtures the core runs, by file name without `.json`.
 pub const CONFORMANCE_FIXTURES: &[&str] = &[
     "convo-derived",
+    "do-session",
     "recurrence",
     "refs",
     "reminders",
@@ -114,6 +115,15 @@ pub fn run_conformance(fixture: String, json: String) -> Result<ConformanceRepor
                 for case in cases(&doc, section) {
                     run.check(section, case, section, case["input"].clone(), false);
                 }
+            }
+        }
+        "do-session" => {
+            for case in cases(&doc, "resolve") {
+                let input = json!({ "sessions": case["sessions"], "now": doc["now"] });
+                run.check("resolve", case, "resolveDoSessions", input, false);
+            }
+            for case in cases(&doc, "endWins") {
+                run.check("endWins", case, "doEndWins", case["input"].clone(), false);
             }
         }
         "reminders" => {

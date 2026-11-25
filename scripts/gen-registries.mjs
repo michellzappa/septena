@@ -108,6 +108,8 @@ function validateRules(rules) {
     "clientOpTtlDays",
     "changeLogTtlDays",
     "deleteGraceSeconds",
+    "doStaleHours",
+    "doLapseHours",
   ];
   for (const k of required) {
     assert(typeof rules[k] === "number" && Number.isFinite(rules[k]) && rules[k] > 0, `rules.json: ${k} must be positive number`);

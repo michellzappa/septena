@@ -5,6 +5,7 @@
 use serde::Deserialize;
 use serde_json::{Value, json};
 
+use crate::do_session::{do_end_wins, resolve_do_sessions};
 use crate::error::CoreError;
 use crate::task_dates::patch_json;
 use crate::{
@@ -34,6 +35,8 @@ pub const JSON_FUNCTIONS: &[&str] = &[
     "shouldArmReminder",
     "deriveConversation",
     "conversationState",
+    "resolveDoSessions",
+    "doEndWins",
     "checkPullPage",
     "planPullRow",
     "planPushResponse",
@@ -140,6 +143,14 @@ pub(crate) fn invoke_value(function: &str, input: Value) -> Result<Value, CoreEr
             let args: ConvoArgs = decode(input).map_err(|e| parse(&e))?;
             serde_json::to_value(conversation_state(args.conversation, args.now)?)
                 .map_err(|e| CoreError::invalid(e.to_string()))
+        }
+        "resolveDoSessions" => {
+            let now = text_arg(&input, "now").ok_or_else(|| parse("now"))?;
+            resolve_do_sessions(&input["sessions"], &now)
+        }
+        "doEndWins" => {
+            let incoming = text_arg(&input, "incoming").ok_or_else(|| parse("incoming"))?;
+            Ok(json!(do_end_wins(input["current"].as_str(), &incoming)?))
         }
         "checkPullPage" => {
             let args: PullPageArgs = decode(input).map_err(|e| parse(&e))?;
