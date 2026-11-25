@@ -190,7 +190,9 @@ appends never overwrite each other.
 
 `POST /v1/sync/push` with a batch of ops:
 
-- `{ clientOpId, entity, id, op: "upsert", fields: { … only changed fields … } }`
+- `{ clientOpId, entity, id, op: "upsert", fields: { … only changed fields … }, base? }`.
+  `base: { notes }` (task and project) is the notes the edit started from. The
+  DO merges when the row changed meanwhile, and the client pulls the result.
 - `{ clientOpId, entity, id, op: "delete" }`
 - `{ clientOpId, op: "appendTurn", taskId, turn }`
 

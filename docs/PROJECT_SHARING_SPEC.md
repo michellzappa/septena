@@ -33,10 +33,12 @@
 - A delivery never overwrites a field with a write still in the outbox. Such a
   row is marked and fetched again after the outbox is empty, so all stores end
   with the same value.
-- An object that cannot be reached is tried again by an alarm. Nothing is lost.
+- An object that cannot be reached is tried again by an alarm. The alarm is
+  set before the work, so an object that stops in the middle sends the rest.
 
 Code: `backend/src/store/ProjectStore.ts`, `store/shares.ts`,
-`store/TaskStore.ts` ("shared projects"), `api/shares.ts`.
+`store/TaskStore.ts` ("shared projects"), `store/mergeText.ts`,
+`api/shares.ts`.
 
 ## 3. Fields
 
@@ -90,6 +92,26 @@ therefore valid for its own account only.
 - **Owner's Plus ends** (mz, 2026-11-25): 30 days' notice, then members read
   only. The owner keeps editing, nothing is deleted, and a Plus member can take
   over. Not built yet: S1b. New shares and invites stop at once.
+
+### 5a. Never lose data
+
+- **Notes merge** (task and project). Changes in different places combine.
+  Where two members changed one place, both versions stay, the stored one
+  first. A client sends the notes its edit started from (`base` on the op);
+  a store sends the same to the ProjectStore.
+- **Every other field** is last writer wins. The change log keeps the value
+  that lost, uncut for a shared row.
+- **A deleted task stays with a member who has something on it that exists
+  nowhere else**: words that did not reach the project, files, references or a
+  conversation. It becomes a private task in their Inbox.
+- **Leaving, removal and Stop sharing** keep such tasks the same way, in the
+  project, which becomes private.
+- **No store deletes on a guess.** A membership that ended says whether the
+  copy stays, and an answer that does not know says keep.
+- A project that ended for everyone is removed from its store after a day.
+- `backend/test/shares.test.ts` runs random edits by three members over a
+  network that loses calls and answers, with restarts: every store must end
+  equal, and no word may be lost.
 
 ## 6. Agents
 

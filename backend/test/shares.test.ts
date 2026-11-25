@@ -13,6 +13,24 @@ async function world(users: string[]) {
   const tasks = new Map<string, Tasks>();
   const projects = new Map<string, Projects>();
   let reachable = true;
+  /// Chance that one call between two stores fails, before or after it ran.
+  let lossy: (() => number) | null = null;
+  const flaky = <T extends object>(target: T): T => lossy
+    ? new Proxy(target, {
+      get(t, name) {
+        const v = (t as Record<string | symbol, unknown>)[name];
+        if (typeof v !== "function") return v;
+        return async (...args: unknown[]) => {
+          const roll = lossy?.() ?? 1;
+          if (roll < 0.15) throw new Error("lost request");
+          // Structured clone, as RPC does: no shared objects between stores.
+          const out = await (v as (...a: unknown[]) => unknown).apply(t, structuredClone(args));
+          if (roll < 0.3) throw new Error("lost answer");
+          return structuredClone(out);
+        };
+      },
+    })
+    : target;
   const env: Record<string, unknown> = {
     API_PUBLIC_URL: "https://api.septena.app",
     ATTACHMENTS: { async delete() {} },
@@ -20,14 +38,14 @@ async function world(users: string[]) {
       idFromName: (n: string) => n,
       get: (n: string) => {
         if (!reachable) throw new Error("unreachable");
-        return tasks.get(n)!.store;
+        return flaky(tasks.get(n)!.store);
       },
     },
     PROJECT_STORE: {
       idFromName: (n: string) => n,
       get: (n: string) => {
         if (!reachable) throw new Error("unreachable");
-        return projects.get(n)!.store;
+        return flaky(projects.get(n)!.store);
       },
     },
   };
@@ -41,6 +59,21 @@ async function world(users: string[]) {
       }
     },
     setReachable(v: boolean) { reachable = v; },
+    setLossy(random: (() => number) | null) { lossy = random; },
+    /// The object stops: what ran in the background is gone, the data stays.
+    async restart(u: string) { tasks.set(u, await createTestTaskStore(tasks.get(u)!.db, env)); },
+    alarmAt: (u: string) => tasks.get(u)!.alarmAt(),
+    projectAlarmAt: (id: string) => projects.get(id)!.alarmAt(),
+    projectRow(id: string, entity: string, row: string) {
+      const r = projects.get(id)!.db.prepare("SELECT fields, deleted FROM rows WHERE entity = ? AND id = ?").get(entity, row) as { fields: string; deleted: number };
+      return { deleted: r.deleted === 1, fields: JSON.parse(r.fields) as Record<string, unknown> };
+    },
+    projectRows(id: string) {
+      return projects.get(id)!.db.prepare("SELECT entity, id, fields FROM rows WHERE deleted = 0").all() as { entity: string; id: string; fields: string }[];
+    },
+    sharedId(u: string, entity: string, local: string) {
+      return (tasks.get(u)!.db.prepare("SELECT sharedId FROM share_ids WHERE entity = ? AND localId = ?").get(entity, local) as { sharedId: string } | undefined)?.sharedId;
+    },
     store: (u: string) => tasks.get(u)!.store,
     project: (id: string) => projects.get(id)!.store,
     async newProject(id: string) { projects.set(id, await createTestProjectStore(env)); return projects.get(id)!.store; },
@@ -208,7 +241,7 @@ test("invites: one use, revocable, not for a removed member to reuse", async () 
   await w.settle();
   assert.equal(replica(w, "ben", "Paint"), undefined);
   assert.equal(w.row("ben", "tasks", "id = ?", "t1")!.title, "Ben task");
-  assert.deepEqual(await p.push("ben", []), { ok: false, reason: "not_member" });
+  assert.deepEqual(await p.push("ben", []), { ok: false, reason: "not_member", keepCopy: false });
   assert.deepEqual(await p.join(token, "ben", "Ben"), { ok: false, reason: "invalid" });
   await join("ben", "Ben");
   assert.ok(replica(w, "ben", "Paint"));
@@ -292,4 +325,220 @@ test("a Do is private, and ends when another member closes or deletes the task",
   await w.settle();
   assert.equal(w.store("ben").readDoing(), null);
   assert.equal(w.store("ben").readDoSession("do-2"), null);
+});
+
+// ---- never lose data (spec §5a) ----
+
+test("two members edit the same notes at once: both keep their words", async () => {
+  const { w, join } = await shared();
+  await join("ben", "Ben");
+  const id = replica(w, "ben", "Paint")!.id as string;
+  w.push("ann", up("task", "t1", { notes: "white paint\nbrush" }));
+  await w.settle();
+  w.push("ann", up("task", "t1", { notes: "white paint\nbrush\ntape" }));
+  w.push("ben", up("task", id, { notes: "blue paint\nbrush" }));
+  await w.settle();
+  for (const [u, local] of [["ann", "t1"], ["ben", id]]) assert.equal(w.row(u, "tasks", "id = ?", local)!.notes, "blue paint\nbrush\ntape");
+  w.push("ann", up("project", "home", { notes: "brief\nann" }));
+  w.push("ben", up("project", w.row("ben", "tasks", "id = ?", id)!.project as string, { notes: "brief\nben" }));
+  await w.settle();
+  const notes = w.row("ann", "projects", "id = ?", "home")!.notes as string;
+  assert.deepEqual(notes.split("\n").sort(), ["ann", "ben", "brief"]);
+  assert.equal(w.row("ben", "projects", "title = ? AND deletedAt IS NULL", "Home")!.notes, notes);
+});
+
+test("a device that was offline sends the notes it started from: nothing is overwritten", async () => {
+  const { w, join } = await shared();
+  await join("ben", "Ben");
+  const id = replica(w, "ben", "Paint")!.id as string;
+  w.push("ann", up("task", "t1", { notes: "a\nb" }));
+  await w.settle();
+  w.push("ben", up("task", id, { notes: "a\nb\nben" }));
+  await w.settle();
+  w.push("ann", { ...up("task", "t1", { notes: "A\nb" }), base: { notes: "a\nb" } });
+  await w.settle();
+  for (const [u, local] of [["ann", "t1"], ["ben", id]]) assert.equal(w.row(u, "tasks", "id = ?", local)!.notes, "A\nb\nben");
+  // A plain overwrite still works, and the log keeps all of what it replaced.
+  const long = "x".repeat(9_000);
+  w.push("ann", up("task", "t1", { notes: long }));
+  await w.settle();
+  w.push("ben", up("task", id, { notes: "short" }));
+  await w.settle();
+  const log = w.store("ann").history("task", "t1", null, 1)[0];
+  assert.equal(log.diff!.notes[0], long);
+});
+
+test("a task another member deletes stays with a member who has files or a conversation on it", async () => {
+  const { w, join } = await shared();
+  await join("ben", "Ben");
+  const id = replica(w, "ben", "Paint")!.id as string;
+  w.push("ben",
+    up("attachment", "file1", { taskId: id, filename: "wall.jpg", contentType: "image/jpeg", byteCount: 10, createdAt: "2026-11-25T10:00:00Z", sha256: "a".repeat(64) }));
+  assert.equal(w.rows("ben", "attachments").length, 1);
+  w.push("ann", del("task", "t1"));
+  await w.settle();
+  const t = w.row("ben", "tasks", "id = ?", id)!;
+  assert.equal(t.deletedAt, null);
+  assert.equal(t.project, null);
+  assert.equal(w.rows("ben", "attachments").length, 1);
+  assert.equal(w.rows("ben", "checklist_items").length, 1);
+  // It is private now: a later edit goes nowhere.
+  w.push("ben", up("task", id, { title: "Mine" }));
+  await w.settle();
+  assert.equal(replica(w, "ann", "Mine"), undefined);
+  assert.equal(w.row("ann", "tasks", "id = ?", "t1")!.title, "Paint");
+});
+
+test("a task one member deletes while another writes it: the writer keeps a private copy", async () => {
+  const { w, join } = await shared();
+  await join("ben", "Ben");
+  const id = replica(w, "ben", "Paint")!.id as string;
+  w.setReachable(false);
+  w.push("ben", up("task", id, { notes: "an hour of typing" }));
+  await w.settle();
+  w.setReachable(true);
+  w.push("ann", del("task", "t1"));
+  await w.settle();
+  await w.store("ben").alarm();
+  await w.settle();
+  const t = w.row("ben", "tasks", "id = ?", id)!;
+  assert.equal(t.deletedAt, null);
+  assert.equal(t.notes, "an hour of typing");
+});
+
+test("leaving keeps what exists nowhere else: unsent tasks and own files", async () => {
+  const { w, p, join } = await shared();
+  const { memberId } = await join("ben", "Ben");
+  const project = replica(w, "ben", "Paint")!.project as string;
+  w.setReachable(false);
+  w.push("ben", up("task", "late", { title: "Written offline", status: "open", project }));
+  await w.settle();
+  w.setReachable(true);
+  assert.equal(await p.endMembership("ann", memberId), true);
+  await w.settle();
+  assert.equal(replica(w, "ben", "Paint"), undefined);
+  const t = replica(w, "ben", "Written offline")!;
+  assert.equal(t.project, project);
+  const kept = w.row("ben", "projects", "id = ?", project)!;
+  assert.equal(kept.deletedAt, null);
+  assert.equal(kept.share, null);
+});
+
+test("the owner's account goes while a member's write is on its way: the copy stays", async () => {
+  const { w, p, join } = await shared();
+  await join("ben", "Ben");
+  const id = replica(w, "ben", "Paint")!.id as string;
+  w.setReachable(false);
+  await p.accountDeleted("ann");
+  w.push("ben", up("task", id, { status: "done", completedAt: "2026-11-25T10:00:00" }));
+  await w.settle();
+  w.setReachable(true);
+  // The write finds out before the notice arrives.
+  await w.store("ben").alarm();
+  await w.settle();
+  assert.equal(w.row("ben", "tasks", "id = ?", id)!.deletedAt, null);
+  assert.equal(w.store("ben").listShares().length, 0);
+  // A project store that knows nothing about the member never deletes.
+  assert.deepEqual(await p.push("stranger", []), { ok: false, reason: "not_member", keepCopy: true });
+});
+
+test("an object that stops in the middle sends the rest when its alarm fires", async () => {
+  const { w, join } = await shared();
+  await join("ben", "Ben");
+  const id = replica(w, "ben", "Paint")!.id as string;
+  const daily = w.alarmAt("ben")!;
+  assert.ok(daily > Date.now() + 3_600_000);
+  w.setReachable(false);
+  w.push("ben", up("task", id, { title: "Stopped" }));
+  await new Promise((done) => setImmediate(done));
+  assert.ok(w.alarmAt("ben")! < Date.now() + 60_000);
+  await w.restart("ben");
+  w.setReachable(true);
+  await w.store("ben").alarm();
+  await w.settle();
+  assert.equal(w.row("ann", "tasks", "id = ?", "t1")!.title, "Stopped");
+  assert.ok(w.alarmAt("ben")! > Date.now() + 3_600_000);
+  assert.equal(w.projectAlarmAt(SHARE), null);
+});
+
+test("a project that ended for everyone is removed from its store a day later", async (t) => {
+  const { w, p, join } = await shared();
+  await join("ben", "Ben");
+  await p.close("ann");
+  await w.settle();
+  assert.ok(w.projectAlarmAt(SHARE)! > Date.now() + 3_600_000);
+  t.mock.method(Date, "now", () => new Date().getTime() + 25 * 3_600_000);
+  await p.alarm();
+  assert.throws(() => w.projectRows(SHARE));
+  assert.deepEqual(await p.push("ben", []), { ok: false, reason: "not_member", keepCopy: true });
+});
+
+function random(seed: number) {
+  return () => {
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+test("random edits by three members over a bad network: every store ends equal and no word is lost", async () => {
+  for (let seed = 1; seed <= 25; seed++) {
+    const { w, p, join } = await shared();
+    await join("ben", "Ben");
+    await join("cat", "Cat");
+    const users = ["ann", "ben", "cat"];
+    const rnd = random(seed);
+    const pick = <T>(list: T[]) => list[Math.floor(rnd() * list.length)];
+    const words: { shared: string; word: string }[] = [];
+    const deleted = new Set<string>();
+    w.setLossy(rnd);
+    for (let step = 0; step < 120; step++) {
+      const u = pick(users);
+      const open = w.rows(u, "tasks").filter((t) => t.kind !== "heading" && t.project && w.sharedId(u, "task", t.id as string));
+      const t = pick(open);
+      const roll = rnd();
+      if (roll < 0.15 || !t) {
+        const project = u === "ann" ? "home" : w.row(u, "projects", "title != 'Ben home' AND deletedAt IS NULL")!.id;
+        w.push(u, up("task", `n-${seed}-${step}`, { title: `T${step}`, status: "open", project }));
+      } else if (roll < 0.55) {
+        const word = `w${seed}x${step}`;
+        words.push({ shared: w.sharedId(u, "task", t.id as string)!, word });
+        const lines = t.notes ? (t.notes as string).split("\n") : [];
+        lines.splice(Math.floor(rnd() * (lines.length + 1)), 0, word);
+        w.push(u, { ...up("task", t.id as string, { notes: lines.join("\n") }), base: { notes: (t.notes as string | null) ?? null } });
+      } else if (roll < 0.7) w.push(u, up("task", t.id as string, { title: `${t.title}${u[0]}`.slice(-20) }));
+      else if (roll < 0.8) w.push(u, up("task", t.id as string, { status: pick(["open", "done"]), position: step }));
+      else if (roll < 0.9) w.push(u, up("checklistItem", `c-${seed}-${step}`, { taskId: t.id, title: `item ${step}` }));
+      else if (roll < 0.93) {
+        deleted.add(w.sharedId(u, "task", t.id as string)!);
+        w.push(u, del("task", t.id as string));
+      } else if (roll < 0.96) await w.settle();
+      else await w.restart(u);
+    }
+    w.setLossy(null);
+    for (let i = 0; i < 6; i++) {
+      for (const u of users) await w.store(u).alarm();
+      await p.alarm();
+      await w.settle();
+    }
+    const truth = w.projectRows(SHARE);
+    for (const u of users) {
+      const mine = w.rows(u, "tasks").filter((t) => w.sharedId(u, "task", t.id as string));
+      assert.equal(mine.length, truth.filter((r) => r.entity === "task").length, `seed ${seed} ${u} tasks`);
+      for (const t of mine) {
+        const fields = JSON.parse(truth.find((r) => r.entity === "task" && r.id === w.sharedId(u, "task", t.id as string))!.fields);
+        for (const f of ["title", "status", "notes", "position"]) assert.equal(t[f] ?? null, fields[f] ?? null, `seed ${seed} ${u} ${f}`);
+      }
+      const items = w.rows(u, "checklist_items").filter((c) => w.sharedId(u, "checklistItem", c.id as string));
+      const live = truth.filter((r) => r.entity === "checklistItem" && mine.some((t) => w.sharedId(u, "task", t.id as string) === JSON.parse(r.fields).taskId));
+      assert.equal(items.length, live.length, `seed ${seed} ${u} items`);
+    }
+    for (const { shared: id, word } of words) {
+      const row = truth.find((r) => r.entity === "task" && r.id === id);
+      const everywhere = users.some((u) => w.rows(u, "tasks").some((t) => ((t.notes as string | null) ?? "").includes(word)));
+      if (row) assert.ok((JSON.parse(row.fields).notes as string).includes(word), `seed ${seed} lost ${word}`);
+      else assert.ok(everywhere || deleted.has(id), `seed ${seed} lost ${word} with its task`);
+    }
+  }
 });
