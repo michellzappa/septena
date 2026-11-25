@@ -143,6 +143,7 @@ enum RegistryIcons {
     "action.edit_details": "info.circle",
     "action.open": "arrow.up.left.and.arrow.down.right",
     "action.share_project": "person.crop.circle.badge.plus",
+    "project.shared": "person.2.fill",
     "action.assign": "person",
     "action.share": "square.and.arrow.up",
     "action.accept": "checkmark.seal",

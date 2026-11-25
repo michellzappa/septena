@@ -32,6 +32,7 @@
     "action.edit_details": { "sfSymbol": "info.circle", "material": "info", "lucide": "info" },
     "action.open": { "sfSymbol": "arrow.up.left.and.arrow.down.right", "material": "open_in_full", "lucide": "maximize-2" },
     "action.share_project": { "sfSymbol": "person.crop.circle.badge.plus", "material": "person_add", "lucide": "user-plus" },
+    "project.shared": { "sfSymbol": "person.2.fill", "material": "group", "lucide": "users" },
     "action.assign": { "sfSymbol": "person", "material": "person", "lucide": "user" },
     "action.share": { "sfSymbol": "square.and.arrow.up", "material": "share", "lucide": "share" },
     "action.accept": { "sfSymbol": "checkmark.seal", "material": "verified", "lucide": "badge-check" },

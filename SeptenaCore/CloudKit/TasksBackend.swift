@@ -391,13 +391,16 @@ final class CloudKitTasksBackend {
   /// from the local store, or the save was rolled back. The inline-create fold
   /// reads this before purging an apparently-untitled new row.
   @discardableResult
-  func update(id: String, title: String?, notes: String?) -> Bool {
+  func update(id: String, title: String?, notes: String?, notesFrom: String? = nil) -> Bool {
     guard let entity = fetch(id: id) else {
       SeptenaLog.info("[CK] update id=\(id) → MISS (no local entity)")
       return false
     }
     if let title { entity.title = title }
-    if let notes { entity.notes = notes.isEmpty ? nil : notes }
+    if let notes {
+      entity.notes = notes.isEmpty ? nil : notes
+      TaskSyncEngine.shared.noteEditedNotes(.task, id, from: notesFrom)
+    }
     entity.pendingSync = true
     return commitAndPush(entity, op: "update")
   }

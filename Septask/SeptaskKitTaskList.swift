@@ -98,7 +98,7 @@ final class SeptaskKitTaskListController: NSViewController {
   /// `key` is the stable identity the animated diff runs on.
   private enum Row: Equatable {
     case header(id: String, title: String, icon: GroupIcon, count: Int)
-    case screenTitle(title: String, icon: GroupIcon)
+    case screenTitle(title: String, icon: GroupIcon, share: ProjectShare? = nil)
     case logbookBar(tab: LogbookTab, deletedCount: Int, showsSegmented: Bool, canEmptyTrash: Bool)
     case tagFilterBar(tags: [TaskTag], active: [String])
     case projectTarget(id: String, title: String, progress: Double, count: Int)
@@ -2261,7 +2261,7 @@ final class SeptaskKitTaskListController: NSViewController {
     case .project(let id):
       guard let project = snapshot.projects.first(where: { $0.id == id }) else { return nil }
       let progress = projectProgress()[id] ?? 0
-      return .screenTitle(title: project.title, icon: .project(progress))
+      return .screenTitle(title: project.title, icon: .project(progress), share: project.share)
     case .area(let id):
       guard let area = snapshot.areas.first(where: { $0.id == id }) else { return nil }
       return .screenTitle(title: area.title, icon: area.emoji.map(GroupIcon.emoji) ?? .areaDot)
@@ -2327,7 +2327,7 @@ final class SeptaskKitTaskListController: NSViewController {
           if isArea {
             try await SeptenaServices.shared.areasMutator.setContext(id: id, context: value)
           } else {
-            try await SeptenaServices.shared.projectsMutator.setNotes(id: id, notes: value)
+            try await SeptenaServices.shared.projectsMutator.setNotes(id: id, notes: value, from: text)
           }
         } catch {
           SeptenaLog.error("[notes] save failed for \(isArea ? "area" : "project") \(id)", error)
@@ -4483,7 +4483,7 @@ final class SeptaskKitTaskListController: NSViewController {
       self.animateComposerHeight(ofRow: row, animated: false)
     }
 
-    cell.onCommit = { [weak self] title, notes in
+    cell.onCommit = { [weak self] title, notes, from in
       guard let self,
             // Compare against the STORE, not the `task` this closure captured:
             // a pill, a sync batch or an earlier commit may have moved it on.
@@ -4495,19 +4495,22 @@ final class SeptaskKitTaskListController: NSViewController {
          self.headingPrefixForNewTask(title: trimmed, task: current) != nil {
         return
       }
-      let titleChanged = !trimmed.isEmpty && trimmed != current.title
+      // A field nobody typed in is not written: the store may hold a newer
+      // value that another device or member wrote while the row was open.
+      let titleChanged = !trimmed.isEmpty && trimmed != current.title && title != from.title
       // Same normalization on both sides as the cell applies to what it
       // saves (trailing whitespace only), so an untouched row never rewrites
       // its notes — and never syncs a no-op.
       let storedNotes = KitComposerCell.normalizedNotes(current.notes)
-      let notesChanged = KitComposerCell.normalizedNotes(notes) != storedNotes
+      let notesChanged = notes != from.notes && KitComposerCell.normalizedNotes(notes) != storedNotes
       guard titleChanged || notesChanged else { return }
       // Title and notes are one logical edit. Send one save/notification; an
       // empty notes string is intentional because the backend uses it to clear
       // the optional notes field.
       self.mutator.update(id: task.id,
                           title: titleChanged ? trimmed : nil,
-                          notes: notesChanged ? (notes ?? "") : nil)
+                          notes: notesChanged ? (notes ?? "") : nil,
+                          notesFrom: from.notes ?? "")
       // A brand-new row's first save is its CREATION, recorded when it closes
       // (`collapseComposer` → `recordNewTaskUndo`); an edit to an existing row
       // is undoable as an edit.
@@ -5045,7 +5048,7 @@ final class SeptaskKitTaskListController: NSViewController {
 
   /// Project header `…` overflow menu: New Section + New Task, built from
   /// canonical registry titles so the Mac project header mirrors iOS's `…`.
-  private func buildProjectOverflowMenu() -> NSMenu {
+  private func buildProjectOverflowMenu(_ projectID: String) -> NSMenu {
     KitRegistryMenu.build([
       RegistryMenuEntry.slot(
         id: "project.newSection",
@@ -5057,6 +5060,11 @@ final class SeptaskKitTaskListController: NSViewController {
         title: RegistryActions.title(.appNewTask),
         sfSymbol: "checkmark.circle"
       ) { [weak self] in self?.createTask() },
+      RegistryMenuEntry.slot(
+        id: RegistryActionID.projectShare.rawValue,
+        title: RegistryActions.title(.projectShare),
+        sfSymbol: RegistryIcons.sfSymbol(for: "action.share_project")
+      ) { SeptaskSharing.present(projectID: projectID) },
     ])
   }
 
@@ -5860,11 +5868,11 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       }
       return cell
 
-    case .screenTitle(let title, let icon):
+    case .screenTitle(let title, let icon, let share):
       let identifier = NSUserInterfaceItemIdentifier("screenTitleCell")
       let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? KitScreenTitleCell
         ?? KitScreenTitleCell(identifier: identifier)
-      cell.configure(title: title, icon: icon, showsNavMenu: !isSidebarVisible)
+      cell.configure(title: title, icon: icon, share: share, showsNavMenu: !isSidebarVisible)
       // The title IS the navigation dropdown (Things-style) when the sidebar is
       // collapsed — same contract as SwiftUI's `TaskNavMenu`. Built fresh per
       // click via the closure rather than once here, so it can never show a
@@ -5880,10 +5888,12 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       } else {
         cell.onPickGlyph = nil
       }
-      if case .project = filter {
-        cell.onOpenOverflowMenu = { [weak self] in self?.buildProjectOverflowMenu() }
+      if case .project(let projectID) = filter {
+        cell.onOpenOverflowMenu = { [weak self] in self?.buildProjectOverflowMenu(projectID) }
+        cell.onOpenMembers = { SeptaskSharing.present(projectID: projectID) }
       } else {
         cell.onOpenOverflowMenu = nil
+        cell.onOpenMembers = nil
       }
       return cell
 
@@ -7127,6 +7137,9 @@ final class KitScreenTitleCell: NSTableCellView {
     }
   }
   private let moreButton = NSButton()
+  /// The members of a shared project. Opens Share Project.
+  private let membersButton = NSButton()
+  var onOpenMembers: (() -> Void)?
   private var moreTrailingConstraint: NSLayoutConstraint!
 
   private static var font: NSFont { .systemFont(ofSize: SeptenaTypeScale.size(.title2), weight: .bold) }
@@ -7189,6 +7202,17 @@ final class KitScreenTitleCell: NSTableCellView {
     moreButton.toolTip = RegistryActions.title(.sectionNew)
     moreButton.setAccessibilityLabel(RegistryActions.title(.sectionNew))
 
+    membersButton.translatesAutoresizingMaskIntoConstraints = false
+    membersButton.isBordered = false
+    membersButton.title = ""
+    membersButton.imagePosition = .imageOnly
+    membersButton.target = self
+    membersButton.action = #selector(openMembers)
+    membersButton.refusesFirstResponder = true
+    membersButton.isHidden = true
+    membersButton.setContentHuggingPriority(.required, for: .horizontal)
+    membersButton.setContentCompressionResistancePriority(.required, for: .horizontal)
+
     icon.kitA11yIgnore()
     emoji.kitA11yIgnore()
 
@@ -7198,6 +7222,7 @@ final class KitScreenTitleCell: NSTableCellView {
     addSubview(titleLabel)
     addSubview(glyphButton)
     addSubview(moreButton)
+    addSubview(membersButton)
     leadingConstraint = icon.centerXAnchor.constraint(
       equalTo: leadingAnchor,
       constant: KitCardRowView.horizontalInset + SeptaskKitLayout.leadingGlyphCenterX)
@@ -7207,9 +7232,9 @@ final class KitScreenTitleCell: NSTableCellView {
     moreTrailingConstraint = moreButton.trailingAnchor.constraint(
       equalTo: trailingAnchor, constant: -(KitCardRowView.horizontalInset + 8))
     trailingConstraint = button.trailingAnchor.constraint(
-      lessThanOrEqualTo: moreButton.leadingAnchor, constant: -6)
+      lessThanOrEqualTo: membersButton.leadingAnchor, constant: -6)
     labelTrailingConstraint = titleLabel.trailingAnchor.constraint(
-      lessThanOrEqualTo: moreButton.leadingAnchor, constant: -6)
+      lessThanOrEqualTo: membersButton.leadingAnchor, constant: -6)
     NSLayoutConstraint.activate([
       leadingConstraint,
       buttonLeadingConstraint,
@@ -7222,6 +7247,8 @@ final class KitScreenTitleCell: NSTableCellView {
       glyphButton.widthAnchor.constraint(equalToConstant: 28),
       glyphButton.heightAnchor.constraint(equalToConstant: 28),
       moreTrailingConstraint,
+      membersButton.trailingAnchor.constraint(equalTo: moreButton.leadingAnchor, constant: -4),
+      membersButton.centerYAnchor.constraint(equalTo: button.centerYAnchor),
       moreButton.centerYAnchor.constraint(equalTo: button.centerYAnchor),
       moreButton.widthAnchor.constraint(equalToConstant: 28),
       moreButton.heightAnchor.constraint(equalToConstant: 28),
@@ -7237,6 +7264,10 @@ final class KitScreenTitleCell: NSTableCellView {
 
   @objc private func pickGlyph() {
     onPickGlyph?(glyphButton)
+  }
+
+  @objc private func openMembers() {
+    onOpenMembers?()
   }
 
   @objc private func openOverflowMenu() {
@@ -7268,6 +7299,9 @@ final class KitScreenTitleCell: NSTableCellView {
     if !moreButton.isHidden {
       addCursorRect(moreButton.frame, cursor: .pointingHand)
     }
+    if !membersButton.isHidden {
+      addCursorRect(membersButton.frame, cursor: .pointingHand)
+    }
   }
 
   /// Same width-dependent centered-column margin as every other row.
@@ -7289,7 +7323,12 @@ final class KitScreenTitleCell: NSTableCellView {
 
   func configure(title titleText: String,
                  icon iconKind: SeptaskKitTaskListController.GroupIcon,
+                 share: ProjectShare? = nil,
                  showsNavMenu: Bool) {
+    membersButton.isHidden = share == nil
+    membersButton.image = share.map { KitGlyph.members($0) }
+    membersButton.toolTip = share?.membersLabel
+    membersButton.setAccessibilityLabel(share?.membersLabel ?? "")
     // `attributedTitle`, not `title`: a borderless NSButton otherwise paints
     // its label in the control's default color, which loses the page title's
     // full-strength ink. Populate both the button and the static label so

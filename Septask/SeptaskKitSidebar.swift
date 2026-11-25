@@ -1090,6 +1090,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     // color; the rest stay quiet secondary ink), areas their emoji or the
     // muted dot, projects their completion ring.
     cell.emoji.isHidden = true
+    cell.sharedMark.isHidden = true
     switch node.content {
     case .filter(let filter, let title, let symbol):
       cell.textField?.font = SeptaskKitTheme.sidebarTitle
@@ -1126,6 +1127,11 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
       cell.textField?.stringValue = project.title
       cell.textField?.textColor = SeptaskKitTheme.inkPrimary
       cell.imageView?.image = KitGlyph.progress(progress)
+      if let share = project.share {
+        cell.sharedMark.isHidden = false
+        cell.sharedMark.toolTip = share.membersLabel
+        cell.sharedMark.setAccessibilityLabel(share.membersLabel)
+      }
     }
     cell.badge.stringValue = Self.showsCounts ? (node.count.map(String.init) ?? "") : ""
 
@@ -1193,6 +1199,8 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     /// An area's user glyph sits where the icon would — same slot, so titles
     /// stay aligned whether an area has an emoji or the muted dot.
     let emoji = NSTextField(labelWithString: "")
+    /// After the title of a shared project.
+    let sharedMark = NSImageView()
     /// Custom expand/collapse affordance — see the controller's
     /// `shouldShowOutlineCellForItem`.
     let disclosure = KitDisclosureView()
@@ -1291,6 +1299,14 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
       badge.translatesAutoresizingMaskIntoConstraints = false
       badge.setContentHuggingPriority(.required, for: .horizontal)
 
+      sharedMark.translatesAutoresizingMaskIntoConstraints = false
+      sharedMark.image = NSImage(systemSymbolName: RegistryIcons.sfSymbol(for: "project.shared"),
+                                 accessibilityDescription: nil)?
+        .withSymbolConfiguration(.init(pointSize: 10, weight: .regular))
+      sharedMark.contentTintColor = SeptaskKitTheme.iconMuted
+      sharedMark.setContentHuggingPriority(.required, for: .horizontal)
+      sharedMark.setContentCompressionResistancePriority(.required, for: .horizontal)
+
       disclosure.translatesAutoresizingMaskIntoConstraints = false
       disclosure.onTap = { [weak self] in self?.onToggleDisclosure?() }
       disclosure.setContentHuggingPriority(.required, for: .horizontal)
@@ -1298,6 +1314,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
       addSubview(text)
       addSubview(image)
       addSubview(emoji)
+      addSubview(sharedMark)
       addSubview(disclosure)
       addSubview(badge)
       textField = text
@@ -1327,6 +1344,9 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
         disclosure.centerYAnchor.constraint(equalTo: image.centerYAnchor),
         disclosure.widthAnchor.constraint(equalToConstant: 14),
         disclosure.heightAnchor.constraint(equalToConstant: 14),
+        sharedMark.leadingAnchor.constraint(equalTo: text.trailingAnchor, constant: 5),
+        sharedMark.centerYAnchor.constraint(equalTo: image.centerYAnchor),
+        sharedMark.trailingAnchor.constraint(lessThanOrEqualTo: disclosure.leadingAnchor, constant: -6),
         text.trailingAnchor.constraint(lessThanOrEqualTo: disclosure.leadingAnchor, constant: -6),
       ])
     }

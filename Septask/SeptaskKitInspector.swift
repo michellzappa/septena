@@ -962,7 +962,7 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     // SwiftData save and one task-change notification instead of up to three
     // refresh cascades. An empty string deliberately clears stored notes.
     mutator.update(id: current.id, title: titlePatch,
-                   notes: notesChanged ? notes : nil)
+                   notes: notesChanged ? notes : nil, notesFrom: beforeNotes)
     // On the ONE shared stack, the same entry the list's composer records.
     TaskUndo.recordEdit(id: current.id,
                         beforeTitle: beforeTitle, afterTitle: loadedTitle,

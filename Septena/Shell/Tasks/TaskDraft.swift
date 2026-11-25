@@ -162,7 +162,8 @@ struct TaskDraft: Equatable {
     if titleChanged || notesChanged {
       titleWriteLanded = mutator.update(id: id,
                                         title: titleChanged ? trimmedTitle : nil,
-                                        notes: notesChanged ? trimmedNotes : nil)
+                                        notes: notesChanged ? trimmedNotes : nil,
+                                        notesFrom: original.notes ?? "")
       // The undo entry describes a write that happened: skip it when the
       // write did not land.
       if undoContext != nil, titleWriteLanded {

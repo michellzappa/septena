@@ -66,7 +66,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
   var onAction: ((Action) -> Void)?
   /// Title + notes as they stand; the controller writes them through the
   /// mutator. Notes is nil when the field was never shown or is empty.
-  var onCommit: ((String, String?) -> Void)?
+  var onCommit: ((_ title: String, _ notes: String?, _ from: (title: String, notes: String?)) -> Void)?
   /// Fold the row shut (Return, ⌘↩, or Esc).
   var onCollapse: (() -> Void)?
   /// The notes band appeared or disappeared — the controller animates the
@@ -917,9 +917,10 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     let title = pendingTitle
     let notes = pendingNotes
     guard title != committedTitle || notes != committedNotes else { return }
+    let from = (title: committedTitle, notes: committedNotes)
     committedTitle = title
     committedNotes = notes
-    onCommit?(title, notes)
+    onCommit?(title, notes, from)
   }
 
   // MARK: - Keyboard

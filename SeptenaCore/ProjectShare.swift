@@ -14,6 +14,12 @@ struct ProjectShare: Codable, Hashable, Sendable {
     let role: String
 
     var isOwner: Bool { role == "owner" }
+    var initials: String { PersonInitials.of(name) }
+  }
+
+  /// "Members: Ann, Ben", for the marks that show no names.
+  var membersLabel: String {
+    "\(RegistrySharing.members): \(members.map(\.name).formatted(.list(type: .and)))"
   }
 
   let id: String
@@ -32,6 +38,20 @@ struct ProjectShare: Codable, Hashable, Sendable {
   static func decode(_ json: String?) -> ProjectShare? {
     guard let data = json?.data(using: .utf8) else { return nil }
     return try? JSONDecoder().decode(ProjectShare.self, from: data)
+  }
+}
+
+enum PersonInitials {
+  static func of(_ name: String) -> String {
+    let words = name.trimmingCharacters(in: .whitespaces).split(separator: " ")
+    // A single short token is almost certainly typed-in initials ("MZ",
+    // "abc") — show it verbatim. A longer single name → its first letter.
+    // Multi-word → first letter of the first two words.
+    if words.count <= 1 {
+      let token = words.first.map(String.init) ?? ""
+      return (token.count <= 3 ? token : String(token.prefix(1))).uppercased()
+    }
+    return words.prefix(2).compactMap(\.first).map(String.init).joined().uppercased()
   }
 }
 

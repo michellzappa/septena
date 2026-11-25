@@ -242,7 +242,9 @@ extension TaskSyncEngine {
         } else if !pendingDelete.contains(key) {
           DeletedContainerLedger.forget(.project, id)
           let p = fetchProject(id) ?? { let n = ProjectEntity(id: id, title: ""); main.insert(n); return n }()
+          let notesBefore = p.notes
           let applied = applyProjectFields(p, change.row, skip: skip)
+          noteReplacedNotes(key, old: notesBefore, new: p.notes)
           let mapped = (try? TaskBackendMapping.project(p).get())?.fields ?? [:]
           recordApplied(key, applied: applied, mapped: mapped, raw: change.row, shadow: shadows[key], store: store)
         }
@@ -393,7 +395,9 @@ extension TaskSyncEngine {
     }
     if pendingDelete { return }
     let t = fetchTask(id) ?? { let n = TaskEntity(id: id, title: ""); main.insert(n); return n }()
+    let notesBefore = t.notes
     let applied = applyTaskFields(t, row, skip: skip)
+    noteReplacedNotes(key, old: notesBefore, new: t.notes)
     var new = old
     if let mapped = try? TaskBackendMapping.task(t).get().fields {
       for k in applied { new[k] = mapped[k] ?? row[k] ?? .null }
