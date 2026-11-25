@@ -454,7 +454,7 @@ api.get("/sync/ws", liveSocket);
 
 api.get("/changes", async (c) => {
   const q = z.object({
-    entity: z.enum(["task", "area", "project", "attachment", "checklistItem", "taskRef", "tag", "convo", "setting", "turn"]).optional(),
+    entity: z.enum(["task", "area", "project", "attachment", "checklistItem", "taskRef", "doSession", "tag", "convo", "setting", "turn"]).optional(),
     id: zId.optional(),
     before: z.coerce.number().int().min(1).optional(),
     limit: z.coerce.number().int().min(1).max(500).default(100),
