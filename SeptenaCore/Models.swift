@@ -135,6 +135,8 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
   var fadedAt: Date? = nil
   var dropReason: String? = nil
   var effort: String? = nil
+  /// Shared projects: the member who does this task (`TaskEntity.assignedTo`).
+  var assignedTo: String? = nil
   /// Row shape (`TaskKind`). `""`/absent = task, `"heading"` = a project
   /// section divider. Rides alongside the entity, not the wire. Read `isHeading`.
   var kind: String = ""
@@ -414,6 +416,7 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     fadedAt: Date? = nil,
     dropReason: String? = nil,
     effort: String? = nil,
+    assignedTo: String? = nil,
     kind: String = "",
     heading: String? = nil,
     conversation: TaskConvo = TaskConvo()
@@ -452,6 +455,7 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     self.fadedAt = fadedAt
     self.dropReason = dropReason
     self.effort = effort
+    self.assignedTo = assignedTo
     self.kind = kind
     self.heading = heading
     self.conversation = conversation
@@ -887,6 +891,8 @@ struct Project: Identifiable, Codable, Hashable {
   /// Optional "owner/repo" pointer. Source of truth for agentic tooling that
   /// needs to know which GitHub repo a project's tasks live against.
   var githubRepo: String?
+  /// Who shares this project (from `ProjectEntity.share`). nil = private.
+  var share: ProjectShare?
   /// Sidebar sort order (synced, from `ProjectEntity.position`). Populated by
   /// the entity init only — intentionally NOT a `CodingKey`, so the MCP/wire
   /// JSON stays unchanged. See `docs/DRAG_AND_DROP.md` §5 gap #2.
@@ -906,12 +912,13 @@ struct Project: Identifiable, Codable, Hashable {
        area: String? = nil, created: String? = nil, completedAt: String? = nil,
        notes: String? = nil, context: String? = nil, noteRev: Int = 0,
        notesProposal: NotesProposal? = nil, githubRepo: String? = nil,
-       position: Int = 0,
+       share: ProjectShare? = nil, position: Int = 0,
        updatedAt: String? = nil, deletedAt: String? = nil) {
     self.id = id; self.title = title; self.status = status
     self.area = area; self.created = created; self.completedAt = completedAt
     self.notes = notes; self.context = context; self.noteRev = noteRev
     self.notesProposal = notesProposal; self.githubRepo = githubRepo
+    self.share = share
     self.position = position
     self.updatedAt = updatedAt; self.deletedAt = deletedAt
   }
@@ -929,6 +936,7 @@ struct Project: Identifiable, Codable, Hashable {
     noteRev = 0
     notesProposal = nil
     githubRepo = try c.decodeIfPresent(String.self, forKey: .githubRepo)
+    share = nil
     position = 0   // not on the wire; set via ProjectEntity init
     updatedAt = try c.decodeIfPresent(String.self, forKey: .updatedAt)
     deletedAt = try c.decodeIfPresent(String.self, forKey: .deletedAt)

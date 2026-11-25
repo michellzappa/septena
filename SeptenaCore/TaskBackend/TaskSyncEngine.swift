@@ -1082,6 +1082,11 @@ final class TaskSyncEngine {
           }
         }
         store.remove(op)
+        if result.reason?.hasPrefix("shared_") == true {
+          // A rule of a shared project, not a fault: the pull puts the row back.
+          noteRejected(entity, id: op.rowID, store: store)
+          continue
+        }
         addIssue(entity, op.rowID, "rejected by the backend: \(result.reason ?? "no reason")")
         if entity == .attachment, op.kind == TaskSyncOpKind.upsert {
           for upload in store.ops(entity: op.opEntity, rowID: op.rowID) where upload.kind == TaskSyncOpKind.upload {

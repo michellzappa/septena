@@ -203,6 +203,8 @@ public enum TasksWidgetDeepLink: Equatable, Sendable {
   case quickAdd
   case list(id: String)
   case task(id: String)
+  /// An invite to a shared project.
+  case join(token: String)
 
   public var url: URL {
     switch self {
@@ -214,6 +216,8 @@ public enum TasksWidgetDeepLink: Equatable, Sendable {
     case .task(let id):
       let encoded = id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? id
       return URL(string: "septask://task/\(encoded)")!
+    case .join(let token):
+      return URL(string: "septask://join/\(token)")!
     }
   }
 
@@ -230,6 +234,9 @@ public enum TasksWidgetDeepLink: Equatable, Sendable {
     case "task":
       guard let raw = pathParts.first, !raw.isEmpty else { return nil }
       return .task(id: raw.removingPercentEncoding ?? raw)
+    case "join":
+      guard let token = pathParts.first, !token.isEmpty else { return nil }
+      return .join(token: token)
     default:
       return nil
     }
