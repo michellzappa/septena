@@ -102,7 +102,7 @@ pub fn conversation_state(conversation: TaskConversation, now: String) -> Result
         agent_stage: agent_stage.map(str::to_string),
         review_group: if facts.needs_review {
             Some("finished".to_string())
-        } else if facts.open_question && !facts.is_terminal && conversation.stopped_at.is_none() {
+        } else if facts.open_question && conversation.stopped_at.is_none() {
             Some("questions".to_string())
         } else {
             None
