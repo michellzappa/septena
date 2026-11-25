@@ -80,7 +80,7 @@ See [ADR 0007](adr/0007-septena-is-the-task-app.md).
 | [PROJECT_SHARING_SPEC.md](PROJECT_SHARING_SPEC.md) | accepted |
 | [PUBLIC_LINKS_SPEC.md](PUBLIC_LINKS_SPEC.md) | proposal (#22, phase S4 of project sharing) |
 | [TASK_FACTORY_SPEC.md](TASK_FACTORY_SPEC.md) | accepted |
-| [TASK_FADE_SPEC.md](TASK_FADE_SPEC.md) | accepted (§6 amended by ADR 0014) |
+| [TASK_FADE_SPEC.md](TASK_FADE_SPEC.md) | accepted (§6 amended by ADR 0014, proposals by ADR 0039) |
 | [INBOX_ZERO_MOTION_SPEC.md](INBOX_ZERO_MOTION_SPEC.md) | accepted (#298) |
 | [PROJECT_NOTES_SPEC.md](PROJECT_NOTES_SPEC.md) | accepted (ADR 0012) |
 | [TASK_PAGE_SPEC.md](TASK_PAGE_SPEC.md) | accepted (ADR 0029, #300) |

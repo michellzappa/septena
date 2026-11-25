@@ -134,6 +134,9 @@ Alongside the features:
 - #5 F1 scheduled runner, push questions, wake on answer
 - Task references, first release (`docs/TASK_REFERENCES_SPEC.md`, ADR 0031, ADR
   0033): #386 R0 core, store, MCP, old issue links → #387 R1 Mac, iPhone, iPad
+- Agents are the integrations (ADR 0038, ADR 0039): #496 duplicate check →
+  #497 turned-down items → #501 source prompts · #498 Slack keys · #499
+  proposals expire · #500 filed suggestions
 - Project notes as agent context (`docs/PROJECT_NOTES_SPEC.md`, ADR 0012):
   #120 N0 store rules and history → #121 N1 MCP tools and claim payload ·
   #122 N2 notes first in the app → #123 N3 proposals and history UI ·
@@ -203,7 +206,6 @@ GitHub milestone: `"M5 Breadth"`.
   W3 signed installer and Store → W4 parity ledger. Starts after the #20 spike.
 - L3 notes / deadline sync, "Send to Starlings" · L4 moves across lists (not
   GitHub, ADR 0033)
-- #15 L5 capture feeds (Gmail first)
 - S2 viewer role, activity, assignment push · S3 agents on shared projects
 - F4 `factory-day` routes questions to Septena; daily digest
 - #28, #53–#56 Task fade (T1–T4: touch/defer, weekly sweep, carry-over, stuck

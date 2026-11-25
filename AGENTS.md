@@ -605,6 +605,11 @@ The product is Septena; the code targets keep the working names `Septask` (iOS),
   hard-to-reverse decision. Mark a superseded doc with a header; never delete
   or move it. **Septena is leaving iCloud** (ADR 0002): new specs design for
   the own backend only.
+- **Agents are the integrations (ADR 0038).** Septena connects to no source
+  (Slack, mail accounts, issue trackers, meeting notes). The user's agent reads
+  the source and proposes tasks. Never add a connector, a capture feed or a
+  "send to Septena" button in another product. An import, the calendar, the
+  mail forwarding address, system capture and the public API stay.
 - **This repo is PUBLIC — keep only app-relevant docs here. Strategy lives in the
   Septena Starlings workspace** (`septena.starlings.work`, Docs `/strategy` and
   `/brand`, connector "Starlings: Septena"). Competitive strategy, positioning,

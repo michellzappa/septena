@@ -8,7 +8,7 @@ a new ADR and set the old one to `superseded by NNNN`.
 |---|---|---|
 | [0001](0001-record-decisions.md) | Record decisions as ADRs; plan with specs, roadmap, issues | accepted |
 | [0002](0002-own-backend-replaces-icloud.md) | Own backend replaces iCloud | accepted |
-| [0003](0003-external-links-run-server-side.md) | External links run on the server; the remote owns mapped fields | accepted; GitHub dropped by 0033 |
+| [0003](0003-external-links-run-server-side.md) | External links run on the server; the remote owns mapped fields | accepted; GitHub dropped by 0033, capture feeds by 0038 |
 | [0004](0004-shared-projects-own-store.md) | A shared project lives in its own store | accepted |
 | [0005](0005-tasks-as-factory-intake.md) | Tasks are factory intake; agents ask in the app | accepted |
 | [0006](0006-tasks-fade-by-default.md) | Tasks fade by default; the list asks why a task is stuck | accepted |
@@ -42,6 +42,8 @@ a new ADR and set the old one to `superseded by NNNN`.
 | [0035](0035-companion-voice-is-push-to-talk-and-confirmed.md) | Make companion voice push-to-talk, unstored and confirmed | proposed |
 | [0036](0036-plan-ladder-one-agent-then-three.md) | Four plan levels: an account adds the server, Plus adds more than one (amends 0010, 0023) | accepted, presentation amended by 0037 |
 | [0037](0037-show-free-plus-and-planned-pro.md) | Show three plans: Free, Plus and a planned Pro (amends 0036) | accepted |
+| [0038](0038-agents-are-the-integrations.md) | Agents are the integrations; Septena connects to no source (extends 0033, amends 0003) | accepted |
+| [0039](0039-unanswered-proposals-expire.md) | An unanswered agent proposal expires to the Faded pile | accepted |
 
 ## Template
 
