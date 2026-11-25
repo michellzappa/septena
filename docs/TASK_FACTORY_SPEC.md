@@ -55,12 +55,13 @@ machine.
 |---|---|
 | **Queued** | `assignee = claude`, no live claim, not terminal. |
 | **Working** | A live claim (§5). |
-| **Your turn** | Last provider turn has `options` and no user turn answers it. |
-| **Review** | `endState = needs_verify`. |
+| **Your turn** | Last provider turn has `options` and no user turn answers it. In Review ▸ Questions. |
+| **Stopped** | The user stopped the agent on this task. |
+| **Review** | `endState = needs_verify`. In Review ▸ Finished work. |
 | **Done** | Terminal `endState`. The task `status` stays mz's: it closes when mz accepts or finishes the handoff. |
 
-Septask gets one smart list, **Agent**, grouped by these stages
-*(default)*. The Today list shows only **Your turn** and **Review** items, as
+The **Agent** list shows work in progress: Working, Queued, Stopped and Done.
+Your turn and Review are groups of **Review** (§3.1). The Today list shows only **Your turn** and **Review** items, as
 today's ball-in-court dot already does.
 
 ### 3.1 Review

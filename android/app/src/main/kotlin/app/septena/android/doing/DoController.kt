@@ -84,6 +84,8 @@ class DoController(
     private val scope: CoroutineScope,
     /** Records the task write of a gesture for Undo. */
     private val captureTaskEdit: suspend (String, suspend () -> Unit) -> Unit,
+    /** Done for a task: the one completion path (a task in Review is accepted). */
+    private val completeTask: suspend (String) -> Boolean,
 ) {
     private val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
     private val lock = Mutex()
@@ -165,7 +167,7 @@ class DoController(
 
     /** Done is the existing complete action. The task mutator ends the Do. */
     fun done(doing: DoState) = gesture {
-        captureTaskEdit(doing.taskId) { tasks.complete(doing.taskId) }
+        completeTask(doing.taskId)
         _ui.update { it.copy(endedSince = doing.startedAt) }
     }
 

@@ -99,6 +99,7 @@ import app.septena.core.generated.RegistrySurfaceIds
 import app.septena.ui.CheckmarkGlyph
 import app.septena.ui.ChevronDownGlyph
 import app.septena.ui.ChevronLeftGlyph
+import app.septena.ui.CollapsibleTaskGroup
 import app.septena.ui.LocalMagicPlusDrag
 import app.septena.ui.LocalTaskReorderDrag
 import app.septena.ui.MagicPlusDragState
@@ -237,7 +238,7 @@ fun TaskHomeScreen(
             actionId == RegistryActionIds.TASK_DELETE_PERMANENTLY -> {
                 pendingPurgeRequest = PurgeTasksRequest(listOf(id), RegistryPromptIds.DELETE_PERMANENTLY)
             }
-            actionId == RegistryActionIds.TASK_ACCEPT_REVIEW -> homeViewModel.acceptReview(id)
+            actionId == RegistryActionIds.TASK_ACCEPT_REVIEW -> homeViewModel.complete(id)
             actionId == RegistryActionIds.TASK_SEND_BACK_REVIEW -> openTaskSendBack(id)
             actionId == RegistryActionIds.TASK_KEEP_FADED -> homeViewModel.keepFaded(id)
             actionId == RegistryActionIds.TASK_LET_GO_FADED -> homeViewModel.letGoFaded(id)
@@ -876,7 +877,7 @@ private fun SectionTitleDropdownHeader(
                 }
             }
 
-            // Bottom smart lists (identical to iOS `TaskNavMenu` `.bottom`: Logbook, Faded, Deleted, etc.).
+            // Bottom smart lists (identical to iOS `TaskNavMenu` `.bottom`: Logbook, etc.).
             if (state.bottomSmartLists.isNotEmpty()) {
                 HorizontalDivider()
                 state.bottomSmartLists.forEach { item ->
@@ -1204,20 +1205,6 @@ private fun TaskHomeScaffold(
                 onDismiss = homeViewModel::dismissWeeklySweepBanner,
                 modifier = Modifier.padding(bottom = 10.dp),
             )
-        } else if (destinationId == RegistryDestinationIds.FADED && state.fadedSweepItems.isNotEmpty()) {
-            val notice = remember(languageTag) {
-                registryNoticeCopy(RegistryNoticeIds.FADED_PILE, languageTag)
-            }
-            val bannerMessage = listOf(notice.title, notice.detail).filter(String::isNotBlank).joinToString(" · ")
-            FadeSweepBannerCard(
-                message = bannerMessage,
-                reviewLabel = notice.primaryTitle,
-                dismissLabel = null,
-                isDark = isDark,
-                hasActiveTexture = appearance.hasActiveTexture,
-                onReview = { activeSweepItems = state.fadedSweepItems },
-                modifier = Modifier.padding(bottom = 10.dp),
-            )
         } else if (destinationId == RegistryDestinationIds.LOGBOOK &&
             (state.deletedTasks.isNotEmpty() || logbookShowingDeleted)
         ) {
@@ -1268,6 +1255,20 @@ private fun TaskHomeScaffold(
         }
     }
 
+    val fadedBanner: @Composable () -> Unit = {
+        val notice = remember(languageTag) {
+            registryNoticeCopy(RegistryNoticeIds.FADED_PILE, languageTag)
+        }
+        FadeSweepBannerCard(
+            message = listOf(notice.title, notice.detail).filter(String::isNotBlank).joinToString(" · "),
+            reviewLabel = notice.primaryTitle,
+            dismissLabel = null,
+            isDark = isDark,
+            hasActiveTexture = appearance.hasActiveTexture,
+            onReview = { activeSweepItems = state.fadedSweepItems },
+        )
+    }
+
     // Grouped canvas background so translucent glass task cards lift gently off the
     // canvas and let the procedural Header Wash texture shine through at the top.
     val canvasBackground = if (isDark) {
@@ -1290,8 +1291,8 @@ private fun TaskHomeScaffold(
                             selectedCount = state.selectedIds.size,
                             destinationId = destinationId,
                             allOnToday = allOnToday,
-                            allSelected = remember(state.selectedIds, state.inboxTasks, state.tasks) {
-                                (state.inboxTasks + state.tasks).all { it.id in state.selectedIds }
+                            allSelected = remember(state.selectedIds, state.visibleTasks) {
+                                state.visibleTasks.all { it.id in state.selectedIds }
                             },
                             canComplete = state.canComplete,
                             languageTag = languageTag,
@@ -1456,7 +1457,7 @@ private fun TaskHomeScaffold(
                                 todayTitle = todayTitle,
                                 todayTint = MaterialTheme.colorScheme.secondary,
                                 fadedTitle = fadedTitle,
-                                showFadedIndicator = location.destinationId != RegistryDestinationIds.FADED && !showingDeletedTab,
+                                showFadedIndicator = !isReviewList && !showingDeletedTab,
                                 isDarkTheme = isDark,
                                 hasActiveTexture = appearance.hasActiveTexture,
                                 headerContent = sectionHeader,
@@ -1596,11 +1597,19 @@ private fun TaskHomeScaffold(
                                 }
                             } else null,
                             onApplyFilingSuggestion = homeViewModel::applyFilingSuggestion,
-                            isReviewList = isReviewList,
                             reviewAcceptTitle = reviewAcceptTitle,
                             reviewSendBackTitle = reviewSendBackTitle,
-                            onAcceptReview = if (isReviewList) homeViewModel::acceptReview else null,
+                            onAcceptReview = if (isReviewList) onComplete else null,
                             onSendBackReview = if (isReviewList) onSendBackReview else null,
+                            collapsibleGroup = state.fadedGroup?.let { header ->
+                                CollapsibleTaskGroup(
+                                    header = header,
+                                    tasks = state.fadedTasks,
+                                    isExpanded = state.fadedGroupExpanded,
+                                    onToggle = homeViewModel::toggleFadedGroup,
+                                    banner = fadedBanner,
+                                )
+                            },
                         )
                         }
                     }
@@ -1724,6 +1733,8 @@ private fun taskRowMenuGroups(
                 unselectedTitle = if (id == RegistryActionIds.TASK_TOGGLE_STAR) {
                     RegistryCatalog.actionAddTitle(id, languageTag)
                 } else null,
+                needsReview = id == RegistryActionIds.TASK_ACCEPT_REVIEW,
+                needsFaded = id == RegistryActionIds.TASK_KEEP_FADED || id == RegistryActionIds.TASK_LET_GO_FADED,
                 icon = actionMenuIcon(id),
             )
         }.withAssign(menuId, languageTag).takeIf { it.isNotEmpty() }

@@ -495,7 +495,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     var reviewCount = 0, agentCount = 0
     for task in open where task.conversationJSON != nil {
       let convo = task.conversation
-      if convo.needsHumanReview { reviewCount += 1 }
+      if convo.reviewGroup != nil { reviewCount += 1 }
       if convo.agentStage(at: now) != nil { agentCount += 1 }
     }
     let smartCounts: [TaskFilter: Int] = [
@@ -507,7 +507,6 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
         !$0.today && $0.scheduled == nil && $0.deadline == nil
       }.count,
       .starred: starredCount,
-      .faded: fadedCount,
     ]
     let openByProject = Dictionary(grouping: open.compactMap(\.project), by: { $0 })
       .mapValues(\.count)
@@ -549,14 +548,13 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     var nonEmptyIDs = Set<RegistryDestinationID>()
     // Review and Agent also stay while selected, so accepting the last item
     // does not yank the row away.
-    if reviewCount > 0 || key == KitSidebarDestination.key(for: .filter(.review)) {
+    if reviewCount + fadedCount > 0 || key == KitSidebarDestination.key(for: .filter(.review)) {
       nonEmptyIDs.insert(.review)
     }
     if agentCount > 0 || key == KitSidebarDestination.key(for: .filter(.agent)) {
       nonEmptyIDs.insert(.agent)
     }
     if starredCount > 0 { nonEmptyIDs.insert(.starred) }
-    if fadedCount > 0 { nonEmptyIDs.insert(.faded) }
     let makeViewNode: (KitSidebarDestination) -> Node = { destination in
       Node(destination.nodeContent, count: self.smartListCount(destination,
                                                                counts: smartCounts,

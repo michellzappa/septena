@@ -478,7 +478,7 @@ internal fun ListsHomeContent(
             }
         }
 
-        // 4. Bottom smart lists card (Logbook, Faded, Deleted, etc. — exact iOS `.bottom`).
+        // 4. Bottom smart lists card (Logbook, etc. — exact iOS `.bottom`).
         if (state.bottomSmartLists.isNotEmpty()) {
             itemsIndexed(
                 state.bottomSmartLists,

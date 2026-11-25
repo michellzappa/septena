@@ -35,6 +35,7 @@ enum SeptaskSharing {
         for task in tasks {
           SeptenaServices.shared.taskMutator.setAssignee(id: task.id, memberID: person.memberID)
         }
+        SeptenaServices.shared.taskMutator.touch(ids: tasks.map(\.id))
       }
     }
   }

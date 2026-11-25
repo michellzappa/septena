@@ -24,8 +24,8 @@ import { DOMAIN_RULES, ENTITY_LIMITS, TURN_FIELDS } from "../generated/registrie
 import { MCP_REFRESH_TTL_S } from "../shadow/tokens.js";
 import { logEvent, randomId } from "../util.js";
 import {
-  sendAgentQuestionPushes,
-  type AgentQuestionPush,
+  sendAgentPushes,
+  type AgentPush,
   type PushPlatform,
   type PushTokenRow,
 } from "../api/apns.js";
@@ -429,8 +429,29 @@ export class TaskStore extends DurableObject<Env> {
   /// a task the human touched since.
   private fadeEnds(task: Record<string, unknown>): boolean {
     if (!task.fadedAt || task.status !== "open") return false;
-    if (task.deadline) return true;
+    // An unaccepted proposal expires with or without a date (ADR 0039).
+    if (task.deadline && !(task.source === "mcp" && !task.acknowledgedAt)) return true;
     return !!task.touchedAt && Date.parse(task.touchedAt as string) > Date.parse(task.fadedAt as string);
+  }
+
+  /// True when a push fades a task that its device did not know well enough to
+  /// fade (docs/TASK_FADE_SPEC.md §4.1): the task was touched inside the fade
+  /// window, has a date ahead, or waits on the user or an agent. A push that
+  /// carries its own `touchedAt` knew the touch.
+  private fadeIsStale(taskId: string, row: Record<string, unknown>, fields: Record<string, unknown>): boolean {
+    if (typeof fields.fadedAt !== "string" || row.fadedAt) return false;
+    const at = Date.parse(fields.fadedAt);
+    if (!("touchedAt" in fields)) {
+      const touched = row.touchedAt as string | null;
+      if (touched && at - Date.parse(touched) < DOMAIN_RULES.fadeWindowDays * DAY_MS) return true;
+      const proposal = row.source === "mcp" && !row.acknowledgedAt && !touched;
+      const scheduled = row.scheduled as string | null;
+      if (scheduled && !proposal && scheduled > fields.fadedAt.slice(0, 10)) return true;
+    }
+    const convo = this.sql.exec<{ assignee: string | null; endState: string | null }>(
+      "SELECT assignee, endState FROM convos WHERE id = ? AND deletedAt IS NULL", taskId,
+    ).toArray()[0];
+    return convo?.assignee === "claude" || convo?.endState === "needs_verify" || this.awaitsHuman(taskId);
   }
 
   /// One time: ends the fade of every row `fadeEnds` is true for, so rows
@@ -733,7 +754,7 @@ export class TaskStore extends DurableObject<Env> {
 
   push(ops: Op[], actor: string, reason: string | null = null): PushOutcome {
     const purgedAttachmentIds: string[] = [];
-    const agentQuestions: AgentQuestionPush[] = [];
+    const agentPushes: AgentPush[] = [];
     const prevRev = this.meta("rev");
     this.reason = reason;
     const sharing = this.shares.any();
@@ -745,7 +766,7 @@ export class TaskStore extends DurableObject<Env> {
       results = this.ctx.storage.transactionSync(() => ops.map((op) => {
         const seen = this.sql.exec<{ result: string }>("SELECT result FROM client_ops WHERE clientOpId = ?", op.clientOpId).toArray()[0];
         if (seen) return JSON.parse(seen.result) as OpResult;
-        const result = this.apply(op, actor, purgedAttachmentIds, agentQuestions);
+        const result = this.apply(op, actor, purgedAttachmentIds, agentPushes);
         this.sql.exec("INSERT INTO client_ops (clientOpId, result, at) VALUES (?, ?, ?)", op.clientOpId, JSON.stringify(result), Date.now());
         return result;
       }));
@@ -762,13 +783,13 @@ export class TaskStore extends DurableObject<Env> {
         if (events.length > 0) this.dispatchAgentEvents(events);
       }
     }
-    // During a Do the question is in the lists and counts. Its push is not sent
+    // During a Do the question or hand-off is in the lists and counts. Its push is not sent
     // (docs/DO_SPEC.md §6).
-    const doing = agentQuestions.length > 0 ? this.readDoing() : null;
-    if (agentQuestions.length > 0 && (!doing || doing.isStale)) {
+    const doing = agentPushes.length > 0 ? this.readDoing() : null;
+    if (agentPushes.length > 0 && (!doing || doing.isStale)) {
       const tokens = this.listPushTokens();
       if (tokens.length > 0) {
-        const delivery = this.dispatchAgentQuestionPushes(agentQuestions, tokens);
+        const delivery = this.dispatchAgentPushes(agentPushes, tokens);
         if (typeof this.ctx.waitUntil === "function") {
           this.ctx.waitUntil(delivery);
         } else {
@@ -783,7 +804,7 @@ export class TaskStore extends DurableObject<Env> {
     op: Op,
     actor: string,
     purgedAttachmentIds: string[],
-    agentQuestions: AgentQuestionPush[],
+    agentPushes: AgentPush[],
   ): OpResult {
     const now = new Date().toISOString();
     if (isAgentActor(actor)) {
@@ -795,7 +816,7 @@ export class TaskStore extends DurableObject<Env> {
           : { clientOpId: op.clientOpId, status: "rejected", reason: refusal };
       }
     }
-    if (op.op === "appendTurn") return this.appendTurn(op.clientOpId, op.taskId, op.turn, actor, now, agentQuestions);
+    if (op.op === "appendTurn") return this.appendTurn(op.clientOpId, op.taskId, op.turn, actor, now, agentPushes);
 
     const spec: EntitySpec = ENTITIES[op.entity];
     const row = this.sql.exec(`SELECT * FROM ${spec.table} WHERE id = ?`, op.id).toArray()[0];
@@ -957,7 +978,8 @@ export class TaskStore extends DurableObject<Env> {
         op.base.notes, (row.notes as string | null) ?? null, (op.fields.notes as string | null) ?? null, ENTITY_LIMITS.notesMax,
       );
     }
-    if (op.entity === "task" && this.fadeEnds({ ...row, ...op.fields })) {
+    if (op.entity === "task"
+      && ((row && this.fadeIsStale(op.id, row as Record<string, unknown>, op.fields)) || this.fadeEnds({ ...row, ...op.fields }))) {
       if (!names.includes("fadedAt")) names.push("fadedAt");
       op.fields.fadedAt = null;
     }
@@ -1007,13 +1029,18 @@ export class TaskStore extends DurableObject<Env> {
       // Handing off to Review puts the ball in the human's court, so the claim ends.
       this.writeConvoServerFields(op.id, { claimedBy: null, claimUntil: null }, "release", actor, now, true);
     }
+    if (isAgentActor(actor) && op.entity === "convo" && op.fields.endStateAt && op.fields.endStateNote
+      && (op.fields.endState ?? row?.endState) === "needs_verify") {
+      const title = this.sql.exec<{ title: string | null }>("SELECT title FROM tasks WHERE id = ?", op.id).toArray()[0]?.title;
+      agentPushes.push({ taskId: op.id, taskTitle: title ?? "", note: op.fields.endStateNote as string });
+    }
     if (op.entity === "convo" && op.fields.endState === "needs_verify") this.unfadeForReview(op.id, actor, now);
     if (op.entity === "convo" && (op.fields.assignee === "claude" || (isAgentActor(actor) && op.fields.endState === "needs_verify"))) {
       this.setAgentWork(op.id, now);
     } else if (op.entity === "convo" && "assignee" in op.fields && !isAgentActor(actor)) {
       this.setAgentWork(op.id, null);
     }
-    if (op.entity === "task" && !isAgentActor(actor) && (op.fields.status === "done" || op.fields.status === "cancelled")) {
+    if (op.entity === "task" && !isAgentActor(actor) && op.fields.status === "done") {
       this.endReview(op.id, actor, now);
     }
     if (sharing) this.shareOut(op.entity, op.id, names, before);
@@ -1380,7 +1407,7 @@ export class TaskStore extends DurableObject<Env> {
     this.log(rev, entity, id, "upsert", names, null, actor, now, this.diffFor(before, next, true));
     // Another member closed the task: the Do of it here ends too (docs/DO_SPEC.md §2.1).
     if (entity === "task" && "status" in next) this.resolveDo(actor, now);
-    if (entity === "task" && (next.status === "done" || next.status === "cancelled")) this.endReview(id, actor, now);
+    if (entity === "task" && next.status === "done") this.endReview(id, actor, now);
     if (entity === "project" && "notes" in next) {
       this.recordNoteRevision("project", id, (next.notes as string | null) ?? null, actor, now, (before?.noteRev as number | null) ?? 0, null);
     }
@@ -1575,18 +1602,16 @@ export class TaskStore extends DurableObject<Env> {
     }
   }
 
-  /// A task the user closed leaves Review, whichever button closed it, so
-  /// opening it again does not put it back.
+  /// A task the user finished leaves Review, whichever button finished it, so
+  /// opening it again does not put it back. A cancelled one keeps its
+  /// hand-off: it is in no list, and undo brings it back as it was.
   private endReview(taskId: string, actor: string, now: string): void {
     this.setAgentWork(taskId, null);
     const row = this.sql.exec<{ endState: string | null }>(
       "SELECT endState FROM convos WHERE id = ? AND deletedAt IS NULL", taskId,
     ).toArray()[0];
     if (row?.endState !== "needs_verify") return;
-    const status = this.sql.exec<{ status: string }>("SELECT status FROM tasks WHERE id = ?", taskId).toArray()[0]?.status;
-    this.writeConvoServerFields(
-      taskId, { endState: status === "done" ? "agent_assisted_done" : "wont_do", endStateAt: now }, "upsert", actor, now,
-    );
+    this.writeConvoServerFields(taskId, { endState: "agent_assisted_done", endStateAt: now }, "upsert", actor, now);
   }
 
   private liveTask(id: string): boolean {
@@ -1878,7 +1903,7 @@ export class TaskStore extends DurableObject<Env> {
     turn: Turn,
     actor: string,
     now: string,
-    agentQuestions: AgentQuestionPush[],
+    agentPushes: AgentPush[],
   ): OpResult {
     const task = this.sql.exec<{ title: string | null; deletedAt: string | null }>(
       "SELECT title, deletedAt FROM tasks WHERE id = ?",
@@ -1911,7 +1936,7 @@ export class TaskStore extends DurableObject<Env> {
       // and we alert the user's Apple devices via APNs (F1b #213).
       this.writeConvoServerFields(taskId, { claimedBy: null, claimUntil: null }, "release", actor, now, true);
       this.unfadeForReview(taskId, actor, now);
-      agentQuestions.push({
+      agentPushes.push({
         taskId,
         taskTitle: task.title ?? "",
         turnSeq: seq,
@@ -2736,15 +2761,15 @@ export class TaskStore extends DurableObject<Env> {
     });
   }
 
-  private async dispatchAgentQuestionPushes(
-    questions: AgentQuestionPush[],
+  private async dispatchAgentPushes(
+    questions: AgentPush[],
     initialTokens: PushTokenRow[],
   ): Promise<void> {
     let activeTokens = initialTokens;
     for (const q of questions) {
       if (activeTokens.length === 0) break;
       try {
-        const res = await sendAgentQuestionPushes(this.env, q, activeTokens);
+        const res = await sendAgentPushes(this.env, q, activeTokens);
         if (res.pruned.length > 0) {
           this.prunePushTokens(res.pruned);
           const dead = new Set(res.pruned);

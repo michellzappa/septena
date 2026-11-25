@@ -18,6 +18,7 @@
     "agent.queued": { "sfSymbol": "clock", "material": "schedule", "lucide": "clock" },
     "agent.working": { "sfSymbol": "ellipsis.circle", "material": "pending", "lucide": "circle-ellipsis" },
     "agent.your_turn": { "sfSymbol": "questionmark.bubble", "material": "contact_support", "lucide": "message-circle-question" },
+    "agent.stopped": { "sfSymbol": "stop.circle", "material": "stop_circle", "lucide": "circle-stop" },
     "agent.done": { "sfSymbol": "checkmark.circle", "material": "check_circle", "lucide": "circle-check" },
     "list.upcoming": { "sfSymbol": "calendar", "material": "calendar_month", "lucide": "calendar" },
     "list.repeating": { "sfSymbol": "arrow.clockwise", "material": "repeat", "lucide": "repeat" },

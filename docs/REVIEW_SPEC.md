@@ -47,7 +47,7 @@ refusal carries its rule as text (`AGENT_WRITE_RULES`).
 **Agent work** is a task that is assigned to `claude`, in Review, or that an
 agent claimed. It stays agent work after the claim ends (`convos.agentWorkAt`,
 a store column that does not sync). It ends when the user changes the assignee
-or closes the task.
+or marks the task done.
 
 The store also keeps these true:
 
@@ -55,9 +55,9 @@ The store also keeps these true:
 - **A revised hand-off is a new hand-off.** When an agent changes the note, the
   artifact or the handoff action in Review, `endStateAt` moves. An Accept that
   names the earlier `reviewAt` is refused as stale.
-- **Closing is leaving.** When the user closes a task in Review by any button,
-  its `endState` becomes `agent_assisted_done` (done) or `wont_do`
-  (cancelled). Reopening it does not put it back.
+- **Finishing is leaving.** When the user marks a task in Review done by any
+  button, its `endState` becomes `agent_assisted_done`. Reopening it does not
+  put it back. A cancelled task keeps its hand-off, so an undo is lossless.
 
 ## 4. Accept and Send back
 

@@ -87,11 +87,13 @@ extension TaskConvo {
   }
 }
 
-/// The five stages the Agent smart list groups by (docs/TASK_FACTORY_SPEC.md
-/// §3). Derived, never stored. Raw values are the group ids of the `agent`
-/// destination in `registry/destinations.json`, which owns titles and icons.
+/// The stages the Agent smart list groups by: work in progress
+/// (docs/TASK_FACTORY_SPEC.md §3). Derived, never stored. Raw values are the
+/// group ids of the `agent` destination in `registry/destinations.json`, which
+/// owns titles and icons. The core's `yourTurn` and `review` stages wait on
+/// the user: they are Review groups, not Agent groups.
 enum AgentStage: String, CaseIterable, Sendable {
-  case queued, working, yourTurn, review, done
+  case working, queued, stopped, done
 
   /// Registry title + symbol for this stage's section header.
   var group: RegistryDestinationGroup? {
@@ -101,14 +103,42 @@ enum AgentStage: String, CaseIterable, Sendable {
 
 extension TaskConvo {
   /// The Agent-list stage of this conversation, or nil when the task is not
-  /// agent work (not assigned to Claude, no live claim, not handed back for
-  /// review). Order of checks follows the spec table: Review and Done win over
-  /// a stale assignee; a stop counts as Your turn, because only the human can
-  /// resume it (ADR 0008).
+  /// agent work in progress: nobody works on it, or it waits on the user and
+  /// is in Review.
   func agentStage(at now: Date) -> AgentStage? {
     coreState(at: now)?.agentStage.flatMap(AgentStage.init(rawValue:))
   }
 
+}
+
+/// The groups of the Review list (docs/REVIEW_SPEC.md §1), in order. Raw
+/// values are the group ids of the `review` destination in
+/// `registry/destinations.json`, which owns titles and icons.
+enum ReviewGroup: String, CaseIterable, Sendable {
+  case questions, finished, faded
+
+  /// Device-local: whether the Faded group is open. It starts closed.
+  static let fadedExpandedKey = "septena.tasks.reviewFadedExpanded"
+
+  /// Registry title + symbol for this group's section header.
+  var group: RegistryDestinationGroup? {
+    RegistryDestinations.groups[.review]?.first { $0.id == rawValue }
+  }
+}
+
+extension TaskConvo {
+  /// The Review group this conversation puts an open task in: a question or
+  /// finished work waits on the user.
+  var reviewGroup: ReviewGroup? {
+    coreState()?.reviewGroup.flatMap(ReviewGroup.init(rawValue:))
+  }
+}
+
+extension TaskConvo {
+  /// The agent's move, or an agent holds the task now: such a task never fades.
+  func isAgentTurn(at now: Date) -> Bool {
+    isClaimed(at: now) || deriveConvo(self).badge == .working
+  }
 }
 
 /// Pure projection of a conversation into UI/queue state, computed by the

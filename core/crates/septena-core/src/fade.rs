@@ -28,6 +28,9 @@ pub struct FadeInput {
     pub is_awaiting_human: bool,
     #[serde(default)]
     pub shows_agent_cue: bool,
+    /// An agent added the task and the user has not accepted it (ADR 0039).
+    #[serde(default)]
+    pub is_proposal: bool,
     #[serde(default)]
     pub touched_at: Option<String>,
     #[serde(default)]
@@ -49,11 +52,19 @@ pub fn row_opacity(fill: Option<f64>) -> f64 {
     }
 }
 
-/// True when the task has gone untouched for the whole fade window.
+/// Proposals made before this instant keep the old rule: they aged in as
+/// ordinary tasks before expiry shipped (#499).
+const PROPOSALS_EXPIRE_SINCE: &str = "2026-11-26T00:00:00Z";
+
+/// True when the task has gone untouched for the whole fade window, or is a
+/// proposal that the user left alone for the cue window (ADR 0039).
 #[cfg_attr(feature = "ffi", uniffi::export)]
 pub fn should_fade(input: FadeInput) -> Result<bool, CoreError> {
     let now = instant(&input.now, "now")?;
     let today = day(&input.today, "today")?;
+    if proposal_expired(&input, now) {
+        return Ok(true);
+    }
     if !is_eligible(&input, today) {
         return Ok(false);
     }
@@ -81,8 +92,30 @@ pub fn fade_fill(input: FadeInput) -> Result<Option<f64>, CoreError> {
     Ok(Some((elapsed as f64 / window).min(1.0)))
 }
 
+/// An unanswered proposal expires with or without a date (ADR 0039): silence
+/// never accepts. A touch accepts it, and it is an ordinary task from then on.
+fn proposal_expired(input: &FadeInput, now: i64) -> bool {
+    if !input.is_proposal || input.touched_at.is_some() || !is_candidate(input) {
+        return false;
+    }
+    let Some(made) = clock_ms(input) else { return false };
+    let since = parse_instant_ms(PROPOSALS_EXPIRE_SINCE).unwrap_or(0);
+    made >= since && now - made >= rules::CUE_DECAY_DAYS * MS_PER_DAY
+}
+
+/// Open, in a list, and waiting on nobody.
+fn is_candidate(input: &FadeInput) -> bool {
+    input.is_open
+        && !input.is_heading
+        && !input.is_deleted
+        && !input.is_faded
+        && !input.is_agent_turn
+        && !input.is_assigned_to_claude
+        && !input.is_awaiting_human
+}
+
 fn is_eligible(input: &FadeInput, today: Day) -> bool {
-    if !input.is_open || input.is_heading || input.is_deleted || input.is_faded {
+    if !is_candidate(input) {
         return false;
     }
     if input.deadline.as_deref().and_then(Day::parse).is_some() {
@@ -98,7 +131,7 @@ fn is_eligible(input: &FadeInput, today: Day) -> bool {
     {
         return false;
     }
-    !input.has_recurrence && !input.is_agent_turn && !input.is_assigned_to_claude && !input.is_awaiting_human
+    !input.has_recurrence
 }
 
 fn clock_ms(input: &FadeInput) -> Option<i64> {

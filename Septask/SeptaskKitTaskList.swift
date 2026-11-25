@@ -603,7 +603,7 @@ final class SeptaskKitTaskListController: NSViewController {
         menu = self.buildHeadingContextMenu()
       } else if self.showingRecentlyDeleted {
         menu = self.buildRecentlyDeletedMenu()
-      } else if self.filter == .faded || (self.rows[row].task?.isFaded == true) {
+      } else if self.rows[row].task?.isFaded == true {
         menu = self.buildFadedMenu()
       } else {
         menu = self.buildContextMenu()
@@ -1231,6 +1231,8 @@ final class SeptaskKitTaskListController: NSViewController {
         + todayLoggedRows()
     case .upcoming:
       newRows = titleRows + upcomingBuckets(pool)
+    case .review:
+      newRows = titleRows + reviewGroupRows(pool)
     case .agent:
       newRows = titleRows + agentStageRows(pool)
     case .unscheduled, .starred:
@@ -1298,12 +1300,6 @@ final class SeptaskKitTaskListController: NSViewController {
         // Already most-recent-first from LocalCache; cap what one screen needs.
         newRows = titleRows + pool.prefix(200).map(chipped)
       }
-    case .faded:
-      var fadedRows = titleRows
-      if !pool.isEmpty {
-        fadedRows.append(.notice(TaskNotices.fadedPile))
-      }
-      newRows = fadedRows + pool.map(chipped)
     default:
       newRows = titleRows + pool.map(chipped)
     }
@@ -2176,6 +2172,32 @@ final class SeptaskKitTaskListController: NSViewController {
     return nil
   }
 
+  /// Review (docs/REVIEW_SPEC.md §1): one header per non-empty `ReviewGroup`,
+  /// in registry order. Faded is last, behind its toggle. The AppKit twin of
+  /// `TaskListView.reviewGroupRows`.
+  private func reviewGroupRows(_ pool: [SeptenaTask]) -> [Row] {
+    let byGroup = Dictionary(grouping: pool) { $0.reviewGroup }
+    var result: [Row] = []
+    for group in ReviewGroup.allCases where group != .faded {
+      guard let tasks = byGroup[group], !tasks.isEmpty else { continue }
+      result.append(.header(id: "review-\(group.rawValue)",
+                            title: group.group?.title ?? group.rawValue,
+                            icon: .symbol(group.group?.sfSymbol ?? "circle"),
+                            count: tasks.count))
+      result += tasks.map(chipped)
+    }
+    guard let faded = byGroup[.faded], !faded.isEmpty else { return result }
+    let expanded = UserDefaults.standard.bool(forKey: ReviewGroup.fadedExpandedKey)
+    result.append(.fadedFooter(count: faded.count, expanded: expanded))
+    if expanded { result += [.notice(TaskNotices.fadedPile)] + faded.map(chipped) }
+    return result
+  }
+
+  /// A Finished work row of Review: it draws Accept and Send back.
+  private func isReviewRow(_ task: SeptenaTask) -> Bool {
+    filter == .review && !task.isHeading && task.conversation.needsHumanReview
+  }
+
   /// Agent smart list (docs/TASK_FACTORY_SPEC.md §3): one header per
   /// non-empty `AgentStage`, in registry order, then that stage's tasks. The
   /// AppKit twin of `TaskListView.agentStageRows`.
@@ -2559,6 +2581,12 @@ final class SeptaskKitTaskListController: NSViewController {
   }
 
   func toggleFadedExpanded() {
+    if filter == .review {
+      let defaults = UserDefaults.standard
+      defaults.set(!defaults.bool(forKey: ReviewGroup.fadedExpandedKey), forKey: ReviewGroup.fadedExpandedKey)
+      reload(animated: false)
+      return
+    }
     guard let key = scopeId else { return }
     var ids = fadedCollapsedIds()
     if ids.contains(key) { ids.remove(key) } else { ids.insert(key) }
@@ -4053,7 +4081,7 @@ final class SeptaskKitTaskListController: NSViewController {
     }
     // A Review row opens the task page (the inspector), same as iPhone. It
     // never expands inline: the review cell is not a task row.
-    if filter == .review {
+    if isReviewRow(task) {
       onOpenInspector?()
       return
     }
@@ -4860,7 +4888,7 @@ final class SeptaskKitTaskListController: NSViewController {
   }
 
   private func presentWeeklySweepSheet() {
-    let tasks: [SeptenaTask] = filter == .faded
+    let tasks: [SeptenaTask] = filter == .review
       ? LocalCache.tasks(in: context, filter: .faded)
       : TaskNotices.sweepCandidates(context: context)
     guard !tasks.isEmpty else { return }
@@ -5282,7 +5310,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       if task.id == composingTaskId {
         return composerRowHeight ?? KitComposerCell.baseHeight
       }
-      if filter == .review {
+      if isReviewRow(task) {
         return KitReviewTaskCell.height(for: task, issue: issueRefs[task.id],
                                         contextText: KitListPath.text(for: task, in: context),
                                         width: tableView.bounds.width)
@@ -6033,7 +6061,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
         wireComposer(cell, task: task)
         return cell
       }
-      if filter == .review, !task.isHeading {
+      if isReviewRow(task) {
         let identifier = NSUserInterfaceItemIdentifier("reviewTaskCell")
         let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? KitReviewTaskCell
           ?? KitReviewTaskCell(identifier: identifier)
@@ -6109,10 +6137,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
   /// lossless undo back into Review (`needs_verify` + check note).
   private func acceptReviewTask(id: String) {
     guard let task = LocalCache.task(id: id, in: context), task.status == .open else { return }
-    let previousNote = task.conversation.endStateNote
-    mutator.complete(id: id)
-    mutator.acknowledge(id: id)
-    TaskUndo.recordAcceptReview(id: id, previousNote: previousNote, mutator: mutator)
+    TaskUndo.acceptReview(id: id, mutator: mutator)
     reload()
   }
 
@@ -6527,15 +6552,16 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     // `isOnToday`, not the raw `today` field) it shows solid.
     // Recently Deleted rows are out of every list, Today included: no gold
     // Today badge there.
-    let showFadedInScope = task.isFaded && filter != .faded
+    let isInFadedPile = filter == .review && task.isFaded
+    let showFadedInScope = task.isFaded && !isInFadedPile
     checkbox.isToday = task.isOnToday && filter != .today && task.deletedAt == nil && !task.isFaded
     // Countdown toward the 14-day fade window in every open list
-    // (`docs/TASK_FADE_SPEC.md` §4). Inside the Faded pile itself rows stay at
+    // (`docs/TASK_FADE_SPEC.md` §4). In Review's Faded group rows stay at
     // full opacity; inside projects and areas faded rows render visibly faded.
     if showFadedInScope {
       checkbox.tenureFill = 1.0
     } else {
-      checkbox.tenureFill = (done || !TaskRowFlags.agingEnabled || filter == .recentlyDeleted || task.deletedAt != nil || filter == .faded)
+      checkbox.tenureFill = (done || !TaskRowFlags.agingEnabled || filter == .recentlyDeleted || task.deletedAt != nil || isInFadedPile)
         ? nil : task.fadeFill()
     }
     // The whole row fades, checkbox included: same curve as `CheckableRow`.

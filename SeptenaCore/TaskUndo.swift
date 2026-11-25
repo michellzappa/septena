@@ -270,28 +270,37 @@ enum TaskUndo {
     let name = wasDone
       ? String(localized: "Reopen Task", comment: "Undo action name")
       : String(localized: "Complete Task", comment: "Undo action name")
+    // A plain completion of a task in Review is an Accept (docs/REVIEW_SPEC.md §4).
+    let fromReview = wasDone ? [] : ids.filter(mutator.completedFromReview)
     record(name: name,
            undo: {
              for id in ids { wasDone ? mutator.complete(id: id) : mutator.uncomplete(id: id) }
+             for id in fromReview {
+               mutator.setConvoEndState(id: id, .needsVerify, note: mutator.conversation(id: id)?.endStateNote)
+             }
            },
            redo: {
              for id in ids { wasDone ? mutator.uncomplete(id: id) : mutator.complete(id: id) }
            })
   }
 
-  /// Accept a task in Review (`needs_verify` → done + `agent_assisted_done`).
+  /// Accepts a task in Review (docs/REVIEW_SPEC.md §4), the one path every
+  /// Accept control calls: done + `agent_assisted_done`, acknowledged, touched.
   /// Undoing reopens the task AND puts it back in Review with its check note.
-  static func recordAcceptReview(id: String,
-                                 previousNote: String?,
-                                 mutator: TaskMutator) {
+  static func acceptReview(id: String, mutator: TaskMutator) {
+    let previousNote = mutator.conversation(id: id)?.endStateNote
+    mutator.complete(id: id)
+    let acknowledged = mutator.acknowledge(id: id)
     mutator.touch(id: id)
     record(name: String(localized: "Accept Review", comment: "Undo action name"),
            undo: {
              mutator.uncomplete(id: id)
              mutator.setConvoEndState(id: id, .needsVerify, note: previousNote)
+             if acknowledged { mutator.unacknowledge(id: id) }
            },
            redo: {
              mutator.complete(id: id)
+             mutator.acknowledge(id: id)
            })
   }
 
@@ -341,6 +350,7 @@ enum TaskUndo {
     let fadedAt: Date?
     let touchedAt: Date?
     let deferCount: Int
+    let acknowledgedAt: Date?
 
     init(_ task: SeptenaTask) {
       id = task.id
@@ -350,6 +360,7 @@ enum TaskUndo {
       fadedAt = task.fadedAt
       touchedAt = task.touchedAt
       deferCount = task.deferCount
+      acknowledgedAt = task.acknowledgedAt
     }
   }
 

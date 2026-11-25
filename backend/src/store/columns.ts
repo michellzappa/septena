@@ -93,6 +93,13 @@ export const SETTING_VALUES = {
   /// "Pause all agents" (docs/TASK_FACTORY_SPEC.md §10). While true, the
   /// store refuses every agent write and claim, and the agent queue reads as empty.
   agentsPaused: z.boolean(),
+  /// "Fade inactive tasks" (docs/TASK_FADE_SPEC.md §4). Off on one device is
+  /// off on all: a fade is account data.
+  tasksShowAging: z.boolean(),
+  /// When the last weekly sweep finished, on any device (§5).
+  fadeSweptAt: z.string().regex(new RegExp(ENTITY_PATTERNS.stamp), "expected ISO time").max(ENTITY_LIMITS.stampMax),
+  /// The sweep day whose prompt the user dismissed, on any device.
+  fadeSweepDismissedOn: z.string().regex(new RegExp(ENTITY_PATTERNS.day), "expected YYYY-MM-DD"),
   /// "Get started" checklist (Septask): true once dismissed or all steps finished.
   getStartedDismissed: z.boolean(),
   /// "Get started" checklist steps completed (step raw IDs).

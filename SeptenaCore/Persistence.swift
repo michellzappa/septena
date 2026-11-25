@@ -1393,7 +1393,7 @@ enum LocalCache {
     if case .logbook = filter {
       return result.sorted { ($0.completedAt ?? "") > ($1.completedAt ?? "") }
     }
-    if case .faded = filter {
+    if filter == .faded || filter == .review {
       return result.sorted {
         let a = $0.fadedAt ?? .distantPast
         let b = $1.fadedAt ?? .distantPast
@@ -1494,6 +1494,13 @@ enum LocalCache {
     if filter == .faded {
       return e.isFaded ? SeptenaTask(e) : nil
     }
+    if filter == .review {
+      // What waits on the user (docs/REVIEW_SPEC.md §1), faded rows included.
+      // Only rows that carry conversation JSON decode it.
+      guard e.status == .open, !e.isHeading, e.isFaded || e.conversationJSON != nil else { return nil }
+      let task = SeptenaTask(e)
+      return task.reviewGroup == nil ? nil : task
+    }
     if e.isFaded { return nil }
     switch filter {
     case .today:
@@ -1506,9 +1513,7 @@ enum LocalCache {
       // Unratified layer above Today — see `TaskEntity.isInTriageBand`.
       return e.isInTriageBand ? SeptenaTask(e) : nil
     case .review:
-      // Agent-worked tasks awaiting the human's verification and acceptance (#87).
-      guard e.status == .open, e.conversation.needsHumanReview else { return nil }
-      return SeptenaTask(e)
+      return nil // handled above, before the faded rows leave
     case .agent:
       // Agent work by stage (docs/TASK_FACTORY_SPEC.md §3). Only rows that
       // carry conversation JSON decode it. A claim lease is backend wall-clock

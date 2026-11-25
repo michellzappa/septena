@@ -55,7 +55,7 @@
       "visibility": "whenNonEmpty",
       "canHide": true,
       "canMoveSection": true,
-      "countRule": "needsVerify",
+      "countRule": "waitsOnUser",
       "supportsManualOrder": false,
       "supportsGroupByList": false,
       "showsCalendarAgenda": false,
@@ -63,7 +63,12 @@
       "supportsInlineCreate": false,
       "dropBehavior": "none",
       "featureId": "lists.review",
-      "emptyState": { "title": "Nothing to review", "detail": "Work an agent finished appears here so you can check and accept it." }
+      "groups": [
+        { "id": "questions", "title": "Questions", "icon": "agent.your_turn" },
+        { "id": "finished", "title": "Finished work", "icon": "list.review" },
+        { "id": "faded", "title": "Faded", "icon": "list.faded" }
+      ],
+      "emptyState": { "title": "Nothing to review", "detail": "Questions and finished work from your agent show up here. So do tasks that faded." }
     },
     {
       "id": "agent",
@@ -85,10 +90,9 @@
       "dropBehavior": "none",
       "featureId": "lists.agent",
       "groups": [
-        { "id": "queued", "title": "Queued", "icon": "agent.queued" },
         { "id": "working", "title": "Working", "icon": "agent.working" },
-        { "id": "yourTurn", "title": "Your turn", "icon": "agent.your_turn" },
-        { "id": "review", "title": "Review", "icon": "list.review" },
+        { "id": "queued", "title": "Queued", "icon": "agent.queued" },
+        { "id": "stopped", "title": "Stopped", "icon": "agent.stopped" },
         { "id": "done", "title": "Done", "icon": "agent.done" }
       ],
       "emptyState": { "title": "No agent work", "detail": "Tasks you assign to Claude appear here, grouped by where the work stands." }
@@ -204,11 +208,9 @@
       "serverView": "all",
       "title": "Faded",
       "icon": "list.faded",
-      "sidebarOrder": 8,
-      "sidebarSection": "bottom",
-      "visibility": "whenNonEmpty",
-      "canHide": true,
-      "canMoveSection": true,
+      "visibility": "reviewGroup",
+      "canHide": false,
+      "canMoveSection": false,
       "countRule": "openFaded",
       "supportsManualOrder": false,
       "supportsGroupByList": false,
@@ -217,7 +219,7 @@
       "supportsInlineCreate": false,
       "dropBehavior": "none",
       "featureId": "lists.faded",
-      "emptyState": { "title": "No Faded Tasks", "detail": "Undated tasks without activity for 14 days appear here until you keep them or let them go." }
+      "emptyState": { "title": "No Faded Tasks", "detail": "Tasks without activity for 14 days appear here until you keep them or let them go." }
     },
     {
       "id": "recentlyDeleted",

@@ -135,6 +135,11 @@ final class TaskMutator {
 
   // MARK: - Conversation (Task Conversations — docs/TASK_CONVERSATIONS_PHASE0.md)
 
+  /// True when the last completion of this task here took it out of Review.
+  func completedFromReview(id: String) -> Bool {
+    cloudBackend?.completedFromReview.contains(id) ?? false
+  }
+
   func conversation(id: String) -> TaskConvo? {
     cloudBackend?.conversation(id: id)
   }
@@ -659,14 +664,15 @@ final class TaskMutator {
   /// Callers must only invoke this on a real disposition (file / when /
   /// today / complete) — never on peek/select. Stack is logged so a stray
   /// call that still evacuates a row is diagnosable in Console.
-  func acknowledge(id: String) {
+  @discardableResult
+  func acknowledge(id: String) -> Bool {
     guard let cloudBackend else {
       SeptenaLog.error("[TaskMutator] acknowledge called before CK bound — dropping", nil)
-      return
+      return false
     }
     let stack = Thread.callStackSymbols.prefix(8).joined(separator: " ← ")
     SeptenaLog.info("[TaskMutator] acknowledge id=\(id) via \(stack)")
-    cloudBackend.acknowledge(id: id)
+    return cloudBackend.acknowledge(id: id)
   }
 
   /// Restore an accidentally peek-acked MCP proposal (clears `acknowledgedAt`).

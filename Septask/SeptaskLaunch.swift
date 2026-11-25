@@ -356,7 +356,10 @@ enum SeptaskDeepLinkRouter {
     )).first {
       let task = SeptenaTask(entity)
       if task.status != .open { return .logbook }
-      if task.isFaded { return .faded }
+      if task.isFaded {
+        UserDefaults.standard.set(true, forKey: ReviewGroup.fadedExpandedKey)
+        return .review
+      }
       if task.isOnToday { return .today }
       if let p = task.project { return .project(p) }
       if let a = task.area { return .area(a) }

@@ -950,6 +950,22 @@ final class TaskSyncEngine {
     // a deleted area / project to Recently Deleted (the receiver half of the
     // delete cascade; `AreasMutator.sweepDeletedContainerOrphans`).
     await SeptenaServices.shared.areasMutator.sweepDeletedContainerOrphans()
+    lastSyncAt = Date()
+    SeptenaServices.shared.runFadePassIfDue()
+  }
+
+  /// When this process last finished a push and a pull.
+  private var lastSyncAt: Date?
+
+  /// True when the local store was up to date a short time ago.
+  var syncedRecently: Bool {
+    lastSyncAt.map { Date().timeIntervalSince($0) < 5 * 60 } ?? false
+  }
+
+  /// True for a device that syncs and has not done so recently. A signed-out
+  /// device, and one the plan does not sync, has only its own data.
+  var needsSyncFirst: Bool {
+    TaskBackendClient.hasSession && !deviceNotSyncing && !syncedRecently
   }
 
   private func handleSyncError(_ error: Error) {

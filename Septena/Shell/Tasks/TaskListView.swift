@@ -481,6 +481,8 @@ struct TaskListView: View {
   /// Starts expanded while `showFadedInLists` is on (mirrors Today's completed
   /// footer: the global setting promises faded tasks are shown).
   @AppStorage("septena.tasks.projectFadedCollapsed") private var scopeFadedCollapsedData: Data = Data()
+  /// Whether Review's Faded group is open.
+  @AppStorage(ReviewGroup.fadedExpandedKey) private var reviewFadedExpanded = false
   private var scopeFadedCollapsedIds: Set<String> {
     (try? JSONDecoder().decode(Set<String>.self, from: scopeFadedCollapsedData)) ?? []
   }
@@ -832,11 +834,11 @@ struct TaskListView: View {
     // for creation; top-right stays Search (and Project's overflow menu).
     // Split layouts (iPad / unfolded Duo) have no Magic Plus orb, so embedded
     // Area/Project lists keep the toolbar "+" there.
-    embedded && !showingRecentlyDeleted && filter != .faded && usesPushNavigation
+    embedded && !showingRecentlyDeleted && usesPushNavigation
     #elseif os(iOS)
-    embedded && !showingRecentlyDeleted && filter != .faded && !usesPushNavigation
+    embedded && !showingRecentlyDeleted && !usesPushNavigation
     #else
-    embedded && !showingRecentlyDeleted && filter != .faded
+    embedded && !showingRecentlyDeleted
     #endif
   }
 
@@ -857,7 +859,7 @@ struct TaskListView: View {
     // regular the "+" merges with the sidebar's "···" in the tab bar; on iPhone
     // a pushed list shows gear + "+" in its own nav bar.
     .modifier(TaskListStandaloneChrome(embedded: embedded,
-                                       recentlyDeleted: showingRecentlyDeleted || filter == .faded,
+                                       recentlyDeleted: showingRecentlyDeleted,
                                        starFilter: starFilterInToolbar && showsStarFilterPill
                                          ? $starredOnlyFilter : nil,
                                        onNew: { handleExternalCreateTrigger() }))
@@ -2415,7 +2417,7 @@ struct TaskListView: View {
     case .review:
       return AnyView(Group {
         AnyView(starFilterBar)
-        AnyView(reviewRows)
+        AnyView(reviewGroupRows)
       })
     case .agent:
       return AnyView(Group {
@@ -2570,24 +2572,28 @@ struct TaskListView: View {
         .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
         noticeStepRows(notice.steps)
       }
-    } else if filter == .faded, !visibleItems.isEmpty {
-      let pile = TaskNotices.fadedPile
-      TaskListNotice(
-        kind: pile.kind,
-        symbol: pile.symbol,
-        title: Text(pile.title),
-        detail: pile.detail.map { Text($0) },
-        onDismiss: nil
-      ) {
-        Button(pile.primaryTitle ?? "") {
-          sweepSheetTasks = visibleItems
-        }
-        .buttonStyle(.bordered)
-        .controlSize(.small)
-      }
-      .plainListChrome()
-      .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
     }
+  }
+
+  /// The notice that leads Review's Faded group: it opens the keep-or-let-go
+  /// sheet on any day (`docs/TASK_FADE_SPEC.md` §5).
+  private func fadedPileNotice(_ tasks: [SeptenaTask]) -> some View {
+    let pile = TaskNotices.fadedPile
+    return TaskListNotice(
+      kind: pile.kind,
+      symbol: pile.symbol,
+      title: Text(pile.title),
+      detail: pile.detail.map { Text($0) },
+      onDismiss: nil
+    ) {
+      Button(pile.primaryTitle ?? "") {
+        sweepSheetTasks = tasks
+      }
+      .buttonStyle(.bordered)
+      .controlSize(.small)
+    }
+    .plainListChrome()
+    .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
   }
 
   /// What another device does now, or what this one does after Show List
@@ -2799,13 +2805,44 @@ struct TaskListView: View {
                reorderable: isManuallyOrderedList)
   }
 
-  /// Review stage rows (`needs_verify`, #87): each row carries Accept and Send
+  /// Review (docs/REVIEW_SPEC.md §1): one section per `ReviewGroup`, in
+  /// registry order, headers only above non-empty groups. Faded is last,
+  /// behind its toggle.
+  @ViewBuilder
+  private var reviewGroupRows: some View {
+    let byGroup = Dictionary(grouping: visibleItems) { $0.reviewGroup }
+    ForEach(ReviewGroup.allCases, id: \.self) { group in
+      if let tasks = byGroup[group], !tasks.isEmpty {
+        if group == .faded {
+          fadedToggleRow(count: tasks.count, isExpanded: reviewFadedExpanded) {
+            reviewFadedExpanded.toggle()
+          }
+          if reviewFadedExpanded {
+            fadedPileNotice(tasks)
+            cardedRows(tasks)
+          }
+        } else {
+          Section {
+            if group == .finished {
+              reviewRows(tasks)
+            } else {
+              cardedRows(tasks)
+            }
+          } header: {
+            groupHeader(icon: group.group?.sfSymbol ?? "circle",
+                        title: group.group?.title ?? group.rawValue)
+          }
+        }
+      }
+    }
+  }
+
+  /// Finished work rows (`needs_verify`, #87): each row carries Accept and Send
   /// back right in the list. A tap opens the task page (pushed on iPhone, the
   /// inspector on wide screens). It never expands inline: the review row's
   /// layout is not a task row, so the inline editor broke it.
   @ViewBuilder
-  private var reviewRows: some View {
-    let rows = visibleItems
+  private func reviewRows(_ rows: [SeptenaTask]) -> some View {
     ForEach(Array(rows.enumerated()), id: \.element.id) { idx, task in
       let position = TaskCardPosition(index: idx, count: rows.count)
       ReviewTaskRow(
@@ -2831,10 +2868,7 @@ struct TaskListView: View {
   /// The row's button and the row menu's Accept both call this.
   private func acceptReview(_ task: SeptenaTask) {
     Haptics.success()
-    let previousNote = task.conversation.endStateNote
-    mutator.complete(id: task.id)
-    mutator.acknowledge(id: task.id)
-    TaskUndo.recordAcceptReview(id: task.id, previousNote: previousNote, mutator: mutator)
+    TaskUndo.acceptReview(id: task.id, mutator: mutator)
     Task { await load() }
   }
 
@@ -3272,16 +3306,16 @@ struct TaskListView: View {
   @ViewBuilder
   private func scopeFadedSection() -> some View {
     if scopeLoggedFilterId != nil, !fadedScopeItems.isEmpty {
-      scopeFadedToggleRow
+      fadedToggleRow(count: fadedScopeItems.count, isExpanded: isScopeFadedExpanded,
+                     toggle: toggleScopeFadedExpanded)
       if isScopeFadedExpanded {
         cardedRows(fadedScopeItems)
       }
     }
   }
 
-  private var scopeFadedToggleLabel: String {
-    let count = fadedScopeItems.count
-    if isScopeFadedExpanded {
+  private func fadedToggleLabel(count: Int, isExpanded: Bool) -> String {
+    if isExpanded {
       return count == 1
         ? String(localized: "Hide 1 faded item",
                  comment: "Project/area footer — collapse faded tasks (singular)")
@@ -3295,12 +3329,13 @@ struct TaskListView: View {
                comment: "Project/area footer — expand faded tasks (plural)")
   }
 
-  private var scopeFadedToggleRow: some View {
+  /// The footer link that folds faded rows, in a project, an area and Review.
+  private func fadedToggleRow(count: Int, isExpanded: Bool, toggle: @escaping () -> Void) -> some View {
     Button {
       if closeActiveEditIfNeeded() { return }
-      toggleScopeFadedExpanded()
+      toggle()
     } label: {
-      Text(scopeFadedToggleLabel)
+      Text(fadedToggleLabel(count: count, isExpanded: isExpanded))
         .font(.septenaMeta)
         .monospacedDigit()
         .foregroundStyle(Theme.inkSecondary)
@@ -3526,6 +3561,10 @@ struct TaskListView: View {
       return todayNoticeSteps.map(\.selectionID) + todayInboxKeyboardIDs + classifiedIds
     case .unscheduled, .starred:
       return orderedFromGroupedOpen(pool: items) + quickAddOrderedIds
+    case .review:
+      return ReviewGroup.allCases.flatMap { group in
+        group == .faded && !reviewFadedExpanded ? [] : visibleItems.filter { $0.reviewGroup == group }.map(\.id)
+      }
     case .upcoming:
       // Upcoming has no inline trigger (`allowsInlineCreate` false) → sentinel empty.
       return upcomingBuckets().flatMap { $0.tasks.map(\.id) }
@@ -4185,7 +4224,7 @@ struct TaskListView: View {
     // the row as the inboard-most trailing accessory (left of the date).
     staticRow(task, accessory: showingRecentlyDeleted
               ? restoreDeletedCapsule(for: task)
-              : (filter == .faded
+              : (isInFadedPile(task)
                  ? keepFadedCapsule(for: task)
                  : (quickMenu ? suggestionCapsule(for: task) : nil)))
     // Drag a row (or the whole selection) to a sidebar area/project to re-home
@@ -4310,6 +4349,11 @@ struct TaskListView: View {
     Task { await load() }
   }
 
+  /// A row of Review's Faded group, where rows stay at full strength.
+  private func isInFadedPile(_ task: SeptenaTask) -> Bool {
+    filter == .review && task.isFaded
+  }
+
   /// One-tap "Keep" capsule shown on each row in the Faded pile
   /// (`docs/TASK_FADE_SPEC.md` §4). Brings the task back to its list in one
   /// undoable gesture.
@@ -4384,7 +4428,7 @@ struct TaskListView: View {
       suppressProject: suppressProject,
       suppressArea: suppressArea,
       showsTodayIndicator: filter != .today,
-      showsFadedIndicator: filter != .faded,
+      showsFadedIndicator: !isInFadedPile(task),
       isListSelected: selection.contains(task.id),
       checkboxDimmed: touchSelectionActive,
       isSettling: model.settle.isSettling(task.id),
@@ -4521,7 +4565,7 @@ struct TaskListView: View {
           default: return nil
           }
         })
-    } else if filter == .faded || (!target.tasks.isEmpty && target.tasks.allSatisfy(\.isFaded)) {
+    } else if !target.tasks.isEmpty && target.tasks.allSatisfy(\.isFaded) {
       // Faded pile (registry `task.faded`, `docs/TASK_FADE_SPEC.md` §4): Keep
       // restores to the task's original list with undo; Let Go cancels with
       // dropReason = "faded".

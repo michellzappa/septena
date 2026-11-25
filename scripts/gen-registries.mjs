@@ -347,8 +347,8 @@ function validateDestinations(dests, icons, caps) {
   for (const d of dests.destinations) {
     assert(!seenIds.has(d.id), `destinations.json: duplicate id "${d.id}"`);
     seenIds.add(d.id);
-    // Embedded destinations (Inbox on Today, Deleted inside Logbook) have no sidebar row.
-    if (d.visibility === "todayBand" || d.visibility === "logbookTab") {
+    // Embedded destinations (Inbox on Today, Deleted inside Logbook, Faded inside Review) have no sidebar row.
+    if (d.visibility === "todayBand" || d.visibility === "logbookTab" || d.visibility === "reviewGroup") {
       assert(d.sidebarOrder === undefined, `destinations.json: ${d.id} is ${d.visibility} and cannot have a sidebarOrder`);
       assert(d.sidebarSection === undefined, `destinations.json: ${d.id} is ${d.visibility} and cannot have a sidebarSection`);
     } else {

@@ -2,22 +2,16 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Bot,
-  Calendar,
-  Check,
   CheckCircle2,
   Circle,
-  CircleDashed,
-  Eye,
   Folder,
-  Layers,
-  Repeat,
   Search,
-  Star,
-  Sun,
   Tag,
 } from "lucide-react";
+import { SIDEBAR_DESTINATIONS } from "@/lib/destinations";
+import { registryText } from "@/lib/generated/registries";
 import type { ActiveDestination, AreaRow, ProjectRow, SmartDestination, TagRow, TaskRow } from "@/lib/types";
+import { RegistryIcon } from "./RegistryIcon";
 
 interface QuickFindModalProps {
   open: boolean;
@@ -26,29 +20,18 @@ interface QuickFindModalProps {
   areas: AreaRow[];
   projects: ProjectRow[];
   tags: TagRow[];
+  language: string;
   onNavigate: (dest: ActiveDestination) => void;
   onSelectTask: (task: TaskRow) => void;
   onSelectTagFilter: (tagId: string) => void;
 }
 
 type ResultItem =
-  | { kind: "smart"; id: SmartDestination; title: string; subtitle: string }
+  | { kind: "smart"; id: SmartDestination; icon: string; title: string; subtitle: string }
   | { kind: "area"; area: AreaRow }
   | { kind: "project"; project: ProjectRow }
   | { kind: "tag"; tag: TagRow }
   | { kind: "task"; task: TaskRow };
-
-const SMART_TARGETS: Array<{ id: SmartDestination; title: string }> = [
-  { id: "today", title: "Today" },
-  { id: "review", title: "Review" },
-  { id: "agent", title: "Agent" },
-  { id: "upcoming", title: "Upcoming" },
-  { id: "repeating", title: "Repeating" },
-  { id: "anytime", title: "Anytime" },
-  { id: "starred", title: "Favorites" },
-  { id: "logbook", title: "Logbook" },
-  { id: "faded", title: "Faded" },
-];
 
 export function QuickFindModal({
   open,
@@ -57,6 +40,7 @@ export function QuickFindModal({
   areas,
   projects,
   tags,
+  language,
   onNavigate,
   onSelectTask,
   onSelectTagFilter,
@@ -77,9 +61,10 @@ export function QuickFindModal({
     const q = query.trim().toLowerCase();
     const out: ResultItem[] = [];
 
-    for (const s of SMART_TARGETS) {
-      if (!q || s.title.toLowerCase().includes(q)) {
-        out.push({ kind: "smart", id: s.id, title: s.title, subtitle: "List" });
+    for (const d of SIDEBAR_DESTINATIONS) {
+      const title = registryText(d.title, language);
+      if (!q || title.toLowerCase().includes(q)) {
+        out.push({ kind: "smart", id: d.id, icon: d.icon, title, subtitle: "List" });
       }
     }
     for (const a of areas) {
@@ -108,7 +93,7 @@ export function QuickFindModal({
       }
     }
     return out.slice(0, 30);
-  }, [areas, projects, query, tags, tasks]);
+  }, [areas, language, projects, query, tags, tasks]);
 
   useEffect(() => {
     setActiveIndex(0);
@@ -179,15 +164,15 @@ export function QuickFindModal({
                 key = `smart:${item.id}`;
                 label = item.title;
                 meta = item.subtitle;
-                if (item.id === "today") icon = <Sun className="h-3.5 w-3.5 text-[var(--today-gold)]" />;
-                else if (item.id === "review") icon = <Eye className="h-3.5 w-3.5 text-[var(--accent)]" />;
-                else if (item.id === "agent") icon = <Bot className="h-3.5 w-3.5 text-[var(--accent)]" />;
-                else if (item.id === "upcoming") icon = <Calendar className="h-3.5 w-3.5 text-[var(--text-muted)]" />;
-                else if (item.id === "repeating") icon = <Repeat className="h-3.5 w-3.5 text-[var(--text-muted)]" />;
-                else if (item.id === "starred") icon = <Star className="h-3.5 w-3.5 text-amber-500" />;
-                else if (item.id === "faded") icon = <CircleDashed className="h-3.5 w-3.5 text-[var(--text-muted)]" />;
-                else if (item.id === "logbook") icon = <Check className="h-3.5 w-3.5 text-[var(--text-muted)]" />;
-                else icon = <Layers className="h-3.5 w-3.5 text-[var(--text-muted)]" />;
+                const tint =
+                  item.id === "today"
+                    ? "text-[var(--today-gold)]"
+                    : item.id === "starred"
+                      ? "text-amber-500"
+                      : item.id === "review" || item.id === "agent"
+                        ? "text-[var(--accent)]"
+                        : "text-[var(--text-muted)]";
+                icon = <RegistryIcon token={item.icon} className={`h-3.5 w-3.5 ${tint}`} />;
               } else if (item.kind === "area") {
                 key = `area:${item.area.id}`;
                 label = `${item.area.emoji ? `${item.area.emoji} ` : ""}${item.area.title}`;

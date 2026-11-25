@@ -15264,7 +15264,7 @@
       }
     },
     "Faded" : {
-      "comment" : "Generated from registry destinations.destinations.faded.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry destinations.destinations.review.groups.faded.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
@@ -15703,6 +15703,48 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Encontre qualquer tarefa, projeto ou área."
+          }
+        }
+      }
+    },
+    "Finished work" : {
+      "comment" : "Generated from registry destinations.destinations.review.groups.finished.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fertige Arbeit"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trabajo terminado"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Travail terminé"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lavoro completato"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afgerond werk"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trabalho concluído"
           }
         }
       }
@@ -28155,6 +28197,90 @@
         }
       }
     },
+    "Questions" : {
+      "comment" : "Generated from registry destinations.destinations.review.groups.questions.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fragen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preguntas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Questions"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Domande"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vragen"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Perguntas"
+          }
+        }
+      }
+    },
+    "Questions and finished work from your agent show up here. So do tasks that faded." : {
+      "comment" : "Generated from registry destinations.destinations.review.emptyState.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hier erscheinen Fragen und fertige Arbeit deines Agenten. Verblasste Aufgaben ebenfalls."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aquí aparecen las preguntas y el trabajo terminado de tu agente. También las tareas atenuadas."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les questions et le travail terminé de votre agent apparaissent ici. Les tâches estompées aussi."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qui appaiono le domande e il lavoro completato dal tuo agente. Anche le attività inattive."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vragen en afgerond werk van je agent verschijnen hier. Vervaagde taken ook."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "As perguntas e o trabalho concluído do seu agente aparecem aqui. As tarefas inativas também."
+          }
+        }
+      }
+    },
     "Queued" : {
       "comment" : "Generated from registry destinations.destinations.agent.groups.queued.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -34684,6 +34810,48 @@
         }
       }
     },
+    "Stopped" : {
+      "comment" : "Generated from registry destinations.destinations.agent.groups.stopped.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Angehalten"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Detenidas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Arrêtées"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Interrotte"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gestopt"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Interrompidas"
+          }
+        }
+      }
+    },
     "Storage" : {
       "localizations" : {
         "nl" : {
@@ -35975,6 +36143,48 @@
         }
       }
     },
+    "Tasks fade after 14 days without activity and move to Review. A deadline or a date ahead keeps a task out. Open or edit a task to bring it back. You can turn this off in Settings." : {
+      "comment" : "Generated from registry surfaces.notices.items.fadeIntro.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aufgaben verblassen nach 14 Tagen ohne Aktivität und wandern zu „Prüfen“. Eine Frist oder ein Datum in der Zukunft verhindert das. Öffne oder bearbeite eine Aufgabe, um sie zurückzuholen. Du kannst das in den Einstellungen ausschalten."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las tareas se atenúan tras 14 días sin actividad y pasan a Revisar. Una fecha límite o una fecha futura lo evita. Abre o edita una tarea para recuperarla. Puedes desactivarlo en Ajustes."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les tâches s’estompent après 14 jours sans activité et passent dans Vérifier. Une échéance ou une date à venir l’évite. Ouvrez ou modifiez une tâche pour la récupérer. Vous pouvez désactiver cela dans les réglages."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dopo 14 giorni senza attività le attività perdono risalto e passano in Revisione. Una scadenza o una data futura lo evita. Apri o modifica un’attività per recuperarla. Puoi disattivarlo in Impostazioni."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Taken vervagen na 14 dagen zonder activiteit en gaan naar Beoordelen. Een deadline of een datum in de toekomst voorkomt dat. Open of bewerk een taak om hem terug te halen. Je kunt dit uitzetten in Instellingen."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "As tarefas perdem destaque após 14 dias sem atividade e vão para Revisar. Um prazo ou uma data futura evita isso. Abra ou edite uma tarefa para trazê-la de volta. Você pode desativar isso nos Ajustes."
+          }
+        }
+      }
+    },
     "Tasks tab" : {
       "localizations" : {
         "pt-BR" : {
@@ -36211,6 +36421,48 @@
         }
       }
     },
+    "Tasks without activity for 14 days appear here until you keep them or let them go." : {
+      "comment" : "Generated from registry destinations.destinations.faded.emptyState.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aufgaben ohne Aktivität seit 14 Tagen erscheinen hier, bis du sie behältst oder loslässt."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aquí aparecen las tareas sin actividad durante 14 días hasta que las conserves o las descartes."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les tâches sans activité depuis 14 jours apparaissent ici jusqu’à ce que vous les gardiez ou les laissiez partir."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qui appaiono le attività senza attività da 14 giorni finché non le tieni o le lasci andare."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Taken die 14 dagen geen activiteit hadden, verschijnen hier tot je ze houdt of loslaat."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "As tarefas sem atividade há 14 dias aparecem aqui até você mantê-las ou descartá-las."
+          }
+        }
+      }
+    },
     "Tasks without activity for 14 days fade out and move to Faded." : {
       "comment" : "Generated from registry settings.rootGroups.lists_root.items.3.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -36249,6 +36501,48 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Depois de 14 dias sem atividade, as tarefas perdem destaque e vão para Inativas."
+          }
+        }
+      }
+    },
+    "Tasks without activity for 14 days fade out and move to Review. This applies on all your devices." : {
+      "comment" : "Generated from registry settings.rootGroups.lists_root.items.3.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aufgaben ohne Aktivität verblassen nach 14 Tagen und wandern zu „Prüfen“. Das gilt auf allen deinen Geräten."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las tareas sin actividad durante 14 días se atenúan y pasan a Revisar. Se aplica en todos tus dispositivos."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les tâches sans activité depuis 14 jours s’estompent et passent dans Vérifier. Cela vaut pour tous vos appareils."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dopo 14 giorni senza attività, le attività perdono risalto e passano in Revisione. Vale su tutti i tuoi dispositivi."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Taken zonder activiteit gedurende 14 dagen vervagen en gaan naar Beoordelen. Dit geldt op al je apparaten."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Depois de 14 dias sem atividade, as tarefas perdem destaque e vão para Revisar. Vale em todos os seus dispositivos."
           }
         }
       }

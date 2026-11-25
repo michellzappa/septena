@@ -155,6 +155,7 @@ final class SeptenaServices {
     SomedayStatusMigrator.runIfNeeded(context: context, engine: ckEngine)
     PeekAckProposalRecovery.runIfNeeded(context: context, mutator: taskMutator)
     taskMutator.catchUpFixedSchedules()
+    if TaskSyncEngine.shared.syncedRecently { SettingsMirror.reconcileFadeEnabled(publish: true) }
     runFadePassIfDue()
     purgeExpiredTasksIfDue()
     SettingsMirror.publishDeviceTimezone(context: context, engine: ckEngine)
@@ -163,11 +164,13 @@ final class SeptenaServices {
   /// The app calendar day the fade pass last ran in this process.
   private var lastFadePassDay: String?
 
-  /// Idempotent daily fade pass (`docs/TASK_FADE_SPEC.md` §4).
+  /// Idempotent daily fade pass (`docs/TASK_FADE_SPEC.md` §4). A device that
+  /// syncs waits for a pull: a fade on old data takes back a touch made on
+  /// another device. The sync engine calls this again after each sync.
   @MainActor
   func runFadePassIfDue() {
     let day = DayClock.appToday
-    guard lastFadePassDay != day else { return }
+    guard lastFadePassDay != day, !TaskSyncEngine.shared.needsSyncFirst else { return }
     lastFadePassDay = day
     taskMutator.runFadePass(now: DayClock.appNow, today: day)
   }

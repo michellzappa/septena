@@ -5,6 +5,7 @@ import app.septena.core.JsonValue
 import app.septena.core.ProjectShare
 import app.septena.core.RegistryCatalog
 import app.septena.core.SyncRecord
+import app.septena.core.TaskConversation
 import app.septena.core.TaskFadeRules
 import app.septena.core.TaskProvenance
 import app.septena.core.TaskSnapshot
@@ -35,6 +36,8 @@ internal data class TaskRowMetadataCatalog(
     val attachmentTaskIds: Set<String> = emptySet(),
     /** The shared projects, by project id. */
     val shares: Map<String, ProjectShare> = emptyMap(),
+    /** Tasks an agent handed over for the user to check. */
+    val reviewTaskIds: Set<String> = emptySet(),
 ) {
     companion object {
         suspend fun load(store: TaskStore): TaskRowMetadataCatalog {
@@ -66,6 +69,9 @@ internal data class TaskRowMetadataCatalog(
                 tagNames = tags,
                 attachmentTaskIds = attachments,
                 shares = ProjectShare.byProject(store),
+                reviewTaskIds = store.records(EntityNames.CONVO)
+                    .filter { TaskConversation.needsHumanReview(it) }
+                    .mapTo(HashSet(), SyncRecord::id),
             )
         }
     }
@@ -197,6 +203,7 @@ internal fun buildTaskListItem(
         isOnToday = membership.isOnToday,
         isStarred = snapshot.starred,
         isFaded = isFaded,
+        isInReview = isOpen && record.id in catalog.reviewTaskIds,
         deadlineText = deadlineText,
         deadlineIsRed = deadlineIsRed,
         deadlineShowsFlag = deadlineShowsFlag,
@@ -212,6 +219,45 @@ internal fun buildTaskListItem(
         hasNotes = hasNotes,
         hasAttachments = hasAttachments,
     )
+}
+
+/**
+ * Row opacity from the core's fade fill (fade.rs), as on iOS: an
+ * untouched open task fades over the fade window. Agent work, waiting
+ * conversations, dated, deadline and repeating tasks never fade.
+ */
+internal fun TaskListItem.withFade(
+    snapshot: TaskSnapshot,
+    conversation: TaskConversation?,
+    now: Instant,
+    today: LocalDate,
+    showAging: Boolean,
+): TaskListItem {
+    // Settings ▸ Lists ▸ "Fade inactive tasks" (tasksShowAging) off: rows stay at full strength.
+    if (!showAging) return this
+    val isProposal = TaskProvenance.isProposal(snapshot.source, snapshot.acknowledgedAt)
+    val fill = runCatching {
+        TaskFadeRules.fadeFill(
+            isOpen = snapshot.status == RegistryEntityEnums.TaskStatus.OPEN,
+            isHeading = snapshot.isHeading,
+            isDeleted = snapshot.deletedAt != null,
+            isFaded = TaskFadeRules.isFaded(snapshot.fadedAt),
+            deadline = snapshot.deadline,
+            scheduled = snapshot.scheduled,
+            hasRecurrence = snapshot.recurrenceUnit != null,
+            isAgentTurn = conversation?.isAgentTurn(now) == true,
+            isAssignedToClaude = conversation?.assignee == RegistryEntityEnums.ConvoAssignee.CLAUDE,
+            showsAgentCue = isProposal,
+            touchedAt = snapshot.touchedAt?.let { runCatching { Instant.parse(it) }.getOrNull() },
+            createdAt = snapshot.createdAt?.let { runCatching { Instant.parse(it) }.getOrNull() },
+            created = snapshot.created,
+            now = now,
+            today = today.toString(),
+            isAwaitingHuman = conversation?.awaitsHuman == true,
+            isProposal = isProposal,
+        )
+    }.getOrNull()
+    return copy(opacity = TaskFadeRules.rowOpacity(fill).toFloat())
 }
 
 internal fun destinationIconKind(destinationId: String): SeptenaIconKind = when (destinationId) {

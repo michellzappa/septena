@@ -8,12 +8,12 @@ import app.septena.core.ProjectShare
 import app.septena.core.RegistryActionContext
 import app.septena.core.RegistryActionResolver
 import app.septena.core.RegistryCatalog
+import app.septena.core.ReviewGroupIds
 import app.septena.core.SmartListResolver
 import app.septena.core.SmartListSection
 import app.septena.core.SyncRecord
 import app.septena.core.TaskConversation
 import app.septena.core.TaskFadeRules
-import app.septena.core.TaskProvenance
 import app.septena.core.TaskSnapshot
 import app.septena.core.TaskViewRules
 import app.septena.core.asSyncRecord
@@ -40,6 +40,7 @@ import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.Locale
 
 sealed interface TaskHomeLocation {
     data class SmartList(val destinationId: String) : TaskHomeLocation
@@ -74,6 +75,10 @@ data class TaskHomeUiState(
     val tasks: List<TaskListItem> = emptyList(),
     /** Soft-deleted tasks shown in Logbook's Deleted tab (#460 / #202). */
     val deletedTasks: List<TaskListItem> = emptyList(),
+    /** Review's Faded group: its header, null when nothing faded, and its rows. */
+    val fadedGroup: TaskGroupHeader? = null,
+    val fadedTasks: List<TaskListItem> = emptyList(),
+    val fadedGroupExpanded: Boolean = false,
     val canQuickAdd: Boolean = false,
     val canComplete: Boolean = false,
     val agentsPaused: Boolean = false,
@@ -92,7 +97,12 @@ data class TaskHomeUiState(
     /** True on sweep day (Sunday) when unswept faded tasks exist and banner wasn't dismissed. */
     val showWeeklySweepBanner: Boolean = false,
     val errorMessage: String? = null,
-)
+) {
+    /** The rows the list draws, in order; a folded group draws none. */
+    val visibleTasks: List<TaskListItem> by lazy(LazyThreadSafetyMode.PUBLICATION) {
+        inboxTasks + tasks + if (fadedGroupExpanded) fadedTasks else emptyList()
+    }
+}
 
 /** The fields of the Quick Add sheet. */
 data class QuickAddDraft(
@@ -119,6 +129,8 @@ private data class LoadedTaskHome(
     val inboxTasks: List<TaskListItem>,
     val tasks: List<TaskListItem>,
     val deletedTasks: List<TaskListItem> = emptyList(),
+    val fadedGroup: TaskGroupHeader? = null,
+    val fadedTasks: List<TaskListItem> = emptyList(),
     val canQuickAdd: Boolean,
     val canComplete: Boolean,
     val agentsPaused: Boolean,
@@ -137,7 +149,6 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
     )
     private val starredOnly = MutableStateFlow(false)
     private val selectedIds = MutableStateFlow<Set<String>>(emptySet())
-    private val sweepRefresh = MutableStateFlow(0L)
     private val errorMessage = MutableStateFlow<String?>(null)
     @Volatile private var filingSuggestionsByTask: Map<String, FilingSuggestion> = emptyMap()
 
@@ -146,8 +157,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         location,
         graph.sync.dataVersion,
         graph.deviceSettings.changes,
-        sweepRefresh,
-    ) { selected, _, _, _ ->
+    ) { selected, _, _ ->
         selected
     }.mapLatest { selected ->
         withContext(Dispatchers.IO) { load(selected) }
@@ -157,8 +167,15 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         initialValue = loadInitial(),
     )
 
-    val state: StateFlow<TaskHomeUiState> = combine(loaded, starredOnly, selectedIds, errorMessage) { home, starFilter, selected, error ->
+    val state: StateFlow<TaskHomeUiState> = combine(
+        loaded,
+        starredOnly,
+        selectedIds,
+        errorMessage,
+        graph.fadeSweepStore.fadedGroupExpanded,
+    ) { home, starFilter, selected, error, fadedGroupExpanded ->
         val applyStar = starFilter && (home.location as? TaskHomeLocation.SmartList)?.destinationId != RegistryDestinationIds.STARRED
+        val fadedTasks = if (applyStar) home.fadedTasks.filter(TaskListItem::isStarred) else home.fadedTasks
         TaskHomeUiState(
             hasLoaded = home.hasLoaded,
             location = home.location,
@@ -169,6 +186,9 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             inboxTasks = if (applyStar) home.inboxTasks.filter(TaskListItem::isStarred) else home.inboxTasks,
             tasks = if (applyStar) home.tasks.filter(TaskListItem::isStarred) else home.tasks,
             deletedTasks = home.deletedTasks,
+            fadedGroup = home.fadedGroup?.takeIf { fadedTasks.isNotEmpty() }?.copy(count = fadedTasks.size),
+            fadedTasks = fadedTasks,
+            fadedGroupExpanded = fadedGroupExpanded,
             canQuickAdd = home.canQuickAdd,
             canComplete = home.canComplete,
             agentsPaused = home.agentsPaused,
@@ -187,10 +207,20 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         initialValue = TaskHomeUiState(),
     )
 
+    /** Faded is a group of Review (ADR 0044): opening it opens Review with that group unfolded. */
     fun select(location: TaskHomeLocation) {
         selectedIds.value = emptySet()
         starredOnly.value = false
-        this.location.value = location
+        val opensFaded = location == TaskHomeLocation.SmartList(RegistryDestinationIds.FADED)
+        if (opensFaded) graph.fadeSweepStore.setFadedGroupExpanded(true)
+        this.location.value = if (opensFaded) TaskHomeLocation.SmartList(RegistryDestinationIds.REVIEW) else location
+    }
+
+    fun toggleFadedGroup() {
+        val expands = !graph.fadeSweepStore.fadedGroupExpanded.value
+        // A folded row must not stay in a selection the user cannot see.
+        if (!expands) selectedIds.value -= state.value.fadedTasks.map(TaskListItem::id).toSet()
+        graph.fadeSweepStore.setFadedGroupExpanded(expands)
     }
 
     fun toggleStarFilter() {
@@ -322,7 +352,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         viewModelScope.launch {
             runCatching {
                 withContext(Dispatchers.IO) {
-                    val order = state.value.let { home -> (home.inboxTasks + home.tasks).map { it.id } }
+                    val order = state.value.visibleTasks.map { it.id }
                     ids.sortedBy { id -> order.indexOf(id).let { if (it < 0) Int.MAX_VALUE else it } }
                         .mapNotNull { id ->
                             graph.taskStore.record(EntityNames.TASK, id)
@@ -339,7 +369,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
 
     /** Selects every row of the list, or clears the selection when all are selected. */
     fun toggleSelectAll() {
-        val visible = state.value.let { home -> (home.inboxTasks + home.tasks).map { it.id } }.toSet()
+        val visible = state.value.visibleTasks.map { it.id }.toSet()
         selectedIds.value = if (selectedIds.value.containsAll(visible)) emptySet() else visible
     }
 
@@ -357,9 +387,12 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
 
     /** Complete, Cancel, Delete or Today on the whole selection, as one undo step. */
     fun applyToSelection(actionId: String, todayEnabled: Boolean = true) {
+        if (actionId == RegistryActionIds.TASK_TOGGLE_COMPLETE) {
+            batchGesture { ids -> graph.completeTasks(ids) }
+            return
+        }
         batch { id ->
             when (actionId) {
-                RegistryActionIds.TASK_TOGGLE_COMPLETE -> graph.taskMutator.complete(id)
                 RegistryActionIds.TASK_CANCEL -> graph.taskMutator.cancel(id)
                 RegistryActionIds.TASK_DELETE -> graph.taskMutator.delete(id)
                 RegistryActionIds.TASK_TOGGLE_TODAY -> graph.taskMutator.setToday(id, todayEnabled)
@@ -433,13 +466,17 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         }
     }
 
-    private fun batch(write: suspend (String) -> Unit) {
+    private fun batch(write: suspend (String) -> Unit) =
+        batchGesture { ids -> graph.captureTaskEdits(ids) { id -> write(id) } }
+
+    /** Runs [gesture], which records its own undo step, on the selection and clears it. */
+    private fun batchGesture(gesture: suspend (Set<String>) -> Unit) {
         val ids = selectedIds.value
         if (ids.isEmpty()) return
         selectedIds.value = emptySet()
         viewModelScope.launch {
             runCatching {
-                withContext(Dispatchers.IO) { graph.captureTaskEdits(ids) { id -> write(id) } }
+                withContext(Dispatchers.IO) { gesture(ids) }
             }.onSuccess { errorMessage.value = null; noteLocalChangeAndSync() }
                 .onFailure { errorMessage.value = it.message; noteLocalChangeAndSync() }
         }
@@ -448,9 +485,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
     fun complete(id: String) {
         viewModelScope.launch {
             runCatching {
-                withContext(Dispatchers.IO) {
-                    graph.captureTaskEdit(id) { graph.taskMutator.complete(id) }
-                }
+                withContext(Dispatchers.IO) { graph.completeTask(id) }
             }
                 .onSuccess {
                     errorMessage.value = null
@@ -498,18 +533,9 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         }
     }
 
-    fun acceptReview(id: String) {
-        viewModelScope.launch {
-            runCatching {
-                withContext(Dispatchers.IO) { check(graph.acceptReview(id)) }
-            }.onSuccess { errorMessage.value = null; noteLocalChangeAndSync() }
-                .onFailure { errorMessage.value = it.message }
-        }
-    }
-
     fun keepFaded(id: String) = editTask(id) { graph.taskMutator.keepFaded(id) }
 
-    fun letGoFaded(id: String) = editTask(id) { graph.taskMutator.letGoFaded(id) }
+    fun letGoFaded(id: String) = editTask(id, touches = false) { graph.taskMutator.letGoFaded(id) }
 
     /** One-tap filing from an Inbox suggestion capsule (`edit.filing-suggestion`, #368). */
     fun applyFilingSuggestion(id: String) {
@@ -533,29 +559,37 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         viewModelScope.launch {
             runCatching {
                 withContext(Dispatchers.IO) {
-                    graph.captureTaskEdits(ids) { id -> graph.taskMutator.letGoFaded(id) }
+                    graph.captureTaskEdits(ids, touches = false) { id -> graph.taskMutator.letGoFaded(id) }
                 }
             }.onSuccess { errorMessage.value = null; noteLocalChangeAndSync() }
                 .onFailure { errorMessage.value = it.message; noteLocalChangeAndSync() }
         }
     }
 
-    fun dismissWeeklySweepBanner() {
+    fun dismissWeeklySweepBanner() = writeSweepState {
         graph.fadeSweepStore.dismissSweepForCurrentWeek(graph.clock.now())
-        sweepRefresh.value += 1
     }
 
-    fun markSweepCompleted() {
+    fun markSweepCompleted() = writeSweepState {
         graph.fadeSweepStore.markSweepCompleted(graph.clock.now())
-        sweepRefresh.value += 1
+    }
+
+    private fun writeSweepState(write: suspend () -> Unit) {
+        viewModelScope.launch {
+            // The device copy is written first, so the banner reloads right even when the synced write fails.
+            runCatching { withContext(Dispatchers.IO) { write() } }
+                .onSuccess { errorMessage.value = null }
+                .onFailure { errorMessage.value = it.message }
+            noteLocalChangeAndSync()
+        }
     }
 
     /** One undoable task edit off the main thread, then a sync. */
-    private fun editTask(id: String, edit: suspend () -> Any?) {
+    private fun editTask(id: String, touches: Boolean = true, edit: suspend () -> Any?) {
         viewModelScope.launch {
             runCatching {
                 withContext(Dispatchers.IO) {
-                    graph.captureTaskEdit(id) { check(edit() != null) }
+                    graph.captureTaskEdit(id, touches) { check(edit() != null) }
                 }
             }.onSuccess { errorMessage.value = null; noteLocalChangeAndSync() }
                 .onFailure { errorMessage.value = it.message }
@@ -671,8 +705,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
 
     private suspend fun load(selected: TaskHomeLocation): LoadedTaskHome {
         val selectedDestId = (selected as? TaskHomeLocation.SmartList)?.destinationId
-        val needsFullHistory = selectedDestId == RegistryDestinationIds.LOGBOOK ||
-            selectedDestId == RegistryDestinationIds.AGENT
+        val needsFullHistory = selectedDestId == RegistryDestinationIds.LOGBOOK
         // Fast path for Today / active lists: read only open + soft-deleted tasks (skips thousands of Logbook rows).
         val taskRecords = if (needsFullHistory) {
             graph.taskStore.records(EntityNames.TASK)
@@ -766,6 +799,9 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             }
         }
 
+        val agentGroups = groupHeaders(RegistryDestinationIds.AGENT)
+        val reviewGroups = groupHeaders(RegistryDestinationIds.REVIEW)
+
         // Compute core TaskViewMembership ONCE per open non-heading non-deleted task
         // (avoids ~8,000 redundant JNA roundtrips across Done/Cancelled Logbook rows).
         val memberships = HashMap<String, app.septena.core.TaskViewMembership>(allSnapshots.size)
@@ -797,7 +833,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                 continue
             }
             val convoState = convoStates[snapshot.id]
-            if (convoState?.agentStage != null) agentCount += 1
+            if (isOpenVisible(snapshot) && convoState?.agentStage in agentGroups) agentCount += 1
 
             when (snapshot.status) {
                 RegistryEntityEnums.TaskStatus.OPEN -> {
@@ -807,7 +843,9 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                     if (membership.matchesView[RegistryDestinationIds.UPCOMING] == true) upcomingCount += 1
                     if (membership.matchesView[RegistryDestinationIds.ANYTIME] == true) anytimeCount += 1
                     if (TaskViewRules.matchesView(snapshot, membership, RegistryDestinationIds.REPEATING)) repeatingCount += 1
-                    if (convoState?.needsHumanReview == true) reviewCount += 1
+                    val reviewGroup = TaskViewRules.reviewGroup(snapshot, convoState?.reviewGroup)
+                    // The badge counts what waits on an answer: questions and finished work, not faded tasks.
+                    if (reviewGroup != null && reviewGroup != ReviewGroupIds.FADED) reviewCount += 1
                     val requestedAt = when {
                         convoState?.needsHumanReview == true -> conversations[snapshot.id]?.endStateAt
                         convoState?.awaitsHuman == true -> conversations[snapshot.id]?.lastTurnAt
@@ -885,14 +923,13 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         }
 
         val nonEmptyDestinations = buildSet {
-            if (reviewCount > 0 || (selected as? TaskHomeLocation.SmartList)?.destinationId == RegistryDestinationIds.REVIEW) {
+            if (reviewCount > 0 || fadedCount > 0 || (selected as? TaskHomeLocation.SmartList)?.destinationId == RegistryDestinationIds.REVIEW) {
                 add(RegistryDestinationIds.REVIEW)
             }
             if (agentCount > 0 || (selected as? TaskHomeLocation.SmartList)?.destinationId == RegistryDestinationIds.AGENT) {
                 add(RegistryDestinationIds.AGENT)
             }
             if (starredCount > 0) add(RegistryDestinationIds.STARRED)
-            if (fadedCount > 0) add(RegistryDestinationIds.FADED)
             if (deletedCount > 0) add(RegistryDestinationIds.RECENTLY_DELETED)
         }
 
@@ -905,7 +942,6 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             RegistryDestinationIds.AGENT -> agentCount.takeIf { it > 0 }
             RegistryDestinationIds.STARRED -> starredCount.takeIf { it > 0 }
             RegistryDestinationIds.LOGBOOK -> doneTodayCount.takeIf { it > 0 }
-            RegistryDestinationIds.FADED -> fadedCount.takeIf { it > 0 }
             RegistryDestinationIds.RECENTLY_DELETED -> deletedCount.takeIf { it > 0 }
             else -> null
         }
@@ -932,8 +968,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                     count = smartListCount(it.id),
                 )
             }
-        val agentGroups = agentGroupTitles()
-        val showAging = graph.deviceSettings.bool(RegistrySettingKeys.TASKS_SHOW_AGING)
+        val showAging = graph.fadesInactiveTasks()
         val resolvedLocation = when (selected) {
             is TaskHomeLocation.Area -> areaRecords.firstOrNull {
                 (it.location as? TaskHomeLocation.Area)?.id == selected.id
@@ -1007,15 +1042,17 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                     }
                     val conversation = conversations[snapshot.id]
                     val convoState = convoStates[snapshot.id]
-                    val stage = convoState?.agentStage
-                    val listed = when (resolvedLocation.destinationId) {
-                        // Review: open tasks an agent handed back to verify.
+                    // The group header of a Review or Agent row; a task with no group there is not in the list.
+                    val groupHeader = when (resolvedLocation.destinationId) {
                         RegistryDestinationIds.REVIEW ->
-                            snapshot.status == RegistryEntityEnums.TaskStatus.OPEN && !snapshot.isHeading &&
-                                snapshot.deletedAt == null && convoState?.needsHumanReview == true
-                        // Agent: every task with an agent stage, grouped by stage.
+                            reviewGroups[TaskViewRules.reviewGroup(snapshot, convoState?.reviewGroup)]
                         RegistryDestinationIds.AGENT ->
-                            stage != null && !snapshot.isHeading && snapshot.deletedAt == null
+                            convoState?.agentStage.takeIf { isOpenVisible(snapshot) }?.let(agentGroups::get)
+                        else -> null
+                    }
+                    val listed = when (resolvedLocation.destinationId) {
+                        RegistryDestinationIds.REVIEW,
+                        RegistryDestinationIds.AGENT -> groupHeader != null
                         else -> TaskViewRules.matchesView(snapshot, membership, resolvedLocation.destinationId)
                     }
                     if (!listed) continue
@@ -1051,7 +1088,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                         now = now,
                         showTodayIndicator = resolvedLocation.destinationId != RegistryDestinationIds.TODAY && !inTodayInbox,
                         isLogbook = resolvedLocation.destinationId == RegistryDestinationIds.LOGBOOK,
-                    ).withFade(snapshot, conversation, convoState, now, today, showAging)
+                    ).withFade(snapshot, conversation, now, today, showAging)
                         .let { base ->
                             if (suggestedTarget != null) base.copy(filingSuggestionLabel = suggestedTarget.title) else base
                         }
@@ -1059,21 +1096,9 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                         ?: record.fields[RegistryEntityFields.Task.POSITION].numberValue()
                     val positioned = PositionedTask(
                         when (resolvedLocation.destinationId) {
-                            RegistryDestinationIds.AGENT -> {
-                                val stageTitle = agentGroups[stage]
-                                item.copy(
-                                    group = stageTitle?.let {
-                                        TaskGroupHeader(
-                                            key = "agent:${stage.orEmpty()}",
-                                            title = it,
-                                            iconKind = SeptenaIconKind.None,
-                                        )
-                                    },
-                                    groupTitle = stageTitle,
-                                    position = rowPosition,
-                                )
-                            }
-                            RegistryDestinationIds.REVIEW -> {
+                            RegistryDestinationIds.REVIEW -> if (groupHeader != reviewGroups[ReviewGroupIds.FINISHED]) {
+                                item.copy(group = groupHeader, position = rowPosition)
+                            } else {
                                 val note = conversation?.endStateNote?.trim()?.takeIf(String::isNotEmpty)
                                     ?: reviewFallback
                                 val projTitle = snapshot.project?.let(projectTitles::get)
@@ -1091,6 +1116,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                                 val metaLine = listOfNotNull(listLabel, askedAgo, artifactTitle)
                                     .joinToString(" · ")
                                 item.copy(
+                                    group = groupHeader,
                                     position = rowPosition,
                                     reviewNote = note,
                                     reviewMeta = metaLine,
@@ -1114,7 +1140,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                                     position = rowPosition,
                                 )
                             }
-                            else -> item.copy(position = rowPosition)
+                            else -> item.copy(group = groupHeader, position = rowPosition)
                         },
                         rowPosition,
                         archiveDate = when (resolvedLocation.destinationId) {
@@ -1147,7 +1173,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                             today = today,
                             now = now,
                             showTodayIndicator = true,
-                        ).withFade(snapshot, conversations[snapshot.id], convoStates[snapshot.id], now, today, showAging),
+                        ).withFade(snapshot, conversations[snapshot.id], now, today, showAging),
                         record.fields[RegistryEntityFields.Task.POSITION].numberValue(),
                     )
                 }
@@ -1165,7 +1191,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                             today = today,
                             now = now,
                             showTodayIndicator = true,
-                        ).withFade(snapshot, conversations[snapshot.id], convoStates[snapshot.id], now, today, showAging),
+                        ).withFade(snapshot, conversations[snapshot.id], now, today, showAging),
                         record.fields[RegistryEntityFields.Task.POSITION].numberValue(),
                     )
                 }
@@ -1194,7 +1220,6 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             ),
         ) && destinationId != RegistryDestinationIds.LOGBOOK &&
             destinationId != RegistryDestinationIds.RECENTLY_DELETED
-        val stageOrder = agentGroups.values.toList()
         val groupByList = (destinationId == RegistryDestinationIds.TODAY &&
             graph.deviceSettings.bool(RegistrySettingKeys.TODAY_GROUP_BY_LIST)) ||
             destinationId == RegistryDestinationIds.ANYTIME
@@ -1206,14 +1231,16 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                 destinationId = destinationId,
             )
         } else {
-            visible.sortedTaskItems(destinationId).let { items ->
-                if (destinationId == RegistryDestinationIds.AGENT) {
-                    items.sortedBy { stageOrder.indexOf(it.groupTitle).let { i -> if (i < 0) Int.MAX_VALUE else i } }
-                } else {
-                    items
-                }
+            val items = visible.sortedTaskItems(destinationId)
+            when (destinationId) {
+                RegistryDestinationIds.AGENT -> items.sortedByGroup(agentGroups)
+                RegistryDestinationIds.REVIEW -> items.sortedByGroup(reviewGroups)
+                else -> items
             }
         }
+        // Review's Faded group folds, so the list draws it apart from the other rows.
+        val fadedGroup = reviewGroups[ReviewGroupIds.FADED].takeIf { destinationId == RegistryDestinationIds.REVIEW }
+        val (fadedTasks, listedTasks) = orderedTasks.partition { fadedGroup != null && it.group?.key == fadedGroup.key }
         filingSuggestionsByTask = nextSuggestions
         val lastSweepAt = graph.fadeSweepStore.lastSweepAt()
         val dismissedWeek = graph.fadeSweepStore.dismissedSweepWeek()
@@ -1237,8 +1264,10 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             areas = countedAreas,
             projects = countedProjects,
             inboxTasks = inbox.sortedTaskItems(),
-            tasks = orderedTasks,
+            tasks = listedTasks,
             deletedTasks = deleted.sortedTaskItems(RegistryDestinationIds.RECENTLY_DELETED),
+            fadedGroup = fadedGroup,
+            fadedTasks = fadedTasks.map { it.copy(group = null) },
             canQuickAdd = canQuickAdd,
             canComplete = canComplete,
             agentsPaused = agentsPaused,
@@ -1290,55 +1319,23 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         )
     }
 
-    /**
-     * Row opacity from the core's fade fill (fade.rs), as on iOS: an
-     * untouched open task fades over the fade window. Agent work, waiting
-     * conversations, dated, deadline and repeating tasks never fade.
-     */
-    private fun TaskListItem.withFade(
-        snapshot: TaskSnapshot,
-        conversation: TaskConversation?,
-        convoState: app.septena.core.ConversationSnapshotState?,
-        now: java.time.Instant,
-        today: java.time.LocalDate,
-        showAging: Boolean,
-    ): TaskListItem {
-        // Settings ▸ Lists ▸ "Fade inactive tasks" (tasksShowAging) off: rows stay at full strength.
-        if (!showAging) return this
-        val fill = runCatching {
-            TaskFadeRules.fadeFill(
-                isOpen = snapshot.status == RegistryEntityEnums.TaskStatus.OPEN,
-                isHeading = snapshot.isHeading,
-                isDeleted = snapshot.deletedAt != null,
-                isFaded = TaskFadeRules.isFaded(snapshot.fadedAt),
-                deadline = snapshot.deadline,
-                scheduled = snapshot.scheduled,
-                hasRecurrence = snapshot.recurrenceUnit != null,
-                isAgentTurn = convoState?.isAgentWorking == true,
-                isAssignedToClaude = conversation?.assignee == RegistryEntityEnums.ConvoAssignee.CLAUDE,
-                showsAgentCue = TaskProvenance.isAgentAuthored(snapshot.source) && snapshot.acknowledgedAt == null,
-                touchedAt = snapshot.touchedAt?.let { runCatching { java.time.Instant.parse(it) }.getOrNull() },
-                createdAt = snapshot.createdAt?.let { runCatching { java.time.Instant.parse(it) }.getOrNull() },
-                created = snapshot.created,
-                now = now,
-                today = today.toString(),
-                isAwaitingHuman = convoState?.awaitsHuman == true,
-            )
-        }.getOrNull()
-        return copy(opacity = TaskFadeRules.rowOpacity(fill).toFloat())
-    }
-
-    /** Agent stage id to its title, in the order registry/destinations.json lists the groups. */
-    private fun agentGroupTitles(): LinkedHashMap<String?, String> {
-        val groups = (RegistryCatalog.destination(RegistryDestinationIds.AGENT)?.fields?.get("groups") as? JsonValue.ArrayValue)
+    /** The group headers of a destination by group id, in the order registry/destinations.json lists them. */
+    private fun groupHeaders(destinationId: String): LinkedHashMap<String?, TaskGroupHeader> {
+        val groups = (RegistryCatalog.destination(destinationId)?.fields?.get("groups") as? JsonValue.ArrayValue)
             ?.values.orEmpty()
-        val out = LinkedHashMap<String?, String>()
+        val languageTag = Locale.getDefault().toLanguageTag()
+        val out = LinkedHashMap<String?, TaskGroupHeader>()
         for (group in groups) {
             val g = (group as? JsonValue.ObjectValue)?.fields ?: continue
             val id = g["id"].stringValue() ?: continue
-            out[id] = g["title"].stringValue() ?: id
+            out[id] = TaskGroupHeader(key = "$destinationId:$id", title = registryText(g["title"].stringValue() ?: id, languageTag))
         }
         return out
+    }
+
+    private fun List<TaskListItem>.sortedByGroup(groups: LinkedHashMap<String?, TaskGroupHeader>): List<TaskListItem> {
+        val order = groups.values.map(TaskGroupHeader::key)
+        return sortedBy { order.indexOf(it.group?.key) }
     }
 
     private fun isOpenVisible(task: TaskSnapshot): Boolean =
@@ -1457,7 +1454,6 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             RegistryDestinationIds.UPCOMING,
             RegistryDestinationIds.REPEATING,
             RegistryDestinationIds.STARRED,
-            RegistryDestinationIds.FADED,
             RegistryDestinationIds.ANYTIME,
             RegistryDestinationIds.LOGBOOK,
             RegistryDestinationIds.RECENTLY_DELETED,

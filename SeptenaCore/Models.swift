@@ -156,6 +156,12 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
   /// count, Next, and the badge.
   var isFaded: Bool { status == .open && fadedAt != nil }
 
+  /// The one Review group an open task shows in, or nil.
+  var reviewGroup: ReviewGroup? {
+    guard status == .open, deletedAt == nil, !isHeading else { return nil }
+    return conversation.reviewGroup ?? (isFaded ? .faded : nil)
+  }
+
   /// Countdown progress (0…1) toward the 14-day fade window (`TaskFade.fadeFill`).
   /// Drives whole-row opacity in every open task list.
   func fadeFill(today: String = SeptenaDate.today, now: Date = Date()) -> Double? {
@@ -167,10 +173,11 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
       deadline: deadline,
       scheduled: scheduled,
       hasRecurrence: recurrence != nil,
-      isAgentTurn: deriveConvo(conversation).badge == .working,
+      isAgentTurn: conversation.isAgentTurn(at: Date()),
       isAssignedToClaude: conversation.assignee == .claude,
       isAwaitingHuman: conversation.awaitsHuman,
       showsAgentCue: showsAgentCue(now: now),
+      isProposal: isUnacceptedProposal,
       touchedAt: touchedAt,
       createdAt: createdAt,
       created: created,
@@ -220,6 +227,9 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     let label = RegistrySurfaces.taskPageBlock(.provenance).label ?? ""
     return "\(label) \(addedByName)"
   }
+
+  /// An agent added the task and the user has not accepted it (ADR 0039).
+  var isUnacceptedProposal: Bool { isAgentAuthored && acknowledgedAt == nil }
 
   /// True while this row should glow as a freshly agent-created item the
   /// user hasn't engaged yet. Provenance (`source`) is permanent; this cue
@@ -1080,9 +1090,9 @@ enum TaskFilter: Equatable, Hashable {
   /// This is the only home for loose captures; the standalone Inbox page was
   /// retired when the triage band absorbed it.
   case triage
-  /// Agent-worked tasks waiting for the human to verify and accept (`endState == .needsVerify`).
+  /// Everything that waits on the user, grouped by `ReviewGroup` (docs/REVIEW_SPEC.md).
   case review
-  /// Every open task an agent owns or worked, grouped by `AgentStage`
+  /// Agent work in progress, grouped by `AgentStage`
   /// (docs/TASK_FACTORY_SPEC.md §3).
   case agent
   case upcoming
@@ -1090,7 +1100,8 @@ enum TaskFilter: Equatable, Hashable {
   case unscheduled
   case starred
   case logbook
-  /// Tasks that faded untouched (`docs/TASK_FADE_SPEC.md` §4).
+  /// Tasks that faded untouched (`docs/TASK_FADE_SPEC.md` §4). A read filter:
+  /// the list that shows them is the Faded group of Review.
   case faded
   case recentlyDeleted
   case project(String)
@@ -1162,7 +1173,7 @@ enum TaskFilter: Equatable, Hashable {
     case .anytime: self = .unscheduled
     case .logbook: self = .logbook
     case .starred: self = .starred
-    case .faded: self = .faded
+    case .faded: self = .review // its group there
     case .recentlyDeleted: self = .recentlyDeleted
     case .inbox: return nil
     }

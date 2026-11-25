@@ -108,7 +108,7 @@
         "dismissScope": "device",
         "dismissible": true,
         "title": "Inactive tasks start to fade",
-        "detail": "Undated tasks fade after 14 days without activity and move to Faded. Open or edit a task to bring it back. You can turn this off in Settings.",
+        "detail": "Tasks fade after 14 days without activity and move to Review. A deadline or a date ahead keeps a task out. Open or edit a task to bring it back. You can turn this off in Settings.",
         "featureId": "task.aging"
       }
     ]

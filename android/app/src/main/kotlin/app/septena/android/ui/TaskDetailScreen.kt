@@ -48,6 +48,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -253,6 +254,18 @@ fun TaskDetailScreen(
         }
     }
 
+    // Opening a faded task keeps it, once per visit: a rotation after Undo must not keep it again.
+    var keptOnOpen by rememberSaveable(taskId) { mutableStateOf(false) }
+    LaunchedEffect(graph, taskId) {
+        if (keptOnOpen) return@LaunchedEffect
+        keptOnOpen = true
+        val kept = withContext(Dispatchers.IO) { runCatching { graph.keepFadedOnOpen(taskId) }.getOrDefault(false) }
+        if (kept) {
+            graph.sync.noteLocalChange()
+            graph.sync.requestSync()
+        }
+    }
+
     suspend fun saveTextFields(): Boolean {
         val current = data ?: return false
         if (current.task.deletedAt != null) {
@@ -426,15 +439,14 @@ fun TaskDetailScreen(
     val discussHeading = attributes.firstOrNull { it.id == RegistryTaskAttributeIds.DISCUSS }?.label
         ?: conversationBlock?.let { RegistryCatalog.taskPageBlockHeading(it, languageTag) }
 
-    fun write(block: suspend () -> Unit) {
+    /** Runs one user gesture that records its own undo step. */
+    fun save(gesture: suspend () -> Unit) {
         if (!canEdit) return
         scope.launch {
             saving = true
             saveFailed = false
             runCatching {
-                withContext(Dispatchers.IO) {
-                    graph.captureTaskEdit(taskId, block)
-                }
+                withContext(Dispatchers.IO) { gesture() }
             }.onSuccess {
                 graph.sync.noteLocalChange()
                 graph.sync.requestSync()
@@ -443,6 +455,14 @@ fun TaskDetailScreen(
             }
             saving = false
         }
+    }
+
+    fun write(block: suspend () -> Unit) = save { graph.captureTaskEdit(taskId, mutation = block) }
+
+    /** A checklist edit: the task row does not change, and Android has no undo for it. */
+    fun writeChecklist(block: suspend () -> Unit) = save {
+        block()
+        graph.touchTask(taskId)
     }
 
     fun toggleComplete() {
@@ -460,7 +480,7 @@ fun TaskDetailScreen(
                 )
             }
         } else {
-            write { check(graph.taskMutator.complete(taskId) != null) }
+            save { check(graph.completeTask(taskId)) }
         }
     }
 
@@ -656,7 +676,7 @@ fun TaskDetailScreen(
     fun saveChecklistTitle(item: ChecklistLine) {
         val title = checklistDrafts[item.id]?.trim().orEmpty()
         if (title == item.title) return
-        write {
+        writeChecklist {
             check(
                 graph.registryEntityMutator.update(
                     RegistryEntityNames.CHECKLIST_ITEM,
@@ -1298,7 +1318,7 @@ fun TaskDetailScreen(
                                                 onCommitTitle = { saveChecklistTitle(item) },
                                                 onToggle = { checked ->
                                                     val checkedAt = if (checked) WireTimestamp.format(graph.clock.now()) else null
-                                                    write {
+                                                    writeChecklist {
                                                         check(
                                                             graph.registryEntityMutator.update(
                                                                 RegistryEntityNames.CHECKLIST_ITEM,
@@ -1312,7 +1332,7 @@ fun TaskDetailScreen(
                                                     }
                                                 },
                                                 onDelete = {
-                                                    write { check(graph.registryEntityMutator.delete(RegistryEntityNames.CHECKLIST_ITEM, item.id) != null) }
+                                                    writeChecklist { check(graph.registryEntityMutator.delete(RegistryEntityNames.CHECKLIST_ITEM, item.id) != null) }
                                                 },
                                             )
                                         }
@@ -1330,7 +1350,7 @@ fun TaskDetailScreen(
                                                     .fillMaxWidth()
                                                     .clickable(enabled = canEdit) {
                                                         val nextPosition = checklistItems.maxOfOrNull(ChecklistLine::position)?.plus(1.0) ?: 0.0
-                                                        write {
+                                                        writeChecklist {
                                                             val item = graph.registryEntityMutator.create(
                                                                 RegistryEntityNames.CHECKLIST_ITEM,
                                                                 mapOf(

@@ -169,7 +169,7 @@ internal fun TaskReferencesSection(
     fun takeSuggestion(offer: TaskRefOffer) {
         scope.launch {
             val result = withContext(Dispatchers.IO) {
-                runCatching { graph.taskRefMutator.add(taskId, offer.input) }.getOrDefault(TaskRefAddResult.Failed)
+                runCatching { graph.addTaskRef(taskId, offer.input) }.getOrDefault(TaskRefAddResult.Failed)
             }
             if (result is TaskRefAddResult.Added) {
                 graph.sync.noteLocalChange()
@@ -304,6 +304,7 @@ internal fun TaskReferencesSection(
                                     runCatching {
                                         withContext(Dispatchers.IO) {
                                             graph.registryEntityMutator.delete(RegistryEntityNames.TASK_REF, ref.id)
+                                            graph.touchTask(ref.taskId)
                                         }
                                     }.onSuccess {
                                         graph.sync.noteLocalChange()
@@ -474,7 +475,7 @@ internal fun AddReferenceDialog(
         errorMessage = null
         scope.launch {
             val result = withContext(Dispatchers.IO) {
-                runCatching { graph.taskRefMutator.add(taskId, text) }.getOrDefault(TaskRefAddResult.Failed)
+                runCatching { graph.addTaskRef(taskId, text) }.getOrDefault(TaskRefAddResult.Failed)
             }
             busy = false
             when (result) {

@@ -173,6 +173,34 @@ enum SettingsMirror {
     upsert(settings: settings, context: context, engine: engine)
   }
 
+  /// Reads the synced settings, changes them, and pushes what changed.
+  static func updateSynced(_ change: (inout AppSettings) -> Void) {
+    let context = LocalStore.shared.container.mainContext
+    var settings = loadSettings(context: context) ?? AppSettings()
+    change(&settings)
+    upsert(settings: settings, context: context)
+  }
+
+  // MARK: - Fade (docs/TASK_FADE_SPEC.md §4)
+
+  /// Turns "Fade inactive tasks" on or off for the account. The device mirror
+  /// changes first, so rows repaint with no round trip.
+  static func setFadeEnabled(_ enabled: Bool) {
+    UserDefaults.standard.set(enabled, forKey: TaskFade.enabledDefaultsKey)
+    updateSynced { $0.tasksShowAging = enabled }
+  }
+
+  /// Copies the account's value into the device mirror. The account has none
+  /// yet: `publish` sends a device that had fading off before the setting
+  /// synced.
+  static func reconcileFadeEnabled(publish: Bool) {
+    if let synced = SeptaskSyncedSettings.current().tasksShowAging {
+      UserDefaults.standard.set(synced, forKey: TaskFade.enabledDefaultsKey)
+    } else if publish, !TaskFade.isEnabled {
+      updateSynced { $0.tasksShowAging = false }
+    }
+  }
+
   static func upsert(settings: AppSettings,
                      context: ModelContext,
                      engine: CKEngine? = nil) {
@@ -185,6 +213,24 @@ enum SettingsMirror {
     return
   }
 
+}
+
+/// The sweep writes: this device, then the account (`TaskFade` holds the rules).
+extension TaskFade {
+  @MainActor
+  static func markSweepCompleted(at date: Date) {
+    UserDefaults.standard.set(date.timeIntervalSince1970, forKey: lastSweepAtKey)
+    SettingsMirror.updateSynced { $0.fadeSweptAt = date }
+  }
+
+  /// Dismisses this week's sweep banner on every device without dropping any tasks.
+  @MainActor
+  static func dismissSweepForCurrentWeek(now: Date, calendar: Calendar = .current) {
+    let anchor = mostRecentSweepAnchor(now: now, calendar: calendar)
+    UserDefaults.standard.set(anchor.timeIntervalSince1970, forKey: dismissedSweepWeekKey)
+    let day = SeptenaDate.format(anchor)
+    SettingsMirror.updateSynced { $0.fadeSweepDismissedOn = day }
+  }
 }
 
 /// Byte-keyed memo for the decoded settings blob. `@unchecked Sendable` with an

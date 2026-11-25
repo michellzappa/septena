@@ -280,8 +280,8 @@
       "availability": { "selection": "none", "onlyDestinations": ["recentlyDeleted"] },
       "featureId": "lists.recently-deleted"
     },
-    "task.keepFaded": { "title": "Keep", "icon": "action.restore", "role": "default", "availability": { "selection": "any", "onlyDestinations": ["faded"] }, "featureId": "fade.sweep" },
-    "task.letGoFaded": { "title": "Let Go", "icon": "action.let_go", "role": "default", "availability": { "selection": "any", "onlyDestinations": ["faded"] }, "featureId": "fade.sweep" },
+    "task.keepFaded": { "title": "Keep", "icon": "action.restore", "role": "default", "availability": { "selection": "any", "onlyDestinations": ["faded", "review"] }, "featureId": "fade.sweep" },
+    "task.letGoFaded": { "title": "Let Go", "icon": "action.let_go", "role": "default", "availability": { "selection": "any", "onlyDestinations": ["faded", "review"] }, "featureId": "fade.sweep" },
     "place.saveNotes": {
       "title": "Save Notes",
       "icon": "action.notes",

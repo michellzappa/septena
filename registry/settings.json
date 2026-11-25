@@ -217,12 +217,30 @@
       "featureId": "lists.today"
     },
     "tasksShowAging": {
-      "scope": "device",
+      "scope": "synced",
       "storageKey": "septena.tasks.showAging",
       "type": "bool",
       "default": true,
       "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
       "featureId": "task.aging"
+    },
+    "fadeSweptAt": {
+      "scope": "synced",
+      "type": "string",
+      "format": "stamp",
+      "default": null,
+      "ui": false,
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "featureId": "fade.sweep"
+    },
+    "fadeSweepDismissedOn": {
+      "scope": "synced",
+      "type": "string",
+      "format": "day",
+      "default": null,
+      "ui": false,
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "featureId": "fade.sweep"
     },
     "tasksShowFaded": {
       "scope": "device",
@@ -696,7 +714,7 @@
           "kind": "setting",
           "key": "tasksShowAging",
           "label": "Fade inactive tasks",
-          "detail": "Tasks without activity for 14 days fade out and move to Faded."
+          "detail": "Tasks without activity for 14 days fade out and move to Review. This applies on all your devices."
         },
         {
           "kind": "setting",

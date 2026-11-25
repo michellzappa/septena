@@ -182,7 +182,7 @@ internal fun TaskConversationSection(
     }
 
     /**
-     * Accept = unified path shared with Review list rows (`AndroidAppGraph.acceptReview`, #415):
+     * Accept = unified path shared with every completion (`AndroidAppGraph.completeTasks`, #415):
      * completes, acknowledges, stamps fade clock, sets `agent_assisted_done`, and records undo.
      */
     fun acceptReview() {
@@ -190,7 +190,7 @@ internal fun TaskConversationSection(
         scope.launch {
             busy = true
             runCatching {
-                withContext(Dispatchers.IO) { check(graph.acceptReview(taskId)) }
+                withContext(Dispatchers.IO) { check(graph.completeTask(taskId)) }
             }.onSuccess {
                 sendBackVisible = false
                 graph.sync.noteLocalChange()
