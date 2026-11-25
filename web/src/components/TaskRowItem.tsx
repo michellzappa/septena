@@ -33,6 +33,7 @@ import {
   X,
 } from "lucide-react";
 import type { CoreConversationState, CoreMembership, CoreProjection } from "@/lib/core";
+import { agentStageTitle } from "@/lib/destinations";
 import type {
   AreaRow,
   AttachmentRow,
@@ -684,7 +685,7 @@ export function TaskDetailEditor({
                 Discuss
                 {convoState?.agentStage && (
                   <span className="rounded bg-[var(--bg-selected)] px-1.5 py-0.5 text-[10px] font-medium">
-                    {convoState.agentStage}
+                    {agentStageTitle(convoState.agentStage)}
                   </span>
                 )}
               </span>
@@ -750,6 +751,7 @@ export function TaskDetailEditor({
                   <form
                     onSubmit={(e) => {
                       e.preventDefault();
+                      if (!sendBackNote.trim()) return;
                       props.onSendBackReview(sendBackNote);
                       setSendBackNote("");
                       setSendBackOpen(false);
@@ -765,7 +767,8 @@ export function TaskDetailEditor({
                     />
                     <button
                       type="submit"
-                      className="rounded-md bg-[var(--accent)] px-2.5 py-1 font-medium"
+                      disabled={!sendBackNote.trim()}
+                      className="rounded-md bg-[var(--accent)] px-2.5 py-1 font-medium disabled:opacity-50"
                       style={{ color: "var(--accent-check)" }}
                     >
                       Send back

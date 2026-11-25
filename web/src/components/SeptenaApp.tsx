@@ -3,25 +3,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Bell,
-  Bot,
-  Calendar,
   Check,
   ChevronDown,
   ChevronRight,
   CircleDashed,
   CloudOff,
-  Eye,
   Folder,
   FolderPlus,
   Inbox,
   Keyboard,
-  Layers,
   Menu,
   PanelLeft,
   PauseCircle,
   Plus,
   RefreshCw,
-  Repeat,
   Search,
   Settings,
   Star,
@@ -34,8 +29,6 @@ import {
 } from "lucide-react";
 import { SeptenaApiClient } from "@/lib/api/client";
 import {
-  conversationState,
-  deriveConversation,
   ensureCoreReady,
   fadeFill,
   getCoreVersion,
@@ -43,23 +36,37 @@ import {
   localUtcOffsetSeconds,
   rowOpacity,
   shouldArmReminder,
-  shouldFade,
   taskViewMembership,
-  type AgentStage,
-  type CoreConversation,
   type CoreConversationState,
   type CoreMembership,
   type CoreProjection,
 } from "@/lib/core";
+import { evaluateConversation, groupTurnsByTask } from "@/lib/conversation";
 import {
+  SIDEBAR_DESTINATIONS,
+  agentGroupOf,
+  destinationGroups,
+  destinationInfo,
+  reviewGroupOf,
+  type SidebarDestination,
+} from "@/lib/destinations";
+import {
+  fadeInput,
+  fadeSettings,
+  isInCurrentSweep,
+  isSweepDue,
+  sweepAnchorDay,
+} from "@/lib/fade";
+import {
+  ACTIONS_CATALOG,
   DESIGN_TOKENS,
-  DESTINATIONS,
   GENERIC_EMPTY_STATE,
+  SURFACES_CATALOG,
   registryText,
 } from "@/lib/generated/registries";
 import { hexWithAlpha, type HeaderTextureStyle } from "@/lib/headerWash";
 import { loadWebPrefs, saveWebPref, type WebDisplayPrefs } from "@/lib/prefs";
-import { WebSyncEngine, type SyncState } from "@/lib/sync/engine";
+import { WebSyncEngine, type CompletionReceipt, type SyncState } from "@/lib/sync/engine";
 import { UndoStack, type UndoSnapshot } from "@/lib/sync/undo";
 import type {
   ActiveDestination,
@@ -77,6 +84,7 @@ import { HeaderWash } from "./HeaderWash";
 import { KeyboardShortcutsModal } from "./KeyboardShortcutsModal";
 import { QuickAddModal, type QuickAddInitial } from "./QuickAddModal";
 import { QuickFindModal } from "./QuickFindModal";
+import { RegistryIcon } from "./RegistryIcon";
 import { SettingsModal } from "./SettingsModal";
 import { SignInScreen } from "./SignInScreen";
 import { TaskPageDrawer } from "./TaskPageDrawer";
@@ -90,39 +98,13 @@ interface EvaluatedTask {
   convoState: CoreConversationState | null;
 }
 
-const AGENT_STAGE_ORDER: Array<{ id: Exclude<AgentStage, null>; title: string }> = [
-  { id: "yourTurn", title: "Your turn" },
-  { id: "review", title: "Review" },
-  { id: "working", title: "Working" },
-  { id: "queued", title: "Queued" },
-  { id: "done", title: "Done" },
-];
-
-const SMART_LIST_IDS: SmartDestination[] = [
-  "today",
-  "review",
-  "agent",
-  "upcoming",
-  "repeating",
-  "anytime",
-  "starred",
-  "logbook",
-  "faded",
-];
-
-function iconForDestination(id: SmartDestination) {
-  switch (id) {
-    case "today": return Sun;
-    case "review": return Eye;
-    case "agent": return Bot;
-    case "upcoming": return Calendar;
-    case "repeating": return Repeat;
-    case "anytime": return Layers;
-    case "starred": return Star;
-    case "logbook": return Check;
-    case "faded": return CircleDashed;
-  }
+function sumRows(groups: Array<{ items: unknown[] }>): number {
+  return groups.reduce((n, g) => n + g.items.length, 0);
 }
+
+const NOTICES = SURFACES_CATALOG.notices.items;
+const WEEKLY_SWEEP_NOTICE = NOTICES.find((n) => n.id === "weeklySweep")!;
+const FADED_PILE_NOTICE = NOTICES.find((n) => n.id === "fadedPile")!;
 
 function ProjectRing({ done, total }: { done: number; total: number }) {
   const pct = total > 0 ? Math.min(1, done / total) : 0;
@@ -209,9 +191,9 @@ export function SeptenaApp() {
   const [quickAddInitial, setQuickAddInitial] = useState<QuickAddInitial | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
-  const [sweepOpen, setSweepOpen] = useState(false);
+  /** The tasks of the open keep-or-let-go sheet, fixed when it opens. Null: closed. */
+  const [sweepTasks, setSweepTasks] = useState<TaskRow[] | null>(null);
   const [firstRunOpen, setFirstRunOpen] = useState(false);
-  const [sweepBannerDismissed, setSweepBannerDismissed] = useState(false);
   const [infoToast, setInfoToast] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
 
@@ -479,14 +461,6 @@ export function SeptenaApp() {
 
     const cvMap = new Map(syncState.snapshot.convos.map((c) => [c.id, c]));
 
-    const tMap = new Map<string, typeof syncState.snapshot.turns>();
-    for (const turn of syncState.snapshot.turns) {
-      const list = tMap.get(turn.taskId) ?? [];
-      list.push(turn);
-      tMap.set(turn.taskId, list);
-    }
-    for (const list of tMap.values()) list.sort((a, b) => a.seq - b.seq);
-
     return {
       activeAreas: areas,
       activeProjects: projects,
@@ -498,7 +472,7 @@ export function SeptenaApp() {
       refsByTask: rMap,
       attachmentsByTask: aMap,
       convoByTask: cvMap,
-      turnsByTask: tMap,
+      turnsByTask: groupTurnsByTask(syncState.snapshot.turns),
     };
   }, [syncState.snapshot]);
 
@@ -511,6 +485,9 @@ export function SeptenaApp() {
     return ids;
   }, [syncState.snapshot.outbox]);
 
+  // Synced fade settings: the "Fade inactive tasks" switch and the weekly sweep state.
+  const fade = useMemo(() => fadeSettings(syncState.snapshot.settings), [syncState.snapshot.settings]);
+
   // Evaluate membership, fade opacity, and conversation projection/state via the shared Rust WASM core.
   const evaluatedTasks = useMemo((): EvaluatedTask[] => {
     if (bootPhase !== "signed_in") return [];
@@ -521,100 +498,30 @@ export function SeptenaApp() {
         const convo = convoByTask.get(task.id) ?? null;
         const turns = turnsByTask.get(task.id) ?? [];
 
-        let convoProj: CoreProjection | null = null;
-        let cState: CoreConversationState | null = null;
-        if (convo || turns.length > 0) {
-          const coreConvo: CoreConversation = {
-            confirmedIntent: convo?.confirmedIntent ?? null,
-            thread: turns.map((t) => ({
-              seq: t.seq,
-              role: t.role,
-              step: t.step,
-              provider: t.provider ?? null,
-              options: t.options ?? null,
-              confidence: t.confidence ?? null,
-            })),
-            artifactExists: Boolean(convo?.artifact),
-            handoffExists: Boolean(convo?.handoff),
-            endState: convo?.endState ?? null,
-            endStateNote: convo?.endStateNote ?? null,
-            assignee: convo?.assignee ?? null,
-            stoppedAt: convo?.stoppedAt ?? null,
-            claimUntil: convo?.claimUntil ?? null,
-          };
-          convoProj = deriveConversation(coreConvo, nowIso);
-          cState = conversationState(coreConvo, nowIso);
-        }
-
-        const fill = prefs.tasksShowAging
-          ? fadeFill({
-              isOpen: task.status === "open",
-              isHeading: false,
-              isDeleted: Boolean(task.deletedAt),
-              isFaded: Boolean(task.fadedAt),
-              deadline: task.deadline ?? null,
-              scheduled: task.scheduled ?? null,
-              hasRecurrence: Boolean(task.recurrenceUnit),
-              isAgentTurn: Boolean(cState?.isClaimed || convoProj?.badge === "working"),
-              isAssignedToClaude: convo?.assignee === "claude",
-              isAwaitingHuman: Boolean(cState?.awaitsHuman),
-              showsAgentCue: task.source === "mcp" && !task.acknowledgedAt,
-              touchedAt: task.touchedAt ?? null,
-              createdAt: task.createdAt ?? null,
-              created: task.created ?? null,
-              now: nowIso,
-              today: todayYMD,
-              utcOffsetSeconds,
-            })
+        const conversation = evaluateConversation(convo, turns, nowIso);
+        const fill = fade.enabled
+          ? fadeFill(
+              fadeInput(task, convo, conversation, { now: nowIso, today: todayYMD, utcOffsetSeconds }),
+            )
           : null;
 
         return {
           task,
           membership,
-          opacity: prefs.tasksShowAging ? rowOpacity(fill) : 1,
-          convoProjection: convoProj,
-          convoState: cState,
+          opacity: rowOpacity(fill),
+          convoProjection: conversation?.projection ?? null,
+          convoState: conversation?.state ?? null,
         };
       });
-  }, [bootPhase, convoByTask, nowIso, prefs.tasksShowAging, syncState.snapshot.tasks, todayYMD, turnsByTask, utcOffsetSeconds]);
+  }, [bootPhase, convoByTask, fade.enabled, nowIso, syncState.snapshot.tasks, todayYMD, turnsByTask, utcOffsetSeconds]);
 
-  // Run the fade pass via Rust WASM `shouldFade` so newly inactive undated tasks move to Faded.
-  const fadePassRanRef = useRef<string>("");
+  // A new app day syncs, and the engine's daily fade pass follows the sync.
+  const syncedDayRef = useRef(todayYMD);
   useEffect(() => {
-    if (bootPhase !== "signed_in" || !prefs.tasksShowAging || syncState.syncing) return;
-    const key = `${todayYMD}:${syncState.snapshot.cursor}`;
-    if (fadePassRanRef.current === key) return;
-    fadePassRanRef.current = key;
-
-    const toFade: TaskRow[] = [];
-    for (const { task, convoProjection, convoState } of evaluatedTasks) {
-      if (task.fadedAt || task.deletedAt || task.status !== "open") continue;
-      const convo = convoByTask.get(task.id) ?? null;
-      const fade = shouldFade({
-        isOpen: true,
-        isHeading: false,
-        isDeleted: false,
-        isFaded: false,
-        deadline: task.deadline ?? null,
-        scheduled: task.scheduled ?? null,
-        hasRecurrence: Boolean(task.recurrenceUnit),
-        isAgentTurn: Boolean(convoState?.isClaimed || convoProjection?.badge === "working"),
-        isAssignedToClaude: convo?.assignee === "claude",
-        isAwaitingHuman: Boolean(convoState?.awaitsHuman),
-        showsAgentCue: task.source === "mcp" && !task.acknowledgedAt,
-        touchedAt: task.touchedAt ?? null,
-        createdAt: task.createdAt ?? null,
-        created: task.created ?? null,
-        now: new Date().toISOString(),
-        today: todayYMD,
-        utcOffsetSeconds,
-      });
-      if (fade) toFade.push(task);
-    }
-    if (toFade.length > 0) {
-      void engine.markTasksFaded(toFade);
-    }
-  }, [bootPhase, convoByTask, engine, evaluatedTasks, prefs.tasksShowAging, syncState.snapshot.cursor, syncState.syncing, todayYMD, utcOffsetSeconds]);
+    if (syncedDayRef.current === todayYMD) return;
+    syncedDayRef.current = todayYMD;
+    if (bootPhase === "signed_in") engine.scheduleSync();
+  }, [bootPhase, engine, todayYMD]);
 
   // Timed reminder watcher using Rust WASM `shouldArmReminder`.
   useEffect(() => {
@@ -703,8 +610,9 @@ export function SeptenaApp() {
       if (task.status !== "open") continue;
 
       if (membership.matchesView.today) counts.today++;
-      if (convoState?.needsHumanReview) counts.review++;
-      if (convoState?.agentStage !== null && convoState?.agentStage !== undefined) counts.agent++;
+      const reviewGroup = reviewGroupOf(task, convoState);
+      if (reviewGroup && reviewGroup !== "faded") counts.review++;
+      if (agentGroupOf(convoState)) counts.agent++;
       if (membership.matchesView.upcoming) counts.upcoming++;
       if (task.recurrenceUnit) counts.repeating++;
       if (membership.matchesView.anytime) counts.anytime++;
@@ -730,32 +638,25 @@ export function SeptenaApp() {
         ? (syncState.snapshot.settings.smartListPlacement as Record<string, "top" | "bottom">)
         : {};
 
-    const destById = new Map(
-      DESTINATIONS.filter(
-        (d): d is (typeof DESTINATIONS)[number] & { id: SmartDestination } =>
-          SMART_LIST_IDS.includes(d.id as SmartDestination) &&
-          d.visibility !== "todayBand" &&
-          d.visibility !== "logbookTab",
-      ).map((d) => [d.id, d]),
-    );
+    const destById = new Map(SIDEBAR_DESTINATIONS.map((d) => [d.id, d]));
+    const isEmpty = (id: SmartDestination) =>
+      // The Faded group keeps Review in the sidebar, but it is not in the badge.
+      (id === "review" ? smartCounts.counts.review + smartCounts.counts.faded : smartCounts.counts[id]) === 0;
 
     const orderedIds: SmartDestination[] = [
       ...rawOrder.filter((id): id is SmartDestination => destById.has(id as SmartDestination)),
-      ...Array.from(destById.values())
-        .sort((a, b) => (a.sidebarOrder ?? 99) - (b.sidebarOrder ?? 99))
-        .map((d) => d.id)
-        .filter((id) => !rawOrder.includes(id)),
+      ...SIDEBAR_DESTINATIONS.map((d) => d.id).filter((id) => !rawOrder.includes(id)),
     ];
 
-    const top: Array<(typeof DESTINATIONS)[number] & { id: SmartDestination }> = [];
-    const bottom: Array<(typeof DESTINATIONS)[number] & { id: SmartDestination }> = [];
+    const top: SidebarDestination[] = [];
+    const bottom: SidebarDestination[] = [];
 
     for (const id of orderedIds) {
       const d = destById.get(id);
       if (!d) continue;
       const isActive = destination.kind === "smart" && destination.id === id;
       if (id !== "today" && hiddenSet.has(id) && !isActive) continue;
-      if (d.visibility === "whenNonEmpty" && smartCounts.counts[id] === 0 && !isActive) continue;
+      if (d.visibility === "whenNonEmpty" && isEmpty(id) && !isActive) continue;
 
       const sec =
         id === "today"
@@ -783,7 +684,7 @@ export function SeptenaApp() {
       .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
   }, [destination, syncState.snapshot.tasks]);
 
-  const visibleTasks = useMemo(() => {
+  const listedTasks = useMemo(() => {
     const filtered = evaluatedTasks.filter(({ task, membership, convoState }) => {
       if (tagFilterId) {
         const tags = Array.isArray(task.tags) ? task.tags : [];
@@ -798,8 +699,8 @@ export function SeptenaApp() {
         if (task.deletedAt || task.status !== "open") return false;
         switch (destination.id) {
           case "today": return membership.matchesView.today;
-          case "review": return Boolean(convoState?.needsHumanReview);
-          case "agent": return convoState?.agentStage !== null && convoState?.agentStage !== undefined;
+          case "review": return reviewGroupOf(task, convoState) !== null;
+          case "agent": return agentGroupOf(convoState) !== null;
           case "upcoming": return membership.matchesView.upcoming;
           case "repeating": return Boolean(task.recurrenceUnit);
           case "anytime": return membership.matchesView.anytime;
@@ -838,6 +739,30 @@ export function SeptenaApp() {
       return String(b.task.createdAt ?? "").localeCompare(String(a.task.createdAt ?? ""));
     });
   }, [destination, evaluatedTasks, logbookTab, prefs.tasksShowFaded, projectById, tagFilterId]);
+
+  // Review grouped by what waits on the user (docs/REVIEW_SPEC.md §1), in registry order.
+  const reviewGroups = useMemo(() => {
+    if (!(destination.kind === "smart" && destination.id === "review")) return [];
+    return destinationGroups("review")
+      .map((group) => ({
+        ...group,
+        items: listedTasks.filter((i) => reviewGroupOf(i.task, i.convoState) === group.id),
+      }))
+      .filter((g) => g.items.length > 0);
+  }, [destination, listedTasks]);
+
+  // The rows on screen, in order: what the keyboard and the selection work on.
+  const visibleTasks = useMemo(() => {
+    if (!(destination.kind === "smart" && destination.id === "review")) return listedTasks;
+    return reviewGroups
+      .filter((g) => g.id !== "faded" || prefs.reviewFadedExpanded)
+      .flatMap((g) => g.items);
+  }, [destination, listedTasks, prefs.reviewFadedExpanded, reviewGroups]);
+
+  const headerCount =
+    destination.kind === "smart" && destination.id === "review"
+      ? sumRows(reviewGroups.filter((g) => g.id !== "faded"))
+      : listedTasks.length;
 
   const completedTodayTasks = useMemo(() => {
     if (!(destination.kind === "smart" && destination.id === "today" && prefs.todayShowCompleted)) {
@@ -914,21 +839,140 @@ export function SeptenaApp() {
     return Array.from(byDay.entries()).sort((a, b) => a[0].localeCompare(b[0]));
   }, [destination, visibleTasks]);
 
-  // Agent grouped by WASM conversationState.agentStage.
+  // Agent grouped by the registry's stages.
   const agentGroups = useMemo(() => {
     if (!(destination.kind === "smart" && destination.id === "agent")) return [];
-    return AGENT_STAGE_ORDER.map((stage) => ({
-      ...stage,
-      items: visibleTasks.filter((i) => i.convoState?.agentStage === stage.id),
-    })).filter((g) => g.items.length > 0);
-  }, [destination, visibleTasks]);
+    return destinationGroups("agent")
+      .map((group) => ({
+        ...group,
+        items: listedTasks.filter((i) => agentGroupOf(i.convoState) === group.id),
+      }))
+      .filter((g) => g.items.length > 0);
+  }, [destination, listedTasks]);
 
+  // Every faded task (the Faded group's sheet), and those of this week's sweep (the prompt on Today).
   const fadedTasks = useMemo(
     () =>
       evaluatedTasks
-        .filter(({ task }) => !task.deletedAt && task.status === "open" && Boolean(task.fadedAt))
-        .map((e) => e.task),
+        .filter((i) => reviewGroupOf(i.task, i.convoState) === "faded")
+        .map((i) => i.task),
     [evaluatedTasks],
+  );
+  const sweepCandidates = useMemo(
+    () => fadedTasks.filter((t) => isInCurrentSweep(t.fadedAt, fade.sweptAt)),
+    [fade.sweptAt, fadedTasks],
+  );
+  const sweepDue = isSweepDue(new Date(), fade, fadedTasks.map((t) => t.fadedAt));
+
+  // Go to a place and clear the selection. Faded is a group of Review: going to it opens the group.
+  const navigateTo = useCallback(
+    (dest: ActiveDestination) => {
+      if (dest.kind === "smart" && dest.id === "faded") {
+        handleChangePref("reviewFadedExpanded", true);
+        setDestination({ kind: "smart", id: "review" });
+      } else {
+        setDestination(dest);
+      }
+      setExpandedTaskId(null);
+      setSelectedTaskId(null);
+      setSelectedIds(new Set());
+    },
+    [handleChangePref],
+  );
+
+  // Complete and reopen: the one path for the checkbox, menus, shortcuts and
+  // drops. In Review it is an Accept, and undo puts the task back in Review.
+  const recordCompletion = useCallback(
+    (label: string, receipt: CompletionReceipt, redo: () => Promise<CompletionReceipt>, toast: boolean) => {
+      let latest = receipt;
+      undoStack.record(
+        {
+          label,
+          undo: () => engine.undoCompletion(latest),
+          redo: async () => {
+            latest = await redo();
+          },
+        },
+        toast,
+      );
+    },
+    [engine, undoStack],
+  );
+
+  const toggleDone = useCallback(
+    async (task: TaskRow) => {
+      const wasDone = task.status === "done";
+      const receipt = await engine.toggleTaskDone(task);
+      recordCompletion(
+        wasDone ? `Reopened “${task.title}”` : `Completed “${task.title}”`,
+        receipt,
+        () => engine.toggleTaskDone(task),
+        !wasDone,
+      );
+    },
+    [engine, recordCompletion],
+  );
+
+  const acceptReview = useCallback(
+    async (task: TaskRow) => {
+      const receipt = await engine.acceptAgentReview(task);
+      recordCompletion(`Accepted “${task.title}”`, receipt, () => engine.acceptAgentReview(task), true);
+    },
+    [engine, recordCompletion],
+  );
+
+  const completeMany = useCallback(
+    async (tasks: TaskRow[]) => {
+      const receipt = await engine.completeTasks(tasks);
+      recordCompletion(`Completed ${tasks.length} tasks`, receipt, () => engine.completeTasks(tasks), true);
+    },
+    [engine, recordCompletion],
+  );
+
+  const sendBackReview = useCallback(
+    async (task: TaskRow, note: string) => {
+      const before = await engine.sendBackAgentReview(task, note);
+      undoStack.record(
+        {
+          label: `Sent back “${task.title}”`,
+          undo: () => engine.restoreReview(before),
+          redo: () => engine.restoreReview({ ...before, endState: "open", endStateNote: null, assignee: "claude", stoppedAt: null }),
+        },
+        true,
+      );
+    },
+    [engine, undoStack],
+  );
+
+  // Keep and Let Go for faded tasks, with undo back into the pile.
+  const keepFaded = useCallback(
+    async (task: TaskRow) => {
+      await engine.keepFadedTask(task);
+      undoStack.record({
+        label: `Kept “${task.title}”`,
+        undo: () => engine.restoreFadedTasks([task]),
+        redo: () => engine.keepFadedTask(task),
+      });
+    },
+    [engine, undoStack],
+  );
+
+  const letGoFaded = useCallback(
+    async (tasks: TaskRow[]) => {
+      const dropped = await engine.dropFadedTasks(tasks);
+      if (dropped.length === 0) return;
+      undoStack.record(
+        {
+          label: dropped.length === 1 ? "Let 1 faded task go" : `Let ${dropped.length} faded tasks go`,
+          undo: () => engine.restoreFadedTasks(dropped),
+          redo: async () => {
+            await engine.dropFadedTasks(dropped);
+          },
+        },
+        true,
+      );
+    },
+    [engine, undoStack],
   );
 
   // Sync container notes draft when switching Area / Project.
@@ -1023,7 +1067,7 @@ export function SeptenaApp() {
       if (!sourceId) return;
       const task = syncState.snapshot.tasks.find((t) => t.id === sourceId);
       if (!task) return;
-      const reg = DESTINATIONS.find((d) => d.id === destId);
+      const reg = destinationInfo(destId);
       if (!reg) return;
       switch (reg.dropBehavior) {
         case "setToday":
@@ -1039,14 +1083,14 @@ export function SeptenaApp() {
           showToast(`Moved “${task.title}” to Anytime`);
           break;
         case "complete":
-          await engine.toggleTaskDone(task);
+          await toggleDone(task);
           break;
         case "delete":
           await engine.deleteTask(task);
           break;
       }
     },
-    [draggedTaskId, engine, showToast, syncState.snapshot.tasks, todayYMD],
+    [draggedTaskId, engine, showToast, syncState.snapshot.tasks, todayYMD, toggleDone],
   );
 
   const handleDropOnSidebarPlace = useCallback(
@@ -1129,16 +1173,13 @@ export function SeptenaApp() {
         const dest = sidebarDestinations.all[idx];
         if (dest) {
           e.preventDefault();
-          setDestination({ kind: "smart", id: dest.id });
-          setExpandedTaskId(null);
-          setSelectedTaskId(null);
-          setSelectedIds(new Set());
+          navigateTo({ kind: "smart", id: dest.id });
         }
         return;
       }
 
       const anyModalOpen =
-        quickFindOpen || quickAddOpen || settingsOpen || shortcutsOpen || sweepOpen || firstRunOpen;
+        quickFindOpen || quickAddOpen || settingsOpen || shortcutsOpen || sweepTasks !== null || firstRunOpen;
       if (anyModalOpen) return;
 
       if (primary && !e.altKey && key === "z" && !typing) {
@@ -1181,8 +1222,8 @@ export function SeptenaApp() {
         const single = activeSelectedTasks[0];
         if (primary && !e.shiftKey && !e.altKey && key === "k") {
           e.preventDefault();
-          if (activeSelectedTasks.length === 1) void engine.toggleTaskDone(single);
-          else void engine.bulkCompleteTasks(activeSelectedTasks);
+          if (activeSelectedTasks.length === 1) void toggleDone(single);
+          else void completeMany(activeSelectedTasks);
           return;
         }
         if (primary && e.altKey && key === "k") {
@@ -1282,11 +1323,13 @@ export function SeptenaApp() {
   }, [
     activeSelectedTasks,
     bootPhase,
+    completeMany,
     destination,
     engine,
     firstRunOpen,
     handleChangePref,
     handleCopyTasks,
+    navigateTo,
     prefs.textSizeStep,
     quickAddOpen,
     quickFindOpen,
@@ -1295,7 +1338,8 @@ export function SeptenaApp() {
     shortcutsOpen,
     showToast,
     sidebarDestinations.all,
-    sweepOpen,
+    sweepTasks,
+    toggleDone,
     undoStack,
     visibleTasks,
   ]);
@@ -1304,10 +1348,10 @@ export function SeptenaApp() {
 
   const pageMeta = useMemo(() => {
     if (destination.kind === "smart") {
-      const reg = DESTINATIONS.find((d) => d.id === destination.id);
+      const reg = destinationInfo(destination.id);
       const empty =
         destination.id === "logbook" && logbookTab === "deleted"
-          ? DESTINATIONS.find((d) => d.id === "recentlyDeleted")?.emptyState
+          ? destinationInfo("recentlyDeleted")?.emptyState
           : reg?.emptyState;
       return {
         title: registryText(reg?.title ?? destination.id, lang),
@@ -1502,7 +1546,10 @@ export function SeptenaApp() {
 
     const isDeletedView =
       destination.kind === "smart" && destination.id === "logbook" && logbookTab === "deleted";
-    const isFadedView = destination.kind === "smart" && destination.id === "faded";
+    const isFadedView =
+      destination.kind === "smart" &&
+      destination.id === "review" &&
+      reviewGroupOf(task, convoState) === "faded";
 
     return {
       task,
@@ -1590,8 +1637,16 @@ export function SeptenaApp() {
             x: e.clientX,
             y: e.clientY,
             items: [
-              { kind: "item", label: "Keep", onSelect: () => void engine.keepFadedTask(task) },
-              { kind: "item", label: "Let Go", onSelect: () => void engine.dropFadedTask(task) },
+              {
+                kind: "item",
+                label: registryText(ACTIONS_CATALOG.actions["task.keepFaded"].title, lang),
+                onSelect: () => void keepFaded(task),
+              },
+              {
+                kind: "item",
+                label: registryText(ACTIONS_CATALOG.actions["task.letGoFaded"].title, lang),
+                onSelect: () => void letGoFaded([task]),
+              },
               { kind: "divider" },
               { kind: "item", label: "Delete", destructive: true, onSelect: () => void engine.deleteTask(task) },
             ],
@@ -1605,7 +1660,11 @@ export function SeptenaApp() {
           items: [
             ...(convoState?.needsHumanReview
               ? [
-                  { kind: "item" as const, label: "Accept", onSelect: () => void engine.acceptAgentReview(task) },
+                  {
+                    kind: "item" as const,
+                    label: registryText(ACTIONS_CATALOG.actions["task.acceptReview"].title, lang),
+                    onSelect: () => void acceptReview(task),
+                  },
                   { kind: "divider" as const },
                 ]
               : []),
@@ -1656,7 +1715,7 @@ export function SeptenaApp() {
               kind: "item",
               label: task.status === "done" ? "Mark as Open" : "Mark as Complete",
               shortcut: "⌘K",
-              onSelect: () => void engine.toggleTaskDone(task),
+              onSelect: () => void toggleDone(task),
             },
             {
               kind: "item",
@@ -1694,29 +1753,7 @@ export function SeptenaApp() {
       },
       onOpenTaskPage: () => setTaskPageId(task.id),
       onCollapse: () => setExpandedTaskId(null),
-      onToggleDone: async () => {
-        const wasDone = task.status === "done";
-        const { spawnedTaskId } = await engine.toggleTaskDone(task);
-        undoStack.record(
-          {
-            label: wasDone ? `Reopened “${task.title}”` : `Completed “${task.title}”`,
-            undo: async () => {
-              await engine.updateTaskFields(task, {
-                status: task.status,
-                completedAt: task.completedAt ?? null,
-              });
-              if (spawnedTaskId) {
-                const spawned = engine.getState().snapshot.tasks.find((t) => t.id === spawnedTaskId);
-                if (spawned) await engine.deleteTask(spawned);
-              }
-            },
-            redo: async () => {
-              await engine.toggleTaskDone(task);
-            },
-          },
-          !wasDone,
-        );
-      },
+      onToggleDone: () => void toggleDone(task),
       onToggleToday: async () => {
         const prev = {
           today: Boolean(task.today),
@@ -1766,13 +1803,13 @@ export function SeptenaApp() {
       onAnswerQuestion: (inReplyTo, chosen) =>
         void engine.appendUserTurn(task.id, { step: "decide", inReplyTo, chosen }),
       onSendReply: (note) => void engine.appendUserTurn(task.id, { step: "work", note }),
-      onAcceptReview: () => void engine.acceptAgentReview(task),
-      onSendBackReview: (note) => void engine.sendBackAgentReview(task, note),
+      onAcceptReview: () => void acceptReview(task),
+      onSendBackReview: (note) => void sendBackReview(task, note),
       onStopAgent: () => void engine.stopAgentOnTask(task.id),
       onResumeAgent: () => void engine.resumeAgentOnTask(task.id),
       onLoadHistory: () => api.getChanges("task", task.id),
-      onKeepFaded: () => void engine.keepFadedTask(task),
-      onDropFaded: () => void engine.dropFadedTask(task),
+      onKeepFaded: () => void keepFaded(task),
+      onDropFaded: () => void letGoFaded([task]),
       onRestoreDeleted: () => void engine.restoreDeletedTask(task),
       onCancelTask: async () => {
         await engine.cancelTask(task);
@@ -1808,6 +1845,36 @@ export function SeptenaApp() {
     <TaskRowItem key={item.task.id} {...buildTaskRowProps(item, hideContainerLabel)} />
   );
 
+  const renderGroupHeader = (
+    group: { title: string; icon: string; items: EvaluatedTask[] },
+    collapse?: { expanded: boolean; onToggle: () => void },
+  ) => {
+    const Chevron = collapse?.expanded ? ChevronDown : ChevronRight;
+    const content = (
+      <>
+        <RegistryIcon token={group.icon} className="h-3.5 w-3.5 text-[var(--text-muted)]" />
+        <span>{registryText(group.title, lang)}</span>
+        <span className="font-mono-tabular ml-auto font-normal text-[var(--text-muted)]">
+          {group.items.length}
+        </span>
+        {collapse && <Chevron className="h-3.5 w-3.5 text-[var(--text-muted)]" />}
+      </>
+    );
+    const className =
+      "mb-1.5 flex w-full items-center gap-2 border-b border-[var(--border-subtle)] pb-1.5 text-left text-xs font-semibold tracking-wide text-[var(--text-secondary)] uppercase";
+    if (!collapse) return <div className={className}>{content}</div>;
+    return (
+      <button
+        type="button"
+        aria-expanded={collapse.expanded}
+        onClick={collapse.onToggle}
+        className={`${className} hover:text-[var(--text-primary)]`}
+      >
+        {content}
+      </button>
+    );
+  };
+
   const taskPageItem = useMemo(() => {
     if (!taskPageId) return null;
     return evaluatedTasks.find((e) => e.task.id === taskPageId) ?? null;
@@ -1832,7 +1899,6 @@ export function SeptenaApp() {
   const todayIconColor = isColorfulAccent ? "var(--today-gold)" : "var(--accent)";
 
   const renderSidebarButton = (dest: (typeof sidebarDestinations.top)[number]) => {
-    const Icon = iconForDestination(dest.id);
     const selected = destination.kind === "smart" && destination.id === dest.id;
     const count = smartCounts.counts[dest.id];
     const isDropOver = dropTargetSidebar === `smart:${dest.id}`;
@@ -1851,10 +1917,7 @@ export function SeptenaApp() {
           void handleDropOnSidebarSmart(dest.id);
         }}
         onClick={() => {
-          setDestination({ kind: "smart", id: dest.id });
-          setExpandedTaskId(null);
-          setSelectedTaskId(null);
-          setSelectedIds(new Set());
+          navigateTo({ kind: "smart", id: dest.id });
           setMobileMenuOpen(false);
         }}
         className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm transition-colors ${
@@ -1865,7 +1928,8 @@ export function SeptenaApp() {
               : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
         }`}
       >
-        <Icon
+        <RegistryIcon
+          token={dest.icon}
           className="h-4 w-4 shrink-0"
           style={
             dest.id === "today"
@@ -2249,7 +2313,7 @@ export function SeptenaApp() {
                 {pageMeta.title}
               </h1>
               <span className="font-mono-tabular text-sm text-[var(--text-muted)]">
-                {visibleTasks.length}
+                {headerCount}
               </span>
             </div>
           </div>
@@ -2426,67 +2490,40 @@ export function SeptenaApp() {
               </div>
             )}
 
-            {/* Faded Pile Review Notice (matching TaskFadeSweepSheet / registry/surfaces.json) */}
-            {destination.kind === "smart" && destination.id === "faded" && fadedTasks.length > 0 && (
-              <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/90 px-4 py-3 text-xs">
-                <div className="flex items-start gap-2.5">
-                  <CircleDashed className="mt-0.5 h-4 w-4 shrink-0 text-[var(--text-muted)]" />
-                  <div>
-                    <p className="font-medium text-[var(--text-primary)]">
-                      Tasks without activity for 14 days
-                    </p>
-                    <p className="mt-0.5 text-[var(--text-muted)]">
-                      Open a task or choose Keep to bring it back, or review the list and let the rest go.
-                    </p>
-                  </div>
+            {/* Weekly sweep prompt on Today, on the sweep day only (docs/TASK_FADE_SPEC.md §5) */}
+            {destination.kind === "smart" && destination.id === "today" && sweepDue && (
+              <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/90 px-4 py-2.5 text-xs">
+                <div className="flex items-center gap-2.5">
+                  <RegistryIcon
+                    token={WEEKLY_SWEEP_NOTICE.icon}
+                    className="h-4 w-4 shrink-0 text-[var(--text-muted)]"
+                  />
+                  <span className="text-[var(--text-secondary)]">
+                    <strong className="font-medium text-[var(--text-primary)]">
+                      {registryText(WEEKLY_SWEEP_NOTICE.title.other, lang, { count: sweepCandidates.length })}
+                    </strong>{" "}
+                    {registryText(WEEKLY_SWEEP_NOTICE.detail, lang)}
+                  </span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setSweepOpen(true)}
-                  className="shrink-0 rounded-lg bg-[var(--accent)] px-3 py-1.5 font-medium"
-                  style={{ color: "var(--accent-check)" }}
-                >
-                  Review…
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSweepTasks(sweepCandidates)}
+                    className="rounded-md bg-[var(--bg-selected)] px-2.5 py-1 font-medium text-[var(--text-primary)]"
+                  >
+                    {registryText(WEEKLY_SWEEP_NOTICE.primaryTitle, lang)}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void engine.setSetting("fadeSweepDismissedOn", sweepAnchorDay(new Date()))}
+                    className="text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                    aria-label={registryText(SURFACES_CATALOG.notices.dismissTitle, lang)}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               </div>
             )}
-
-            {/* Weekly Sweep Notice on Today when faded tasks await review */}
-            {destination.kind === "smart" &&
-              destination.id === "today" &&
-              fadedTasks.length > 0 &&
-              !sweepBannerDismissed && (
-                <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/90 px-4 py-2.5 text-xs">
-                  <div className="flex items-center gap-2.5">
-                    <CircleDashed className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
-                    <span className="text-[var(--text-secondary)]">
-                      <strong className="font-medium text-[var(--text-primary)]">
-                        {fadedTasks.length === 1
-                          ? "1 task faded"
-                          : `${fadedTasks.length} tasks faded`}
-                      </strong>{" "}
-                      — Still want any of them?
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setSweepOpen(true)}
-                      className="rounded-md bg-[var(--bg-selected)] px-2.5 py-1 font-medium text-[var(--text-primary)]"
-                    >
-                      Review
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setSweepBannerDismissed(true)}
-                      className="text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-                      aria-label="Dismiss"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                </div>
-              )}
 
             {/* Get Started Notice on Today (synced getStartedDismissed) */}
             {destination.kind === "smart" &&
@@ -2683,7 +2720,7 @@ export function SeptenaApp() {
             )}
 
             {/* Task Lists */}
-            {visibleTasks.length === 0 && projectHeadings.length === 0 && completedTodayTasks.length === 0 ? (
+            {listedTasks.length === 0 && projectHeadings.length === 0 && completedTodayTasks.length === 0 ? (
               <div className="py-16 text-center">
                 <p className="text-sm font-medium text-[var(--text-secondary)]">{pageMeta.emptyTitle}</p>
                 <p className="mt-1 text-xs text-[var(--text-muted)]">{pageMeta.emptyDetail}</p>
@@ -2787,15 +2824,55 @@ export function SeptenaApp() {
               <div className="space-y-5">
                 {agentGroups.map((group) => (
                   <section key={group.id}>
-                    <div className="mb-1.5 flex items-center justify-between border-b border-[var(--border-subtle)] pb-1.5 text-xs font-semibold tracking-wide text-[var(--text-secondary)] uppercase">
-                      <span>{group.title}</span>
-                      <span className="font-mono-tabular font-normal text-[var(--text-muted)]">
-                        {group.items.length}
-                      </span>
-                    </div>
+                    {renderGroupHeader(group)}
                     <div className="space-y-0.5">{group.items.map((i) => renderTaskRow(i))}</div>
                   </section>
                 ))}
+              </div>
+            ) : destination.kind === "smart" && destination.id === "review" ? (
+              <div className="space-y-5">
+                {reviewGroups.map((group) => {
+                  if (group.id !== "faded") {
+                    return (
+                      <section key={group.id}>
+                        {renderGroupHeader(group)}
+                        <div className="space-y-0.5">{group.items.map((i) => renderTaskRow(i))}</div>
+                      </section>
+                    );
+                  }
+                  return (
+                    <section key={group.id}>
+                      {renderGroupHeader(group, {
+                        expanded: prefs.reviewFadedExpanded,
+                        onToggle: () =>
+                          handleChangePref("reviewFadedExpanded", !prefs.reviewFadedExpanded),
+                      })}
+                      {prefs.reviewFadedExpanded && (
+                        <>
+                          <div className="my-2 flex items-center justify-between gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/90 px-4 py-3 text-xs">
+                            <div>
+                              <p className="font-medium text-[var(--text-primary)]">
+                                {registryText(FADED_PILE_NOTICE.title, lang)}
+                              </p>
+                              <p className="mt-0.5 text-[var(--text-muted)]">
+                                {registryText(FADED_PILE_NOTICE.detail, lang)}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setSweepTasks(fadedTasks)}
+                              className="shrink-0 rounded-lg bg-[var(--accent)] px-3 py-1.5 font-medium"
+                              style={{ color: "var(--accent-check)" }}
+                            >
+                              {registryText(FADED_PILE_NOTICE.primaryTitle, lang)}
+                            </button>
+                          </div>
+                          <div className="space-y-0.5">{group.items.map((i) => renderTaskRow(i))}</div>
+                        </>
+                      )}
+                    </section>
+                  );
+                })}
               </div>
             ) : destination.kind === "project" && projectHeadings.length > 0 ? (
               <div className="space-y-5">
@@ -2878,18 +2955,8 @@ export function SeptenaApp() {
               <button
                 type="button"
                 onClick={async () => {
-                  const tasks = activeSelectedTasks;
-                  await engine.bulkCompleteTasks(tasks);
+                  await completeMany(activeSelectedTasks);
                   setSelectedIds(new Set());
-                  undoStack.record(
-                    {
-                      label: `Completed ${tasks.length} tasks`,
-                      undo: () =>
-                        engine.bulkUpdateTasks(tasks, { status: "open", completedAt: null }),
-                      redo: () => engine.bulkCompleteTasks(tasks).then(() => {}),
-                    },
-                    true,
-                  );
                 }}
                 className="inline-flex items-center gap-1 rounded-lg bg-[var(--bg-hover)] px-2.5 py-1 font-medium text-[var(--text-primary)] hover:bg-[var(--bg-selected)]"
               >
@@ -2998,12 +3065,8 @@ export function SeptenaApp() {
         areas={activeAreas}
         projects={activeProjects}
         tags={activeTags}
-        onNavigate={(dest) => {
-          setDestination(dest);
-          setExpandedTaskId(null);
-          setSelectedTaskId(null);
-          setSelectedIds(new Set());
-        }}
+        language={lang}
+        onNavigate={navigateTo}
         onSelectTask={(task) => {
           if (task.status === "done" || task.status === "cancelled") {
             setDestination({ kind: "smart", id: "logbook" });
@@ -3025,38 +3088,18 @@ export function SeptenaApp() {
         }}
       />
 
-      <FadeSweepModal
-        open={sweepOpen}
-        tasks={fadedTasks}
-        areas={activeAreas}
-        projects={activeProjects}
-        onClose={() => setSweepOpen(false)}
-        onKeep={async (task) => {
-          await engine.keepFadedTask(task);
-          undoStack.record({
-            label: `Kept “${task.title}”`,
-            undo: () => engine.markTasksFaded([task]),
-            redo: () => engine.keepFadedTask(task),
-          });
-        }}
-        onLetRestGo={async (tasks) => {
-          await engine.bulkDropFadedTasks(tasks);
-          setSweepBannerDismissed(true);
-          undoStack.record(
-            {
-              label: tasks.length === 1 ? "Let 1 faded task go" : `Let ${tasks.length} faded tasks go`,
-              undo: () =>
-                engine.bulkUpdateTasks(tasks, {
-                  status: "open",
-                  completedAt: null,
-                  dropReason: null,
-                }),
-              redo: () => engine.bulkDropFadedTasks(tasks),
-            },
-            true,
-          );
-        }}
-      />
+      {sweepTasks && (
+        <FadeSweepModal
+          tasks={sweepTasks}
+          areas={activeAreas}
+          projects={activeProjects}
+          language={lang}
+          onClose={() => setSweepTasks(null)}
+          onKeep={keepFaded}
+          onLetRestGo={letGoFaded}
+          onSwept={() => engine.setSetting("fadeSweptAt", new Date().toISOString())}
+        />
+      )}
 
       <KeyboardShortcutsModal
         open={shortcutsOpen}

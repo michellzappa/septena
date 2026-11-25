@@ -39,9 +39,9 @@ import {
 } from "lucide-react";
 import {
   DESIGN_TOKENS,
-  DESTINATIONS,
   FIRST_RUN,
   REGISTRY_LANGUAGES,
+  SETTINGS_REGISTRY,
   registryText,
 } from "@/lib/generated/registries";
 import {
@@ -51,6 +51,8 @@ import {
   parseImportJson,
   type ParsedBackupPreview,
 } from "@/lib/export";
+import { SIDEBAR_DESTINATIONS, destinationInfo } from "@/lib/destinations";
+import { fadeSettings } from "@/lib/fade";
 import type { HeaderTextureStyle } from "@/lib/headerWash";
 import type { WebDisplayPrefs } from "@/lib/prefs";
 import type { SeptenaApiClient } from "@/lib/api/client";
@@ -101,17 +103,11 @@ const TABS: Array<{ id: SettingsTab; title: string; icon: typeof UserCircle }> =
   { id: "about", title: "About", icon: Info },
 ];
 
-const CUSTOMIZABLE_SMART_LISTS: SmartDestination[] = [
-  "today",
-  "review",
-  "agent",
-  "upcoming",
-  "repeating",
-  "anytime",
-  "starred",
-  "logbook",
-  "faded",
-];
+const CUSTOMIZABLE_SMART_LISTS: SmartDestination[] = SIDEBAR_DESTINATIONS.map((d) => d.id);
+
+const SETTING_ROWS: ReadonlyArray<{ key?: string; label?: string; detail?: string }> =
+  SETTINGS_REGISTRY.rootGroups.flatMap((g): ReadonlyArray<object> => g.items);
+const FADE_SETTING_ROW = SETTING_ROWS.find((r) => r.key === "tasksShowAging");
 
 function ToggleRow({
   label,
@@ -282,8 +278,7 @@ export function SettingsModal({
     if (id === "today") return "top";
     const override = placementMap[id];
     if (override === "top" || override === "bottom") return override;
-    const reg = DESTINATIONS.find((d) => d.id === id);
-    return reg && "sidebarSection" in reg && reg.sidebarSection === "bottom" ? "bottom" : "top";
+    return destinationInfo(id)?.sidebarSection ?? "top";
   };
 
   const moveSmartListOrder = async (id: SmartDestination, delta: -1 | 1) => {
@@ -743,7 +738,7 @@ export function SettingsModal({
                             ) : (
                               <div className="space-y-1">
                                 {ids.map((id, idx) => {
-                                  const reg = DESTINATIONS.find((d) => d.id === id);
+                                  const reg = destinationInfo(id);
                                   const isHidden = hiddenSet.has(id);
                                   const locked = id === "today";
                                   return (
@@ -837,10 +832,10 @@ export function SettingsModal({
                       onChange={(v) => onChangePref("todayShowCompleted", v)}
                     />
                     <ToggleRow
-                      label="Fade inactive tasks"
-                      detail="Tasks without activity for 14 days fade out and move to Faded."
-                      checked={prefs.tasksShowAging}
-                      onChange={(v) => onChangePref("tasksShowAging", v)}
+                      label={registryText(FADE_SETTING_ROW?.label ?? "", lang)}
+                      detail={registryText(FADE_SETTING_ROW?.detail ?? "", lang)}
+                      checked={fadeSettings(snapshot.settings).enabled}
+                      onChange={(v) => void engine.setSetting("tasksShowAging", v)}
                     />
                     <ToggleRow
                       label="Show faded tasks"

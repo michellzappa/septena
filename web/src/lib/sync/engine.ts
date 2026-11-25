@@ -5,6 +5,7 @@ import {
   checklistOccurrenceId,
   ensureCoreReady,
   localTodayYMD,
+  localUtcOffsetSeconds,
   nextOccurrenceDates,
   nextScheduledDate,
   occurrenceId,
@@ -13,8 +14,11 @@ import {
   planPushResponse,
   shiftReminderForRecurrence,
   shiftReminderOnReschedule,
+  shouldFade,
   taskRefId,
 } from "../core";
+import { evaluateConversation, groupTurnsByTask } from "../conversation";
+import { fadeInput, fadeSettings, isProposal, type FadeClock } from "../fade";
 import { LocalStore, pendingFieldsFor, turnSyntheticId, type LocalMutation } from "../store/db";
 import type { ParsedBackupPreview } from "../export";
 import type {
@@ -48,6 +52,12 @@ export interface SyncState {
   liveConnected: boolean;
   lastError: string | null;
   notSynced: NotSyncedItem[];
+}
+
+/** What a completion replaced, so its undo restores exactly that. */
+export interface CompletionReceipt {
+  before: Array<{ task: TaskRow; convo: ConvoRow | null }>;
+  spawnedTaskIds: string[];
 }
 
 function randomBase64Url(bytes: number): string {
@@ -112,6 +122,8 @@ export class WebSyncEngine {
   private syncScheduled = false;
   private running = false;
   private stopped = false;
+  /** The account and app day the fade pass last ran for in this tab. */
+  private lastFadePass: string | null = null;
 
   constructor(api: SeptenaApiClient, store = new LocalStore()) {
     this.api = api;
@@ -445,40 +457,89 @@ export class WebSyncEngine {
     return { mutations, ops, spawnedTaskId: newTaskID };
   }
 
-  async toggleTaskDone(task: TaskRow): Promise<{ spawnedTaskId: string | null }> {
-    await ensureCoreReady();
-    const now = new Date().toISOString();
-    const todayYMD = localTodayYMD();
-    const nextStatus = task.status === "done" ? "open" : "done";
+  /** The rows and ops that complete one task. In Review, completing accepts (docs/REVIEW_SPEC.md §4). */
+  private completionWrites(
+    task: TaskRow,
+    now: string,
+    queuedAt: number,
+  ): { mutations: LocalMutation[]; ops: OutboxOp[]; spawnedTaskId: string | null; reviewed: ConvoRow | null } {
+    const mutations: LocalMutation[] = [];
+    const ops: OutboxOp[] = [];
+
+    const convo = this.existingConvo(task.id);
+    const reviewed = convo.endState === "needs_verify" ? convo : null;
+    if (reviewed) {
+      const convoFields = { endState: "agent_assisted_done" };
+      mutations.push({ entity: "convo", action: "put", id: task.id, row: { ...reviewed, ...convoFields } });
+      ops.push({ clientOpId: newClientOpId(), op: "upsert", entity: "convo", id: task.id, fields: convoFields, queuedAt });
+    }
+
     const fields: Record<string, unknown> = {
-      status: nextStatus,
-      completedAt: nextStatus === "done" ? now : null,
+      status: "done",
+      completedAt: now,
       touchedAt: now,
-      ...(task.source === "mcp" && !task.acknowledgedAt ? { acknowledgedAt: now } : {}),
+      ...(isProposal(task) ? { acknowledgedAt: now } : {}),
     };
-    const updated: TaskRow = { ...task, ...fields };
-    const mutations: LocalMutation[] = [{ entity: "task", action: "put", id: task.id, row: updated }];
-    const ops: OutboxOp[] = [
-      {
-        clientOpId: newClientOpId(),
-        op: "upsert",
-        entity: "task",
-        id: task.id,
-        fields,
-        queuedAt: Date.now(),
-      },
-    ];
+    mutations.push({ entity: "task", action: "put", id: task.id, row: { ...task, ...fields } });
+    ops.push({ clientOpId: newClientOpId(), op: "upsert", entity: "task", id: task.id, fields, queuedAt: queuedAt + 1 });
 
     let spawnedTaskId: string | null = null;
-    if (nextStatus === "done" && task.recurrenceUnit && !task.recurrencePaused) {
-      const nextOcc = this.buildNextRecurrenceMutations(task, todayYMD, now);
+    if (task.recurrenceUnit && !task.recurrencePaused) {
+      const nextOcc = this.buildNextRecurrenceMutations(task, localTodayYMD(), now);
       mutations.push(...nextOcc.mutations);
       ops.push(...nextOcc.ops);
       spawnedTaskId = nextOcc.spawnedTaskId;
     }
+    return { mutations, ops, spawnedTaskId, reviewed };
+  }
 
+  async completeTasks(tasks: TaskRow[]): Promise<CompletionReceipt> {
+    const receipt: CompletionReceipt = { before: [], spawnedTaskIds: [] };
+    if (tasks.length === 0) return receipt;
+    await ensureCoreReady();
+    const now = new Date().toISOString();
+    const queuedAt = Date.now();
+    const mutations: LocalMutation[] = [];
+    const ops: OutboxOp[] = [];
+    tasks.forEach((row, idx) => {
+      const task = this.liveTask(row.id) ?? row;
+      const writes = this.completionWrites(task, now, queuedAt + idx * 10);
+      mutations.push(...writes.mutations);
+      ops.push(...writes.ops);
+      receipt.before.push({ task, convo: writes.reviewed });
+      if (writes.spawnedTaskId) receipt.spawnedTaskIds.push(writes.spawnedTaskId);
+    });
     await this.commit(mutations, ops);
-    return { spawnedTaskId };
+    return receipt;
+  }
+
+  /** Undo of a completion: the task, its place in Review with the note, and the next occurrence. */
+  async undoCompletion(receipt: CompletionReceipt): Promise<void> {
+    for (const { task, convo } of receipt.before) {
+      await this.patchTask(this.liveTask(task.id) ?? task, {
+        status: task.status,
+        completedAt: task.completedAt ?? null,
+        touchedAt: task.touchedAt ?? null,
+        acknowledgedAt: task.acknowledgedAt ?? null,
+      });
+      if (convo) await this.restoreReview(convo);
+    }
+    for (const id of receipt.spawnedTaskIds) {
+      const spawned = this.liveTask(id);
+      if (spawned) await this.deleteTask(spawned);
+    }
+  }
+
+  async toggleTaskDone(task: TaskRow): Promise<CompletionReceipt> {
+    if (task.status !== "done") return this.completeTasks([task]);
+    const now = new Date().toISOString();
+    await this.patchTask(this.liveTask(task.id) ?? task, {
+      status: "open",
+      completedAt: null,
+      touchedAt: now,
+      ...(isProposal(task) ? { acknowledgedAt: now } : {}),
+    });
+    return { before: [{ task, convo: null }], spawnedTaskIds: [] };
   }
 
   async cancelTask(task: TaskRow): Promise<void> {
@@ -504,21 +565,43 @@ export class WebSyncEngine {
     });
   }
 
+  /** Keep a task out of the Faded pile. Keeping a proposal accepts it (ADR 0039). */
   async keepFadedTask(task: TaskRow): Promise<void> {
-    await ensureCoreReady();
     const now = new Date().toISOString();
-    await this.patchTask(task, { fadedAt: null, touchedAt: now });
+    await this.patchTask(this.liveTask(task.id) ?? task, {
+      fadedAt: null,
+      touchedAt: now,
+      deferCount: 0,
+      ...(isProposal(task) ? { acknowledgedAt: now } : {}),
+    });
   }
 
-  async dropFadedTask(task: TaskRow): Promise<void> {
-    await ensureCoreReady();
+  /**
+   * Let faded tasks go. Only tasks that are still faded and open: a task that
+   * another device kept stays. Returns the rows it dropped.
+   */
+  async dropFadedTasks(tasks: TaskRow[]): Promise<TaskRow[]> {
+    const dropped = tasks
+      .map((t) => this.liveTask(t.id))
+      .filter((t): t is TaskRow => t !== null && t.status === "open" && !t.deletedAt && Boolean(t.fadedAt));
     const now = new Date().toISOString();
-    await this.patchTask(task, {
-      status: "cancelled",
-      completedAt: now,
-      dropReason: "faded",
-      touchedAt: now,
-    });
+    await this.patchTasks(dropped, { status: "cancelled", completedAt: now, dropReason: "faded" });
+    return dropped;
+  }
+
+  /** Undo of Keep and Let Go: puts the rows back in the Faded pile with their own stamps. */
+  async restoreFadedTasks(before: TaskRow[]): Promise<void> {
+    for (const task of before) {
+      await this.patchTask(this.liveTask(task.id) ?? task, {
+        status: task.status,
+        completedAt: task.completedAt ?? null,
+        dropReason: task.dropReason ?? null,
+        fadedAt: task.fadedAt ?? null,
+        touchedAt: task.touchedAt ?? null,
+        deferCount: task.deferCount ?? 0,
+        acknowledgedAt: task.acknowledgedAt ?? null,
+      });
+    }
   }
 
   async toggleTaskToday(task: TaskRow): Promise<void> {
@@ -530,7 +613,7 @@ export class WebSyncEngine {
     await this.patchTask(task, {
       ...datePatch,
       touchedAt: now,
-      ...(task.source === "mcp" && !task.acknowledgedAt ? { acknowledgedAt: now } : {}),
+      ...(isProposal(task) ? { acknowledgedAt: now } : {}),
     });
   }
 
@@ -559,7 +642,7 @@ export class WebSyncEngine {
       ...datePatch,
       ...(task.reminderAt && shiftedReminder !== task.reminderAt ? { reminderAt: shiftedReminder } : {}),
       touchedAt: now,
-      ...(task.source === "mcp" && !task.acknowledgedAt ? { acknowledgedAt: now } : {}),
+      ...(isProposal(task) ? { acknowledgedAt: now } : {}),
     });
   }
 
@@ -652,7 +735,7 @@ export class WebSyncEngine {
       project: target.project,
       heading: target.heading ?? null,
       touchedAt: now,
-      ...(task.source === "mcp" && !task.acknowledgedAt ? { acknowledgedAt: now } : {}),
+      ...(isProposal(task) ? { acknowledgedAt: now } : {}),
     });
   }
 
@@ -703,6 +786,26 @@ export class WebSyncEngine {
       queuedAt: Date.now(),
     };
     await this.commit([{ entity: "task", action: "put", id: task.id, row: updated }], [op]);
+  }
+
+  private async patchTasks(tasks: TaskRow[], fields: Record<string, unknown>): Promise<void> {
+    if (tasks.length === 0) return;
+    const queuedAt = Date.now();
+    await this.commit(
+      tasks.map((task) => ({ entity: "task", action: "put", id: task.id, row: { ...task, ...fields } })),
+      tasks.map((task, idx) => ({
+        clientOpId: newClientOpId(),
+        op: "upsert",
+        entity: "task",
+        id: task.id,
+        fields,
+        queuedAt: queuedAt + idx,
+      })),
+    );
+  }
+
+  private liveTask(id: string): TaskRow | null {
+    return this.state.snapshot.tasks.find((t) => t.id === id) ?? null;
   }
 
   // ---- Checklists ----
@@ -1015,24 +1118,7 @@ export class WebSyncEngine {
   }
 
   async bulkUpdateTasks(tasks: TaskRow[], fields: Record<string, unknown>): Promise<void> {
-    if (tasks.length === 0) return;
-    const now = new Date().toISOString();
-    const queuedAt = Date.now();
-    const mutations: LocalMutation[] = [];
-    const ops: OutboxOp[] = [];
-    tasks.forEach((task, idx) => {
-      const patch = { ...fields, touchedAt: now };
-      mutations.push({ entity: "task", action: "put", id: task.id, row: { ...task, ...patch } });
-      ops.push({
-        clientOpId: newClientOpId(),
-        op: "upsert",
-        entity: "task",
-        id: task.id,
-        fields: patch,
-        queuedAt: queuedAt + idx,
-      });
-    });
-    await this.commit(mutations, ops);
+    await this.patchTasks(tasks, { ...fields, touchedAt: new Date().toISOString() });
   }
 
   async bulkToggleToday(tasks: TaskRow[], putOnToday: boolean): Promise<void> {
@@ -1065,37 +1151,6 @@ export class WebSyncEngine {
     if (mutations.length > 0) await this.commit(mutations, ops);
   }
 
-  async bulkCompleteTasks(tasks: TaskRow[]): Promise<string[]> {
-    if (tasks.length === 0) return [];
-    await ensureCoreReady();
-    const now = new Date().toISOString();
-    const todayYMD = localTodayYMD();
-    const queuedAt = Date.now();
-    const mutations: LocalMutation[] = [];
-    const ops: OutboxOp[] = [];
-    const spawnedIds: string[] = [];
-    tasks.forEach((task, idx) => {
-      const patch: Record<string, unknown> = { status: "done", completedAt: now, touchedAt: now };
-      mutations.push({ entity: "task", action: "put", id: task.id, row: { ...task, ...patch } });
-      ops.push({
-        clientOpId: newClientOpId(),
-        op: "upsert",
-        entity: "task",
-        id: task.id,
-        fields: patch,
-        queuedAt: queuedAt + idx * 10,
-      });
-      if (task.recurrenceUnit && !task.recurrencePaused) {
-        const nextOcc = this.buildNextRecurrenceMutations(task, todayYMD, now);
-        mutations.push(...nextOcc.mutations);
-        ops.push(...nextOcc.ops);
-        if (nextOcc.spawnedTaskId) spawnedIds.push(nextOcc.spawnedTaskId);
-      }
-    });
-    await this.commit(mutations, ops);
-    return spawnedIds;
-  }
-
   async bulkDeleteTasks(tasks: TaskRow[]): Promise<void> {
     if (tasks.length === 0) return;
     const now = new Date().toISOString();
@@ -1113,38 +1168,6 @@ export class WebSyncEngine {
       });
     });
     await this.commit(mutations, ops);
-  }
-
-  async bulkDropFadedTasks(tasks: TaskRow[]): Promise<void> {
-    if (tasks.length === 0) return;
-    const now = new Date().toISOString();
-    await this.bulkUpdateTasks(tasks, {
-      status: "cancelled",
-      completedAt: now,
-      dropReason: "faded",
-    });
-  }
-
-  async markTasksFaded(tasks: TaskRow[]): Promise<void> {
-    if (tasks.length === 0) return;
-    const now = new Date().toISOString();
-    const queuedAt = Date.now();
-    const mutations: LocalMutation[] = [];
-    const ops: OutboxOp[] = [];
-    tasks.forEach((task, idx) => {
-      if (task.fadedAt) return;
-      const patch = { fadedAt: now };
-      mutations.push({ entity: "task", action: "put", id: task.id, row: { ...task, ...patch } });
-      ops.push({
-        clientOpId: newClientOpId(),
-        op: "upsert",
-        entity: "task",
-        id: task.id,
-        fields: patch,
-        queuedAt: queuedAt + idx,
-      });
-    });
-    if (mutations.length > 0) await this.commit(mutations, ops);
   }
 
   async purgeDeletedTasks(tasks: TaskRow[]): Promise<void> {
@@ -1447,39 +1470,28 @@ export class WebSyncEngine {
     await this.commit([{ entity: "turn", action: "put", id: localTurn.id, row: localTurn }], [op]);
   }
 
-  async acceptAgentReview(task: TaskRow): Promise<void> {
-    await ensureCoreReady();
-    const now = new Date().toISOString();
-    const todayYMD = localTodayYMD();
-    const convo = this.existingConvo(task.id);
-    const convoFields: Record<string, unknown> = { endState: "agent_assisted_done" };
-    const taskFields: Record<string, unknown> = {
-      status: "done",
-      completedAt: now,
-      touchedAt: now,
-      ...(task.source === "mcp" && !task.acknowledgedAt ? { acknowledgedAt: now } : {}),
-    };
-
-    const mutations: LocalMutation[] = [
-      { entity: "convo", action: "put", id: task.id, row: { ...convo, ...convoFields } },
-      { entity: "task", action: "put", id: task.id, row: { ...task, ...taskFields } },
-    ];
-    const nowMs = Date.now();
-    const ops: OutboxOp[] = [
-      { clientOpId: newClientOpId(), op: "upsert", entity: "convo", id: task.id, fields: convoFields, queuedAt: nowMs },
-      { clientOpId: newClientOpId(), op: "upsert", entity: "task", id: task.id, fields: taskFields, queuedAt: nowMs + 1 },
-    ];
-
-    if (task.recurrenceUnit && !task.recurrencePaused) {
-      const nextOcc = this.buildNextRecurrenceMutations(task, todayYMD, now);
-      mutations.push(...nextOcc.mutations);
-      ops.push(...nextOcc.ops);
-    }
-
-    await this.commit(mutations, ops);
+  acceptAgentReview(task: TaskRow): Promise<CompletionReceipt> {
+    return this.completeTasks([task]);
   }
 
-  async sendBackAgentReview(task: TaskRow, note: string): Promise<void> {
+  /** Undo of Accept and Send back: the task waits in Review again, with its note. */
+  async restoreReview(convo: ConvoRow): Promise<void> {
+    const fields = {
+      endState: convo.endState ?? null,
+      endStateNote: convo.endStateNote ?? null,
+      assignee: convo.assignee ?? null,
+      stoppedAt: convo.stoppedAt ?? null,
+    };
+    await this.commit(
+      [{ entity: "convo", action: "put", id: convo.id, row: { ...this.existingConvo(convo.id), ...fields } }],
+      [{ clientOpId: newClientOpId(), op: "upsert", entity: "convo", id: convo.id, fields, queuedAt: Date.now() }],
+    );
+  }
+
+  /** Sends a hand-off back with the user's note. Returns the conversation it replaced. */
+  async sendBackAgentReview(task: TaskRow, note: string): Promise<ConvoRow> {
+    const trimmed = note.trim();
+    if (!trimmed) throw new Error("Send back needs a note");
     const now = new Date().toISOString();
     const convo = this.existingConvo(task.id);
     const convoFields: Record<string, unknown> = {
@@ -1492,7 +1504,7 @@ export class WebSyncEngine {
     const turn: WireTurn = {
       role: "user",
       step: "work",
-      note: note.trim() || "Sent back without a note.",
+      note: trimmed,
       ts: now,
     };
     const localTurn: TurnRow = { id: turnSyntheticId(task.id, seq), taskId: task.id, seq, ...turn };
@@ -1507,6 +1519,7 @@ export class WebSyncEngine {
         { clientOpId: newClientOpId(), op: "appendTurn", taskId: task.id, turn, queuedAt: nowMs + 1 },
       ],
     );
+    return convo;
   }
 
   async setSetting(key: string, value: unknown): Promise<void> {
@@ -1545,6 +1558,7 @@ export class WebSyncEngine {
       try {
         await this.drainOutbox();
         await this.pullAllPages();
+        await this.runFadePassIfDue();
         this.broadcastChange();
       } catch (err) {
         if (err instanceof ApiError && err.status === 401) {
@@ -1754,6 +1768,37 @@ export class WebSyncEngine {
 
       if (check.decision === "apply") break;
     }
+  }
+
+  /**
+   * The daily fade pass (docs/TASK_FADE_SPEC.md §4), as Android's
+   * TaskMutator.runFadePass. It runs after a full sync, so it sees the touches
+   * of other devices first, once per app day. A failed sync or a pass that the
+   * setting turned off leaves the day open. It never writes `touchedAt` and is
+   * not on the undo stack.
+   */
+  private async runFadePassIfDue(): Promise<void> {
+    if (this.stopped) return;
+    const snap = await this.store.loadSnapshot();
+    if (!fadeSettings(snap.settings).enabled) return;
+    const clock: FadeClock = {
+      now: new Date().toISOString(),
+      today: localTodayYMD(),
+      utcOffsetSeconds: localUtcOffsetSeconds(),
+    };
+    const pass = `${snap.userId}:${clock.today}`;
+    if (this.lastFadePass === pass) return;
+
+    const convoById = new Map(snap.convos.map((c) => [c.id, c]));
+    const turnsByTask = groupTurnsByTask(snap.turns);
+    const faded = snap.tasks.filter((task) => {
+      if (task.status !== "open" || task.deletedAt || task.fadedAt) return false;
+      const convo = convoById.get(task.id) ?? null;
+      const conversation = evaluateConversation(convo, turnsByTask.get(task.id) ?? [], clock.now);
+      return shouldFade(fadeInput(task, convo, conversation, clock));
+    });
+    await this.patchTasks(faded, { fadedAt: clock.now });
+    this.lastFadePass = pass;
   }
 
   // ---- Live WebSocket nudge via single-use /v1/sync/ws-ticket ----
