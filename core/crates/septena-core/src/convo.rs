@@ -153,31 +153,17 @@ impl Facts {
 #[cfg_attr(feature = "ffi", uniffi::export)]
 pub fn derive_conversation(conversation: TaskConversation, now: String) -> Result<ConversationProjection, CoreError> {
     let now = instant(&now, "now")?;
-    let mut thread = conversation.thread.clone();
-    thread.sort_by_key(|turn| turn.sequence);
-
-    let is_terminal = conversation
-        .end_state
-        .as_deref()
-        .is_some_and(|s| s != convo_end_state::OPEN);
-    let needs_review = conversation.end_state.as_deref() == Some(convo_end_state::NEEDS_VERIFY);
-    let open_question = thread
-        .last()
-        .is_some_and(|t| t.role == convo_turn_role::PROVIDER && t.options.as_ref().is_some_and(|o| !o.is_empty()));
-    let has_started = !thread.is_empty()
-        || conversation.confirmed_intent.is_some()
-        || is_terminal
-        || conversation.artifact_exists
-        || conversation.handoff_exists;
-    let pending = if is_terminal || conversation.stopped_at.is_some() {
+    let facts = Facts::of(&conversation, now);
+    let pending = if facts.is_terminal || conversation.stopped_at.is_some() {
         false
     } else if conversation.assignee.as_deref() == Some(convo_assignee::CLAUDE) {
         true
     } else {
-        thread
+        conversation
+            .thread
             .iter()
-            .rev()
-            .find(|t| t.role == convo_turn_role::PROVIDER)
+            .filter(|t| t.role == convo_turn_role::PROVIDER)
+            .max_by_key(|t| t.sequence)
             .and_then(|t| t.confidence)
             .is_some_and(|c| c < 0.5)
     };
@@ -195,7 +181,7 @@ pub fn derive_conversation(conversation: TaskConversation, now: String) -> Resul
             pending_reasoning,
         };
 
-    if needs_review {
+    if facts.needs_review {
         return Ok(projection(
             "awaitingHuman",
             Some("needsYou"),
@@ -203,7 +189,7 @@ pub fn derive_conversation(conversation: TaskConversation, now: String) -> Resul
             false,
         ));
     }
-    if is_terminal {
+    if facts.is_terminal {
         let badge = if conversation.end_state.as_deref() == Some(convo_end_state::WONT_DO) {
             "wontDo"
         } else {
@@ -211,13 +197,13 @@ pub fn derive_conversation(conversation: TaskConversation, now: String) -> Resul
         };
         return Ok(projection("terminal", Some(badge), note("Resolved"), false));
     }
-    if !has_started {
+    if !facts.has_started {
         return Ok(projection("open", None, "No conversation yet".into(), pending));
     }
     if conversation.stopped_at.is_some() {
         return Ok(projection("inProgress", None, "Stopped".into(), false));
     }
-    if open_question {
+    if facts.open_question {
         return Ok(projection(
             "awaitingHuman",
             Some("needsYou"),
@@ -230,11 +216,6 @@ pub fn derive_conversation(conversation: TaskConversation, now: String) -> Resul
     } else {
         "inProgress"
     };
-    let claimed = conversation
-        .claim_until
-        .as_deref()
-        .and_then(parse_instant_ms)
-        .is_some_and(|until| until > now);
-    let next = if claimed { "Claude is working" } else { "Claude's move" };
+    let next = if facts.is_claimed { "Claude is working" } else { "Claude's move" };
     Ok(projection(stage, Some("working"), next.into(), pending))
 }
