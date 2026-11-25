@@ -338,11 +338,7 @@ struct ConversationCard: View {
   }
 
   private func acceptReview() {
-    let mutator = SeptenaServices.shared.taskMutator
-    let previousNote = convo.endStateNote
-    mutator.complete(id: taskID)
-    mutator.acknowledge(id: taskID)
-    TaskUndo.recordAcceptReview(id: taskID, previousNote: previousNote, mutator: mutator)
+    TaskUndo.acceptReview(id: taskID, mutator: SeptenaServices.shared.taskMutator)
     Haptics.success()
     showSendBack = false
     reload()

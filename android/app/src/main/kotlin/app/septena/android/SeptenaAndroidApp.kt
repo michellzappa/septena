@@ -24,10 +24,11 @@ import app.septena.core.TaskRefMutator
 import app.septena.core.TaskSyncEngine
 import app.septena.core.UuidTaskIdGenerator
 import app.septena.core.WireTimestamp
-import app.septena.core.asSyncRecord
+import app.septena.core.booleanValue
 import app.septena.core.generated.RegistryEntityEnums
 import app.septena.core.generated.RegistryEntityFields
 import app.septena.core.generated.RegistryEntityNames
+import app.septena.core.generated.RegistrySettingKeys
 import app.septena.store.SqlDelightTaskStore
 import app.septena.store.db.SeptenaDatabase
 import app.septena.transport.SeptenaAccessClient
@@ -75,7 +76,6 @@ class AndroidAppGraph(application: Application) {
     val taskUndoHistory = TaskUndoHistory()
     val deviceSettings = app.septena.android.ui.AndroidDeviceSettings(application)
     val filingSuggestions = app.septena.android.ui.FilingSuggestionEngine(application)
-    val fadeSweepStore = app.septena.android.ui.FadeSweepStore(application)
     val registryEntityMutator = RegistryEntityMutator(taskStore, clock, ids)
     val taskRefMutator = TaskRefMutator(taskStore, clock, ids)
     val taskRefLookup = TaskRefLookup(taskStore)
@@ -84,6 +84,7 @@ class AndroidAppGraph(application: Application) {
     val conversationRules = ConversationRules
     val syncedSettings = SyncedSettings(taskStore)
     val syncedSettingsMutator = SyncedSettingsMutator(taskStore, ids)
+    val fadeSweepStore = app.septena.android.ui.FadeSweepStore(application, syncedSettings, syncedSettingsMutator)
 
     val auth = SeptenaAuthClient(clientVersion)
     val credentials = AppCredentials(SessionStore(application), auth, beforeAdopt = ::finishPendingWipe)
@@ -137,21 +138,48 @@ class AndroidAppGraph(application: Application) {
     /**
      * After each sync: attachment uploads, then the daily fade pass once per
      * app day (docs/TASK_FADE_SPEC.md §4, as iOS runFadePassIfDue). The pass
-     * runs after a pull, so it sees other devices' touches first. True asks
-     * for one more sync, which pushes what the pass or the uploads changed.
+     * runs after a pull, so it sees other devices' touches first, and only
+     * while "Fade inactive tasks" is on. A skipped or failed pass tries again
+     * after the next sync. True asks for one more sync, which pushes what the
+     * pass or the uploads changed.
      */
     private suspend fun afterSync(): Boolean {
         val uploads = attachments.afterSync()
+        if (!credentials.signedIn.value) return uploads
+        val changed = moveFadeSettingToAccount() || uploads
         val day = clock.today(clock.now()).toString()
-        if (lastFadePassDay == day) return uploads
-        lastFadePassDay = day
+        if (lastFadePassDay == day || !fadesInactiveTasks()) return changed
         val turnsByTask = taskStore.allTurnsByTask()
         val conversations = taskStore.records(RegistryEntityNames.CONVO)
             .filter { it.deletedAt == null }
             .mapNotNull { r -> runCatching { r.id to TaskConversation.from(r, turnsByTask[r.id].orEmpty()) }.getOrNull() }
             .toMap()
         val faded = taskMutator.runFadePass(conversations)
-        return uploads || faded > 0
+        lastFadePassDay = day
+        return changed || faded > 0
+    }
+
+    /**
+     * Settings ▸ "Fade inactive tasks" (`tasksShowAging`), one setting per account. A device that had
+     * it off before it synced keeps it off until [moveFadeSettingToAccount] ran.
+     */
+    suspend fun fadesInactiveTasks(): Boolean {
+        val key = RegistrySettingKeys.TASKS_SHOW_AGING
+        if (syncedSettings.rawValue(key) == null && deviceSettings.storedBool(key) == false) return false
+        return syncedSettings.value(key).booleanValue() ?: true
+    }
+
+    /**
+     * Moves this device's old `tasksShowAging` to the account, once: an explicit off is pushed when the
+     * account has no value yet. Runs after a pull, so it never overrides another device's choice.
+     */
+    private suspend fun moveFadeSettingToAccount(): Boolean {
+        val key = RegistrySettingKeys.TASKS_SHOW_AGING
+        val stored = deviceSettings.storedBool(key) ?: return false
+        val pushes = !stored && syncedSettings.rawValue(key) == null
+        if (pushes) syncedSettingsMutator.set(key, JsonValue.BooleanValue(false))
+        deviceSettings.forget(key)
+        return pushes
     }
 
     val reminders = TaskReminderScheduler(application, taskStore)
@@ -189,32 +217,56 @@ class AndroidAppGraph(application: Application) {
     }
 
     /**
-     * One unified Accept for both Review rows and the conversation card (#415):
-     * completes the task, acknowledges any MCP provenance, stamps the fade clock,
-     * moves the conversation to `agent_assisted_done`, and records a single undo
-     * step that reverts both task and conversation fields.
+     * Every way a user completes a task (checkbox, menu, selection, notification, widget, task page)
+     * ends here, as one undo step. A task in Review is accepted (docs/REVIEW_SPEC.md §4): that also
+     * acknowledges any MCP provenance, stamps the fade clock and moves the conversation to
+     * `agent_assisted_done`. The store sets that end state on a plain completion too, so only a
+     * conversation write here lets Undo put the task back in Review. False when nothing was open.
      */
-    suspend fun acceptReview(taskId: String): Boolean {
-        val beforeTask = taskStore.record(RegistryEntityNames.TASK, taskId) ?: return false
+    suspend fun completeTasks(taskIds: Collection<String>): Boolean {
+        val edits = mutableListOf<TaskUndoHistory.Edit>()
+        try {
+            for (taskId in taskIds) {
+                val convo = taskStore.record(RegistryEntityNames.CONVO, taskId)
+                val inReview = convo != null && TaskConversation.needsHumanReview(convo)
+                val edit = captureTaskAndConvo(taskId) {
+                    if (!inReview) {
+                        taskMutator.complete(taskId) != null
+                    } else if (taskMutator.acceptReview(taskId) != null) {
+                        conversationMutator.update(
+                            taskId,
+                            mapOf(
+                                RegistryEntityFields.Convo.END_STATE to
+                                    JsonValue.StringValue(RegistryEntityEnums.ConvoEndState.AGENT_ASSISTED_DONE),
+                            ),
+                        )
+                        true
+                    } else {
+                        false
+                    }
+                }
+                if (edit != null) edits += edit
+            }
+        } finally {
+            withContext(NonCancellable) { taskUndoHistory.recordTaskAndConvoEdits(edits) }
+        }
+        return edits.isNotEmpty()
+    }
+
+    suspend fun completeTask(taskId: String): Boolean = completeTasks(listOf(taskId))
+
+    /** The task and its conversation around [write]; null when [write] did nothing. */
+    private suspend fun captureTaskAndConvo(taskId: String, write: suspend () -> Boolean): TaskUndoHistory.Edit? {
+        val beforeTask = taskStore.record(RegistryEntityNames.TASK, taskId) ?: return null
         val beforeConvo = taskStore.record(RegistryEntityNames.CONVO, taskId)
-        val completed = taskMutator.acceptReview(taskId) ?: return false
-        conversationMutator.update(
-            taskId,
-            mapOf(
-                RegistryEntityFields.Convo.END_STATE to
-                    JsonValue.StringValue(RegistryEntityEnums.ConvoEndState.AGENT_ASSISTED_DONE),
-            ),
-        )
-        val afterTask = taskStore.record(RegistryEntityNames.TASK, taskId) ?: completed.asSyncRecord()
-        val afterConvo = taskStore.record(RegistryEntityNames.CONVO, taskId)
-        taskUndoHistory.recordTaskAndConvoEdit(
+        if (!write()) return null
+        return TaskUndoHistory.Edit(
             taskId = taskId,
             beforeTask = beforeTask,
-            afterTask = afterTask,
+            afterTask = taskStore.record(RegistryEntityNames.TASK, taskId),
             beforeConvo = beforeConvo,
-            afterConvo = afterConvo,
+            afterConvo = taskStore.record(RegistryEntityNames.CONVO, taskId),
         )
-        return true
     }
 
     /**
@@ -225,38 +277,31 @@ class AndroidAppGraph(application: Application) {
     suspend fun sendBackReview(taskId: String, note: String): Boolean {
         val clean = note.trim()
         if (clean.isEmpty()) return false
-        val beforeTask = taskStore.record(RegistryEntityNames.TASK, taskId) ?: return false
-        val beforeConvo = taskStore.record(RegistryEntityNames.CONVO, taskId)
-        conversationMutator.appendTurn(
-            taskId,
-            mapOf(
-                "role" to JsonValue.StringValue(RegistryEntityEnums.ConvoTurnRole.USER),
-                "step" to JsonValue.StringValue(RegistryEntityEnums.ConvoTurnStep.WORK),
-                "note" to JsonValue.StringValue(clean),
-                "ts" to JsonValue.StringValue(WireTimestamp.format(clock.now())),
-            ),
-        )
-        conversationMutator.update(
-            taskId,
-            mapOf(
-                RegistryEntityFields.Convo.END_STATE to
-                    JsonValue.StringValue(RegistryEntityEnums.ConvoEndState.OPEN),
-                RegistryEntityFields.Convo.END_STATE_NOTE to JsonValue.Null,
-                RegistryEntityFields.Convo.STOPPED_AT to JsonValue.Null,
-                RegistryEntityFields.Convo.ASSIGNEE to
-                    JsonValue.StringValue(RegistryEntityEnums.ConvoAssignee.CLAUDE),
-            ),
-        )
-        taskMutator.touch(taskId)
-        val afterTask = taskStore.record(RegistryEntityNames.TASK, taskId)
-        val afterConvo = taskStore.record(RegistryEntityNames.CONVO, taskId)
-        taskUndoHistory.recordTaskAndConvoEdit(
-            taskId = taskId,
-            beforeTask = beforeTask,
-            afterTask = afterTask,
-            beforeConvo = beforeConvo,
-            afterConvo = afterConvo,
-        )
+        val edit = captureTaskAndConvo(taskId) {
+            conversationMutator.appendTurn(
+                taskId,
+                mapOf(
+                    "role" to JsonValue.StringValue(RegistryEntityEnums.ConvoTurnRole.USER),
+                    "step" to JsonValue.StringValue(RegistryEntityEnums.ConvoTurnStep.WORK),
+                    "note" to JsonValue.StringValue(clean),
+                    "ts" to JsonValue.StringValue(WireTimestamp.format(clock.now())),
+                ),
+            )
+            conversationMutator.update(
+                taskId,
+                mapOf(
+                    RegistryEntityFields.Convo.END_STATE to
+                        JsonValue.StringValue(RegistryEntityEnums.ConvoEndState.OPEN),
+                    RegistryEntityFields.Convo.END_STATE_NOTE to JsonValue.Null,
+                    RegistryEntityFields.Convo.STOPPED_AT to JsonValue.Null,
+                    RegistryEntityFields.Convo.ASSIGNEE to
+                        JsonValue.StringValue(RegistryEntityEnums.ConvoAssignee.CLAUDE),
+                ),
+            )
+            taskMutator.touch(taskId)
+            true
+        } ?: return false
+        taskUndoHistory.recordTaskAndConvoEdits(listOf(edit))
         return true
     }
 

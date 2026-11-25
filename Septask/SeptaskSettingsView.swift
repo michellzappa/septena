@@ -461,7 +461,10 @@ struct SeptaskSettingsView: View {
     case "todayShowCompleted":
       Toggle(label, isOn: TaskViewOptions.announcing($todayShowCompleted))
     case "tasksShowAging":
-      Toggle(isOn: TaskViewOptions.announcing($showAging)) {
+      Toggle(isOn: TaskViewOptions.announcing(Binding(
+        get: { showAging },
+        set: { SettingsMirror.setFadeEnabled($0) }
+      ))) {
         rowLabel(label, detail: item.detail)
       }
     case "tasksShowFaded":

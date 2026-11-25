@@ -403,12 +403,14 @@ final class CloudKitTasksBackend {
   /// Stamp `acknowledgedAt` so the agent-cue clears (and stays cleared on
   /// other devices via sync). No-op when there's nothing to acknowledge —
   /// not an agent row, or already seen — so engagement never churns writes.
-  func acknowledge(id: String) {
-    guard let entity = fetch(id: id) else { return }
-    guard entity.source == TaskSource.mcp, entity.acknowledgedAt == nil else { return }
+  @discardableResult
+  func acknowledge(id: String) -> Bool {
+    guard let entity = fetch(id: id) else { return false }
+    guard entity.source == TaskSource.mcp, entity.acknowledgedAt == nil else { return false }
     entity.acknowledgedAt = Date()
     entity.pendingSync = true
     commitAndPush(entity, op: "acknowledge")
+    return true
   }
 
   /// Undo a peek/select ack — restore the proposal glow and (under the
@@ -446,6 +448,9 @@ final class CloudKitTasksBackend {
       var convo = entity.conversation
       convo.endState = .agentAssistedDone
       entity.conversation = convo
+      completedFromReview.insert(id)
+    } else {
+      completedFromReview.remove(id)
     }
     // Do NOT clear `today` (or `scheduled`/`deadline`): every visibility test
     // (`isOnToday`, `isInTriageBand`) and every count site already gate on
@@ -462,6 +467,10 @@ final class CloudKitTasksBackend {
       SeptenaLog.error("[CK] complete id=\(id) could not calculate next recurrence", nil)
     }
   }
+
+  /// Tasks whose last completion here took them out of Review, so its undo
+  /// (`TaskUndo.recordCompletion`) puts them back.
+  private(set) var completedFromReview: Set<String> = []
 
   func uncomplete(id: String) {
     guard let entity = fetch(id: id) else { return }
@@ -1649,7 +1658,7 @@ final class CloudKitTasksBackend {
     var fadedIDs: [String] = []
     for entity in candidates {
       let convo = entity.conversation
-      let isAgentTurn = deriveConvo(convo).badge == .working
+      let isAgentTurn = convo.isAgentTurn(at: Date())
       let isAssignedToClaude = convo.assignee == .claude
       guard TaskFade.shouldFade(
         isOpen: entity.status == .open,
@@ -1662,6 +1671,7 @@ final class CloudKitTasksBackend {
         isAgentTurn: isAgentTurn,
         isAssignedToClaude: isAssignedToClaude,
         isAwaitingHuman: convo.awaitsHuman,
+        isProposal: entity.source == TaskSource.mcp && entity.acknowledgedAt == nil,
         touchedAt: entity.touchedAt,
         createdAt: entity.createdAt,
         created: entity.created,
@@ -1681,8 +1691,10 @@ final class CloudKitTasksBackend {
   /// Keep faded task(s) out of the Faded pile (§4): clears `fadedAt`, stamps
   /// `touchedAt`, resets `deferCount`. Routed through `touch` so there stays
   /// one stamp site.
+  /// Keeping an unanswered proposal accepts it (ADR 0039).
   func keepFaded(ids: [String]) {
     touch(ids: ids)
+    for id in ids { acknowledge(id: id) }
   }
 
   /// Drop faded task(s) in the weekly sweep (§5): sets status `cancelled`,
@@ -1691,7 +1703,7 @@ final class CloudKitTasksBackend {
   func dropFaded(ids: [String]) {
     let stamp = ckCompletionTimestamp()
     for id in ids {
-      guard let entity = fetch(id: id), entity.deletedAt == nil, entity.status == .open else { continue }
+      guard let entity = fetch(id: id), entity.deletedAt == nil, entity.isFaded else { continue }
       entity.statusRaw = TaskStatus.cancelled.rawValue
       entity.dropReason = TaskDropReason.faded
       entity.completedAt = stamp
@@ -1713,6 +1725,7 @@ final class CloudKitTasksBackend {
       entity.fadedAt = snap.fadedAt
       entity.touchedAt = snap.touchedAt
       entity.deferCount = snap.deferCount
+      entity.acknowledgedAt = snap.acknowledgedAt
       if statusChanged {
         entity.pendingSync = true
         commitAndPush(entity, op: "restoreFaded")

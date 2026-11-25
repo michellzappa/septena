@@ -43,6 +43,16 @@ struct AppSettings: Codable {
   /// holds on all of them. Nil → not paused.
   var agentsPaused: Bool? = nil
 
+  /// "Fade inactive tasks" (docs/TASK_FADE_SPEC.md §4). Nil → on. Mirrored
+  /// into `TaskFade.enabledDefaultsKey`, which rows read.
+  var tasksShowAging: Bool? = nil
+
+  /// When the weekly sweep last finished, on any device. Nil → never.
+  var fadeSweptAt: Date? = nil
+
+  /// The sweep day (`yyyy-MM-dd`) whose prompt was dismissed. Nil → none.
+  var fadeSweepDismissedOn: String? = nil
+
   /// "Get started" checklist (Septask): true once dismissed or every step is
   /// complete, synced so finishing onboarding on one device hides it on all
   /// other devices too. Nil → not dismissed.
@@ -105,6 +115,9 @@ struct AppSettings: Codable {
     case welcomeName = "welcome_name"
     case rolledInDismissedOn = "rolled_in_dismissed_on"
     case agentsPaused = "agents_paused"
+    case tasksShowAging = "tasks_show_aging"
+    case fadeSweptAt = "fade_swept_at"
+    case fadeSweepDismissedOn = "fade_sweep_dismissed_on"
     case getStartedDismissed = "get_started_dismissed"
     case getStartedSteps = "get_started_steps"
     case upsellsSeen = "upsells_seen"

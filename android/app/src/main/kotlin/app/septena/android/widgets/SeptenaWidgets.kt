@@ -87,7 +87,7 @@ class SeptenaWidgetActionReceiver : BroadcastReceiver() {
         widgetScope.launch {
             try {
                 val app = context.applicationContext as? SeptenaAndroidApp ?: return@launch
-                app.graph.taskMutator.complete(taskId)
+                app.graph.completeTask(taskId)
                 app.graph.sync.noteLocalChange()
                 app.graph.sync.requestSync()
                 SeptenaWidgetUpdater.refreshAll(context)

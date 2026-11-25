@@ -661,10 +661,9 @@ struct SidebarRootView: View {
     var ids = Set<RegistryDestinationID>()
     // Review and Agent also stay while selected, so accepting the last item
     // does not pull the row out from under the user.
-    if reviewCount > 0 || isSelected(.filter(.review)) { ids.insert(.review) }
+    if reviewCount + fadedCount > 0 || isSelected(.filter(.review)) { ids.insert(.review) }
     if agentCount > 0 || isSelected(.filter(.agent)) { ids.insert(.agent) }
     if starredCount > 0 { ids.insert(.starred) }
-    if fadedCount > 0 { ids.insert(.faded) }
     return ids
   }
 
@@ -722,7 +721,6 @@ struct SidebarRootView: View {
     case .filter(.unscheduled):     return counts?.unscheduledCount
     case .filter(.logbook):         return doneTodayCount > 0 ? doneTodayCount : nil
     case .filter(.starred):         return starredCount > 0 ? starredCount : nil
-    case .filter(.faded):           return fadedCount > 0 ? fadedCount : nil
     default:                        return nil
     }
   }
@@ -1414,7 +1412,7 @@ struct SidebarRootView: View {
       if t.recurrenceUnit != nil, t.recurrence != nil { repeating += 1 }
       if t.conversationJSON != nil {
         let convo = t.conversation
-        if convo.needsHumanReview { review += 1 }
+        if convo.reviewGroup != nil { review += 1 }
         if convo.agentStage(at: now) != nil { agent += 1 }
       }
       if t.isInInbox { inbox += 1 }

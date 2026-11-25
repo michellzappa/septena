@@ -44,6 +44,7 @@ final class SettingsStore {
         self.reloadFromMirror(context: context)
         self.reconcileWelcomeName(context: context, engine: nil)
         self.reconcileHiddenCalendars(context: context, engine: nil)
+        SettingsMirror.reconcileFadeEnabled(publish: false)
       }
     }
   }

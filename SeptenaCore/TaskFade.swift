@@ -19,8 +19,9 @@ enum TaskFade {
   /// stays above a 4.5:1 contrast ratio, so a faded title is still readable.
   static let minOpacity: Double = RegistryRules.fadeMinOpacity
 
-  /// Shared UserDefaults key for the Settings toggle (`SettingsKey.tasksShowAging`).
-  /// Absent → enabled by default (`docs/TASK_FADE_SPEC.md` §11).
+  /// Device mirror of the synced setting `tasksShowAging`, so rows read it
+  /// without a decode (`SettingsMirror.setFadeEnabled`). Absent → enabled by
+  /// default (`docs/TASK_FADE_SPEC.md` §11).
   static let enabledDefaultsKey = "septena.tasks.showAging"
 
   /// Persisted timestamp of the last completed weekly sweep.
@@ -70,6 +71,7 @@ enum TaskFade {
                          isAgentTurn: Bool,
                          isAssignedToClaude: Bool,
                          isAwaitingHuman: Bool = false,
+                         isProposal: Bool = false,
                          touchedAt: Date?,
                          createdAt: Date,
                          created: String?,
@@ -78,7 +80,7 @@ enum TaskFade {
     let input = coreInput(isOpen: isOpen, isHeading: isHeading, isDeleted: isDeleted, isFaded: isFaded,
                           deadline: deadline, scheduled: scheduled, hasRecurrence: hasRecurrence,
                           isAgentTurn: isAgentTurn, isAssignedToClaude: isAssignedToClaude,
-                          isAwaitingHuman: isAwaitingHuman, showsAgentCue: false,
+                          isAwaitingHuman: isAwaitingHuman, showsAgentCue: false, isProposal: isProposal,
                           touchedAt: touchedAt, createdAt: createdAt, created: created, now: now, today: today)
     return (try? SeptenaSharedCore.shouldFade(input: input)) ?? false
   }
@@ -97,6 +99,7 @@ enum TaskFade {
                        isAssignedToClaude: Bool,
                        isAwaitingHuman: Bool = false,
                        showsAgentCue: Bool,
+                       isProposal: Bool = false,
                        touchedAt: Date?,
                        createdAt: Date,
                        created: String?,
@@ -105,7 +108,7 @@ enum TaskFade {
     let input = coreInput(isOpen: isOpen, isHeading: isHeading, isDeleted: isDeleted, isFaded: isFaded,
                           deadline: deadline, scheduled: scheduled, hasRecurrence: hasRecurrence,
                           isAgentTurn: isAgentTurn, isAssignedToClaude: isAssignedToClaude,
-                          isAwaitingHuman: isAwaitingHuman, showsAgentCue: showsAgentCue,
+                          isAwaitingHuman: isAwaitingHuman, showsAgentCue: showsAgentCue, isProposal: isProposal,
                           touchedAt: touchedAt, createdAt: createdAt, created: created, now: now, today: today)
     return try? SeptenaSharedCore.fadeFill(input: input)
   }
@@ -113,13 +116,14 @@ enum TaskFade {
   private static func coreInput(isOpen: Bool, isHeading: Bool, isDeleted: Bool, isFaded: Bool,
                                 deadline: String?, scheduled: String?, hasRecurrence: Bool,
                                 isAgentTurn: Bool, isAssignedToClaude: Bool, isAwaitingHuman: Bool,
-                                showsAgentCue: Bool, touchedAt: Date?, createdAt: Date, created: String?,
+                                showsAgentCue: Bool, isProposal: Bool, touchedAt: Date?, createdAt: Date, created: String?,
                                 now: Date, today: String) -> FadeInput {
     FadeInput(
       isOpen: isOpen, isHeading: isHeading, isDeleted: isDeleted, isFaded: isFaded,
       deadline: deadline, scheduled: scheduled, hasRecurrence: hasRecurrence,
       isAgentTurn: isAgentTurn, isAssignedToClaude: isAssignedToClaude,
       isAwaitingHuman: isAwaitingHuman, showsAgentCue: showsAgentCue,
+      isProposal: isProposal,
       touchedAt: touchedAt.map(SharedCoreValues.instant),
       // `.distantPast` is the migration sentinel for "creation time unknown".
       createdAt: createdAt == .distantPast ? nil : SharedCoreValues.instant(createdAt),
@@ -165,24 +169,34 @@ enum TaskFade {
     return fadedDates.contains { isInCurrentSweep(fadedAt: $0, lastSweepAt: lastSweepAt) }
   }
 
+  /// When the last sweep finished on any device: the later of the account's
+  /// value and this device's, so a stale sync cannot bring a sweep back.
   static var lastSweepAt: Date? {
     let ts = UserDefaults.standard.double(forKey: lastSweepAtKey)
-    return ts > 0 ? Date(timeIntervalSince1970: ts) : nil
+    return [ts > 0 ? Date(timeIntervalSince1970: ts) : nil, SeptaskSyncedSettings.current().fadeSweptAt]
+      .compactMap { $0 }.max()
   }
 
+  @MainActor
   static func markSweepCompleted(at date: Date) {
     UserDefaults.standard.set(date.timeIntervalSince1970, forKey: lastSweepAtKey)
+    SettingsMirror.updateSynced { $0.fadeSweptAt = date }
   }
 
   static var dismissedSweepWeek: Date? {
     let ts = UserDefaults.standard.double(forKey: dismissedSweepWeekKey)
-    return ts > 0 ? Date(timeIntervalSince1970: ts) : nil
+    return [ts > 0 ? Date(timeIntervalSince1970: ts) : nil,
+            parseDay(SeptaskSyncedSettings.current().fadeSweepDismissedOn)]
+      .compactMap { $0 }.max()
   }
 
-  /// Dismisses this week's sweep banner without dropping any tasks.
+  /// Dismisses this week's sweep banner on every device without dropping any tasks.
+  @MainActor
   static func dismissSweepForCurrentWeek(now: Date, calendar: Calendar = .current) {
     let anchor = mostRecentSweepAnchor(now: now, calendar: calendar)
     UserDefaults.standard.set(anchor.timeIntervalSince1970, forKey: dismissedSweepWeekKey)
+    let day = SeptenaDate.format(anchor)
+    SettingsMirror.updateSynced { $0.fadeSweepDismissedOn = day }
   }
 
   /// Plain-language, field-derived one-line reason shown under a faded row in

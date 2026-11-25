@@ -535,7 +535,11 @@ tasksRest.post("/:id/accept", async (c) => {
   if (read?.task.status === "done") return c.json({ id: id.data, status: "done", alreadyComplete: true });
   const gate = await reviewGate(c, ctx, id.data, body.reviewAt);
   if (gate) return gate;
-  return attempt(c, "accept", () => acceptReview(ctx, id.data));
+  return attempt(c, "accept", async () => {
+    const done = await acceptReview(ctx, id.data);
+    await touchTask(ctx, id.data);
+    return done;
+  });
 });
 
 tasksRest.post("/:id/send_back", async (c) => {
@@ -549,7 +553,11 @@ tasksRest.post("/:id/send_back", async (c) => {
   const ctx = await writeContext(c);
   const gate = await reviewGate(c, ctx, id.data, body.reviewAt);
   if (gate) return gate;
-  return attempt(c, "send_back", () => sendBackReview(ctx, id.data, body.note));
+  return attempt(c, "send_back", async () => {
+    const sent = await sendBackReview(ctx, id.data, body.note);
+    await touchTask(ctx, id.data);
+    return sent;
+  });
 });
 
 tasksRest.post("/:id/:verb", async (c) => {
@@ -608,7 +616,23 @@ async function run(
 ): Promise<Response> {
   const parsed = zWriteArgs[name].safeParse(args);
   if (!parsed.success) return c.json({ error: "invalid_request" }, 400);
-  return attempt(c, name, () => runWriteTool(ctx, name, parsed.data as Record<string, unknown>) as Promise<object>, okStatus);
+  const input = parsed.data as Record<string, unknown>;
+  return attempt(c, name, async () => {
+    const result = await runWriteTool(ctx, name, input) as object;
+    if (typeof input.id === "string") await touchTask(ctx, input.id, name === "tasks_defer" || input.today === false);
+    return result;
+  }, okStatus);
+}
+
+/// A thin client's gesture is the user's: it restarts the fade clock, as a
+/// gesture in an app does (docs/TASK_FADE_SPEC.md §3). A defer counts.
+async function touchTask(ctx: WriteContext, id: string, deferred = false): Promise<void> {
+  const read = await ctx.store.readTask(id);
+  if (!read) return;
+  const deferCount = deferred ? Number(read.task.deferCount ?? 0) + 1 : 0;
+  await pushOps(ctx, [{
+    op: "upsert", entity: "task", id, fields: { touchedAt: new Date().toISOString(), deferCount, fadedAt: null },
+  }]);
 }
 
 async function attempt(c: Ctx, name: string, write: () => Promise<object>, okStatus: 200 | 201 = 200): Promise<Response> {

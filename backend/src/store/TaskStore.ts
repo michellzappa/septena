@@ -439,11 +439,13 @@ export class TaskStore extends DurableObject<Env> {
   private fadeIsStale(taskId: string, row: Record<string, unknown>, fields: Record<string, unknown>): boolean {
     if (typeof fields.fadedAt !== "string" || row.fadedAt) return false;
     const at = Date.parse(fields.fadedAt);
-    const touched = "touchedAt" in fields ? null : (row.touchedAt as string | null);
-    if (touched && at - Date.parse(touched) < DOMAIN_RULES.fadeWindowDays * DAY_MS) return true;
-    const proposal = row.source === "mcp" && !row.acknowledgedAt && !row.touchedAt;
-    const scheduled = row.scheduled as string | null;
-    if (scheduled && !proposal && scheduled > fields.fadedAt.slice(0, 10)) return true;
+    if (!("touchedAt" in fields)) {
+      const touched = row.touchedAt as string | null;
+      if (touched && at - Date.parse(touched) < DOMAIN_RULES.fadeWindowDays * DAY_MS) return true;
+      const proposal = row.source === "mcp" && !row.acknowledgedAt && !touched;
+      const scheduled = row.scheduled as string | null;
+      if (scheduled && !proposal && scheduled > fields.fadedAt.slice(0, 10)) return true;
+    }
     const convo = this.sql.exec<{ assignee: string | null; endState: string | null }>(
       "SELECT assignee, endState FROM convos WHERE id = ? AND deletedAt IS NULL", taskId,
     ).toArray()[0];
@@ -1023,7 +1025,7 @@ export class TaskStore extends DurableObject<Env> {
     } else if (op.entity === "convo" && "assignee" in op.fields && !isAgentActor(actor)) {
       this.setAgentWork(op.id, null);
     }
-    if (op.entity === "task" && !isAgentActor(actor) && (op.fields.status === "done" || op.fields.status === "cancelled")) {
+    if (op.entity === "task" && !isAgentActor(actor) && op.fields.status === "done") {
       this.endReview(op.id, actor, now);
     }
     if (sharing) this.shareOut(op.entity, op.id, names);
@@ -1360,7 +1362,7 @@ export class TaskStore extends DurableObject<Env> {
     this.log(rev, entity, id, "upsert", names, null, actor, now, this.diffFor(before, next));
     // Another member closed the task: the Do of it here ends too (docs/DO_SPEC.md §2.1).
     if (entity === "task" && "status" in next) this.resolveDo(actor, now);
-    if (entity === "task" && (next.status === "done" || next.status === "cancelled")) this.endReview(id, actor, now);
+    if (entity === "task" && next.status === "done") this.endReview(id, actor, now);
     if (entity === "project" && "notes" in next) {
       this.recordNoteRevision("project", id, (next.notes as string | null) ?? null, actor, now, (before?.noteRev as number | null) ?? 0, null);
     }
@@ -1507,18 +1509,16 @@ export class TaskStore extends DurableObject<Env> {
     }
   }
 
-  /// A task the user closed leaves Review, whichever button closed it, so
-  /// opening it again does not put it back.
+  /// A task the user finished leaves Review, whichever button finished it, so
+  /// opening it again does not put it back. A cancelled one keeps its
+  /// hand-off: it is in no list, and undo brings it back as it was.
   private endReview(taskId: string, actor: string, now: string): void {
     this.setAgentWork(taskId, null);
     const row = this.sql.exec<{ endState: string | null }>(
       "SELECT endState FROM convos WHERE id = ? AND deletedAt IS NULL", taskId,
     ).toArray()[0];
     if (row?.endState !== "needs_verify") return;
-    const status = this.sql.exec<{ status: string }>("SELECT status FROM tasks WHERE id = ?", taskId).toArray()[0]?.status;
-    this.writeConvoServerFields(
-      taskId, { endState: status === "done" ? "agent_assisted_done" : "wont_do", endStateAt: now }, "upsert", actor, now,
-    );
+    this.writeConvoServerFields(taskId, { endState: "agent_assisted_done", endStateAt: now }, "upsert", actor, now);
   }
 
   private liveTask(id: string): boolean {
