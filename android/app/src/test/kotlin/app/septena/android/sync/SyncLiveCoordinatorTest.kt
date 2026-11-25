@@ -180,6 +180,7 @@ class SyncLiveCoordinatorTest {
             includeChecklists: Boolean,
             includeTags: Boolean,
             includeRefs: Boolean,
+            includeDoSessions: Boolean,
         ): SyncPullPage {
             pulls.incrementAndGet()
             return SyncPullPage(
