@@ -138,7 +138,8 @@ internal fun SettingsScreen(graph: AndroidAppGraph, onBack: () -> Unit) {
     }
     // The account card and the Account page show the plan (`planStatus`).
     LaunchedEffect(signedIn) { plans.refresh(signedIn) }
-    val currentTitle = currentPageId?.let(::titleFor)?.takeIf(String::isNotEmpty)
+    val pageTitle = if (currentPageId == PlanSettingsModel.PAGE) plans.title(languageTag) else titleFor(currentPageId)
+    val currentTitle = pageTitle.takeIf(String::isNotEmpty)
         ?: RegistryCatalog.actionTitle(RegistryActionIds.APP_SETTINGS, languageTag = languageTag).orEmpty()
     val backTitle = RegistryCatalog.surface(RegistryTaskDetail.ID)
         ?.objectAt("controls")?.string("back")?.localized(languageTag).orEmpty()
@@ -317,7 +318,10 @@ private fun SettingsRegistryRow(
         "pageLink" -> {
             val target = item.page ?: return
             val page = pages[target]
-            val title = item.label ?: page?.title ?: return
+            val title = when (item.statusKey) {
+                PlanSettingsModel.PLAN_STATUS_KEY -> surfaceEnv.plans.title(languageTag)
+                else -> item.label ?: page?.title ?: return
+            }
             if (item.surface == ACCOUNT_PROFILE_CARD) {
                 AccountProfileCard(
                     name = values[RegistrySettingKeys.WELCOME_NAME].stringValue().orEmpty(),

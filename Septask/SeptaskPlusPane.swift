@@ -16,9 +16,9 @@ struct SeptaskPlusPane: View {
     Form {
       Section {
         VStack(alignment: .leading, spacing: 8) {
-          Text(RegistryPlans.headline)
+          Text(status.isPro ? RegistryPlans.proCard.title : RegistryPlans.headline)
             .font(.title2.weight(.semibold))
-          Text(RegistryPlans.subhead)
+          Text(status.isPro ? RegistryPlans.proCard.detail : RegistryPlans.subhead)
             .foregroundStyle(.secondary)
         }
         .padding(.vertical, 4)
@@ -37,26 +37,28 @@ struct SeptaskPlusPane: View {
             SyncThisDeviceButton()
           }
         }
-        if status.plan != nil {
+        if status.plan != nil, !status.isGranted {
           Button(sheetButtonTitle) { showingSheet = true }
         }
       }
 
-      Section {
-        ForEach(RegistryPlans.prices) { price in
-          LabeledContent {
-            if price.highlighted {
-              Image(systemName: "checkmark.circle.fill").foregroundStyle(.tint)
+      if !status.isPro {
+        Section {
+          ForEach(RegistryPlans.prices) { price in
+            LabeledContent {
+              if price.highlighted {
+                Image(systemName: "checkmark.circle.fill").foregroundStyle(.tint)
+              }
+            } label: {
+              Text(price.label).font(.body.weight(price.highlighted ? .semibold : .regular))
+              Text(price.detail)
             }
-          } label: {
-            Text(price.label).font(.body.weight(price.highlighted ? .semibold : .regular))
-            Text(price.detail)
           }
+        } header: {
+          Text(RegistryPlans.name)
+        } footer: {
+          Text(RegistryPlans.checkoutOpen ? RegistryPlans.priceFootnote : RegistryPlans.checkoutNotice)
         }
-      } header: {
-        Text(RegistryPlans.name)
-      } footer: {
-        Text(RegistryPlans.checkoutOpen ? RegistryPlans.priceFootnote : RegistryPlans.checkoutNotice)
       }
 
       if status.plan == .device {
@@ -75,9 +77,11 @@ struct SeptaskPlusPane: View {
           Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 10) {
             GridRow {
               Color.clear.gridCellUnsizedAxes([.horizontal, .vertical])
-              Label(RegistryPlans.card("free")?.title ?? "", systemImage: Self.cardSymbol("free"))
+              Label(status.isPro ? RegistryPlans.shortName : RegistryPlans.card("free")?.title ?? "",
+                    systemImage: Self.cardSymbol(status.isPro ? "plus" : "free"))
                 .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-              Label(RegistryPlans.shortName, systemImage: Self.cardSymbol("plus"))
+              Label(status.isPro ? RegistryPlans.proName : RegistryPlans.shortName,
+                    systemImage: status.isPro ? Self.proSymbol : Self.cardSymbol("plus"))
                 .font(.caption.weight(.semibold)).foregroundStyle(.tint)
             }
             ForEach(outcome.rows) { row in
@@ -88,8 +92,9 @@ struct SeptaskPlusPane: View {
                     Text(RegistryPlans.Copy.planned).font(.caption).foregroundStyle(.secondary)
                   }
                 }
-                PlanCellView(cell: row.free)
-                PlanCellView(cell: row.plus)
+                // The account's plan next to the plan below it.
+                PlanCellView(cell: status.isPro ? row.plus : row.free)
+                PlanCellView(cell: status.isPro ? row.pro : row.plus)
               }
             }
           }
@@ -112,7 +117,7 @@ struct SeptaskPlusPane: View {
       }
     }
     .formStyle(.grouped)
-    .navigationTitle(RegistryPlans.name)
+    .navigationTitle(status.title)
     #if os(iOS)
     .navigationBarTitleDisplayMode(.inline)
     #endif
@@ -127,11 +132,12 @@ struct SeptaskPlusPane: View {
   }
 
   /// SF Symbol of a plan card's registry icon (plans.json `cards[].icon`).
-  /// Pro has no card in the apps: no store sells it (ADR 0037, ADR 0045).
   private var planSymbol: String {
-    if status.isPro { return RegistryIcons.sfSymbols["plans.pro"] ?? "circle" }
+    if status.isPro { return Self.proSymbol }
     return Self.cardSymbol(status.isPlus ? "plus" : "free")
   }
+
+  private static var proSymbol: String { RegistryIcons.sfSymbols[RegistryPlans.proCard.icon] ?? "circle" }
 
   private static func cardSymbol(_ id: String) -> String {
     RegistryIcons.sfSymbols[RegistryPlans.card(id)?.icon ?? ""] ?? "circle"
