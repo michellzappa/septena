@@ -55,7 +55,7 @@ class ReminderActionReceiver : BroadcastReceiver() {
             val graph = context.graph()
             val now = Instant.now()
             when (action) {
-                ACTION_COMPLETE -> graph.taskMutator.complete(taskId)
+                ACTION_COMPLETE -> graph.completeTask(taskId)
                 ACTION_SNOOZE_15M -> graph.taskMutator.snoozeReminder(taskId, now.plus(Duration.ofMinutes(15)))
                 ACTION_SNOOZE_1H -> graph.taskMutator.snoozeReminder(taskId, now.plus(Duration.ofHours(1)))
                 ACTION_DISMISS -> graph.taskMutator.dismissReminder(taskId)

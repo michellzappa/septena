@@ -367,15 +367,14 @@ fun TaskDetailScreen(
     val discussHeading = attributes.firstOrNull { it.id == RegistryTaskAttributeIds.DISCUSS }?.label
         ?: conversationBlock?.let { RegistryCatalog.taskPageBlockHeading(it, languageTag) }
 
-    fun write(block: suspend () -> Unit) {
+    /** Runs one user gesture that records its own undo step. */
+    fun save(gesture: suspend () -> Unit) {
         if (!canEdit) return
         scope.launch {
             saving = true
             saveFailed = false
             runCatching {
-                withContext(Dispatchers.IO) {
-                    graph.captureTaskEdit(taskId, block)
-                }
+                withContext(Dispatchers.IO) { gesture() }
             }.onSuccess {
                 graph.sync.noteLocalChange()
                 graph.sync.requestSync()
@@ -385,6 +384,8 @@ fun TaskDetailScreen(
             saving = false
         }
     }
+
+    fun write(block: suspend () -> Unit) = save { graph.captureTaskEdit(taskId, block) }
 
     fun toggleComplete() {
         if (!canEdit) return
@@ -401,7 +402,7 @@ fun TaskDetailScreen(
                 )
             }
         } else {
-            write { check(graph.taskMutator.complete(taskId) != null) }
+            save { check(graph.completeTask(taskId)) }
         }
     }
 

@@ -4,6 +4,7 @@ import app.septena.core.ConversationMutator
 import app.septena.core.JsonValue
 import app.septena.core.SyncRecord
 import app.septena.core.TaskMutator
+import app.septena.core.generated.RegistryEntities
 import app.septena.core.generated.RegistryEntityNames
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -26,6 +27,15 @@ class TaskUndoHistory {
         data object DeleteCreated : UndoOperation
     }
 
+    /** One task around a gesture's write, with its conversation when the gesture may change that too. */
+    data class Edit(
+        val taskId: String,
+        val beforeTask: SyncRecord?,
+        val afterTask: SyncRecord?,
+        val beforeConvo: SyncRecord?,
+        val afterConvo: SyncRecord?,
+    )
+
     private data class Step(
         val taskId: String,
         val operation: UndoOperation,
@@ -46,19 +56,16 @@ class TaskUndoHistory {
     }
 
     /**
-     * Records a task + conversation mutation (such as Review Accept or Send back)
+     * Records task + conversation mutations (such as Review Accept or Send back)
      * as ONE undo entry so Undo restores both the task and the conversation state.
      */
-    suspend fun recordTaskAndConvoEdit(
-        taskId: String,
-        beforeTask: SyncRecord?,
-        afterTask: SyncRecord?,
-        beforeConvo: SyncRecord?,
-        afterConvo: SyncRecord?,
-    ) {
-        val steps = mutableListOf<Step>()
-        step(beforeTask, afterTask)?.let { steps += it }
-        convoStep(taskId, beforeConvo, afterConvo)?.let { steps += it }
+    suspend fun recordTaskAndConvoEdits(edits: List<Edit>) {
+        val steps = edits.flatMap { edit ->
+            listOfNotNull(
+                step(edit.beforeTask, edit.afterTask),
+                convoStep(edit.taskId, edit.beforeConvo, edit.afterConvo),
+            )
+        }
         if (steps.isEmpty()) return
         record(Entry(steps))
     }
@@ -104,8 +111,10 @@ class TaskUndoHistory {
         if (after == null || after.entity != RegistryEntityNames.CONVO) return null
         val beforeFields = before?.fields.orEmpty()
         val afterFields = after.fields
+        // A pull between the two reads can bring in server-owned fields; a client may not write those back.
+        val columns = RegistryEntities.all.getValue(RegistryEntityNames.CONVO).columns
         val changedFields = (beforeFields.keys + afterFields.keys)
-            .filter { beforeFields[it] != afterFields[it] }
+            .filter { beforeFields[it] != afterFields[it] && columns[it]?.serverOwned == false }
         if (changedFields.isEmpty()) return null
         return Step(
             taskId = taskId,
