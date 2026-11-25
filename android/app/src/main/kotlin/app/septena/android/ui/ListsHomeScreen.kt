@@ -35,11 +35,13 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -76,6 +78,7 @@ import app.septena.ui.TaskCardPosition
 import app.septena.ui.TaskCardSlice
 import app.septena.ui.cardPosition
 import app.septena.ui.rememberMagicPlusContainerDrop
+import kotlinx.coroutines.launch
 
 private val SIDEBAR_ROW_HEIGHT = 42.dp
 private val TILE_GUTTER = 10.dp
@@ -104,6 +107,7 @@ internal fun ListsHomePage(
     onCreateArea: (String) -> Unit,
     onCreateProject: (String) -> Unit,
     onJoinShared: () -> Unit,
+    onRefresh: (suspend () -> Unit)? = null,
 ) {
     val isDark = LocalSeptenaDarkTheme.current
     val appearance = LocalAppearance.current
@@ -114,6 +118,8 @@ internal fun ListsHomePage(
     }
     var createMenuOpen by remember { mutableStateOf(false) }
     var promptMode by remember { mutableStateOf<HomeCreatePrompt?>(null) }
+    val pullScope = rememberCoroutineScope()
+    var isPullRefreshing by remember { mutableStateOf(false) }
     val magicPlusDrag = remember { MagicPlusDragState() }
     magicPlusDrag.fallbackDrop = { onNewTask(QuickAddDraft(today = true)) }
 
@@ -159,32 +165,50 @@ internal fun ListsHomePage(
                     )
                 },
             ) { contentPadding ->
-                ListsHomeContent(
-                    state = state,
-                    languageTag = languageTag,
-                    settingsTitle = settingsTitle,
-                    isDark = isDark,
-                    hasActiveTexture = appearance.hasActiveTexture,
-                    highlightSelection = false,
-                    showSettingsRow = false,
-                    onSelect = onSelectLocation,
-                    onSetAreaEmoji = onSetAreaEmoji,
-                    onOpenSettings = onOpenSettings,
-                    onMagicPlusDropLocation = { loc ->
-                        onNewTask(
-                            when (loc) {
-                                is TaskHomeLocation.Area -> QuickAddDraft(areaId = loc.id)
-                                is TaskHomeLocation.Project -> QuickAddDraft(projectId = loc.id)
-                                is TaskHomeLocation.SmartList -> when (loc.destinationId) {
-                                    RegistryDestinationIds.TODAY -> QuickAddDraft(today = true)
-                                    RegistryDestinationIds.STARRED -> QuickAddDraft(starred = true)
-                                    else -> QuickAddDraft()
+                PullToRefreshBox(
+                    isRefreshing = isPullRefreshing,
+                    onRefresh = {
+                        val refresh = onRefresh ?: return@PullToRefreshBox
+                        if (!isPullRefreshing) {
+                            isPullRefreshing = true
+                            pullScope.launch {
+                                try {
+                                    refresh()
+                                } finally {
+                                    isPullRefreshing = false
                                 }
-                            },
-                        )
+                            }
+                        }
                     },
-                    modifier = Modifier.padding(contentPadding),
-                )
+                    modifier = Modifier.fillMaxSize().padding(contentPadding),
+                ) {
+                    ListsHomeContent(
+                        state = state,
+                        languageTag = languageTag,
+                        settingsTitle = settingsTitle,
+                        isDark = isDark,
+                        hasActiveTexture = appearance.hasActiveTexture,
+                        highlightSelection = false,
+                        showSettingsRow = false,
+                        onSelect = onSelectLocation,
+                        onSetAreaEmoji = onSetAreaEmoji,
+                        onOpenSettings = onOpenSettings,
+                        onMagicPlusDropLocation = { loc ->
+                            onNewTask(
+                                when (loc) {
+                                    is TaskHomeLocation.Area -> QuickAddDraft(areaId = loc.id)
+                                    is TaskHomeLocation.Project -> QuickAddDraft(projectId = loc.id)
+                                    is TaskHomeLocation.SmartList -> when (loc.destinationId) {
+                                        RegistryDestinationIds.TODAY -> QuickAddDraft(today = true)
+                                        RegistryDestinationIds.STARRED -> QuickAddDraft(starred = true)
+                                        else -> QuickAddDraft()
+                                    }
+                                },
+                            )
+                        },
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
             }
 
             // Round Magic Plus orb on the Lists Homepage: tap opens New Task / New Project / New Area;
