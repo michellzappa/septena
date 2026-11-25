@@ -45,6 +45,7 @@ import {
   SHARED_FIELDS,
   SHARED_PROJECT_ROW,
   ShareBook,
+  isSharedEntity,
   newSharedRowId,
   sharedColumn,
   type ShareDelivery,
@@ -54,6 +55,7 @@ import {
   type ShareValue,
   type SharedEntity,
 } from "./shares.js";
+import { mergeNotes } from "./mergeText.js";
 import { SESSION_HEADER, SessionBook, type RenewResult, type SessionGrant } from "./sessions.js";
 
 /// Task fields only the app writes (docs/TASK_FADE_SPEC.md §3): the fade
@@ -674,12 +676,15 @@ export class TaskStore extends DurableObject<Env> {
   /// Before/after per field for the change log. `before` is the decoded row
   /// (or null for an insert), `after` the pushed values. Only fields whose
   /// value actually changed are kept; long text is cut to keep the log small.
-  private diffFor(before: Record<string, unknown> | null, after: Record<string, unknown>): ChangeDiff {
+  /// `whole` keeps it: what a member of a shared project overwrote can be read
+  /// back here.
+  private diffFor(before: Record<string, unknown> | null, after: Record<string, unknown>, whole = false): ChangeDiff {
+    const keep = whole ? (v: unknown) => v : clipForLog;
     const out: ChangeDiff = {};
     for (const [name, next] of Object.entries(after)) {
       const prev = before ? (before[name] ?? null) : null;
       if (JSON.stringify(prev) === JSON.stringify(next ?? null)) continue;
-      out[name] = [clipForLog(prev), clipForLog(next ?? null)];
+      out[name] = [keep(prev), keep(next ?? null)];
     }
     return out;
   }
@@ -943,6 +948,12 @@ export class TaskStore extends DurableObject<Env> {
       }
     }
 
+    // Another device or member changed the notes since this writer read them.
+    if (op.base && row && "notes" in op.fields) {
+      op.fields.notes = mergeNotes(
+        op.base.notes, (row.notes as string | null) ?? null, (op.fields.notes as string | null) ?? null, ENTITY_LIMITS.notesMax,
+      );
+    }
     if (op.entity === "task" && this.fadeEnds({ ...row, ...op.fields })) {
       if (!names.includes("fadedAt")) names.push("fadedAt");
       op.fields.fadedAt = null;
@@ -967,7 +978,8 @@ export class TaskStore extends DurableObject<Env> {
       if (op.fields.status === "open") this.forgetTurnDown(op.id);
     }
     const before = row ? decodeRow(spec, row as Record<string, unknown>) : null;
-    this.log(rev, op.entity, op.id, "upsert", names, op.clientOpId, actor, now, this.diffFor(before, op.fields));
+    this.log(rev, op.entity, op.id, "upsert", names, op.clientOpId, actor, now,
+      this.diffFor(before, op.fields, sharing && this.isShared(op.entity, op.id)));
     if (noteContainer) {
       const field = NOTE_FIELD[noteContainer];
       const next = (op.fields[field] as string | null | undefined) ?? null;
@@ -1001,7 +1013,7 @@ export class TaskStore extends DurableObject<Env> {
     if (op.entity === "task" && !isAgentActor(actor) && (op.fields.status === "done" || op.fields.status === "cancelled")) {
       this.endReview(op.id, actor, now);
     }
-    if (sharing) this.shareOut(op.entity, op.id, names);
+    if (sharing) this.shareOut(op.entity, op.id, names, before);
     return { clientOpId: op.clientOpId, status: "applied", rev };
   }
 
@@ -1019,6 +1031,10 @@ export class TaskStore extends DurableObject<Env> {
     if (from && this.doomedShares.has(from) && (op.op === "delete" || moves)) return "shared_project";
     if (moves && this.shares.shared("task", op.id) && this.shares.forProject(from)?.role !== "owner") return "shared_move_out";
     return null;
+  }
+
+  private isShared(entity: string, id: string): boolean {
+    return isSharedEntity(entity) && this.shares.shared(entity, id) !== null;
   }
 
   private rowOf(entity: SharedEntity, id: string): Record<string, unknown> | null {
@@ -1039,22 +1055,23 @@ export class TaskStore extends DurableObject<Env> {
   }
 
   /// Queues one applied local write for the ProjectStore. `names`: the
-  /// changed fields, or null for a delete.
-  private shareOut(entity: string, id: string, names: string[] | null): void {
+  /// changed fields, or null for a delete. `before`: the row it changed.
+  private shareOut(entity: string, id: string, names: string[] | null, before: Record<string, unknown> | null = null): void {
+    const baseNotes = before && names?.includes("notes") ? ((before.notes as string | null) ?? null) : undefined;
     if (entity === "project") {
       const share = this.shares.forProject(id);
       const fields = (names ?? []).filter((n) => SHARED_FIELDS.project.includes(n));
       if (share && fields.length) {
-        this.shares.enqueue(share.id, "project", SHARED_PROJECT_ROW, false, this.outFields("project", this.rowOf("project", id)!, fields));
+        this.shares.enqueue(share.id, "project", SHARED_PROJECT_ROW, false, this.outFields("project", this.rowOf("project", id)!, fields), baseNotes);
       }
     } else if (entity === "task") {
-      this.shareOutTask(id, names);
+      this.shareOutTask(id, names, baseNotes);
     } else if (entity === "checklistItem") {
       this.shareOutItem(id, names);
     }
   }
 
-  private shareOutTask(id: string, names: string[] | null): void {
+  private shareOutTask(id: string, names: string[] | null, baseNotes?: string | null): void {
     const mapping = this.shares.shared("task", id);
     if (names === null) {
       if (mapping) this.shares.enqueue(mapping.shareId, "task", mapping.sharedId, true, {});
@@ -1066,7 +1083,7 @@ export class TaskStore extends DurableObject<Env> {
     if (!share) return;
     if (mapping && mapping.shareId === share.id) {
       const fields = names.filter((n) => SHARED_FIELDS.task.includes(n));
-      if (fields.length) this.shares.enqueue(share.id, "task", mapping.sharedId, false, this.outFields("task", row, fields));
+      if (fields.length) this.shares.enqueue(share.id, "task", mapping.sharedId, false, this.outFields("task", row, fields), baseNotes);
       return;
     }
     this.shareTaskIn(share.id, id, row);
@@ -1181,11 +1198,30 @@ export class TaskStore extends DurableObject<Env> {
     this.ctx.waitUntil(this.drainShares());
   }
 
+  /// The alarm before the work: an object that stops in the middle sends the
+  /// rest when it fires. `housekeepAt` keeps the daily run where it was.
+  private async armShareAlarm(): Promise<void> {
+    const at = await this.ctx.storage.getAlarm();
+    const retry = Date.now() + SHARE_RETRY_MS;
+    if (at !== null && at <= retry) return;
+    if (at !== null) this.setMeta("housekeepAt", at);
+    await this.ctx.storage.setAlarm(retry);
+  }
+
+  /// Nothing is left to send.
+  private async disarmShareAlarm(): Promise<void> {
+    const at = this.meta("housekeepAt");
+    if (!at) return;
+    this.setMeta("housekeepAt", 0);
+    await this.ctx.storage.setAlarm(Math.max(at, Date.now()));
+  }
+
   async drainShares(): Promise<void> {
-    if (this.drainingShares) return;
+    if (this.drainingShares || !this.shares.pendingShares().length) return;
     this.drainingShares = true;
     let failed = false;
     try {
+      await this.armShareAlarm();
       for (const shareId of this.shares.pendingShares()) {
         const share = this.shares.get(shareId);
         if (!share) { this.shares.remove(shareId); continue; }
@@ -1194,25 +1230,24 @@ export class TaskStore extends DurableObject<Env> {
             const res = await projectStoreFor(this.env, shareId).push(share.userId, batch.ops);
             if (!res.ok) {
               // The membership ended. Its notice may still be on the way.
-              await this.receiveShare({ shareId, userId: share.userId, state: "ended", keepCopy: share.role === "owner" });
+              await this.receiveShare({ shareId, userId: share.userId, state: "ended", keepCopy: res.keepCopy || share.role === "owner" });
               break;
             }
             this.shares.sent(shareId, batch.through);
           }
           for (let ids = this.shares.maskedRows(shareId); ids.length; ids = this.shares.maskedRows(shareId)) {
-            const rows = await projectStoreFor(this.env, shareId).rows(share.userId, ids);
-            if (!rows) {
-              await this.receiveShare({ shareId, userId: share.userId, state: "ended", keepCopy: share.role === "owner" });
+            const found = await projectStoreFor(this.env, shareId).rows(share.userId, ids);
+            if (!found.ok) {
+              await this.receiveShare({ shareId, userId: share.userId, state: "ended", keepCopy: found.keepCopy || share.role === "owner" });
               break;
             }
-            for (const { entity, id } of ids) {
-              if (!rows.some((r) => r.entity === entity && r.id === id)) this.shares.took(shareId, entity, id, 0, false);
-            }
+            const { rows } = found;
             // Deliver them like any other rows. A write that came in
             // meanwhile masks its row again; it is sent first, next round.
             const before = this.meta("rev");
             const purged: string[] = [];
             this.ctx.storage.transactionSync(() => {
+              this.shares.unmask(shareId, ids);
               for (const row of rows) this.applyShared(shareId, share.localProjectId, row, purged);
             });
             if (this.meta("rev") > before) this.broadcast(this.meta("rev"));
@@ -1227,8 +1262,9 @@ export class TaskStore extends DurableObject<Env> {
     } finally {
       this.drainingShares = false;
     }
-    if (failed) await this.ctx.storage.setAlarm(Date.now() + SHARE_RETRY_MS);
-    else this.kickShares();
+    if (failed) return;
+    if (this.shares.pendingShares().length) this.kickShares();
+    else await this.disarmShareAlarm();
   }
 
   /// Takes a delivery from a ProjectStore. Only a ProjectStore calls it, and
@@ -1286,7 +1322,9 @@ export class TaskStore extends DurableObject<Env> {
     if (row.rev < this.shares.revOf(shareId, entity, row.id)) return;
     const known = this.shares.localId(shareId, entity, row.id);
     if (row.deleted) {
-      if (known) purged.push(...this.tombstoneReplica(entity, known, new Date().toISOString(), row.by));
+      if (!known) return;
+      if (entity === "task" && this.keepsOwnCopy(shareId, known, row.id)) this.keepAsPrivate(shareId, known, row.id, row.by);
+      else purged.push(...this.tombstoneReplica(entity, known, new Date().toISOString(), row.by));
       return;
     }
     const id = this.localFor(shareId, entity, row.id);
@@ -1308,6 +1346,10 @@ export class TaskStore extends DurableObject<Env> {
     }
     if (!before) {
       if (typeof next.title !== "string") return;
+      // An item of a task that is gone here. (A task that is not here yet is
+      // on its way: rows come in the order of their last change.)
+      if (entity === "checklistItem" && typeof next.taskId === "string"
+        && (ShareBook.isRetired(next.taskId) || this.rowOf("task", next.taskId)?.deletedAt)) return;
       if (entity === "task") {
         // Not a proposal, not filed yet, and its fade clock starts today.
         Object.assign(next, { project: projectId, source: "app", acknowledgedAt: now, touchedAt: now, status: next.status ?? "open" });
@@ -1332,7 +1374,7 @@ export class TaskStore extends DurableObject<Env> {
       );
     }
     const actor = `member:${row.by}`;
-    this.log(rev, entity, id, "upsert", names, null, actor, now, this.diffFor(before, next));
+    this.log(rev, entity, id, "upsert", names, null, actor, now, this.diffFor(before, next, true));
     // Another member closed the task: the Do of it here ends too (docs/DO_SPEC.md §2.1).
     if (entity === "task" && "status" in next) this.resolveDo(actor, now);
     if (entity === "task" && (next.status === "done" || next.status === "cancelled")) this.endReview(id, actor, now);
@@ -1348,7 +1390,9 @@ export class TaskStore extends DurableObject<Env> {
     if (!before || before.deletedAt) return [];
     const rev = this.nextRev();
     this.sql.exec(`UPDATE ${ENTITIES[entity].table} SET deletedAt = ?, rev = ?, updatedAt = ? WHERE id = ?`, now, rev, now, id);
-    this.log(rev, entity, id, "delete", null, null, by ? `member:${by}` : "system:share", now);
+    const snapshot: ChangeDiff = {};
+    for (const name of SHARED_FIELDS[entity]) if (before[name] !== null && before[name] !== undefined) snapshot[name] = [before[name], null];
+    this.log(rev, entity, id, "delete", null, null, by ? `member:${by}` : "system:share", now, snapshot);
     if (entity !== "task") return [];
     this.tombstoneConvo(id, now);
     const purged = this.tombstoneAttachments(id, now);
@@ -1362,15 +1406,61 @@ export class TaskStore extends DurableObject<Env> {
     const share = this.shares.get(shareId);
     if (!share) return;
     const rows = this.shares.mapped(shareId);
-    this.shares.remove(shareId);
     if (keepCopy) {
+      this.shares.remove(shareId);
       this.setProjectShare(share.localProjectId, null);
       return;
     }
-    const now = new Date().toISOString();
-    for (const entity of ["checklistItem", "task", "project"] as const) {
-      for (const r of rows) if (r.entity === entity) purged.push(...this.tombstoneReplica(entity, r.localId, now));
+    // Tasks that hold something only this account has stay, in the project,
+    // which becomes private. Their sections stay with them.
+    const own = new Set(rows.filter((r) => r.entity === "task" && this.keepsOwnCopy(shareId, r.localId, r.sharedId)).map((r) => r.localId));
+    for (const id of [...own]) {
+      const heading = this.rowOf("task", id)?.heading;
+      if (typeof heading === "string") own.add(heading);
     }
+    this.shares.remove(shareId);
+    const now = new Date().toISOString();
+    for (const r of rows) {
+      if (r.entity === "task" && !own.has(r.localId)) purged.push(...this.tombstoneReplica("task", r.localId, now));
+      if (r.entity === "checklistItem" && !own.has((this.rowOf("checklistItem", r.localId)?.taskId as string | undefined) ?? "")) {
+        purged.push(...this.tombstoneReplica("checklistItem", r.localId, now));
+      }
+    }
+    if (own.size) this.setProjectShare(share.localProjectId, null);
+    else purged.push(...this.tombstoneReplica("project", share.localProjectId, now));
+  }
+
+  /// Whether deleting this replica would delete something that exists nowhere
+  /// else: words that did not reach the project, or this account's own files,
+  /// conversation and references.
+  private keepsOwnCopy(shareId: string, taskId: string, sharedId: string): boolean {
+    const row = this.rowOf("task", taskId);
+    if (!row || row.deletedAt) return false;
+    if (this.shares.hasUnsentText(shareId, sharedId) || this.shares.revOf(shareId, "task", sharedId) === 0) return true;
+    const items = this.sql.exec<{ id: string }>("SELECT id FROM checklist_items WHERE taskId = ? AND deletedAt IS NULL", taskId).toArray();
+    for (const { id } of items) {
+      const item = this.shares.shared("checklistItem", id);
+      if (item && this.shares.hasUnsentText(shareId, item.sharedId, "checklistItem")) return true;
+    }
+    return ["attachments", "task_refs"].some((table) =>
+      this.sql.exec(`SELECT 1 FROM ${table} WHERE taskId = ? AND deletedAt IS NULL LIMIT 1`, taskId).toArray().length > 0)
+      || this.sql.exec("SELECT 1 FROM turns WHERE taskId = ? LIMIT 1", taskId).toArray().length > 0;
+  }
+
+  /// Another member deleted the task. It stays here as a private one, in the
+  /// Inbox, with what this account had on it.
+  private keepAsPrivate(shareId: string, taskId: string, sharedId: string, by: string): void {
+    for (const { id } of this.sql.exec<{ id: string }>("SELECT id FROM checklist_items WHERE taskId = ?", taskId).toArray()) {
+      const item = this.shares.shared("checklistItem", id);
+      if (item) this.shares.retire(shareId, "checklistItem", item.sharedId);
+    }
+    this.shares.retire(shareId, "task", sharedId);
+    const before = this.rowOf("task", taskId)!;
+    const now = new Date().toISOString();
+    const rev = this.nextRev();
+    const next = { project: null, heading: null, assignedTo: null };
+    this.sql.exec("UPDATE tasks SET project = NULL, heading = NULL, assignedTo = NULL, rev = ?, updatedAt = ? WHERE id = ?", rev, now, taskId);
+    this.log(rev, "task", taskId, "upsert", Object.keys(next), null, `member:${by}`, now, this.diffFor(before, next));
   }
 
   /// The rules an agent write must pass, enforced here so no connector can
@@ -3427,6 +3517,14 @@ export class TaskStore extends DurableObject<Env> {
     const now = Date.now();
     const tombstoneCutoff = new Date(now - TOMBSTONE_TTL_MS).toISOString();
     const revBefore = this.meta("rev");
+    // Only a share retry, and the daily run is not due.
+    const housekeepAt = this.meta("housekeepAt");
+    if (housekeepAt > now) {
+      await this.ctx.storage.setAlarm(housekeepAt);
+      await this.drainShares();
+      return;
+    }
+    this.setMeta("housekeepAt", 0);
     this.ctx.storage.transactionSync(() => {
       // A Do nobody ended (docs/DO_SPEC.md §2.2).
       this.resolveDo("system:housekeeping", new Date(now).toISOString());
@@ -3455,7 +3553,7 @@ export class TaskStore extends DurableObject<Env> {
     });
     if (this.meta("rev") > revBefore) this.broadcast(this.meta("rev"));
     await this.ctx.storage.setAlarm(now + DAY_MS);
-    // A failed drain sets its own, earlier alarm.
+    // It sets its own, earlier alarm.
     await this.drainShares();
   }
 }
