@@ -53,6 +53,12 @@ A task can point at up to 20 items: an email, a mail thread, a calendar event, a
 - A GitHub issue or PR URL that you write into an artifact, a handoff, an end-state note or a turn becomes a reference on its own. A reference that the user removed does not come back this way.
 - A reference never completes a task.
 
+#### Files on a task
+
+- `tasks_get` lists `attachments` (filename, contentType, byteCount). You cannot read a file's bytes. `uploaded: false` means the bytes are only on the device that added the file.
+- **`tasks_attachment_add(task_id, filename, content_type)`** adds a file of up to 10 MB. Pass `text` for text you wrote, or `base64` for a tiny binary. For a file on disk, pass neither and run the returned `command` (one-time token, 15 minutes). The file is attached when that upload answers `attached: true`.
+- For a web page or an email, add a reference instead. Only the user can remove a file.
+
 #### Task Conversations (agent-driven resolution)
 
 A task can hold a persisted **conversation** that drives it toward a solution. You are the

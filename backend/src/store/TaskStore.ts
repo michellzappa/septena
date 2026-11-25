@@ -2318,6 +2318,17 @@ export class TaskStore extends DurableObject<Env> {
     ).toArray().map((r) => decodeRow(ENTITIES.taskRef, r) as Row);
   }
 
+  readAttachments(taskId: string): Row[] {
+    return this.sql.exec(
+      "SELECT * FROM attachments WHERE taskId = ? AND deletedAt IS NULL ORDER BY position IS NULL, position, createdAt, id", taskId,
+    ).toArray().map((r) => decodeRow(ENTITIES.attachment, r) as Row);
+  }
+
+  /// Whether the id was ever used, also by a file that is now deleted.
+  hasAttachment(id: string): boolean {
+    return this.sql.exec("SELECT 1 FROM attachments WHERE id = ?", id).toArray().length > 0;
+  }
+
   /// The tasks that point at a key, active first, then the newest write
   /// first. `key` is in normal form.
   findByRef(key: string, limit: number): { tasks: RefHit[]; total: number } {

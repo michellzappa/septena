@@ -82,7 +82,9 @@ const notesFile = parseFile("src/shadow/notes.ts");
 const taskTools = extractToolArray(findConstInitializer(taskToolsFile, "TASK_TOOLS"));
 const agentTools = extractToolArray(findConstInitializer(agentFile, "AGENT_TOOLS"));
 const notesTools = extractToolArray(findConstInitializer(notesFile, "NOTES_TOOLS"));
-const allTools = [...taskTools, ...agentTools, ...notesTools];
+const attachmentFile = parseFile("src/shadow/attachments.ts");
+const attachmentTools = extractToolArray(findConstInitializer(attachmentFile, "ATTACHMENT_TOOLS"));
+const allTools = [...taskTools, ...attachmentTools, ...agentTools, ...notesTools];
 const byName = new Map(allTools.map((t) => [t.name, t]));
 
 test("every api.septena.app tool has unique name, title, and explicit MCP ToolAnnotations", () => {
@@ -116,7 +118,8 @@ test("api.septena.app connector tools match issue #85 read-only and destructive 
   const shadowWrites = objectKeys(shadowWritesFile, "zWriteArgs");
   const shadowAgent = objectKeys(agentFile, "zAgentArgs");
   const shadowNotes = objectKeys(notesFile, "zNotesArgs");
-  const apiConnectorNames = new Set([...shadowReads, ...shadowWrites, ...shadowAgent, ...shadowNotes]);
+  const shadowAttachments = objectKeys(attachmentFile, "zAttachmentArgs");
+  const apiConnectorNames = new Set([...shadowAttachments, ...shadowReads, ...shadowWrites, ...shadowAgent, ...shadowNotes]);
 
   const expectedReadOnly = new Set([
     "tasks_list",
@@ -137,6 +140,7 @@ test("api.septena.app connector tools match issue #85 read-only and destructive 
   ]);
   const expectedDestructive = new Set(["tasks_complete", "tasks_update", "tasks_checklist_delete"]);
   const expectedNonIdempotent = new Set([
+    "tasks_attachment_add",
     "tasks_create",
     "tasks_update",
     "tasks_thread_append",
