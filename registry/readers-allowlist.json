@@ -53,16 +53,60 @@
       "reason": "The fade grace period is read by the shared Rust core (ADR 0025); Swift calls the core for fadeFill.",
       "issue": "#250"
     },
-    "RegistryEntityEnums.doExit": {
-      "reason": "Do (ADR 0041): the core holds the rule; the client half reads it.",
-      "issue": "#517"
-    },
     "RegistryRules.doStaleHours": {
       "reason": "The shared core applies it (resolve_do_sessions).",
       "issue": "#517"
     },
     "RegistryRules.doLapseHours": {
       "reason": "The shared core applies it (resolve_do_sessions).",
+      "issue": "#517"
+    },
+    "RegistryDoing.lengths": {
+      "reason": "Do (ADR 0041): the Do screen reads it.",
+      "issue": "#517"
+    },
+    "RegistryDoing.lastTimeTitle": {
+      "reason": "Do (ADR 0041): the Do screen reads it.",
+      "issue": "#517"
+    },
+    "RegistryDoing.firstStepTitle": {
+      "reason": "Do (ADR 0041): the Do screen reads it.",
+      "issue": "#517"
+    },
+    "RegistryDoing.lengthTitle": {
+      "reason": "Do (ADR 0041): the Do screen reads it.",
+      "issue": "#517"
+    },
+    "RegistryDoing.noLengthTitle": {
+      "reason": "Do (ADR 0041): the Do screen reads it.",
+      "issue": "#517"
+    },
+    "RegistryDoing.stopNoteTitle": {
+      "reason": "Do (ADR 0041): the Do screen reads it.",
+      "issue": "#517"
+    },
+    "RegistryDoing.stopNoteSaveTitle": {
+      "reason": "Do (ADR 0041): the Do screen reads it.",
+      "issue": "#517"
+    },
+    "RegistryDoing.stopNoteSkipTitle": {
+      "reason": "Do (ADR 0041): the Do screen reads it.",
+      "issue": "#517"
+    },
+    "RegistryDoing.openExitLabel": {
+      "reason": "Do (ADR 0041): the Do screen reads it.",
+      "issue": "#517"
+    },
+    "RegistryDoing.lengthOption": {
+      "reason": "Do (ADR 0041): the Do screen reads it.",
+      "issue": "#517"
+    },
+    "RegistryDoing.stale": {
+      "reason": "Do (ADR 0041): the Do screen reads it.",
+      "issue": "#517"
+    },
+    "RegistryDoing.exitLabels": {
+      "reason": "Do (ADR 0041): the Do screen reads it.",
       "issue": "#517"
     }
   },

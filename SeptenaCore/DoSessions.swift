@@ -159,14 +159,9 @@ struct DoState: Equatable, Sendable {
   /// The same words for a closed Do in the history.
   static func lengthText(_ length: TimeInterval) -> String {
     let minutes = Int(length / 60)
-    return Duration.seconds(minutes * 60).formatted(
-      .units(allowed: minutes >= 60 ? [.hours, .minutes] : [.minutes], width: .abbreviated, zeroValueUnits: .hide))
-      .nonEmpty ?? Duration.zero.formatted(.units(allowed: [.minutes], width: .abbreviated))
+    let units: Set<Duration.UnitsFormatStyle.Unit> = minutes >= 60 ? [.hours, .minutes] : [.minutes]
+    return Duration.seconds(minutes * 60).formatted(.units(allowed: units, width: .abbreviated))
   }
-}
-
-private extension String {
-  var nonEmpty: String? { isEmpty ? nil : self }
 }
 
 /// The current Do, and every gesture on it. Reads rows; writes them through
@@ -305,7 +300,7 @@ final class DoStore {
       older.lapsed = end.lapsed
       changed.append(older.id)
     }
-    guard commit(changed, op: "do.begin") else { return }
+    guard commit(changed, op: "doSession.begin") else { return }
     justStoppedSessionID = nil
     fullSessionID = row.id
     refresh()
@@ -324,7 +319,7 @@ final class DoStore {
   func confirm(sessionID: String) {
     guard let row = entity(sessionID), row.endedAt == nil else { return }
     row.confirmedAt = DoStamp.text(Date())
-    commit([sessionID], op: "do.confirm")
+    commit([sessionID], op: "doSession.confirm")
     refresh()
   }
 
@@ -333,7 +328,7 @@ final class DoStore {
     guard let row = entity(sessionID), row.endedAt == nil else { return }
     row.plannedMinutes = minutes.map(clampedLength)
     signalled.remove(sessionID)
-    commit([sessionID], op: "do.length")
+    commit([sessionID], op: "doSession.length")
     refresh()
   }
 
@@ -344,7 +339,7 @@ final class DoStore {
     if justStoppedSessionID == sessionID { justStoppedSessionID = nil }
     guard !text.isEmpty, let row = entity(sessionID) else { return }
     row.note = text
-    commit([sessionID], op: "do.note")
+    commit([sessionID], op: "doSession.note")
   }
 
   func dismissStopNote() { justStoppedSessionID = nil }
@@ -370,7 +365,7 @@ final class DoStore {
     row.lapsed = current?.sessionID == sessionID && current?.isStale == true
     row.endedAt = DoStamp.text(Date())
     row.exit = exit.rawValue
-    let ok = commit([sessionID], op: "do.\(exit.rawValue)")
+    let ok = commit([sessionID], op: "doSession.end")
     refresh()
     return ok
   }
@@ -392,7 +387,7 @@ final class DoStore {
       row.exit = (task?.status == .done && task?.deletedAt == nil ? DoExit.done : .closed).rawValue
       changed.append(row.id)
     }
-    guard !changed.isEmpty, commit(changed, op: "do.taskClosed") else { return }
+    guard !changed.isEmpty, commit(changed, op: "doSession.taskClosed") else { return }
     refresh()
   }
 
