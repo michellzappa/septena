@@ -634,8 +634,6 @@ targets:
 # ships, so ⌘R gives you that build. Consequences worth knowing:
 #   • debug-only affordances are gone at runtime — the dashboard's ⟨ / ⟩ day
 #     time-travel strip, the Milestones preview row, the server inspector;
-#   • telemetry is LIVE in Release (`Telemetry` / `SeptaskDiagnostics` return
-#     early only under `#if DEBUG`), so dev runs post to the community worker;
 #   • step-debugging is effectively gone (it was already imprecise under -Osize).
 # Flip a scheme's `run: config:` back to `Debug` here for a debugging session.
 #

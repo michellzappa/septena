@@ -769,26 +769,11 @@ private struct SeptaskAccountPane: View {
 
 // MARK: - Privacy (Depth 1)
 
-/// Concise privacy overview + one canonical usage-data dial. Opt-in weekly
-/// diagnostics & Community Pulse live in Settings ▸ About ▸ Advanced so
-/// consumer Privacy stays unambiguous (docs/SETTINGS_UX_SPEC.md).
+/// Concise privacy overview and the way to Import & Export. The app sends no
+/// usage data, so there is nothing to set (#436).
 private struct SeptaskPrivacyPane: View {
-  @Environment(\.modelContext) private var modelContext
-  @Environment(CKEngine.self) private var ckEngine
-  @Environment(SettingsStore.self) private var store
-  @AppStorage(SettingsKey.telemetryLevel) private var levelRaw: String =
-    RegistrySettings.Defaults.telemetryLevel
-
-  private var level: TelemetryClient.TelemetryLevel {
-    TelemetryClient.TelemetryLevel(rawValue: levelRaw) ?? .balanced
-  }
-
   private var dataSection: RegistrySettingsSection? {
     RegistrySettings.section("data_locality", page: RegistrySettings.PageID.privacy)
-  }
-
-  private var telemetrySection: RegistrySettingsSection? {
-    RegistrySettings.section("telemetry", page: RegistrySettings.PageID.privacy)
   }
 
   var body: some View {
@@ -809,23 +794,6 @@ private struct SeptaskPrivacyPane: View {
             }
           }
         }
-      }
-
-      Section {
-        Picker(RegistrySettings.label(key: "telemetryLevel"), selection: Binding(
-          get: { level },
-          set: { store.setTelemetryLevel($0, context: modelContext, engine: ckEngine) }
-        )) {
-          ForEach(TelemetryClient.TelemetryLevel.allCases, id: \.self) { lvl in
-            Text(lvl.title).tag(lvl)
-          }
-        }
-        .pickerStyle(.inline)
-        .labelsHidden()
-      } header: {
-        Text(telemetrySection?.header ?? "")
-      } footer: {
-        Text([level.summary, telemetrySection?.footer].compactMap { $0 }.joined(separator: " "))
       }
     }
     .formStyle(.grouped)
