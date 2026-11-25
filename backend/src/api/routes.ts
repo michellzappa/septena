@@ -1042,6 +1042,16 @@ api.delete("/agent/webhooks/:id", async (c) => {
 
 // ---- account deletion (§10) ----
 
+async function emptyAttachments(env: Env, userId: string): Promise<void> {
+  const prefix = `u/${userId}/`;
+  let cursor: string | undefined;
+  do {
+    const page = await env.ATTACHMENTS.list({ prefix, cursor });
+    if (page.objects.length) await env.ATTACHMENTS.delete(page.objects.map((o) => o.key));
+    cursor = page.truncated ? page.cursor : undefined;
+  } while (cursor);
+}
+
 api.delete("/account", async (c) => {
   const userId = c.get("userId");
   const store = storeFor(c.env, userId);
@@ -1054,14 +1064,14 @@ api.delete("/account", async (c) => {
   // retried with the same token. Every step repeats safely.
   const accounts = accountStoreFor(c.env);
   if (accounts) await accounts.deleteIdentitiesForUser(userId);
-  const prefix = `u/${userId}/`;
-  let cursor: string | undefined;
-  do {
-    const page = await c.env.ATTACHMENTS.list({ prefix, cursor });
-    if (page.objects.length) await c.env.ATTACHMENTS.delete(page.objects.map((o) => o.key));
-    cursor = page.truncated ? page.cursor : undefined;
-  } while (cursor);
+  await emptyAttachments(c.env, userId);
   await store.deleteAccount();
+  // An upload from another device may have landed in between.
+  try {
+    await emptyAttachments(c.env, userId);
+  } catch (e) {
+    logEvent("account_attachment_sweep_failed", { userId, error: String(e) });
+  }
   logEvent("api_account_deleted", {});
   // The store held every session, so no token of this account works now.
   return c.body(null, 204);

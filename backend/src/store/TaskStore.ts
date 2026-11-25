@@ -1711,8 +1711,9 @@ export class TaskStore extends DurableObject<Env> {
     return this.sessions.hasAppSession();
   }
 
-  wasDeleted(): boolean {
-    return this.meta("deletedAt") > 0;
+  /// When the account in this store was last deleted (ms), or 0.
+  deletedAt(): number {
+    return this.meta("deletedAt");
   }
 
   /// True once an agent's session lives here instead of in KV.
@@ -2444,7 +2445,7 @@ export class TaskStore extends DurableObject<Env> {
     const url = new URL(request.url);
     // The session may have ended between the Worker's check and this call.
     const sid = request.headers.get(SESSION_HEADER);
-    if (sid && (this.sessions.hasEnded(sid) || (this.wasDeleted() && !this.sessions.exists(sid) && !this.ownsAgent(sid)))) {
+    if (sid && (this.sessions.hasEnded(sid) || (this.deletedAt() > 0 && !this.sessions.exists(sid) && !this.ownsAgent(sid)))) {
       return new Response("session ended", { status: 401 });
     }
     if (url.pathname.endsWith("/agent/events/stream")) {

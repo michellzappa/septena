@@ -51,7 +51,8 @@ it on that device only, and signs out only on a 401 that says
 - A copy of an old token, for example in an old backup, ends that session.
 - Tokens from before this decision keep working and move over on their next
   renewal. The rollout has two steps (`SIGNED_SESSIONS`): the first version
-  reads the new tokens, the second issues them. A rollback signs nobody out.
+  reads the new tokens, the second issues them. A rollback by one step signs nobody out. After the
+  second step, never roll back to a version from before this decision.
 - Account deletion empties the store last, and a repeated deletion answers 204.
 
 ## Links

@@ -20,6 +20,7 @@ function makeMemoryKv() {
   return {
     map,
     async get(key: string) { return map.get(key) ?? null; },
+    async getWithMetadata(key: string) { return { value: map.get(key) ?? null, metadata: null }; },
     async put(key: string, value: string) { map.set(key, value); },
     async delete(key: string) { map.delete(key); },
   };

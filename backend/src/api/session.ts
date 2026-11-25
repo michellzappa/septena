@@ -67,6 +67,7 @@ export interface AccessClaims {
   sid: string;
   /// Hash of the refresh token this access token came with.
   rt: string | null;
+  issuedAt: number;
 }
 
 /// The claims of a correctly signed, unexpired access token, or null. The
@@ -79,7 +80,7 @@ export async function verifyAccessToken(env: Env, token: string, prefix = ACCESS
     const claims = JSON.parse(new TextDecoder().decode(fromBase64Url(message.slice(prefix.length + 1)))) as { sub?: unknown; sid?: unknown; rt?: unknown; exp?: unknown };
     if (typeof claims.sub !== "string" || typeof claims.sid !== "string") return null;
     if (typeof claims.exp !== "number" || claims.exp < Math.floor(Date.now() / 1000)) return null;
-    return { userId: claims.sub, sid: claims.sid, rt: typeof claims.rt === "string" ? claims.rt : null };
+    return { userId: claims.sub, sid: claims.sid, rt: typeof claims.rt === "string" ? claims.rt : null, issuedAt: (claims.exp - ACCESS_TTL_S) * 1000 };
   } catch {
     return null;
   }
@@ -120,7 +121,7 @@ async function mintAppRefresh(env: Env, userId: string, sid: string): Promise<Mi
   if (issuesSignedTokens(env)) return mintRefresh(env, REFRESH_PREFIX, userId, sid, REFRESH_TTL_S);
   const token = `${LEGACY_REFRESH_PREFIX}.${randomId(32)}`;
   const hash = await sha256Base64Url(token);
-  await env.TOKENS.put(`api-refresh:${hash}`, userId, { expirationTtl: REFRESH_TTL_S });
+  await env.TOKENS.put(`api-refresh:${hash}`, userId, { expirationTtl: REFRESH_TTL_S, metadata: { sid } });
   return { token, hash, expiresAt: Date.now() + REFRESH_TTL_S * 1000 };
 }
 
@@ -159,8 +160,9 @@ export async function issueSession(env: Env, userId: string): Promise<IssuedSess
 async function readLegacyRefresh(env: Env, token: string): Promise<RefreshRef | null> {
   if (!token.startsWith(`${LEGACY_REFRESH_PREFIX}.`)) return null;
   const hash = await sha256Base64Url(token);
-  const userId = await env.TOKENS.get(`api-refresh:${hash}`);
-  const sid = userId ? await storeFor(env, userId).sessionIdFor(hash) : null;
+  const { value: userId, metadata } = await env.TOKENS.getWithMetadata<{ sid?: string }>(`api-refresh:${hash}`);
+  // The session id from KV tells reuse from noise after the row is purged.
+  const sid = userId ? metadata?.sid ?? await storeFor(env, userId).sessionIdFor(hash) : null;
   return userId && sid ? { userId, sid, hash } : null;
 }
 
@@ -181,13 +183,13 @@ export async function revokeSession(env: Env, refreshToken: string): Promise<voi
   if (ref) await storeFor(env, ref.userId).revokeSession(ref.hash, ref.sid);
 }
 
-/// An access token whose account is already deleted: a repeated `DELETE
+/// An access token from before its account was deleted: a repeated `DELETE
 /// /v1/account` (the first reply was lost) has nothing left to do.
 export async function accountAlreadyDeleted(env: Env, token: string): Promise<boolean> {
   const claims = await verifyAccessToken(env, token);
   if (!claims) return false;
   const store = storeFor(env, claims.userId);
-  return (await store.wasDeleted()) && !(await store.hasAppSession());
+  return claims.issuedAt < await store.deletedAt() && !(await store.hasAppSession());
 }
 
 /// The request with the session that opened it, for a stream the store holds

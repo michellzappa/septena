@@ -21,10 +21,13 @@ type Store = Awaited<ReturnType<typeof createTestTaskStore>>["store"];
 
 function memoryKv() {
   const map = new Map<string, string>();
+  const meta = new Map<string, unknown>();
   return {
     map,
+    meta,
     async get(key: string) { return map.get(key) ?? null; },
-    async put(key: string, value: string) { map.set(key, value); },
+    async getWithMetadata(key: string) { return { value: map.get(key) ?? null, metadata: meta.get(key) ?? null }; },
+    async put(key: string, value: string, opts?: { metadata?: unknown }) { map.set(key, value); meta.set(key, opts?.metadata); },
     async delete(key: string) { map.delete(key); },
   };
 }
@@ -349,7 +352,37 @@ describe("rollout", () => {
   });
 });
 
+describe("KV tokens issued in step 1", () => {
+  for (const step of ["false", "true"]) {
+    it(`reuse of one ends the session (SIGNED_SESSIONS ${step})`, async () => {
+      const h = await harness();
+      h.env.SIGNED_SESSIONS = "false";
+      const s0 = await session.issueSession(h.e, USER);
+      const c1 = await h.refresh(s0.refreshToken);
+      assert.ok(c1 && await h.uses(c1.accessToken));
+      h.env.SIGNED_SESSIONS = step;
+      const thief = await h.refresh(c1.refreshToken);
+      assert.ok(thief && await h.uses(thief.accessToken));
+      age(h.db, 2 * DAY);
+      await h.store.alarm();
+      assert.equal(await h.refresh(c1.refreshToken), null);
+      assert.equal(await h.uses(thief.accessToken), false);
+    });
+  }
+});
+
 describe("account deletion", () => {
+  it("never answers 204 for a new account that is still there", async () => {
+    const h = await harness();
+    await session.issueSession(h.e, USER);
+    await h.store.deleteAccount();
+    h.db.prepare("UPDATE meta SET value = value - 5000 WHERE key = 'deletedAt'").run();
+    const s1 = await session.issueSession(h.e, USER);
+    await session.revokeSession(h.e, s1.refreshToken);
+    const res = await api.request("https://api.septena.app/account", { method: "DELETE", headers: { Authorization: `Bearer ${s1.accessToken}` } }, h.e);
+    assert.equal(res.status, 401);
+  });
+
   it("can be retried after a failure and after a lost reply", async () => {
     const h = await harness();
     const s0 = await session.issueSession(h.e, USER);
