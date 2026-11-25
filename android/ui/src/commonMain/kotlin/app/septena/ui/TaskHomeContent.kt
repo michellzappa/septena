@@ -168,7 +168,17 @@ fun TaskHomeContent(
     onDropInboxHeader: (() -> Unit)? = null,
     onDropInboxRow: ((index: Int, before: Boolean) -> Unit)? = null,
     onDropTaskRow: ((index: Int, before: Boolean) -> Unit)? = null,
+    canReorder: Boolean = false,
+    onReorderInboxHeader: ((ids: List<String>) -> Unit)? = null,
+    onReorderInboxRow: ((ids: List<String>, index: Int, before: Boolean) -> Unit)? = null,
+    onReorderTaskRow: ((ids: List<String>, index: Int, before: Boolean) -> Unit)? = null,
+    onReorderGroupHeader: ((ids: List<String>, targetLocationKey: String) -> Unit)? = null,
 ) {
+    val orderedSelectionIds = if (selection.isActive) {
+        (inboxTasks + tasks).map(TaskListItem::id).filter { it in selection.selectedIds }
+    } else {
+        emptyList()
+    }
     Column(
         modifier = modifier.fillMaxSize(),
     ) {
@@ -199,11 +209,17 @@ fun TaskHomeContent(
                             title = inboxBandTitle,
                             iconKind = SeptenaIconKind.Inbox,
                         ),
-                        modifier = Modifier.magicPlusSectionDrop(
-                            id = "mp-inbox-header",
-                            enabled = onDropInboxHeader != null,
-                            onDrop = { onDropInboxHeader?.invoke() },
-                        ),
+                        modifier = Modifier
+                            .magicPlusSectionDrop(
+                                id = "mp-inbox-header",
+                                enabled = onDropInboxHeader != null,
+                                onDrop = { onDropInboxHeader?.invoke() },
+                            )
+                            .taskReorderSectionDrop(
+                                id = "reorder-inbox-header",
+                                enabled = canReorder && onReorderInboxHeader != null,
+                                onDrop = { ids -> onReorderInboxHeader?.invoke(ids) },
+                            ),
                     )
                 }
                 taskCardRows(
@@ -226,6 +242,10 @@ fun TaskHomeContent(
                     onTaskAction = onTaskAction,
                     onOpenGroupTarget = onOpenGroupTarget,
                     onDropRow = onDropInboxRow,
+                    canReorder = canReorder && onReorderInboxRow != null,
+                    orderedDragIds = orderedSelectionIds,
+                    onReorderRow = onReorderInboxRow,
+                    onReorderGroupHeader = null,
                 )
             }
 
@@ -275,6 +295,10 @@ fun TaskHomeContent(
                 onTaskAction = onTaskAction,
                 onOpenGroupTarget = onOpenGroupTarget,
                 onDropRow = onDropTaskRow,
+                canReorder = canReorder && onReorderTaskRow != null,
+                orderedDragIds = orderedSelectionIds,
+                onReorderRow = onReorderTaskRow,
+                onReorderGroupHeader = onReorderGroupHeader,
             )
         }
     }
@@ -303,6 +327,10 @@ private fun LazyListScope.taskCardRows(
     onTaskAction: (String, String) -> Unit,
     onOpenGroupTarget: ((String) -> Unit)?,
     onDropRow: ((index: Int, before: Boolean) -> Unit)?,
+    canReorder: Boolean = false,
+    orderedDragIds: List<String> = emptyList(),
+    onReorderRow: ((ids: List<String>, index: Int, before: Boolean) -> Unit)? = null,
+    onReorderGroupHeader: ((ids: List<String>, targetLocationKey: String) -> Unit)? = null,
 ) {
     // Compute contiguous card runs so each group paints continuous rounded glass card slices.
     val positions = computeCardPositions(tasks)
@@ -314,6 +342,15 @@ private fun LazyListScope.taskCardRows(
             val target = header.targetLocationKey
             TaskGroupHeaderRow(
                 header = header,
+                modifier = if (target != null && canReorder && onReorderGroupHeader != null) {
+                    Modifier.taskReorderSectionDrop(
+                        id = "reorder-group-$keyPrefix-${header.key}",
+                        enabled = true,
+                        onDrop = { ids -> onReorderGroupHeader(ids, target) },
+                    )
+                } else {
+                    Modifier
+                },
                 onClick = if (target != null && onOpenGroupTarget != null) {
                     { onOpenGroupTarget(target) }
                 } else null,
@@ -337,11 +374,20 @@ private fun LazyListScope.taskCardRows(
             rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
             selection = selection,
             onTaskAction = onTaskAction,
-            dropModifier = Modifier.magicPlusRowDrop(
-                id = "mp-$keyPrefix-${task.id}",
-                enabled = onDropRow != null,
-                onDrop = { before -> onDropRow?.invoke(index, before) },
-            ),
+            canReorder = canReorder,
+            orderedDragIds = orderedDragIds,
+            dropModifier = Modifier
+                .magicPlusRowDrop(
+                    id = "mp-$keyPrefix-${task.id}",
+                    enabled = onDropRow != null,
+                    onDrop = { before -> onDropRow?.invoke(index, before) },
+                )
+                .taskReorderRowDrop(
+                    id = "reorder-$keyPrefix-${task.id}",
+                    taskId = task.id,
+                    enabled = canReorder && onReorderRow != null,
+                    onDrop = { ids, before -> onReorderRow?.invoke(ids, index, before) },
+                ),
         )
     }
 }

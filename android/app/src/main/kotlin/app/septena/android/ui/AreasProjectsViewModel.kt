@@ -249,6 +249,59 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         errorMessage.value = null
     }
 
+    /** Reorders [ids] inside this area, project, or project section as one undoable edit. */
+    fun reorderTasks(
+        ids: List<String>,
+        positions: List<Double>,
+        targetHeadingId: String? = null,
+        updateHeading: Boolean = false,
+    ) {
+        if (ids.isEmpty() || positions.size < ids.size) return
+        val ordered = ids.zip(positions)
+        mutate {
+            graph.captureTaskEdits(ids.toSet()) { id ->
+                val pos = ordered.firstOrNull { it.first == id }?.second ?: return@captureTaskEdits
+                val changes = linkedMapOf<String, JsonValue>(
+                    RegistryEntityFields.Task.POSITION to JsonValue.DecimalValue(pos),
+                )
+                if (updateHeading) {
+                    changes[RegistryEntityFields.Task.HEADING] = JsonValue.stringOrNull(targetHeadingId)
+                }
+                graph.taskMutator.updateFields(id, changes)
+            }
+            true
+        }
+    }
+
+    /** Re-homes dragged area tasks into one of the area's projects, preserving relative order at top. */
+    fun moveTasksToProject(ids: List<String>, projectId: String) {
+        if (ids.isEmpty()) return
+        mutate {
+            val minPos = graph.taskStore.records(RegistryEntityNames.TASK)
+                .asSequence()
+                .filter { it.deletedAt == null }
+                .filter { it.fields[RegistryEntityFields.Task.PROJECT].stringValue() == projectId }
+                .filter { it.fields[RegistryEntityFields.Task.KIND].stringValue() != RegistryEntityEnums.TaskKind.HEADING }
+                .mapNotNull { it.fields[RegistryEntityFields.Task.POSITION].numberValue() }
+                .minOrNull() ?: 0.0
+            val startPos = minPos - ids.size.toDouble()
+            val ordered = ids.mapIndexed { idx, id -> id to (startPos + idx.toDouble()) }
+            graph.captureTaskEdits(ids.toSet()) { id ->
+                val pos = ordered.firstOrNull { it.first == id }?.second ?: return@captureTaskEdits
+                graph.taskMutator.updateFields(
+                    id,
+                    linkedMapOf(
+                        RegistryEntityFields.Task.AREA to JsonValue.Null,
+                        RegistryEntityFields.Task.PROJECT to JsonValue.StringValue(projectId),
+                        RegistryEntityFields.Task.HEADING to JsonValue.Null,
+                        RegistryEntityFields.Task.POSITION to JsonValue.DecimalValue(pos),
+                    ),
+                )
+            }
+            true
+        }
+    }
+
     private suspend fun nextTaskPosition(areaId: String?, projectId: String?, headingId: String?): Double {
         return graph.taskStore.records(RegistryEntityNames.TASK)
             .asSequence()

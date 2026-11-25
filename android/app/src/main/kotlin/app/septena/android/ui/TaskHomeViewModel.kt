@@ -346,6 +346,61 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         batch { id -> graph.taskMutator.moveToList(id, areaId, projectId) }
     }
 
+    /**
+     * Reorders [ids] in place (and optionally files them into [targetGroupKey] or Inbox)
+     * as one undoable edit, writing `todayPosition` on Today and `position` elsewhere
+     * (`docs/DRAG_AND_DROP.md` §4–5).
+     */
+    fun reorderTasks(
+        ids: List<String>,
+        positions: List<Double>,
+        useTodayPosition: Boolean,
+        targetGroupKey: String? = null,
+        moveToInbox: Boolean = false,
+    ) {
+        if (ids.isEmpty() || positions.size < ids.size) return
+        val positionKey = if (useTodayPosition) {
+            RegistryEntityFields.Task.TODAY_POSITION
+        } else {
+            RegistryEntityFields.Task.POSITION
+        }
+        selectedIds.value = emptySet()
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val ordered = ids.zip(positions)
+                    graph.captureTaskEdits(ids.toSet()) { id ->
+                        val pos = ordered.firstOrNull { it.first == id }?.second ?: return@captureTaskEdits
+                        val changes = linkedMapOf<String, JsonValue>(
+                            positionKey to JsonValue.DecimalValue(pos),
+                        )
+                        when {
+                            moveToInbox -> {
+                                changes[RegistryEntityFields.Task.AREA] = JsonValue.Null
+                                changes[RegistryEntityFields.Task.PROJECT] = JsonValue.Null
+                                changes[RegistryEntityFields.Task.HEADING] = JsonValue.Null
+                            }
+                            targetGroupKey != null && targetGroupKey.startsWith("area:") -> {
+                                changes[RegistryEntityFields.Task.AREA] = JsonValue.StringValue(targetGroupKey.removePrefix("area:"))
+                                changes[RegistryEntityFields.Task.PROJECT] = JsonValue.Null
+                                changes[RegistryEntityFields.Task.HEADING] = JsonValue.Null
+                            }
+                            targetGroupKey != null && targetGroupKey.startsWith("project:") -> {
+                                changes[RegistryEntityFields.Task.AREA] = JsonValue.Null
+                                changes[RegistryEntityFields.Task.PROJECT] = JsonValue.StringValue(targetGroupKey.removePrefix("project:"))
+                                changes[RegistryEntityFields.Task.HEADING] = JsonValue.Null
+                            }
+                        }
+                        graph.taskMutator.updateFields(id, changes)
+                    }
+                }
+            }.onSuccess {
+                errorMessage.value = null
+                noteLocalChangeAndSync()
+            }.onFailure { errorMessage.value = it.message }
+        }
+    }
+
     private fun batch(write: suspend (String) -> Unit) {
         val ids = selectedIds.value
         if (ids.isEmpty()) return

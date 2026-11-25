@@ -79,6 +79,10 @@ import app.septena.ui.cardPosition
 import app.septena.ui.insertionPosition
 import app.septena.ui.magicPlusRowDrop
 import app.septena.ui.magicPlusSectionDrop
+import app.septena.ui.rememberTaskContainerDropTarget
+import app.septena.ui.reorderPositions
+import app.septena.ui.taskReorderRowDrop
+import app.septena.ui.taskReorderSectionDrop
 
 /** Detail content for an area or project, aligned with iOS AreaDetailView / ProjectDetailView. */
 @Composable
@@ -150,6 +154,12 @@ fun AreasProjectsScreen(
         } else {
             state.sections
         }
+    }
+    val orderedPlaceDragIds = remember(selection.selectedIds, visibleAreaTasks, visibleUnsectioned, visibleSections) {
+        if (!selection.isActive) emptyList()
+        else (visibleAreaTasks + visibleUnsectioned + visibleSections.flatMap(PlaceSectionRow::tasks))
+            .map(PlaceTaskRow::id)
+            .filter { it in selection.selectedIds }
     }
 
     Column(modifier = modifier.fillMaxSize()) {
@@ -297,11 +307,17 @@ fun AreasProjectsScreen(
                         }
                     } else {
                         itemsIndexed(state.projects, key = { _, it -> "project:${it.id}" }) { index, project ->
+                            val (dropMod, isDropTargeted) = rememberTaskContainerDropTarget(
+                                id = "reorder-area-project-${project.id}",
+                                enabled = true,
+                                onDrop = { ids -> viewModel.moveTasksToProject(ids, project.id) },
+                            )
                             TaskCardSlice(
                                 position = cardPosition(index, state.projects.size),
-                                isSelected = false,
+                                isSelected = isDropTargeted,
                                 isDark = isDark,
                                 hasActiveTexture = hasActiveTexture,
+                                modifier = dropMod,
                             ) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
@@ -402,18 +418,30 @@ fun AreasProjectsScreen(
                                 onComplete = onComplete,
                                 onOpenTask = onOpenTask,
                                 onTaskAction = onTaskAction,
-                                dropModifier = Modifier.magicPlusRowDrop(
-                                    id = "mp-area-row-${task.id}",
-                                    enabled = onMagicPlusDrop != null,
-                                    onDrop = { before ->
-                                        onMagicPlusDrop?.invoke(
-                                            QuickAddDraft(
-                                                areaId = destination.id,
-                                                position = insertionPosition(areaPositions, index, before),
-                                            ),
-                                        )
-                                    },
-                                ),
+                                canReorder = true,
+                                orderedDragIds = orderedPlaceDragIds,
+                                dropModifier = Modifier
+                                    .magicPlusRowDrop(
+                                        id = "mp-area-row-${task.id}",
+                                        enabled = onMagicPlusDrop != null,
+                                        onDrop = { before ->
+                                            onMagicPlusDrop?.invoke(
+                                                QuickAddDraft(
+                                                    areaId = destination.id,
+                                                    position = insertionPosition(areaPositions, index, before),
+                                                ),
+                                            )
+                                        },
+                                    )
+                                    .taskReorderRowDrop(
+                                        id = "reorder-area-row-${task.id}",
+                                        taskId = task.id,
+                                        enabled = true,
+                                        onDrop = { ids, before ->
+                                            val newPositions = reorderPositions(areaPositions, index, before, ids.size)
+                                            viewModel.reorderTasks(ids, newPositions)
+                                        },
+                                    ),
                             )
                         }
                     }
@@ -453,6 +481,15 @@ fun AreasProjectsScreen(
                                         )
                                     },
                                 )
+                                .taskReorderSectionDrop(
+                                    id = "reorder-project-tasks-${destination.id}",
+                                    enabled = true,
+                                    onDrop = { ids ->
+                                        val topPos = visibleUnsectioned.firstOrNull()?.position ?: 0.0
+                                        val positions = List(ids.size) { i -> topPos - (ids.size - i).toDouble() }
+                                        viewModel.reorderTasks(ids, positions, targetHeadingId = null, updateHeading = true)
+                                    },
+                                )
                                 .padding(
                                     start = TaskCardMetrics.HeaderLeading,
                                     end = TaskCardMetrics.Margin,
@@ -489,18 +526,30 @@ fun AreasProjectsScreen(
                                 onComplete = onComplete,
                                 onOpenTask = onOpenTask,
                                 onTaskAction = onTaskAction,
-                                dropModifier = Modifier.magicPlusRowDrop(
-                                    id = "mp-project-row-${task.id}",
-                                    enabled = onMagicPlusDrop != null,
-                                    onDrop = { before ->
-                                        onMagicPlusDrop?.invoke(
-                                            QuickAddDraft(
-                                                projectId = destination.id,
-                                                position = insertionPosition(projectPositions, index, before),
-                                            ),
-                                        )
-                                    },
-                                ),
+                                canReorder = true,
+                                orderedDragIds = orderedPlaceDragIds,
+                                dropModifier = Modifier
+                                    .magicPlusRowDrop(
+                                        id = "mp-project-row-${task.id}",
+                                        enabled = onMagicPlusDrop != null,
+                                        onDrop = { before ->
+                                            onMagicPlusDrop?.invoke(
+                                                QuickAddDraft(
+                                                    projectId = destination.id,
+                                                    position = insertionPosition(projectPositions, index, before),
+                                                ),
+                                            )
+                                        },
+                                    )
+                                    .taskReorderRowDrop(
+                                        id = "reorder-project-row-${task.id}",
+                                        taskId = task.id,
+                                        enabled = true,
+                                        onDrop = { ids, before ->
+                                            val newPositions = reorderPositions(projectPositions, index, before, ids.size)
+                                            viewModel.reorderTasks(ids, newPositions, targetHeadingId = null, updateHeading = true)
+                                        },
+                                    ),
                             )
                         }
                     }
@@ -567,6 +616,10 @@ fun AreasProjectsScreen(
                                 onRename = { dialog = PlacesDialog.RenameSection(section.id, section.title) },
                                 onDelete = { dialog = PlacesDialog.DeleteSection(section.id) },
                                 onMagicPlusDrop = onMagicPlusDrop,
+                                orderedDragIds = orderedPlaceDragIds,
+                                onReorderToSection = { ids, newPositions ->
+                                    viewModel.reorderTasks(ids, newPositions, targetHeadingId = section.id, updateHeading = true)
+                                },
                             )
                         }
                     }
@@ -748,6 +801,8 @@ private fun PlaceTaskItem(
     onOpenTask: (String) -> Unit,
     onTaskAction: (String, String) -> Unit,
     dropModifier: Modifier = Modifier,
+    canReorder: Boolean = false,
+    orderedDragIds: List<String> = emptyList(),
 ) {
     TaskCardRow(
         task = task.item,
@@ -768,6 +823,8 @@ private fun PlaceTaskItem(
         selection = selection,
         onTaskAction = onTaskAction,
         dropModifier = dropModifier,
+        canReorder = canReorder,
+        orderedDragIds = orderedDragIds,
     )
 }
 
@@ -794,6 +851,8 @@ private fun PlaceSectionBlock(
     onRename: () -> Unit,
     onDelete: () -> Unit,
     onMagicPlusDrop: ((QuickAddDraft) -> Unit)? = null,
+    orderedDragIds: List<String> = emptyList(),
+    onReorderToSection: (ids: List<String>, positions: List<Double>) -> Unit = { _, _ -> },
 ) {
     var menuOpen by remember(section.id) { mutableStateOf(false) }
     val mutedInk = MaterialTheme.colorScheme.onSurfaceVariant
@@ -816,6 +875,15 @@ private fun PlaceSectionBlock(
                                 position = section.tasks.firstOrNull()?.position?.let { it - 1.0 },
                             ),
                         )
+                    },
+                )
+                .taskReorderSectionDrop(
+                    id = "reorder-heading-${section.id}",
+                    enabled = true,
+                    onDrop = { ids ->
+                        val topPos = section.tasks.firstOrNull()?.position ?: 0.0
+                        val positions = List(ids.size) { i -> topPos - (ids.size - i).toDouble() }
+                        onReorderToSection(ids, positions)
                     },
                 )
                 .padding(
@@ -914,19 +982,31 @@ private fun PlaceSectionBlock(
                     onComplete = onComplete,
                     onOpenTask = onOpenTask,
                     onTaskAction = onTaskAction,
-                    dropModifier = Modifier.magicPlusRowDrop(
-                        id = "mp-section-row-${task.id}",
-                        enabled = onMagicPlusDrop != null,
-                        onDrop = { before ->
-                            onMagicPlusDrop?.invoke(
-                                QuickAddDraft(
-                                    projectId = projectId,
-                                    headingId = section.id,
-                                    position = insertionPosition(sectionPositions, index, before),
-                                ),
-                            )
-                        },
-                    ),
+                    canReorder = true,
+                    orderedDragIds = orderedDragIds,
+                    dropModifier = Modifier
+                        .magicPlusRowDrop(
+                            id = "mp-section-row-${task.id}",
+                            enabled = onMagicPlusDrop != null,
+                            onDrop = { before ->
+                                onMagicPlusDrop?.invoke(
+                                    QuickAddDraft(
+                                        projectId = projectId,
+                                        headingId = section.id,
+                                        position = insertionPosition(sectionPositions, index, before),
+                                    ),
+                                )
+                            },
+                        )
+                        .taskReorderRowDrop(
+                            id = "reorder-section-row-${task.id}",
+                            taskId = task.id,
+                            enabled = true,
+                            onDrop = { ids, before ->
+                                val newPositions = reorderPositions(sectionPositions, index, before, ids.size)
+                                onReorderToSection(ids, newPositions)
+                            },
+                        ),
                 )
             }
         }
