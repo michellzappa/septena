@@ -82,15 +82,16 @@ strip with Today first, then one list of rows: Tomorrow, Pick another date,
 Clear, Repeat and Add time. Every row has the same shape on a platform.
 The rows, their order and their words are in `registry/surfaces.json`
 `taskDateBoard`. Tomorrow has a strip cell and a row (decided 2026-11-24).
-Android has no Repeat row (Repeat is the next row of its task page) and no
-time editor yet.
+iPhone, iPad, Mac, Android and web all render them. The watch stays reduced
+(decided 2026-11-25): it offers Tomorrow and no board.
+Android has no Repeat row (Repeat is the next row of its task page).
 
 The Repeat row reads "Repeat…", or "Repeat: &lt;rule&gt;" when the task
 already repeats. It closes the When picker and opens the Repeat editor,
 which also holds Pause.
 
-On iPhone and iPad the Repeat row shows for one task only, because the
-Repeat sheet edits one task. The Mac Repeat editor edits a selection, so
+On iPhone, iPad and web the Repeat row shows for one task only, because
+their Repeat editor edits one task. The Mac Repeat editor edits a selection, so
 the Mac shows the row for several tasks too. The Deadline picker has no
 Repeat row.
 
