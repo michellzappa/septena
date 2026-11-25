@@ -64,6 +64,7 @@ class AndroidAppGraph(application: Application) {
     val taskMutator = TaskMutator(taskStore, clock, ids)
     val taskUndoHistory = TaskUndoHistory()
     val deviceSettings = app.septena.android.ui.AndroidDeviceSettings(application)
+    val fadeSweepStore = app.septena.android.ui.FadeSweepStore(application)
     val registryEntityMutator = RegistryEntityMutator(taskStore, clock, ids)
     val conversationMutator = ConversationMutator(taskStore, ids)
     val recurrenceRules = RecurrenceRules

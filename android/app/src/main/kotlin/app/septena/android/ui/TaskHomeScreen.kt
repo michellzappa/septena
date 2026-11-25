@@ -734,6 +734,7 @@ private fun TaskHomeScaffold(
     var newSectionTrigger by remember { mutableIntStateOf(0) }
     var selectionPicker by remember { mutableStateOf<SelectionPicker?>(null) }
     var allOnToday by remember { mutableStateOf(false) }
+    var activeSweepItems by remember { mutableStateOf<List<FadeSweepItem>?>(null) }
     val magicPlusDrag = remember { MagicPlusDragState() }
     val reorderDrag = remember { TaskReorderDragState() }
     val context = LocalContext.current
@@ -829,6 +830,23 @@ private fun TaskHomeScaffold(
         null -> Unit
     }
 
+    activeSweepItems?.let { itemsToSweep ->
+        val keepLabel = remember(languageTag) {
+            RegistryCatalog.actionTitle(RegistryActionIds.TASK_KEEP_FADED, languageTag = languageTag)
+                ?.takeIf(String::isNotBlank) ?: "Keep"
+        }
+        TaskFadeSweepSheet(
+            items = itemsToSweep,
+            keepTitle = keepLabel,
+            isDark = isDark,
+            hasActiveTexture = appearance.hasActiveTexture,
+            onKeep = homeViewModel::keepFaded,
+            onLetRestGo = homeViewModel::letGoFadedBatch,
+            onMarkCompleted = homeViewModel::markSweepCompleted,
+            onDismiss = { activeSweepItems = null },
+        )
+    }
+
     val sectionHeader: @Composable () -> Unit = {
         SectionTitleDropdownHeader(
             state = state,
@@ -838,6 +856,43 @@ private fun TaskHomeScaffold(
             onSelectLocation = onSelectHomeLocation,
             onOpenSettings = onOpenSettings,
         )
+        if (destinationId == RegistryDestinationIds.TODAY &&
+            state.showWeeklySweepBanner &&
+            state.weeklySweepItems.isNotEmpty()
+        ) {
+            val count = state.weeklySweepItems.size
+            val bannerMessage = if (count == 1) {
+                "1 task faded this week. Still want it?"
+            } else {
+                "$count tasks faded this week. Still want any of them?"
+            }
+            FadeSweepBannerCard(
+                message = bannerMessage,
+                reviewLabel = "Review",
+                dismissLabel = "Not now",
+                isDark = isDark,
+                hasActiveTexture = appearance.hasActiveTexture,
+                onReview = { activeSweepItems = state.weeklySweepItems },
+                onDismiss = homeViewModel::dismissWeeklySweepBanner,
+                modifier = Modifier.padding(bottom = 10.dp),
+            )
+        } else if (destinationId == RegistryDestinationIds.FADED && state.fadedSweepItems.isNotEmpty()) {
+            val count = state.fadedSweepItems.size
+            val bannerMessage = if (count == 1) {
+                "1 faded task. Keep what you still need or let it go."
+            } else {
+                "$count faded tasks. Keep what you still need or let the rest go."
+            }
+            FadeSweepBannerCard(
+                message = bannerMessage,
+                reviewLabel = "Review",
+                dismissLabel = null,
+                isDark = isDark,
+                hasActiveTexture = appearance.hasActiveTexture,
+                onReview = { activeSweepItems = state.fadedSweepItems },
+                modifier = Modifier.padding(bottom = 10.dp),
+            )
+        }
     }
 
     // Grouped canvas background so translucent glass task cards lift gently off the

@@ -8,9 +8,9 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 
 | Status | iPhone | iPad | Mac | Web | Android | Windows | Watch |
 |---|---|---|---|---|---|---|---|
-| ships | 53 | 54 | 54 | 0 | 42 | 0 | 1 |
+| ships | 53 | 54 | 54 | 0 | 43 | 0 | 1 |
 | partial | 1 | 1 | 1 | 0 | 3 | 0 | 3 |
-| planned | 0 | 0 | 0 | 51 | 8 | 54 | 1 |
+| planned | 0 | 0 | 0 | 51 | 7 | 54 | 1 |
 | - | 4 | 3 | 3 | 7 | 5 | 4 | 53 |
 
 | ID | Feature | iPhone | iPad | Mac | Web | Android | Windows | Watch |
@@ -41,7 +41,7 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 | `task.tags` | Tags | ships | ships | ships | planned | ships | planned | - |
 | `task.share` | Share a task (title and notes) through the system share sheet | ships | ships | ships | planned | ships | planned | - |
 | `task.alerts` | Timed reminders | ships | ships | ships | planned | ships | planned | - |
-| `fade.sweep` | Fade pass, Faded pile and weekly sweep | ships | ships | ships | planned | planned | planned | - |
+| `fade.sweep` | Fade pass, Faded pile and weekly sweep | ships | ships | ships | planned | ships | planned | - |
 | `capture.quick-add` | Quick Add sheet | ships | ships | - | planned | ships | - | - |
 | `capture.share-target` | Share into Inbox | ships | ships | - | planned | ships | planned | - |
 | `capture.quick-entry` | Quick Entry global panel | - | - | ships | - | - | planned | - |

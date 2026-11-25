@@ -75,6 +75,12 @@ data class TaskHomeUiState(
     val starredOnly: Boolean = false,
     /** Task ids picked by a long-press; non-empty means the list is in selection mode. */
     val selectedIds: Set<String> = emptySet(),
+    /** All currently faded open tasks ready for the Faded sweep sheet. */
+    val fadedSweepItems: List<FadeSweepItem> = emptyList(),
+    /** Subset of faded tasks since last sweep, shown in the Sunday weekly banner. */
+    val weeklySweepItems: List<FadeSweepItem> = emptyList(),
+    /** True on sweep day (Sunday) when unswept faded tasks exist and banner wasn't dismissed. */
+    val showWeeklySweepBanner: Boolean = false,
     val errorMessage: String? = null,
 )
 
@@ -105,6 +111,9 @@ private data class LoadedTaskHome(
     val canQuickAdd: Boolean,
     val canComplete: Boolean,
     val agentsPaused: Boolean,
+    val fadedSweepItems: List<FadeSweepItem> = emptyList(),
+    val weeklySweepItems: List<FadeSweepItem> = emptyList(),
+    val showWeeklySweepBanner: Boolean = false,
 )
 
 /** Reads the store on IO and refreshes from the sync controller's data version flow. */
@@ -114,6 +123,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
     )
     private val starredOnly = MutableStateFlow(false)
     private val selectedIds = MutableStateFlow<Set<String>>(emptySet())
+    private val sweepRefresh = MutableStateFlow(0L)
     private val errorMessage = MutableStateFlow<String?>(null)
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -121,7 +131,8 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         location,
         graph.sync.dataVersion,
         graph.deviceSettings.changes,
-    ) { selected, _, _ ->
+        sweepRefresh,
+    ) { selected, _, _, _ ->
         selected
     }.mapLatest { selected ->
         withContext(Dispatchers.IO) { load(selected) }
@@ -147,6 +158,9 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             agentsPaused = home.agentsPaused,
             starredOnly = applyStar,
             selectedIds = selected,
+            fadedSweepItems = home.fadedSweepItems,
+            weeklySweepItems = home.weeklySweepItems,
+            showWeeklySweepBanner = home.showWeeklySweepBanner,
             errorMessage = error,
         )
     }.stateIn(
@@ -460,6 +474,29 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
 
     fun letGoFaded(id: String) = editTask(id) { graph.taskMutator.letGoFaded(id) }
 
+    /** Drops all remaining sweep rows in ONE undo entry (`docs/TASK_FADE_SPEC.md` §5). */
+    fun letGoFadedBatch(ids: List<String>) {
+        if (ids.isEmpty()) return
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    graph.captureTaskEdits(ids) { id -> graph.taskMutator.letGoFaded(id) }
+                }
+            }.onSuccess { errorMessage.value = null; noteLocalChangeAndSync() }
+                .onFailure { errorMessage.value = it.message; noteLocalChangeAndSync() }
+        }
+    }
+
+    fun dismissWeeklySweepBanner() {
+        graph.fadeSweepStore.dismissSweepForCurrentWeek(graph.clock.now())
+        sweepRefresh.value += 1
+    }
+
+    fun markSweepCompleted() {
+        graph.fadeSweepStore.markSweepCompleted(graph.clock.now())
+        sweepRefresh.value += 1
+    }
+
     /** One undoable task edit off the main thread, then a sync. */
     private fun editTask(id: String, edit: suspend () -> Any?) {
         viewModelScope.launch {
@@ -652,6 +689,9 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             item.parentAreaId?.let { proj.id to it }
         }.toMap()
 
+        val fadedSweepList = mutableListOf<FadeSweepItem>()
+        val inboxLabel = RegistryCatalog.destinationTitle(RegistryDestinationIds.INBOX)?.takeIf(String::isNotBlank)
+            ?: "Inbox"
         for ((record, snapshot) in allSnapshots) {
             if (snapshot.isHeading) continue
             if (snapshot.deletedAt != null) {
@@ -672,6 +712,25 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                     if (convoState?.needsHumanReview == true) reviewCount += 1
                     if (TaskFadeRules.isFaded(snapshot.fadedAt)) {
                         fadedCount += 1
+                        val fadedInstant = snapshot.fadedAt?.let { runCatching { java.time.Instant.parse(it) }.getOrNull() }
+                        val touchedInstant = snapshot.touchedAt?.let { runCatching { java.time.Instant.parse(it) }.getOrNull() }
+                        val createdInstant = snapshot.createdAt?.let { runCatching { java.time.Instant.parse(it) }.getOrNull() }
+                        val listName = snapshot.project?.let(projectTitles::get) ?: snapshot.area?.let(areaTitles::get)
+                        fadedSweepList += FadeSweepItem(
+                            id = snapshot.id,
+                            title = snapshot.title,
+                            reason = FadeSweepRules.sweepReason(
+                                touchedAt = touchedInstant,
+                                createdAt = createdInstant,
+                                created = snapshot.created,
+                                listName = listName,
+                                scheduled = snapshot.scheduled,
+                                now = now,
+                                inboxLabel = inboxLabel,
+                                zoneId = zoneId,
+                            ),
+                            fadedAt = fadedInstant,
+                        )
                     } else {
                         if (snapshot.starred) starredCount += 1
                         val projId = snapshot.project
@@ -930,6 +989,20 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                 }
             }
         }
+        val lastSweepAt = graph.fadeSweepStore.lastSweepAt()
+        val dismissedWeek = graph.fadeSweepStore.dismissedSweepWeek()
+        val sortedFadedSweep = fadedSweepList.sortedWith(
+            compareByDescending<FadeSweepItem> { it.fadedAt ?: java.time.Instant.EPOCH }
+                .thenBy { it.title.lowercase() },
+        )
+        val currentWeekSweep = sortedFadedSweep.filter { FadeSweepRules.isInCurrentSweep(it.fadedAt, lastSweepAt) }
+        val showSweepBanner = FadeSweepRules.isSweepDue(
+            now = now,
+            lastSweepAt = lastSweepAt,
+            dismissedWeek = dismissedWeek,
+            fadedDates = sortedFadedSweep.mapNotNull(FadeSweepItem::fadedAt),
+            zoneId = zoneId,
+        )
         return LoadedTaskHome(
             hasLoaded = true,
             location = resolvedLocation,
@@ -942,6 +1015,9 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             canQuickAdd = canQuickAdd,
             canComplete = canComplete,
             agentsPaused = agentsPaused,
+            fadedSweepItems = sortedFadedSweep,
+            weeklySweepItems = currentWeekSweep,
+            showWeeklySweepBanner = showSweepBanner,
         )
     }
 
