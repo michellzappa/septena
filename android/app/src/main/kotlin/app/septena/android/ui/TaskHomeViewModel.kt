@@ -8,6 +8,7 @@ import app.septena.core.RegistryActionContext
 import app.septena.core.RegistryActionResolver
 import app.septena.core.RegistryCatalog
 import app.septena.core.SmartListResolver
+import app.septena.core.SmartListSection
 import app.septena.core.SyncRecord
 import app.septena.core.TaskConversation
 import app.septena.core.TaskFadeRules
@@ -24,6 +25,8 @@ import app.septena.core.generated.RegistryEntityFields
 import app.septena.core.generated.RegistryEntityNames as EntityNames
 import app.septena.core.generated.RegistryPlatformIds
 import app.septena.core.generated.RegistrySettingKeys
+import app.septena.ui.SeptenaIconKind
+import app.septena.ui.TaskGroupHeader
 import app.septena.ui.TaskListItem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -48,12 +51,19 @@ data class TaskHomeNavigationItem(
     val emoji: String? = null,
     /** Owning area id for a project item, so the sidebar nests projects under their areas. */
     val parentAreaId: String? = null,
+    /** Item count shown on smart-list pills/rows, areas (rolled-up), and projects (matches iOS `SidebarView`). */
+    val count: Int? = null,
+    /** Done fraction (0..1) for projects, driving the progress ring glyph. */
+    val progress: Float = 0f,
 )
 
 data class TaskHomeUiState(
     val hasLoaded: Boolean = false,
     val location: TaskHomeLocation = TaskHomeLocation.SmartList(RegistryDestinationIds.TODAY),
-    val smartLists: List<TaskHomeNavigationItem> = emptyList(),
+    /** Smart lists pinned to the top sidebar/nav zone (above Areas & Projects), identical to iOS. */
+    val topSmartLists: List<TaskHomeNavigationItem> = emptyList(),
+    /** Smart lists pinned to the bottom sidebar/nav zone (below Areas & Projects), identical to iOS. */
+    val bottomSmartLists: List<TaskHomeNavigationItem> = emptyList(),
     val areas: List<TaskHomeNavigationItem> = emptyList(),
     val projects: List<TaskHomeNavigationItem> = emptyList(),
     val inboxTasks: List<TaskListItem> = emptyList(),
@@ -61,6 +71,8 @@ data class TaskHomeUiState(
     val canQuickAdd: Boolean = false,
     val canComplete: Boolean = false,
     val agentsPaused: Boolean = false,
+    /** Top-nav Star filter toggle: shows only starred tasks in the current list. */
+    val starredOnly: Boolean = false,
     /** Task ids picked by a long-press; non-empty means the list is in selection mode. */
     val selectedIds: Set<String> = emptySet(),
     val errorMessage: String? = null,
@@ -84,7 +96,8 @@ data class QuickAddDraft(
 private data class LoadedTaskHome(
     val hasLoaded: Boolean,
     val location: TaskHomeLocation,
-    val smartLists: List<TaskHomeNavigationItem>,
+    val topSmartLists: List<TaskHomeNavigationItem>,
+    val bottomSmartLists: List<TaskHomeNavigationItem>,
     val areas: List<TaskHomeNavigationItem>,
     val projects: List<TaskHomeNavigationItem>,
     val inboxTasks: List<TaskListItem>,
@@ -99,6 +112,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
     private val location = MutableStateFlow<TaskHomeLocation>(
         TaskHomeLocation.SmartList(RegistryDestinationIds.TODAY),
     )
+    private val starredOnly = MutableStateFlow(false)
     private val selectedIds = MutableStateFlow<Set<String>>(emptySet())
     private val errorMessage = MutableStateFlow<String?>(null)
 
@@ -117,18 +131,21 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         initialValue = loadInitial(),
     )
 
-    val state: StateFlow<TaskHomeUiState> = combine(loaded, selectedIds, errorMessage) { home, selected, error ->
+    val state: StateFlow<TaskHomeUiState> = combine(loaded, starredOnly, selectedIds, errorMessage) { home, starFilter, selected, error ->
+        val applyStar = starFilter && (home.location as? TaskHomeLocation.SmartList)?.destinationId != RegistryDestinationIds.STARRED
         TaskHomeUiState(
             hasLoaded = home.hasLoaded,
             location = home.location,
-            smartLists = home.smartLists,
+            topSmartLists = home.topSmartLists,
+            bottomSmartLists = home.bottomSmartLists,
             areas = home.areas,
             projects = home.projects,
-            inboxTasks = home.inboxTasks,
-            tasks = home.tasks,
+            inboxTasks = if (applyStar) home.inboxTasks.filter(TaskListItem::isStarred) else home.inboxTasks,
+            tasks = if (applyStar) home.tasks.filter(TaskListItem::isStarred) else home.tasks,
             canQuickAdd = home.canQuickAdd,
             canComplete = home.canComplete,
             agentsPaused = home.agentsPaused,
+            starredOnly = applyStar,
             selectedIds = selected,
             errorMessage = error,
         )
@@ -140,7 +157,12 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
 
     fun select(location: TaskHomeLocation) {
         selectedIds.value = emptySet()
+        starredOnly.value = false
         this.location.value = location
+    }
+
+    fun toggleStarFilter() {
+        starredOnly.value = !starredOnly.value
     }
 
     /** Long-press enters selection with the row; in selection a tap adds or removes a row. */
@@ -165,6 +187,48 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             }.onSuccess { changed ->
                 errorMessage.value = null
                 if (changed) noteLocalChangeAndSync()
+            }.onFailure { errorMessage.value = it.message }
+        }
+    }
+
+    fun createArea(title: String, onCreated: (TaskHomeLocation.Area) -> Unit = {}) {
+        val trimmed = title.trim()
+        if (trimmed.isEmpty()) return
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val created = graph.registryEntityMutator.create(
+                        EntityNames.AREA,
+                        mapOf(RegistryEntityFields.Area.TITLE to JsonValue.StringValue(trimmed)),
+                    )
+                    TaskHomeLocation.Area(created.id, trimmed)
+                }
+            }.onSuccess { area ->
+                errorMessage.value = null
+                noteLocalChangeAndSync()
+                onCreated(area)
+            }.onFailure { errorMessage.value = it.message }
+        }
+    }
+
+    fun createProject(title: String, areaId: String? = null, onCreated: (TaskHomeLocation.Project) -> Unit = {}) {
+        val trimmed = title.trim()
+        if (trimmed.isEmpty()) return
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val fields = buildMap<String, JsonValue> {
+                        put(RegistryEntityFields.Project.TITLE, JsonValue.StringValue(trimmed))
+                        put(RegistryEntityFields.Project.STATUS, JsonValue.StringValue(RegistryEntityEnums.ProjectStatus.ACTIVE))
+                        areaId?.let { put(RegistryEntityFields.Project.AREA, JsonValue.StringValue(it)) }
+                    }
+                    val created = graph.registryEntityMutator.create(EntityNames.PROJECT, fields)
+                    TaskHomeLocation.Project(created.id, trimmed)
+                }
+            }.onSuccess { project ->
+                errorMessage.value = null
+                noteLocalChangeAndSync()
+                onCreated(project)
             }.onFailure { errorMessage.value = it.message }
         }
     }
@@ -415,7 +479,8 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
     private fun loadInitial() = LoadedTaskHome(
         hasLoaded = false,
         location = TaskHomeLocation.SmartList(RegistryDestinationIds.TODAY),
-        smartLists = emptyList(),
+        topSmartLists = emptyList(),
+        bottomSmartLists = emptyList(),
         areas = emptyList(),
         projects = emptyList(),
         inboxTasks = emptyList(),
@@ -426,7 +491,15 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
     )
 
     private suspend fun load(selected: TaskHomeLocation): LoadedTaskHome {
-        val taskRecords = graph.taskStore.records(EntityNames.TASK)
+        val selectedDestId = (selected as? TaskHomeLocation.SmartList)?.destinationId
+        val needsFullHistory = selectedDestId == RegistryDestinationIds.LOGBOOK ||
+            selectedDestId == RegistryDestinationIds.AGENT
+        // Fast path for Today / active lists: read only open + soft-deleted tasks (skips thousands of Logbook rows).
+        val taskRecords = if (needsFullHistory) {
+            graph.taskStore.records(EntityNames.TASK)
+        } else {
+            graph.taskStore.activeTasks()
+        }
         val areaRecords = graph.taskStore.records(EntityNames.AREA)
             .filter { it.deletedAt == null }
             .mapNotNull { record ->
@@ -472,20 +545,6 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
 
         val agentsPaused = graph.syncedSettings.value(RegistrySettingKeys.AGENTS_PAUSED).booleanValue() ?: false
 
-        val nonEmptyDestinations = buildSet {
-            if (taskRecords.any { it.deletedAt != null }) add(RegistryDestinationIds.RECENTLY_DELETED)
-        }
-        val smartListItems = SmartListResolver.visibleFromSynced(
-            graph.syncedSettings,
-            nonEmptyIds = nonEmptyDestinations,
-        ).map { descriptor ->
-            descriptor.id to TaskHomeNavigationItem(
-                location = TaskHomeLocation.SmartList(descriptor.id),
-            )
-        }.filter { (id, _) -> id in SHELL_DESTINATIONS }
-            .sortedBy { (id, _) -> if (id == RegistryDestinationIds.TODAY) 0 else 1 }
-            .map { it.second }
-
         val areaTitles = areaRecords.mapNotNull { item ->
             val area = item.location as? TaskHomeLocation.Area ?: return@mapNotNull null
             area.id to area.title
@@ -498,13 +557,162 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         val allSnapshots = taskRecords.mapNotNull { record ->
             runCatching { record to TaskSnapshot.from(record) }.getOrNull()
         }
+        val metadataCatalog = TaskRowMetadataCatalog.load(graph.taskStore)
         val now = graph.clock.now()
         val today = graph.clock.today(now)
-        // Conversations (one per task id) drive Review, Agent and the fade
-        // exemptions; their rules are the core's (convo.rs).
+        // Load all turns in 2 bulk queries (cached) and evaluate only relevant conversations ONCE.
+        val turnsByTask = graph.taskStore.allTurnsByTask()
+        val relevantTaskIds = if (needsFullHistory) null else allSnapshots.mapTo(HashSet(allSnapshots.size)) { it.second.id }
         val conversations = graph.taskStore.records(EntityNames.CONVO)
+            .asSequence()
             .filter { it.deletedAt == null }
-            .associate { it.id to runCatching { TaskConversation.from(it, graph.taskStore.turns(it.id)) }.getOrNull() }
+            .filter { relevantTaskIds == null || it.id in relevantTaskIds }
+            .associate { it.id to runCatching { TaskConversation.from(it, turnsByTask[it.id].orEmpty()) }.getOrNull() }
+        val convoStates = HashMap<String, app.septena.core.ConversationSnapshotState>(conversations.size)
+        for ((id, convo) in conversations) {
+            if (convo != null) {
+                runCatching { convo.evaluate(now) }.getOrNull()?.let { convoStates[id] = it }
+            }
+        }
+
+        // Compute core TaskViewMembership ONCE per open non-heading non-deleted task
+        // (avoids ~8,000 redundant JNA roundtrips across Done/Cancelled Logbook rows).
+        val memberships = HashMap<String, app.septena.core.TaskViewMembership>(allSnapshots.size)
+        var todayCount = 0
+        var upcomingCount = 0
+        var repeatingCount = 0
+        var anytimeCount = 0
+        var reviewCount = 0
+        var agentCount = 0
+        var starredCount = 0
+        var fadedCount = 0
+        var deletedCount = 0
+        val zoneId = java.time.ZoneId.systemDefault()
+        var doneTodayCount = if (needsFullHistory) 0 else graph.taskStore.countDoneTasksOnLocalDay(today, zoneId)
+        val projectOpenCounts = mutableMapOf<String, Int>()
+        val projectDoneCounts = mutableMapOf<String, Int>()
+        val areaDirectOpenCounts = mutableMapOf<String, Int>()
+        val activeProjectAreaById = projectRecords.mapNotNull { item ->
+            val proj = item.location as? TaskHomeLocation.Project ?: return@mapNotNull null
+            item.parentAreaId?.let { proj.id to it }
+        }.toMap()
+
+        for ((record, snapshot) in allSnapshots) {
+            if (snapshot.isHeading) continue
+            if (snapshot.deletedAt != null) {
+                deletedCount += 1
+                continue
+            }
+            val convoState = convoStates[snapshot.id]
+            if (convoState?.agentStage != null) agentCount += 1
+
+            when (snapshot.status) {
+                RegistryEntityEnums.TaskStatus.OPEN -> {
+                    val membership = TaskViewRules.membership(snapshot, today, now)
+                    memberships[snapshot.id] = membership
+                    if (membership.matchesView[RegistryDestinationIds.TODAY] == true) todayCount += 1
+                    if (membership.matchesView[RegistryDestinationIds.UPCOMING] == true) upcomingCount += 1
+                    if (membership.matchesView[RegistryDestinationIds.ANYTIME] == true) anytimeCount += 1
+                    if (TaskViewRules.matchesView(snapshot, membership, RegistryDestinationIds.REPEATING)) repeatingCount += 1
+                    if (convoState?.needsHumanReview == true) reviewCount += 1
+                    if (TaskFadeRules.isFaded(snapshot.fadedAt)) {
+                        fadedCount += 1
+                    } else {
+                        if (snapshot.starred) starredCount += 1
+                        val projId = snapshot.project
+                        val areaId = snapshot.area
+                        if (projId != null) {
+                            projectOpenCounts[projId] = (projectOpenCounts[projId] ?: 0) + 1
+                        } else if (areaId != null) {
+                            areaDirectOpenCounts[areaId] = (areaDirectOpenCounts[areaId] ?: 0) + 1
+                        }
+                    }
+                }
+                RegistryEntityEnums.TaskStatus.DONE -> {
+                    val completedAt = record.fields[RegistryEntityFields.Task.COMPLETED_AT].stringValue()
+                    val completedDay = completedAt?.let {
+                        runCatching { java.time.Instant.parse(it).atZone(zoneId).toLocalDate() }.getOrNull()
+                            ?: runCatching { java.time.LocalDate.parse(it.take(10)) }.getOrNull()
+                    }
+                    if (completedDay == today) doneTodayCount += 1
+                    snapshot.project?.let { projId ->
+                        projectDoneCounts[projId] = (projectDoneCounts[projId] ?: 0) + 1
+                    }
+                }
+            }
+        }
+
+        val areaRolledUpCounts = mutableMapOf<String, Int>().apply {
+            areaDirectOpenCounts.forEach { (areaId, count) -> put(areaId, count) }
+            projectOpenCounts.forEach { (projId, count) ->
+                val parentArea = activeProjectAreaById[projId] ?: return@forEach
+                put(parentArea, (this[parentArea] ?: 0) + count)
+            }
+        }
+
+        val countedAreas = areaRecords.map { item ->
+            val areaId = (item.location as? TaskHomeLocation.Area)?.id
+            item.copy(count = areaId?.let { areaRolledUpCounts[it] ?: 0 } ?: 0)
+        }
+        val countedProjects = projectRecords.map { item ->
+            val projId = (item.location as? TaskHomeLocation.Project)?.id
+            val open = projId?.let { projectOpenCounts[it] ?: 0 } ?: 0
+            val done = projId?.let { projectDoneCounts[it] ?: 0 } ?: 0
+            val total = open + done
+            item.copy(
+                count = open,
+                progress = if (total > 0) done.toFloat() / total.toFloat() else 0f,
+            )
+        }
+
+        val nonEmptyDestinations = buildSet {
+            if (reviewCount > 0 || (selected as? TaskHomeLocation.SmartList)?.destinationId == RegistryDestinationIds.REVIEW) {
+                add(RegistryDestinationIds.REVIEW)
+            }
+            if (agentCount > 0 || (selected as? TaskHomeLocation.SmartList)?.destinationId == RegistryDestinationIds.AGENT) {
+                add(RegistryDestinationIds.AGENT)
+            }
+            if (starredCount > 0) add(RegistryDestinationIds.STARRED)
+            if (fadedCount > 0) add(RegistryDestinationIds.FADED)
+            if (deletedCount > 0) add(RegistryDestinationIds.RECENTLY_DELETED)
+        }
+
+        fun smartListCount(destinationId: String): Int? = when (destinationId) {
+            RegistryDestinationIds.TODAY -> todayCount
+            RegistryDestinationIds.UPCOMING -> upcomingCount
+            RegistryDestinationIds.REPEATING -> repeatingCount
+            RegistryDestinationIds.ANYTIME -> anytimeCount
+            RegistryDestinationIds.REVIEW -> reviewCount.takeIf { it > 0 }
+            RegistryDestinationIds.AGENT -> agentCount.takeIf { it > 0 }
+            RegistryDestinationIds.STARRED -> starredCount.takeIf { it > 0 }
+            RegistryDestinationIds.LOGBOOK -> doneTodayCount.takeIf { it > 0 }
+            RegistryDestinationIds.FADED -> fadedCount.takeIf { it > 0 }
+            RegistryDestinationIds.RECENTLY_DELETED -> deletedCount.takeIf { it > 0 }
+            else -> null
+        }
+
+        val topSmartListItems = SmartListResolver.visibleFromSynced(
+            graph.syncedSettings,
+            nonEmptyIds = nonEmptyDestinations,
+            section = SmartListSection.TOP,
+        ).filter { it.id in SHELL_DESTINATIONS }
+            .map {
+                TaskHomeNavigationItem(
+                    location = TaskHomeLocation.SmartList(it.id),
+                    count = smartListCount(it.id),
+                )
+            }
+        val bottomSmartListItems = SmartListResolver.visibleFromSynced(
+            graph.syncedSettings,
+            nonEmptyIds = nonEmptyDestinations,
+            section = SmartListSection.BOTTOM,
+        ).filter { it.id in SHELL_DESTINATIONS }
+            .map {
+                TaskHomeNavigationItem(
+                    location = TaskHomeLocation.SmartList(it.id),
+                    count = smartListCount(it.id),
+                )
+            }
         val agentGroups = agentGroupTitles()
         val showAging = graph.deviceSettings.bool(RegistrySettingKeys.TASKS_SHOW_AGING)
         val resolvedLocation = when (selected) {
@@ -520,29 +728,53 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         val inbox = mutableListOf<PositionedTask>()
         val visible = mutableListOf<PositionedTask>()
         for ((record, snapshot) in allSnapshots) {
-            val membership = TaskViewRules.membership(snapshot, today, now)
+            val membership = memberships[snapshot.id] ?: TaskViewRules.INACTIVE_MEMBERSHIP
             when (resolvedLocation) {
                 is TaskHomeLocation.SmartList -> {
                     val conversation = conversations[snapshot.id]
-                    val stage = conversation?.agentStage(now)
+                    val convoState = convoStates[snapshot.id]
+                    val stage = convoState?.agentStage
                     val listed = when (resolvedLocation.destinationId) {
                         // Review: open tasks an agent handed back to verify.
                         RegistryDestinationIds.REVIEW ->
                             snapshot.status == RegistryEntityEnums.TaskStatus.OPEN && !snapshot.isHeading &&
-                                snapshot.deletedAt == null && conversation?.needsHumanReview == true
+                                snapshot.deletedAt == null && convoState?.needsHumanReview == true
                         // Agent: every task with an agent stage, grouped by stage.
                         RegistryDestinationIds.AGENT ->
                             stage != null && !snapshot.isHeading && snapshot.deletedAt == null
-                        else -> TaskViewRules.matchesView(snapshot, resolvedLocation.destinationId, today, now)
+                        else -> TaskViewRules.matchesView(snapshot, membership, resolvedLocation.destinationId)
                     }
                     if (!listed) continue
-                    val item = taskListItem(record, snapshot, resolvedLocation, areaTitles, projectTitles, membership.isOnToday)
-                        .withFade(snapshot, conversation, now, today, showAging)
+                    val inTodayInbox = resolvedLocation.destinationId == RegistryDestinationIds.TODAY && membership.inTodayInbox
+                    val item = taskListItem(
+                        record = record,
+                        snapshot = snapshot,
+                        membership = membership,
+                        selected = resolvedLocation,
+                        areaTitles = areaTitles,
+                        projectTitles = projectTitles,
+                        catalog = metadataCatalog,
+                        today = today,
+                        now = now,
+                        showTodayIndicator = resolvedLocation.destinationId != RegistryDestinationIds.TODAY && !inTodayInbox,
+                        isLogbook = resolvedLocation.destinationId == RegistryDestinationIds.LOGBOOK,
+                    ).withFade(snapshot, conversation, convoState, now, today, showAging)
                     val rowPosition = record.fields[positionField(resolvedLocation.destinationId)].numberValue()
                         ?: record.fields[RegistryEntityFields.Task.POSITION].numberValue()
                     val positioned = PositionedTask(
                         if (resolvedLocation.destinationId == RegistryDestinationIds.AGENT) {
-                            item.copy(groupTitle = agentGroups[stage], position = rowPosition)
+                            val stageTitle = agentGroups[stage]
+                            item.copy(
+                                group = stageTitle?.let {
+                                    TaskGroupHeader(
+                                        key = "agent:${stage.orEmpty()}",
+                                        title = it,
+                                        iconKind = SeptenaIconKind.None,
+                                    )
+                                },
+                                groupTitle = stageTitle,
+                                position = rowPosition,
+                            )
                         } else {
                             item.copy(position = rowPosition)
                         },
@@ -556,7 +788,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                         areaId = snapshot.area,
                         projectId = snapshot.project,
                     )
-                    if (resolvedLocation.destinationId == RegistryDestinationIds.TODAY && membership.inTodayInbox) {
+                    if (inTodayInbox) {
                         inbox += positioned
                     } else {
                         visible += positioned
@@ -565,16 +797,36 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                 is TaskHomeLocation.Area -> {
                     if (snapshot.area != resolvedLocation.id || !isOpenVisible(snapshot)) continue
                     visible += PositionedTask(
-                        taskListItem(record, snapshot, resolvedLocation, areaTitles, projectTitles, membership.isOnToday)
-                            .withFade(snapshot, conversations[snapshot.id], now, today, showAging),
+                        taskListItem(
+                            record = record,
+                            snapshot = snapshot,
+                            membership = membership,
+                            selected = resolvedLocation,
+                            areaTitles = areaTitles,
+                            projectTitles = projectTitles,
+                            catalog = metadataCatalog,
+                            today = today,
+                            now = now,
+                            showTodayIndicator = true,
+                        ).withFade(snapshot, conversations[snapshot.id], convoStates[snapshot.id], now, today, showAging),
                         record.fields[RegistryEntityFields.Task.POSITION].numberValue(),
                     )
                 }
                 is TaskHomeLocation.Project -> {
                     if (snapshot.project != resolvedLocation.id || !isOpenVisible(snapshot)) continue
                     visible += PositionedTask(
-                        taskListItem(record, snapshot, resolvedLocation, areaTitles, projectTitles, membership.isOnToday)
-                            .withFade(snapshot, conversations[snapshot.id], now, today, showAging),
+                        taskListItem(
+                            record = record,
+                            snapshot = snapshot,
+                            membership = membership,
+                            selected = resolvedLocation,
+                            areaTitles = areaTitles,
+                            projectTitles = projectTitles,
+                            catalog = metadataCatalog,
+                            today = today,
+                            now = now,
+                            showTodayIndicator = true,
+                        ).withFade(snapshot, conversations[snapshot.id], convoStates[snapshot.id], now, today, showAging),
                         record.fields[RegistryEntityFields.Task.POSITION].numberValue(),
                     )
                 }
@@ -626,9 +878,10 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         return LoadedTaskHome(
             hasLoaded = true,
             location = resolvedLocation,
-            smartLists = smartListItems,
-            areas = areaRecords,
-            projects = projectRecords,
+            topSmartLists = topSmartListItems,
+            bottomSmartLists = bottomSmartListItems,
+            areas = countedAreas,
+            projects = countedProjects,
             inboxTasks = inbox.sortedTaskItems(),
             tasks = orderedTasks,
             canQuickAdd = canQuickAdd,
@@ -647,10 +900,15 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
     private fun taskListItem(
         record: SyncRecord,
         snapshot: TaskSnapshot,
+        membership: app.septena.core.TaskViewMembership,
         selected: TaskHomeLocation,
         areaTitles: Map<String, String>,
         projectTitles: Map<String, String>,
-        isOnToday: Boolean,
+        catalog: TaskRowMetadataCatalog,
+        today: java.time.LocalDate,
+        now: java.time.Instant,
+        showTodayIndicator: Boolean,
+        isLogbook: Boolean = false,
     ): TaskListItem {
         val projectTitle = snapshot.project?.let(projectTitles::get)
         val areaTitle = snapshot.area?.let(areaTitles::get)
@@ -659,14 +917,16 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             is TaskHomeLocation.Area -> projectTitle
             is TaskHomeLocation.Project -> null
         }
-        return TaskListItem(
-            id = record.id,
-            title = snapshot.title,
-            agentName = agentName(snapshot),
+        return buildTaskListItem(
+            record = record,
+            snapshot = snapshot,
+            membership = membership,
             subtitle = subtitle,
-            isCompleted = snapshot.status == RegistryEntityEnums.TaskStatus.DONE,
-            isOnToday = isOnToday,
-            isStarred = snapshot.starred,
+            catalog = catalog,
+            today = today,
+            now = now,
+            showTodayIndicator = showTodayIndicator,
+            isLogbook = isLogbook,
         )
     }
 
@@ -678,6 +938,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
     private fun TaskListItem.withFade(
         snapshot: TaskSnapshot,
         conversation: TaskConversation?,
+        convoState: app.septena.core.ConversationSnapshotState?,
         now: java.time.Instant,
         today: java.time.LocalDate,
         showAging: Boolean,
@@ -693,7 +954,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                 deadline = snapshot.deadline,
                 scheduled = snapshot.scheduled,
                 hasRecurrence = snapshot.recurrenceUnit != null,
-                isAgentTurn = conversation?.isAgentTurn(now) == true,
+                isAgentTurn = convoState?.isAgentWorking == true,
                 isAssignedToClaude = conversation?.assignee == RegistryEntityEnums.ConvoAssignee.CLAUDE,
                 showsAgentCue = TaskProvenance.isAgentAuthored(snapshot.source) && snapshot.acknowledgedAt == null,
                 touchedAt = snapshot.touchedAt?.let { runCatching { java.time.Instant.parse(it) }.getOrNull() },
@@ -701,7 +962,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                 created = snapshot.created,
                 now = now,
                 today = today.toString(),
-                isAwaitingHuman = conversation?.awaitsHuman == true,
+                isAwaitingHuman = convoState?.awaitsHuman == true,
             )
         }.getOrNull()
         return copy(opacity = TaskFadeRules.rowOpacity(fill).toFloat())
@@ -761,24 +1022,36 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         if (destinationId != RegistryDestinationIds.TODAY) {
             sorted.filter { it.projectId == null && it.areaId == null }.forEach { entry ->
                 emitted += entry.item.id
-                result += entry.item.copy(groupTitle = null)
+                result += entry.item.copy(group = null, groupTitle = null)
             }
         }
 
         val areaIds = areas.mapNotNull { (it.location as? TaskHomeLocation.Area)?.id }.toSet()
         for (areaItem in areas) {
             val area = areaItem.location as? TaskHomeLocation.Area ?: continue
-            val areaHeader = listOfNotNull(areaItem.emoji, area.title).joinToString(" ")
+            val areaHeader = TaskGroupHeader(
+                key = "area:${area.id}",
+                title = area.title,
+                iconKind = SeptenaIconKind.Area,
+                emoji = areaItem.emoji,
+                targetLocationKey = "area:${area.id}",
+            )
             byArea[area.id].orEmpty().forEach { entry ->
                 emitted += entry.item.id
-                result += entry.item.copy(groupTitle = areaHeader, subtitle = null)
+                result += entry.item.copy(group = areaHeader, groupTitle = area.title, subtitle = null)
             }
             for (projectItem in projects) {
                 if (projectItem.parentAreaId != area.id) continue
                 val project = projectItem.location as? TaskHomeLocation.Project ?: continue
+                val projectHeader = TaskGroupHeader(
+                    key = "project:${project.id}",
+                    title = project.title,
+                    iconKind = SeptenaIconKind.Project,
+                    targetLocationKey = "project:${project.id}",
+                )
                 byProject[project.id].orEmpty().forEach { entry ->
                     emitted += entry.item.id
-                    result += entry.item.copy(groupTitle = project.title, subtitle = null)
+                    result += entry.item.copy(group = projectHeader, groupTitle = project.title, subtitle = null)
                 }
             }
         }
@@ -787,9 +1060,15 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         for (projectItem in projects) {
             if (projectItem.parentAreaId != null && projectItem.parentAreaId in areaIds) continue
             val project = projectItem.location as? TaskHomeLocation.Project ?: continue
+            val projectHeader = TaskGroupHeader(
+                key = "project:${project.id}",
+                title = project.title,
+                iconKind = SeptenaIconKind.Project,
+                targetLocationKey = "project:${project.id}",
+            )
             byProject[project.id].orEmpty().forEach { entry ->
                 emitted += entry.item.id
-                result += entry.item.copy(groupTitle = project.title, subtitle = null)
+                result += entry.item.copy(group = projectHeader, groupTitle = project.title, subtitle = null)
             }
         }
 
@@ -829,11 +1108,3 @@ private fun JsonValue?.numberValue(): Double? = when (this) {
     is JsonValue.DecimalValue -> value
     else -> null
 }
-
-/** The agent's name for a row an agent added (`task.provenance`), else null. */
-private fun agentName(snapshot: TaskSnapshot): String? =
-    if (TaskProvenance.isAgentAuthored(snapshot.source)) {
-        TaskProvenance.addedByName(snapshot.source, snapshot.sourceClient)
-    } else {
-        null
-    }

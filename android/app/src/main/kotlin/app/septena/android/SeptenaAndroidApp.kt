@@ -39,6 +39,12 @@ class SeptenaAndroidApp : Application() {
     val graph: AndroidAppGraph by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
         AndroidAppGraph(this)
     }
+
+    override fun onCreate() {
+        super.onCreate()
+        // Start warming registries and the active-task SQLite cache before Activity.onCreate.
+        graph.prewarm()
+    }
 }
 
 class AndroidAppGraph(application: Application) {
@@ -83,6 +89,26 @@ class AndroidAppGraph(application: Application) {
 
     /** The app day the fade pass last ran in this process. */
     @Volatile private var lastFadePassDay: String? = null
+    private val prewarmed = java.util.concurrent.atomic.AtomicBoolean(false)
+
+    /** Starts warming startup registries and active-task caches in parallel with Compose's first frame. */
+    fun prewarm() {
+        if (!prewarmed.compareAndSet(false, true)) return
+        appScope.launch(Dispatchers.Default) {
+            runCatching { app.septena.core.RegistryCatalog.prewarmStartup() }
+        }
+        appScope.launch(Dispatchers.IO) {
+            runCatching {
+                taskStore.activeTasks()
+                taskStore.records(RegistryEntityNames.AREA)
+                taskStore.records(RegistryEntityNames.PROJECT)
+                taskStore.records(RegistryEntityNames.CONVO)
+                taskStore.allTurnsByTask()
+                taskStore.records(RegistryEntityNames.CHECKLIST_ITEM)
+                taskStore.records(RegistryEntityNames.TAG)
+            }
+        }
+    }
 
     /**
      * After each sync: attachment uploads, then the daily fade pass once per
@@ -95,9 +121,10 @@ class AndroidAppGraph(application: Application) {
         val day = clock.today(clock.now()).toString()
         if (lastFadePassDay == day) return uploads
         lastFadePassDay = day
+        val turnsByTask = taskStore.allTurnsByTask()
         val conversations = taskStore.records(RegistryEntityNames.CONVO)
             .filter { it.deletedAt == null }
-            .mapNotNull { r -> runCatching { r.id to TaskConversation.from(r, taskStore.turns(r.id)) }.getOrNull() }
+            .mapNotNull { r -> runCatching { r.id to TaskConversation.from(r, turnsByTask[r.id].orEmpty()) }.getOrNull() }
             .toMap()
         val faded = taskMutator.runFadePass(conversations)
         return uploads || faded > 0
@@ -108,10 +135,10 @@ class AndroidAppGraph(application: Application) {
     init {
         // Timed reminders follow the store: every sync and every local write
         // bumps dataVersion, and the alarms are armed again (#362). A burst of
-        // bumps runs one reconcile.
+        // bumps runs one reconcile; defer past initial boot so the UI loads first.
         appScope.launch {
             sync.dataVersion.collectLatest {
-                delay(150)
+                delay(1500)
                 runCatching { reminders.reconcile() }
             }
         }

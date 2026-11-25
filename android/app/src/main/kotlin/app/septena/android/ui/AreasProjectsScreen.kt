@@ -1,25 +1,23 @@
 package app.septena.android.ui
 
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.ListItemDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ListItem
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -32,9 +30,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.septena.android.AndroidAppGraph
@@ -45,14 +44,19 @@ import app.septena.core.generated.RegistryActionIds
 import app.septena.core.generated.RegistryPlacesScreenIds
 import app.septena.core.generated.RegistryPromptIds
 import app.septena.core.generated.RegistryTaskAttributeIds
-import app.septena.ui.SELECTION_WASH_ALPHA
-import app.septena.ui.TaskRowActionsMenu
+import app.septena.ui.ChevronRightGlyph
+import app.septena.ui.SeptenaGlyph
+import app.septena.ui.SeptenaIconKind
+import app.septena.ui.TaskCardMetrics
+import app.septena.ui.TaskCardPosition
+import app.septena.ui.TaskCardRow
+import app.septena.ui.TaskCardSlice
+import app.septena.ui.TaskRowMenuAction
 import app.septena.ui.TaskSelection
+import app.septena.ui.cardPosition
 import app.septena.ui.insertionPosition
 import app.septena.ui.magicPlusRowDrop
 import app.septena.ui.magicPlusSectionDrop
-import app.septena.ui.selectableTaskRow
-import app.septena.ui.TaskRowMenuAction
 
 /** Detail content for an area or project. The shell owns navigation and routes callbacks to these details. */
 @Composable
@@ -60,6 +64,12 @@ fun AreasProjectsScreen(
     graph: AndroidAppGraph,
     destination: AreasProjectsDestination,
     modifier: Modifier = Modifier,
+    starredOnly: Boolean = false,
+    completeTitle: String = "",
+    todayTitle: String = "",
+    fadedTitle: String = "",
+    headerContent: (@Composable () -> Unit)? = null,
+    onComplete: (String) -> Unit = {},
     onOpenProject: (String) -> Unit = {},
     onOpenTask: (String) -> Unit = {},
     rowMenuGroups: List<List<TaskRowMenuAction>> = emptyList(),
@@ -73,6 +83,9 @@ fun AreasProjectsScreen(
     val viewModel: AreasProjectsViewModel = viewModel(key = destination.key, factory = factory)
     val state by viewModel.state.collectAsStateWithLifecycle()
     val languageTag = LocalConfiguration.current.locales[0].toLanguageTag()
+    val isDark = LocalSeptenaDarkTheme.current
+    val hasActiveTexture = LocalAppearance.current.hasActiveTexture
+    val todayTint = MaterialTheme.colorScheme.secondary
     var dialog by remember { mutableStateOf<PlacesDialog?>(null) }
     var emojiPickerOpen by rememberSaveable(destination.key) { mutableStateOf(false) }
     var notesDraft by rememberSaveable(destination.key) { mutableStateOf("") }
@@ -88,18 +101,39 @@ fun AreasProjectsScreen(
         }
     }
 
+    val visibleAreaTasks = remember(state.areaTasks, starredOnly) {
+        if (starredOnly) state.areaTasks.filter(PlaceTaskRow::isStarred) else state.areaTasks
+    }
+    val visibleUnsectioned = remember(state.unsectionedTasks, starredOnly) {
+        if (starredOnly) state.unsectionedTasks.filter(PlaceTaskRow::isStarred) else state.unsectionedTasks
+    }
+    val visibleSections = remember(state.sections, starredOnly) {
+        if (starredOnly) {
+            state.sections.map { it.copy(tasks = it.tasks.filter(PlaceTaskRow::isStarred)) }
+        } else {
+            state.sections
+        }
+    }
+
     Column(modifier = modifier.fillMaxSize()) {
         if (state.isLoading) {
+            headerContent?.invoke()
             CircularProgressIndicator(modifier = Modifier.padding(24.dp))
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 88.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(bottom = 96.dp),
             ) {
-                item(key = "place-title") {
+                if (headerContent != null) {
+                    item(key = "place-screen-header") {
+                        headerContent()
+                    }
+                }
+                item(key = "place-actions") {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = TaskCardMetrics.Margin, vertical = 2.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
@@ -110,7 +144,7 @@ fun AreasProjectsScreen(
                                 onClick = { emojiPickerOpen = true },
                             )
                         }
-                        Text(state.title, modifier = Modifier.weight(1f))
+                        Spacer(modifier = Modifier.weight(1f))
                         TextButton(onClick = { dialog = PlacesDialog.RenamePlace(state.title) }) {
                             Text(actionTitle(destination.renameAction(), languageTag))
                         }
@@ -120,13 +154,20 @@ fun AreasProjectsScreen(
                     OutlinedTextField(
                         value = notesDraft,
                         onValueChange = { notesDraft = it },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = TaskCardMetrics.Margin),
                         label = { Text(surfaceText(RegistryTaskAttributeIds.NOTES, "label", languageTag)) },
                         minLines = 2,
                     )
                 }
                 item(key = "save-notes") {
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = TaskCardMetrics.Margin),
+                        horizontalArrangement = Arrangement.End,
+                    ) {
                         TextButton(onClick = { viewModel.saveNotes(notesDraft) }) {
                             Text(actionTitle(RegistryActionIds.PLACE_SAVE_NOTES, languageTag))
                         }
@@ -135,29 +176,83 @@ fun AreasProjectsScreen(
 
                 if (destination is AreasProjectsDestination.Area) {
                     item(key = "projects-heading") {
-                        Text(surfaceText(RegistryPlacesScreenIds.AREA_PROJECTS_HEADING, "label", languageTag))
-                    }
-                    item(key = "new-project") {
-                        Button(onClick = { dialog = PlacesDialog.CreateProject }) {
-                            Text(actionTitle(RegistryActionIds.AREA_NEW_PROJECT, languageTag))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(
+                                    start = TaskCardMetrics.HeaderLeading,
+                                    end = TaskCardMetrics.Margin,
+                                    top = 12.dp,
+                                    bottom = 6.dp,
+                                ),
+                        ) {
+                            Text(
+                                text = surfaceText(RegistryPlacesScreenIds.AREA_PROJECTS_HEADING, "label", languageTag),
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.weight(1f),
+                            )
+                            TextButton(onClick = { dialog = PlacesDialog.CreateProject }) {
+                                Text(actionTitle(RegistryActionIds.AREA_NEW_PROJECT, languageTag))
+                            }
                         }
                     }
                     if (state.projects.isEmpty()) {
                         item(key = "projects-empty") {
-                            Text(surfaceText(RegistryPlacesScreenIds.EMPTY_AREA_PROJECTS, "title", languageTag))
+                            Text(
+                                text = surfaceText(RegistryPlacesScreenIds.EMPTY_AREA_PROJECTS, "title", languageTag),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = TaskCardMetrics.HeaderLeading, vertical = 4.dp),
+                            )
                         }
                     } else {
-                        items(state.projects, key = { "project:${it.id}" }) { project ->
-                            ListItem(
-                                headlineContent = { Text(project.title) },
-                                modifier = Modifier.fillMaxWidth().clickable { onOpenProject(project.id) },
-                                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                            )
+                        itemsIndexed(state.projects, key = { _, it -> "project:${it.id}" }) { index, project ->
+                            TaskCardSlice(
+                                position = cardPosition(index, state.projects.size),
+                                isSelected = false,
+                                isDark = isDark,
+                                hasActiveTexture = hasActiveTexture,
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(TaskCardMetrics.IconTextGap),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { onOpenProject(project.id) }
+                                        .padding(horizontal = TaskCardMetrics.ContentInset, vertical = 12.dp),
+                                ) {
+                                    Box(
+                                        contentAlignment = Alignment.Center,
+                                        modifier = Modifier.width(TaskCardMetrics.LeadingColumnWidth),
+                                    ) {
+                                        SeptenaGlyph(
+                                            kind = SeptenaIconKind.Project,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            size = 18.dp,
+                                        )
+                                    }
+                                    Text(
+                                        text = project.title,
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    ChevronRightGlyph(
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                                        size = 14.dp,
+                                    )
+                                }
+                            }
                         }
                     }
                     item(key = "area-tasks-heading") {
                         Text(
-                            surfaceText(RegistryPlacesScreenIds.TASKS_HEADING, "label", languageTag),
+                            text = surfaceText(RegistryPlacesScreenIds.TASKS_HEADING, "label", languageTag),
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .magicPlusSectionDrop(
@@ -167,36 +262,44 @@ fun AreasProjectsScreen(
                                         onMagicPlusDrop?.invoke(
                                             QuickAddDraft(
                                                 areaId = destination.id,
-                                                position = state.areaTasks.firstOrNull()?.position?.let { it - 1.0 },
+                                                position = visibleAreaTasks.firstOrNull()?.position?.let { it - 1.0 },
                                             ),
                                         )
                                     },
+                                )
+                                .padding(
+                                    start = TaskCardMetrics.HeaderLeading,
+                                    end = TaskCardMetrics.Margin,
+                                    top = 16.dp,
+                                    bottom = 6.dp,
                                 ),
                         )
                     }
-                    item(key = "area-quick-add") {
-                        QuickAddRow(
-                            draft = areaTaskDraft,
-                            onDraftChange = { areaTaskDraft = it },
-                            title = actionTitle(RegistryActionIds.APP_QUICK_ADD, languageTag),
-                            onAdd = {
-                                viewModel.createTask(areaTaskDraft)
-                                areaTaskDraft = ""
-                            },
-                        )
-                    }
-                    if (state.areaTasks.isEmpty()) {
+                    if (visibleAreaTasks.isEmpty()) {
                         item(key = "area-tasks-empty") {
-                            Text(surfaceText(RegistryPlacesScreenIds.EMPTY_AREA_TASKS, "title", languageTag))
+                            Text(
+                                text = surfaceText(RegistryPlacesScreenIds.EMPTY_AREA_TASKS, "title", languageTag),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = TaskCardMetrics.HeaderLeading, vertical = 4.dp),
+                            )
                         }
                     } else {
-                        val areaPositions = state.areaTasks.map(PlaceTaskRow::position)
-                        itemsIndexed(state.areaTasks, key = { _, it -> "task:${it.id}" }) { index, task ->
+                        val areaPositions = visibleAreaTasks.map(PlaceTaskRow::position)
+                        itemsIndexed(visibleAreaTasks, key = { _, it -> "task:${it.id}" }) { index, task ->
                             PlaceTaskItem(
                                 task = task,
+                                position = cardPosition(index, visibleAreaTasks.size),
+                                completeTitle = completeTitle,
+                                todayTitle = todayTitle,
+                                todayTint = todayTint,
+                                fadedTitle = fadedTitle,
+                                isDark = isDark,
+                                hasActiveTexture = hasActiveTexture,
                                 rowMenuGroups = rowMenuGroups,
                                 rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
                                 selection = selection,
+                                onComplete = onComplete,
                                 onOpenTask = onOpenTask,
                                 onTaskAction = onTaskAction,
                                 dropModifier = Modifier.magicPlusRowDrop(
@@ -214,20 +317,24 @@ fun AreasProjectsScreen(
                             )
                         }
                     }
+                    item(key = "area-quick-add") {
+                        QuickAddRow(
+                            draft = areaTaskDraft,
+                            onDraftChange = { areaTaskDraft = it },
+                            title = actionTitle(RegistryActionIds.APP_QUICK_ADD, languageTag),
+                            onAdd = {
+                                viewModel.createTask(areaTaskDraft)
+                                areaTaskDraft = ""
+                            },
+                            modifier = Modifier.padding(horizontal = TaskCardMetrics.Margin, vertical = 8.dp),
+                        )
+                    }
                 }
 
                 if (destination is AreasProjectsDestination.Project) {
-                    item(key = "sections-heading") {
-                        Text(surfaceText(RegistryPlacesScreenIds.SECTIONS_HEADING, "label", languageTag))
-                    }
-                    item(key = "new-section") {
-                        Button(onClick = { dialog = PlacesDialog.CreateSection }) {
-                            Text(actionTitle(RegistryActionIds.SECTION_NEW, languageTag))
-                        }
-                    }
                     item(key = "project-tasks-heading") {
-                        Text(
-                            surfaceText(RegistryPlacesScreenIds.TASKS_HEADING, "label", languageTag),
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .magicPlusSectionDrop(
@@ -237,37 +344,56 @@ fun AreasProjectsScreen(
                                         onMagicPlusDrop?.invoke(
                                             QuickAddDraft(
                                                 projectId = destination.id,
-                                                position = state.unsectionedTasks.firstOrNull()?.position?.let { it - 1.0 },
+                                                position = visibleUnsectioned.firstOrNull()?.position?.let { it - 1.0 },
                                             ),
                                         )
                                     },
+                                )
+                                .padding(
+                                    start = TaskCardMetrics.HeaderLeading,
+                                    end = TaskCardMetrics.Margin,
+                                    top = 12.dp,
+                                    bottom = 6.dp,
                                 ),
-                        )
-                    }
-                    item(key = "project-quick-add") {
-                        QuickAddRow(
-                            draft = projectTaskDraft,
-                            onDraftChange = { projectTaskDraft = it },
-                            title = actionTitle(RegistryActionIds.APP_QUICK_ADD, languageTag),
-                            onAdd = {
-                                viewModel.createTask(projectTaskDraft)
-                                projectTaskDraft = ""
-                            },
-                        )
-                    }
-                    if (state.unsectionedTasks.isEmpty() && state.sections.isEmpty()) {
-                        item(key = "project-tasks-empty") {
-                            Text(surfaceText(RegistryPlacesScreenIds.EMPTY_PROJECT_TASKS, "title", languageTag))
+                        ) {
+                            Text(
+                                text = surfaceText(RegistryPlacesScreenIds.TASKS_HEADING, "label", languageTag),
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.weight(1f),
+                            )
+                            TextButton(onClick = { dialog = PlacesDialog.CreateSection }) {
+                                Text(actionTitle(RegistryActionIds.SECTION_NEW, languageTag))
+                            }
                         }
                     }
-                    if (state.unsectionedTasks.isNotEmpty()) {
-                        val projectPositions = state.unsectionedTasks.map(PlaceTaskRow::position)
-                        itemsIndexed(state.unsectionedTasks, key = { _, it -> "task:${it.id}" }) { index, task ->
+                    if (visibleUnsectioned.isEmpty() && visibleSections.isEmpty()) {
+                        item(key = "project-tasks-empty") {
+                            Text(
+                                text = surfaceText(RegistryPlacesScreenIds.EMPTY_PROJECT_TASKS, "title", languageTag),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = TaskCardMetrics.HeaderLeading, vertical = 4.dp),
+                            )
+                        }
+                    }
+                    if (visibleUnsectioned.isNotEmpty()) {
+                        val projectPositions = visibleUnsectioned.map(PlaceTaskRow::position)
+                        itemsIndexed(visibleUnsectioned, key = { _, it -> "task:${it.id}" }) { index, task ->
                             PlaceTaskItem(
                                 task = task,
+                                position = cardPosition(index, visibleUnsectioned.size),
+                                completeTitle = completeTitle,
+                                todayTitle = todayTitle,
+                                todayTint = todayTint,
+                                fadedTitle = fadedTitle,
+                                isDark = isDark,
+                                hasActiveTexture = hasActiveTexture,
                                 rowMenuGroups = rowMenuGroups,
                                 rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
                                 selection = selection,
+                                onComplete = onComplete,
                                 onOpenTask = onOpenTask,
                                 onTaskAction = onTaskAction,
                                 dropModifier = Modifier.magicPlusRowDrop(
@@ -285,22 +411,60 @@ fun AreasProjectsScreen(
                             )
                         }
                     }
-                    if (state.sections.isEmpty()) {
+                    item(key = "project-quick-add") {
+                        QuickAddRow(
+                            draft = projectTaskDraft,
+                            onDraftChange = { projectTaskDraft = it },
+                            title = actionTitle(RegistryActionIds.APP_QUICK_ADD, languageTag),
+                            onAdd = {
+                                viewModel.createTask(projectTaskDraft)
+                                projectTaskDraft = ""
+                            },
+                            modifier = Modifier.padding(horizontal = TaskCardMetrics.Margin, vertical = 8.dp),
+                        )
+                    }
+                    item(key = "sections-heading") {
+                        Text(
+                            text = surfaceText(RegistryPlacesScreenIds.SECTIONS_HEADING, "label", languageTag),
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(
+                                start = TaskCardMetrics.HeaderLeading,
+                                end = TaskCardMetrics.Margin,
+                                top = 16.dp,
+                                bottom = 4.dp,
+                            ),
+                        )
+                    }
+                    if (visibleSections.isEmpty()) {
                         item(key = "project-sections-empty") {
-                            Text(surfaceText(RegistryPlacesScreenIds.EMPTY_PROJECT_SECTIONS, "title", languageTag))
+                            Text(
+                                text = surfaceText(RegistryPlacesScreenIds.EMPTY_PROJECT_SECTIONS, "title", languageTag),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = TaskCardMetrics.HeaderLeading, vertical = 4.dp),
+                            )
                         }
                     } else {
-                        items(state.sections, key = { "section:${it.id}" }) { section ->
+                        items(visibleSections, key = { "section:${it.id}" }) { section ->
                             PlaceSectionBlock(
                                 projectId = destination.id,
                                 section = section,
                                 languageTag = languageTag,
+                                completeTitle = completeTitle,
+                                todayTitle = todayTitle,
+                                todayTint = todayTint,
+                                fadedTitle = fadedTitle,
+                                isDark = isDark,
+                                hasActiveTexture = hasActiveTexture,
                                 taskDraft = sectionTaskDrafts[section.id].orEmpty(),
                                 onTaskDraftChange = { value -> sectionTaskDrafts = sectionTaskDrafts + (section.id to value) },
                                 onAddTask = {
                                     viewModel.createTask(sectionTaskDrafts[section.id].orEmpty(), section.id)
                                     sectionTaskDrafts = sectionTaskDrafts + (section.id to "")
                                 },
+                                onComplete = onComplete,
                                 onOpenTask = onOpenTask,
                                 rowMenuGroups = rowMenuGroups,
                                 rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
@@ -379,8 +543,13 @@ private fun QuickAddRow(
     onDraftChange: (String) -> Unit,
     title: String,
     onAdd: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         OutlinedTextField(
             value = draft,
             onValueChange = onDraftChange,
@@ -395,50 +564,40 @@ private fun QuickAddRow(
 @Composable
 private fun PlaceTaskItem(
     task: PlaceTaskRow,
+    position: TaskCardPosition,
+    completeTitle: String,
+    todayTitle: String,
+    todayTint: androidx.compose.ui.graphics.Color,
+    fadedTitle: String,
+    isDark: Boolean,
+    hasActiveTexture: Boolean,
     rowMenuGroups: List<List<TaskRowMenuAction>>,
     rowMenuAccessibilityLabel: String,
     selection: TaskSelection,
+    onComplete: (String) -> Unit,
     onOpenTask: (String) -> Unit,
     onTaskAction: (String, String) -> Unit,
     dropModifier: Modifier = Modifier,
 ) {
-    var menuExpanded by remember(task.id) { mutableStateOf(false) }
-    val selected = task.id in selection.selectedIds
-    ListItem(
-        headlineContent = { Text(task.title) },
-        colors = if (selected) {
-            ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = SELECTION_WASH_ALPHA))
-        } else {
-            ListItemDefaults.colors(containerColor = Color.Transparent)
-        },
-        leadingContent = if (selection.isActive) {
-            {
-                Checkbox(
-                    checked = selected,
-                    onCheckedChange = { selection.onToggle(task.id) },
-                    modifier = Modifier.semantics { contentDescription = selection.toggleLabel },
-                )
-            }
-        } else null,
-        modifier = dropModifier.fillMaxWidth().selectableTaskRow(task.id, selection, onOpenTask, onMenu = { menuExpanded = true }),
-        trailingContent = if (rowMenuGroups.isNotEmpty() && !selection.isActive) {
-            {
-                TaskRowActionsMenu(
-                    groups = rowMenuGroups.map { group ->
-                        group.map { action ->
-                            if (action.selectedTitle != null || action.unselectedTitle != null) action.copy(
-                                title = if (task.isStarred) action.selectedTitle ?: action.title
-                                else action.unselectedTitle ?: action.title,
-                            ) else action
-                        }
-                    },
-                    accessibilityLabel = rowMenuAccessibilityLabel,
-                    expanded = menuExpanded,
-                    onExpandedChange = { menuExpanded = it },
-                    onAction = { onTaskAction(task.id, it) },
-                )
-            }
-        } else null,
+    TaskCardRow(
+        task = task.item,
+        position = position,
+        completeTitle = completeTitle,
+        canComplete = true,
+        todayTitle = todayTitle,
+        todayTint = todayTint,
+        fadedTitle = fadedTitle,
+        showTodayIndicator = true,
+        showFadedIndicator = true,
+        isDark = isDark,
+        hasActiveTexture = hasActiveTexture,
+        onComplete = onComplete,
+        onOpenTask = onOpenTask,
+        rowMenuGroups = rowMenuGroups,
+        rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
+        selection = selection,
+        onTaskAction = onTaskAction,
+        dropModifier = dropModifier,
     )
 }
 
@@ -447,9 +606,16 @@ private fun PlaceSectionBlock(
     projectId: String,
     section: PlaceSectionRow,
     languageTag: String,
+    completeTitle: String,
+    todayTitle: String,
+    todayTint: androidx.compose.ui.graphics.Color,
+    fadedTitle: String,
+    isDark: Boolean,
+    hasActiveTexture: Boolean,
     taskDraft: String,
     onTaskDraftChange: (String) -> Unit,
     onAddTask: () -> Unit,
+    onComplete: (String) -> Unit,
     onOpenTask: (String) -> Unit,
     rowMenuGroups: List<List<TaskRowMenuAction>>,
     rowMenuAccessibilityLabel: String,
@@ -459,7 +625,7 @@ private fun PlaceSectionBlock(
     onDelete: () -> Unit,
     onMagicPlusDrop: ((QuickAddDraft) -> Unit)? = null,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
@@ -476,9 +642,21 @@ private fun PlaceSectionBlock(
                             ),
                         )
                     },
+                )
+                .padding(
+                    start = TaskCardMetrics.HeaderLeading,
+                    end = TaskCardMetrics.Margin,
+                    top = 16.dp,
+                    bottom = 6.dp,
                 ),
         ) {
-            Text(section.title, modifier = Modifier.weight(1f))
+            Text(
+                text = section.title,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f),
+            )
             TextButton(onClick = onRename) {
                 Text(actionTitle(RegistryActionIds.SECTION_RENAME, languageTag))
             }
@@ -487,15 +665,28 @@ private fun PlaceSectionBlock(
             }
         }
         if (section.tasks.isEmpty()) {
-            Text(surfaceText(RegistryPlacesScreenIds.EMPTY_SECTION_TASKS, "title", languageTag), modifier = Modifier.padding(start = 12.dp))
+            Text(
+                text = surfaceText(RegistryPlacesScreenIds.EMPTY_SECTION_TASKS, "title", languageTag),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = TaskCardMetrics.HeaderLeading, vertical = 4.dp),
+            )
         } else {
             val sectionPositions = section.tasks.map(PlaceTaskRow::position)
             section.tasks.forEachIndexed { index, task ->
                 PlaceTaskItem(
                     task = task,
+                    position = cardPosition(index, section.tasks.size),
+                    completeTitle = completeTitle,
+                    todayTitle = todayTitle,
+                    todayTint = todayTint,
+                    fadedTitle = fadedTitle,
+                    isDark = isDark,
+                    hasActiveTexture = hasActiveTexture,
                     rowMenuGroups = rowMenuGroups,
                     rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
                     selection = selection,
+                    onComplete = onComplete,
                     onOpenTask = onOpenTask,
                     onTaskAction = onTaskAction,
                     dropModifier = Modifier.magicPlusRowDrop(
@@ -519,6 +710,7 @@ private fun PlaceSectionBlock(
             onDraftChange = onTaskDraftChange,
             title = actionTitle(RegistryActionIds.SECTION_NEW_TASK, languageTag),
             onAdd = onAddTask,
+            modifier = Modifier.padding(horizontal = TaskCardMetrics.Margin, vertical = 6.dp),
         )
     }
 }

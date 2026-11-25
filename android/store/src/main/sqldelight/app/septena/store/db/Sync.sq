@@ -73,13 +73,36 @@ SELECT entity, id, fields_json AS fieldsJson, revision, updated_at AS updatedAt,
        deleted_at AS deletedAt, remote_known AS remoteKnown
 FROM sync_record WHERE entity = ? ORDER BY id;
 
+selectActiveTasks:
+SELECT entity, id, fields_json AS fieldsJson, revision, updated_at AS updatedAt,
+       deleted_at AS deletedAt, remote_known AS remoteKnown
+FROM sync_record
+WHERE entity = 'task' AND (deleted_at IS NOT NULL OR fields_json LIKE '%"status":"open"%')
+ORDER BY id;
+
+selectDoneTasksMatchingDays:
+SELECT fields_json AS fieldsJson
+FROM sync_record
+WHERE entity = 'task'
+  AND deleted_at IS NULL
+  AND fields_json LIKE '%"status":"done"%'
+  AND (fields_json LIKE ? OR fields_json LIKE ? OR fields_json LIKE ?);
+
 selectTurns:
 SELECT task_id AS taskId, sequence, fields_json AS fieldsJson
 FROM sync_turn WHERE task_id = ? ORDER BY sequence;
 
+selectAllTurns:
+SELECT task_id AS taskId, sequence, fields_json AS fieldsJson
+FROM sync_turn ORDER BY task_id, sequence;
+
 selectLocalTurns:
 SELECT local_seq AS localSeq, task_id AS taskId, client_op_id AS clientOpId, fields_json AS fieldsJson
 FROM sync_local_turn WHERE task_id = ? ORDER BY local_seq;
+
+selectAllLocalTurns:
+SELECT local_seq AS localSeq, task_id AS taskId, client_op_id AS clientOpId, fields_json AS fieldsJson
+FROM sync_local_turn ORDER BY task_id, local_seq;
 
 insertLocalTurn:
 INSERT INTO sync_local_turn(task_id, client_op_id, fields_json) VALUES (?, ?, ?);

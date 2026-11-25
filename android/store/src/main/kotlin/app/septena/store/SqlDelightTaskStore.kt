@@ -19,10 +19,14 @@ import app.septena.sharedcore.CoreException
 import app.septena.sharedcore.PullRowPlan
 import app.septena.sharedcore.planPullRow
 import java.time.Instant
+import java.util.concurrent.ConcurrentHashMap
 
 /** SQLDelight-backed outbox, local rows and remote shadows. The injected driver keeps this module JVM reusable. */
 class SqlDelightTaskStore(private val database: SeptenaDatabase) : TaskStore {
     private val queries = database.syncQueries
+    private val recordsCache = ConcurrentHashMap<String, List<SyncRecord>>()
+    @Volatile private var activeTasksCache: List<SyncRecord>? = null
+    @Volatile private var allTurnsCache: Map<String, List<SyncTurn>>? = null
 
     /**
      * Called after a committed sync transaction removes a non-task row because
@@ -34,15 +38,101 @@ class SqlDelightTaskStore(private val database: SeptenaDatabase) : TaskStore {
 
     constructor(driver: SqlDriver) : this(SeptenaDatabase(driver))
 
-    override suspend fun record(entity: String, id: String): SyncRecord? =
-        queries.selectRecord(entity, id).executeAsOneOrNull()?.let { row ->
+    override suspend fun record(entity: String, id: String): SyncRecord? {
+        recordsCache[entity]?.let { cached -> return cached.firstOrNull { it.id == id } }
+        return queries.selectRecord(entity, id).executeAsOneOrNull()?.let { row ->
             SyncRecord(row.entity, row.id, parseObject(row.fieldsJson), row.revision, row.updatedAt, row.deletedAt)
         }
+    }
 
     override suspend fun records(entity: String): List<SyncRecord> =
-        queries.selectRecords(entity).executeAsList().map { row ->
+        recordsCache.computeIfAbsent(entity) {
+            queries.selectRecords(entity).executeAsList().map { row ->
+                SyncRecord(row.entity, row.id, parseObject(row.fieldsJson), row.revision, row.updatedAt, row.deletedAt)
+            }
+        }
+
+    /**
+     * Fast boot path: loads only open and soft-deleted tasks (skipping closed Logbook rows)
+     * so Today renders without parsing thousands of archived tasks.
+     */
+    suspend fun activeTasks(): List<SyncRecord> {
+        recordsCache[RegistryEntityNames.TASK]?.let { all ->
+            return all.filter {
+                it.deletedAt != null || it.fields["status"].stringValue() == "open"
+            }
+        }
+        activeTasksCache?.let { return it }
+        val loaded = queries.selectActiveTasks().executeAsList().map { row ->
             SyncRecord(row.entity, row.id, parseObject(row.fieldsJson), row.revision, row.updatedAt, row.deletedAt)
         }
+        activeTasksCache = loaded
+        return loaded
+    }
+
+    /** Counts tasks completed on [localDay] without scanning the whole Logbook. */
+    suspend fun countDoneTasksOnLocalDay(localDay: java.time.LocalDate, zoneId: java.time.ZoneId): Int {
+        val prevDay = localDay.minusDays(1)
+        val nextDay = localDay.plusDays(1)
+        val rows = queries.selectDoneTasksMatchingDays(
+            "%\"completedAt\":\"$localDay%",
+            "%\"completedAt\":\"$prevDay%",
+            "%\"completedAt\":\"$nextDay%",
+        ).executeAsList()
+        var count = 0
+        for (json in rows) {
+            val completedAt = runCatching { parseObject(json)["completedAt"].stringValue() }.getOrNull() ?: continue
+            val day = runCatching { Instant.parse(completedAt).atZone(zoneId).toLocalDate() }.getOrNull()
+                ?: runCatching { java.time.LocalDate.parse(completedAt.take(10)) }.getOrNull()
+            if (day == localDay) count += 1
+        }
+        return count
+    }
+
+    /** Loads every task's server + pending turns in 2 bulk queries (cached until the next turn write). */
+    suspend fun allTurnsByTask(): Map<String, List<SyncTurn>> {
+        allTurnsCache?.let { return it }
+        val grouped = LinkedHashMap<String, MutableList<SyncTurn>>()
+        for (row in queries.selectAllTurns().executeAsList()) {
+            grouped.getOrPut(row.taskId) { mutableListOf() }.add(
+                SyncTurn(taskId = row.taskId, sequence = row.sequence, fields = parseObject(row.fieldsJson)),
+            )
+        }
+        val localByTask = queries.selectAllLocalTurns().executeAsList().groupBy { it.taskId }
+        for ((taskId, localRows) in localByTask) {
+            val list = grouped.getOrPut(taskId) { mutableListOf() }
+            val lastSequence = list.maxOfOrNull(SyncTurn::sequence) ?: 0L
+            localRows.forEachIndexed { index, row ->
+                list.add(
+                    SyncTurn(
+                        taskId = row.taskId,
+                        sequence = lastSequence + index + 1L,
+                        fields = parseObject(row.fieldsJson),
+                        isPending = true,
+                        clientOpId = row.clientOpId,
+                    ),
+                )
+            }
+        }
+        allTurnsCache = grouped
+        return grouped
+    }
+
+    private fun invalidateCache(entity: String? = null) {
+        if (entity == null) {
+            recordsCache.clear()
+            activeTasksCache = null
+            allTurnsCache = null
+        } else {
+            recordsCache.remove(entity)
+            if (entity == RegistryEntityNames.TASK) {
+                activeTasksCache = null
+                allTurnsCache = null
+            } else if (entity == "turn") {
+                allTurnsCache = null
+            }
+        }
+    }
 
     override suspend fun turns(taskId: String): List<SyncTurn> {
         val serverTurns = queries.selectTurns(taskId).executeAsList().map { row ->
@@ -88,6 +178,7 @@ class SqlDelightTaskStore(private val database: SeptenaDatabase) : TaskStore {
                 is SyncOperation.AppendTurn -> error("Append turns use appendTurnAndEnqueue")
             }
         }
+        invalidateCache(record.entity)
     }
 
     override suspend fun appendTurnAndEnqueue(
@@ -101,6 +192,7 @@ class SqlDelightTaskStore(private val database: SeptenaDatabase) : TaskStore {
             insertOperation(operation, encoded, Instant.EPOCH)
             queries.insertLocalTurn(taskId, operation.clientOpId, encodeObject(turn))
         }
+        invalidateCache("turn")
     }
 
     override suspend fun claimPendingOperations(limit: Int, now: Instant): List<QueuedOperation> {
@@ -163,6 +255,7 @@ class SqlDelightTaskStore(private val database: SeptenaDatabase) : TaskStore {
                 }
             }
         }
+        if (results.isNotEmpty()) invalidateCache()
         val listener = onRemoteDelete
         remotelyDeleted.forEach { (entity, id) -> listener(entity, id) }
     }
@@ -192,6 +285,7 @@ class SqlDelightTaskStore(private val database: SeptenaDatabase) : TaskStore {
             }
             queries.deleteRejected(clientOpId)
         }
+        invalidateCache("turn")
     }
 
     override suspend fun applyPullPage(page: app.septena.core.SyncPullPage, at: Instant) {
@@ -275,6 +369,7 @@ class SqlDelightTaskStore(private val database: SeptenaDatabase) : TaskStore {
             }
             queries.setSyncCursor(page.nextSince.toString())
         }
+        if (page.changes.isNotEmpty()) invalidateCache()
         val listener = onRemoteDelete
         remotelyDeleted.forEach { (entity, rowId) -> listener(entity, rowId) }
     }
@@ -290,6 +385,7 @@ class SqlDelightTaskStore(private val database: SeptenaDatabase) : TaskStore {
             queries.deleteAllTurns()
             queries.setSyncCursor("0")
         }
+        invalidateCache()
     }
 
     /**
@@ -306,6 +402,7 @@ class SqlDelightTaskStore(private val database: SeptenaDatabase) : TaskStore {
             queries.deleteAllRejectedRows()
             queries.deleteAllMetadata()
         }
+        invalidateCache()
     }
 
     private fun enqueueUpsert(operation: SyncOperation.Upsert, notBefore: Instant) {

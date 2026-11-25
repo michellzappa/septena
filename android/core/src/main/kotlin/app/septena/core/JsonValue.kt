@@ -135,7 +135,21 @@ private class JsonParser(private val source: String) {
 
     private fun string(): String {
         require(consume('"')) { "Expected string at offset $index" }
-        return buildString {
+        val start = index
+        // Fast path: scan unescaped strings directly and slice once without StringBuilder churn.
+        while (index < source.length) {
+            val character = source[index]
+            if (character == '"') {
+                val result = source.substring(start, index)
+                index++
+                return result
+            }
+            if (character == '\\') break
+            if (character.code < 0x20) error("Unescaped control character in JSON string at offset $index")
+            index++
+        }
+        return buildString(index - start + 16) {
+            if (index > start) append(source, start, index)
             while (index < source.length) {
                 val character = source[index++]
                 when {
@@ -198,7 +212,12 @@ private class JsonParser(private val source: String) {
     }
 
     private fun whitespace() {
-        while (index < source.length && source[index] in listOf(' ', '\n', '\r', '\t')) index++
+        while (index < source.length) {
+            when (source[index]) {
+                ' ', '\n', '\r', '\t' -> index++
+                else -> return
+            }
+        }
     }
 
     private fun consume(character: Char): Boolean {
