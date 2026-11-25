@@ -215,6 +215,24 @@ enum SettingsMirror {
 
 }
 
+/// The sweep writes: this device, then the account (`TaskFade` holds the rules).
+extension TaskFade {
+  @MainActor
+  static func markSweepCompleted(at date: Date) {
+    UserDefaults.standard.set(date.timeIntervalSince1970, forKey: lastSweepAtKey)
+    SettingsMirror.updateSynced { $0.fadeSweptAt = date }
+  }
+
+  /// Dismisses this week's sweep banner on every device without dropping any tasks.
+  @MainActor
+  static func dismissSweepForCurrentWeek(now: Date, calendar: Calendar = .current) {
+    let anchor = mostRecentSweepAnchor(now: now, calendar: calendar)
+    UserDefaults.standard.set(anchor.timeIntervalSince1970, forKey: dismissedSweepWeekKey)
+    let day = SeptenaDate.format(anchor)
+    SettingsMirror.updateSynced { $0.fadeSweepDismissedOn = day }
+  }
+}
+
 /// Byte-keyed memo for the decoded settings blob. `@unchecked Sendable` with an
 /// explicit lock: `loadSettings` is `nonisolated` and genuinely runs on both the
 /// main actor and background model actors, and `AppSettings` is a value type

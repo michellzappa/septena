@@ -97,6 +97,14 @@ enum SeptaskSyncedSettings {
   /// `ISO8601DateFormatter` is not `Sendable`.
   private static var stampFormatter: ISO8601DateFormatter { ISO8601DateFormatter() }
 
+  /// The web and Android write fractional seconds; the formatter wants to know.
+  private static func stamp(_ raw: String) -> Date? {
+    if let date = stampFormatter.date(from: raw) { return date }
+    let fractional = stampFormatter
+    fractional.formatOptions.insert(.withFractionalSeconds)
+    return fractional.date(from: raw)
+  }
+
   @discardableResult
   static func apply(_ key: String, _ v: BackendJSON, to s: inout AppSettings) -> Bool {
     func string() -> String?? {
@@ -116,7 +124,7 @@ enum SeptaskSyncedSettings {
     case "onboardedAt":
       guard let x = string() else { return false }
       guard let raw = x else { s.onboardedAt = nil; break }
-      guard let date = stampFormatter.date(from: raw) else { return false }
+      guard let date = stamp(raw) else { return false }
       s.onboardedAt = date
     case "homeTimezone":
       guard let x = string() else { return false }
@@ -137,7 +145,7 @@ enum SeptaskSyncedSettings {
     case "fadeSweptAt":
       guard let x = string() else { return false }
       guard let raw = x else { s.fadeSweptAt = nil; break }
-      guard let date = stampFormatter.date(from: raw) else { return false }
+      guard let date = stamp(raw) else { return false }
       s.fadeSweptAt = date
     case "fadeSweepDismissedOn":
       guard let x = string() else { return false }

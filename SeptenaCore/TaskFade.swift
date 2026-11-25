@@ -177,26 +177,11 @@ enum TaskFade {
       .compactMap { $0 }.max()
   }
 
-  @MainActor
-  static func markSweepCompleted(at date: Date) {
-    UserDefaults.standard.set(date.timeIntervalSince1970, forKey: lastSweepAtKey)
-    SettingsMirror.updateSynced { $0.fadeSweptAt = date }
-  }
-
   static var dismissedSweepWeek: Date? {
     let ts = UserDefaults.standard.double(forKey: dismissedSweepWeekKey)
     return [ts > 0 ? Date(timeIntervalSince1970: ts) : nil,
             parseDay(SeptaskSyncedSettings.current().fadeSweepDismissedOn)]
       .compactMap { $0 }.max()
-  }
-
-  /// Dismisses this week's sweep banner on every device without dropping any tasks.
-  @MainActor
-  static func dismissSweepForCurrentWeek(now: Date, calendar: Calendar = .current) {
-    let anchor = mostRecentSweepAnchor(now: now, calendar: calendar)
-    UserDefaults.standard.set(anchor.timeIntervalSince1970, forKey: dismissedSweepWeekKey)
-    let day = SeptenaDate.format(anchor)
-    SettingsMirror.updateSynced { $0.fadeSweepDismissedOn = day }
   }
 
   /// Plain-language, field-derived one-line reason shown under a faded row in
