@@ -3,14 +3,21 @@ package app.septena.ui
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.sp
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -25,6 +32,15 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+
+/** Read-only device calendar event rendered above Today / Upcoming (mirrors iOS `CalendarEventRow`). */
+data class CalendarAgendaRow(
+    val id: String,
+    val title: String,
+    val timeLabel: String? = null,
+    val isAllDay: Boolean = false,
+    val dayLabel: String? = null,
+)
 
 /**
  * Portable view model for a task row (iOS `TaskRow` parity).
@@ -149,6 +165,7 @@ fun TaskHomeContent(
     isToday: Boolean,
     inboxTasks: List<TaskListItem>,
     tasks: List<TaskListItem>,
+    calendarEvents: List<CalendarAgendaRow> = emptyList(),
     canQuickAdd: Boolean,
     canComplete: Boolean,
     errorMessage: String?,
@@ -198,6 +215,73 @@ fun TaskHomeContent(
             if (headerContent != null) {
                 item(key = "list-screen-header") {
                     headerContent()
+                }
+            }
+
+            if (calendarEvents.isNotEmpty()) {
+                itemsIndexed(calendarEvents, key = { _, event -> "cal:${event.id}" }) { index, event ->
+                    val prevDay = calendarEvents.getOrNull(index - 1)?.dayLabel
+                    val showDayHeader = event.dayLabel != null && event.dayLabel != prevDay
+                    val slicePos = calendarSlicePosition(calendarEvents, index)
+                    if (showDayHeader && event.dayLabel != null) {
+                        Text(
+                            text = event.dayLabel,
+                            fontSize = 12.5.sp,
+                            lineHeight = 16.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(
+                                start = TaskCardMetrics.HeaderLeading,
+                                end = TaskCardMetrics.Margin,
+                                top = if (index == 0) 4.dp else 10.dp,
+                                bottom = 4.dp,
+                            ),
+                        )
+                    }
+                    TaskCardSlice(
+                        position = slicePos,
+                        isSelected = false,
+                        isDark = isDarkTheme,
+                        hasActiveTexture = hasActiveTexture,
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = TaskCardMetrics.ContentInset, vertical = 6.dp),
+                        ) {
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier.width(TaskCardMetrics.LeadingColumnWidth + 14.dp),
+                            ) {
+                                if (event.timeLabel != null) {
+                                    Text(
+                                        text = event.timeLabel,
+                                        style = TextStyle(
+                                            fontSize = 11.sp,
+                                            lineHeight = 14.sp,
+                                            fontFeatureSettings = "tnum",
+                                        ),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = event.title,
+                                fontSize = 13.5.sp,
+                                lineHeight = 18.sp,
+                                color = if (event.isAllDay) {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface
+                                },
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                    }
                 }
             }
 
@@ -390,6 +474,16 @@ private fun LazyListScope.taskCardRows(
                 ),
         )
     }
+}
+
+/** Card position for a calendar agenda row, grouping rows that share the same day header. */
+private fun calendarSlicePosition(events: List<CalendarAgendaRow>, index: Int): TaskCardPosition {
+    val day = events[index].dayLabel
+    var start = index
+    while (start > 0 && events[start - 1].dayLabel == day) start -= 1
+    var end = index
+    while (end + 1 < events.size && events[end + 1].dayLabel == day) end += 1
+    return cardPosition(index - start, end - start + 1)
 }
 
 /** Splits [tasks] into contiguous runs sharing the same group key and computes each row's card slice position. */

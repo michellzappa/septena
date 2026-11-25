@@ -1,11 +1,14 @@
 package app.septena.android.ui
 
+import android.Manifest
 import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -30,24 +33,111 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import app.septena.android.AndroidAppGraph
+import app.septena.android.calendar.AndroidCalendarReader
+import app.septena.android.calendar.DeviceCalendarInfo
+import app.septena.core.JsonValue
+import app.septena.core.booleanValue
+import app.septena.core.generated.RegistrySettingKeys
+import app.septena.core.stringValue
 import app.septena.transport.IcalFeed
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
- * Surface `calendar_detail` on Android: the private iCal feed of dated tasks
- * (`/v1/ical/settings`), like the feed section of iOS `CalendarDetail`. The device
- * calendar part (events in Today and Upcoming) is `calendar.events`, still planned
- * on Android, so this page has no calendar list.
+ * Surface `calendar_detail` on Android: device calendar events in Today & Upcoming
+ * (`calendar.events`, read-only via `CalendarContract`) plus the private iCal feed
+ * (`/v1/ical/settings`, `calendar.feed`).
  */
 @Composable
-internal fun CalendarFeedSection(graph: AndroidAppGraph, signedIn: Boolean, languageTag: String) {
+internal fun CalendarFeedSection(
+    graph: AndroidAppGraph,
+    signedIn: Boolean,
+    values: Map<String, JsonValue>,
+    onValueChange: (String, JsonValue) -> Unit,
+    languageTag: String,
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    var hasCalendarPermission by remember { mutableStateOf(AndroidCalendarReader.hasPermission(context)) }
+    var calendars by remember { mutableStateOf<List<DeviceCalendarInfo>>(emptyList()) }
+    val showEvents = values[RegistrySettingKeys.TASKS_SHOW_CALENDAR_EVENTS].booleanValue() ?: true
+    val hiddenTitles = remember(values[RegistrySettingKeys.CALENDAR_HIDDEN_TITLES]) {
+        (values[RegistrySettingKeys.CALENDAR_HIDDEN_TITLES] as? JsonValue.ArrayValue)
+            ?.values.orEmpty()
+            .mapNotNull { it.stringValue() }
+            .toSet()
+    }
+    val requestCalendarPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        hasCalendarPermission = granted || AndroidCalendarReader.hasPermission(context)
+    }
+
+    LaunchedEffect(hasCalendarPermission, showEvents) {
+        calendars = if (hasCalendarPermission && showEvents) {
+            withContext(Dispatchers.IO) { AndroidCalendarReader.listCalendars(context) }
+        } else {
+            emptyList()
+        }
+    }
+
     var feed by remember { mutableStateOf<IcalFeed?>(null) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var confirmRotate by remember { mutableStateOf(false) }
     fun copy(id: String) = settingsCopy(CALENDAR, id, languageTag)
+
+    SectionHeader("Device calendars")
+    ListItem(
+        headlineContent = { Text("Show calendar events") },
+        supportingContent = { Text("Read-only agenda in Today and Upcoming") },
+        trailingContent = {
+            Switch(
+                checked = showEvents && hasCalendarPermission,
+                onCheckedChange = { enabled ->
+                    if (enabled && !hasCalendarPermission) {
+                        onValueChange(RegistrySettingKeys.TASKS_SHOW_CALENDAR_EVENTS, JsonValue.BooleanValue(true))
+                        requestCalendarPermission.launch(Manifest.permission.READ_CALENDAR)
+                    } else {
+                        onValueChange(RegistrySettingKeys.TASKS_SHOW_CALENDAR_EVENTS, JsonValue.BooleanValue(enabled))
+                    }
+                },
+            )
+        },
+        modifier = Modifier.fillMaxWidth(),
+    )
+    if (showEvents && !hasCalendarPermission) {
+        ListItem(
+            headlineContent = { Text("Allow calendar access", color = MaterialTheme.colorScheme.primary) },
+            modifier = Modifier.fillMaxWidth().clickable {
+                requestCalendarPermission.launch(Manifest.permission.READ_CALENDAR)
+            },
+        )
+    } else if (showEvents && calendars.isNotEmpty()) {
+        calendars.forEach { cal ->
+            val visible = cal.name !in hiddenTitles
+            ListItem(
+                headlineContent = { Text(cal.name) },
+                supportingContent = if (cal.accountName.isNotBlank()) {
+                    { Text(cal.accountName) }
+                } else null,
+                trailingContent = {
+                    Switch(
+                        checked = visible,
+                        onCheckedChange = { on ->
+                            val next = if (on) hiddenTitles - cal.name else hiddenTitles + cal.name
+                            onValueChange(
+                                RegistrySettingKeys.CALENDAR_HIDDEN_TITLES,
+                                JsonValue.ArrayValue(next.sorted().map { JsonValue.StringValue(it) }),
+                            )
+                        },
+                    )
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
 
     LaunchedEffect(signedIn) {
         if (!signedIn) {

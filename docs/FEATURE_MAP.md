@@ -8,9 +8,9 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 
 | Status | iPhone | iPad | Mac | Web | Android | Windows | Watch |
 |---|---|---|---|---|---|---|---|
-| ships | 53 | 54 | 54 | 0 | 43 | 0 | 1 |
+| ships | 53 | 54 | 54 | 0 | 45 | 0 | 1 |
 | partial | 1 | 1 | 1 | 0 | 3 | 0 | 3 |
-| planned | 0 | 0 | 0 | 51 | 7 | 54 | 1 |
+| planned | 0 | 0 | 0 | 51 | 5 | 54 | 1 |
 | - | 4 | 3 | 3 | 7 | 5 | 4 | 53 |
 
 | ID | Feature | iPhone | iPad | Mac | Web | Android | Windows | Watch |
@@ -52,7 +52,7 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 | `task.page` | Task page (ADR 0029) | partial | partial | partial | planned | partial | planned | partial |
 | `mac.keyboard` | Keyboard-first shortcuts | - | ships | ships | planned | planned | planned | - |
 | `mac.updates` | In-app updates (Sparkle) | - | - | ships | - | - | planned | - |
-| `calendar.events` | Calendar events in Today and Upcoming | ships | ships | ships | planned | planned | planned | - |
+| `calendar.events` | Calendar events in Today and Upcoming | ships | ships | ships | planned | ships | planned | - |
 | `import.reminders` | Apple Reminders into Inbox | ships | ships | ships | - | - | - | - |
 | `import.things` | One-time Things import | ships | ships | ships | - | - | - | - |
 | `ai.discuss` | Discuss: conversation on one task | ships | ships | ships | planned | partial | planned | - |
@@ -63,7 +63,7 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 | `sync.backend` | Sync through api.septena.app | ships | ships | ships | planned | ships | planned | planned |
 | `account.delete` | Delete account | ships | ships | ships | planned | ships | planned | - |
 | `task.times` | Start time and duration on a task | ships | ships | ships | planned | ships | planned | - |
-| `calendar.feed` | Private read-only calendar feed (.ics) | ships | ships | ships | planned | planned | planned | - |
+| `calendar.feed` | Private read-only calendar feed (.ics) | ships | ships | ships | planned | ships | planned | - |
 | `widgets.tasks` | Today and Upcoming widgets | ships | ships | ships | - | ships | planned | - |
 | `watch.app` | Apple Watch app | - | - | - | - | - | - | ships |
 | `data.import-export` | Export as JSON, Markdown or CSV; import JSON with a preview | ships | ships | ships | planned | planned | planned | - |

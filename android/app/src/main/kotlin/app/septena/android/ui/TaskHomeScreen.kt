@@ -67,7 +67,12 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.septena.android.AndroidAppGraph
+import app.septena.android.calendar.AndroidCalendarReader
 import app.septena.android.widgets.WidgetLaunchAction
+import app.septena.core.JsonValue
+import app.septena.core.generated.RegistrySettingKeys
+import app.septena.core.stringValue
+import app.septena.ui.CalendarAgendaRow
 import app.septena.core.RegistryActionContext
 import app.septena.core.RegistryActionResolver
 import app.septena.core.RegistryCatalog
@@ -772,6 +777,9 @@ private fun TaskHomeScaffold(
     val magicPlusDrag = remember { MagicPlusDragState() }
     val reorderDrag = remember { TaskReorderDragState() }
     val context = LocalContext.current
+    val dataVersion by graph.sync.dataVersion.collectAsStateWithLifecycle()
+    val deviceSettingsVersion by graph.deviceSettings.changes.collectAsStateWithLifecycle()
+    var calendarEvents by remember { mutableStateOf<List<CalendarAgendaRow>>(emptyList()) }
     val isDark = LocalSeptenaDarkTheme.current
     val appearance = LocalAppearance.current
     val selecting = state.selectedIds.isNotEmpty()
@@ -799,6 +807,43 @@ private fun TaskHomeScaffold(
     LaunchedEffect(state.location) {
         if (!magicPlusDrag.isDragging) magicPlusDrag.reset()
         if (!reorderDrag.isDragging) reorderDrag.reset()
+    }
+    LaunchedEffect(destinationId, dataVersion, deviceSettingsVersion, languageTag) {
+        val isTodayOrUpcoming = destinationId == RegistryDestinationIds.TODAY ||
+            destinationId == RegistryDestinationIds.UPCOMING
+        if (!isTodayOrUpcoming || !AndroidCalendarReader.hasPermission(context)) {
+            calendarEvents = emptyList()
+            return@LaunchedEffect
+        }
+        calendarEvents = withContext(Dispatchers.IO) {
+            if (!graph.deviceSettings.bool(RegistrySettingKeys.TASKS_SHOW_CALENDAR_EVENTS)) {
+                return@withContext emptyList()
+            }
+            val hidden = (graph.syncedSettings.value(RegistrySettingKeys.CALENDAR_HIDDEN_TITLES) as? JsonValue.ArrayValue)
+                ?.values.orEmpty()
+                .mapNotNull { it.stringValue() }
+                .toSet()
+            val today = graph.clock.today(graph.clock.now())
+            if (destinationId == RegistryDestinationIds.TODAY) {
+                AndroidCalendarReader.loadAgendaRows(
+                    context = context,
+                    startDay = today,
+                    dayCount = 1,
+                    hiddenTitles = hidden,
+                    includeDayLabel = false,
+                    languageTag = languageTag,
+                )
+            } else {
+                AndroidCalendarReader.loadAgendaRows(
+                    context = context,
+                    startDay = today.plusDays(1),
+                    dayCount = 7,
+                    hiddenTitles = hidden,
+                    includeDayLabel = true,
+                    languageTag = languageTag,
+                )
+            }
+        }
     }
     BackHandler(enabled = selecting) { homeViewModel.clearSelection() }
 
@@ -1040,6 +1085,7 @@ private fun TaskHomeScaffold(
                             isToday = isTodayList,
                             inboxTasks = state.inboxTasks,
                             tasks = state.tasks,
+                            calendarEvents = calendarEvents,
                             canQuickAdd = state.canQuickAdd,
                             canComplete = state.canComplete,
                             errorMessage = state.errorMessage,
