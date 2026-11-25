@@ -15,7 +15,8 @@
         android:theme="@style/Theme.Septena">
         <activity
             android:name=".MainActivity"
-            android:exported="true">
+            android:exported="true"
+            android:launchMode="singleTop">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -48,6 +49,32 @@
                 <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />
             </intent-filter>
         </receiver>
+        <!-- Today & Upcoming home-screen widgets (feature `widgets.tasks`). -->
+        <receiver
+            android:name=".widgets.TodayWidgetProvider"
+            android:exported="true"
+            android:label="@string/widget_today_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_today_info" />
+        </receiver>
+        <receiver
+            android:name=".widgets.UpcomingWidgetProvider"
+            android:exported="true"
+            android:label="@string/widget_upcoming_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_upcoming_info" />
+        </receiver>
+        <receiver
+            android:name=".widgets.SeptenaWidgetActionReceiver"
+            android:exported="false" />
         <!-- Asks Google Play services to fetch the code scanner UI at install,
              so the first Scan Code (sign-in approval, #353) opens at once. -->
         <meta-data
