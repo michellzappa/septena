@@ -1,26 +1,73 @@
-import type { AreaRow, OutboxOp, ProjectRow, StoreSnapshot, TaskRow } from "../types";
+import type {
+  AreaRow,
+  AttachmentRow,
+  ChecklistItemRow,
+  ConvoRow,
+  OutboxOp,
+  ProjectRow,
+  StoreSnapshot,
+  SyncedEntity,
+  TagRow,
+  TaskRefRow,
+  TaskRow,
+  TurnRow,
+} from "../types";
 
-// IndexedDB local store for the web client (docs/WEB_CLIENT_SPEC.md §6).
-// Holds pulled rows, the sync cursor, and the persistent coalesced outbox.
-// Also exports a pure outbox coalescing helper so tests verify offline queue logic in Node.
+// IndexedDB local store for the web client (docs/WEB_CLIENT_SPEC.md §6, WB2).
+// Holds every synced entity, append-only conversation turns, sync cursor, and
+// the persistent coalesced outbox.
 
 const DB_NAME = "septena-web-v1";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 const STORES = {
   tasks: "tasks",
   areas: "areas",
   projects: "projects",
+  checklistItems: "checklistItems",
+  tags: "tags",
+  taskRefs: "taskRefs",
+  convos: "convos",
+  turns: "turns",
+  attachments: "attachments",
   settings: "settings",
   outbox: "outbox",
   meta: "meta",
 } as const;
 
+type StoreName = (typeof STORES)[keyof typeof STORES];
+
+export function storeNameForEntity(entity: SyncedEntity | "turn"): StoreName {
+  switch (entity) {
+    case "task": return STORES.tasks;
+    case "area": return STORES.areas;
+    case "project": return STORES.projects;
+    case "checklistItem": return STORES.checklistItems;
+    case "tag": return STORES.tags;
+    case "taskRef": return STORES.taskRefs;
+    case "convo": return STORES.convos;
+    case "turn": return STORES.turns;
+    case "attachment": return STORES.attachments;
+    case "setting": return STORES.settings;
+  }
+}
+
+export function turnSyntheticId(taskId: string, seq: number): string {
+  return `${taskId}:${seq}`;
+}
+
 export function coalesceOutboxOp(existing: OutboxOp[], incoming: OutboxOp): OutboxOp[] {
   const next = [...existing];
+  if (incoming.op === "appendTurn") {
+    // Conversation turns are append-only and never coalesce.
+    next.push(incoming);
+    return next;
+  }
+
   if (incoming.op === "delete") {
-    // Drop any earlier queued ops for the same row, then append the delete.
-    const filtered = next.filter((o) => !(o.entity === incoming.entity && o.id === incoming.id));
+    const filtered = next.filter(
+      (o) => o.op === "appendTurn" || !(o.entity === incoming.entity && o.id === incoming.id),
+    );
     filtered.push(incoming);
     return filtered;
   }
@@ -51,6 +98,7 @@ export function pendingFieldsFor(outbox: OutboxOp[], entity: string, id: string)
   const fields = new Set<string>();
   let pendingDelete = false;
   for (const op of outbox) {
+    if (op.op === "appendTurn") continue;
     if (op.entity !== entity || op.id !== id) continue;
     if (op.op === "delete") {
       pendingDelete = true;
@@ -81,17 +129,46 @@ function openDb(): Promise<IDBDatabase> {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onupgradeneeded = () => {
       const db = req.result;
-      if (!db.objectStoreNames.contains(STORES.tasks)) db.createObjectStore(STORES.tasks, { keyPath: "id" });
-      if (!db.objectStoreNames.contains(STORES.areas)) db.createObjectStore(STORES.areas, { keyPath: "id" });
-      if (!db.objectStoreNames.contains(STORES.projects)) db.createObjectStore(STORES.projects, { keyPath: "id" });
-      if (!db.objectStoreNames.contains(STORES.settings)) db.createObjectStore(STORES.settings, { keyPath: "id" });
-      if (!db.objectStoreNames.contains(STORES.outbox)) db.createObjectStore(STORES.outbox, { keyPath: "clientOpId" });
-      if (!db.objectStoreNames.contains(STORES.meta)) db.createObjectStore(STORES.meta, { keyPath: "key" });
+      const createIfMissing = (name: string, keyPath: string) => {
+        if (!db.objectStoreNames.contains(name)) db.createObjectStore(name, { keyPath });
+      };
+      createIfMissing(STORES.tasks, "id");
+      createIfMissing(STORES.areas, "id");
+      createIfMissing(STORES.projects, "id");
+      createIfMissing(STORES.checklistItems, "id");
+      createIfMissing(STORES.tags, "id");
+      createIfMissing(STORES.taskRefs, "id");
+      createIfMissing(STORES.convos, "id");
+      createIfMissing(STORES.turns, "id");
+      createIfMissing(STORES.attachments, "id");
+      createIfMissing(STORES.settings, "id");
+      createIfMissing(STORES.outbox, "clientOpId");
+      createIfMissing(STORES.meta, "key");
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error ?? new Error("Failed to open IndexedDB"));
   });
 }
+
+export interface LocalMutation {
+  entity: SyncedEntity | "turn";
+  action: "put" | "delete";
+  id: string;
+  row?: Record<string, unknown>;
+}
+
+const ALL_DATA_STORES: StoreName[] = [
+  STORES.tasks,
+  STORES.areas,
+  STORES.projects,
+  STORES.checklistItems,
+  STORES.tags,
+  STORES.taskRefs,
+  STORES.convos,
+  STORES.turns,
+  STORES.attachments,
+  STORES.settings,
+];
 
 export class LocalStore {
   private dbPromise: Promise<IDBDatabase> | null = null;
@@ -103,14 +180,30 @@ export class LocalStore {
 
   async loadSnapshot(): Promise<StoreSnapshot> {
     const db = await this.db();
-    const tx = db.transaction(
-      [STORES.tasks, STORES.areas, STORES.projects, STORES.settings, STORES.outbox, STORES.meta],
-      "readonly",
-    );
-    const [tasks, areas, projects, settingsRows, outbox, metaRows] = await Promise.all([
+    const tx = db.transaction([...ALL_DATA_STORES, STORES.outbox, STORES.meta], "readonly");
+    const [
+      tasks,
+      areas,
+      projects,
+      checklistItems,
+      tags,
+      taskRefs,
+      convos,
+      turns,
+      attachments,
+      settingsRows,
+      outbox,
+      metaRows,
+    ] = await Promise.all([
       reqPromise<TaskRow[]>(tx.objectStore(STORES.tasks).getAll()),
       reqPromise<AreaRow[]>(tx.objectStore(STORES.areas).getAll()),
       reqPromise<ProjectRow[]>(tx.objectStore(STORES.projects).getAll()),
+      reqPromise<ChecklistItemRow[]>(tx.objectStore(STORES.checklistItems).getAll()),
+      reqPromise<TagRow[]>(tx.objectStore(STORES.tags).getAll()),
+      reqPromise<TaskRefRow[]>(tx.objectStore(STORES.taskRefs).getAll()),
+      reqPromise<ConvoRow[]>(tx.objectStore(STORES.convos).getAll()),
+      reqPromise<TurnRow[]>(tx.objectStore(STORES.turns).getAll()),
+      reqPromise<AttachmentRow[]>(tx.objectStore(STORES.attachments).getAll()),
       reqPromise<Array<{ id: string; value: unknown }>>(tx.objectStore(STORES.settings).getAll()),
       reqPromise<OutboxOp[]>(tx.objectStore(STORES.outbox).getAll()),
       reqPromise<Array<{ key: string; value: unknown }>>(tx.objectStore(STORES.meta).getAll()),
@@ -127,6 +220,12 @@ export class LocalStore {
       tasks,
       areas,
       projects,
+      checklistItems,
+      tags,
+      taskRefs,
+      convos,
+      turns,
+      attachments,
       settings,
       outbox,
       cursor: typeof meta.get("cursor") === "number" ? (meta.get("cursor") as number) : 0,
@@ -144,46 +243,50 @@ export class LocalStore {
 
   async resetRowsKeepOutbox(): Promise<void> {
     const db = await this.db();
-    const tx = db.transaction([STORES.tasks, STORES.areas, STORES.projects, STORES.settings, STORES.meta], "readwrite");
-    tx.objectStore(STORES.tasks).clear();
-    tx.objectStore(STORES.areas).clear();
-    tx.objectStore(STORES.projects).clear();
-    tx.objectStore(STORES.settings).clear();
+    const tx = db.transaction([...ALL_DATA_STORES, STORES.meta], "readwrite");
+    for (const s of ALL_DATA_STORES) tx.objectStore(s).clear();
     tx.objectStore(STORES.meta).put({ key: "cursor", value: 0 });
     await txDone(tx);
   }
 
+  async commitLocalAndQueue(mutations: LocalMutation[], ops: OutboxOp[]): Promise<void> {
+    const db = await this.db();
+    const touched = new Set<StoreName>([STORES.outbox]);
+    for (const m of mutations) touched.add(storeNameForEntity(m.entity));
+
+    const tx = db.transaction(Array.from(touched), "readwrite");
+    for (const m of mutations) {
+      const store = tx.objectStore(storeNameForEntity(m.entity));
+      if (m.action === "delete") {
+        store.delete(m.id);
+      } else if (m.row) {
+        store.put(m.row);
+      }
+    }
+
+    if (ops.length) {
+      const outboxStore = tx.objectStore(STORES.outbox);
+      let current = await reqPromise<OutboxOp[]>(outboxStore.getAll());
+      current.sort((a, b) => a.queuedAt - b.queuedAt);
+      for (const op of ops) {
+        current = coalesceOutboxOp(current, op);
+      }
+      outboxStore.clear();
+      for (const item of current) outboxStore.put(item);
+    }
+
+    await txDone(tx);
+  }
+
   async putLocalAndQueue(
-    entity: "task" | "area" | "project" | "setting",
+    entity: SyncedEntity,
     row: Record<string, unknown> | null,
     op: OutboxOp,
   ): Promise<void> {
-    const db = await this.db();
-    const storeName =
-      entity === "task"
-        ? STORES.tasks
-        : entity === "area"
-          ? STORES.areas
-          : entity === "project"
-            ? STORES.projects
-            : STORES.settings;
-
-    const tx = db.transaction([storeName, STORES.outbox], "readwrite");
-    const entityStore = tx.objectStore(storeName);
-    const outboxStore = tx.objectStore(STORES.outbox);
-
-    if (row) {
-      entityStore.put(row);
-    } else if (op.op === "delete") {
-      entityStore.delete(op.id);
-    }
-
-    const existing = await reqPromise<OutboxOp[]>(outboxStore.getAll());
-    const coalesced = coalesceOutboxOp(existing, op);
-    outboxStore.clear();
-    for (const item of coalesced) outboxStore.put(item);
-
-    await txDone(tx);
+    const mutation: LocalMutation = row
+      ? { entity, action: "put", id: String(row.id), row }
+      : { entity, action: "delete", id: op.op === "appendTurn" ? op.taskId : op.id };
+    await this.commitLocalAndQueue([mutation], [op]);
   }
 
   async removeOutboxOps(clientOpIds: string[]): Promise<void> {
@@ -196,30 +299,15 @@ export class LocalStore {
   }
 
   async applyPulledBatch(
-    mutations: Array<{
-      entity: "task" | "area" | "project" | "setting";
-      action: "put" | "delete";
-      id: string;
-      row?: Record<string, unknown>;
-    }>,
+    mutations: LocalMutation[],
     nextSince: number,
     syncedAt: number,
   ): Promise<void> {
     const db = await this.db();
-    const tx = db.transaction(
-      [STORES.tasks, STORES.areas, STORES.projects, STORES.settings, STORES.meta],
-      "readwrite",
-    );
+    const tx = db.transaction([...ALL_DATA_STORES, STORES.meta], "readwrite");
 
     for (const m of mutations) {
-      const target =
-        m.entity === "task"
-          ? tx.objectStore(STORES.tasks)
-          : m.entity === "area"
-            ? tx.objectStore(STORES.areas)
-            : m.entity === "project"
-              ? tx.objectStore(STORES.projects)
-              : tx.objectStore(STORES.settings);
+      const target = tx.objectStore(storeNameForEntity(m.entity));
       if (m.action === "delete") {
         target.delete(m.id);
       } else if (m.row) {

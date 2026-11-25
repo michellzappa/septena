@@ -71,20 +71,8 @@
       "reason": "The server accepts any product under the sync prefix; the StoreKit work narrows it to these IDs.",
       "issue": "#46"
     },
-    "GENERIC_EMPTY_STATE": {
-      "reason": "For the web client's list views.",
-      "issue": "#21"
-    },
     "FIRST_RUN": {
       "reason": "For the web client's first run.",
-      "issue": "#21"
-    },
-    "REGISTRY_LANGUAGES": {
-      "reason": "For the web client's localized copy.",
-      "issue": "#21"
-    },
-    "registryText": {
-      "reason": "For the web client's localized copy.",
       "issue": "#21"
     }
   },
