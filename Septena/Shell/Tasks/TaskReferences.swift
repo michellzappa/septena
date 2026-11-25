@@ -23,6 +23,13 @@ enum TaskRefActions {
     TaskRefCore.isAvailable && RegistryActions.isAvailableOnPlatform(.taskAddReference)
   }
 
+  /// The links of a task's text that the References block suggests.
+  static func suggestions(taskID: String, title: String, notes: String?) -> [TaskRefRows.Offer] {
+    guard canAdd else { return [] }
+    return TaskRefRows.suggestions(title: title, notes: notes,
+                                   existing: LocalCache.taskRefs(forTaskID: taskID, in: context))
+  }
+
   static func add(_ input: String, to taskID: String) -> TaskRefAddResult {
     let result = mutator.addTaskRef(taskID: taskID, input: input)
     if case .added(let ref) = result {
@@ -146,8 +153,8 @@ private struct TaskReferenceRowLabel: View {
 // MARK: - References block
 
 /// The task page's References block (`taskPage.references`). The host draws
-/// the heading and shows the block only for a task that has references. The
-/// inline editor passes no `onAdd`, so it shows the rows alone.
+/// the heading. The inline editor passes no `onAdd` and shows the panel only
+/// for a task that has references, so it shows the rows alone.
 struct TaskReferencesPanel: View {
   let taskID: String
   var onAdd: (() -> Void)?
@@ -202,6 +209,39 @@ struct TaskReferencesPanel: View {
 
   private func reload() {
     rows = LocalCache.taskRefRows(forTaskID: taskID, in: LocalStore.shared.container.mainContext)
+  }
+}
+
+// MARK: - Suggestions
+
+/// The links of the task's text that are not references yet, one faint chip
+/// each. A tap makes the reference and leaves the text as it is.
+struct TaskReferenceSuggestions: View {
+  let offers: [TaskRefRows.Offer]
+  let onTake: (TaskRefRows.Offer) -> Void
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 6) {
+      ForEach(offers) { offer in
+        Button { onTake(offer) } label: {
+          HStack(spacing: 6) {
+            Image(systemName: "plus")
+            Text(offer.title)
+              .lineLimit(1)
+              .truncationMode(.middle)
+          }
+          .font(.septenaCaption)
+          .foregroundStyle(Theme.inkSecondary)
+          .padding(.horizontal, 10)
+          .padding(.vertical, 7)
+          .overlay(Capsule().strokeBorder(Theme.inkSecondary.opacity(0.35),
+                                          style: StrokeStyle(lineWidth: 1, dash: [3, 3])))
+          .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(RegistryTaskReferences.suggestion(name: offer.title))
+      }
+    }
   }
 }
 

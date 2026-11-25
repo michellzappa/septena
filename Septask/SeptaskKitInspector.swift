@@ -427,11 +427,16 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     return attachFileButton
   }
 
-  /// References (docs/TASK_REFERENCES_SPEC.md §8). Every view of the block is
-  /// hidden on a task that has none: Add Reference is in the task's menu then.
+  /// References (docs/TASK_REFERENCES_SPEC.md §8). The page always offers Add
+  /// Reference, also on a task that has none.
   private func addReferencesBlock(_ block: RegistryTaskPageBlock) -> NSView {
     styleHeading(referencesLabel, block)
     referencesView.translatesAutoresizingMaskIntoConstraints = false
+    referencesView.onTakeSuggestion = { [weak self] offer in
+      guard let self, let task = self.task else { return }
+      _ = TaskRefActions.add(offer.input, to: task.id)
+      self.refreshReferences(task)
+    }
     addReferenceButton.title = RegistryActions.title(.taskAddReference)
     form.addArrangedSubview(referencesLabel)
     form.addArrangedSubview(referencesView)
@@ -441,10 +446,11 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   }
 
   private func refreshReferences(_ next: SeptenaTask) {
-    referencesView.configure(rows: LocalCache.taskRefRows(forTaskID: next.id, in: context))
-    referencesLabel.isHidden = referencesView.isEmpty
+    referencesView.reload(taskID: next.id, title: titleField.stringValue, notes: notesView.string)
+    let canAdd = TaskRefActions.canAdd && next.deletedAt == nil
+    referencesLabel.isHidden = referencesView.isEmpty && !canAdd
     referencesView.isHidden = referencesView.isEmpty
-    addReferenceButton.isHidden = referencesView.isEmpty || !TaskRefActions.canAdd
+    addReferenceButton.isHidden = !canAdd
     // The section gap follows the last view that shows.
     form.setCustomSpacing(addReferenceButton.isHidden ? 14 : form.spacing, after: referencesView)
   }
