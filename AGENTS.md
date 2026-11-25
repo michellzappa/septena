@@ -84,6 +84,10 @@ It does not run tests or launch the app. The mini currently has no Java runtime,
 so do not use `remote-build` for Android or install toolchains unless the user
 explicitly asks for that download.
 
+**A branch on mz's phone, with no Mac:** push it to `device/<name>`. mz
+approves the run, then TestFlight delivers it to the internal group only. See
+`docs/DEVICE_BUILDS.md`. Never use it to ship: `main` ships.
+
 **Shared Rust core (`core/`, ADR 0025):** task rules and sync decisions live
 once, in `core/crates/septena-core`, with no I/O. No machine has a Rust
 toolchain and agents **never install one** (no `rustup`, no `brew install
