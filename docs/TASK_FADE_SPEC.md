@@ -146,8 +146,8 @@ Once a week (Sunday *(default)*), the Inbox band shows one row: "N tasks
 faded this week. Still want any of them?" with a **Review** button. Tapping
 it opens the sweep sheet. The row shows on the sweep day only: if the user
 ignores it, it is gone on Monday and comes back next Sunday. The Faded pile
-opens the same sheet on any day. "Sweep" is the internal name; the UI says
-"Review".
+opens the same sheet on any day. "Sweep" is the internal name. The faded tasks
+themselves are the Faded group of Review (`docs/REVIEW_SPEC.md`).
 
 - The sheet lists the tasks that faded since the last sweep.
 - Each row has one control: **Keep**. Kept tasks go back to their list.

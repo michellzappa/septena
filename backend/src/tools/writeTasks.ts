@@ -669,9 +669,10 @@ export const setEndStateJsonSchema = {
     id: { type: "string" },
     endState: {
       type: "string",
-      enum: ["agent_done", "human_done", "agent_assisted_done", "needs_verify", "decomposed", "reminder_set", "promoted_to_today", "wont_do", "open"],
+      enum: ["needs_verify", "decomposed", "open"],
+      description: "needs_verify hands the task to the user's Review. decomposed: the work goes on as an issue or smaller tasks. open undoes decomposed.",
     },
-    note: { type: "string", description: "e.g. needs_verify: what to verify" },
+    note: { type: "string", description: "Required for needs_verify: what the user must check." },
   },
 } as const;
 

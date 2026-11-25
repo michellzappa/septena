@@ -355,4 +355,85 @@ describe("TaskStore human_accepts rule (#87)", () => {
     assert.equal(review.rows[0].id, "t-review");
     assert.equal(review.notes["t-review"], "Inspect tests");
   });
+
+  const upsert = (entity: string, id: string, fields: Record<string, unknown>) =>
+    ({ clientOpId: opId("w"), op: "upsert", entity, id, fields }) as Parameters<Awaited<ReturnType<typeof createTestTaskStore>>["store"]["push"]>[0][number];
+
+  async function agentWork(task: Record<string, unknown> = {}, convo: Record<string, unknown> = { assignee: "claude" }) {
+    const { store } = await createTestTaskStore();
+    store.push([upsert("task", "t", { title: "Work", status: "open", ...task }), upsert("convo", "t", convo)], HUMAN_ACTOR);
+    const write = (entity: string, fields: Record<string, unknown>, actor = AGENT_ACTOR) => {
+      const r = store.push([upsert(entity, "t", fields)], actor).result.results[0];
+      return r.status === "rejected" ? r.reason : r.status;
+    };
+    const handOver = (note = "Check it") => write("convo", { endState: "needs_verify", endStateNote: note });
+    return { store, write, handOver };
+  }
+
+  it("an agent cannot take work out of Review or reach done around it", async () => {
+    const { store, write, handOver } = await agentWork();
+    assert.equal(handOver(), "applied");
+    for (const endState of ["open", "agent_done", "human_done", "decomposed", "wont_do", null]) {
+      assert.equal(write("convo", { endState }), "in_review", String(endState));
+    }
+    assert.equal(write("convo", { assignee: null }), "human_only:assignee");
+    assert.equal(write("task", { status: "done" }), "human_accepts");
+    assert.equal(write("task", { status: "cancelled" }), "human_accepts");
+    const del = store.push([{ clientOpId: opId("del"), op: "delete", entity: "task", id: "t" }], AGENT_ACTOR).result.results[0];
+    assert.equal(del.status, "rejected");
+    assert.equal(store.readReviewTasks(10).total, 1);
+  });
+
+  it("a released claim is still agent work, until the user takes the task back", async () => {
+    const { store, write } = await agentWork({}, { assignee: "me" });
+    assert.equal(store.claim("t", "mcp:claude", 600_000, AGENT_ACTOR, null).ok, true);
+    assert.equal(store.release("t", "mcp:claude", AGENT_ACTOR, null), true);
+    assert.equal(write("task", { status: "done" }), "human_accepts");
+    write("convo", { assignee: "me" }, HUMAN_ACTOR);
+    assert.equal(write("task", { status: "done" }), "applied");
+  });
+
+  it("only needs_verify and decomposed are an agent's to set, and a hand-off needs a note", async () => {
+    const { write } = await agentWork();
+    assert.equal(write("convo", { endState: "agent_done" }), "human_ends");
+    assert.equal(write("convo", { endState: "decomposed" }), "applied");
+    assert.equal(write("convo", { endState: "open" }), "applied");
+    assert.equal(write("convo", { endState: "needs_verify" }), "note_required");
+    assert.equal(write("convo", { endState: "needs_verify", endStateNote: "  " }), "note_required");
+    write("task", { status: "done" }, HUMAN_ACTOR);
+    assert.equal(write("convo", { endState: "needs_verify", endStateNote: "Late" }), "closed");
+  });
+
+  it("a hand-off or a question brings a faded task back", async () => {
+    const fadedAt = "2026-11-20T10:00:00Z";
+    const one = await agentWork({ fadedAt }, { assignee: "me" });
+    assert.equal(one.handOver(), "applied");
+    assert.equal(one.store.readTask("t")?.task.fadedAt, null);
+    const two = await agentWork({ fadedAt }, { assignee: "me" });
+    two.store.push([{
+      clientOpId: opId("q"), op: "appendTurn", taskId: "t",
+      turn: { role: "provider", step: "decide", question: "Which?", options: ["A", "B"], ts: "2026-11-25T10:00:00Z" },
+    }], AGENT_ACTOR);
+    assert.equal(two.store.readTask("t")?.task.fadedAt, null);
+  });
+
+  it("a revised hand-off moves endStateAt", async () => {
+    const { store, handOver } = await agentWork();
+    handOver("v1");
+    const first = store.readTask("t")?.convo?.endStateAt;
+    await new Promise((r) => setTimeout(r, 5));
+    handOver("v1");
+    assert.equal(store.readTask("t")?.convo?.endStateAt, first);
+    handOver("v2");
+    assert.notEqual(store.readTask("t")?.convo?.endStateAt, first);
+  });
+
+  it("a task the user closes any way leaves Review for good", async () => {
+    const { store, write, handOver } = await agentWork();
+    handOver();
+    write("task", { status: "done" }, HUMAN_ACTOR);
+    assert.equal(store.readTask("t")?.convo?.endState, "agent_assisted_done");
+    write("task", { status: "open" }, HUMAN_ACTOR);
+    assert.equal(store.readReviewTasks(10).total, 0);
+  });
 });
