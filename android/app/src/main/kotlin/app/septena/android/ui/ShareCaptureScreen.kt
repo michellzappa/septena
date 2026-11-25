@@ -1,5 +1,6 @@
 package app.septena.android.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -28,13 +29,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.septena.android.R
 import app.septena.core.JsonValue
 import app.septena.core.RegistryCatalog
+import app.septena.core.TaskRefOther
 import app.septena.core.generated.RegistryActionIds
 import app.septena.core.generated.RegistryDestinationIds
 import app.septena.core.generated.RegistryEntityLimits
+import app.septena.core.generated.RegistrySurfaceIds
 import app.septena.core.generated.RegistryTaskDetail
 import app.septena.core.stringValue
 
@@ -43,6 +47,8 @@ import app.septena.core.stringValue
 internal fun ShareCaptureScreen(
     initialTitle: String,
     initialNotes: String,
+    existing: List<TaskRefOther>,
+    onOpenExisting: (String) -> Unit,
     saving: Boolean,
     saveFailed: Boolean,
     onCancel: () -> Unit,
@@ -85,6 +91,26 @@ internal fun ShareCaptureScreen(
                 .padding(horizontal = 20.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            if (existing.isNotEmpty()) {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        labels.alreadyTask,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    existing.forEach { task ->
+                        Text(
+                            task.title,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable(enabled = !saving) { onOpenExisting(task.id) }
+                                .padding(vertical = 12.dp),
+                        )
+                    }
+                }
+            }
             OutlinedTextField(
                 value = title,
                 onValueChange = { title = it.take(RegistryEntityLimits.TEXT_MAX.toInt()) },
@@ -125,6 +151,7 @@ private data class ShareCaptureLabels(
     val notes: String,
     val today: String,
     val saveError: String,
+    val alreadyTask: String,
 ) {
     companion object {
         fun fromRegistry(languageTag: String): ShareCaptureLabels {
@@ -140,6 +167,10 @@ private data class ShareCaptureLabels(
                 task = field(RegistryTaskDetail.Fields.TITLE),
                 notes = field(RegistryTaskDetail.Fields.NOTES),
                 today = RegistryCatalog.destinationTitle(RegistryDestinationIds.TODAY, languageTag).orEmpty(),
+                alreadyTask = localized(
+                    (RegistryCatalog.surface(RegistrySurfaceIds.TASK_REFERENCES)?.fields?.get("alreadyTask") as? JsonValue.ObjectValue)
+                        ?.fields?.get("title").stringValue(),
+                ),
                 saveError = localized(controls[RegistryTaskDetail.Controls.SAVE_ERROR].stringValue()),
             )
         }

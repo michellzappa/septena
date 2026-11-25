@@ -147,9 +147,15 @@ final class SeptaskKitQuickFind {
     found += snapshot.areas.filter { Self.matches($0.title, query) }.map(Hit.area)
     found += liveProjects.filter { Self.matches($0.title, query) }.map(Hit.project)
     // Title matches first, then tag matches, then tasks that match only in
-    // their notes. Open tasks rank ahead of completed ones inside each band.
+    // their notes or their references. Open tasks rank ahead of completed ones inside each band.
     let tagsByID = LocalCache.tagsByID(in: context)
     let strippedTagQuery = query.hasPrefix("#") ? String(query.dropFirst()) : query
+    let refTexts = TaskRefLookup.searchTexts(in: context)
+    // A pasted link: the tasks that point at the item come first, whatever way
+    // the link is spelled there.
+    let pointing = TaskRefLookup.taskIDs(forLink: query, in: context) ?? []
+    let pointingIDs = Set(pointing)
+    var pointingHits: [String: SeptenaTask] = [:]
     var titleHits: [SeptenaTask] = []
     var tagHits: [SeptenaTask] = []
     var notesHits: [SeptenaTask] = []
@@ -158,18 +164,23 @@ final class SeptaskKitQuickFind {
     // every task's JSON each time. Same rows as `allTasks` (headings and
     // orphans already excluded).
     for e in LocalCache.liveAggregateEntities(in: context) {
-      if Self.matches(e.title, query) {
+      if pointingIDs.contains(e.id) {
+        pointingHits[e.id] = SeptenaTask(e)
+      } else if Self.matches(e.title, query) {
         titleHits.append(SeptenaTask(e))
       } else if !strippedTagQuery.isEmpty, e.tagIDsJSON != nil,
                 e.tagIDs.compactMap({ tagsByID[$0]?.name }).contains(where: { Self.matches($0, strippedTagQuery) }) {
         tagHits.append(SeptenaTask(e))
       } else if let notes = e.notes, Self.matches(notes, query) {
         notesHits.append(SeptenaTask(e))
+      } else if let text = refTexts[e.id], Self.matches(text, query) {
+        notesHits.append(SeptenaTask(e))
       }
     }
     let openFirst: (SeptenaTask, SeptenaTask) -> Bool = { a, b in
       (a.status == .open ? 0 : 1) < (b.status == .open ? 0 : 1)
     }
+    found += pointing.compactMap { pointingHits[$0] }.sorted(by: openFirst).map(taskHit)
     found += titleHits.sorted(by: openFirst).map(taskHit)
     found += tagHits.sorted(by: openFirst).map { task in
       let names = task.tags.compactMap { tagsByID[$0]?.name }.map { "#\($0)" }.joined(separator: " ")

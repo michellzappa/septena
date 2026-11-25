@@ -254,9 +254,23 @@ key on an active task, the store stamps `replyAt` on the task.
 
 ### 6.4 Back-links
 
-"Which tasks point at this?" is one indexed lookup. The task page of a Septena
-task shows the tasks that point at it. The Share extension and agents use the
-same lookup to show that an item already has a task.
+"Which tasks point at this?" is one lookup (`TaskRefLookup` in Swift and
+Kotlin, `tasks_find_by_ref` in the backend). In the apps a task points at an
+item when it has the key, or when its title or notes hold a link that parses to
+the key (mz, 2026-11-25). An `email` and a `thread` key with one id match.
+
+- **Quick Find:** a pasted link lists the tasks that point at the item, open
+  ones first, whatever way the link is spelled there. Other text also matches
+  the title, the subtitle and the key id of a task's references ("#387").
+- **Also in:** an open task shows, after its suggestions, the other open tasks
+  that point at what it points at, or at the task itself (at most 3). A
+  completed task is left out: each past occurrence of a repeating task has the
+  same references.
+- **Share:** the share sheet shows the open tasks that point at the shared URL
+  under "Already a task" (at most 3). On Android a tap opens one. An iOS share
+  extension cannot open the app, so there the rows only tell. It reads an index
+  that the app writes to the app group when it leaves the foreground, and that
+  holds nothing while App Lock is on.
 
 ### 6.5 Completion hints
 

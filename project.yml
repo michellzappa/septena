@@ -222,6 +222,9 @@ targets:
       - path: ShareExtension/ShareViewController.swift
       - path: ShareExtension/PrivacyInfo.xcprivacy
       - path: SeptenaCore/SharedTaskCapture.swift
+    dependencies:
+      # The key grammar of a shared link (TASK_REFERENCES_SPEC.md §6.4).
+      - package: SeptenaSharedCore
     info:
       path: ShareExtension/SeptaskShare-Info.plist
       properties:
