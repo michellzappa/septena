@@ -589,7 +589,7 @@ export async function revoke(c: Context<{ Bindings: Env }>) {
 
 // ---- pages ----
 
-const PAGE_CSS = `
+export const PAGE_CSS = `
   :root { color-scheme: light dark; }
   body { margin: 0; min-height: 100vh; display: grid; place-items: center;
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
