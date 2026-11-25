@@ -3601,6 +3601,48 @@
         }
       }
     },
+    "Delete all %lld deleted tasks permanently?" : {
+      "comment" : "Generated from registry surfaces.prompts.items.emptyTrash.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Delete 1 deleted task permanently?"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Delete all %lld deleted tasks permanently?"
+                }
+              }
+            }
+          }
+        },
+        "pt-BR" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Apagar 1 tarefa apagada permanentemente?"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Apagar todas as %lld tarefas apagadas permanentemente?"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "Delete Area" : {
       "comment" : "Generated from registry actions.actions.area.delete.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -4070,6 +4112,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Conversa por e-mail"
+          }
+        }
+      }
+    },
+    "Empty Trash" : {
+      "comment" : "Generated from registry actions.actions.task.emptyTrash.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esvaziar lixeira"
           }
         }
       }

@@ -107,6 +107,41 @@ https://septena.app/privacy
 
 2026 MZ
 
+### beta_description
+
+> The TestFlight "Beta App Description". Not a deliver field: an agent pushes it
+> with `asc testflight app-localizations update`. It is the description above
+> plus ABOUT THIS BETA. Change both together. "What to Test" lives in
+> `scripts/testflight-distribute.mjs`.
+
+Septena is a task app that thinks with you. It is for people who want a short list and a clear day. Capture a thought in a second, sort it when you’re ready, and decide what today holds before it decides for you.
+
+THE BASICS, DONE CAREFULLY
+Inbox, Today, Upcoming, and Anytime, with areas, projects, and sections to group the work. Deadlines, repeating tasks, notes, and attachments. Your calendar events sit next to today's tasks, so you plan against the hours you actually have.
+
+TODAY IS YOUR CALL
+New and loose tasks wait in the Inbox at the top of Today. Nothing lands on your day until you put it there. Septena also learns where you usually file things and suggests the right project, on your device.
+
+AI THAT ASKS BEFORE IT ACTS
+Some tasks need a moment of thinking before anyone can act on them. Tap Discuss on a task and Septena asks a short question with a few answers to tap. Where it can, it drafts, compares, or looks something up. Then it hands you the one step only you can take. It runs on your device first and reaches further only when you let it.
+
+YOUR AGENTS DO THE WORK. YOU DECIDE WHEN IT’S DONE.
+Connect Claude or your own agent and hand it a task. It works on the task and asks you there when it needs a decision. It never closes the task. Finished work waits in Review until you Accept it or Send it back. Stop an agent on one task, or Pause all agents at once. Anything an agent writes is marked, so you can see what it touched.
+
+THE LIST THAT LETS GO
+An undated task you leave alone for 14 days moves to Faded. Once a week, Septena asks you to sweep. Keep what still matters. Let go of the rest, and it moves to the Logbook.
+
+COMING FROM THINGS OR REMINDERS
+Import from Things once and keep your areas, projects, and sections. Things stays as it is. From Reminders, pick a list and bring its reminders into your Inbox. Septena deletes each one from Reminders as it comes in.
+
+YOURS, BUILT IN THE OPEN
+The apps and the sync server are open source under the MIT License. Septena works without an account: your tasks stay on your device until you sign in. When you sign in, they sync through Septena’s private server. Back up everything as JSON at any time, and preview a backup before you import it.
+
+Native on iPhone, iPad and Mac, with your tasks in sync across all three.
+
+ABOUT THIS BETA
+One person makes Septena: mz. This beta is the iPhone and iPad app. Sign in with Apple and your tasks sync to your other devices through Septena's own server. You can also connect Claude or another agent in Settings, under Connections & AI. Expect rough edges. Send feedback from TestFlight with a screenshot, or write to mz@envisioning.com.
+
 ### primary_category
 
 PRODUCTIVITY
@@ -264,6 +299,15 @@ appstore/upload.sh septask ios --screenshots-only    # 5. upload (from the repo 
 ```
 
 ### Uploading (agents do this, not mz)
+
+The `asc` CLI is signed in on the laptop and needs no extra setup (2026-11-25).
+It is the fallback when `~/.appstoreconnect/septena.json` does not exist:
+`asc screenshots upload`, `asc localizations update`, `asc app-setup`. The app
+id is 6836809027. The first version (1.0) takes no `release_notes`.
+
+TestFlight has no screenshot upload of its own. The invitation page shows the
+App Store screenshots and category, but only after an App Store version is
+approved and Ready for Distribution.
 
 `appstore/upload.sh` wraps `fastlane deliver` (fastlane is installed with
 Homebrew on the laptop since 2026-11-22). An agent runs it when mz asks for an

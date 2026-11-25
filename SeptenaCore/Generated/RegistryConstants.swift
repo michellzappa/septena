@@ -865,7 +865,7 @@ enum RegistryDestinations {
     RegistryDestination(id: "logbook", navigationKey: "logbook", serverView: "logbook", title: RegistryL10n.t("Logbook"), iconId: "list.logbook", sfSymbol: "checkmark", sidebarSection: "bottom", visibility: "always", canHide: true, canMoveSection: true, emptyTitle: RegistryL10n.t("Logbook is empty"), emptyDetail: RegistryL10n.t("Tasks you complete or let go end up here."), featureId: "lists.logbook"),
     RegistryDestination(id: "starred", navigationKey: "starred", serverView: "all", title: RegistryL10n.t("Favorites"), iconId: "list.starred", sfSymbol: "star.fill", sidebarSection: "top", visibility: "whenNonEmpty", canHide: true, canMoveSection: true, emptyTitle: RegistryL10n.t("No Favorites"), emptyDetail: RegistryL10n.t("Favorite important tasks to keep them one tap away."), featureId: "lists.starred"),
     RegistryDestination(id: "faded", navigationKey: "faded", serverView: "all", title: RegistryL10n.t("Faded"), iconId: "list.faded", sfSymbol: "circle.dashed", sidebarSection: "bottom", visibility: "whenNonEmpty", canHide: true, canMoveSection: true, emptyTitle: RegistryL10n.t("No Faded Tasks"), emptyDetail: RegistryL10n.t("Undated tasks without activity for 14 days appear here until you keep them or let them go."), featureId: "lists.faded"),
-    RegistryDestination(id: "recentlyDeleted", navigationKey: "recentlyDeleted", serverView: "all", title: RegistryL10n.t("Deleted"), iconId: "list.recently_deleted", sfSymbol: "trash", sidebarSection: "bottom", visibility: "whenNonEmpty", canHide: true, canMoveSection: true, emptyTitle: RegistryL10n.t("No Deleted Tasks"), emptyDetail: RegistryL10n.t("Septena keeps deleted tasks here for 30 days, then deletes them for good."), featureId: "lists.recently-deleted"),
+    RegistryDestination(id: "recentlyDeleted", navigationKey: "recentlyDeleted", serverView: "all", title: RegistryL10n.t("Deleted"), iconId: "list.recently_deleted", sfSymbol: "trash", sidebarSection: "top", visibility: "logbookTab", canHide: false, canMoveSection: false, emptyTitle: RegistryL10n.t("No Deleted Tasks"), emptyDetail: RegistryL10n.t("Septena keeps deleted tasks here for 30 days, then deletes them for good."), featureId: "lists.recently-deleted"),
   ]
 
   static let byId: [String: RegistryDestination] = Dictionary(uniqueKeysWithValues: all.map { ($0.id, $0) })
@@ -993,6 +993,7 @@ enum RegistryActions {
     "task.delete": RegistryL10n.t("Delete"),
     "task.restore": RegistryL10n.t("Restore"),
     "task.deletePermanently": RegistryL10n.t("Delete Permanently"),
+    "task.emptyTrash": RegistryL10n.t("Empty Trash"),
     "task.keepFaded": RegistryL10n.t("Keep"),
     "task.letGoFaded": RegistryL10n.t("Let Go"),
     "place.saveNotes": RegistryL10n.t("Save Notes"),
@@ -1078,6 +1079,7 @@ enum RegistryActions {
     "task.delete": "trash",
     "task.restore": "arrow.uturn.backward",
     "task.deletePermanently": "trash",
+    "task.emptyTrash": "trash",
     "task.keepFaded": "arrow.uturn.backward",
     "task.letGoFaded": "wind",
     "place.saveNotes": "text.alignleft",
@@ -1207,6 +1209,7 @@ enum RegistryActions {
     "task.deleteChecklistItem",
     "task.delete",
     "task.deletePermanently",
+    "task.emptyTrash",
     "area.delete",
     "project.delete",
     "logged.clear",
@@ -1251,6 +1254,7 @@ enum RegistryActions {
     "task.delete": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: ["recentlyDeleted"], onlyDestinations: [], requiresRecurrence: false, featureId: "lists.recently-deleted"),
     "task.restore": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: [], onlyDestinations: ["recentlyDeleted"], requiresRecurrence: false, featureId: "lists.recently-deleted"),
     "task.deletePermanently": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: [], onlyDestinations: ["recentlyDeleted"], requiresRecurrence: false, featureId: "lists.recently-deleted"),
+    "task.emptyTrash": RegistryActionAvailability(selection: "none", platforms: [], excludeDestinations: [], onlyDestinations: ["recentlyDeleted"], requiresRecurrence: false, featureId: "lists.recently-deleted"),
     "task.keepFaded": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: [], onlyDestinations: ["faded"], requiresRecurrence: false, featureId: "fade.sweep"),
     "task.letGoFaded": RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: [], onlyDestinations: ["faded"], requiresRecurrence: false, featureId: "fade.sweep"),
     "place.saveNotes": RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "places.projects"),
@@ -1575,6 +1579,9 @@ enum RegistryPrompts {
   static func deletePermanently(count: Int) -> RegistryPromptCopy {
     RegistryPromptCopy(id: "deletePermanently", title: RegistryL10n.plural("Delete %lld tasks permanently?", count: count, one: "Delete this task permanently?", other: "Delete %lld tasks permanently?", args: [count]), message: RegistryL10n.t("You can’t undo this."), confirmTitle: RegistryL10n.t("Delete Permanently"), options: [])
   }
+  static func emptyTrash(count: Int) -> RegistryPromptCopy {
+    RegistryPromptCopy(id: "emptyTrash", title: RegistryL10n.plural("Delete all %lld deleted tasks permanently?", count: count, one: "Delete 1 deleted task permanently?", other: "Delete all %lld deleted tasks permanently?", args: [count]), message: RegistryL10n.t("You can’t undo this."), confirmTitle: RegistryL10n.t("Empty Trash"), options: [])
+  }
   static func deleteArea(name: String, projects: Int, tasks: Int) -> RegistryPromptCopy {
     let name = name.isEmpty ? RegistryL10n.t("Area") : name
     let projectPhrase = projectsPhrase(count: projects)
@@ -1817,6 +1824,18 @@ enum RegistryTaskReferences {
   static let offersTitle: String = RegistryL10n.t("Links in this task")
   static let invalidMessage: String = RegistryL10n.t("Septena can’t add this. Paste a web link or a mail link.")
   static let failedMessage: String = RegistryL10n.t("Couldn’t add the reference.")
+}
+
+/// Sign-in by device approval (`registry/surfaces.json` `deviceSignIn`).
+enum RegistryDeviceSignIn {
+  static let title: String = RegistryL10n.t("Sign in to Septena")
+  static let intro: String = RegistryL10n.t("Use a device where Septena is already signed in.")
+  static let start: String = RegistryL10n.t("Get a sign-in code")
+  static let approve: String = RegistryL10n.t("On your iPhone, iPad or Mac, open Septena and go to Settings ▸ Account ▸ Approve a sign-in. Tap Scan Code and point the camera at this screen, or enter this code:")
+  static let lifetime: String = RegistryL10n.t("The code works for 10 minutes. After you approve it, this screen continues by itself.")
+  static let expired: String = RegistryL10n.t("The code expired.")
+  static let unreachable: String = RegistryL10n.t("Could not reach Septena.")
+  static let retry: String = RegistryL10n.t("Get a new code")
 }
 
 /// One button in the first run. `action` is one of a closed set the client implements.

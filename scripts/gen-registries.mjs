@@ -344,10 +344,10 @@ function validateDestinations(dests, icons, caps) {
   for (const d of dests.destinations) {
     assert(!seenIds.has(d.id), `destinations.json: duplicate id "${d.id}"`);
     seenIds.add(d.id);
-    // A band (Inbox on Today) has no sidebar row, so no sidebarOrder or sidebarSection.
-    if (d.visibility === "todayBand") {
-      assert(d.sidebarOrder === undefined, `destinations.json: ${d.id} is a todayBand and cannot have a sidebarOrder`);
-      assert(d.sidebarSection === undefined, `destinations.json: ${d.id} is a todayBand and cannot have a sidebarSection`);
+    // Embedded destinations (Inbox on Today, Deleted inside Logbook) have no sidebar row.
+    if (d.visibility === "todayBand" || d.visibility === "logbookTab") {
+      assert(d.sidebarOrder === undefined, `destinations.json: ${d.id} is ${d.visibility} and cannot have a sidebarOrder`);
+      assert(d.sidebarSection === undefined, `destinations.json: ${d.id} is ${d.visibility} and cannot have a sidebarSection`);
     } else {
       assert(d.sidebarOrder > lastOrder, `destinations.json: sidebarOrder must strictly increase at "${d.id}"`);
       lastOrder = d.sidebarOrder;
@@ -1709,6 +1709,15 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
     ["offersTitle", refs.add.offers, "title"], ["invalidMessage", refs.add.invalid, "message"],
     ["failedMessage", refs.add.failed, "message"],
   ]) lines.push(`  static let ${name}: String = ${L(node[field], node, field)}`);
+  lines.push("}");
+  lines.push("");
+
+  // 8a. Sign-in by device approval (surfaces.json `deviceSignIn`, ADR 0016)
+  const deviceSignIn = surfaces.deviceSignIn;
+  lines.push("/// Sign-in by device approval (`registry/surfaces.json` `deviceSignIn`).");
+  lines.push("enum RegistryDeviceSignIn {");
+  lines.push(`  static let title: String = ${L(deviceSignIn.title, deviceSignIn, "title")}`);
+  for (const e of deviceSignIn.copy) lines.push(`  static let ${e.id}: String = ${L(e.label, e, "label")}`);
   lines.push("}");
   lines.push("");
 
