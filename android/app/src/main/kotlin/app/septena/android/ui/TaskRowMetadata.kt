@@ -5,6 +5,7 @@ import app.septena.core.JsonValue
 import app.septena.core.ProjectShare
 import app.septena.core.RegistryCatalog
 import app.septena.core.SyncRecord
+import app.septena.core.TaskConversation
 import app.septena.core.TaskFadeRules
 import app.septena.core.TaskProvenance
 import app.septena.core.TaskSnapshot
@@ -35,6 +36,8 @@ internal data class TaskRowMetadataCatalog(
     val attachmentTaskIds: Set<String> = emptySet(),
     /** The shared projects, by project id. */
     val shares: Map<String, ProjectShare> = emptyMap(),
+    /** Tasks an agent handed over for the user to check. */
+    val reviewTaskIds: Set<String> = emptySet(),
 ) {
     companion object {
         suspend fun load(store: TaskStore): TaskRowMetadataCatalog {
@@ -66,6 +69,9 @@ internal data class TaskRowMetadataCatalog(
                 tagNames = tags,
                 attachmentTaskIds = attachments,
                 shares = ProjectShare.byProject(store),
+                reviewTaskIds = store.records(EntityNames.CONVO)
+                    .filter { TaskConversation.needsHumanReview(it) }
+                    .mapTo(HashSet(), SyncRecord::id),
             )
         }
     }
@@ -197,6 +203,7 @@ internal fun buildTaskListItem(
         isOnToday = membership.isOnToday,
         isStarred = snapshot.starred,
         isFaded = isFaded,
+        isInReview = isOpen && record.id in catalog.reviewTaskIds,
         deadlineText = deadlineText,
         deadlineIsRed = deadlineIsRed,
         deadlineShowsFlag = deadlineShowsFlag,

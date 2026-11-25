@@ -58,7 +58,9 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.collapse
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.expand
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
@@ -131,13 +133,15 @@ enum class SeptenaIconKind {
     Settings,
 }
 
-/** Group header shown above a card of related tasks (area, project, Inbox band, or agent stage). */
+/** Group header shown above a card of related tasks (area, project, Inbox band, agent stage, or Review group). */
 data class TaskGroupHeader(
     val key: String,
     val title: String,
     val iconKind: SeptenaIconKind = SeptenaIconKind.None,
     val emoji: String? = null,
     val targetLocationKey: String? = null,
+    /** Row count after the title, for a group that can fold. */
+    val count: Int? = null,
 )
 
 /**
@@ -291,15 +295,25 @@ fun SeptenaTaskCheckbox(
  * Section/Area/Project group header aligned to the shared leading grid:
  * icon/emoji centers over task checkboxes; larger semibold title starts at the
  * exact task-title X (mirrors iOS `groupHeaderBody` + `sectionGroupHeaderTitleStyle`).
+ * A header with [isExpanded] folds its group instead of opening a list.
  */
 @Composable
 fun TaskGroupHeaderRow(
     header: TaskGroupHeader,
     modifier: Modifier = Modifier,
+    isExpanded: Boolean? = null,
     onClick: (() -> Unit)? = null,
 ) {
     val clickableModifier = if (onClick != null) {
-        Modifier.clickable(onClick = onClick)
+        Modifier
+            .clickable(onClick = onClick)
+            .semantics {
+                when (isExpanded) {
+                    true -> collapse { onClick(); true }
+                    false -> expand { onClick(); true }
+                    null -> Unit
+                }
+            }
     } else {
         Modifier
     }
@@ -351,11 +365,21 @@ fun TaskGroupHeaderRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            if (onClick != null) {
-                ChevronRightGlyph(
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
-                    size = 13.dp,
+            header.count?.let { count ->
+                Text(
+                    text = count.toString(),
+                    fontSize = 15.sp,
+                    lineHeight = 22.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
+            if (onClick != null) {
+                val chevronTint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
+                if (isExpanded == true) {
+                    ChevronDownGlyph(tint = chevronTint, size = 13.dp)
+                } else {
+                    ChevronRightGlyph(tint = chevronTint, size = 13.dp)
+                }
             }
         }
     }
@@ -724,8 +748,7 @@ fun TaskCardRow(
                     onDismissRequest = { menuExpanded = false },
                     isDark = isDark,
                     groups = rowMenuGroups,
-                    isTaskStarred = task.isStarred,
-                    canAssign = task.canAssign,
+                    task = task,
                     accessibilityLabel = rowMenuAccessibilityLabel,
                     onAction = { actionId -> onTaskAction(task.id, actionId) },
                 )
@@ -895,10 +918,9 @@ fun SeptenaContextMenu(
     onDismissRequest: () -> Unit,
     isDark: Boolean,
     groups: List<List<TaskRowMenuAction>>,
-    isTaskStarred: Boolean,
+    task: TaskListItem,
     accessibilityLabel: String,
     onAction: (String) -> Unit,
-    canAssign: Boolean = false,
 ) {
     val menuBg = if (isDark) {
         MaterialTheme.colorScheme.surfaceContainerHigh
@@ -925,7 +947,7 @@ fun SeptenaContextMenu(
             .semantics { contentDescription = accessibilityLabel },
     ) {
         val shown = groups
-            .map { group -> group.filter { canAssign || !it.needsAssignees } }
+            .map { group -> group.filter { it.appliesTo(task) } }
             .filter { it.isNotEmpty() }
         shown.forEachIndexed { groupIndex, group ->
             if (groupIndex > 0) {
@@ -941,7 +963,7 @@ fun SeptenaContextMenu(
                     HorizontalDivider(thickness = 0.5.dp, color = rowDivider)
                 }
                 val label = if (action.selectedTitle != null || action.unselectedTitle != null) {
-                    if (isTaskStarred) action.selectedTitle ?: action.title
+                    if (task.isStarred) action.selectedTitle ?: action.title
                     else action.unselectedTitle ?: action.title
                 } else {
                     action.title
@@ -976,7 +998,7 @@ fun SeptenaContextMenu(
                             TaskMenuActionGlyph(
                                 icon = action.icon,
                                 tint = iconTint,
-                                isStarFilled = isTaskStarred,
+                                isStarFilled = task.isStarred,
                                 size = 17.dp,
                             )
                         }
@@ -1820,8 +1842,7 @@ fun ReviewTaskCardRow(
                     onDismissRequest = { menuExpanded = false },
                     isDark = isDark,
                     groups = rowMenuGroups,
-                    isTaskStarred = task.isStarred,
-                    canAssign = task.canAssign,
+                    task = task,
                     accessibilityLabel = rowMenuAccessibilityLabel,
                     onAction = { actionId -> onTaskAction(task.id, actionId) },
                 )
