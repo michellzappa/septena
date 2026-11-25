@@ -142,6 +142,13 @@ extension SeptenaTask {
   }
 }
 
+extension TaskConvo {
+  /// The agent's move, or an agent holds the task now: such a task never fades.
+  func isAgentTurn(at now: Date) -> Bool {
+    isClaimed(at: now) || deriveConvo(self).badge == .working
+  }
+}
+
 /// Pure projection of a conversation into UI/queue state, computed by the
 /// shared core. A claim lease is wall-clock time on the backend, not the
 /// app's day, and this projection is nonisolated, so it reads the real clock.

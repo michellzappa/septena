@@ -167,7 +167,7 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
       deadline: deadline,
       scheduled: scheduled,
       hasRecurrence: recurrence != nil,
-      isAgentTurn: deriveConvo(conversation).badge == .working,
+      isAgentTurn: conversation.isAgentTurn(at: Date()),
       isAssignedToClaude: conversation.assignee == .claude,
       isAwaitingHuman: conversation.awaitsHuman,
       showsAgentCue: showsAgentCue(now: now),

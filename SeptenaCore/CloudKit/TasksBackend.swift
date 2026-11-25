@@ -1658,7 +1658,7 @@ final class CloudKitTasksBackend {
     var fadedIDs: [String] = []
     for entity in candidates {
       let convo = entity.conversation
-      let isAgentTurn = deriveConvo(convo).badge == .working
+      let isAgentTurn = convo.isAgentTurn(at: Date())
       let isAssignedToClaude = convo.assignee == .claude
       guard TaskFade.shouldFade(
         isOpen: entity.status == .open,

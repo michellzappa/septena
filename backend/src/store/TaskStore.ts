@@ -439,11 +439,13 @@ export class TaskStore extends DurableObject<Env> {
   private fadeIsStale(taskId: string, row: Record<string, unknown>, fields: Record<string, unknown>): boolean {
     if (typeof fields.fadedAt !== "string" || row.fadedAt) return false;
     const at = Date.parse(fields.fadedAt);
-    const touched = "touchedAt" in fields ? null : (row.touchedAt as string | null);
-    if (touched && at - Date.parse(touched) < DOMAIN_RULES.fadeWindowDays * DAY_MS) return true;
-    const proposal = row.source === "mcp" && !row.acknowledgedAt && !row.touchedAt;
-    const scheduled = row.scheduled as string | null;
-    if (scheduled && !proposal && scheduled > fields.fadedAt.slice(0, 10)) return true;
+    if (!("touchedAt" in fields)) {
+      const touched = row.touchedAt as string | null;
+      if (touched && at - Date.parse(touched) < DOMAIN_RULES.fadeWindowDays * DAY_MS) return true;
+      const proposal = row.source === "mcp" && !row.acknowledgedAt && !touched;
+      const scheduled = row.scheduled as string | null;
+      if (scheduled && !proposal && scheduled > fields.fadedAt.slice(0, 10)) return true;
+    }
     const convo = this.sql.exec<{ assignee: string | null; endState: string | null }>(
       "SELECT assignee, endState FROM convos WHERE id = ? AND deletedAt IS NULL", taskId,
     ).toArray()[0];
