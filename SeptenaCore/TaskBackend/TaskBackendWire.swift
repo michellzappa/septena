@@ -252,8 +252,6 @@ struct BackendNoteRevision: Decodable, Identifiable, Hashable, Sendable {
   let body: String?
 
   var id: Int { rev }
-  var date: Date? { TaskHistory.parseStamp(at) }
-  var who: String { TaskHistory.who(actor) }
   var byAgent: Bool { actor.hasPrefix("mcp:") }
 }
 
