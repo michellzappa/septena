@@ -6,4 +6,7 @@
     <string name="widget_upcoming_description">Tarefas agendadas para os próximos dias.</string>
     <string name="widget_add_task">Nova tarefa</string>
     <string name="widget_complete_task">Concluir tarefa</string>
+    <string name="shortcut_inbox_label">Entrada</string>
+    <string name="process_text_add_to_septena">Adicionar ao Septena</string>
+    <string name="tile_quick_add_label">Nova tarefa</string>
 </resources>

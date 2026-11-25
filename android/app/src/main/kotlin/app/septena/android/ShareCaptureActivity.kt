@@ -74,9 +74,7 @@ class ShareCaptureActivity : ComponentActivity() {
     }
 
     private fun captureDraft(incoming: Intent): ShareDraft {
-        val sharedText = incoming.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString()
-            ?.trim()
-            .orEmpty()
+        val sharedText = extractSharedText(incoming)
         val textUrl = URL_PATTERN.find(sharedText)?.value?.trimEnd('.', ',', ';', ')', ']', '}', '"', '\'')
             ?.let { Uri.parse(it) }
             ?.let(::supportedUrl)
@@ -98,7 +96,15 @@ class ShareCaptureActivity : ComponentActivity() {
         it.scheme.equals("https", ignoreCase = true) || it.scheme.equals("http", ignoreCase = true)
     }?.takeIf { !it.host.isNullOrBlank() }
 
-    private companion object {
+    internal companion object {
         val URL_PATTERN = Regex("https?://[^\\s<>\\\"']+", RegexOption.IGNORE_CASE)
+
+        /** Reads text from either `ACTION_SEND` (`EXTRA_TEXT`) or Android's selection menu (`EXTRA_PROCESS_TEXT`). */
+        internal fun extractSharedText(incoming: Intent): String =
+            (incoming.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)
+                ?: incoming.getCharSequenceExtra(Intent.EXTRA_TEXT))
+                ?.toString()
+                ?.trim()
+                .orEmpty()
     }
 }

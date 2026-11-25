@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 #
 # setup-testflight-secrets.sh — put the signing materials for
-# .github/workflows/testflight-ios.yml into this repo's GitHub Actions secrets.
+# .github/workflows/testflight-ios.yml into the GitHub environments
+# apple-release and apple-device (docs/DEVICE_BUILDS.md). Both accept jobs from
+# `main` only. Then it deletes the repository copies: any workflow on any
+# branch can read a repository secret.
 #
 # The values go from this Mac straight to GitHub. Nothing is printed.
 #
@@ -78,10 +81,23 @@ grep -q '"Apple Distribution' <<<"$IDS" || die "the .p12 has no Apple Distributi
 grep -q '"Developer ID' <<<"$IDS" && echo "note: the .p12 also holds a Developer ID identity; CI does not need it"
 
 REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner)"
-echo "Setting 5 secrets on $REPO (key $KEY_ID) …"
-gh secret set APPLE_API_KEY --repo "$REPO" < "$P8"
-printf '%s' "$KEY_ID" | gh secret set APPLE_API_KEY_ID --repo "$REPO"
-printf '%s' "$ISSUER_ID" | gh secret set APPLE_API_ISSUER_ID --repo "$REPO"
-base64 < "$P12" | gh secret set IOS_SIGNING_P12 --repo "$REPO"
-printf '%s' "$P12_PASSWORD" | gh secret set IOS_SIGNING_P12_PASSWORD --repo "$REPO"
+for ENVIRONMENT in apple-release apple-device; do
+  # Fail closed: an environment without a branch policy protects nothing.
+  POLICY="$(gh api "repos/$REPO/environments/$ENVIRONMENT/deployment-branch-policies" \
+    --jq '[.branch_policies[].name] | join(",")' 2>/dev/null || true)"
+  [[ "$POLICY" == "main" ]] || die "environment $ENVIRONMENT is not limited to main"
+done
+for ENVIRONMENT in apple-release apple-device; do
+  echo "Setting 5 secrets on $REPO, environment $ENVIRONMENT (key $KEY_ID) …"
+  gh secret set APPLE_API_KEY --repo "$REPO" --env "$ENVIRONMENT" < "$P8"
+  printf '%s' "$KEY_ID" | gh secret set APPLE_API_KEY_ID --repo "$REPO" --env "$ENVIRONMENT"
+  printf '%s' "$ISSUER_ID" | gh secret set APPLE_API_ISSUER_ID --repo "$REPO" --env "$ENVIRONMENT"
+  base64 < "$P12" | gh secret set IOS_SIGNING_P12 --repo "$REPO" --env "$ENVIRONMENT"
+  printf '%s' "$P12_PASSWORD" | gh secret set IOS_SIGNING_P12_PASSWORD --repo "$REPO" --env "$ENVIRONMENT"
+done
+for NAME in APPLE_API_KEY APPLE_API_KEY_ID APPLE_API_ISSUER_ID IOS_SIGNING_P12 IOS_SIGNING_P12_PASSWORD; do
+  if gh secret list --repo "$REPO" --json name --jq '.[].name' | grep -qx "$NAME"; then
+    gh secret delete "$NAME" --repo "$REPO"
+  fi
+done
 echo "Done. Start a run with: gh workflow run testflight-ios.yml"

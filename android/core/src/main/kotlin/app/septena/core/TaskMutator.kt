@@ -545,6 +545,14 @@ class TaskMutator(
         return restored
     }
 
+    /** Permanently removes a soft-deleted task (Delete Permanently / Empty Trash, #460). */
+    suspend fun purge(id: String): Boolean {
+        store.record(RegistryEntityNames.TASK, id) ?: return false
+        val operation = SyncOperation.Delete(ids.nextClientOpId(), RegistryEntityNames.TASK, id)
+        store.purgeLocalAndEnqueue(RegistryEntityNames.TASK, id, operation)
+        return true
+    }
+
     private fun validateTitle(title: String) {
         val maximum = RegistryEntityLimits.TEXT_MAX
         require(title.length.toLong() <= maximum) { "Task title exceeds the registry limit of $maximum characters" }

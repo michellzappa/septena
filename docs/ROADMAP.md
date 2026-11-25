@@ -214,7 +214,7 @@ GitHub milestone: `"M5 Breadth"`.
 - #88 Packaged agent installs (Claude Code, Gemini CLI, OpenClaw)
 - #89 Siri, Shortcuts and App Intents · #90 Public API with keys
 - Companion devices: #430 CD0 added feed · #424 CD1 needs-you feed → #358 CD2 limited session →
-  #425 CD3 live nudge · #426 CD4 voice (after ADR 0009)
+  #425 CD3 live nudge · #426 CD4 voice (later)
 - Do (`docs/DO_SPEC.md`, ADR 0041): #515 D0 core → #516 D1 store → #517 D2 iPhone, iPad,
   Mac, Android · #518 D3 watch · tinyseptena#18 D4 orb → #519 D5 Live Activity · #520 D6 Review ·
   #521 D7 agent proposal · #522 D8 web
