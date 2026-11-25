@@ -109,8 +109,11 @@ class TaskMutator(
         return updated
     }
 
-    /** Applies a registry validated task patch for actions whose semantics are owned by the caller. */
-    suspend fun updateFields(id: String, changes: Map<String, JsonValue>): TaskRecord? {
+    /**
+     * Applies a registry validated task patch for actions whose semantics are owned by the caller.
+     * [notesBase]: the notes an editor started from, when the stored ones may have moved on since.
+     */
+    suspend fun updateFields(id: String, changes: Map<String, JsonValue>, notesBase: NotesBase? = null): TaskRecord? {
         require(changes.isNotEmpty()) { "A task update must contain at least one field" }
         RegistryValidator.requireValidUpsert(RegistryEntityNames.TASK, id, changes, insert = false)
         val existing = store.record(RegistryEntityNames.TASK, id)?.asTaskRecord() ?: return null
@@ -118,7 +121,10 @@ class TaskMutator(
         val updated = existing.changing(changes)
         store.writeLocalAndEnqueue(
             updated.asSyncRecord(),
-            SyncOperation.Upsert(ids.nextClientOpId(), RegistryEntityNames.TASK, id, changes),
+            SyncOperation.Upsert(
+                ids.nextClientOpId(), RegistryEntityNames.TASK, id, changes,
+                base = NotesBase.of(RegistryEntityNames.TASK, changes, existing.fields, notesBase),
+            ),
         )
         return updated
     }

@@ -66,6 +66,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.septena.android.AndroidAppGraph
 import app.septena.core.JsonValue
+import app.septena.core.NotesBase
 import app.septena.core.RegistryCatalog
 import app.septena.core.SyncRecord
 import app.septena.core.TaskConversation
@@ -186,6 +187,9 @@ fun TaskDetailScreen(
     var hasLoaded by remember(taskId) { mutableStateOf(false) }
     var titleDraft by remember(taskId) { mutableStateOf("") }
     var notesDraft by remember(taskId) { mutableStateOf("") }
+    // What the drafts were loaded from: an edit another member made meanwhile is not a change here.
+    var titleBase by remember(taskId) { mutableStateOf("") }
+    var notesBase by remember(taskId) { mutableStateOf("") }
     var textIsDirty by remember(taskId) { mutableStateOf(false) }
     var saving by remember(taskId) { mutableStateOf(false) }
     var saveFailed by remember(taskId) { mutableStateOf(false) }
@@ -201,6 +205,8 @@ fun TaskDetailScreen(
         if (loaded != null && !textIsDirty) {
             titleDraft = loaded.task.fields[RegistryEntityFields.Task.TITLE].stringValue().orEmpty()
             notesDraft = loaded.task.fields[RegistryEntityFields.Task.NOTES].stringValue().orEmpty()
+            titleBase = titleDraft
+            notesBase = notesDraft
         }
         if (loaded != null) {
             loaded.checklist.forEach { item ->
@@ -224,8 +230,8 @@ fun TaskDetailScreen(
         val currentTitle = current.task.fields[RegistryEntityFields.Task.TITLE].stringValue().orEmpty()
         val currentNotes = current.task.fields[RegistryEntityFields.Task.NOTES].stringValue().orEmpty()
         val notes = notesDraft.trim()
-        val titleChanged = title != currentTitle
-        val notesChanged = notes != currentNotes
+        val titleChanged = title != currentTitle && title != titleBase.trim()
+        val notesChanged = notes != currentNotes && notes != notesBase.trim()
         if (!titleChanged && !notesChanged) {
             textIsDirty = false
             saveFailed = false
@@ -237,9 +243,15 @@ fun TaskDetailScreen(
         }
         withContext(Dispatchers.IO) {
             graph.captureTaskEdit(taskId) {
-                check(graph.taskMutator.updateFields(taskId, changes) != null)
+                check(
+                    graph.taskMutator.updateFields(
+                        taskId, changes, notesBase = NotesBase(notesBase.ifEmpty { null }),
+                    ) != null,
+                )
             }
         }
+        titleBase = title
+        notesBase = notes
         textIsDirty = false
         saveFailed = false
         graph.sync.noteLocalChange()

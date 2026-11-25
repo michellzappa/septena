@@ -27,7 +27,13 @@ class RegistryEntityMutator(
         return record
     }
 
-    suspend fun update(entity: String, id: String, changes: Map<String, JsonValue>): SyncRecord? {
+    /** [notesBase]: the notes an editor started from, when the stored ones may have moved on since. */
+    suspend fun update(
+        entity: String,
+        id: String,
+        changes: Map<String, JsonValue>,
+        notesBase: NotesBase? = null,
+    ): SyncRecord? {
         require(entity in RegistryEntityNames.all) { "Unknown registry entity '$entity'" }
         require(entity != RegistryEntityNames.TASK && entity != RegistryEntityNames.SETTING && entity != RegistryEntityNames.CONVO) {
             "Use the entity-specific mutator for '$entity'"
@@ -39,7 +45,10 @@ class RegistryEntityMutator(
         val updated = existing.copy(fields = existing.fields + changes)
         store.writeLocalAndEnqueue(
             updated,
-            SyncOperation.Upsert(ids.nextClientOpId(), entity, id, changes),
+            SyncOperation.Upsert(
+                ids.nextClientOpId(), entity, id, changes,
+                base = NotesBase.of(entity, changes, existing.fields, notesBase),
+            ),
         )
         return updated
     }
