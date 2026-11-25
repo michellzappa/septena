@@ -33,7 +33,10 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         graph.prewarm()
-        SeptenaWidgetIntents.parseLaunchAction(intent)?.let { pendingWidgetAction.value = it }
+        SeptenaWidgetIntents.parseLaunchAction(intent)
+            // A recreated activity still holds the link it opened with.
+            ?.takeUnless { it is WidgetLaunchAction.JoinShare && savedInstanceState != null }
+            ?.let { pendingWidgetAction.value = it }
         setContent {
             SeptenaAndroidTheme(graph.appearance) {
                 Surface(modifier = Modifier.fillMaxSize()) {
@@ -59,7 +62,7 @@ class MainActivity : ComponentActivity() {
                             )
                         } else {
                             Box(Modifier.fillMaxSize().safeDrawingPadding()) {
-                                SignInScreen(graph)
+                                SignInScreen(graph, joining = widgetAction is WidgetLaunchAction.JoinShare)
                             }
                         }
                     }

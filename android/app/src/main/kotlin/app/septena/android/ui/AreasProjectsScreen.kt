@@ -94,6 +94,7 @@ fun AreasProjectsScreen(
     onTaskAction: (String, String) -> Unit = { _, _ -> },
     selection: TaskSelection = TaskSelection(),
     newSectionTrigger: Int = 0,
+    onLeftProject: () -> Unit = {},
     onMagicPlusDrop: ((QuickAddDraft) -> Unit)? = null,
 ) {
     val factory = remember(graph) { AreasProjectsViewModel.Factory(graph) }
@@ -106,6 +107,7 @@ fun AreasProjectsScreen(
     val mutedInk = MaterialTheme.colorScheme.onSurfaceVariant
     val accent = MaterialTheme.colorScheme.primary
     var dialog by remember { mutableStateOf<PlacesDialog?>(null) }
+    var shareOpen by rememberSaveable(destination.key) { mutableStateOf(false) }
     var emojiPickerOpen by rememberSaveable(destination.key) { mutableStateOf(false) }
     var notesDraft by rememberSaveable(destination.key) { mutableStateOf("") }
     var notesFocused by remember(destination.key) { mutableStateOf(false) }
@@ -216,7 +218,7 @@ fun AreasProjectsScreen(
                     }
                 }
 
-                // Emoji, then the page's ⋯ menu (New Project or New Section, Rename), as on iPhone and Mac.
+                // Emoji, then the page's ⋯ menu (New Project or New Section, Rename, Share Project), as on iPhone and Mac.
                 item(key = "place-actions") {
                     var menuOpen by remember(destination.key) { mutableStateOf(false) }
                     Row(
@@ -278,6 +280,15 @@ fun AreasProjectsScreen(
                                         dialog = PlacesDialog.RenamePlace(state.title)
                                     },
                                 )
+                                if (destination is AreasProjectsDestination.Project) {
+                                    PlaceMenuItem(
+                                        title = actionTitle(RegistryActionIds.PROJECT_SHARE, languageTag),
+                                        onClick = {
+                                            menuOpen = false
+                                            shareOpen = true
+                                        },
+                                    )
+                                }
                             }
                         }
                     }
@@ -615,6 +626,16 @@ fun AreasProjectsScreen(
             languageTag = languageTag,
             onDismissRequest = { emojiPickerOpen = false },
             onSelect = viewModel::setAreaEmoji,
+        )
+    }
+
+    if (shareOpen && destination is AreasProjectsDestination.Project) {
+        ShareProjectDialog(
+            graph = graph,
+            projectId = destination.id,
+            languageTag = languageTag,
+            onDismiss = { shareOpen = false },
+            onEnded = onLeftProject,
         )
     }
 
