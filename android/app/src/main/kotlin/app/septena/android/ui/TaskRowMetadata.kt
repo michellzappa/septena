@@ -16,6 +16,7 @@ import app.septena.core.generated.RegistryDestinationIds
 import app.septena.core.generated.RegistryEntityEnums
 import app.septena.core.generated.RegistryEntityFields
 import app.septena.core.generated.RegistryEntityNames as EntityNames
+import app.septena.core.generated.RegistrySurfaceIds
 import app.septena.core.generated.RegistryTaskAttributeIds
 import app.septena.core.stringValue
 import app.septena.ui.SeptenaIconKind
@@ -91,7 +92,11 @@ internal fun buildTaskListItem(
         RegistryTaskAttributeIds.WHEN,
         languageTag = languageTag,
     ).firstOrNull { it.kind == DateBoardRowKinds.TOMORROW }?.label.orEmpty()
-    val overdueLabel = RegistryCatalog.localizedString("Overdue", languageTag).orEmpty()
+    val overdueLabel = (RegistryCatalog.surface(RegistrySurfaceIds.TASK_DATE_BOARD)?.fields?.get("overdue") as? JsonValue.ObjectValue)
+        ?.fields?.get("label")
+        .stringValue()
+        ?.let { RegistryCatalog.localizedString(it, languageTag) ?: it }
+        .orEmpty()
 
     // Deadline / Scheduled / Completed date — matches iOS `TaskRow.trailingDate`.
     var deadlineText: String? = null
