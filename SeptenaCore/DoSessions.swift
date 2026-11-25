@@ -223,6 +223,9 @@ final class DoStore {
     if let fullSessionID, next?.sessionID != fullSessionID { self.fullSessionID = nil }
     scheduleWake()
     DoEndAlert.update(for: isFullHere ? current : nil)
+    #if os(iOS)
+    DoActivity.update(for: isFullHere ? current : nil)
+    #endif
   }
 
   /// A task's Do history, newest first.
