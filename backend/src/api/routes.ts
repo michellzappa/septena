@@ -413,6 +413,8 @@ api.get("/sync/pull", async (c) => {
     tags: z.enum(["0", "1"]).default("0"),
     // `refs=1`: the client syncs the `taskRef` entity (TaskStore.pull).
     refs: z.enum(["0", "1"]).default("0"),
+    // `doSessions=1`: the client syncs the `doSession` entity (TaskStore.pull).
+    doSessions: z.enum(["0", "1"]).default("0"),
   }).safeParse(c.req.query());
   if (!q.success) return c.json({ error: "invalid_request" }, 400);
   return c.json(await storeFor(c.env, c.get("userId")).pull(
@@ -422,6 +424,7 @@ api.get("/sync/pull", async (c) => {
     q.data.checklists === "1",
     q.data.tags === "1",
     q.data.refs === "1",
+    q.data.doSessions === "1",
   ));
 });
 

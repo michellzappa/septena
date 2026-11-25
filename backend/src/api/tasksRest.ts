@@ -3,14 +3,14 @@ import { z } from "zod";
 import type { Env } from "../env.js";
 import { logEvent } from "../util.js";
 import { zId } from "../store/columns.js";
-import type { Row } from "../store/TaskStore.js";
+import type { Doing, Row } from "../store/TaskStore.js";
 import { addDaysYMD, isValidTz, todayYMD } from "../tz.js";
 import type { TaskOut } from "../tools/taskShared.js";
 import { matchesView } from "../tools/taskShared.js";
 import { listTasks, taskOut } from "../shadow/mcp.js";
 import { MAX_REF_INPUT, findByRef, zRefs } from "../shadow/refs.js";
 import { DESIGN_TOKENS, ENTITY_LIMITS } from "../generated/registries.js";
-import { AGENT_FALLBACK_NAME, acceptReview, rpcStoreFor, runWriteTool, sendBackReview, zWriteArgs, type StoreRpc, type WriteContext, type WriteToolName } from "../shadow/writes.js";
+import { AGENT_FALLBACK_NAME, acceptReview, pushOps, rpcStoreFor, runWriteTool, sendBackReview, zWriteArgs, type StoreRpc, type WriteContext, type WriteToolName } from "../shadow/writes.js";
 
 // A small REST surface over the MCP task tools for thin app clients, first of
 // all the Apple Watch (docs/WATCH.md in the app repo). The watch has no task
@@ -119,6 +119,14 @@ export function clientTask(t: TaskOut, names: Map<string, string>): ClientTask {
     out.checklistDoneCount = t.checklistDoneCount ?? 0;
   }
   return out;
+}
+
+/// The current Do in every view (docs/DO_SPEC.md §7), or null. `now` lets a
+/// device correct its clock.
+export function doingOut(doing: Doing | null): (Omit<Doing, "isStale"> & { now: string }) | null {
+  if (!doing || doing.isStale) return null;
+  const { isStale: _stale, ...rest } = doing;
+  return { ...rest, now: new Date().toISOString() };
 }
 
 const ADDED_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -263,6 +271,7 @@ tasksRest.get("/", async (c) => {
   if (!q.success) return c.json({ error: "invalid_request" }, 400);
   const store = rpcStoreFor(c.env, c.get("userId"));
   const timeZone = await timeZoneFor(c, store);
+  const doing = doingOut(await store.readDoing());
   if (q.data.view === "questions") {
     const [open, areas, projects, accentSetting] = await Promise.all([
       store.readOpenQuestions(q.data.limit),
@@ -285,6 +294,7 @@ tasksRest.get("/", async (c) => {
       view: "questions",
       today: todayYMD(timeZone),
       accent: accentFor(accentSetting),
+      doing,
       total: open.total,
       truncated: open.total > tasks.length,
       tasks,
@@ -302,6 +312,7 @@ tasksRest.get("/", async (c) => {
       view: "added",
       today: todayYMD(timeZone),
       accent: accentFor(accentSetting),
+      doing,
       total: added.total,
       truncated: added.total > added.tasks.length,
       tasks: added.tasks,
@@ -350,6 +361,7 @@ tasksRest.get("/", async (c) => {
     view: q.data.view,
     today,
     accent: accentFor(accentSetting),
+    doing,
     total,
     truncated,
     tasks: tasks.map((t) => clientTask(t, names)),
@@ -389,6 +401,75 @@ tasksRest.post("/", async (c) => {
   if (body.when === "tomorrow") args.scheduled = addDaysYMD(todayYMD(ctx.timeZone), 1);
   return run(c, ctx, "tasks_create", args, 201);
 });
+
+/// Starts a Do (docs/DO_SPEC.md §7). The client mints the session id, so a
+/// retry starts nothing new. The start is human engagement: it resets the fade.
+tasksRest.post("/:id/do", async (c) => {
+  const id = zId.safeParse(c.req.param("id"));
+  if (!id.success) return c.json({ error: "invalid_request" }, 400);
+  const body = await json(c, z.object({
+    sessionId: zId,
+    plannedMinutes: z.number().int().min(1).max(ENTITY_LIMITS.doPlannedMinutesMax).optional(),
+  }).strict());
+  if (body instanceof Response) return body;
+  const ctx = await writeContext(c);
+  const read = await ctx.store.readTask(id.data);
+  if (!read || read.task.kind === "heading") return c.json({ error: "not_found" }, 404);
+  const existing = await ctx.store.readDoSession(body.sessionId);
+  if (existing) {
+    if (existing.taskId !== id.data) return c.json({ error: "invalid_request" }, 400);
+    return c.json({ sessionId: body.sessionId, taskId: id.data, alreadyStarted: true });
+  }
+  if (read.task.status !== "open") return stale(c);
+  return attempt(c, "do", async () => {
+    const now = new Date().toISOString();
+    await pushOps(ctx, [
+      { op: "upsert", entity: "task", id: id.data, fields: { touchedAt: now, deferCount: 0, ...(read.task.fadedAt ? { fadedAt: null } : {}) } },
+      {
+        op: "upsert", entity: "doSession", id: body.sessionId,
+        fields: { taskId: id.data, startedAt: now, plannedMinutes: body.plannedMinutes ?? null, sourceClient: ctx.source?.sourceClient ?? null },
+      },
+    ]);
+    return { sessionId: body.sessionId, taskId: id.data };
+  }, 201);
+});
+
+/// Ends (`stop`) or confirms (`confirm`) one Do. It names the session, so an
+/// old request cannot touch a newer Do. A repeat returns 200.
+tasksRest.post("/do/:sessionId/:verb", async (c) => {
+  const id = zId.safeParse(c.req.param("sessionId"));
+  const verb = z.enum(["stop", "confirm"]).safeParse(c.req.param("verb"));
+  if (!id.success || !verb.success) return c.json({ error: "invalid_request" }, 400);
+  const body = await json(c, z.object({ note: z.string().trim().min(1).max(ENTITY_LIMITS.doNoteMax).optional() }).strict());
+  if (body instanceof Response) return body;
+  const ctx = await writeContext(c);
+  const session = await ctx.store.readDoSession(id.data);
+  if (!session) return c.json({ error: "not_found" }, 404);
+  const ended = typeof session.endedAt === "string";
+  if (ended && (verb.data === "confirm" || !body.note)) {
+    return verb.data === "confirm" ? stale(c) : c.json({ sessionId: id.data, alreadyEnded: true });
+  }
+  return attempt(c, `do_${verb.data}`, async () => {
+    const now = new Date().toISOString();
+    if (verb.data === "confirm") {
+      await pushOps(ctx, [{ op: "upsert", entity: "doSession", id: id.data, fields: { confirmedAt: now } }]);
+      return { sessionId: id.data, confirmedAt: now };
+    }
+    await endDo(ctx, id.data, ended ? null : "stopped", now, body.note);
+    return { sessionId: id.data, ended: true };
+  });
+});
+
+/// Ends a Do with `exit`, or only adds the note when `exit` is null. The length
+/// of a stale one is unknown.
+async function endDo(ctx: WriteContext, sessionId: string, exit: "stopped" | "later" | null, now: string, note?: string): Promise<void> {
+  const doing = await ctx.store.readDoing();
+  const lapsed = doing?.sessionId === sessionId && doing.isStale;
+  await pushOps(ctx, [{
+    op: "upsert", entity: "doSession", id: sessionId,
+    fields: { ...(exit ? { endedAt: now, exit, lapsed } : {}), ...(note ? { note } : {}) },
+  }]);
+}
 
 const zVerb = z.enum(["complete", "today", "untoday", "tomorrow", "defer", "cancel"]);
 
@@ -485,9 +566,15 @@ tasksRest.post("/:id/:verb", async (c) => {
     case "tomorrow":
       return run(c, ctx, "tasks_defer", { id: id.data, until: addDaysYMD(today, 1) });
     case "defer": {
-      const body = await json(c, z.object({ until: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }).strict());
+      // `session`: the Do this Later ends.
+      const body = await json(c, z.object({ until: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), session: zId.optional() }).strict());
       if (body instanceof Response) return body;
-      return run(c, ctx, "tasks_defer", { id: id.data, until: body.until });
+      const response = await run(c, ctx, "tasks_defer", { id: id.data, until: body.until });
+      if (response.ok && body.session) {
+        const session = await ctx.store.readDoSession(body.session);
+        if (session?.taskId === id.data && !session.endedAt) await endDo(ctx, body.session, "later", new Date().toISOString());
+      }
+      return response;
     }
     case "untoday":
       // The phone's "Remove from Today" (spec §4 A3): the core drops the pin

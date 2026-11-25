@@ -64,6 +64,7 @@ type StoreMethod =
   | "readChecklistItems" | "readChecklistItem" | "readChecklistCounts"
   | "readTags" | "readTagByName"
   | "readOrderTop" | "readSetting" | "push" | "captureTask" | "claim" | "release" | "agentEvents" | "history" | "head"
+  | "readDoing" | "readDoSession" | "readDoSessions"
   | "addUsage" | "connectionName"
   | "readNote" | "noteRevisions" | "readContainer" | "readContainerTasks";
 export type StoreRpc = {

@@ -216,10 +216,28 @@ export async function runAgentTool(
       return { activity: rows.map(describeChange) };
     }
     case "tasks_history": {
-      const rows = await store.history(null, args.id as string, null, (args.limit as number | undefined) ?? 50, historySince);
-      return { id: args.id, history: rows.map(historyEntry) };
+      const [rows, sessions] = await Promise.all([
+        store.history(null, args.id as string, null, (args.limit as number | undefined) ?? 50, historySince),
+        store.readDoSessions(args.id as string),
+      ]);
+      return {
+        id: args.id,
+        history: rows.map(historyEntry),
+        ...(sessions.length > 0 ? { doSessions: sessions.map(doSessionOut) } : {}),
+      };
     }
   }
+}
+
+/// One Do of the task (docs/DO_SPEC.md §8). A lapsed one has no known length.
+function doSessionOut(r: Row) {
+  return {
+    startedAt: r.startedAt,
+    endedAt: r.lapsed === true ? undefined : r.endedAt ?? undefined,
+    exit: r.exit ?? undefined,
+    lengthUnknown: r.lapsed === true ? true : undefined,
+    whereStopped: r.note ?? undefined,
+  };
 }
 
 /// One change log row for tasks_history: who, what, and before/after values.
@@ -243,6 +261,7 @@ const REFUSAL_RULES: Record<string, string> = {
   paused: "The user paused all agents. Do nothing until tasks_agent_events reports unpaused.",
   your_turn: "A question waits for the user. Wait for a user_turn event on this task.",
   held: "Another agent holds this task. Pick another task.",
+  doing: "The user does this task now. Do not work on it until a do_ended event on this task.",
   budget: `${AGENT_RUN_BUDGET} runs since the user last wrote on this task. Ask the user (a provider turn with options) before you continue.`,
 };
 

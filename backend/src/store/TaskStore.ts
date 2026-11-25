@@ -82,12 +82,24 @@ export type ClaimResult =
   | { ok: true; holder: string; claimUntil: string; renewed: boolean; runsSinceUser: number }
   | { ok: false; reason: ClaimRefusal; holder?: string; claimUntil?: string };
 
+/// What the user does now (docs/DO_SPEC.md §7). A stale Do is still here.
+export interface Doing {
+  sessionId: string;
+  taskId: string;
+  title: string;
+  startedAt: string;
+  plannedMinutes: number | null;
+  confirmedAt: string | null;
+  staleAt: string;
+  isStale: boolean;
+}
+
 /// One thing an agent may need to react to. A pointer, never content: the
 /// agent reads the task itself, so text in a task can never arrive as an
 /// order through this feed.
 export interface AgentEvent {
   rev: number;
-  kind: "assigned" | "user_turn" | "stopped" | "resumed" | "paused" | "unpaused";
+  kind: "assigned" | "user_turn" | "stopped" | "resumed" | "paused" | "unpaused" | "do_started" | "do_ended";
   taskId: string | null;
   at: string;
 }
@@ -122,6 +134,7 @@ export const AGENT_WRITE_RULES: Record<string, string> = {
     "The text above `## Log` is the user's brief. Append a dated entry under `## Log`, or propose a new brief for the user to accept.",
   paused: "The user paused all agents. Do not write; only the user can unpause.",
   "retired:context": "Project context is retired (ADR 0012). Write the project's notes instead.",
+  human_only_do: "Only the user starts, changes or ends a Do.",
   human_accepts:
     "Only the user marks an agent-worked task done. Call tasks_set_endstate with endState \"needs_verify\" and a note describing what to check.",
 };
@@ -641,7 +654,10 @@ export class TaskStore extends DurableObject<Env> {
         if (events.length > 0) this.dispatchAgentEvents(events);
       }
     }
-    if (agentQuestions.length > 0) {
+    // During a Do the question is in the lists and counts. Its push is not sent
+    // (docs/DO_SPEC.md §6).
+    const doing = agentQuestions.length > 0 ? this.readDoing() : null;
+    if (agentQuestions.length > 0 && (!doing || doing.isStale)) {
       const tokens = this.listPushTokens();
       if (tokens.length > 0) {
         const delivery = this.dispatchAgentQuestionPushes(agentQuestions, tokens);
@@ -695,6 +711,7 @@ export class TaskStore extends DurableObject<Env> {
         purgedAttachmentIds.push(...this.tombstoneAttachments(op.id, now));
         this.tombstoneChecklistItems(op.id, now);
         this.tombstoneTaskRefs(op.id, now);
+        this.tombstoneDoSessions(op.id, now);
       }
       if (op.entity === "taskRef" && !isAgentActor(actor)) {
         // A user's own removal wins over every automatic add (§6.6).
@@ -724,6 +741,10 @@ export class TaskStore extends DurableObject<Env> {
       return { clientOpId: op.clientOpId, status: "dropped", rev, reason: "deleted" };
     }
     if (names.length === 0) return { clientOpId: op.clientOpId, status: "noop" };
+    if (op.entity === "doSession") {
+      const settled = this.settleDoFields(op.fields, row as Record<string, unknown> | undefined, now);
+      names.splice(0, names.length, ...settled);
+    }
 
     if (!row) {
       const missing = spec.requiredOnInsert.filter((f) => op.fields[f] === undefined || op.fields[f] === null);
@@ -743,6 +764,12 @@ export class TaskStore extends DurableObject<Env> {
         if (count >= MAX_CHECKLIST_ITEMS_PER_TASK) {
           return { clientOpId: op.clientOpId, status: "rejected", reason: "checklist_limit_exceeded" };
         }
+      }
+      if (op.entity === "doSession") {
+        const task = this.sql.exec<{ kind: string | null }>(
+          "SELECT kind FROM tasks WHERE id = ? AND deletedAt IS NULL", op.fields.taskId as string,
+        ).toArray()[0];
+        if (!task || task.kind === "heading") return { clientOpId: op.clientOpId, status: "rejected", reason: "unknown_task" };
       }
       if (op.entity === "taskRef") {
         const taskId = op.fields.taskId as string;
@@ -840,6 +867,9 @@ export class TaskStore extends DurableObject<Env> {
         ...(artifact?.refs ?? []), artifact?.body, artifact?.title, handoff?.payload, handoff?.instruction, endStateNote,
       ], actor, now);
     }
+    if (op.entity === "doSession" || (op.entity === "task" && ("status" in op.fields || "fadedAt" in op.fields))) {
+      this.resolveDo(actor, now, op.entity === "doSession" && !row ? op.id : null);
+    }
     if (isAgentActor(actor) && op.entity === "convo" && op.fields.endState === "needs_verify") {
       // Handing off to Review puts the ball in the human's court, so the claim ends.
       this.writeConvoServerFields(op.id, { claimedBy: null, claimUntil: null }, "release", actor, now, true);
@@ -852,6 +882,7 @@ export class TaskStore extends DurableObject<Env> {
   /// writes at all, and an agent cannot mark an agent-worked task done —
   /// only the human accepts it after review (`human_accepts`).
   private agentRefusal(op: Op): string | null {
+    if (op.op !== "appendTurn" && op.entity === "doSession") return "human_only_do";
     if (op.op === "upsert" && op.entity === "convo" && "stoppedAt" in op.fields) return "human_only:stoppedAt";
     if (op.op === "upsert" && op.entity === "setting" && op.id === "agentsPaused") return "human_only:agentsPaused";
     if (op.op === "upsert" && op.entity === "project" && "context" in op.fields) return "retired:context";
@@ -936,6 +967,127 @@ export class TaskStore extends DurableObject<Env> {
       return row?.taskId ?? null;
     }
     return null;
+  }
+
+  // ---- Do (docs/DO_SPEC.md, ADR 0041) ----
+
+  /// A permanently deleted task takes its Do history with it.
+  private tombstoneDoSessions(taskId: string, now: string): void {
+    const ids = this.sql.exec<{ id: string }>(
+      "SELECT id FROM do_sessions WHERE taskId = ? AND deletedAt IS NULL", taskId,
+    ).toArray().map((r) => r.id);
+    for (const id of ids) {
+      const rev = this.nextRev();
+      this.sql.exec("UPDATE do_sessions SET deletedAt = ?, rev = ?, updatedAt = ? WHERE id = ?", now, rev, now, id);
+    }
+  }
+
+  /// Keeps §2.1 rules 2 and 4 on one push, in place, and returns the fields
+  /// that are left to write. A closed row only takes an earlier end or a new
+  /// note. A push that loses still moves the row's rev, so its device pulls
+  /// what the store kept.
+  private settleDoFields(fields: Record<string, unknown>, row: Record<string, unknown> | undefined, now: string): string[] {
+    const startedAt = (row?.startedAt as string | undefined) ?? (fields.startedAt as string | undefined) ?? now;
+    if (!row && typeof fields.startedAt === "string" && Date.parse(fields.startedAt) > Date.parse(now)) fields.startedAt = now;
+    if (typeof fields.endedAt === "string" && Date.parse(fields.endedAt) < Date.parse(startedAt)) fields.endedAt = startedAt;
+    const drop = (...keys: string[]) => { for (const k of keys) delete fields[k]; };
+    const current = (row?.endedAt as string | null | undefined) ?? null;
+    if (typeof fields.endedAt === "string" && doEndWins(current, fields.endedAt)) {
+      fields.exit ??= "stopped";
+      if (current) fields.lapsed ??= false;
+    } else {
+      drop("endedAt", "exit", "lapsed");
+    }
+    if (current) drop("plannedMinutes", "confirmedAt");
+    return Object.keys(fields);
+  }
+
+  /// The rows the core needs: the open ones and every row that started after
+  /// the oldest of them.
+  private doRows(): { rows: CoreDoSession[]; taskIds: Map<string, string> } {
+    const open = this.sql.exec<{ startedAt: string }>(
+      "SELECT startedAt FROM do_sessions WHERE endedAt IS NULL AND deletedAt IS NULL",
+    ).toArray();
+    const taskIds = new Map<string, string>();
+    if (open.length === 0) return { rows: [], taskIds };
+    // Stamps keep their zone, so the instants are compared here, not in SQL.
+    const oldest = Math.min(...open.map((r) => Date.parse(r.startedAt)));
+    const rows = this.sql.exec<{
+      id: string; taskId: string; startedAt: string; plannedMinutes: number | null; confirmedAt: string | null;
+      endedAt: string | null; status: string | null; gone: number;
+    }>(
+      `SELECT s.id, s.taskId, s.startedAt, s.plannedMinutes, s.confirmedAt, s.endedAt, t.status,
+              (t.id IS NULL OR t.deletedAt IS NOT NULL OR t.fadedAt IS NOT NULL) AS gone
+       FROM do_sessions s LEFT JOIN tasks t ON t.id = s.taskId WHERE s.deletedAt IS NULL AND s.startedAt >= ?`,
+      new Date(oldest - DAY_MS).toISOString().slice(0, 10),
+    ).toArray().filter((r) => Date.parse(r.startedAt) >= oldest);
+    for (const r of rows) taskIds.set(r.id, r.taskId);
+    return {
+      rows: rows.map((r) => ({
+        id: r.id, startedAt: r.startedAt, plannedMinutes: r.plannedMinutes, confirmedAt: r.confirmedAt,
+        endedAt: r.endedAt, taskStatus: r.gone ? null : r.status,
+      })),
+      taskIds,
+    };
+  }
+
+  /// Ends every open Do that the rules end. `startedId` is a Do that this
+  /// write started: when it stays open, a live agent claim on its task ends,
+  /// because the user does that task now (§6).
+  private resolveDo(actor: string, now: string, startedId: string | null = null): void {
+    const { rows, taskIds } = this.doRows();
+    if (rows.length === 0) return;
+    const { ends, current } = resolveDoSessions(rows, now);
+    for (const end of ends) {
+      const fields = { endedAt: end.endedAt, exit: end.exit, lapsed: end.lapsed };
+      const rev = this.nextRev();
+      this.sql.exec(
+        "UPDATE do_sessions SET endedAt = ?, exit = ?, lapsed = ?, rev = ?, updatedAt = ? WHERE id = ?",
+        end.endedAt, end.exit, end.lapsed ? 1 : 0, rev, now, end.id,
+      );
+      this.log(rev, "doSession", end.id, "upsert", Object.keys(fields), null, actor, now, this.diffFor(null, fields));
+    }
+    if (!startedId || current?.id !== startedId) return;
+    const taskId = taskIds.get(startedId)!;
+    const claim = this.sql.exec<{ claimedBy: string | null; claimUntil: string | null }>(
+      "SELECT claimedBy, claimUntil FROM convos WHERE id = ? AND deletedAt IS NULL", taskId,
+    ).toArray()[0];
+    if (!claim?.claimedBy || !claim.claimUntil || Date.parse(claim.claimUntil) <= Date.parse(now)) return;
+    const reason = this.reason;
+    this.reason = "The user does this task now.";
+    try {
+      this.writeConvoServerFields(taskId, { claimedBy: null, claimUntil: null }, "release", actor, now, true);
+    } finally {
+      this.reason = reason;
+    }
+  }
+
+  /// The current Do, or null. `staleAt`, `startedAt` and the rest are stamps.
+  readDoing(): Doing | null {
+    const { rows, taskIds } = this.doRows();
+    if (rows.length === 0) return null;
+    const { current } = resolveDoSessions(rows, new Date().toISOString());
+    if (!current) return null;
+    const row = rows.find((r) => r.id === current.id)!;
+    const taskId = taskIds.get(current.id)!;
+    const title = this.sql.exec<{ title: string | null }>("SELECT title FROM tasks WHERE id = ?", taskId).toArray()[0]?.title ?? "";
+    return {
+      sessionId: current.id, taskId, title, startedAt: row.startedAt, plannedMinutes: row.plannedMinutes ?? null,
+      confirmedAt: row.confirmedAt ?? null, staleAt: new Date(current.staleAtMs).toISOString(), isStale: current.isStale,
+    };
+  }
+
+  /// One Do, open or closed, or null.
+  readDoSession(id: string): Row | null {
+    const raw = this.sql.exec("SELECT * FROM do_sessions WHERE id = ? AND deletedAt IS NULL", id).toArray()[0];
+    return raw ? (decodeRow(ENTITIES.doSession, raw) as Row) : null;
+  }
+
+  /// The Do history of one task, newest first.
+  readDoSessions(taskId: string): Row[] {
+    return this.sql.exec("SELECT * FROM do_sessions WHERE taskId = ? AND deletedAt IS NULL", taskId).toArray()
+      .map((r) => decodeRow(ENTITIES.doSession, r) as Row)
+      .sort((a, b) => Date.parse(b.startedAt as string) - Date.parse(a.startedAt as string));
   }
 
   // ---- task references (docs/TASK_REFERENCES_SPEC.md, ADR 0031) ----
@@ -1150,6 +1302,8 @@ export class TaskStore extends DurableObject<Env> {
         claimUntil: string | null; runsSinceUser: number | null;
       }>("SELECT endState, stoppedAt, claimedBy, claimUntil, runsSinceUser FROM convos WHERE id = ? AND deletedAt IS NULL", taskId).toArray()[0];
       if (convo?.stoppedAt) return { ok: false, reason: "stopped" };
+      const doing = this.readDoing();
+      if (doing && !doing.isStale && doing.taskId === taskId) return { ok: false, reason: "doing" };
       if (convo?.endState && convo.endState !== "open") return { ok: false, reason: "terminal" };
       if (this.awaitsHuman(taskId)) return { ok: false, reason: "your_turn" };
       const nowMs = Date.now();
@@ -1230,6 +1384,10 @@ export class TaskStore extends DurableObject<Env> {
         }
         else if (r.entity === "convo" && diff.assignee?.[1] === "claude") push("assigned", r.id);
         else if (r.entity === "convo" && diff.stoppedAt) push(diff.stoppedAt[1] ? "stopped" : "resumed", r.id);
+        else if (r.entity === "doSession" && (diff.taskId || diff.endedAt)) {
+          const row = this.sql.exec<{ taskId: string }>("SELECT taskId FROM do_sessions WHERE id = ?", r.id).toArray()[0];
+          if (row) push(diff.endedAt ? "do_ended" : "do_started", row.taskId);
+        }
         else if (r.entity === "setting" && r.id === "agentsPaused" && diff.value) push(diff.value[1] === true ? "paused" : "unpaused", null);
         if (events.length >= n) break;
       }
@@ -1245,7 +1403,7 @@ export class TaskStore extends DurableObject<Env> {
   /// The other flags do the same for entities that came later.
   pull(
     since: number, limit: number, includeSettings = false, includeChecklists = false, includeTags = false,
-    includeRefs = false,
+    includeRefs = false, includeDoSessions = false,
   ): PullResult {
     const n = Math.min(Math.max(limit, 1), MAX_PULL);
     if (since > 0 && since < this.meta("purgedThrough")) {
@@ -1259,6 +1417,7 @@ export class TaskStore extends DurableObject<Env> {
       if (name === "checklistItem" && !includeChecklists) continue;
       if (name === "tag" && !includeTags) continue;
       if (name === "taskRef" && !includeRefs) continue;
+      if (name === "doSession" && !includeDoSessions) continue;
       const spec: EntitySpec = ENTITIES[name];
       for (const raw of this.sql.exec(`SELECT * FROM ${spec.table} WHERE rev > ? ORDER BY rev LIMIT ?`, since, n)) {
         merged.push({ rev: raw.rev as number, entity: name, row: decodeRow(spec, raw) });
@@ -2646,7 +2805,10 @@ export class TaskStore extends DurableObject<Env> {
   override async alarm(): Promise<void> {
     const now = Date.now();
     const tombstoneCutoff = new Date(now - TOMBSTONE_TTL_MS).toISOString();
+    const revBefore = this.meta("rev");
     this.ctx.storage.transactionSync(() => {
+      // A Do nobody ended (docs/DO_SPEC.md §2.2).
+      this.resolveDo("system:housekeeping", new Date(now).toISOString());
       let purged = this.meta("purgedThrough");
       for (const name of ENTITY_NAMES) {
         const table = ENTITIES[name].table;
@@ -2670,6 +2832,7 @@ export class TaskStore extends DurableObject<Env> {
       // Day and month counters: two months covers the current month.
       this.sql.exec("DELETE FROM usage WHERE updatedAt < ?", now - 62 * DAY_MS);
     });
+    if (this.meta("rev") > revBefore) this.broadcast(this.meta("rev"));
     await this.ctx.storage.setAlarm(now + DAY_MS);
   }
 }
