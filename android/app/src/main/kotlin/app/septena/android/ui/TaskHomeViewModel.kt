@@ -728,8 +728,6 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         }.toMap()
 
         val fadedSweepList = mutableListOf<FadeSweepItem>()
-        val inboxLabel = RegistryCatalog.destinationTitle(RegistryDestinationIds.INBOX)?.takeIf(String::isNotBlank)
-            ?: "Inbox"
         for ((record, snapshot) in allSnapshots) {
             if (snapshot.isHeading) continue
             if (snapshot.deletedAt != null) {
