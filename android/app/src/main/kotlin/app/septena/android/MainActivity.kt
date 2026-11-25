@@ -77,6 +77,7 @@ class MainActivity : ComponentActivity() {
     /** Foreground fetch is the refresh path (no push yet), as on Apple. */
     override fun onStart() {
         super.onStart()
+        graph.doing.requestRefresh()
         if (graph.credentials.signedIn.value) graph.sync.requestSync()
     }
 }

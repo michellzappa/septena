@@ -182,6 +182,12 @@ internal fun registryNoticeCopy(noticeId: String, languageTag: String, count: In
     return RegistryNoticeCopy(title = title, detail = detail, primaryTitle = primary)
 }
 
+/** The word that closes a notice (surfaces.json `notices.dismissTitle`). */
+internal fun noticeDismissTitle(languageTag: String): String {
+    val notices = RegistryCatalog.document("surfaces").fields["notices"] as? JsonValue.ObjectValue
+    return registryText(notices?.fields?.get("dismissTitle").stringValue(), languageTag)
+}
+
 /** Device-local sweep timestamps matching Apple `TaskFade.lastSweepAt` / `dismissedSweepWeek`. */
 class FadeSweepStore(context: Context) {
     private val prefs = context.getSharedPreferences("septena_fade_sweep", Context.MODE_PRIVATE)

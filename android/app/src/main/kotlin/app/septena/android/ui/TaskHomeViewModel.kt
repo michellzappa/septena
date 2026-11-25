@@ -74,6 +74,8 @@ data class TaskHomeUiState(
     val canQuickAdd: Boolean = false,
     val canComplete: Boolean = false,
     val agentsPaused: Boolean = false,
+    /** Open agent requests: the rows of Review. */
+    val reviewCount: Int = 0,
     /** Top-nav Star filter toggle: shows only starred tasks in the current list. */
     val starredOnly: Boolean = false,
     /** Task ids picked by a long-press; non-empty means the list is in selection mode. */
@@ -115,6 +117,7 @@ private data class LoadedTaskHome(
     val canQuickAdd: Boolean,
     val canComplete: Boolean,
     val agentsPaused: Boolean,
+    val reviewCount: Int = 0,
     val fadedSweepItems: List<FadeSweepItem> = emptyList(),
     val weeklySweepItems: List<FadeSweepItem> = emptyList(),
     val showWeeklySweepBanner: Boolean = false,
@@ -162,6 +165,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             canQuickAdd = home.canQuickAdd,
             canComplete = home.canComplete,
             agentsPaused = home.agentsPaused,
+            reviewCount = home.reviewCount,
             starredOnly = applyStar,
             selectedIds = selected,
             fadedSweepItems = home.fadedSweepItems,
@@ -262,7 +266,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
      * removes the new task in one step. Once the row exists the sheet closes,
      * also when a later field write fails: a retry would create it twice.
      */
-    fun quickAdd(draft: QuickAddDraft, onSaved: () -> Unit) {
+    fun quickAdd(draft: QuickAddDraft, onSaved: (taskId: String) -> Unit) {
         val title = draft.title.trim()
         if (title.isEmpty() || quickAddRunning) return
         quickAddRunning = true
@@ -291,13 +295,13 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                         }
                     }
                     graph.taskUndoHistory.recordCreated(created.asSyncRecord())
-                    fields.exceptionOrNull()
+                    created.id to fields.exceptionOrNull()
                 }
             }
-                .onSuccess { fieldError ->
+                .onSuccess { (taskId, fieldError) ->
                     errorMessage.value = fieldError?.message
                     noteLocalChangeAndSync()
-                    onSaved()
+                    onSaved(taskId)
                 }
                 .onFailure { errorMessage.value = it.message }
             quickAddRunning = false
@@ -1174,6 +1178,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             canQuickAdd = canQuickAdd,
             canComplete = canComplete,
             agentsPaused = agentsPaused,
+            reviewCount = reviewCount,
             fadedSweepItems = sortedFadedSweep,
             weeklySweepItems = currentWeekSweep,
             showWeeklySweepBanner = showSweepBanner,

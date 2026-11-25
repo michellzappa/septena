@@ -78,6 +78,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.septena.android.AndroidAppGraph
 import app.septena.android.calendar.AndroidCalendarReader
+import app.septena.android.doing.DoCopy
 import app.septena.android.widgets.WidgetLaunchAction
 import app.septena.core.JsonValue
 import app.septena.core.generated.RegistrySettingKeys
@@ -135,6 +136,7 @@ fun TaskHomeScreen(
     val factory = remember(graph) { TaskHomeViewModelFactory(graph) }
     val homeViewModel: TaskHomeViewModel = viewModel(factory = factory)
     val state by homeViewModel.state.collectAsStateWithLifecycle()
+    val doing by graph.doing.ui.collectAsStateWithLifecycle()
     val selectHomeLocation: (TaskHomeLocation) -> Unit = { location ->
         logbookShowingDeleted = false
         homeViewModel.select(location)
@@ -148,12 +150,14 @@ fun TaskHomeScreen(
                 quickFindOpen = false
                 openedTaskId = null
                 openedTaskAttribute = null
+                graph.doing.showList()
                 selectHomeLocation(TaskHomeLocation.SmartList(launchAction.destinationId))
                 onConsumeLaunchAction()
             }
             is WidgetLaunchAction.OpenTask -> {
                 settingsOpen = false
                 quickFindOpen = false
+                graph.doing.showList()
                 launchAction.destinationId?.let { selectHomeLocation(TaskHomeLocation.SmartList(it)) }
                 openedTaskId = launchAction.taskId
                 openedTaskAttribute = null
@@ -180,7 +184,7 @@ fun TaskHomeScreen(
     val effectiveDestId = if (showingDeleted) RegistryDestinationIds.RECENTLY_DELETED else currentDestId
     val rowMenuId = if (showingDeleted) "task.recentlyDeleted" else "task.row"
     val rowMenuGroups = remember(rowMenuId, languageTag, effectiveDestId) {
-        taskRowMenuGroups(rowMenuId, effectiveDestId, languageTag)
+        taskRowMenuGroups(rowMenuId, effectiveDestId, languageTag, offersDo = graph.doing.isAvailable)
     }
     val rowMenuAccessibilityLabel = remember(languageTag) {
         surfaceField(RegistrySurfaceIds.TASK_ROW_MENU, "accessibilityLabel", languageTag)
@@ -201,6 +205,7 @@ fun TaskHomeScreen(
             actionId == RegistryActionIds.TASK_OPEN -> openTaskWithAttribute(id, null)
             RegistryCatalog.actionOpensAttribute(actionId) != null ->
                 openTaskWithAttribute(id, RegistryCatalog.actionOpensAttribute(actionId))
+            actionId == RegistryActionIds.TASK_DO -> graph.doing.begin(id)
             actionId == RegistryActionIds.TASK_TOGGLE_STAR -> homeViewModel.toggleStar(id)
             actionId == RegistryActionIds.TASK_ADD_REFERENCE -> referenceTaskId = id
             actionId == RegistryActionIds.TASK_DUPLICATE -> homeViewModel.duplicate(id)
@@ -349,6 +354,7 @@ fun TaskHomeScreen(
             initialDraft = initialDraft,
             onDismiss = { homeQuickAddDraft = null },
             onAdd = { draft -> homeViewModel.quickAdd(draft) { homeQuickAddDraft = null } },
+            onAddAndDo = addAndDo(graph, homeViewModel) { homeQuickAddDraft = null },
         )
     }
 
@@ -378,8 +384,26 @@ fun TaskHomeScreen(
         )
     }
 
+    if (doing.justStoppedSessionId != null) {
+        DoStopNoteDialog(graph.doing, doing.justStoppedSessionId.orEmpty(), languageTag)
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
-        if (wideLayout) {
+        val fullDo = doing.current?.takeIf { doing.isFullHere }
+        if (fullDo != null) {
+            DoScreen(
+                graph = graph,
+                doing = fullDo,
+                quickAddTitle = quickAddTitle,
+                onQuickAdd = { homeQuickAddDraft = QuickAddDraft() },
+                onOpenTask = { id ->
+                    graph.doing.showList()
+                    settingsOpen = false
+                    quickFindOpen = false
+                    openTaskWithAttribute(id, null)
+                },
+            )
+        } else if (wideLayout) {
             PermanentNavigationDrawer(
                 drawerContent = {
                     PermanentDrawerSheet(
@@ -548,7 +572,8 @@ fun TaskHomeScreen(
                 .align(Alignment.BottomCenter)
                 .navigationBarsPadding()
                 .imePadding()
-                .padding(horizontal = 16.dp, vertical = 16.dp),
+                // The exits of the Do screen stay free.
+                .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = if (fullDo != null) 132.dp else 16.dp),
         )
     }
 }
@@ -990,6 +1015,7 @@ private fun TaskHomeScaffold(
             initialDraft = initial,
             onDismiss = { quickAddDraft = null },
             onAdd = { draft -> homeViewModel.quickAdd(draft) { quickAddDraft = null } },
+            onAddAndDo = addAndDo(graph, homeViewModel) { quickAddDraft = null },
         )
     }
     when (selectionPicker) {
@@ -1037,6 +1063,7 @@ private fun TaskHomeScaffold(
         )
     }
 
+    val doing by graph.doing.ui.collectAsStateWithLifecycle()
     val sectionHeader: @Composable () -> Unit = {
         SectionTitleDropdownHeader(
             state = state,
@@ -1046,6 +1073,31 @@ private fun TaskHomeScaffold(
             onSelectLocation = onSelectHomeLocation,
             onOpenSettings = onOpenSettings,
         )
+        val noticedDo = doing.current?.takeIf { doing.showsNotice }
+        if (noticedDo != null) {
+            DoNoticeCard(
+                graph = graph,
+                doing = noticedDo,
+                languageTag = languageTag,
+                isDark = isDark,
+                hasActiveTexture = appearance.hasActiveTexture,
+                modifier = Modifier.padding(bottom = 10.dp),
+            )
+        } else if (doing.justEnded && state.reviewCount > 0) {
+            FadeSweepBannerCard(
+                message = remember(languageTag, state.reviewCount) { DoCopy(languageTag).needsYou(state.reviewCount) },
+                reviewLabel = RegistryCatalog.destinationTitle(RegistryDestinationIds.REVIEW, languageTag).orEmpty(),
+                dismissLabel = noticeDismissTitle(languageTag),
+                isDark = isDark,
+                hasActiveTexture = appearance.hasActiveTexture,
+                onReview = {
+                    graph.doing.dismissNeedsYou()
+                    onSelectHomeLocation(TaskHomeLocation.SmartList(RegistryDestinationIds.REVIEW))
+                },
+                onDismiss = graph.doing::dismissNeedsYou,
+                modifier = Modifier.padding(bottom = 10.dp),
+            )
+        }
         if (destinationId == RegistryDestinationIds.TODAY &&
             state.showWeeklySweepBanner &&
             state.weeklySweepItems.isNotEmpty()
@@ -1472,15 +1524,32 @@ internal fun SearchGlyph(tint: Color) {
     }
 }
 
+/** Add and Do for a Quick Add sheet, or null when the linked core has no Do rules. */
+private fun addAndDo(
+    graph: AndroidAppGraph,
+    homeViewModel: TaskHomeViewModel,
+    onSaved: () -> Unit,
+): ((QuickAddDraft) -> Unit)? {
+    if (!graph.doing.isAvailable) return null
+    return { draft ->
+        homeViewModel.quickAdd(draft) { taskId ->
+            onSaved()
+            graph.doing.begin(taskId)
+        }
+    }
+}
+
 private fun taskRowMenuGroups(
     menuId: String,
     destinationId: String?,
     languageTag: String,
+    offersDo: Boolean,
 ): List<List<TaskRowMenuAction>> {
     val supportedActions = if (menuId == "task.recentlyDeleted") {
         setOf(RegistryActionIds.TASK_RESTORE, RegistryActionIds.TASK_DELETE_PERMANENTLY)
     } else {
-        setOf(
+        setOfNotNull(
+            RegistryActionIds.TASK_DO.takeIf { offersDo },
             RegistryActionIds.TASK_ACCEPT_REVIEW,
             RegistryActionIds.TASK_KEEP_FADED,
             RegistryActionIds.TASK_LET_GO_FADED,
@@ -1524,6 +1593,7 @@ private fun taskRowMenuGroups(
 }
 
 private fun actionMenuIcon(actionId: String): TaskMenuActionIcon = when (actionId) {
+    RegistryActionIds.TASK_DO -> TaskMenuActionIcon.Do
     RegistryActionIds.TASK_WHEN -> TaskMenuActionIcon.When
     RegistryActionIds.TASK_MOVE -> TaskMenuActionIcon.Move
     RegistryActionIds.TASK_TAGS -> TaskMenuActionIcon.Tags
@@ -1578,7 +1648,7 @@ private fun purgePromptCopy(promptId: String, count: Int, languageTag: String): 
     return PurgePromptCopy(title = title, message = message, confirmTitle = confirmTitle, cancelTitle = cancelTitle)
 }
 
-private fun localizedPlural(
+internal fun localizedPlural(
     key: String,
     oneFallback: String,
     otherFallback: String,
