@@ -4,6 +4,7 @@
 **First release = R0 + R1:** add a link or an email to a task, see it, open it. R2 to R4 come later and do not block it.
 Defaults that this doc adds are marked *(new)* in §13.
 **Decisions:** [ADR 0031](adr/0031-references-are-keyed-pointers.md),
+[ADR 0038](adr/0038-agents-are-the-integrations.md),
 [ADR 0002](adr/0002-own-backend-replaces-icloud.md),
 [ADR 0003](adr/0003-external-links-run-server-side.md),
 [ADR 0008](adr/0008-agent-loop-rules-live-in-the-store.md),
@@ -40,8 +41,8 @@ A task without references shows no reference UI.
 | Owner | A link (`extLinkId`) | The user |
 
 - Both use the key grammar of §3.
-- A capture feed (#15) and the forwarding address (#134) write a reference to
-  the item they captured.
+- The forwarding address (#134) and an agent that proposes a task write a
+  reference to the item it came from. There are no capture feeds (ADR 0038).
 - The name `links` belongs to linked projects. This entity is `taskRef`.
 
 ## 3. Key grammar
@@ -168,7 +169,7 @@ URL either, the row shows the snapshot and has no open action.
 
 ### 6.1 Attach on capture
 
-The forwarding address, capture feeds, the iOS Share extension and agents
+The forwarding address, the iOS Share extension and agents
 write a `from` reference when they create a task.
 
 **A forwarded mail is a new message with its own Message-ID.** That id must
@@ -179,7 +180,7 @@ never become the key of the original. `email_ref_keys(headers)` decides:
 | Forward as attachment (`message/rfc822` part) | Message-ID of the attached message | Root of the attached message |
 | Redirect, or an automatic forwarding rule (no new message; `From` is not the account owner) | Message-ID of the message | Root of the message |
 | Forward inline (a new message by the owner) | Last entry of `References`, else `In-Reply-To`, else none | First entry of `References`, else none |
-| Gmail feed (#15), agents with mail access | Message-ID from the headers | Root from the headers |
+| Agents with mail access | Message-ID from the headers | Root from the headers |
 
 With no key, the capture creates a task without a reference. Mail clients
 differ in the headers they write on an inline forward. This is unknown until
@@ -206,7 +207,9 @@ single-writer transaction as the insert.
 
 The same check covers agents. `tasks_create` with a `from` reference whose key
 is on an active task returns that task and `placement: "existing"`. With
-`allow_duplicate: true` it creates the task. Duplicate checks apply to `from`
+`allow_duplicate: true` it creates the task. This part is #496, and an item
+whose proposal the user turned down is #497 (ADR 0038); neither waits for
+forwarded mail. Duplicate checks apply to `from`
 references only. A user who adds an `about` reference by hand is never blocked.
 
 ### 6.3 Thread activity
@@ -225,7 +228,7 @@ key on an active task, the store stamps `replyAt` on the task.
   reference, edits or moves the task, or completes it. An agent cannot clear
   it.
 - A reply from the account owner does not set it.
-- Only mail that Septena receives counts: the forwarding address, a feed, or
+- Only mail that Septena receives counts: the forwarding address, or
   an agent that calls `tasks_ref_seen` (§7). Septena never reads a mailbox on
   its own.
 - A sender address can be forged. The mark never completes, edits, files or
@@ -351,8 +354,8 @@ thin clients (`backend/src/api/tasksRest.ts`) gets the same fields.
 |---|---|---|---|
 | R0 (#386) | Core key grammar and vectors; registry entity, limits and enum; store, index, opt-in pull, permissions; MCP and REST fields, `tasks_find_by_ref`; issue links become references (§6.6); the JSON export row shape. | None | An agent creates a task with an `email` reference, and `tasks_find_by_ref` on the raw `message://` link returns it. |
 | R1 (#387) | Apple apps: sync, the References block on Mac, iPhone and iPad, resolvers, paste to add, undo, JSON, Markdown and CSV export; the row chip and the Swift parser go (§6.6). | R0 (#386) | A tap on an `email` reference opens the mail in Apple Mail on Mac and iPhone. |
-| R2 (#388) | Forwarding address writes references; duplicate check in the store and in `tasks_create`; privacy line. | R0, #134 (EM0) | The same mail forwarded twice as an attachment creates one task. The `.eml` fixtures give the results of §6.1. |
-| R3 (#389) | `replyAt`, the Inbox-band rule in the core, the "New reply" mark, `tasks_ref_seen`. The Gmail feed writes references when it ships (#15). | R1, R2 | A reply on a referenced thread marks the active task and shows it in the Inbox band. Opening the task clears it. |
+| R2 (#388) | Forwarding address writes references; duplicate check for forwarded mail; privacy line. The `tasks_create` check is #496. | R0, #496, #134 (EM0) | The same mail forwarded twice as an attachment creates one task. The `.eml` fixtures give the results of §6.1. |
+| R3 (#389) | `replyAt`, the Inbox-band rule in the core, the "New reply" mark, `tasks_ref_seen`. | R1, R2 | A reply on a referenced thread marks the active task and shows it in the Inbox band. Opening the task clears it. |
 | R4 (#390) | Back-links: the task page list and the iOS Share extension. Drag a mail onto a task on the Mac. Android and web blocks and resolvers. | R1; web waits for #21 | Sharing a URL that already has a task shows that task. |
 
 Every phase: registry generator check, core vectors, backend typecheck and

@@ -1,7 +1,7 @@
 # Linked projects — spec
 
 **Status:** not started; rewrite for Starlings only before any work (#12).
-**GitHub is out of this spec** since 2026-11-24 (ADR 0033): Septena does not connect to GitHub, and an issue link is a reference ([TASK_REFERENCES_SPEC.md](TASK_REFERENCES_SPEC.md) §6.6). Read every GitHub rule below as historical. **Linear is not planned** (mz, 2026-11-24). The spec still holds for Starlings, which now also builds the shared parts of L0 and L1.
+**GitHub is out of this spec** since 2026-11-24 (ADR 0033): Septena does not connect to GitHub, and an issue link is a reference ([TASK_REFERENCES_SPEC.md](TASK_REFERENCES_SPEC.md) §6.6). Read every GitHub rule below as historical. **Linear is not planned** (mz, 2026-11-24). **Capture feeds and every provider except Starlings are dropped** (2026-11-25, [ADR 0038](adr/0038-agents-are-the-integrations.md)): an agent reads the source and proposes tasks. The spec still holds for Starlings, which now also builds the shared parts of L0 and L1.
 **Decisions:** [ADR 0002](adr/0002-own-backend-replaces-icloud.md),
 [ADR 0003](adr/0003-external-links-run-server-side.md).
 **Depends on:** the task backend (`docs/SEPTASK_BACKEND.md`). This spec
@@ -234,7 +234,7 @@ provider cannot do.
 
 - **Source** (two-way): the full model in this spec. GitHub, Starlings,
   Linear, GitLab.
-- **Capture feed** (inbound only): the adapter creates a task once per remote
+- **Capture feed** (dropped, ADR 0038; inbound only): the adapter creates a task once per remote
   item, in the Inbox or a chosen project, and never syncs it again. No
   ownership, no write-back, no conflicts. The item's URL goes in `extUrl`, and
   its key in a `from` reference (`docs/TASK_REFERENCES_SPEC.md` §6.1).
@@ -247,9 +247,9 @@ provider cannot do.
 | GitHub Issues | source | First. Proves the model. |
 | Starlings tasks | source | Second. Our own product, so its API can adapt. Proves several connections + dedupe. |
 | Linear | not planned | Was third. Clean GraphQL and webhooks; strong for selling to developers. |
-| Gmail (starred / label) | capture | First capture feed. |
-| Granola action items | capture | Action items go to the project of the meeting. |
-| GitLab | source | Close to GitHub; on demand. |
+| Gmail (starred / label) | — | Dropped (ADR 0038). Was the first capture feed. |
+| Granola action items | — | Dropped (ADR 0038). |
+| GitLab | — | Dropped (ADR 0038). |
 | Jira, Asana, Todoist | — | Not planned. Todoist and Asana fit better as a one-shot import. |
 | Apple Reminders | — | EventKit runs only on the device. Stays the device inbox bridge (`RemindersBridge`). |
 
@@ -306,7 +306,7 @@ link pauses until another member reconnects it.
 | L3 | Notes ↔ body, deadline ↔ due date, "Send to GitHub/Starlings" for local tasks. | Edits round-trip without loss on a real project. |
 
 | L4 | Moves across lists (§6.5), including cross-provider with confirm. | A task moved GitHub → Starlings keeps its id, Today slot and conversation. |
-| L5 | Capture feeds: Gmail first. | A starred mail creates one Inbox task, once. |
+| ~~L5~~ | Capture feeds: dropped (ADR 0038). Was: Gmail first. | A starred mail creates one Inbox task, once. |
 | ~~L6~~ | Linear: not planned. Was: | Same exit check as L0–L1, on a Linear team. |
 
 The task factory (`docs/TASK_FACTORY_SPEC.md`) uses the project's

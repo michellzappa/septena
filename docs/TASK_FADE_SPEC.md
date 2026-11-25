@@ -4,7 +4,8 @@
 until mz overrules them in §11.
 **Decisions:** [ADR 0006](adr/0006-tasks-fade-by-default.md),
 [ADR 0014](adr/0014-today-rollover-review-or-clean-slate.md) (§6, added
-2026-11-21), [ADR 0002](adr/0002-own-backend-replaces-icloud.md).
+2026-11-21), [ADR 0039](adr/0039-unanswered-proposals-expire.md) (unanswered
+agent proposals, not built: #499), [ADR 0002](adr/0002-own-backend-replaces-icloud.md).
 **Builds on:** the triage band (`docs/TRIAGE_BAND_SPEC.md`), the task
 conversation loop (`SeptenaCore/TaskConvo.swift`,
 `docs/TASK_CONVERSATIONS_PLAN.md`), the Next feed
