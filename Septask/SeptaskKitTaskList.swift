@@ -1865,7 +1865,7 @@ final class SeptaskKitTaskListController: NSViewController {
       case .task(let task, _, _):
         ids.insert(task.id)
       case .header, .loggedFooter, .fadedFooter, .addSection,
-           .screenTitle, .tagFilterBar, .projectTarget, .containerNotes,
+           .screenTitle, .tagFilterBar, .projectTarget, .notesProposal, .containerNotes,
            .notice, .noticeStep, .event:
         return ids
       }
