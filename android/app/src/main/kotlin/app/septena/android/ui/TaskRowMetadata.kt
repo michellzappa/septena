@@ -1,5 +1,6 @@
 package app.septena.android.ui
 
+import app.septena.core.DateBoardRowKinds
 import app.septena.core.JsonValue
 import app.septena.core.RegistryCatalog
 import app.septena.core.SyncRecord
@@ -15,6 +16,7 @@ import app.septena.core.generated.RegistryDestinationIds
 import app.septena.core.generated.RegistryEntityEnums
 import app.septena.core.generated.RegistryEntityFields
 import app.septena.core.generated.RegistryEntityNames as EntityNames
+import app.septena.core.generated.RegistryTaskAttributeIds
 import app.septena.core.stringValue
 import app.septena.ui.SeptenaIconKind
 import app.septena.ui.TaskListItem
@@ -84,9 +86,12 @@ internal fun buildTaskListItem(
     val isFaded = TaskFadeRules.isFaded(snapshot.fadedAt)
 
     val todayLabel = RegistryCatalog.destinationTitle(RegistryDestinationIds.TODAY, languageTag)
-        ?.takeIf(String::isNotBlank) ?: "Today"
-    val tomorrowLabel = RegistryCatalog.localizedString("Tomorrow", languageTag) ?: "Tomorrow"
-    val overdueLabel = RegistryCatalog.localizedString("Overdue", languageTag) ?: "Overdue"
+        ?.takeIf(String::isNotBlank).orEmpty()
+    val tomorrowLabel = RegistryCatalog.dateBoardRows(
+        RegistryTaskAttributeIds.WHEN,
+        languageTag = languageTag,
+    ).firstOrNull { it.kind == DateBoardRowKinds.TOMORROW }?.label.orEmpty()
+    val overdueLabel = RegistryCatalog.localizedString("Overdue", languageTag).orEmpty()
 
     // Deadline / Scheduled / Completed date — matches iOS `TaskRow.trailingDate`.
     var deadlineText: String? = null
