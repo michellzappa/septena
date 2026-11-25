@@ -8,11 +8,17 @@ import SwiftUI
 // when the pill opens, so opening a task never waits on the network, and
 // each open reads the log again. The pill shows only where the backend owns
 // tasks (`TaskHistory.isAvailable`).
+//
+// The task's Do sessions (docs/DO_SPEC.md §8) come first. They are local rows,
+// so the page block shows them without an account too.
 struct TaskHistoryPanel: View {
   let taskID: String
+  /// The page block's heading, drawn only when there is something under it.
+  var title: String? = nil
 
   @Environment(\.modelContext) private var modelContext
   @State private var rows: [TaskHistoryRow] = []
+  @State private var sessions: [DoSession] = []
   @State private var loadedFor: String?
   @State private var failed = false
   /// The `history_edge` upsell under the last row (spec §3.2), when the
@@ -25,10 +31,22 @@ struct TaskHistoryPanel: View {
     // A VStack, not a Group: `.task` needs a child that always exists
     // (CLAUDE.md Group-modifier trap).
     VStack(alignment: .leading, spacing: 8) {
-      content
+      if let title, TaskHistory.isAvailable || !sessions.isEmpty {
+        Text(title)
+          .font(.septenaLabel)
+          .foregroundStyle(Theme.inkSecondary)
+      }
+      ForEach(sessions) { DoSessionRowView(session: $0) }
+      if TaskHistory.isAvailable { content }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .task(id: taskID) { await load() }
+    .task(id: taskID) {
+      sessions = DoStore.shared.history(taskID: taskID)
+      if TaskHistory.isAvailable { await load() }
+    }
+    .onChange(of: DoStore.shared.current) { _, _ in
+      sessions = DoStore.shared.history(taskID: taskID)
+    }
     .sheet(isPresented: $showingPlus) { SeptaskPlusSheet(upsellID: edge?.id) }
   }
 
@@ -37,7 +55,7 @@ struct TaskHistoryPanel: View {
       ProgressView().controlSize(.small)
     } else if failed {
       Text("Couldn’t load history.").font(.caption).foregroundStyle(.secondary)
-    } else if rows.isEmpty, edge == nil {
+    } else if rows.isEmpty, edge == nil, sessions.isEmpty {
       Text("No changes yet.").font(.caption).foregroundStyle(.secondary)
     } else {
       ForEach(rows) { TaskHistoryRowView(row: $0) }
@@ -95,6 +113,31 @@ struct TaskHistoryPanel: View {
       failed = true
     }
     loadedFor = id
+  }
+}
+
+/// One Do of this task: how it ended and how long it was, where the user
+/// stopped, and the day. A lapsed or open Do shows no length.
+private struct DoSessionRowView: View {
+  let session: DoSession
+
+  private var exitLabel: String {
+    session.exit.flatMap { RegistryDoing.exitLabels[$0.rawValue] } ?? RegistryDoing.openExitLabel
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 2) {
+      Text(verbatim: [exitLabel, session.length.map(DoState.lengthText)]
+        .compactMap { $0 }.joined(separator: " · "))
+        .font(.caption)
+      if let note = session.note, !note.isEmpty {
+        Text(note).font(.caption).fixedSize(horizontal: false, vertical: true)
+      }
+      Text(TaskAttributeBar.dateLabel(session.startedAt))
+        .font(.caption2)
+        .foregroundStyle(.secondary)
+    }
+    .accessibilityElement(children: .combine)
   }
 }
 

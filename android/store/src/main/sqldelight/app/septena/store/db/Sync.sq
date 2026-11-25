@@ -226,6 +226,13 @@ setSyncCursor:
 INSERT INTO sync_metadata(key, value) VALUES ('since', ?)
 ON CONFLICT(key) DO UPDATE SET value = excluded.value;
 
+selectMetadata:
+SELECT value FROM sync_metadata WHERE key = ?;
+
+setMetadata:
+INSERT INTO sync_metadata(key, value) VALUES (?, ?)
+ON CONFLICT(key) DO UPDATE SET value = excluded.value;
+
 resetRemoteRecords:
 DELETE FROM sync_record
 WHERE remote_known = 1

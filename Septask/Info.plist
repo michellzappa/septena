@@ -53,6 +53,8 @@
 	<string>Septena moves reminders from your Reminders lists into the Inbox and deletes them from Reminders.</string>
 	<key>NSRemindersUsageDescription</key>
 	<string>Septena moves reminders from your Reminders lists into the Inbox and deletes them from Reminders.</string>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

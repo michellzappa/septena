@@ -95,6 +95,7 @@ interface SyncTransport {
         includeChecklists: Boolean = true,
         includeTags: Boolean = true,
         includeRefs: Boolean = true,
+        includeDoSessions: Boolean = true,
     ): SyncPullPage
 }
 
@@ -143,6 +144,17 @@ interface TaskStore {
     suspend fun applyPullPage(page: SyncPullPage, at: Instant)
 
     suspend fun syncCursor(): Long
+
+    /**
+     * True once a pull that asked for [entity] rows finished here. Pulls before
+     * this build skipped them, and the cursor moved past them.
+     */
+    suspend fun hasPulled(entity: String): Boolean = true
+
+    suspend fun markPulled(entity: String) {}
+
+    /** Puts the cursor at the start, so the next pull reads every row again. Local rows and shadows stay. */
+    suspend fun rewindCursor() {}
 
     /** Clears the remote cache and cursor while preserving local rows and pending writes. */
     suspend fun resetForFullPull()

@@ -45,6 +45,7 @@ import app.septena.ui.TaskCardMetrics
 import app.septena.ui.TaskCardPosition
 import app.septena.ui.TaskCardSlice
 import app.septena.ui.cardPosition
+import app.septena.ui.taskListMotion
 import java.time.DayOfWeek
 import java.time.Duration
 import java.time.Instant
@@ -180,6 +181,12 @@ internal fun registryNoticeCopy(noticeId: String, languageTag: String, count: In
     val detail = registryText(fields["detail"].stringValue(), languageTag).replace("{count}", count.toString())
     val primary = registryText(fields["primaryTitle"].stringValue(), languageTag)
     return RegistryNoticeCopy(title = title, detail = detail, primaryTitle = primary)
+}
+
+/** The word that closes a notice (surfaces.json `notices.dismissTitle`). */
+internal fun noticeDismissTitle(languageTag: String): String {
+    val notices = RegistryCatalog.document("surfaces").fields["notices"] as? JsonValue.ObjectValue
+    return registryText(notices?.fields?.get("dismissTitle").stringValue(), languageTag)
 }
 
 /** Device-local sweep timestamps matching Apple `TaskFade.lastSweepAt` / `dismissedSweepWeek`. */
@@ -357,6 +364,7 @@ internal fun TaskFadeSweepSheet(
                             isSelected = false,
                             isDark = isDark,
                             hasActiveTexture = hasActiveTexture,
+                            modifier = taskListMotion(),
                         ) {
                             Row(
                                 modifier = Modifier

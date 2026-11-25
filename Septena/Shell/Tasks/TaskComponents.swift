@@ -618,6 +618,10 @@ struct TaskRow: View {
   var isListSelected: Bool = false
   /// Soften the checkbox during iOS touch multi-select mode.
   var checkboxDimmed: Bool = false
+  /// The row was just checked and still holds its place (`SettleStore`). Its
+  /// trailing cluster stays as it was, so the title never rewraps and the rows
+  /// below do not move until the row leaves.
+  var isSettling: Bool = false
   /// Optional inboard-most trailing accessory — the deep list passes the Inbox
   /// "file here" capsule here so it sits left of the date (a variable-width
   /// element kept inboard of the fixed glyphs). Nil on every other surface.
@@ -712,12 +716,22 @@ struct TaskRow: View {
     )
   }
 
+  /// The task the trailing cluster draws: a just-checked row draws the cluster
+  /// it had while open (`isSettling`).
+  private var trailingTask: SeptenaTask {
+    guard isSettling, task.status == .done else { return task }
+    var open = task
+    open.status = .open
+    return open
+  }
+
   // Right-side order (left → right): variable-width elements inboard, fixed-width
   // pinned to the right edge so the row's right margin stays stable.
   //   accessory (Inbox "file here") · date  →  recurrence · reference · notes · status-dot
   // Accessory and date flex with their content; recurrence / reference / notes /
   // agent glyphs are fixed and anchor the trailing edge.
   @ViewBuilder private var trailing: some View {
+    let task = trailingTask
     if let accessory { accessory }
     if showsFadedIndicator && task.isFaded {
       TaskStatusPill(symbol: "circle.dashed",
@@ -850,6 +864,7 @@ struct TaskRow: View {
   ///   • `due > today` → gray flag + date (marked, not urgent).
   ///   • no `due`, scheduled, not a Today surface → muted calendar + date.
   @ViewBuilder private var trailingDate: some View {
+    let task = trailingTask
     let cal = Calendar.current
     let today = todayAnchor
     // Completed tasks show WHEN they were done (the Completed view reads as a

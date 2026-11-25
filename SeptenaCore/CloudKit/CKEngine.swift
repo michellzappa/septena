@@ -215,6 +215,8 @@ func noteChecklistItemChange(id: String) { _ = routeToTaskBackend(.checklistItem
 func noteChecklistItemDeletion(id: String) { _ = routeToTaskBackend(.checklistItem, id) }
 func noteTaskRefChange(id: String) { _ = routeToTaskBackend(.taskRef, id) }
 func noteTaskRefDeletion(id: String) { _ = routeToTaskBackend(.taskRef, id) }
+func noteDoSessionChange(id: String) { _ = routeToTaskBackend(.doSession, id) }
+func noteDoSessionDeletion(id: String) { _ = routeToTaskBackend(.doSession, id) }
 func noteTagChange(id: String) { _ = routeToTaskBackend(.tag, id) }
 func noteTagDeletion(id: String) { _ = routeToTaskBackend(.tag, id) }
 

@@ -4,6 +4,7 @@ import type { Env } from "../env.js";
 import { escapeHtml, logEvent, randomId, sha256Base64Url } from "../util.js";
 import { refreshAccounts } from "../admin/accounts.js";
 import { accountStoreFor } from "../store/AccountStore.js";
+import { grantRow, type PaidPlanId } from "../entitlement/entitlement.js";
 import { plusLinkGrantId, type PlusLink, type PlusLinkInput } from "../store/plusLinks.js";
 import { PAGE_CSS, PAIR_TTL_MS, normalizePairCode, openApprovalCode, pairingFor } from "../shadow/oauth.js";
 import { pairApproveUrl, pairQrSvg } from "../shadow/pairQr.js";
@@ -11,7 +12,7 @@ import { storeFor } from "./session.js";
 
 // Plus links (ADR 0043): https://api.septena.app/plus/<token>.
 //
-// The page finds out which account to give Plus to with the approval code
+// The page finds out which account to give the plan to with the approval code
 // that signs in a device (ADR 0016), so it works for every sign-in provider
 // and with every app already installed. The approval mints no session: a
 // "plus" code can only finish here. No app has a code field or a link handler
@@ -24,8 +25,8 @@ const TOKEN_RE = /^pl_[A-Za-z0-9_-]{32}$/;
 const COOKIE = "septena_plus";
 const SECRET_RE = /^[A-Za-z0-9_-]{20,64}$/;
 
-/// What the approving app shows: "Sign in on Septena Plus link?".
-const APPROVAL_NAME = "Septena Plus link";
+/// What the approving app shows: "Sign in on Septena plan link?".
+const APPROVAL_NAME = "Septena plan link";
 
 /// Makes a link. The URL is shown once: only a hash of the token is stored.
 export async function createPlusLink(env: Env, input: PlusLinkInput): Promise<{ link: PlusLink; url: string } | null> {
@@ -33,13 +34,13 @@ export async function createPlusLink(env: Env, input: PlusLinkInput): Promise<{ 
   if (!accounts) return null;
   const token = `pl_${randomId(24)}`;
   const link = await accounts.createPlusLink(await sha256Base64Url(token), input);
-  logEvent("plus_link_created", { linkId: link.id, months: input.months, maxUses: input.maxUses });
+  logEvent("plus_link_created", { linkId: link.id, plan: input.plan, months: input.months, maxUses: input.maxUses });
   return { link, url: `${env.API_PUBLIC_URL}/plus/${token}` };
 }
 
-/// Gives the account the link's Plus. Null when the link does not work (any
+/// Gives the account the link's plan. Null when the link does not work (any
 /// more). Repeats safely with the same account.
-export async function claimPlusLink(env: Env, tokenHash: string, userId: string): Promise<{ linkId: string; expiresAt: number | null } | null> {
+export async function claimPlusLink(env: Env, tokenHash: string, userId: string): Promise<{ linkId: string; plan: PaidPlanId; expiresAt: number | null } | null> {
   const accounts = accountStoreFor(env);
   if (!accounts) return null;
   const store = storeFor(env, userId);
@@ -50,24 +51,14 @@ export async function claimPlusLink(env: Env, tokenHash: string, userId: string)
     logEvent("plus_link_refused", { userId });
     return null;
   }
-  await store.putEntitlement({
-    id: plusLinkGrantId(claim.linkId),
-    source: "grant",
-    productId: null,
-    expiresAt: claim.expiresAt,
-    originalTransactionId: null,
-    status: "active",
-    environment: null,
-    note: "plus link",
-    signedAt: Date.now(),
-  }, "admin");
+  await store.putEntitlement(grantRow(plusLinkGrantId(claim.linkId), claim.plan, claim.expiresAt, "plus link"), "admin");
   // A revoke that ran between the claim and the write wins.
   if (!(await accounts.plusLinkIsLive(claim.linkId, userId))) {
     await store.deleteEntitlement(plusLinkGrantId(claim.linkId));
     return null;
   }
   logEvent("plus_link_claimed", { linkId: claim.linkId, userId });
-  return { linkId: claim.linkId, expiresAt: claim.expiresAt };
+  return { linkId: claim.linkId, plan: claim.plan, expiresAt: claim.expiresAt };
 }
 
 /// Ends the link for everyone (`userId` null) or for one account.
@@ -79,6 +70,13 @@ export async function revokePlusLink(env: Env, linkId: string, userId: string | 
 }
 
 // ---- pages ----
+
+const PLAN_TITLE: Record<PaidPlanId, string> = { plus: "Plus", pro: "Pro" };
+
+const PLAN_LINE: Record<PaidPlanId, string> = {
+  plus: "It syncs your tasks and files to all your devices.",
+  pro: "It syncs your tasks and files to all your devices, and you can connect as many agents as you like.",
+};
 
 const duration = (months: number | null) =>
   months === null ? "with no end date" : months % 12 === 0
@@ -118,7 +116,7 @@ ${opts.refresh ? `<meta http-equiv="refresh" content="3;url=${escapeHtml(opts.re
   });
 }
 
-const endedPage = () => page("Septena Plus", `<h1>This Plus link no longer works</h1>
+const endedPage = () => page("Septena", `<h1>This link no longer works</h1>
   <p>It was used up or taken back. Ask the person who sent it for a new one.</p>`, { status: 404 });
 
 const startForm = (token: string, label: string) =>
@@ -135,9 +133,9 @@ export async function plusLanding(c: Ctx): Promise<Response> {
   const token = tokenOf(c);
   const link = token && await accountStoreFor(c.env)?.openPlusLink(await sha256Base64Url(token));
   if (!token || !link) return endedPage();
-  return page("Septena Plus", `<h1>Someone gave you Septena Plus</h1>
-  <p>Septena Plus is yours ${duration(link.months)}. It syncs your tasks and files to all your devices. You don’t need a card, and it doesn’t renew.</p>
-  ${startForm(token, "Add Plus to my account")}
+  return page("Septena", `<h1>Someone gave you Septena ${PLAN_TITLE[link.plan]}</h1>
+  <p>Septena ${PLAN_TITLE[link.plan]} is yours ${duration(link.months)}. ${PLAN_LINE[link.plan]} You don’t need a card, and it doesn’t renew.</p>
+  ${startForm(token, `Add ${PLAN_TITLE[link.plan]} to my account`)}
   <p class="small">You need Septena on a device where you are signed in. <a href="https://septena.app">Get the app</a> first if you don’t have it, then open this link again.</p>`);
 }
 
@@ -148,7 +146,7 @@ export async function plusStart(c: Ctx): Promise<Response> {
   if (!token || !link) return endedPage();
   const opened = await openApprovalCode(c.env, "plus", APPROVAL_NAME, c.req.header("CF-Connecting-IP"));
   if (!opened.ok) {
-    return page("Septena Plus", `<h1>Try again later</h1>
+    return page("Septena", `<h1>Try again later</h1>
   <p>${opened.reason === "rate_limited" ? "There were too many attempts from your network. Wait an hour, then open the link again." : "Septena could not make a code. Open the link again in a minute."}</p>`,
       { status: opened.reason === "rate_limited" ? 429 : 503 });
   }
@@ -165,7 +163,7 @@ export async function plusContinue(c: Ctx): Promise<Response> {
   if (!token) return endedPage();
   const [rawCode, secret] = (getCookie(c, COOKIE) ?? "").split(".");
   const code = rawCode ? normalizePairCode(rawCode) : null;
-  const expired = () => page("Septena Plus", `<h1>The code expired</h1>
+  const expired = () => page("Septena", `<h1>The code expired</h1>
   <p>Your link still works.</p>
   ${startForm(token, "Get a new code")}`, { status: 410 });
   if (!code || !secret || !SECRET_RE.test(secret)) return expired();
@@ -175,17 +173,17 @@ export async function plusContinue(c: Ctx): Promise<Response> {
   if (s.status === "gone") return expired();
   if (s.status === "denied") {
     await pairing.consumeDenied(secret, "plus");
-    return page("Septena Plus", `<h1>You declined the code</h1>
+    return page("Septena", `<h1>You declined the code</h1>
   <p>Nothing changed on your account.</p>
   ${startForm(token, "Get a new code")}`);
   }
   if (s.status === "pending") {
     const shown = `${code.slice(0, 4)}-${code.slice(4)}`;
-    return page("Septena Plus", `<h1>Approve this code in Septena</h1>
+    return page("Septena", `<h1>Approve this code in Septena</h1>
   <p>On a device where you are signed in, open Septena &#9656; Settings &#9656; Account &#9656; Approve a sign-in. Scan this, or enter the code below it:</p>
   <div class="qr">${pairQrSvg(pairApproveUrl(c.env.API_PUBLIC_URL, code), `Code ${shown}`)}</div>
   <div class="code">${escapeHtml(shown)}</div>
-  <p>Septena asks whether to sign in on “${escapeHtml(APPROVAL_NAME)}”. Approving tells this page which account gets Plus. It does not give this page your tasks.</p>
+  <p>Septena asks whether to sign in on “${escapeHtml(APPROVAL_NAME)}”. Approving tells this page which account gets the plan. It does not give this page your tasks.</p>
   <p class="small">The code works for 10 minutes. Keep this page open.</p>`, { refresh: `/plus/${token}/continue` });
   }
 
@@ -194,7 +192,7 @@ export async function plusContinue(c: Ctx): Promise<Response> {
   const claim = await claimPlusLink(c.env, await sha256Base64Url(token), taken.approval.userId);
   if (!claim) return endedPage();
   c.executionCtx.waitUntil(refreshAccounts(c.env, [taken.approval.userId]));
-  return page("Septena Plus", `<h1>Plus is on</h1>
-  <p>${claim.expiresAt === null ? "Your account has Septena Plus, with no end date." : `Your account has Septena Plus until ${date(claim.expiresAt)}.`} Your other devices start syncing when you sign in on them.</p>
+  return page("Septena", `<h1>${PLAN_TITLE[claim.plan]} is on</h1>
+  <p>${claim.expiresAt === null ? `Your account has Septena ${PLAN_TITLE[claim.plan]}, with no end date.` : `Your account has Septena ${PLAN_TITLE[claim.plan]} until ${date(claim.expiresAt)}.`} Your other devices start syncing when you sign in on them.</p>
   <p class="small">You can close this page. If Septena still shows the old plan, close it and open it again.</p>`);
 }

@@ -31,8 +31,12 @@ struct KitNotice {
   var detail: String?
   /// Bordered trailing button. Nil means no primary action.
   var primaryTitle: String?
+  /// Quiet text at the trailing edge (the time of a Do).
+  var trailing: String?
   /// True draws a small close button at the trailing edge.
   var dismissible: Bool
+  /// True makes the whole notice one button (`onPress`).
+  var pressable: Bool = false
   /// True when checklist rows (`KitNoticeStepCell`) follow immediately on the
   /// same card: `KitCardRowView` owns the unified card backdrop and this cell
   /// drops its bottom gap so the header joins directly onto row 1.
@@ -86,6 +90,10 @@ final class KitNoticeCell: NSTableCellView, KitSelfSelectingCell {
   private let titleLabel = NSTextField(labelWithString: "")
   private let detailLabel = NSTextField(labelWithString: "")
   private let textStack = NSStackView()
+  private let trailingLabel = NSTextField(labelWithString: "")
+  /// Covers a pressable notice. The table claims a cell's clicks, so a press
+  /// needs a real control.
+  private let hit = NSButton()
   private let primary = NSButton(title: "", target: nil, action: nil)
   private let dismiss = NSButton()
   private var pin: KitContentColumnPin!
@@ -94,7 +102,9 @@ final class KitNoticeCell: NSTableCellView, KitSelfSelectingCell {
   private var textToDismiss: NSLayoutConstraint!
   private var primaryToDismiss: NSLayoutConstraint!
   private var primaryToEdge: NSLayoutConstraint!
+  private var textToTrailing: NSLayoutConstraint!
 
+  var onPress: (() -> Void)?
   var onPrimary: (() -> Void)?
   var onDismiss: (() -> Void)?
 
@@ -152,8 +162,27 @@ final class KitNoticeCell: NSTableCellView, KitSelfSelectingCell {
     dismiss.setContentHuggingPriority(.required, for: .horizontal)
     dismiss.setContentCompressionResistancePriority(.required, for: .horizontal)
 
+    trailingLabel.translatesAutoresizingMaskIntoConstraints = false
+    trailingLabel.font = SeptaskKitTheme.meta
+    trailingLabel.textColor = SeptaskKitTheme.inkSecondary
+    trailingLabel.setContentHuggingPriority(.required, for: .horizontal)
+    trailingLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
+
+    hit.translatesAutoresizingMaskIntoConstraints = false
+    hit.isBordered = false
+    hit.isTransparent = true
+    hit.title = ""
+    hit.setButtonType(.momentaryChange)
+    hit.refusesFirstResponder = true
+    hit.target = self
+    hit.action = #selector(firePress)
+    hit.kitA11yIgnore()
+
     fill.addSubview(glyph)
     fill.addSubview(textStack)
+    fill.addSubview(trailingLabel)
+    // Over the content, under the two real buttons.
+    fill.addSubview(hit)
     fill.addSubview(primary)
     fill.addSubview(dismiss)
     textField = titleLabel
@@ -168,6 +197,8 @@ final class KitNoticeCell: NSTableCellView, KitSelfSelectingCell {
       equalTo: dismiss.leadingAnchor, constant: -8)
     primaryToEdge = primary.trailingAnchor.constraint(
       equalTo: fill.trailingAnchor, constant: -10)
+    textToTrailing = textStack.trailingAnchor.constraint(
+      lessThanOrEqualTo: trailingLabel.leadingAnchor, constant: -8)
     NSLayoutConstraint.activate(pin.constraints + [
       fill.topAnchor.constraint(equalTo: topAnchor),
       fillBottom,
@@ -177,6 +208,12 @@ final class KitNoticeCell: NSTableCellView, KitSelfSelectingCell {
       textStack.leadingAnchor.constraint(equalTo: fill.leadingAnchor, constant: Self.textLeading),
       textStack.centerYAnchor.constraint(equalTo: fill.centerYAnchor),
       textStack.trailingAnchor.constraint(lessThanOrEqualTo: fill.trailingAnchor, constant: -10),
+      trailingLabel.centerYAnchor.constraint(equalTo: fill.centerYAnchor),
+      trailingLabel.trailingAnchor.constraint(equalTo: fill.trailingAnchor, constant: -10),
+      hit.topAnchor.constraint(equalTo: fill.topAnchor),
+      hit.bottomAnchor.constraint(equalTo: fill.bottomAnchor),
+      hit.leadingAnchor.constraint(equalTo: fill.leadingAnchor),
+      hit.trailingAnchor.constraint(equalTo: fill.trailingAnchor),
       primary.centerYAnchor.constraint(equalTo: fill.centerYAnchor),
       dismiss.centerYAnchor.constraint(equalTo: fill.centerYAnchor),
       dismiss.trailingAnchor.constraint(equalTo: fill.trailingAnchor, constant: -10),
@@ -209,6 +246,10 @@ final class KitNoticeCell: NSTableCellView, KitSelfSelectingCell {
     primary.isHidden = !hasPrimary
     primary.title = notice.primaryTitle ?? ""
     dismiss.isHidden = !notice.dismissible
+    trailingLabel.stringValue = notice.trailing ?? ""
+    trailingLabel.isHidden = notice.trailing == nil
+    hit.isHidden = !notice.pressable
+    textToTrailing.isActive = notice.trailing != nil
 
     // Text runs up to whichever control comes first; the primary button sits
     // against the close button when both exist, else against the edge.
@@ -219,9 +260,11 @@ final class KitNoticeCell: NSTableCellView, KitSelfSelectingCell {
 
     titleLabel.kitA11yIgnore()
     detailLabel.kitA11yIgnore()
+    trailingLabel.kitA11yIgnore()
+    let label = [toolTip, notice.trailing].compactMap { $0 }.joined(separator: ", ")
     setAccessibilityElement(true)
-    setAccessibilityRole(.group)
-    setAccessibilityLabel(toolTip)
+    setAccessibilityRole(notice.pressable ? .button : .group)
+    setAccessibilityLabel(label)
     window?.invalidateCursorRects(for: self)
   }
 
@@ -229,7 +272,14 @@ final class KitNoticeCell: NSTableCellView, KitSelfSelectingCell {
     [primary, dismiss].filter { !$0.isHidden }
   }
 
+  override func accessibilityPerformPress() -> Bool {
+    guard !hit.isHidden, let onPress else { return false }
+    onPress()
+    return true
+  }
+
   override func resetCursorRects() {
+    if !hit.isHidden { addCursorRect(convert(hit.frame, from: fill), cursor: .pointingHand) }
     if !primary.isHidden { addCursorRect(convert(primary.frame, from: fill), cursor: .pointingHand) }
     if !dismiss.isHidden { addCursorRect(convert(dismiss.frame, from: fill), cursor: .pointingHand) }
   }
@@ -252,6 +302,7 @@ final class KitNoticeCell: NSTableCellView, KitSelfSelectingCell {
     set { fill.isRowSelected = newValue }
   }
 
+  @objc private func firePress() { onPress?() }
   @objc private func firePrimary() { onPrimary?() }
   @objc private func fireDismiss() { onDismiss?() }
 }

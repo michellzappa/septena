@@ -42,6 +42,8 @@ data class TaskConversation(
      * only; the core's conversation rules do not use it.
      */
     val endStateAt: String? = null,
+    /** When the last turn was written. Kotlin-side only, like [endStateAt]. */
+    val lastTurnAt: String? = null,
 ) {
     /** The core's predicates (`convo.rs`). A live claim needs a clock; these do not. */
     private fun state(now: Instant = Instant.now()) = conversationState(toCore(), now.toString())
@@ -117,6 +119,7 @@ data class TaskConversation(
                 // The core reads a claim only when it has a claimant (`convo.rs`, `is_claimed`).
                 claimUntil = fields["claimUntil"].stringValue().takeIf { fields["claimedBy"].stringValue() != null },
                 endStateAt = fields[RegistryEntityFields.Convo.END_STATE_AT].stringValue(),
+                lastTurnAt = turns.maxByOrNull(SyncTurn::sequence)?.fields?.get("ts").stringValue(),
             )
         }
     }

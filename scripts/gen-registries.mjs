@@ -588,6 +588,16 @@ function validatePlaceNotes(surfaces, caps) {
   }
 }
 
+// Do (docs/DO_SPEC.md §3 to §5): the copy of the screen, the notice and the
+// history, and the lengths it offers.
+function validateDoing(surfaces, caps, entities) {
+  const d = surfaces.doing;
+  assert(d && d.featureId in caps.capabilities, "surfaces.json: doing needs a known featureId");
+  assert(d.lengths.length > 0 && d.lengths.every((m) => Number.isInteger(m) && m > 0 && m <= entities.limits.doPlannedMinutesMax), "surfaces.json: doing.lengths are minutes up to doPlannedMinutesMax");
+  assert(JSON.stringify(Object.keys(d.exits)) === JSON.stringify(entities.enums.doExit), "surfaces.json: doing.exits has one label per doExit, in order");
+  for (const [p, v] of stringsOf(d, "doing")) assert(!/[–—]/.test(v), `surfaces.json: ${p} contains an em or en dash`);
+}
+
 // References (docs/TASK_REFERENCES_SPEC.md §8): a label and an icon per key
 // kind, the fallback for a kind this build does not know, the labels of the
 // roles that show one, and the copy of Add Reference.
@@ -650,9 +660,10 @@ const TASK_PAGE_BLOCK_KINDS = new Set(["header", "notes", "attributes", "checkli
 const TASK_PAGE_DEPTHS = new Set(["inline", "page", "review"]);
 
 // ---- plans.json (ADR 0010, ADR 0023) ----
-// Pro is planned: the site shows it, the apps and the server do not (ADR 0037).
+// Pro is planned: the site shows it and no store sells it. The server has it for
+// grants, and the apps name it on an account that has it (ADR 0037, ADR 0045).
 const PLAN_LEVELS = ["free", "plus", "pro"];
-const PLAN_LIMIT_PLANS = ["account", "plus"];
+const PLAN_LIMIT_PLANS = ["account", "plus", "pro"];
 
 /** Every string in a JSON value, with its path. */
 function stringsOf(node, p, out = []) {
@@ -689,7 +700,7 @@ function validateImportSources(file, caps) {
 function validatePlans(plans, icons, caps, importSources) {
   assert(plans.version === 1, "plans.json: version must be 1");
   assert(plans.featureId in caps.capabilities, `plans.json: unknown featureId "${plans.featureId}"`);
-  for (const f of ["name", "shortName", "headline", "subhead", "ladderHeadline", "accountNote", "agentNote"]) assert(typeof plans[f] === "string" && plans[f].length > 0, `plans.json: ${f} missing`);
+  for (const f of ["name", "shortName", "proName", "headline", "subhead", "ladderHeadline", "accountNote", "agentNote"]) assert(typeof plans[f] === "string" && plans[f].length > 0, `plans.json: ${f} missing`);
   // House rule: rendered copy has no em or en dashes.
   for (const [p, v] of stringsOf(plans, "plans")) assert(!/[–—]/.test(v), `plans.json: ${p} contains an em or en dash`);
   assert(typeof plans.checkout?.open === "boolean", "plans.json: checkout.open must be a boolean");
@@ -714,7 +725,7 @@ function validatePlans(plans, icons, caps, importSources) {
   assert(JSON.stringify(plans.cards.map((c) => c.id)) === JSON.stringify(PLAN_LEVELS), `plans.json: cards must be ${PLAN_LEVELS.join(", ")}`);
   assert(plans.cards.find((c) => c.id === "pro").status === "planned", "plans.json: the pro card must be planned");
   assert(plans.cards.filter((c) => c.highlighted).length === 1, "plans.json: exactly one card must be highlighted");
-  for (const k of ["seePlus", "startTrial", "trialStarted", "trialBilling", "success", "pending", "serverRetry", "failed", "ownedApple", "ownedWeb", "ownedGoogle", "ownedGrant", "ownedOtherAccount", "done"]) {
+  for (const k of ["seePlus", "startTrial", "trialStarted", "trialBilling", "success", "pending", "serverRetry", "failed", "ownedApple", "ownedWeb", "ownedGoogle", "ownedGrant", "ownedGrantPro", "ownedOtherAccount", "done"]) {
     assert(typeof plans.paywall?.[k] === "string" && plans.paywall[k].length > 0, `plans.json: paywall.${k} missing`);
   }
   assert(plans.paywall.startTrial.includes(String(plans.trial.days)), `plans.json: paywall.startTrial must state ${plans.trial.days} days`);
@@ -1797,6 +1808,30 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("}");
   lines.push("");
 
+  // 8a. Do (surfaces.json `doing`, docs/DO_SPEC.md)
+  const doing = surfaces.doing;
+  lines.push("/// Do: one task now (`registry/surfaces.json` `doing`, docs/DO_SPEC.md §3 to §5).");
+  lines.push("enum RegistryDoing {");
+  lines.push("  /// The lengths offered, in minutes.");
+  lines.push(`  static let lengths: [Int] = [${doing.lengths.join(", ")}]`);
+  for (const [name, node, field] of [
+    ["lastTimeTitle", doing.screen.lastTime, "title"], ["firstStepTitle", doing.screen.firstStep, "title"],
+    ["lengthTitle", doing.screen.length, "title"], ["noLengthTitle", doing.screen.length.noneTitle, "title"],
+    ["stopNoteTitle", doing.stopNote, "title"], ["stopNoteSaveTitle", doing.stopNote, "confirmTitle"],
+    ["stopNoteSkipTitle", doing.stopNote, "dismissTitle"], ["openExitLabel", doing.openExit, "label"],
+  ]) lines.push(`  static let ${name}: String = ${L(node[field], node, field)}`);
+  for (const [name, node] of [
+    ["lengthOption", doing.screen.length.option], ["notice", doing.notice], ["stale", doing.stale],
+    ["plannedEnd", doing.plannedEnd], ["needsYou", doing.needsYou],
+  ]) {
+    const t = L10N.swiftTemplate(BY_KEY, tmplKey(node.format, node, "format"));
+    lines.push(`  static func ${name}(${t.params}) -> String { ${t.body} }`);
+  }
+  lines.push("  /// The label of an exit (`doExit`) in the history.");
+  lines.push(`  static let exitLabels: [String: String] = [${Object.entries(doing.exits).map(([id, e]) => `${swiftStr(id)}: ${L(e.label, e, "label")}`).join(", ")}]`);
+  lines.push("}");
+  lines.push("");
+
   // 8a. Project and area notes (surfaces.json `placeNotes`)
   const placeNotes = surfaces.placeNotes;
   lines.push("/// The notes on a project's or an area's page (`registry/surfaces.json` `placeNotes`).");
@@ -1951,7 +1986,7 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("");
   lines.push("/// Plans and pricing (`registry/plans.json`). The site's /pricing page reads the same file.");
   lines.push("enum RegistryPlans {");
-  for (const f of ["name", "shortName", "headline", "subhead"]) lines.push(`  static var ${f}: String { ${L(P[f], P, f)} }`);
+  for (const f of ["name", "shortName", "proName", "headline", "subhead"]) lines.push(`  static var ${f}: String { ${L(P[f], P, f)} }`);
   lines.push(`  static let checkoutOpen = ${P.checkout.open}`);
   lines.push(`  static var checkoutNotice: String { ${L(P.checkout.notice, P.checkout, "notice")} }`);
   lines.push(`  static let trialDays = ${P.trial.days}`);
@@ -2512,6 +2547,7 @@ validateActions(actions, icons, caps, destIds);
 validateSurfaces(surfaces, icons, caps, plans);
 validateTaskReferences(surfaces, icons, caps, entities);
 validatePlaceNotes(surfaces, caps);
+validateDoing(surfaces, caps, entities);
 checkOpensAttribute({ actions, surfaces });
 checkTaskDateBoard({ surfaces, icons, caps, actions });
 validateFirstRun(surfaces, icons, caps, settings);

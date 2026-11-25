@@ -2,6 +2,8 @@ import { DurableObject } from "cloudflare:workers";
 import type { Env } from "../env.js";
 import { logEvent, randomId, sha256Base64Url } from "../util.js";
 import { storeFor } from "../api/session.js";
+import { ENTITY_LIMITS } from "../generated/registries.js";
+import { mergeNotes } from "./mergeText.js";
 import {
   INVITE_TTL_MS,
   MAX_MEMBERS,
@@ -13,12 +15,14 @@ import {
   isSharedEntity,
   newMemberId,
   type ShareDelivery,
+  type ShareEnded,
   type ShareFields,
   type ShareInfo,
   type ShareMember,
   type ShareOp,
   type SharePushResult,
   type ShareRow,
+  type ShareRowsResult,
   type SharedEntity,
 } from "./shares.js";
 
@@ -27,13 +31,17 @@ import {
 // The authority for the project's shared fields, its members and its invites.
 // Every method that acts for a person takes the caller's `userId`, which the
 // Worker took from a verified session, and checks membership here. Changes
-// are last-writer-wins per field, in the order they arrive. Each member's
+// are last-writer-wins per field, in the order they arrive. Notes are merged
+// instead: two members who write at once both keep their words. Each member's
 // TaskStore gets the current state of every row it has not seen.
 //
 // A store that was never created holds no tables, so a made-up id costs no
 // storage.
 
 const RETRY_MS = 30_000;
+const APPLIED_OP_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+/// How long a project that ended for everyone keeps its rows.
+const CLOSED_TTL_MS = 24 * 60 * 60 * 1000;
 
 export interface InviteView {
   id: string;
@@ -84,6 +92,7 @@ export class ProjectStore extends DurableObject<Env> {
       );
       CREATE INDEX IF NOT EXISTS rows_rev ON rows(rev);
       CREATE TABLE IF NOT EXISTS applied_ops (opId TEXT PRIMARY KEY, at INTEGER NOT NULL);
+      CREATE INDEX IF NOT EXISTS applied_ops_at ON applied_ops(at);
     `);
   }
 
@@ -300,20 +309,32 @@ export class ProjectStore extends DurableObject<Env> {
       for (const op of ops) this.apply(op, m);
       return true;
     });
-    if (!ok) return { ok: false, reason: "not_member" };
+    if (!ok) return this.notMember(userId);
     this.ctx.waitUntil(this.deliver());
     return { ok: true };
   }
 
+  private notMember(userId: string): ShareEnded {
+    const ended = this.exists()
+      ? this.sql.exec<{ keepCopy: number }>("SELECT keepCopy FROM members WHERE userId = ?", userId).toArray()[0]
+      : undefined;
+    return { ok: false, reason: "not_member", keepCopy: ended ? ended.keepCopy === 1 : true };
+  }
+
   /// The current state of some rows (TaskStore fetches what it masked).
-  rows(userId: string, ids: { entity: SharedEntity; id: string }[]): ShareRow[] | null {
-    if (!this.member(userId)) return null;
-    return ids.slice(0, SHARE_BATCH).flatMap(({ entity, id }) =>
+  rows(userId: string, ids: { entity: SharedEntity; id: string }[]): ShareRowsResult {
+    if (!this.member(userId)) return this.notMember(userId);
+    const rows = ids.slice(0, SHARE_BATCH).flatMap(({ entity, id }) =>
       this.sql.exec<{ fields: string; rev: number; deleted: number; byMember: string }>(
         "SELECT fields, rev, deleted, byMember FROM rows WHERE entity = ? AND id = ?", entity, id,
       ).toArray().map((r) => ({
         entity, id, deleted: r.deleted === 1, fields: JSON.parse(r.fields) as ShareFields, by: r.byMember, rev: r.rev,
       })));
+    return { ok: true, rows };
+  }
+
+  private isGone(entity: SharedEntity, id: string): boolean {
+    return this.sql.exec("SELECT 1 FROM rows WHERE entity = ? AND id = ? AND deleted = 1", entity, id).toArray().length > 0;
   }
 
   private apply(op: ShareOp, m: MemberRow): void {
@@ -328,13 +349,18 @@ export class ProjectStore extends DurableObject<Env> {
     // A deleted row stays deleted, as in TaskStore.
     if (row?.deleted) return;
     if (!row && op.deleted) return;
+    if (op.entity === "checklistItem" && !op.deleted && typeof op.fields.taskId === "string" && this.isGone("task", op.fields.taskId)) return;
     if (!row && this.sql.exec<{ n: number }>("SELECT COUNT(*) AS n FROM rows WHERE deleted = 0").one().n >= MAX_SHARED_ROWS) {
       logEvent("share_rows_full", { shareId: this.metaText("id") });
       return;
     }
     const accepted = acceptedFields(op.entity);
     const fields: ShareFields = row ? (JSON.parse(row.fields) as ShareFields) : {};
+    const stored = (fields.notes ?? null) as string | null;
     for (const [k, v] of Object.entries(op.fields)) if (accepted.includes(k)) fields[k] = v;
+    if (row && op.baseNotes !== undefined && "notes" in op.fields && accepted.includes("notes")) {
+      fields.notes = mergeNotes(op.baseNotes, stored, (op.fields.notes ?? null) as string | null, ENTITY_LIMITS.notesMax);
+    }
     const rev = this.bump("rev");
     this.sql.exec(
       `INSERT INTO rows (entity, id, fields, rev, deleted, byMember, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -342,6 +368,17 @@ export class ProjectStore extends DurableObject<Env> {
          byMember = excluded.byMember, updatedAt = excluded.updatedAt`,
       op.entity, op.id, op.deleted ? "{}" : JSON.stringify(fields), rev, op.deleted ? 1 : 0, m.memberId, now,
     );
+    // A deleted task takes its checklist with it, so nobody who joins later
+    // gets items of no task.
+    if (op.entity !== "task" || !op.deleted) return;
+    for (const item of this.sql.exec<{ id: string }>(
+      "SELECT id FROM rows WHERE entity = 'checklistItem' AND deleted = 0 AND json_extract(fields, '$.taskId') = ?", op.id,
+    ).toArray()) {
+      this.sql.exec(
+        "UPDATE rows SET fields = '{}', deleted = 1, rev = ?, byMember = ?, updatedAt = ? WHERE entity = 'checklistItem' AND id = ?",
+        this.bump("rev"), m.memberId, now, item.id,
+      );
+    }
   }
 
   // ---- delivery ----
@@ -369,9 +406,19 @@ export class ProjectStore extends DurableObject<Env> {
 
   private async deliverOnce(): Promise<void> {
     if (!this.exists()) return;
+    // The alarm first: an object that stops during the run starts it again.
+    await this.ctx.storage.setAlarm(Date.now() + RETRY_MS);
+    this.sql.exec("DELETE FROM applied_ops WHERE at < ?", Date.now() - APPLIED_OP_TTL_MS);
     const users = this.sql.exec<{ userId: string }>("SELECT userId FROM members WHERE endedAt IS NULL OR delivered = 0").toArray();
     const outcomes = await Promise.all(users.map(({ userId }) => this.deliverTo(userId)));
-    if (outcomes.includes(false)) await this.ctx.storage.setAlarm(Date.now() + RETRY_MS);
+    if (outcomes.includes(false) || this.again) return;
+    // Nobody is left and everyone knows: the alarm removes what is stored.
+    if (this.over()) await this.ctx.storage.setAlarm(Date.now() + CLOSED_TTL_MS);
+    else await this.ctx.storage.deleteAlarm();
+  }
+
+  private over(): boolean {
+    return this.sql.exec("SELECT 1 FROM members WHERE endedAt IS NULL OR delivered = 0 LIMIT 1").toArray().length === 0;
   }
 
   private async deliverTo(userId: string): Promise<boolean> {
@@ -421,7 +468,11 @@ export class ProjectStore extends DurableObject<Env> {
 
   override async alarm(): Promise<void> {
     if (!this.exists()) return;
-    this.sql.exec("DELETE FROM applied_ops WHERE at < ?", Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const ended = this.sql.exec<{ at: number | null }>("SELECT MAX(endedAt) AS at FROM members").one().at ?? 0;
+    if (this.over() && Date.now() - ended >= CLOSED_TTL_MS) {
+      await this.ctx.storage.deleteAll();
+      return;
+    }
     await this.deliver();
   }
 }

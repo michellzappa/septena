@@ -59,6 +59,9 @@ struct TaskAttributeBar: View {
   /// their own sections. Both open the same pickers.
   enum Layout { case rail, rows }
   var layout: Layout = .rail
+  /// Off on the Do screen: the attribute cards go, and the checklist,
+  /// attachments and references stay. Empty attachments and references hide.
+  var showsAttributes: Bool = true
 
   /// The electives. Order, label and icon come from the registry
   /// (`registry/surfaces.json` `taskAttributes`, ADR 0020) so the AppKit
@@ -163,7 +166,7 @@ struct TaskAttributeBar: View {
        moveFocus: ((Bool) -> Void)? = nil,
        showsChecklist: Bool = true, showsAttachments: Bool = true,
        showsReferences: Bool = false, showsHistory: Bool = false, showsConversation: Bool = false,
-       leading: AnyView? = nil, layout: Layout = .rail) {
+       leading: AnyView? = nil, layout: Layout = .rail, showsAttributes: Bool = true) {
     _draft = draft
     self.areas = areas
     self.projects = projects
@@ -181,6 +184,7 @@ struct TaskAttributeBar: View {
     self.showsConversation = showsConversation
     self.leading = leading
     self.layout = layout
+    self.showsAttributes = showsAttributes
     _discussStarted = State(initialValue: discussTask?.conversation.hasStarted ?? true)
   }
 
@@ -242,9 +246,11 @@ struct TaskAttributeBar: View {
     VStack(alignment: .leading, spacing: 18) {
       // Each attribute is its own card, so every one reads as its own place
       // on the page rather than a line in a list.
-      VStack(spacing: 10) {
-        ForEach(rowAttributes) { attr in
-          rowCard(attr, edit: edit)
+      if showsAttributes {
+        VStack(spacing: 10) {
+          ForEach(rowAttributes) { attr in
+            rowCard(attr, edit: edit)
+          }
         }
       }
 
@@ -262,12 +268,14 @@ struct TaskAttributeBar: View {
         }
       }
 
-      if showsAttachments, let task = discussTask {
+      if showsAttachments, let task = discussTask,
+         showsAttributes || (edit?.attachments ?? 0) > 0 {
         pageSection(.attachments) { TaskAttachmentsPanel(taskID: task.id) }
       }
 
       if showsReferences, let task = discussTask,
-         edit?.hasReferences == true || (TaskRefActions.canAdd && task.deletedAt == nil) {
+         edit?.hasReferences == true
+          || (showsAttributes && TaskRefActions.canAdd && task.deletedAt == nil) {
         pageSection(.references) {
           TaskReferencesPanel(taskID: task.id, onAdd: task.deletedAt == nil ? { addingReference = true } : nil)
           suggestionChips(for: task)

@@ -182,6 +182,7 @@ private struct SeptaskTaskMenu: View {
     switch id {
     case .taskEditDetails: return .rename
     case .taskOpen: return .open
+    case .taskDo: return .startDo
     case .taskDuplicate: return .duplicate
     case .taskToggleComplete: return .toggleComplete
     case .taskCancel: return .cancel

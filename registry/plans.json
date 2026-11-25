@@ -4,6 +4,7 @@
   "featureId": "sync.backend",
   "name": "Septena Plus",
   "shortName": "Plus",
+  "proName": "Pro",
   "headline": "Free on one device. Plus on all of them.",
   "subhead": "Every task feature is free on the device you use. A free account adds a backup and lets you connect one agent. Plus covers all your devices, three agents, synced files and a longer history.",
   "checkout": {
@@ -44,7 +45,7 @@
     { "id": "plus", "title": "Plus", "detail": "€60 a year or €7 a month" },
     { "id": "pro", "title": "Pro", "detail": "Planned: €120 a year or €14 a month" }
   ],
-  "ladderHeadline": "One device, all devices or all your agents.",
+  "ladderHeadline": "One device free. All devices on Plus. All your agents on Pro.",
   "cardRows": ["devices", "connected", "files", "history"],
   "accountNote": "Backup, history and your agent need a free account. The app does not.",
   "agentNote": "An agent is an AI you connect to your list, such as Claude.",
@@ -144,6 +145,17 @@
       "connectedAgents": 3,
       "createShares": true,
       "linkedProjects": null
+    },
+    "pro": {
+      "devices": null,
+      "liveSync": true,
+      "changeLogDays": 365,
+      "recentlyDeletedDays": 30,
+      "attachmentsGB": 50,
+      "connectorWritesPerDay": null,
+      "connectedAgents": null,
+      "createShares": true,
+      "linkedProjects": null
     }
   },
   "promises": [
@@ -193,6 +205,7 @@
     "ownedWeb": "You have Plus through the web. Manage it at septena.app.",
     "ownedGoogle": "You have Plus through Google Play. Manage it in Google Play.",
     "ownedGrant": "Plus is on for this account.",
+    "ownedGrantPro": "Pro is on for this account.",
     "ownedOtherAccount": "This Apple ID's Plus belongs to another Septena account. Sign in to that account to use it.",
     "syncThisDeviceFailed": "Septena could not reach the server. Try again in a moment.",
     "done": "Done"
@@ -203,6 +216,7 @@
     "trial": "Plus trial",
     "plus": "Plus",
     "trialEnds": "Plus trial until {date}",
-    "paidThrough": "Plus through {date}"
+    "paidThrough": "Plus through {date}",
+    "proThrough": "Pro through {date}"
   }
 }

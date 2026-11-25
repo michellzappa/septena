@@ -222,6 +222,7 @@ private class ScriptedTransport(
         includeChecklists: Boolean,
         includeTags: Boolean,
         includeRefs: Boolean,
+        includeDoSessions: Boolean,
     ): SyncPullPage {
         pullRequests += since
         return if (remainingPages.isEmpty()) emptyPage(since) else remainingPages.removeAt(0)
