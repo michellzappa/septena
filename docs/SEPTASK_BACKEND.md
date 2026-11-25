@@ -170,6 +170,10 @@ seeded from that row, and a seeded value is pushed only for a key the first
 pull did not bring, so a value another device pushed wins. Device-only
 preferences stay in local defaults.
 
+**do_sessions** (entity `doSession`, pull flag `doSessions=1`): one row for each
+Do. The columns are in `backend/src/store/columns.ts`. The rules, the REST verbs
+and what agents may do are in `docs/DO_SPEC.md`.
+
 **changes:** rev, entity, id, op (`upsert` / `delete` / `dropped`), fields (JSON of the
 changed field names), clientOpId, actor (`app:<device>` / `mcp:<client>`),
 at. This is the sync log and the audit log.
