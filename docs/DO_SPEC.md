@@ -169,8 +169,8 @@ Every signed-in device that does not show the Do screen.
 
 | Surface | What it shows |
 |---|---|
-| iPhone, iPad, Android | One line at the top of the list root: "Doing *title*" and the time |
-| Mac | The same line in the window, and a menu bar item while a Do is open. The menu bar item also shows on the Mac with the Do screen |
+| iPhone, iPad, Android | One line at the top of every list: "Doing *title*" and the time |
+| Mac | The same line at the top of every list, and a menu bar item while a Do is open. The menu bar item also shows on the Mac with the Do screen |
 | Watch | One row at the top of Today and the complication. No takeover |
 | Web, Windows | Built with the client's own first version of Do |
 | Locked iPhone (D5) | Live Activity |

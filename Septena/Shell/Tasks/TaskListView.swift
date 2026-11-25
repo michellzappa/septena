@@ -2531,12 +2531,13 @@ struct TaskListView: View {
     }
   }
 
-  /// Today's notices (sign in, rolled in, an explainer), decided once in
-  /// `TaskNotices` and read the same way by the AppKit list.
+  /// The Do notice, in every list as on the Mac and Android, then Today's
+  /// notices (sign in, rolled in, an explainer), decided once in `TaskNotices`
+  /// and read the same way by the AppKit list.
   @ViewBuilder
   private var noticesRow: some View {
+    doNoticeRow
     if filter == .today {
-      doNoticeRow
       ForEach(todayNotices) { notice in
         TaskListNotice(
           kind: notice.kind,
