@@ -432,6 +432,7 @@ enum RegistrySettings {
     static let tasksShowCalendarEvents = "septena.tasks.showCalendarEvents"
     static let badgeShowOverdue = "septena.badge.showOverdue"
     static let loggingAnimationsEnabled = "septena.ui.loggingAnimations"
+    static let inboxZeroMotionEnabled = "septena.ui.inboxZeroMotion"
     static let textSizeStep = "septena.display.textSizeStep"
     static let sidebarCounts = "septena.septask.sidebarCounts"
     static let aiMode = "septena.ai.mode"
@@ -462,6 +463,7 @@ enum RegistrySettings {
     static let tasksShowCalendarEvents: Bool = true
     static let badgeShowOverdue: Bool = false
     static let loggingAnimationsEnabled: Bool = true
+    static let inboxZeroMotionEnabled: Bool = true
     static let textSizeStep: Int = 0
     static let sidebarCounts: Bool = true
     static let aiMode: String = "auto"
@@ -560,6 +562,7 @@ enum RegistrySettings {
         RegistrySettingsItem(kind: "setting", key: "textSizeStep", page: nil, surface: nil, label: RegistryL10n.t("Text Size"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "appearance.text-size"),
         RegistrySettingsItem(kind: "setting", key: "tasksTitleLines", page: nil, surface: nil, label: RegistryL10n.t("Title lines"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: ["ios", "ipados", "android"], featureId: "settings.display"),
         RegistrySettingsItem(kind: "setting", key: "loggingAnimationsEnabled", page: nil, surface: nil, label: RegistryL10n.t("Completion animations"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "settings.display"),
+        RegistrySettingsItem(kind: "setting", key: "inboxZeroMotionEnabled", page: nil, surface: nil, label: RegistryL10n.t("Inbox zero animation"), detail: RegistryL10n.t("Play a short animation when you empty the Inbox."), iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: ["ios", "ipados", "macos"], featureId: "settings.display"),
       ]),
     ]),
     RegistrySettingsPage(id: "account", title: RegistryL10n.t("Account"), iconId: "settings.account", sfSymbol: "person.crop.circle", depth: 1, platforms: nil, featureId: "sync.backend", sections: [

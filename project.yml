@@ -563,6 +563,7 @@ targets:
       - path: SeptenaCore/TaskConvo.swift
       - path: SeptenaCore/ConvoDerived.swift
       - path: SeptenaCore/TaskFade.swift
+      - path: SeptenaCore/InboxZeroMotion.swift
       - path: SeptenaCore/SharedCoreBridge.swift
       - path: SeptenaCore/TasksWidgetWire.swift
       - path: SeptenaCore/TaskBackend/TaskBackendLimits.swift

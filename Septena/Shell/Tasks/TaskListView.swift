@@ -402,6 +402,14 @@ struct TaskListView: View {
   /// default; the header shows the count either way.
   @State private var inboxCollapsed = false
 
+  /// Settings ▸ Display ▸ "Inbox zero animation" (`docs/INBOX_ZERO_MOTION_SPEC.md`, #298).
+  @AppStorage(SettingsKey.inboxZeroMotionEnabled) private var inboxZeroMotionEnabled =
+    RegistrySettings.Defaults.inboxZeroMotionEnabled
+  @State private var inboxZeroTracker = InboxZeroMotionTracker()
+  @State private var inboxZeroPhase: InboxZeroMotionTracker.Phase = .idle
+  @State private var inboxZeroAnimating = false
+  @State private var inboxZeroHoldTask: Task<Void, Never>?
+
   /// Project / area ids whose completed-task foldout is expanded. Collapsed by
   /// default; persisted across relaunches (Things-style per-list memory).
   @AppStorage("septena.tasks.projectLoggedExpanded") private var scopeLoggedExpandedData: Data = Data()
@@ -973,6 +981,12 @@ struct TaskListView: View {
       guard filter == .today else { return }
       Task { await load() }
     }
+    .onChange(of: selectedTagIDs) { _, _ in
+      evaluateInboxZero()
+    }
+    .onChange(of: renderedTodayInboxRows.map(\.id)) { _, _ in
+      evaluateInboxZero()
+    }
   }
 
   private var taskList: some View {
@@ -987,6 +1001,7 @@ struct TaskListView: View {
         logbookRevealAll = false
       }
       model.resetSession()
+      resetInboxZeroMotionForFilterChange()
       clearSelection()
       expandedEditId = nil
       // Drop the inline-create placeholders this filter owned BEFORE forgetting
@@ -1040,6 +1055,7 @@ struct TaskListView: View {
     .onAppear(perform: didAppearOnScreen)
     .onDisappear {
       isOnScreen = false
+      cancelInboxZeroMotion()
       #if os(iOS)
       showingQuickDropTray = false
       if isTouchSelecting {
@@ -1082,7 +1098,10 @@ struct TaskListView: View {
           accent: theme.color(for: "tasks"),
           allowsHeadingPrefix: isProjectFilter,
           onDone: {
-            if case .edit(let task) = mode { repatchTask(id: task.id) }
+            if case .edit(let task) = mode {
+              noteInboxGesture(ids: [task.id])
+              repatchTask(id: task.id)
+            }
             reloadOrDeferWhileEditing()
           }
         )
@@ -1174,6 +1193,7 @@ struct TaskListView: View {
       groupTarget = .area(areaId)
     } else if filter == .today {
       groupTarget = .inbox
+      cancelInboxZeroMotion()
     } else {
       groupTarget = nil
     }
@@ -1656,6 +1676,7 @@ struct TaskListView: View {
             let moving = ids.filter { !(currentTask(id: $0)?.isOnToday ?? false) }
             guard !moving.isEmpty else { return false }
             Haptics.commit()
+            noteInboxGesture(ids: ids)
             promoteToToday(moving)
             for id in ids { mutator.acknowledge(id: id) }
             if touchSelectionActive { clearSelection() }
@@ -1973,7 +1994,7 @@ struct TaskListView: View {
     // always lives at the foot of this card (capture drops into the band).
     if filter == .today {
       let allInbox = renderedTodayInboxRows
-      if showsQuickAddInInbox || !allInbox.isEmpty {
+      if showsQuickAddInInbox || !allInbox.isEmpty || inboxZeroPhase == .checkmark || inboxZeroAnimating {
         Section {
           if !inboxCollapsed {
             cardedRows(allInbox,
@@ -1995,8 +2016,13 @@ struct TaskListView: View {
   /// Foldable Inbox header — see `foldableSectionHeader`.
   @ViewBuilder
   private func inboxHeader(count: Int) -> some View {
-    foldableSectionHeader(icon: "tray.full", title: TaskFilter.triage.title, count: count,
-                          isCollapsed: inboxCollapsed) {
+    let animateMotion = inboxZeroAnimating && inboxZeroMotionEnabled && !motion.reduceMotion
+    let showsCheckmark = inboxZeroPhase == .checkmark && animateMotion
+    let restingIcon = count > 0 ? InboxZeroMotion.filledTraySymbol : InboxZeroMotion.emptyTraySymbol
+    foldableSectionHeader(icon: restingIcon, title: TaskFilter.triage.title, count: count,
+                          isCollapsed: inboxCollapsed,
+                          showsCheckmarkMotion: showsCheckmark,
+                          animateSymbolEffects: animateMotion) {
       inboxCollapsed.toggle()
     }
     .modifier(todayMoveDrop(.inbox))
@@ -2012,6 +2038,8 @@ struct TaskListView: View {
   @ViewBuilder
   private func foldableSectionHeader(icon: String, title: String, count: Int? = nil,
                                      isCollapsed: Bool, showsHairline: Bool = true,
+                                     showsCheckmarkMotion: Bool = false,
+                                     animateSymbolEffects: Bool = false,
                                      onToggle: @escaping () -> Void) -> some View {
     #if os(macOS)
     let headerTopPadding: CGFloat = 24
@@ -2025,17 +2053,28 @@ struct TaskListView: View {
     } label: {
       VStack(alignment: .leading, spacing: 0) {
         HStack(spacing: Theme.iconTextGap) {
-          Image(systemName: icon)
-            .scaledFont(size: 16)
-            .foregroundStyle(Theme.iconMuted)
-            .frame(width: Theme.checkboxTap, alignment: .center)
-            .offset(x: -Theme.checkboxLeadingNudge)
+          ZStack {
+            if showsCheckmarkMotion {
+              Image(systemName: InboxZeroMotion.checkmarkSymbol)
+                .scaledFont(size: 16)
+                .foregroundStyle(Theme.iconMuted)
+                .transition(.symbolEffect(.drawOn))
+            } else {
+              Image(systemName: icon)
+                .scaledFont(size: 16)
+                .foregroundStyle(Theme.iconMuted)
+                .contentTransition(animateSymbolEffects ? .symbolEffect(.replace) : .identity)
+            }
+          }
+          .frame(width: Theme.checkboxTap, alignment: .center)
+          .offset(x: -Theme.checkboxLeadingNudge)
           Text(title).sectionGroupHeaderTitleStyle()
-          if let count, count > 0 {
+          if let count, count > 0 || showsCheckmarkMotion {
             Text("\(count)")
               .scaledFont(size: Theme.groupHeaderFontSize, weight: .regular)
               .monospacedDigit()
               .foregroundStyle(Theme.inkSecondary)
+              .contentTransition(animateSymbolEffects ? .numericText(countsDown: true) : .identity)
           }
           Spacer()
           Image(systemName: "chevron.down")
@@ -2058,6 +2097,79 @@ struct TaskListView: View {
     .buttonStyle(PlainHoverRowButtonStyle())
     .textCase(nil)
     .selectionDisabled()
+  }
+
+  // MARK: - Inbox zero motion (docs/INBOX_ZERO_MOTION_SPEC.md, #298)
+
+  private func noteInboxGesture(ids: [String], clearedTodayArc: Bool = false) {
+    guard filter == .today, !ids.isEmpty else { return }
+    inboxZeroTracker.recordGesture(
+      itemIDs: ids,
+      currentInboxIDs: Set(renderedTodayInboxRows.map(\.id)),
+      clearedTodayArc: clearedTodayArc
+    )
+  }
+
+  private func evaluateInboxZero() {
+    let outcome = inboxZeroTracker.observe(
+      isToday: filter == .today,
+      inboxIDs: Set(renderedTodayInboxRows.map(\.id)),
+      tagFilterActive: !selectedTagIDs.isEmpty,
+      isCollapsed: inboxCollapsed,
+      today: clock.today,
+      settingEnabled: inboxZeroMotionEnabled,
+      reduceMotion: motion.reduceMotion
+    )
+    applyInboxZeroOutcome(outcome)
+  }
+
+  private func applyInboxZeroOutcome(_ outcome: InboxZeroMotionTracker.Outcome) {
+    if outcome.cancelInFlightMotion {
+      stopInboxZeroMotionImmediately()
+      return
+    }
+    if outcome.announceVoiceOver {
+      A11y.announce(InboxZeroMotion.announcementText)
+    }
+    if outcome.playHaptic {
+      Haptics.play(CheckFeel.tuck.hapticSpec())
+    }
+    if outcome.playVisualMotion {
+      inboxZeroHoldTask?.cancel()
+      inboxZeroAnimating = true
+      a11yAnimate(.snappy(duration: 0.32)) {
+        inboxZeroPhase = .checkmark
+      }
+      inboxZeroHoldTask = Task { @MainActor in
+        try? await Task.sleep(for: .seconds(InboxZeroMotion.holdDuration))
+        guard !Task.isCancelled else { return }
+        inboxZeroTracker.finishMotion()
+        a11yAnimate(.snappy(duration: 0.32)) {
+          inboxZeroPhase = .idle
+        }
+        try? await Task.sleep(for: .milliseconds(350))
+        guard !Task.isCancelled else { return }
+        inboxZeroAnimating = false
+        inboxZeroHoldTask = nil
+      }
+    }
+  }
+
+  private func cancelInboxZeroMotion() {
+    inboxZeroTracker.cancelMotion()
+    stopInboxZeroMotionImmediately()
+  }
+
+  private func resetInboxZeroMotionForFilterChange() {
+    inboxZeroTracker.resetForFilterChange()
+    stopInboxZeroMotionImmediately()
+  }
+
+  private func stopInboxZeroMotionImmediately() {
+    inboxZeroHoldTask?.cancel()
+    inboxZeroHoldTask = nil
+    inboxZeroAnimating = false
+    inboxZeroPhase = .idle
   }
 
   /// Every task list now rides in grouped cards on the gray canvas — the same
@@ -3429,6 +3541,7 @@ struct TaskListView: View {
       applyRemoveFromToday(ids)
     } else {
       Haptics.commit()
+      noteInboxGesture(ids: ids)
       promoteToToday(ids.filter { !(currentTask(id: $0)?.isOnToday ?? false) })
       for id in ids { mutator.acknowledge(id: id) }
       Task { await load() }
@@ -3442,6 +3555,7 @@ struct TaskListView: View {
   /// reload lands.
   private func applyRemoveFromToday(_ ids: [String]) {
     Haptics.commit()
+    noteInboxGesture(ids: ids)
     let undoBefore = scheduleSnapshots(ids)
     for id in ids { mutator.apply(.removeFromToday, to: id) }
     TaskUndo.recordScheduleChange(
@@ -3525,6 +3639,7 @@ struct TaskListView: View {
   private func clearSchedule(_ ids: [String]) {
     guard !ids.isEmpty else { return }
     Haptics.commit()
+    noteInboxGesture(ids: ids)
     recordingSchedule(RegistryActions.title("task.clearSchedule"), ids) {
       for id in ids { mutator.apply(.clearWhen, to: id) }
     }
@@ -3561,6 +3676,7 @@ struct TaskListView: View {
 
   private func applyCancel(_ id: String) {
     Haptics.warning()
+    noteInboxGesture(ids: [id])
     // Cancellation settles exactly like completion: the row lingers in place
     // for the beat (struck through + dimmed), then fades out and lives on in
     // the Logbook alongside completed work. Open the settle window BEFORE the
@@ -3570,6 +3686,7 @@ struct TaskListView: View {
     // fails the next pull will surface server truth.
     model.settle.schedule(id) {
       motion.run(Theme.Motion.settle) { model.settle.endSettle(id) }
+      evaluateInboxZero()
     }
     motion.run(Theme.Motion.settle) { flipStatus(id: id, to: .cancelled) }
     model.noteCompleted(id, done: true)
@@ -3580,11 +3697,13 @@ struct TaskListView: View {
 
   private func applyDelete(_ id: String) {
     Haptics.warning()
+    noteInboxGesture(ids: [id])
     let title = currentTask(id: id)?.title ?? ""
     // Remove from the visible buckets immediately — the row is filtered
     // from LocalCache via `pendingDeletion`, but the in-memory @State
     // arrays power the current screen and have to be poked separately.
     removeLocally(id: id)
+    evaluateInboxZero()
     mutator.delete(id: id)
     TaskUndo.recordDelete(ids: [id], mutator: mutator)
     // Show undo snackbar (not in the Recently Deleted view — there the
@@ -3673,6 +3792,11 @@ struct TaskListView: View {
     }
     let moved = ids.filter { movedSet.contains($0) }
     guard !moved.isEmpty else { return }
+    if areaId != nil || projectId != nil {
+      noteInboxGesture(ids: moved)
+    } else {
+      cancelInboxZeroMotion()
+    }
     let undoBefore = before.filter { movedSet.contains($0.id) }
     TaskUndo.recordMove(before: undoBefore, context: modelContext, mutator: mutator)
     if touchSelectionActive { clearSelection() }
@@ -3715,8 +3839,11 @@ struct TaskListView: View {
   private func handleTodayMoveDrop(ids: [String], target: TodayDropTarget) -> Bool {
     guard filter == .today else { return false }
     if TaskDragIDs.isNewTaskPayload(ids) {
-      if target == .inbox && inboxCollapsed {
-        a11yAnimate(.easeInOut(duration: 0.2)) { inboxCollapsed = false }
+      if target == .inbox {
+        cancelInboxZeroMotion()
+        if inboxCollapsed {
+          a11yAnimate(.easeInOut(duration: 0.2)) { inboxCollapsed = false }
+        }
       }
       let destination = todayDropDestination(target)
       let groupRows = excludingQuickAddCapture(visibleItems).filter { isTask($0, alreadyIn: target) }
@@ -4201,6 +4328,7 @@ struct TaskListView: View {
         onMoveToToday: { ids, today in
           if today {
             Haptics.commit()
+            noteInboxGesture(ids: ids)
             promoteToToday(ids)
             for id in ids { mutator.acknowledge(id: id) }
             Task { await load() }
@@ -4447,6 +4575,7 @@ struct TaskListView: View {
   private func applySuggestion(task: SeptenaTask,
                                suggestion: SuggestionEngine.Suggestion) {
     Haptics.commit()
+    noteInboxGesture(ids: [task.id])
     // Capture the prior filing BEFORE the move so Undo can put it back.
     let undoBefore = filingSnapshots([task.id])
     let wasInTriage = task.isInTriageBand
@@ -5078,6 +5207,7 @@ struct TaskListView: View {
 
   private func applyWhen(id: String, kind: WhenKind, date: Date?) {
     Haptics.commit()
+    noteInboxGesture(ids: [id])
     switch kind {
     case .deadline:
       recordingSchedule(String(localized: "Set Deadline", comment: "Undo action name"),
@@ -5115,6 +5245,7 @@ struct TaskListView: View {
   private func applyScheduledWhen(id: String,
                                   date: Date?,
                                   mode: RecurrenceRescheduleMode) {
+    noteInboxGesture(ids: [id])
     let undoBefore = scheduleSnapshots([id])
     defer {
       TaskUndo.recordScheduleChange(
@@ -5171,9 +5302,11 @@ struct TaskListView: View {
     if newStatus == .done {
       model.settle.schedule(task.id) {
         motion.run(Theme.Motion.settle) { model.settle.endSettle(task.id) }
+        evaluateInboxZero()
       }
     } else {
       model.settle.cancel(task.id)
+      inboxZeroTracker.cancelGesture(itemIDs: [task.id])
     }
 
     motion.run(Theme.Motion.settle) { flipStatus(id: task.id, to: newStatus) }
@@ -5185,6 +5318,7 @@ struct TaskListView: View {
     if newStatus == .done {
       let clearedToday = filter == .today
         && !items.contains { $0.status == .open }
+      noteInboxGesture(ids: [task.id], clearedTodayArc: clearedToday)
       TaskCelebration.completed(isToday: task.isOnToday || filter == .today,
                                 clearedToday: clearedToday,
                                 accent: theme.color(for: "tasks"),
@@ -5404,6 +5538,7 @@ struct TaskListView: View {
     } else {
       triageStorage = []
     }
+    evaluateInboxZero()
     fadedScopeStorage = (showFadedInLists && scopeLoggedFilterId != nil)
       ? LocalCache.fadedTasks(in: modelContext, scope: filter)
       : []

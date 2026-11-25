@@ -108,6 +108,11 @@ enum SettingsKey {
   /// app-wide; the commit haptic + VoiceOver confirmation still fire, exactly
   /// like Reduce Motion. Read by `CommitFlourish` and `LogCommitOverlay`.
   static let loggingAnimationsEnabled = RegistrySettings.StorageKey.loggingAnimationsEnabled
+  /// Toggle for the Inbox zero header animation on Today
+  /// (`docs/INBOX_ZERO_MOTION_SPEC.md`, #298). Device-local, default on.
+  /// Independent of `loggingAnimationsEnabled`: off stops the header symbol
+  /// effects and the extra haptic while keeping the VoiceOver announcement.
+  static let inboxZeroMotionEnabled = RegistrySettings.StorageKey.inboxZeroMotionEnabled
   /// Whether the user is a paying *supporter*. The whole app is free — this
   /// flag unlocks NOTHING functional; it only drives cosmetics (the avatar
   /// foil ring and the "Supporter" badge). It's a local @AppStorage *mirror*
