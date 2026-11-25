@@ -1561,7 +1561,7 @@ export function SettingsModal({
                     className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
                   >
                     <BookOpen className="h-4 w-4 text-[var(--text-muted)]" />
-                    <span>{registryText("Help", language)}</span>
+                    <span>{registryText("Help", lang)}</span>
                     <ExternalLink className="ml-auto h-3.5 w-3.5 text-[var(--text-muted)]" />
                   </a>
                   <button
