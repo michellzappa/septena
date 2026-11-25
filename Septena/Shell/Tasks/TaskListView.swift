@@ -3004,11 +3004,6 @@ struct TaskListView: View {
       let members = visibleItems.filter { $0.heading == heading.id }
       cardedRows(members, reorderable: true, grouped: true, magicContext: heading.title)
     }
-    #if !os(iOS)
-    // Septask iOS makes sections from the "+" (Magic Plus menu on iPhone, the
-    // toolbar "+" menu on iPad), so the foot line would be a second entry.
-    addSectionButton
-    #endif
   }
 
   private var isProjectFilter: Bool {
@@ -3088,29 +3083,6 @@ struct TaskListView: View {
         default: return nil
         }
       })
-  }
-
-  /// Quiet Things-style "+ Add Section" affordance at the foot of a project.
-  private var addSectionButton: some View {
-    Button {
-      guard case .project(let pid) = filter else { return }
-      headingDraftTitle = ""
-      headingCreateProject = pid
-    } label: {
-      HStack(spacing: 6) {
-        Image(systemName: "plus")
-        Text("Add Section")
-      }
-      .font(.septenaMeta)
-      .foregroundStyle(Theme.inkSecondary)
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(.horizontal, Theme.hPadding)
-      .padding(.vertical, 12)
-      .contentShape(Rectangle())
-    }
-    .buttonStyle(PlainHoverRowButtonStyle())
-    .asListRow()
-    .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
   }
 
   /// A reorder drop inside a project's grouped list. The drop target is a task

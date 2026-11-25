@@ -2024,6 +2024,14 @@ enum RegistryTaskReferences {
   static let maxSuggestions = 3
 }
 
+/// The notes on a project's or an area's page (`registry/surfaces.json` `placeNotes`).
+enum RegistryPlaceNotes {
+  /// Lines of the folded notes.
+  static let previewLines = 3
+  static let showMoreTitle: String = RegistryL10n.t("Show more")
+  static let showLessTitle: String = RegistryL10n.t("Show less")
+}
+
 /// Sign-in by device approval (`registry/surfaces.json` `deviceSignIn`).
 enum RegistryDeviceSignIn {
   static let title: String = RegistryL10n.t("Sign in to Septena")

@@ -3247,6 +3247,18 @@
       "settings.rootGroups.lists_root.items.4.detail"
     ]
   },
+  "Show less": {
+    "text": "Show less",
+    "paths": [
+      "surfaces.placeNotes.showLess.title"
+    ]
+  },
+  "Show more": {
+    "text": "Show more",
+    "paths": [
+      "surfaces.placeNotes.showMore.title"
+    ]
+  },
   "Shown when non-empty": {
     "text": "Shown when non-empty",
     "paths": [

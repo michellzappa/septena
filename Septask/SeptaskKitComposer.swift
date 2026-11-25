@@ -171,7 +171,8 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
   /// Caps growth so a novel-length note scrolls inside the field instead of
   /// eating the whole list. Matches SwiftUI `TaskMarkdownNotesEditor`.
   private static let notesMaxHeight: CGFloat = 360
-  private static let notesInset = NSSize(width: 2, height: 4)
+  /// No side inset: the notes start under the title's first letter.
+  private static let notesInset = NSSize(width: 0, height: 4)
   /// Breathing room under the pill rail. The TOP of the composer is not
   /// padded separately — it reuses the closed row's vertical band so the
   /// title doesn't travel when the row expands.
@@ -228,11 +229,12 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     return value
   }
 
-  /// Row height for a one-line title with no notes — the controller's answer
-  /// until the live cell has measured itself (`expandedHeight`).
+  /// Row height for a one-line title with empty notes (an open row always
+  /// shows the field) — the controller's answer until the live cell has
+  /// measured itself (`expandedHeight`).
   static var baseHeight: CGFloat {
-    height(titleHeight: titleLineHeight, notesHeight: nil, checklistHeight: 0, attachmentsHeight: 0,
-           referencesHeight: 0)
+    height(titleHeight: titleLineHeight, notesHeight: notesMinHeight, checklistHeight: 0,
+           attachmentsHeight: 0, referencesHeight: 0)
   }
 
   /// Layout: a closed-row-height band at the top (checkbox + first title line

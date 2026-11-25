@@ -576,6 +576,16 @@ function validateSurfaces(surfaces, icons, caps, plans) {
   }
 }
 
+// Project and area notes on the page (docs/PROJECT_NOTES_SPEC.md §6).
+function validatePlaceNotes(surfaces, caps) {
+  const t = surfaces.placeNotes;
+  assert(t && t.featureId in caps.capabilities, "surfaces.json: placeNotes needs a known featureId");
+  assert(Number.isInteger(t.previewLines) && t.previewLines > 0, "surfaces.json: placeNotes.previewLines is not a positive integer");
+  for (const key of ["showMore", "showLess"]) {
+    assert(typeof t[key]?.title === "string" && t[key].title.length > 0, `surfaces.json: placeNotes.${key} needs a title`);
+  }
+}
+
 // References (docs/TASK_REFERENCES_SPEC.md §8): a label and an icon per key
 // kind, the fallback for a kind this build does not know, the labels of the
 // roles that show one, and the copy of Add Reference.
@@ -1785,6 +1795,18 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("}");
   lines.push("");
 
+  // 8a. Project and area notes (surfaces.json `placeNotes`)
+  const placeNotes = surfaces.placeNotes;
+  lines.push("/// The notes on a project's or an area's page (`registry/surfaces.json` `placeNotes`).");
+  lines.push("enum RegistryPlaceNotes {");
+  lines.push("  /// Lines of the folded notes.");
+  lines.push(`  static let previewLines = ${placeNotes.previewLines}`);
+  for (const key of ["showMore", "showLess"]) {
+    lines.push(`  static let ${key}Title: String = ${L(placeNotes[key].title, placeNotes[key], "title")}`);
+  }
+  lines.push("}");
+  lines.push("");
+
   // 8a. Sign-in by device approval (surfaces.json `deviceSignIn`, ADR 0016)
   const deviceSignIn = surfaces.deviceSignIn;
   lines.push("/// Sign-in by device approval (`registry/surfaces.json` `deviceSignIn`).");
@@ -2478,6 +2500,7 @@ const destIds = validateDestinations(dests, icons, caps);
 validateActions(actions, icons, caps, destIds);
 validateSurfaces(surfaces, icons, caps, plans);
 validateTaskReferences(surfaces, icons, caps, entities);
+validatePlaceNotes(surfaces, caps);
 checkOpensAttribute({ actions, surfaces });
 checkTaskDateBoard({ surfaces, icons, caps, actions });
 validateFirstRun(surfaces, icons, caps, settings);

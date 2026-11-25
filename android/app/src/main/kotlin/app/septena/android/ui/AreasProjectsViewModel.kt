@@ -208,43 +208,6 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         }
     }
 
-    fun createTask(title: String, headingId: String? = null) {
-        val selected = destination.value ?: return
-        val trimmed = title.trim()
-        if (trimmed.isEmpty()) return
-        mutate {
-            when (selected) {
-                is AreasProjectsDestination.Area -> {
-                    val position = nextTaskPosition(
-                        areaId = selected.id,
-                        projectId = null,
-                        headingId = null,
-                    )
-                    graph.taskMutator.create(
-                        title = trimmed,
-                        area = selected.id,
-                        position = position,
-                    )
-                }
-                is AreasProjectsDestination.Project -> {
-                    headingId?.let { requireHeading(it, selected.id) }
-                    val position = nextTaskPosition(
-                        areaId = null,
-                        projectId = selected.id,
-                        headingId = headingId,
-                    )
-                    graph.taskMutator.create(
-                        title = trimmed,
-                        project = selected.id,
-                        heading = headingId,
-                        position = position,
-                    )
-                }
-            }
-            true
-        }
-    }
-
     fun clearError() {
         errorMessage.value = null
     }
@@ -300,18 +263,6 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             }
             true
         }
-    }
-
-    private suspend fun nextTaskPosition(areaId: String?, projectId: String?, headingId: String?): Double {
-        return graph.taskStore.records(RegistryEntityNames.TASK)
-            .asSequence()
-            .filter { it.deletedAt == null }
-            .filter { it.fields[RegistryEntityFields.Task.AREA].stringValue() == areaId }
-            .filter { it.fields[RegistryEntityFields.Task.PROJECT].stringValue() == projectId }
-            .filter { it.fields[RegistryEntityFields.Task.HEADING].stringValue() == headingId }
-            .filter { it.fields[RegistryEntityFields.Task.KIND].stringValue() != RegistryEntityEnums.TaskKind.HEADING }
-            .mapNotNull { it.fields[RegistryEntityFields.Task.POSITION].numberValue() }
-            .maxOrNull()?.plus(1.0) ?: 0.0
     }
 
     private suspend fun requireHeading(id: String, projectId: String) {

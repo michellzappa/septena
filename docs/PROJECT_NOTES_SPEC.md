@@ -143,6 +143,11 @@ them before acting on a task.
 - **Notes first.** The project and area detail views open with the notes
   field above the task list. Empty notes show the template as placeholder
   text, not as content.
+- **Folded.** While nobody edits them, the notes show
+  `placeNotes.previewLines` lines (`registry/surfaces.json`) and a Show more
+  line, on every platform. A tap on cut-off notes unfolds them; a tap on whole
+  notes edits them. `ContainerNotes.previewLines` reads the lines (Kotlin:
+  `PlaceNotes`): headings, list items, quotes and inline markdown.
 - **Template** *(default)*: `Goal`, `Current state`, `People`, `Decisions`,
   `Constraints`, then `## Log`. A new project created in the app gets the
   headings inserted when the user first focuses the field.

@@ -37,6 +37,16 @@ struct NotesDiffLine: Identifiable, Hashable, Sendable {
   let text: String
 }
 
+/// One line of notes as a page shows them while nobody edits them.
+enum NotesPreviewLine: Hashable, Sendable {
+  case heading(level: Int, text: String)
+  case blank
+  /// A list item: its nesting depth, its marker ("•", "☐", "☑", "1.") and text.
+  case item(depth: Int, marker: String, text: String)
+  case quote(String)
+  case body(String)
+}
+
 /// Project and area notes: the context agents read before they decide
 /// anything about a task (ADR 0012, docs/PROJECT_NOTES_SPEC.md).
 ///
@@ -133,6 +143,74 @@ enum ContainerNotes {
       }
     }
     return out
+  }
+
+  /// The notes as a page shows them, line by line. The user's line breaks
+  /// survive as typed (CommonMark would fold a single newline into a space).
+  /// Runs of blank lines collapse to one; blank lines at both ends and directly
+  /// under a heading drop; so does a heading with nothing under it (an unfilled
+  /// template section). The text of a line still holds its inline markdown.
+  static func previewLines(_ raw: String) -> [NotesPreviewLine] {
+    let source = raw.replacingOccurrences(of: "\r\n", with: "\n")
+      .components(separatedBy: "\n").map(previewLine)
+
+    // A heading is empty when the next non-blank line is a heading of the same
+    // or a higher level, or the end of the notes.
+    var kept: [NotesPreviewLine] = []
+    for (index, line) in source.enumerated() {
+      if case .heading(let level, _) = line {
+        let next = source[(index + 1)...].first { $0 != .blank }
+        switch next {
+        case nil: continue
+        case .heading(let nextLevel, _)? where nextLevel <= level: continue
+        default: break
+        }
+      }
+      kept.append(line)
+    }
+
+    var result: [NotesPreviewLine] = []
+    for line in kept {
+      if line == .blank {
+        guard let last = result.last, last != .blank else { continue }
+        if case .heading = last { continue }
+      }
+      result.append(line)
+    }
+    while result.last == .blank { result.removeLast() }
+    return result
+  }
+
+  private static func previewLine(_ line: String) -> NotesPreviewLine {
+    let content = line.trimmingCharacters(in: .whitespaces)
+    if content.isEmpty { return .blank }
+    let hashes = content.prefix(while: { $0 == "#" }).count
+    if (1...6).contains(hashes) {
+      let rest = content.dropFirst(hashes)
+      if rest.first == " " || rest.first == "\t" {
+        return .heading(level: hashes, text: rest.trimmingCharacters(in: .whitespaces))
+      }
+    }
+    let depth = min(line.prefix(while: { $0 == " " || $0 == "\t" }).count / 2, 4)
+    if let match = content.firstMatch(of: #/^[-*+]\s+\[([ xX])\]\s+(.*)$/#) {
+      return .item(depth: depth, marker: match.1 == " " ? "☐" : "☑", text: String(match.2))
+    }
+    if let match = content.firstMatch(of: #/^[-*+]\s+(.*)$/#) {
+      return .item(depth: depth, marker: "•", text: String(match.1))
+    }
+    if let match = content.firstMatch(of: #/^(\d+[.)])\s+(.*)$/#) {
+      return .item(depth: depth, marker: String(match.1), text: String(match.2))
+    }
+    if let match = content.firstMatch(of: #/^>\s?(.*)$/#) { return .quote(String(match.1)) }
+    return .body(content)
+  }
+
+  /// Inline markdown of one line (**bold**, *italic*, `code`, [links]); plain
+  /// text when the parse fails.
+  static func inlineMarkdown(_ text: String) -> AttributedString {
+    let options = AttributedString.MarkdownParsingOptions(
+      interpretedSyntax: .inlineOnlyPreservingWhitespace)
+    return (try? AttributedString(markdown: text, options: options)) ?? AttributedString(text)
   }
 
   private static func lcsDiff(_ a: [String], _ b: [String]) -> [(NotesDiffLine.Kind, String)] {

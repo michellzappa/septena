@@ -435,6 +435,13 @@
       "failed": { "message": "Couldn’t add the reference." }
     }
   },
+  "placeNotes": {
+    "id": "placeNotes",
+    "featureId": "places.projects",
+    "previewLines": 3,
+    "showMore": { "title": "Show more" },
+    "showLess": { "title": "Show less" }
+  },
   "taskDateBoard": {
     "id": "taskDateBoard",
     "overdue": { "label": "Overdue" },
