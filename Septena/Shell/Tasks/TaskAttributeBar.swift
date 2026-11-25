@@ -41,7 +41,7 @@ struct TaskAttributeBar: View {
   /// its panel.
   var showsChecklist: Bool = true
   var showsAttachments: Bool = true
-  /// The task page's `references` block is on at this depth (page only). It
+  /// The task page's `references` block is on at this depth. It
   /// shows for a task that has references.
   var showsReferences: Bool = false
   /// The task page's `history` block is on at this depth (page only).
@@ -309,6 +309,10 @@ struct TaskAttributeBar: View {
         TaskChecklistPanel(taskID: task.id, addRequest: checklistAddRequest,
                            focus: $focus, moveFocus: moveFocus)
           .transition(.opacity.combined(with: .move(edge: .top)))
+      }
+
+      if showsReferences, let task = discussTask, edit?.hasReferences == true {
+        TaskReferencesPanel(taskID: task.id)
       }
 
       // Horizontal rail of icon + label capsules — scrolls sideways inside its

@@ -297,7 +297,9 @@ thin clients (`backend/src/api/tasksRest.ts`) gets the same fields.
 ## 8. App surfaces
 
 - **Task page:** a new block kind `references` in `registry/surfaces.json`
-  (`taskPage.references`, depth `page`, `editOnly`), after attachments. One
+  (`taskPage.references`, depths `inline` and `page`, `editOnly`), after
+  attachments. The inline editor shows the rows above the pills, with no
+  heading and no add row. One
   row per reference: kind icon, title, subtitle. A tap opens it. The context
   menu has Open, Copy Link, Remove. The block is absent on a task with no
   references, except through "Add Reference" in the task's menu.
@@ -312,7 +314,8 @@ thin clients (`backend/src/api/tasksRest.ts`) gets the same fields.
   mail from Apple Mail, or a link from a browser, onto a task row or the page.
 - **Row title:** `snapshot.title`. Without one: `owner/repo#n` for an issue,
   host and path for a URL, the kind's label for the rest. The client never
-  fetches a title from the network.
+  fetches a title from the network. Without a subtitle, the row shows the
+  kind's label ("GitHub issue").
 - **Wrong input:** text that does not parse shows one line under the field and
   adds nothing. A key that the task has already only highlights its row.
 - **Watch and widgets:** nothing in v1.

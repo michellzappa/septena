@@ -1659,7 +1659,7 @@ enum RegistrySurfaces {
     RegistryTaskPageBlock(id: "taskPage.attributes", kind: .attributes, depths: [.inline, .page], label: nil, attributeId: nil, featureId: "lists.today", editOnly: false),
     RegistryTaskPageBlock(id: "taskPage.checklist", kind: .checklist, depths: [.inline, .page], label: RegistryL10n.t("Checklist"), attributeId: "checklist", featureId: "task.checklists", editOnly: true),
     RegistryTaskPageBlock(id: "taskPage.attachments", kind: .attachments, depths: [.inline, .page], label: RegistryL10n.t("Attachments"), attributeId: "attachments", featureId: "task.attachments", editOnly: true),
-    RegistryTaskPageBlock(id: "taskPage.references", kind: .references, depths: [.page], label: RegistryL10n.t("References"), attributeId: nil, featureId: "task.references", editOnly: true),
+    RegistryTaskPageBlock(id: "taskPage.references", kind: .references, depths: [.inline, .page], label: RegistryL10n.t("References"), attributeId: nil, featureId: "task.references", editOnly: true),
     RegistryTaskPageBlock(id: "taskPage.conversation", kind: .conversation, depths: [.page, .review], label: RegistryL10n.t("Conversation"), attributeId: nil, featureId: "ai.discuss", editOnly: true),
     RegistryTaskPageBlock(id: "taskPage.provenance", kind: .provenance, depths: [.page, .review], label: RegistryL10n.t("Added by"), attributeId: nil, featureId: "task.provenance", editOnly: true),
     RegistryTaskPageBlock(id: "taskPage.history", kind: .history, depths: [.page], label: RegistryL10n.t("History"), attributeId: "history", featureId: "task.history", editOnly: true),

@@ -146,10 +146,11 @@ private struct TaskReferenceRowLabel: View {
 // MARK: - References block
 
 /// The task page's References block (`taskPage.references`). The host draws
-/// the heading and shows the block only for a task that has references.
+/// the heading and shows the block only for a task that has references. The
+/// inline editor passes no `onAdd`, so it shows the rows alone.
 struct TaskReferencesPanel: View {
   let taskID: String
-  let onAdd: () -> Void
+  var onAdd: (() -> Void)?
 
   @Environment(NavigationState.self) private var navigation: NavigationState?
   @State private var rows: [TaskRefRow] = []
@@ -168,10 +169,12 @@ struct TaskReferencesPanel: View {
             RegistryActions.menu("task.reference"),
             bind: { TaskRefActions.bind($0, row: row, navigation: navigation) }))
         }
-        Divider().padding(.horizontal, 12)
+        if addAction != nil || row.id != rows.last?.id {
+          Divider().padding(.horizontal, 12)
+        }
       }
-      if TaskRefActions.canAdd {
-        Button(action: onAdd) {
+      if let addAction {
+        Button(action: addAction) {
           HStack(spacing: Theme.iconTextGap) {
             Image(systemName: "plus")
               .font(.septenaSidebarRow)
@@ -194,6 +197,8 @@ struct TaskReferencesPanel: View {
     .onAppear(perform: reload)
     .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in reload() }
   }
+
+  private var addAction: (() -> Void)? { TaskRefActions.canAdd ? onAdd : nil }
 
   private func reload() {
     rows = LocalCache.taskRefRows(forTaskID: taskID, in: LocalStore.shared.container.mainContext)

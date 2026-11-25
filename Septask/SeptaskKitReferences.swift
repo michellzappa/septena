@@ -3,7 +3,7 @@ import AppKit
 import SwiftData
 
 // Task references in the AppKit shell (docs/TASK_REFERENCES_SPEC.md §8): the
-// References block of the inspector and the Add Reference popover. The rows
+// References block of the inspector and the composer, and the Add Reference popover. The rows
 // and the gestures are shared with the SwiftUI shell (`TaskRefRows`,
 // `TaskRefActions`).
 
@@ -12,15 +12,22 @@ import SwiftData
 /// The rows of one task's references. The host hides the block when it is empty.
 @MainActor
 final class KitReferencesView: NSView {
+  /// `rows` in the inspector; `chips` in the composer, drawn as its attachments are.
+  enum Style { case rows, chips }
+
+  private let style: Style
   private let stack = NSStackView()
   private var rows: [TaskRefRow] = []
   var isEmpty: Bool { rows.isEmpty }
+  /// The rows' height, for a host that computes its own (the composer).
+  var preferredHeight: CGFloat { rows.isEmpty ? 0 : ceil(stack.fittingSize.height) }
 
-  override init(frame frameRect: NSRect) {
-    super.init(frame: frameRect)
+  init(style: Style = .rows) {
+    self.style = style
+    super.init(frame: .zero)
     stack.orientation = .vertical
     stack.alignment = .leading
-    stack.spacing = 2
+    stack.spacing = style == .chips ? 4 : 2
     stack.translatesAutoresizingMaskIntoConstraints = false
     addSubview(stack)
     NSLayoutConstraint.activate([
@@ -36,7 +43,8 @@ final class KitReferencesView: NSView {
   func configure(rows next: [TaskRefRow]) {
     guard next != rows else { return }
     rows = next
-    stack.kitReplaceArrangedSubviews(with: rows.map { KitReferenceRowView(row: $0) })
+    stack.kitReplaceArrangedSubviews(with: rows.map { KitReferenceRowView(row: $0, isChip: style == .chips) },
+                                     fillsWidth: style == .rows)
   }
 }
 
@@ -46,9 +54,13 @@ final class KitReferencesView: NSView {
 private final class KitReferenceRowView: NSView {
   private let row: TaskRefRow
   private let isInteractive: Bool
+  /// Takes the clicks. In the composer the row sits in an `NSTableView`, which
+  /// claims clicks on labels and images, so only a real `NSControl` gets them.
+  private let hit = KitReferenceHitButton()
 
   /// `isHighlighted` marks the row of a key that the task has already.
-  init(row: TaskRefRow, isInteractive: Bool = true, isHighlighted: Bool = false) {
+  init(row: TaskRefRow, isInteractive: Bool = true, isHighlighted: Bool = false,
+       isChip: Bool = false) {
     self.row = row
     self.isInteractive = isInteractive
     super.init(frame: .zero)
@@ -57,6 +69,13 @@ private final class KitReferenceRowView: NSView {
       wantsLayer = true
       layer?.cornerRadius = 6
       layer?.backgroundColor = SeptaskKitTheme.listSelectionFill(emphasized: true).cgColor
+    }
+
+    if isChip {
+      wantsLayer = true
+      layer?.cornerRadius = 6
+      layer?.borderWidth = 0.75
+      layer?.borderColor = NSColor.secondaryLabelColor.withAlphaComponent(0.25).cgColor
     }
 
     let icon = NSImageView()
@@ -80,9 +99,9 @@ private final class KitReferenceRowView: NSView {
       label.lineBreakMode = .byTruncatingMiddle
       label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
     }
-    labels.orientation = .vertical
-    labels.alignment = .leading
-    labels.spacing = 1
+    labels.orientation = isChip ? .horizontal : .vertical
+    labels.alignment = isChip ? .firstBaseline : .leading
+    labels.spacing = isChip ? 6 : 1
     labels.translatesAutoresizingMaskIntoConstraints = false
 
     addSubview(icon)
@@ -92,10 +111,24 @@ private final class KitReferenceRowView: NSView {
       icon.centerYAnchor.constraint(equalTo: centerYAnchor),
       icon.widthAnchor.constraint(equalToConstant: 18),
       labels.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 6),
-      labels.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -4),
+      isChip ? labels.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8)
+        : labels.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -4),
       labels.topAnchor.constraint(equalTo: topAnchor, constant: 3),
       labels.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -3),
     ])
+
+    if isInteractive {
+      hit.target = self
+      hit.action = #selector(openRow)
+      hit.menuProvider = { [weak self] in self?.rowMenu() }
+      addSubview(hit)
+      NSLayoutConstraint.activate([
+        hit.topAnchor.constraint(equalTo: topAnchor),
+        hit.bottomAnchor.constraint(equalTo: bottomAnchor),
+        hit.leadingAnchor.constraint(equalTo: leadingAnchor),
+        hit.trailingAnchor.constraint(equalTo: trailingAnchor),
+      ])
+    }
 
     setAccessibilityElement(true)
     setAccessibilityRole(isInteractive && row.target != nil ? .button : .staticText)
@@ -104,24 +137,15 @@ private final class KitReferenceRowView: NSView {
 
   required init?(coder: NSCoder) { fatalError("KitReferenceRowView is code-only") }
 
-  override func mouseUp(with event: NSEvent) {
-    guard isInteractive, bounds.contains(convert(event.locationInWindow, from: nil)) else { return }
-    TaskRefActions.open(row, navigation: nil)
-  }
-
-  // Keep the click on this view, so `mouseUp` follows it.
-  override func mouseDown(with event: NSEvent) {
-    if !isInteractive { super.mouseDown(with: event) }
-  }
+  @objc private func openRow() { TaskRefActions.open(row, navigation: nil) }
 
   override func resetCursorRects() {
     if isInteractive, row.target != nil { addCursorRect(bounds, cursor: .pointingHand) }
   }
 
-  override func menu(for event: NSEvent) -> NSMenu? {
-    guard isInteractive else { return nil }
-    return KitRegistryMenu.build(RegistryActions.menu("task.reference"),
-                                 bind: { TaskRefActions.bind($0, row: self.row, navigation: nil) })
+  private func rowMenu() -> NSMenu? {
+    KitRegistryMenu.build(RegistryActions.menu("task.reference"),
+                          bind: { TaskRefActions.bind($0, row: self.row, navigation: nil) })
   }
 
   override func accessibilityPerformPress() -> Bool {
@@ -131,17 +155,39 @@ private final class KitReferenceRowView: NSView {
   }
 }
 
+/// The transparent click target over one reference row.
+@MainActor
+private final class KitReferenceHitButton: NSButton {
+  var menuProvider: (() -> NSMenu?)?
+
+  init() {
+    super.init(frame: .zero)
+    translatesAutoresizingMaskIntoConstraints = false
+    isBordered = false
+    isTransparent = true
+    title = ""
+    setButtonType(.momentaryChange)
+    refusesFirstResponder = true
+    kitA11yIgnore()
+  }
+
+  required init?(coder: NSCoder) { fatalError("KitReferenceHitButton is code-only") }
+
+  override func menu(for event: NSEvent) -> NSMenu? { menuProvider?() }
+}
+
 private extension NSStackView {
-  /// Full-width rows in place of what the stack showed.
-  func kitReplaceArrangedSubviews(with views: [NSView]) {
+  /// Rows in place of what the stack showed: full width, or no wider than it.
+  func kitReplaceArrangedSubviews(with views: [NSView], fillsWidth: Bool = true) {
     for view in arrangedSubviews {
       removeArrangedSubview(view)
       view.removeFromSuperview()
     }
     for view in views {
       addArrangedSubview(view)
-      view.widthAnchor.constraint(equalTo: widthAnchor, constant: -edgeInsets.left - edgeInsets.right)
-        .isActive = true
+      let inset = -edgeInsets.left - edgeInsets.right
+      (fillsWidth ? view.widthAnchor.constraint(equalTo: widthAnchor, constant: inset)
+        : view.widthAnchor.constraint(lessThanOrEqualTo: widthAnchor, constant: inset)).isActive = true
     }
   }
 }
