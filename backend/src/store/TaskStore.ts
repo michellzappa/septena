@@ -1244,6 +1244,8 @@ export class TaskStore extends DurableObject<Env> {
     }
     const actor = `member:${row.by}`;
     this.log(rev, entity, id, "upsert", names, null, actor, now, this.diffFor(before, next));
+    // Another member closed the task: the Do of it here ends too (docs/DO_SPEC.md §2.1).
+    if (entity === "task" && "status" in next) this.resolveDo(actor, now);
     if (entity === "project" && "notes" in next) {
       this.recordNoteRevision("project", id, (next.notes as string | null) ?? null, actor, now, (before?.noteRev as number | null) ?? 0, null);
     }
@@ -1262,6 +1264,7 @@ export class TaskStore extends DurableObject<Env> {
     const purged = this.tombstoneAttachments(id, now);
     this.tombstoneChecklistItems(id, now);
     this.tombstoneTaskRefs(id, now);
+    this.tombstoneDoSessions(id, now);
     return purged;
   }
 
