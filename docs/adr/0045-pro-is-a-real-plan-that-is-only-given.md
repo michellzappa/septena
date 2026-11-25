@@ -1,4 +1,4 @@
-# 0044. Pro is a real plan that is only given, never sold yet
+# 0045. Pro is a real plan that is only given, never sold yet
 
 - Status: accepted (2026-11-25)
 - Date: 2026-11-25

@@ -1,7 +1,7 @@
 import type { PaidPlanId } from "../entitlement/entitlement.js";
 import { randomId } from "../util.js";
 
-// Plus links (ADR 0043, ADR 0044): mz gives Plus or Pro to people with a link. The link is a
+// Plus links (ADR 0043, ADR 0045): mz gives Plus or Pro to people with a link. The link is a
 // secret, stored hashed. A signed-in account claims it once; the claim writes
 // the `grant:<link id>` entitlement row in that account's own store
 // (src/api/plusLinks.ts). The two controls copy the list-sharing links people

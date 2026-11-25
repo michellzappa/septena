@@ -587,7 +587,7 @@ export class TaskStore extends DurableObject<Env> {
     // The name the user gave an agent (pairing or Settings rename). Null =
     // the client's registered name.
     const connectionCols = this.sql.exec<{ name: string }>("PRAGMA table_info(connections)").toArray().map((r) => r.name);
-    // The plan a grant gives (ADR 0044); null = Plus.
+    // The plan a grant gives (ADR 0045); null = Plus.
     const entitlementCols = this.sql.exec<{ name: string }>("PRAGMA table_info(entitlements)").toArray().map((r) => r.name);
     if (!entitlementCols.includes("plan")) this.sql.exec("ALTER TABLE entitlements ADD COLUMN plan TEXT");
     // The app version a device last sent (`X-Septena-Version`).

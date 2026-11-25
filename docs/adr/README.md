@@ -48,7 +48,7 @@ a new ADR and set the old one to `superseded by NNNN`.
 | [0041](0041-do-is-one-task-now-on-every-screen.md) | Do is one task now, and every screen shows it (extends 0034) | accepted |
 | [0042](0042-members-keep-replicas-of-a-shared-project.md) | Members keep replicas of a shared project (amends 0004) | accepted |
 | [0043](0043-plus-links-and-a-counts-only-admin-page.md) | Plus is given by link, and the admin page sees counts only (amends 0016) | accepted |
-| [0044](0044-pro-is-a-real-plan-that-is-only-given.md) | Pro is a real plan that is only given, never sold yet (amends 0037, 0043) | accepted |
+| [0045](0045-pro-is-a-real-plan-that-is-only-given.md) | Pro is a real plan that is only given, never sold yet (amends 0037, 0043) | accepted |
 
 ## Template
 

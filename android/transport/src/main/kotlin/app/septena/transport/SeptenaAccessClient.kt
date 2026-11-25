@@ -42,7 +42,7 @@ data class EntitlementRow(
     /** ms since 1970; null means no expiry (a grant). */
     val expiresAtMs: Long?,
     val active: Boolean,
-    /** The plan the row gives; null means Plus (ADR 0044). */
+    /** The plan the row gives; null means Plus (ADR 0045). */
     val plan: String? = null,
 )
 

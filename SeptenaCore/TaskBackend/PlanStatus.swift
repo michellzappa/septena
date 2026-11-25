@@ -19,7 +19,7 @@ struct BackendEntitlement: Decodable, Sendable {
     let expiresAt: Double?
     let status: String
     let active: Bool
-    /// The plan the row gives; nil means Plus (ADR 0044).
+    /// The plan the row gives; nil means Plus (ADR 0045).
     let plan: String?
   }
   let active: Bool
@@ -81,7 +81,7 @@ final class PlanStatus {
   /// nil until the first answer from the server. Views show nothing for an
   /// unknown plan rather than guess.
   private(set) var plan: Plan?
-  /// The account is on Pro (ADR 0044). Pro has every Plus limit or more, so
+  /// The account is on Pro (ADR 0045). Pro has every Plus limit or more, so
   /// `plan` is `.plus` and `isPlus` is true too. Only the words differ.
   private(set) var isPro = false
   private(set) var lastError: String?

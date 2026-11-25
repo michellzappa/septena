@@ -3,7 +3,7 @@
 - Status: accepted (2026-11-24)
 - Date: 2026-11-24
 - Deciders: mz
-- Amended by: [ADR 0044](0044-pro-is-a-real-plan-that-is-only-given.md) (the
+- Amended by: [ADR 0045](0045-pro-is-a-real-plan-that-is-only-given.md) (the
   server has Pro, for grants)
 - Amends: [ADR 0036](0036-plan-ladder-one-agent-then-three.md) (how the levels
   are shown; the limits stand)

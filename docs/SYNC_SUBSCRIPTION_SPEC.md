@@ -213,7 +213,7 @@ row per source of access: `id` (`apple:<originalTransactionId>` or
 `grant:<name>`), `source`, `productId`, `expiresAt` (ms; null = no expiry),
 `originalTransactionId`, `status` (`active` / `grace` / `billing_retry` /
 `expired` / `revoked`), `environment`, `note`, `signedAt`, `updatedAt`. The
-user is on Pro when any active row has `plan` = `pro` (grants only, ADR 0044),
+user is on Pro when any active row has `plan` = `pro` (grants only, ADR 0045),
 else on Plus when any row is active. An older Apple payload (`signedDate`)
 never overwrites a newer one. KV `TOKENS` maps `ent-otx:<originalTransactionId>`
 and `ent-aat:<appAccountToken>` to the user, so a webhook finds its user.
@@ -237,7 +237,7 @@ does not cut sync); `grace` until the grace period end + 24 h;
 | `DELETE /v1/admin/grants/:userId/:name` | `X-Admin-Token` | removes a grant |
 
 The admin page `https://api.septena.app/admin` gives plans (ADR 0043, ADR
-0044). A link's claim writes a `grant:link-…` row; Give on an account writes
+0045). A link's claim writes a `grant:link-…` row; Give on an account writes
 `grant:admin`. The
 `X-Admin-Token` routes stay for scripts.
 

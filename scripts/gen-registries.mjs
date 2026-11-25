@@ -651,7 +651,7 @@ const TASK_PAGE_DEPTHS = new Set(["inline", "page", "review"]);
 
 // ---- plans.json (ADR 0010, ADR 0023) ----
 // Pro is planned: the site shows it and no store sells it. The server has it for
-// grants, and the apps name it on an account that has it (ADR 0037, ADR 0044).
+// grants, and the apps name it on an account that has it (ADR 0037, ADR 0045).
 const PLAN_LEVELS = ["free", "plus", "pro"];
 const PLAN_LIMIT_PLANS = ["account", "plus", "pro"];
 

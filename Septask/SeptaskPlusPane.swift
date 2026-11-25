@@ -127,7 +127,7 @@ struct SeptaskPlusPane: View {
   }
 
   /// SF Symbol of a plan card's registry icon (plans.json `cards[].icon`).
-  /// Pro has no card in the apps: no store sells it (ADR 0037, ADR 0044).
+  /// Pro has no card in the apps: no store sells it (ADR 0037, ADR 0045).
   private var planSymbol: String {
     if status.isPro { return RegistryIcons.sfSymbols["plans.pro"] ?? "circle" }
     return Self.cardSymbol(status.isPlus ? "plus" : "free")

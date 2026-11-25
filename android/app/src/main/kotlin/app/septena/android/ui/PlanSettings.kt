@@ -38,7 +38,7 @@ internal sealed interface AccountPlan {
 
     /**
      * An active entitlement; [paidThroughMs] is null for a grant with no expiry. Pro
-     * (ADR 0044) has every Plus limit or more, so only the words differ.
+     * (ADR 0045) has every Plus limit or more, so only the words differ.
      */
     data class Plus(val paidThroughMs: Long?, val source: String, val isPro: Boolean = false) : AccountPlan
 }
