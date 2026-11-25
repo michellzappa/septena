@@ -215,6 +215,12 @@
       "destinations.destinations.today.emptyState.detail"
     ]
   },
+  "Add and Do": {
+    "text": "Add and Do",
+    "paths": [
+      "actions.actions.do.addAndDo.title"
+    ]
+  },
   "Add time": {
     "text": "Add time",
     "paths": [
@@ -1128,10 +1134,37 @@
       "surfaces.notices.dismissTitle"
     ]
   },
+  "Do": {
+    "text": "Do",
+    "paths": [
+      "actions.actions.task.do.title"
+    ]
+  },
+  "Do Here": {
+    "text": "Do Here",
+    "paths": [
+      "actions.actions.do.here.title"
+    ]
+  },
   "Does what it can: a draft, a comparison. Uses the web or your Claude only when needed.": {
     "text": "Does what it can: a draft, a comparison. Uses the web or your Claude only when needed.",
     "paths": [
       "settings.copy.ai_explainer.workDetail.label"
+    ]
+  },
+  "Doing now": {
+    "text": "Doing now",
+    "paths": [
+      "surfaces.doing.openExit.label"
+    ]
+  },
+  "Doing {title}": {
+    "text": "Doing {title}",
+    "placeholders": [
+      "title"
+    ],
+    "paths": [
+      "surfaces.doing.notice.format"
     ]
   },
   "Don't approve": {
@@ -1147,6 +1180,8 @@
       "settings.copy.sign_in_approval.done.label",
       "destinations.destinations.agent.groups.done.title",
       "actions.actions.task.select.activeTitle",
+      "actions.actions.do.done.title",
+      "surfaces.doing.exits.done.label",
       "plans.paywall.done"
     ]
   },
@@ -1221,6 +1256,12 @@
     "paths": [
       "actions.actions.task.emptyTrash.title",
       "surfaces.prompts.items.emptyTrash.confirmTitle"
+    ]
+  },
+  "Ended": {
+    "text": "Ended",
+    "paths": [
+      "surfaces.doing.exits.closed.label"
     ]
   },
   "Enter the code from the other device. If you're connecting Claude, the code is in your browser.": {
@@ -1830,6 +1871,12 @@
       "surfaces.firstRun.steps.connectClaude.secondary.title"
     ]
   },
+  "Later…": {
+    "text": "Later…",
+    "paths": [
+      "actions.actions.do.later.title"
+    ]
+  },
   "Learn where you usually file similar tasks.": {
     "text": "Learn where you usually file similar tasks.",
     "paths": [
@@ -1840,6 +1887,12 @@
     "text": "Leave Project",
     "paths": [
       "surfaces.sharing.copy.leave.label"
+    ]
+  },
+  "Length": {
+    "text": "Length",
+    "paths": [
+      "surfaces.doing.screen.length.title"
     ]
   },
   "Let Claude or your own agent work your list": {
@@ -2064,6 +2117,12 @@
       "settings.copy.smart_lists_editor.moveUp.label"
     ]
   },
+  "Moved to later": {
+    "text": "Moved to later",
+    "paths": [
+      "surfaces.doing.exits.later.label"
+    ]
+  },
   "Moved to {date} (When)": {
     "text": "Moved to {date}",
     "placeholders": [
@@ -2186,6 +2245,12 @@
     "text": "No agent work",
     "paths": [
       "destinations.destinations.agent.emptyState.title"
+    ]
+  },
+  "No length": {
+    "text": "No length",
+    "paths": [
+      "surfaces.doing.screen.length.noneTitle.title"
     ]
   },
   "No matches": {
@@ -3056,7 +3121,8 @@
     "paths": [
       "actions.actions.task.detail.save.title",
       "actions.actions.settings.save.title",
-      "surfaces.prompts.text.nameAgent.confirmTitle"
+      "surfaces.prompts.text.nameAgent.confirmTitle",
+      "surfaces.doing.stopNote.confirmTitle"
     ]
   },
   "Save Notes": {
@@ -3320,6 +3386,12 @@
       "actions.actions.task.toggleInfo.title"
     ]
   },
+  "Show List": {
+    "text": "Show List",
+    "paths": [
+      "actions.actions.do.showList.title"
+    ]
+  },
   "Show Sidebar": {
     "text": "Show Sidebar",
     "paths": [
@@ -3465,6 +3537,12 @@
       "settings.copy.access_devices.signOutTitle.label"
     ]
   },
+  "Skip": {
+    "text": "Skip",
+    "paths": [
+      "surfaces.doing.stopNote.dismissTitle"
+    ]
+  },
   "Slow drift": {
     "text": "Slow drift",
     "paths": [
@@ -3514,6 +3592,21 @@
       "surfaces.taskReferences.kinds.door.label"
     ]
   },
+  "Still on It": {
+    "text": "Still on It",
+    "paths": [
+      "actions.actions.do.confirm.title"
+    ]
+  },
+  "Still on {title}?": {
+    "text": "Still on {title}?",
+    "placeholders": [
+      "title"
+    ],
+    "paths": [
+      "surfaces.doing.stale.format"
+    ]
+  },
   "Still want any of them?": {
     "text": "Still want any of them?",
     "paths": [
@@ -3536,6 +3629,18 @@
     "text": "Stop Sharing",
     "paths": [
       "surfaces.sharing.copy.stop.label"
+    ]
+  },
+  "Stop for Now": {
+    "text": "Stop for Now",
+    "paths": [
+      "actions.actions.do.stop.title"
+    ]
+  },
+  "Stopped for now": {
+    "text": "Stopped for now",
+    "paths": [
+      "surfaces.doing.exits.stopped.label"
     ]
   },
   "Subscribe": {
@@ -3561,6 +3666,12 @@
     "paths": [
       "surfaces.taskDetail.weekdays.6.title",
       "surfaces.taskDetail.calendarWeekdays.0.title"
+    ]
+  },
+  "Switched to another task": {
+    "text": "Switched to another task",
+    "paths": [
+      "surfaces.doing.exits.replaced.label"
     ]
   },
   "Sync": {
@@ -4160,6 +4271,12 @@
       "surfaces.prompts.text.sendBackReview.placeholder"
     ]
   },
+  "What’s the first step?": {
+    "text": "What’s the first step?",
+    "paths": [
+      "surfaces.doing.screen.firstStep.title"
+    ]
+  },
   "When": {
     "text": "When",
     "paths": [
@@ -4194,6 +4311,18 @@
     "text": "Where AI runs",
     "paths": [
       "settings.pages.ai_preferences.sections.reach.header"
+    ]
+  },
+  "Where did you stop?": {
+    "text": "Where did you stop?",
+    "paths": [
+      "surfaces.doing.stopNote.title"
+    ]
+  },
+  "Where you stopped": {
+    "text": "Where you stopped",
+    "paths": [
+      "surfaces.doing.screen.lastTime.title"
     ]
   },
   "While paused, no agent can start or work on a task.": {
@@ -4537,6 +4666,27 @@
       "surfaces.taskAttributes.attachments.countLabel"
     ]
   },
+  "{count} min": {
+    "text": "{count} min",
+    "placeholders": [
+      "count"
+    ],
+    "paths": [
+      "surfaces.doing.screen.length.option.format"
+    ]
+  },
+  "{count} minutes are up.": {
+    "forms": {
+      "one": "1 minute is up.",
+      "other": "{count} minutes are up."
+    },
+    "placeholders": [
+      "count"
+    ],
+    "paths": [
+      "surfaces.doing.plannedEnd.format"
+    ]
+  },
   "{count} non-task records will be skipped.": {
     "text": "{count} non-task records will be skipped.",
     "placeholders": [
@@ -4625,6 +4775,18 @@
     ],
     "paths": [
       "surfaces.notices.items.rolledIn.title"
+    ]
+  },
+  "{count} things need you": {
+    "forms": {
+      "one": "1 thing needs you",
+      "other": "{count} things need you"
+    },
+    "placeholders": [
+      "count"
+    ],
+    "paths": [
+      "surfaces.doing.needsYou.format"
     ]
   },
   "{name} can no longer read or change your tasks. To use it again, connect it again.": {

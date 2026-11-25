@@ -766,6 +766,7 @@ struct TaskListView: View {
       delete: !hasTaskSelection ? nil : deleteSelected,
       clearSchedule: !hasTaskSelection ? nil : clearScheduleForSelected,
       editDetails: editDetailsSelectedAction,
+      doTask: doSelectedAction,
       duplicate: duplicateSelectedAction,
       copy: copySelectedAction
     ))
@@ -818,6 +819,7 @@ struct TaskListView: View {
       delete: !hasTaskSelection ? nil : deleteSelected,
       clearSchedule: !hasTaskSelection ? nil : clearScheduleForSelected,
       editDetails: editDetailsSelectedAction,
+      doTask: doSelectedAction,
       duplicate: duplicateSelectedAction,
       copy: copySelectedAction
     )
@@ -2544,10 +2546,12 @@ struct TaskListView: View {
     }
   }
 
-  /// Today's notices (sign in, rolled in, an explainer), decided once in
-  /// `TaskNotices` and read the same way by the AppKit list.
+  /// The Do notice, in every list as on the Mac and Android, then Today's
+  /// notices (sign in, rolled in, an explainer), decided once in `TaskNotices`
+  /// and read the same way by the AppKit list.
   @ViewBuilder
   private var noticesRow: some View {
+    doNoticeRow
     if filter == .today {
       ForEach(todayNotices) { notice in
         TaskListNotice(
@@ -2583,6 +2587,37 @@ struct TaskListView: View {
       .plainListChrome()
       .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
     }
+  }
+
+  /// What another device does now, or what this one does after Show List
+  /// (docs/DO_SPEC.md §5). A state of the account, so it leads the notices,
+  /// it cannot be dismissed, and it never counts as the one explainer.
+  @ViewBuilder
+  private var doNoticeRow: some View {
+    if DoFlow.isAvailable, DoStore.shared.showsNotice, let doing = DoStore.shared.current {
+      DoNotice(
+        doing: doing,
+        onDone: { finishDo(doing) },
+        onStop: { DoFlow.stop(doing, nav: nav) },
+        onLater: { DoFlow.openLater(doing, nav: nav) }
+      )
+      .transition(.opacity.combined(with: .move(edge: .top)))
+      .plainListChrome()
+      .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
+    }
+  }
+
+  /// Done from the notice: the row's own checkbox path when the row is in
+  /// this list, so it settles as usual.
+  private func finishDo(_ doing: DoState) {
+    nav.doExitSince = doing.startedAt
+    if let task = currentTask(id: doing.taskID), task.status == .open {
+      toggle(task)
+    } else {
+      DoFlow.complete(doing, mutator: mutator, accent: theme.color(for: "tasks"),
+                      logCommit: logCommit, context: modelContext)
+    }
+    DoFlow.offerNeedsYou(nav: nav, context: modelContext)
   }
 
   /// Today's notices, cached outside `body` so rendering never runs synchronous
@@ -3698,6 +3733,22 @@ struct TaskListView: View {
       before: undoBefore, context: modelContext, mutator: mutator)
   }
 
+  /// ⌘J — Do the one selected open task. Nil disables the command.
+  private var doSelectedAction: (() -> Void)? {
+    guard !showingRecentlyDeleted, hasTaskSelection else { return nil }
+    let ids = orderedActionIDs()
+    guard ids.count == 1, let task = currentTask(id: ids[0]), DoFlow.canDo(task) else { return nil }
+    return { beginDo(task) }
+  }
+
+  /// Starts a Do on this task. An open editor folds first, so it saves before
+  /// the Do screen reads the task.
+  private func beginDo(_ task: SeptenaTask) {
+    closeActiveEditIfNeeded()
+    if touchSelectionActive { clearSelection() }
+    DoFlow.begin(task.id)
+  }
+
   /// ⌘S — open the When (schedule) picker for the focused row.
   private func openWhenForSelected() {
     let ids = orderedActionIDs()
@@ -4493,6 +4544,7 @@ struct TaskListView: View {
           guard case let .single(task) = target else { return nil }
           return filingChipSuggestion(for: task)
         }(),
+        onDo: { task in beginDo(task) },
         onDuplicate: { target in duplicate(target.ids) },
         onSelect: allowsTouchMultiSelect && !touchSelectionActive
           ? { task in beginTouchSelection(task.id) } : nil,

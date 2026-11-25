@@ -213,6 +213,13 @@ final class NavigationState {
   /// so it keeps `showSettings`).
   var presentedModal: AppModal? = nil
 
+  /// The open sheet of the Do flow in this window (`DoFlow`): Later, "Where
+  /// did you stop?", or the line after an exit.
+  var doSheet: DoSheet?
+  /// The start of the Do that just ended here, until the line after the exit
+  /// was offered.
+  var doExitSince: Date?
+
   // MARK: - Modal convenience
 
   // Thin bridges so the many call sites that present these sheets stay terse

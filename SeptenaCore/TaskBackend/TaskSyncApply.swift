@@ -77,6 +77,9 @@ extension TaskSyncEngine {
     for r in (try? context.fetch(FetchDescriptor<TaskRefEntity>())) ?? [] where store.shadow("taskRef:\(r.id)") != nil {
       context.delete(r)
     }
+    for s in (try? context.fetch(FetchDescriptor<DoSessionEntity>())) ?? [] where store.shadow("doSession:\(s.id)") != nil {
+      context.delete(s)
+    }
     _ = StoreHealth.save(context, op: "taskSync.reset")
     store.deleteAllShadows()
     since = 0
@@ -127,6 +130,13 @@ extension TaskSyncEngine {
                                 kind: TaskRefCore.parse(key)?.kind ?? "")
           main.insert(n)
           applyTaskRefFields(n, fields, skip: [])
+        }
+      case (TaskSyncOpKind.upsert, .doSession?):
+        if let s = fetchDoSession(op.rowID) { applyDoSessionFields(s, fields, skip: []) }
+        else if let taskID = fields["taskId"]?.stringValue, let startedAt = fields["startedAt"]?.stringValue {
+          let n = DoSessionEntity(id: op.rowID, taskID: taskID, startedAt: startedAt)
+          main.insert(n)
+          applyDoSessionFields(n, fields, skip: [])
         }
       case (TaskSyncOpKind.upsert, .tag?):
         if let tag = fetchTag(op.rowID) { applyTagFields(tag, fields, skip: []) }
@@ -302,6 +312,22 @@ extension TaskSyncEngine {
           recordApplied(key, applied: applied, mapped: mapped, raw: change.row, shadow: shadows[key], store: store)
         }
         touchedTasks = true
+      case .doSession:
+        if tombstone {
+          if let s = fetchDoSession(id) { main.delete(s) }
+          markGone(.doSession, id, shadow: shadows[key], store: store)
+        } else if !pendingDelete.contains(key) {
+          let s = fetchDoSession(id) ?? {
+            let n = DoSessionEntity(id: id, taskID: change.row["taskId"]?.stringValue ?? "",
+                                    startedAt: change.row["startedAt"]?.stringValue ?? "")
+            main.insert(n)
+            return n
+          }()
+          let applied = applyDoSessionFields(s, change.row, skip: skip)
+          let mapped = (try? TaskBackendMapping.doSession(s).get())?.fields ?? [:]
+          recordApplied(key, applied: applied, mapped: mapped, raw: change.row, shadow: shadows[key], store: store)
+        }
+        touchedTasks = true
       case .tag:
         if tombstone {
           if let tag = fetchTag(id) { main.delete(tag) }
@@ -463,6 +489,10 @@ extension TaskSyncEngine {
       if let ref = fetchTaskRef(id) { main.delete(ref) }
       markGone(.taskRef, id, shadow: store.shadow("taskRef:\(id)"), store: store)
       addIssue(.taskRef, id, "change refused: the reference is deleted on the backend")
+      NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+    case .doSession:
+      if let s = fetchDoSession(id) { main.delete(s) }
+      markGone(.doSession, id, shadow: store.shadow("doSession:\(id)"), store: store)
       NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
     case .tag:
       if let tag = fetchTag(id) { main.delete(tag) }
@@ -793,6 +823,26 @@ extension TaskSyncEngine {
     take("lastSeenAt") { ref.lastSeenAt = $0.stringValue }
     take("createdAt") { ref.createdAt = Self.parseStamp($0.stringValue) ?? ref.createdAt }
     ref.updatedAt = Date()
+    return applied
+  }
+
+  @discardableResult
+  func applyDoSessionFields(_ s: DoSessionEntity, _ fields: [String: BackendJSON], skip: Set<String>) -> [String] {
+    var applied: [String] = []
+    func take(_ name: String, _ write: (BackendJSON) -> Void) {
+      guard !skip.contains(name), let v = fields[name] else { return }
+      write(v)
+      applied.append(name)
+    }
+    take("taskId") { s.taskID = $0.stringValue ?? s.taskID }
+    take("startedAt") { s.startedAt = $0.stringValue ?? s.startedAt }
+    take("plannedMinutes") { s.plannedMinutes = Self.int($0) }
+    take("confirmedAt") { s.confirmedAt = $0.stringValue }
+    take("endedAt") { s.endedAt = $0.stringValue }
+    take("exit") { s.exit = $0.stringValue }
+    take("lapsed") { s.lapsed = Self.bool($0) ?? false }
+    take("note") { s.note = $0.stringValue }
+    take("sourceClient") { s.sourceClient = $0.stringValue }
     return applied
   }
 
