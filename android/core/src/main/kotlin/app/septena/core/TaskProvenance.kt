@@ -12,6 +12,9 @@ object TaskProvenance {
     /** True when an agent added the task over MCP. */
     fun isAgentAuthored(source: String?): Boolean = source == RegistryEntityEnums.TaskSource.MCP
 
+    /** An agent added the task and the user has not accepted it (ADR 0039). */
+    fun isProposal(source: String?, acknowledgedAt: String?): Boolean = isAgentAuthored(source) && acknowledgedAt == null
+
     /**
      * The author's name: the agent's connector name (`sourceClient`), else the
      * registry fallback name, or the registry's "You" for a task a person added.

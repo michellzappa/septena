@@ -90,12 +90,16 @@ class TaskUndoReviewTest {
             taskId,
             mapOf(RegistryEntityFields.Convo.END_STATE to JsonValue.StringValue(RegistryEntityEnums.ConvoEndState.AGENT_ASSISTED_DONE)),
         )
-        undo.recordTaskAndConvoEdit(
-            taskId = taskId,
-            beforeTask = initialTask,
-            afterTask = doneTask?.let { store.record(RegistryEntityNames.TASK, taskId) },
-            beforeConvo = initialConvo,
-            afterConvo = doneConvo,
+        undo.recordTaskAndConvoEdits(
+            listOf(
+                TaskUndoHistory.Edit(
+                    taskId = taskId,
+                    beforeTask = initialTask,
+                    afterTask = doneTask?.let { store.record(RegistryEntityNames.TASK, taskId) },
+                    beforeConvo = initialConvo,
+                    afterConvo = doneConvo,
+                ),
+            ),
         )
 
         assertTrue(undo.undo(taskMutator, convoMutator))

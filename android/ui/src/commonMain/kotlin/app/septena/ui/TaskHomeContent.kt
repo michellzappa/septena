@@ -63,6 +63,8 @@ data class TaskListItem(
     val isOnToday: Boolean = false,
     val isStarred: Boolean = false,
     val isFaded: Boolean = false,
+    /** An agent handed the task over for the user to check, so its row menu offers Accept. */
+    val isInReview: Boolean = false,
     /** Row opacity from the fade fill (1 = full strength), as on iOS. */
     val opacity: Float = 1f,
     /** Structured group header (area/project/agent stage); separates icon/emoji from title for alignment. */
@@ -96,7 +98,7 @@ data class TaskListItem(
     val hasAttachments: Boolean = false,
     /** On-device filing suggestion target title shown as a one-tap capsule on Inbox rows (#368). */
     val filingSuggestionLabel: String? = null,
-    /** Full untruncated agent review note (`endStateNote` or fallback) for Review list rows (#412). */
+    /** Full untruncated agent review note (`endStateNote` or fallback) for Review's Finished work rows (#412). */
     val reviewNote: String? = null,
     /** Single-line Review metadata (`Area › Project · asked {ago} · artifact`). */
     val reviewMeta: String? = null,
@@ -165,7 +167,24 @@ data class TaskRowMenuAction(
     val unselectedTitle: String? = null,
     /** Shows only on a task that can be assigned ([TaskListItem.canAssign]). */
     val needsAssignees: Boolean = false,
+    /** Shows only on a task handed over for review ([TaskListItem.isInReview]). */
+    val needsReview: Boolean = false,
+    /** Shows only on a faded task ([TaskListItem.isFaded]). */
+    val needsFaded: Boolean = false,
     val icon: TaskMenuActionIcon = TaskMenuActionIcon.None,
+) {
+    fun appliesTo(task: TaskListItem): Boolean =
+        (task.canAssign || !needsAssignees) && (task.isInReview || !needsReview) && (task.isFaded || !needsFaded)
+}
+
+/** The last group of a list, which the user folds (Review's Faded). Its rows carry no group header. */
+data class CollapsibleTaskGroup(
+    val header: TaskGroupHeader,
+    val tasks: List<TaskListItem>,
+    val isExpanded: Boolean,
+    val onToggle: () -> Unit,
+    /** Shown above the rows while the group is open. */
+    val banner: (@Composable () -> Unit)? = null,
 )
 
 /** Portable task-list surface. Platform hosts provide registry copy and bind actions to their mutators. */
@@ -210,11 +229,11 @@ fun TaskHomeContent(
     onReorderTaskRow: ((ids: List<String>, index: Int, before: Boolean) -> Unit)? = null,
     onReorderGroupHeader: ((ids: List<String>, targetLocationKey: String) -> Unit)? = null,
     onApplyFilingSuggestion: ((String) -> Unit)? = null,
-    isReviewList: Boolean = false,
     reviewAcceptTitle: String = "",
     reviewSendBackTitle: String = "",
     onAcceptReview: ((String) -> Unit)? = null,
     onSendBackReview: ((String) -> Unit)? = null,
+    collapsibleGroup: CollapsibleTaskGroup? = null,
 ) {
     val orderedSelectionIds = if (selection.isActive) {
         (inboxTasks + tasks).map(TaskListItem::id).filter { it in selection.selectedIds }
@@ -321,7 +340,9 @@ fun TaskHomeContent(
             }
 
             val hasUpcomingAgenda = isUpcoming && calendarEvents.isNotEmpty()
-            if (hasLoaded && tasks.isEmpty() && inboxTasks.isEmpty() && !hasUpcomingAgenda && emptyTitle.isNotBlank()) {
+            if (hasLoaded && tasks.isEmpty() && inboxTasks.isEmpty() && collapsibleGroup == null &&
+                !hasUpcomingAgenda && emptyTitle.isNotBlank()
+            ) {
                 item(key = "empty-state") {
                     Column(
                         modifier = Modifier
@@ -483,12 +504,47 @@ fun TaskHomeContent(
                     onReorderRow = onReorderTaskRow,
                     onReorderGroupHeader = onReorderGroupHeader,
                     onApplyFilingSuggestion = onApplyFilingSuggestion,
-                    isReviewList = isReviewList,
                     reviewAcceptTitle = reviewAcceptTitle,
                     reviewSendBackTitle = reviewSendBackTitle,
                     onAcceptReview = onAcceptReview,
                     onSendBackReview = onSendBackReview,
                 )
+            }
+
+            collapsibleGroup?.let { group ->
+                item(key = "collapsible-header:${group.header.key}") {
+                    TaskGroupHeaderRow(
+                        header = group.header,
+                        isExpanded = group.isExpanded,
+                        onClick = group.onToggle,
+                    )
+                }
+                if (group.isExpanded) {
+                    group.banner?.let { banner ->
+                        item(key = "collapsible-banner:${group.header.key}") { banner() }
+                    }
+                    taskCardRows(
+                        tasks = group.tasks,
+                        keyPrefix = group.header.key,
+                        completeTitle = completeTitle,
+                        canComplete = canComplete,
+                        todayTitle = todayTitle,
+                        todayTint = todayTint,
+                        fadedTitle = fadedTitle,
+                        showTodayIndicator = !isToday,
+                        showFadedIndicator = showFadedIndicator,
+                        isDark = isDarkTheme,
+                        hasActiveTexture = hasActiveTexture,
+                        onComplete = onComplete,
+                        onOpenTask = onOpenTask,
+                        rowMenuGroups = rowMenuGroups,
+                        rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
+                        selection = selection,
+                        onTaskAction = onTaskAction,
+                        onOpenGroupTarget = null,
+                        onDropRow = null,
+                    )
+                }
             }
         }
     }
@@ -523,7 +579,6 @@ private fun LazyListScope.taskCardRows(
     onReorderRow: ((ids: List<String>, index: Int, before: Boolean) -> Unit)? = null,
     onReorderGroupHeader: ((ids: List<String>, targetLocationKey: String) -> Unit)? = null,
     onApplyFilingSuggestion: ((String) -> Unit)? = null,
-    isReviewList: Boolean = false,
     reviewAcceptTitle: String = "",
     reviewSendBackTitle: String = "",
     onAcceptReview: ((String) -> Unit)? = null,
@@ -568,7 +623,7 @@ private fun LazyListScope.taskCardRows(
                 } else null,
             )
         }
-        if (isReviewList && onAcceptReview != null && onSendBackReview != null) {
+        if (task.reviewNote != null && onAcceptReview != null && onSendBackReview != null) {
             ReviewTaskCardRow(
                 task = task,
                 position = positions[index],

@@ -25,13 +25,16 @@ data class SmartListDescriptor(
  * `registry/settings.json`). Mirrors Swift `SmartListPreferences` 1:1.
  */
 object SmartListResolver {
+    /** Lists that show inside another one (Inbox on Today, Deleted in Logbook, Faded in Review): no sidebar row. */
+    private val EMBEDDED_VISIBILITIES = setOf("todayBand", "logbookTab", "reviewGroup")
+
     fun sidebarDestinations(): List<SmartListDescriptor> {
         val list = (RegistryCatalog.document("destinations").fields["destinations"] as? JsonValue.ArrayValue)
             ?.values.orEmpty()
         return list.mapNotNull { raw ->
             val obj = raw as? JsonValue.ObjectValue ?: return@mapNotNull null
             val visibility = obj.fields["visibility"].stringValue() ?: return@mapNotNull null
-            if (visibility == "todayBand" || visibility == "logbookTab") return@mapNotNull null
+            if (visibility in EMBEDDED_VISIBILITIES) return@mapNotNull null
             val id = obj.fields["id"].stringValue() ?: return@mapNotNull null
             val section = SmartListSection.fromWire(obj.fields["sidebarSection"].stringValue())
                 ?: SmartListSection.TOP

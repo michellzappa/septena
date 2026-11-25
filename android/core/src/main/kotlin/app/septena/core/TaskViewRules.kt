@@ -148,6 +148,16 @@ object TaskViewRules {
     }
 
     /**
+     * The Review group of a task (docs/REVIEW_SPEC.md §1), or null when it is not in Review.
+     * [conversationGroup] is the core's group for its conversation.
+     */
+    fun reviewGroup(task: TaskSnapshot, conversationGroup: String?): String? = when {
+        task.status != RegistryEntityEnums.TaskStatus.OPEN || task.isHeading || task.deletedAt != null -> null
+        TaskFadeRules.isFaded(task.fadedAt) -> ReviewGroupIds.FADED
+        else -> conversationGroup
+    }
+
+    /**
      * Membership for a registry destination, including the historical lists
      * whose rows are not represented by the open-task fields in
      * [TaskViewMembership.matchesView].
@@ -204,6 +214,13 @@ object TaskViewRules {
             else -> false
         }
     }
+}
+
+/** Ids of the Review groups (registry/destinations.json `review.groups`). */
+object ReviewGroupIds {
+    const val QUESTIONS: String = "questions"
+    const val FINISHED: String = "finished"
+    const val FADED: String = RegistryDestinationIds.FADED
 }
 
 /** The task as the shared core reads it. */
