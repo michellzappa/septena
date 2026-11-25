@@ -936,6 +936,7 @@ final class LocalStore {
                          TaskAttachmentEntity.self,
                          TaskChecklistItemEntity.self,
                          TaskRefEntity.self,
+                         DoSessionEntity.self,
                          TagEntity.self,
                          ProjectEntity.self,
                          AreaEntity.self,

@@ -4,12 +4,14 @@ import android.app.Application
 import app.cash.sqldelight.driver.android.AndroidSqliteDriver
 import app.septena.android.auth.AppCredentials
 import app.septena.android.auth.SessionStore
+import app.septena.android.doing.DoController
 import app.septena.android.reminders.TaskReminderScheduler
 import app.septena.android.sync.SyncController
 import app.septena.android.sync.SyncLiveCoordinator
 import app.septena.android.ui.AppearanceStore
 import app.septena.core.ConversationMutator
 import app.septena.core.ConversationRules
+import app.septena.core.DoSessionMutator
 import app.septena.core.JsonValue
 import app.septena.core.RecurrenceRules
 import app.septena.core.RegistryEntityMutator
@@ -77,7 +79,8 @@ class AndroidAppGraph(application: Application) {
     val taskStore = SqlDelightTaskStore(driver)
     val clock = SystemDayClock()
     val ids = UuidTaskIdGenerator()
-    val taskMutator = TaskMutator(taskStore, clock, ids)
+    val doSessions = DoSessionMutator(taskStore, clock, ids)
+    val taskMutator = TaskMutator(taskStore, clock, ids, doSessions)
     val taskUndoHistory = TaskUndoHistory()
     val deviceSettings = app.septena.android.ui.AndroidDeviceSettings(application)
     val filingSuggestions = app.septena.android.ui.FilingSuggestionEngine(application)
@@ -135,6 +138,7 @@ class AndroidAppGraph(application: Application) {
                 taskStore.allTurnsByTask()
                 taskStore.records(RegistryEntityNames.CHECKLIST_ITEM)
                 taskStore.records(RegistryEntityNames.TASK_REF)
+                taskStore.records(RegistryEntityNames.DO_SESSION)
                 taskStore.records(RegistryEntityNames.TAG)
             }
         }
@@ -192,6 +196,22 @@ class AndroidAppGraph(application: Application) {
     }
 
     val reminders = TaskReminderScheduler(application, taskStore)
+    val doing = DoController(
+        context = application,
+        store = taskStore,
+        sessions = doSessions,
+        tasks = taskMutator,
+        clock = clock,
+        sync = sync,
+        reminders = reminders,
+        scope = appScope,
+        captureTaskEdit = ::captureTaskEdit,
+    ).also { it.start() }
+
+    /** Runs a write that must outlive the screen that asked for it. */
+    fun launch(write: suspend () -> Unit) {
+        appScope.launch(Dispatchers.IO) { runCatching { write() } }
+    }
 
     init {
         // Timed reminders follow the store: every sync and every local write

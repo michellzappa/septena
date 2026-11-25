@@ -119,6 +119,8 @@ final class SeptenaServices {
       }
       bindWriteBoundary()
 
+      DoStore.shared.start()
+
       // Demo-seed (screenshot) builds stay offline — never start sync.
       if !DemoSeedMode.isOn {
         LaunchTrace.spanSync("start.taskSyncStart") {

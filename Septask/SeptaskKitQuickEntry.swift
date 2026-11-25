@@ -9,7 +9,8 @@ import Carbon.HIToolbox
 // triage band — the app's one home for loose captures); ⌘Return sends it
 // straight to Today. Esc discards the draft and dismisses; clicking away only
 // hides the panel and KEEPS the draft, so a half-typed capture is still there
-// on the next show. Writes go through TaskMutator like every other surface.
+// on the next show. Add and Do files the capture and starts a Do of it
+// (docs/DO_SPEC.md §4.1). Writes go through TaskMutator like every other surface.
 //
 // The global hotkey is ⌃⌥Space, through the Carbon RegisterEventHotKey API —
 // the sanctioned, sandbox-safe mechanism every quick-entry app uses (no event
@@ -97,9 +98,15 @@ final class SeptaskKitQuickEntry: NSObject, NSTextFieldDelegate, NSWindowDelegat
     hint.textColor = SeptaskKitTheme.iconMuted
     hint.translatesAutoresizingMaskIntoConstraints = false
 
+    let addAndDo = SeptaskKitDo.button(.doAddAndDo, target: self, action: #selector(addAndDoPressed))
+    addAndDo.controlSize = .small
+    addAndDo.isHidden = !RegistryActions.isAvailableOnPlatform(.doAddAndDo)
+    addAndDo.translatesAutoresizingMaskIntoConstraints = false
+
     let body = NSView()
     body.addSubview(field)
     body.addSubview(hint)
+    body.addSubview(addAndDo)
     let inset = KitSurface.listInset + 2
     NSLayoutConstraint.activate([
       field.topAnchor.constraint(equalTo: body.topAnchor, constant: 16),
@@ -108,6 +115,8 @@ final class SeptaskKitQuickEntry: NSObject, NSTextFieldDelegate, NSWindowDelegat
       hint.topAnchor.constraint(equalTo: field.bottomAnchor, constant: 10),
       hint.leadingAnchor.constraint(equalTo: field.leadingAnchor),
       hint.bottomAnchor.constraint(equalTo: body.bottomAnchor, constant: -12),
+      addAndDo.trailingAnchor.constraint(equalTo: field.trailingAnchor),
+      addAndDo.centerYAnchor.constraint(equalTo: hint.centerYAnchor),
     ])
 
     let panel = KitSurfacePanel.make(
@@ -122,7 +131,9 @@ final class SeptaskKitQuickEntry: NSObject, NSTextFieldDelegate, NSWindowDelegat
 
   // MARK: - Saving
 
-  private func save(today: Bool) {
+  @objc private func addAndDoPressed() { save(today: false, startsDo: true) }
+
+  private func save(today: Bool, startsDo: Bool = false) {
     let title = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
     dismiss()
     guard !title.isEmpty else { return }
@@ -131,10 +142,14 @@ final class SeptaskKitQuickEntry: NSObject, NSTextFieldDelegate, NSWindowDelegat
     Task { @MainActor in
       // The panel can fire before the runtime is warm (start() memoizes).
       await SeptenaServices.shared.start()
-      _ = SeptenaServices.shared.taskMutator.create(title: title, today: today)
+      let task = SeptenaServices.shared.taskMutator.create(title: title, today: today)
       // Local mutations don't broadcast on their own; both shells listen for
       // this, so the capture appears everywhere at once.
       NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+      if startsDo {
+        SeptaskKitDo.shared.begin(taskID: task.id)
+        SeptaskKitDo.shared.showShell()
+      }
     }
   }
 

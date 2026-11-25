@@ -28,7 +28,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.septena.android.AndroidAppGraph
+import app.septena.android.doing.DoCopy
+import app.septena.core.DoSession
 import app.septena.core.JsonValue
 import app.septena.core.RegistryCatalog
 import app.septena.core.TaskProvenance
@@ -44,6 +47,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.Instant
+import java.time.ZoneId
 
 /** One line of the History list: what changed, then who and when. Same model as iOS `TaskHistoryRow`. */
 internal data class TaskHistoryRow(
@@ -110,6 +114,12 @@ internal fun TaskHistoryList(
     var state by remember(taskId) { mutableStateOf<HistoryState>(HistoryState.Loading) }
     var showingPlus by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val dataVersion by graph.sync.dataVersion.collectAsStateWithLifecycle()
+    var sessions by remember(taskId) { mutableStateOf<List<DoSession>>(emptyList()) }
+
+    LaunchedEffect(graph, taskId, dataVersion) {
+        sessions = withContext(Dispatchers.IO) { graph.doSessions.history(taskId) }
+    }
 
     LaunchedEffect(graph, taskId) {
         state = HistoryState.Loading
@@ -135,11 +145,15 @@ internal fun TaskHistoryList(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        if (sessions.isNotEmpty()) {
+            val copy = remember(languageTag) { DoCopy(languageTag) }
+            sessions.forEach { DoSessionRow(it, copy, languageTag) }
+        }
         when (val current = state) {
             HistoryState.Loading -> CircularProgressIndicator()
             HistoryState.Failed -> HistoryNote(control(RegistryTaskDetail.Controls.HISTORY_LOAD_FAILED))
             is HistoryState.Loaded -> if (current.rows.isEmpty() && current.edge == null) {
-                HistoryNote(control(RegistryTaskDetail.Controls.HISTORY_EMPTY))
+                if (sessions.isEmpty()) HistoryNote(control(RegistryTaskDetail.Controls.HISTORY_EMPTY))
             } else {
                 val now = System.currentTimeMillis()
                 current.rows.forEach { row -> HistoryRowView(row, now) }
@@ -168,6 +182,25 @@ internal fun TaskHistoryList(
             graph = graph,
             languageTag = languageTag,
             onDismiss = { showingPlus = false },
+        )
+    }
+}
+
+/** One Do of the task: how it ended, its length, the note and the day. An unknown length shows none. */
+@Composable
+private fun DoSessionRow(session: DoSession, copy: DoCopy, languageTag: String) {
+    val exit = when {
+        session.endedAt == null -> copy.openExit
+        else -> session.exit?.let(copy::exit)
+    }
+    val length = session.length?.let { copy.length(it.toMinutes()) }
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(listOfNotNull(exit, length).joinToString(" · "), style = MaterialTheme.typography.bodySmall)
+        session.note?.let { HistoryNote(it) }
+        Text(
+            formatDay(session.startedAt.atZone(ZoneId.systemDefault()).toLocalDate().toString(), languageTag),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
