@@ -16,13 +16,14 @@ struct SeptenaDateParser {
   /// Parse what a person types into a day. Day precision only; returns the
   /// start of that day.
   ///
-  /// Accepts: today / tod / tonight, tomorrow / tom / tmr / tmrw, weekday names
-  /// and their abbreviations (the next occurrence after today; "next fri"
-  /// too), "in N days / weeks / months", "+N" (days), "+Nd" / "+Nw" / "+Nm",
-  /// month-day in either order ("dec 4", "4 dec", optional year, commas
-  /// ignored: "March 15, 2027"), ISO "yyyy-mm-dd", and "mm/dd/yyyy" (then
-  /// "dd/mm/yyyy" when the first reading is not a date). Month and weekday
-  /// names match English and the current locale.
+  /// Accepts English and Brazilian Portuguese relative dates (today / hoje,
+  /// tomorrow / amanhã, "in 3 days" / "em 3 dias"), weekday names and their
+  /// abbreviations (the next occurrence after today; "next fri" and
+  /// "próxima sexta" too), "+N" (days), "+Nd" / "+Nw" / "+Nm", month-day in
+  /// either order ("dec 4", "4 de março", optional year, commas ignored), ISO
+  /// "yyyy-mm-dd", and localized "mm/dd/yyyy" or "dd/mm/yyyy". Month and
+  /// weekday names match English, Brazilian
+  /// Portuguese, and the current locale.
   static func parse(_ raw: String, today: Date, calendar: Calendar = .current) -> Date? {
     let text = raw.lowercased()
       .folding(options: .diacriticInsensitive, locale: .current)
@@ -36,8 +37,9 @@ struct SeptenaDateParser {
     }
 
     switch text {
-    case "today", "tod", "tdy", "now", "tonight": return start
-    case "tomorrow", "tom", "tmr", "tmrw", "tmw": return add(1, .day)
+    case "today", "tod", "tdy", "now", "tonight", "hoje", "hj", "agora", "hoje a noite":
+      return start
+    case "tomorrow", "tom", "tmr", "tmrw", "tmw", "amanha": return add(1, .day)
     default: break
     }
 
@@ -48,13 +50,20 @@ struct SeptenaDateParser {
     }
 
     // "in 3 days", "in 2 weeks", "in 1 month", "in 3d"
-    if text.hasPrefix("in ") {
+    if text.hasPrefix("in ") || text.hasPrefix("em ") {
       return relative(String(text.dropFirst(3)).replacingOccurrences(of: " ", with: ""),
                       add: add)
     }
 
     // Weekday, optionally "next ..."
-    let weekdayText = text.hasPrefix("next ") ? String(text.dropFirst(5)) : text
+    let weekdayText: String
+    if text.hasPrefix("next ") {
+      weekdayText = String(text.dropFirst(5))
+    } else if text.hasPrefix("proximo ") || text.hasPrefix("proxima ") {
+      weekdayText = String(text.dropFirst(8))
+    } else {
+      weekdayText = text
+    }
     if let weekday = weekdayNumber(weekdayText, calendar: calendar) {
       let current = calendar.component(.weekday, from: start)
       var delta = (weekday - current + 7) % 7
@@ -69,16 +78,24 @@ struct SeptenaDateParser {
       return validDate(year: year, month: month, day: day, calendar: calendar)
     }
 
-    // mm/dd/yyyy, then dd/mm/yyyy
+    // Numeric dates follow Brazilian order for pt-BR; otherwise try US order
+    // first, falling back to day-first when the first reading is invalid.
     let slash = text.split(separator: "/")
     if slash.count == 3, slash[2].count == 4,
        let first = Int(slash[0]), let second = Int(slash[1]), let year = Int(slash[2]) {
-      return validDate(year: year, month: first, day: second, calendar: calendar)
-        ?? validDate(year: year, month: second, day: first, calendar: calendar)
+      let localeID = (calendar.locale?.identifier ?? Locale.current.identifier)
+        .replacingOccurrences(of: "-", with: "_")
+        .lowercased()
+      let brazilianOrder = localeID.hasPrefix("pt_br")
+      let month = brazilianOrder ? second : first
+      let day = brazilianOrder ? first : second
+      return validDate(year: year, month: month, day: day, calendar: calendar)
+        ?? validDate(year: year, month: brazilianOrder ? first : second,
+                     day: brazilianOrder ? second : first, calendar: calendar)
     }
 
     // Month-day in either order, optional year: "dec 4", "4 dec 2027".
-    let words = text.split(separator: " ").map(String.init)
+    let words = text.split(separator: " ").map(String.init).filter { $0 != "de" }
     guard words.count == 2 || words.count == 3 else { return nil }
     var month: Int?
     var day: Int?
@@ -155,15 +172,17 @@ struct SeptenaDateParser {
 
   // ─── Private helpers ──────────────────────────────────────────────────────
 
-  /// "3", "3d", "3days", "2w", "2weeks", "1m", "1month" → offset from today.
+  /// "3", "3d", "3days", "2w", "2weeks", "1m", "1month" (and Portuguese
+  /// day / week / month names) → offset from today.
   private static func relative(_ text: String, add: (Int, Calendar.Component) -> Date?) -> Date? {
     let digits = text.prefix { $0.isNumber }
     guard let count = Int(digits) else { return nil }
     let unit = text.dropFirst(digits.count)
     switch unit {
-    case "", "d", "day", "days": return add(count, .day)
-    case "w", "wk", "wks", "week", "weeks": return add(count * 7, .day)
-    case "m", "mo", "month", "months": return add(count, .month)
+    case "", "d", "day", "days", "dia", "dias": return add(count, .day)
+    case "w", "wk", "wks", "week", "weeks", "sem", "semana", "semanas":
+      return add(count * 7, .day)
+    case "m", "mo", "month", "months", "mes", "meses": return add(count, .month)
     default: return nil
     }
   }
@@ -176,15 +195,21 @@ struct SeptenaDateParser {
 
   private static let englishWeekdays = ["sunday", "monday", "tuesday", "wednesday",
                                         "thursday", "friday", "saturday"]
+  private static let portugueseWeekdays = ["domingo", "segunda-feira", "terca-feira",
+                                           "quarta-feira", "quinta-feira", "sexta-feira",
+                                           "sabado"]
   private static let englishMonths = ["january", "february", "march", "april", "may", "june",
                                       "july", "august", "september", "october", "november",
                                       "december"]
+  private static let portugueseMonths = ["janeiro", "fevereiro", "marco", "abril", "maio",
+                                         "junho", "julho", "agosto", "setembro", "outubro",
+                                         "novembro", "dezembro"]
 
   /// 1 = Sunday … 7 = Saturday (Calendar's numbering). A word matches a full
   /// name, or any prefix of at least three letters ("thu", "thurs").
   private static func weekdayNumber(_ word: String, calendar: Calendar) -> Int? {
     let localized = calendar.weekdaySymbols.map { fold($0) }
-    for names in [englishWeekdays, localized] {
+    for names in [englishWeekdays, portugueseWeekdays, localized] {
       if let index = names.firstIndex(where: { word.count >= 3 && $0.hasPrefix(word) }) {
         return index + 1
       }
@@ -196,7 +221,7 @@ struct SeptenaDateParser {
   private static func monthNumber(_ word: String, calendar: Calendar) -> Int? {
     let cleaned = word.hasSuffix(".") ? String(word.dropLast()) : word
     let localized = calendar.monthSymbols.map { fold($0) }
-    for names in [englishMonths, localized] {
+    for names in [englishMonths, portugueseMonths, localized] {
       if let index = names.firstIndex(where: { cleaned.count >= 3 && $0.hasPrefix(cleaned) }) {
         return index + 1
       }
