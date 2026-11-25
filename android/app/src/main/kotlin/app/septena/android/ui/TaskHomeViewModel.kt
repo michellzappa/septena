@@ -25,6 +25,7 @@ import app.septena.core.generated.RegistryEntityFields
 import app.septena.core.generated.RegistryEntityNames as EntityNames
 import app.septena.core.generated.RegistryPlatformIds
 import app.septena.core.generated.RegistrySettingKeys
+import app.septena.core.generated.RegistryTaskPageBlockIds
 import app.septena.ui.SeptenaIconKind
 import app.septena.ui.TaskGroupHeader
 import app.septena.ui.TaskListItem
@@ -468,7 +469,14 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         }
     }
 
-    fun acceptReview(id: String) = editTask(id) { graph.taskMutator.acceptReview(id) }
+    fun acceptReview(id: String) {
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) { check(graph.acceptReview(id)) }
+            }.onSuccess { errorMessage.value = null; noteLocalChangeAndSync() }
+                .onFailure { errorMessage.value = it.message }
+        }
+    }
 
     fun keepFaded(id: String) = editTask(id) { graph.taskMutator.keepFaded(id) }
 
@@ -655,11 +663,24 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         // Load all turns in 2 bulk queries (cached) and evaluate only relevant conversations ONCE.
         val turnsByTask = graph.taskStore.allTurnsByTask()
         val relevantTaskIds = if (needsFullHistory) null else allSnapshots.mapTo(HashSet(allSnapshots.size)) { it.second.id }
-        val conversations = graph.taskStore.records(EntityNames.CONVO)
+        val convoRecords = graph.taskStore.records(EntityNames.CONVO)
             .asSequence()
             .filter { it.deletedAt == null }
             .filter { relevantTaskIds == null || it.id in relevantTaskIds }
-            .associate { it.id to runCatching { TaskConversation.from(it, turnsByTask[it.id].orEmpty()) }.getOrNull() }
+            .associateBy(SyncRecord::id)
+        val conversations = convoRecords.mapValues { (id, record) ->
+            runCatching { TaskConversation.from(record, turnsByTask[id].orEmpty()) }.getOrNull()
+        }
+        val projectParentAreaTitle = projectRecords.mapNotNull { item ->
+            val proj = item.location as? TaskHomeLocation.Project ?: return@mapNotNull null
+            val areaTitle = item.parentAreaId?.let(areaTitles::get) ?: return@mapNotNull null
+            proj.id to areaTitle
+        }.toMap()
+        val reviewFallback = RegistryCatalog.surface(RegistryTaskPageBlockIds.TASK_PAGE_CONVERSATION)
+            ?.fields?.get("reviewFallback")?.stringValue()?.takeIf(String::isNotBlank)
+            ?: "Ready for review"
+        val inboxLabel = RegistryCatalog.destinationTitle(RegistryDestinationIds.INBOX)?.takeIf(String::isNotBlank)
+            ?: "Inbox"
         val convoStates = HashMap<String, app.septena.core.ConversationSnapshotState>(conversations.size)
         for ((id, convo) in conversations) {
             if (convo != null) {
@@ -876,21 +897,45 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                     val rowPosition = record.fields[positionField(resolvedLocation.destinationId)].numberValue()
                         ?: record.fields[RegistryEntityFields.Task.POSITION].numberValue()
                     val positioned = PositionedTask(
-                        if (resolvedLocation.destinationId == RegistryDestinationIds.AGENT) {
-                            val stageTitle = agentGroups[stage]
-                            item.copy(
-                                group = stageTitle?.let {
-                                    TaskGroupHeader(
-                                        key = "agent:${stage.orEmpty()}",
-                                        title = it,
-                                        iconKind = SeptenaIconKind.None,
-                                    )
-                                },
-                                groupTitle = stageTitle,
-                                position = rowPosition,
-                            )
-                        } else {
-                            item.copy(position = rowPosition)
+                        when (resolvedLocation.destinationId) {
+                            RegistryDestinationIds.AGENT -> {
+                                val stageTitle = agentGroups[stage]
+                                item.copy(
+                                    group = stageTitle?.let {
+                                        TaskGroupHeader(
+                                            key = "agent:${stage.orEmpty()}",
+                                            title = it,
+                                            iconKind = SeptenaIconKind.None,
+                                        )
+                                    },
+                                    groupTitle = stageTitle,
+                                    position = rowPosition,
+                                )
+                            }
+                            RegistryDestinationIds.REVIEW -> {
+                                val note = conversation?.endStateNote?.trim()?.takeIf(String::isNotEmpty)
+                                    ?: reviewFallback
+                                val projTitle = snapshot.project?.let(projectTitles::get)
+                                val areaTitle = snapshot.area?.let(areaTitles::get)
+                                    ?: snapshot.project?.let(projectParentAreaTitle::get)
+                                val listLabel = when {
+                                    areaTitle != null && projTitle != null -> "$areaTitle › $projTitle"
+                                    projTitle != null -> projTitle
+                                    areaTitle != null -> areaTitle
+                                    else -> inboxLabel
+                                }
+                                val askedAgo = relativeAgo(conversation?.endStateAt)?.let { "asked $it" }
+                                val artifactTitle = (convoRecords[snapshot.id]?.fields?.get("artifact") as? JsonValue.ObjectValue)
+                                    ?.fields?.get("title")?.stringValue()?.trim()?.takeIf(String::isNotEmpty)
+                                val metaLine = listOfNotNull(listLabel, askedAgo, artifactTitle)
+                                    .joinToString(" · ")
+                                item.copy(
+                                    position = rowPosition,
+                                    reviewNote = note,
+                                    reviewMeta = metaLine,
+                                )
+                            }
+                            else -> item.copy(position = rowPosition)
                         },
                         rowPosition,
                         archiveDate = when (resolvedLocation.destinationId) {

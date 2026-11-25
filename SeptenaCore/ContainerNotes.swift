@@ -1,5 +1,42 @@
 import Foundation
 
+/// An agent's suggested replacement for a project's or area's brief (the part
+/// above `## Log`). Written via MCP `tasks_notes_propose` and cleared when the
+/// user accepts or rejects it in the app (ADR 0012, docs/PROJECT_NOTES_SPEC.md).
+struct NotesProposal: Codable, Hashable, Sendable {
+  let body: String
+  let agent: String
+  let at: String
+  let why: String?
+
+  var date: Date? {
+    TaskHistory.parseStamp(at)
+  }
+
+  /// Friendly agent label shown on the proposal card.
+  var displayAgent: String {
+    let trimmed = agent.trimmingCharacters(in: .whitespacesAndNewlines)
+    if trimmed.isEmpty || trimmed.lowercased() == "claude" {
+      return RegistrySurfaces.provenanceAgentFallbackName
+    }
+    return trimmed
+  }
+}
+
+/// One line in a compact brief diff shown inside a proposal card.
+struct NotesDiffLine: Identifiable, Hashable, Sendable {
+  enum Kind: Hashable, Sendable {
+    case context
+    case added
+    case removed
+    case separator
+  }
+
+  let id: Int
+  let kind: Kind
+  let text: String
+}
+
 /// Project and area notes: the context agents read before they decide
 /// anything about a task (ADR 0012, docs/PROJECT_NOTES_SPEC.md).
 ///
@@ -14,6 +51,11 @@ import Foundation
 /// the backend merged it into notes once, and the apps no longer read or
 /// push it.
 enum ContainerNotes {
+  enum Container: String, Codable, Sendable {
+    case project
+    case area
+  }
+
   /// The line that starts the agent log. Not localized: the backend matches
   /// it byte for byte.
   static let logHeading = "## Log"
@@ -25,6 +67,108 @@ enum ContainerNotes {
     guard let body, !body.isEmpty else { return ("", nil) }
     guard let match = body.firstMatch(of: logLine) else { return (body, nil) }
     return (String(body[..<match.range.lowerBound]), String(body[match.range.upperBound...]))
+  }
+
+  /// True when the note contains a `## Log` section.
+  static func hasLog(_ body: String?) -> Bool {
+    split(body).log != nil
+  }
+
+  /// Replaces only the brief (everything above `## Log`) with `proposedBrief`,
+  /// preserving the `## Log` heading and every log entry below it verbatim.
+  static func replacingBrief(in current: String?, with proposedBrief: String) -> String {
+    let (_, log) = split(current)
+    let cleanBrief = proposedBrief
+      .replacingOccurrences(of: "\r\n", with: "\n")
+      .trimmingTrailingWhitespace()
+    guard let log else { return cleanBrief }
+    if cleanBrief.isEmpty {
+      return "\(logHeading)\(log)"
+    }
+    return "\(cleanBrief)\n\n\(logHeading)\(log)"
+  }
+
+  /// Compact line diff comparing the current brief (text above `## Log`) to a
+  /// proposed brief. Shows changed lines with 1 line of surrounding context and
+  /// collapses long unchanged runs into `.separator`.
+  static func diffLines(from currentNotes: String?, to proposedBrief: String, contextRadius: Int = 1) -> [NotesDiffLine] {
+    let currentBrief = split(currentNotes).brief
+      .replacingOccurrences(of: "\r\n", with: "\n")
+      .trimmingTrailingWhitespace()
+    let targetBrief = proposedBrief
+      .replacingOccurrences(of: "\r\n", with: "\n")
+      .trimmingTrailingWhitespace()
+
+    let oldLines = currentBrief.isEmpty ? [] : currentBrief.components(separatedBy: "\n")
+    let newLines = targetBrief.isEmpty ? [] : targetBrief.components(separatedBy: "\n")
+    if oldLines == newLines { return [] }
+
+    // Guard against quadratic memory on huge notes.
+    let raw: [(NotesDiffLine.Kind, String)]
+    if oldLines.count * newLines.count > 160_000 {
+      raw = oldLines.map { (.removed, $0) } + newLines.map { (.added, $0) }
+    } else {
+      raw = lcsDiff(oldLines, newLines)
+    }
+
+    // Keep lines within `contextRadius` of any change; collapse the rest.
+    var keep = [Bool](repeating: false, count: raw.count)
+    for idx in raw.indices where raw[idx].0 != .context {
+      let lo = max(0, idx - contextRadius)
+      let hi = min(raw.count - 1, idx + contextRadius)
+      for j in lo...hi { keep[j] = true }
+    }
+
+    var out: [NotesDiffLine] = []
+    var skipping = false
+    for idx in raw.indices {
+      if keep[idx] {
+        if skipping {
+          out.append(NotesDiffLine(id: out.count, kind: .separator, text: "…"))
+          skipping = false
+        }
+        out.append(NotesDiffLine(id: out.count, kind: raw[idx].0, text: raw[idx].1))
+      } else if !out.isEmpty {
+        skipping = true
+      }
+    }
+    return out
+  }
+
+  private static func lcsDiff(_ a: [String], _ b: [String]) -> [(NotesDiffLine.Kind, String)] {
+    let m = a.count
+    let n = b.count
+    var dp = Array(repeating: Array(repeating: 0, count: n + 1), count: m + 1)
+    if m > 0 && n > 0 {
+      for i in stride(from: m - 1, through: 0, by: -1) {
+        for j in stride(from: n - 1, through: 0, by: -1) {
+          if a[i] == b[j] {
+            dp[i][j] = dp[i + 1][j + 1] + 1
+          } else {
+            dp[i][j] = max(dp[i + 1][j], dp[i][j + 1])
+          }
+        }
+      }
+    }
+    var result: [(NotesDiffLine.Kind, String)] = []
+    var i = 0
+    var j = 0
+    while i < m && j < n {
+      if a[i] == b[j] {
+        result.append((.context, a[i]))
+        i += 1
+        j += 1
+      } else if dp[i + 1][j] >= dp[i][j + 1] {
+        result.append((.removed, a[i]))
+        i += 1
+      } else {
+        result.append((.added, b[j]))
+        j += 1
+      }
+    }
+    while i < m { result.append((.removed, a[i])); i += 1 }
+    while j < n { result.append((.added, b[j])); j += 1 }
+    return result
   }
 
   /// Built per call: `Regex` is not `Sendable`, so it cannot be a static
@@ -88,6 +232,100 @@ enum ContainerNotes {
     let top = briefTrimmed.isEmpty ? block : "\(brief.trimmingTrailingWhitespace())\n\n\(block)"
     guard let log else { return top }
     return "\(top)\n\(logHeading)\(log)"
+  }
+}
+
+/// Shared UI copy for notes proposals and notes history so iOS SwiftUI and
+/// macOS AppKit stay in lockstep.
+enum ContainerNotesCopy {
+  static func proposalHeading(agent: String) -> String {
+    String(localized: "\(agent) suggested a notes update",
+           comment: "Header of a project or area notes proposal card")
+  }
+
+  static var acceptButton: String {
+    String(localized: "Accept", comment: "Accept a proposed notes brief update")
+  }
+
+  static var rejectButton: String {
+    String(localized: "Reject", comment: "Reject a proposed notes brief update")
+  }
+
+  static var noChangesInBrief: String {
+    String(localized: "No changes to the brief.", comment: "Shown when a proposal matches the current brief")
+  }
+
+  static var logPreservedHint: String {
+    String(localized: "Entries under ## Log stay untouched.",
+           comment: "Reassurance on a notes proposal card when the note has a log section")
+  }
+
+  static var historyMenuTitle: String {
+    String(localized: "Notes History", comment: "Menu item and sheet title for project/area notes revisions")
+  }
+
+  static var historyButtonTitle: String {
+    String(localized: "History", comment: "Compact button title for opening project/area notes history")
+  }
+
+  static var editNotesMenuTitle: String {
+    String(localized: "Edit Notes", comment: "Context menu item on project or area notes")
+  }
+
+  static var loadingHistory: String {
+    String(localized: "Loading history…", comment: "Loading indicator in notes history sheet")
+  }
+
+  static var emptyHistory: String {
+    String(localized: "No saved versions yet.", comment: "Empty state in notes history sheet")
+  }
+
+  static var failedHistory: String {
+    String(localized: "Couldn’t load notes history.", comment: "Error message in notes history sheet")
+  }
+
+  static var signInForHistory: String {
+    String(localized: "Sign in to view notes history.", comment: "Shown when notes history is opened without sync sign-in")
+  }
+
+  static var emptyRevisionBody: String {
+    String(localized: "Empty notes", comment: "Placeholder when previewing a blank notes revision")
+  }
+
+  static var restoreButton: String {
+    String(localized: "Restore", comment: "Button that restores a selected notes revision")
+  }
+
+  static var currentBadge: String {
+    String(localized: "Current", comment: "Badge marking the latest notes revision")
+  }
+
+  static var loadOlderButton: String {
+    String(localized: "Load older versions", comment: "Pagination button in notes history")
+  }
+
+  static var selectRevisionPrompt: String {
+    String(localized: "Choose a version to preview.", comment: "Empty selection state in macOS notes history detail pane")
+  }
+
+  static func versionLabel(_ rev: Int) -> String {
+    String(localized: "v\(rev)", comment: "Short revision number label in notes history")
+  }
+
+  static func revisionTitle(_ rev: Int) -> String {
+    String(localized: "Version \(rev)", comment: "Navigation title for a selected notes revision")
+  }
+
+  static var undoRestoreName: String {
+    String(localized: "Restore Notes", comment: "Undo action name when restoring an older notes version")
+  }
+
+  static var undoAcceptProposalName: String {
+    String(localized: "Accept Notes Suggestion", comment: "Undo action name when accepting an agent notes proposal")
+  }
+
+  static var undoRejectProposalName: String {
+    String(localized: "Reject Notes Suggestion", comment: "Undo action name when rejecting an agent notes proposal")
   }
 }
 

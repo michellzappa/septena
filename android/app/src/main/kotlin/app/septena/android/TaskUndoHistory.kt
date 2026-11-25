@@ -1,5 +1,6 @@
 package app.septena.android
 
+import app.septena.core.ConversationMutator
 import app.septena.core.JsonValue
 import app.septena.core.SyncRecord
 import app.septena.core.TaskMutator
@@ -19,6 +20,7 @@ data class TaskUndoState(
 class TaskUndoHistory {
     private sealed interface UndoOperation {
         data class RestoreFields(val fields: Map<String, JsonValue>) : UndoOperation
+        data class RestoreConvoFields(val fields: Map<String, JsonValue>) : UndoOperation
         data object RestoreDeleted : UndoOperation
         data object DeleteRestored : UndoOperation
         data object DeleteCreated : UndoOperation
@@ -41,6 +43,24 @@ class TaskUndoHistory {
     /** Called by a foreground gesture after its mutator write succeeds. */
     suspend fun recordEdit(before: SyncRecord?, after: SyncRecord?) {
         recordEdits(listOf(before to after))
+    }
+
+    /**
+     * Records a task + conversation mutation (such as Review Accept or Send back)
+     * as ONE undo entry so Undo restores both the task and the conversation state.
+     */
+    suspend fun recordTaskAndConvoEdit(
+        taskId: String,
+        beforeTask: SyncRecord?,
+        afterTask: SyncRecord?,
+        beforeConvo: SyncRecord?,
+        afterConvo: SyncRecord?,
+    ) {
+        val steps = mutableListOf<Step>()
+        step(beforeTask, afterTask)?.let { steps += it }
+        convoStep(taskId, beforeConvo, afterConvo)?.let { steps += it }
+        if (steps.isEmpty()) return
+        record(Entry(steps))
     }
 
     /**
@@ -80,6 +100,21 @@ class TaskUndoHistory {
         return Step(taskId = before.id, operation = operation)
     }
 
+    private fun convoStep(taskId: String, before: SyncRecord?, after: SyncRecord?): Step? {
+        if (after == null || after.entity != RegistryEntityNames.CONVO) return null
+        val beforeFields = before?.fields.orEmpty()
+        val afterFields = after.fields
+        val changedFields = (beforeFields.keys + afterFields.keys)
+            .filter { beforeFields[it] != afterFields[it] }
+        if (changedFields.isEmpty()) return null
+        return Step(
+            taskId = taskId,
+            operation = UndoOperation.RestoreConvoFields(
+                changedFields.associateWith { field -> beforeFields[field] ?: JsonValue.Null },
+            ),
+        )
+    }
+
     /** Drops every entry: the tasks they restore are gone (account deletion). */
     suspend fun clear() {
         mutex.withLock {
@@ -102,12 +137,18 @@ class TaskUndoHistory {
      * Replays the newest user gesture through the normal mutator, newest step
      * first. The entry stays available when no step could be replayed.
      */
-    suspend fun undo(mutator: TaskMutator): Boolean = mutex.withLock {
+    suspend fun undo(
+        mutator: TaskMutator,
+        conversationMutator: ConversationMutator? = null,
+    ): Boolean = mutex.withLock {
         val entry = entries.lastOrNull() ?: return@withLock false
         var undone = false
         for (step in entry.steps.asReversed()) {
             val replayed = when (val operation = step.operation) {
                 is UndoOperation.RestoreFields -> mutator.updateFields(step.taskId, operation.fields) != null
+                is UndoOperation.RestoreConvoFields -> runCatching {
+                    conversationMutator?.update(step.taskId, operation.fields) != null
+                }.getOrDefault(false)
                 UndoOperation.RestoreDeleted -> mutator.restore(step.taskId) != null
                 UndoOperation.DeleteRestored,
                 UndoOperation.DeleteCreated -> mutator.delete(step.taskId) != null

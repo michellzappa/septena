@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="20dp"
+    android:height="20dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="@color/widget_today_gold"
+        android:pathData="M12,7.5A4.5,4.5 0,1 0,12 16.5A4.5,4.5 0,1 0,12 7.5z" />
+    <path
+        android:strokeColor="@color/widget_today_gold"
+        android:strokeWidth="2.1"
+        android:strokeLineCap="round"
+        android:pathData="M12,2.5v2.3M12,19.2v2.3M2.5,12h2.3M19.2,12h2.3M5.3,5.3l1.6,1.6M17.1,17.1l1.6,1.6M18.7,5.3l-1.6,1.6M6.9,17.1l-1.6,1.6" />
+</vector>

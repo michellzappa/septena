@@ -57,6 +57,8 @@ struct SeptaskSettingsView: View {
     RegistrySettings.Defaults.textSizeStep
   @AppStorage(SettingsKey.loggingAnimationsEnabled) private var completionAnimations: Bool =
     RegistrySettings.Defaults.loggingAnimationsEnabled
+  @AppStorage(SettingsKey.inboxZeroMotionEnabled) private var inboxZeroMotion: Bool =
+    RegistrySettings.Defaults.inboxZeroMotionEnabled
   @AppStorage(AIPolicy.modeKey) private var aiModeRaw: String =
     RegistrySettings.Defaults.aiMode
 
@@ -486,6 +488,10 @@ struct SeptaskSettingsView: View {
         } else {
           Text(label)
         }
+      }
+    case "inboxZeroMotionEnabled":
+      Toggle(isOn: $inboxZeroMotion) {
+        rowLabel(label, detail: item.detail)
       }
     case "tasksTitleLines":
       Picker(label, selection: $titleLines) {

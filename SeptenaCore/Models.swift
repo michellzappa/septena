@@ -882,6 +882,11 @@ struct Project: Identifiable, Codable, Hashable {
   var completedAt: String?
   var notes: String?
   var context: String?
+  /// Server-maintained notes revision counter (from `ProjectEntity.noteRev`).
+  /// Populated by the entity init only — not part of the legacy `CodingKeys`.
+  var noteRev: Int
+  /// Open agent brief suggestion (from `ProjectEntity.notesProposal`).
+  var notesProposal: NotesProposal?
   /// Optional "owner/repo" pointer. Source of truth for agentic tooling that
   /// needs to know which GitHub repo a project's tasks live against.
   var githubRepo: String?
@@ -902,12 +907,14 @@ struct Project: Identifiable, Codable, Hashable {
 
   init(id: String, title: String, status: ProjectStatus = .active,
        area: String? = nil, created: String? = nil, completedAt: String? = nil,
-       notes: String? = nil, context: String? = nil, githubRepo: String? = nil,
+       notes: String? = nil, context: String? = nil, noteRev: Int = 0,
+       notesProposal: NotesProposal? = nil, githubRepo: String? = nil,
        position: Int = 0,
        updatedAt: String? = nil, deletedAt: String? = nil) {
     self.id = id; self.title = title; self.status = status
     self.area = area; self.created = created; self.completedAt = completedAt
-    self.notes = notes; self.context = context; self.githubRepo = githubRepo
+    self.notes = notes; self.context = context; self.noteRev = noteRev
+    self.notesProposal = notesProposal; self.githubRepo = githubRepo
     self.position = position
     self.updatedAt = updatedAt; self.deletedAt = deletedAt
   }
@@ -922,6 +929,8 @@ struct Project: Identifiable, Codable, Hashable {
     completedAt = try c.decodeIfPresent(String.self, forKey: .completedAt)
     notes = try c.decodeIfPresent(String.self, forKey: .notes)
     context = try c.decodeIfPresent(String.self, forKey: .context)
+    noteRev = 0
+    notesProposal = nil
     githubRepo = try c.decodeIfPresent(String.self, forKey: .githubRepo)
     position = 0   // not on the wire; set via ProjectEntity init
     updatedAt = try c.decodeIfPresent(String.self, forKey: .updatedAt)
@@ -935,6 +944,10 @@ struct Area: Identifiable, Codable, Hashable {
   let id: String
   var title: String
   var context: String?
+  /// Server-maintained notes revision counter (from `AreaEntity.noteRev`).
+  var noteRev: Int
+  /// Open agent brief suggestion (from `AreaEntity.notesProposal`).
+  var notesProposal: NotesProposal?
   /// Optional user-assigned glyph; nil ⇒ the area renders its filler dot.
   var emoji: String?
   /// Sidebar sort order (synced, from `AreaEntity.position`). Populated by the
@@ -946,10 +959,12 @@ struct Area: Identifiable, Codable, Hashable {
   // "wholesale-replace array" note here is FastAPI-era history. No `deletedAt`
   // field by design (delete-by-omission from the local mirror).
 
-  init(id: String, title: String, context: String? = nil, emoji: String? = nil,
+  init(id: String, title: String, context: String? = nil, noteRev: Int = 0,
+       notesProposal: NotesProposal? = nil, emoji: String? = nil,
        position: Int = 0,
        updatedAt: String? = nil) {
-    self.id = id; self.title = title; self.context = context; self.emoji = emoji
+    self.id = id; self.title = title; self.context = context; self.noteRev = noteRev
+    self.notesProposal = notesProposal; self.emoji = emoji
     self.position = position
     self.updatedAt = updatedAt
   }
@@ -959,6 +974,8 @@ struct Area: Identifiable, Codable, Hashable {
     id = try c.decode(String.self, forKey: .id)
     title = try c.decodeIfPresent(String.self, forKey: .title) ?? id
     context = try c.decodeIfPresent(String.self, forKey: .context)
+    noteRev = 0
+    notesProposal = nil
     emoji = try c.decodeIfPresent(String.self, forKey: .emoji)
     position = 0   // not on the wire; set via AreaEntity init
     updatedAt = try c.decodeIfPresent(String.self, forKey: .updatedAt)

@@ -122,6 +122,9 @@ final class SeptaskKitTaskListController: NSViewController {
     /// Return, ⌘K, type-select, right-click) that is never a task. Every task
     /// command reads `task`, which is nil here, so it does nothing.
     case noticeStep(TaskNoticeStep)
+    /// An agent's proposed brief update, rendered directly above the notes row
+    /// (`KitNotesProposalCell`, ADR 0012, #123). Not selectable.
+    case notesProposal(isArea: Bool, id: String, currentNotes: String, proposal: NotesProposal)
     /// The project's or area's notes, under the page title
     /// (`KitContainerNotesCell`, ADR 0012). Not selectable: it carries no
     /// task, and a click opens its editor popover.
@@ -143,6 +146,7 @@ final class SeptaskKitTaskListController: NSViewController {
       case .notice(let notice): return "notice:" + notice.id.rawValue
       case .noticeStep(let step): return step.selectionID
       case .importAllReminders: return "import-all-reminders"
+      case .notesProposal: return "notes-proposal"
       case .containerNotes: return "container-notes"
       }
     }
@@ -170,7 +174,7 @@ final class SeptaskKitTaskListController: NSViewController {
     /// so they break the card run the same way a Today area/project header does.
     var isCardRow: Bool {
       switch self {
-      case .header, .screenTitle, .tagFilterBar, .fadedFooter, .loggedFooter, .addSection, .containerNotes: return false
+      case .header, .screenTitle, .tagFilterBar, .fadedFooter, .loggedFooter, .addSection, .notesProposal, .containerNotes: return false
       // A standalone notice sits on the page with its own card fill. A notice
       // with checklist steps (`Get started`) heads its steps' card so the
       // header and rows share one seamless frosted surface (matching iOS).
@@ -259,6 +263,10 @@ final class SeptaskKitTaskListController: NSViewController {
   /// the gate clears (`flushHeldReload`).
   private var heldReload = false
   private var settleWorkItem: DispatchWorkItem?
+  /// Shared trigger, once-a-day budget, and interruption state for Inbox zero
+  /// header motion (`docs/INBOX_ZERO_MOTION_SPEC.md`, #298).
+  private var inboxZeroTracker = InboxZeroMotionTracker()
+  private var inboxZeroHoldWorkItem: DispatchWorkItem?
   /// Notifications are synchronous, but a single user gesture can emit several
   /// of them (move-to-area, date changes, batch completion). Keep the payload
   /// and repaint once on the next run-loop turn instead of rebuilding the table
@@ -803,13 +811,25 @@ final class SeptaskKitTaskListController: NSViewController {
     let width = tableView.bounds.width
     guard abs(width - notesRowMeasuredWidth) > 0.5 else { return }
     notesRowMeasuredWidth = width
-    guard let index = rows.firstIndex(where: { if case .containerNotes = $0 { return true }; return false }),
-          index < tableView.numberOfRows else { return }
-    tableView.noteHeightOfRows(withIndexesChanged: [index])
+    let indexes = IndexSet(rows.indices.filter { idx in
+      guard idx < tableView.numberOfRows else { return false }
+      switch rows[idx] {
+      case .containerNotes, .notesProposal: return true
+      default: return false
+      }
+    })
+    guard !indexes.isEmpty else { return }
+    tableView.noteHeightOfRows(withIndexesChanged: indexes)
+  }
+
+  override func viewWillDisappear() {
+    super.viewWillDisappear()
+    cancelInboxZeroMotion()
   }
 
   deinit {
     reloadWorkItem?.cancel()
+    inboxZeroHoldWorkItem?.cancel()
     for observer in observers {
       NotificationCenter.default.removeObserver(observer)
       NSWorkspace.shared.notificationCenter.removeObserver(observer)
@@ -848,6 +868,7 @@ final class SeptaskKitTaskListController: NSViewController {
     // composer can never ride along (pinned) into a different list.
     commitOpenEdits()
     cancelSettle()
+    resetInboxZeroMotionForFilterChange()
     activeTagFilterIDs.removeAll()
     self.filter = filter
     if case .project(let id) = filter {
@@ -1251,7 +1272,36 @@ final class SeptaskKitTaskListController: NSViewController {
 
     let priorRows = rows
     let live = liveEditorIDs
-    apply(pinned(newRows, liveEditors: live), animated: animated, preserving: live)
+    var nextRows = pinned(newRows, liveEditors: live)
+    let currentInboxIDs = visibleInboxIDs(in: nextRows)
+    if filter == .today,
+       let headerIndex = nextRows.firstIndex(where: {
+         if case .header(let id, _, _, _) = $0 { return id == "inbox" }
+         return false
+       }) {
+      let restingSymbol = currentInboxIDs.isEmpty
+        ? InboxZeroMotion.emptyTraySymbol
+        : InboxZeroMotion.filledTraySymbol
+      nextRows[headerIndex] = .header(
+        id: "inbox",
+        title: TaskFilter.triage.title,
+        icon: .symbol(restingSymbol),
+        count: currentInboxIDs.count
+      )
+    }
+    let inboxZeroOutcome = inboxZeroTracker.observe(
+      isToday: filter == .today,
+      inboxIDs: currentInboxIDs,
+      tagFilterActive: !activeTagFilterIDs.isEmpty,
+      isCollapsed: false,
+      today: DayClock.appToday,
+      settingEnabled: InboxZeroMotion.isEnabled(),
+      reduceMotion: KitMotion.reduce
+    )
+    let preserveInboxHeader = inboxZeroOutcome.playVisualMotion
+      || inboxZeroTracker.phase == .checkmark
+    apply(nextRows, animated: animated, preserving: live, preserveInboxHeader: preserveInboxHeader)
+    applyInboxZeroOutcome(inboxZeroOutcome, inboxCount: currentInboxIDs.count)
     let hasContent = rows.contains { row in
       if case .screenTitle = row { return false }
       return true
@@ -1715,6 +1765,7 @@ final class SeptaskKitTaskListController: NSViewController {
   private func importReminder(_ id: String) {
     guard !bulkImportingReminders, importingReminderID == nil,
           let pair = reminderPairs.first(where: { $0.view.id == id }) else { return }
+    noteInboxGesture(ids: ["reminder:\(id)"])
     importingReminderID = id
     reload()
     let created = mutator.create(title: pair.view.title,
@@ -1741,6 +1792,7 @@ final class SeptaskKitTaskListController: NSViewController {
 
   private func importAllReminders() {
     guard !bulkImportingReminders, !reminderPairs.isEmpty else { return }
+    noteInboxGesture(ids: reminderPairs.map { "reminder:\($0.view.id)" })
     bulkImportingReminders = true
     reload()
     let pairs = reminderPairs
@@ -1785,9 +1837,100 @@ final class SeptaskKitTaskListController: NSViewController {
     let count = band.count + reminderPairs.count
     return [.header(id: "inbox",
                     title: TaskFilter.triage.title,
-                    icon: .symbol("tray"), count: count)]
+                    icon: .symbol(count > 0 ? InboxZeroMotion.filledTraySymbol : InboxZeroMotion.emptyTraySymbol),
+                    count: count)]
       + reminders
       + band.map(chipped)
+  }
+
+  // MARK: - Inbox zero motion (docs/INBOX_ZERO_MOTION_SPEC.md, #298)
+
+  /// Every visible Inbox row under `.header(id: "inbox")` on Today — pending
+  /// Apple Reminders, triage-band rows, loose unfiled Today tasks, and any
+  /// settling Inbox rows kept alive by `pinned(_:liveEditors:)`.
+  private func visibleInboxIDs(in candidateRows: [Row]) -> Set<String> {
+    guard filter == .today,
+          let headerIndex = candidateRows.firstIndex(where: {
+            if case .header(let id, _, _, _) = $0 { return id == "inbox" }
+            return false
+          })
+    else { return [] }
+    var ids: Set<String> = []
+    for index in (headerIndex + 1)..<candidateRows.count {
+      switch candidateRows[index] {
+      case .reminder(let item, _):
+        ids.insert("reminder:\(item.id)")
+      case .importAllReminders, .newTask:
+        continue
+      case .task(let task, _, _):
+        ids.insert(task.id)
+      case .header, .loggedFooter, .fadedFooter, .addSection,
+           .screenTitle, .tagFilterBar, .projectTarget, .containerNotes,
+           .notice, .noticeStep, .event:
+        return ids
+      }
+    }
+    return ids
+  }
+
+  private func noteInboxGesture(ids: [String], clearedTodayArc: Bool = false) {
+    guard filter == .today, !ids.isEmpty else { return }
+    inboxZeroTracker.recordGesture(
+      itemIDs: ids,
+      currentInboxIDs: visibleInboxIDs(in: rows),
+      clearedTodayArc: clearedTodayArc
+    )
+  }
+
+  private func inboxHeaderCell() -> KitGroupHeaderCell? {
+    guard let index = rows.firstIndex(where: {
+      if case .header(let id, _, _, _) = $0 { return id == "inbox" }
+      return false
+    }) else { return nil }
+    return tableView.view(atColumn: 0, row: index, makeIfNecessary: false) as? KitGroupHeaderCell
+  }
+
+  private func applyInboxZeroOutcome(_ outcome: InboxZeroMotionTracker.Outcome, inboxCount: Int) {
+    if outcome.cancelInFlightMotion {
+      inboxZeroHoldWorkItem?.cancel()
+      inboxZeroHoldWorkItem = nil
+      let symbol = inboxCount > 0 ? InboxZeroMotion.filledTraySymbol : InboxZeroMotion.emptyTraySymbol
+      inboxHeaderCell()?.cancelInboxZeroMotion(symbolName: symbol)
+      return
+    }
+    if outcome.announceVoiceOver {
+      A11y.announce(InboxZeroMotion.announcementText)
+    }
+    // macOS has no haptic (spec §4).
+    if outcome.playVisualMotion {
+      inboxZeroHoldWorkItem?.cancel()
+      inboxHeaderCell()?.playInboxZeroCheckmark()
+      let work = DispatchWorkItem { [weak self] in
+        guard let self else { return }
+        self.inboxZeroHoldWorkItem = nil
+        guard self.inboxZeroTracker.phase == .checkmark else { return }
+        self.inboxZeroTracker.finishMotion()
+        self.inboxHeaderCell()?.finishInboxZeroToEmptyTray()
+      }
+      inboxZeroHoldWorkItem = work
+      DispatchQueue.main.asyncAfter(deadline: .now() + InboxZeroMotion.holdDuration, execute: work)
+    }
+  }
+
+  private func cancelInboxZeroMotion() {
+    inboxZeroHoldWorkItem?.cancel()
+    inboxZeroHoldWorkItem = nil
+    if inboxZeroTracker.cancelMotion() {
+      let count = visibleInboxIDs(in: rows).count
+      let symbol = count > 0 ? InboxZeroMotion.filledTraySymbol : InboxZeroMotion.emptyTraySymbol
+      inboxHeaderCell()?.cancelInboxZeroMotion(symbolName: symbol)
+    }
+  }
+
+  private func resetInboxZeroMotionForFilterChange() {
+    inboxZeroHoldWorkItem?.cancel()
+    inboxZeroHoldWorkItem = nil
+    inboxZeroTracker.resetForFilterChange()
   }
 
   /// An MCP-authored row can satisfy both the triage band and Today (the band
@@ -1874,6 +2017,7 @@ final class SeptaskKitTaskListController: NSViewController {
     _ picks: [(task: SeptenaTask, suggestion: SuggestionEngine.Suggestion)]
   ) {
     guard !picks.isEmpty else { return }
+    noteInboxGesture(ids: picks.map(\.task.id))
     let before = picks.map { TaskUndo.FilingSnapshot($0.task) }
     for (task, suggestion) in picks {
       let wasInTriage = task.isInTriageBand
@@ -1999,17 +2143,29 @@ final class SeptaskKitTaskListController: NSViewController {
     }
   }
 
-  /// The notes row under a project's or area's title — on every such page,
-  /// empty or not, so the notes are always one click away (ADR 0012).
+  /// The notes row (plus any open proposal card directly above it) under a
+  /// project's or area's title — always one click away (ADR 0012).
   private func containerNotesRows() -> [Row] {
     let snapshot = StructureCache.snapshot(in: context)
     switch filter {
     case .project(let id):
       guard let project = snapshot.projects.first(where: { $0.id == id }) else { return [] }
-      return [.containerNotes(isArea: false, id: id, text: project.notes ?? "")]
+      let text = project.notes ?? ""
+      var out: [Row] = []
+      if let proposal = project.notesProposal {
+        out.append(.notesProposal(isArea: false, id: id, currentNotes: text, proposal: proposal))
+      }
+      out.append(.containerNotes(isArea: false, id: id, text: text))
+      return out
     case .area(let id):
       guard let area = snapshot.areas.first(where: { $0.id == id }) else { return [] }
-      return [.containerNotes(isArea: true, id: id, text: area.context ?? "")]
+      let text = area.context ?? ""
+      var out: [Row] = []
+      if let proposal = area.notesProposal {
+        out.append(.notesProposal(isArea: true, id: id, currentNotes: text, proposal: proposal))
+      }
+      out.append(.containerNotes(isArea: true, id: id, text: text))
+      return out
     default:
       return []
     }
@@ -2018,7 +2174,14 @@ final class SeptaskKitTaskListController: NSViewController {
   /// Opens the notes editor anchored to the notes row; closing it saves
   /// through the same mutators the SwiftUI project and area pages use.
   private func editContainerNotes(isArea: Bool, id: String, text: String, anchor: NSView) {
-    KitContainerNotesPopover.present(isArea: isArea, notes: text, relativeTo: anchor) { [weak self] newText in
+    KitContainerNotesPopover.present(
+      isArea: isArea,
+      notes: text,
+      relativeTo: anchor,
+      onHistory: { [weak self] in
+        self?.showContainerNotesHistory(isArea: isArea, id: id)
+      }
+    ) { [weak self] newText in
       let value: String? = newText.isEmpty ? nil : newText
       Task { @MainActor in
         do {
@@ -2029,6 +2192,102 @@ final class SeptaskKitTaskListController: NSViewController {
           }
         } catch {
           SeptenaLog.error("[notes] save failed for \(isArea ? "area" : "project") \(id)", error)
+        }
+        self?.reload()
+      }
+    }
+  }
+
+  private func acceptContainerNotesProposal(isArea: Bool, id: String, currentNotes: String, proposal: NotesProposal) {
+    let before: String? = currentNotes.isEmpty ? nil : currentNotes
+    let merged = ContainerNotes.replacingBrief(in: before, with: proposal.body)
+    let after: String? = merged.isEmpty ? nil : merged
+    if isArea {
+      TaskUndo.recordAreaProposalDecision(
+        id: id, accepted: true, beforeNotes: before, afterNotes: after,
+        proposal: proposal, areas: SeptenaServices.shared.areasMutator)
+    } else {
+      TaskUndo.recordProjectProposalDecision(
+        id: id, accepted: true, beforeNotes: before, afterNotes: after,
+        proposal: proposal, projects: SeptenaServices.shared.projectsMutator)
+    }
+    Task { @MainActor in
+      do {
+        if isArea {
+          try await SeptenaServices.shared.areasMutator.acceptNotesProposal(id: id)
+        } else {
+          try await SeptenaServices.shared.projectsMutator.acceptNotesProposal(id: id)
+        }
+      } catch {
+        SeptenaLog.error("[notes] accept proposal failed for \(isArea ? "area" : "project") \(id)", error)
+      }
+      self.reload()
+    }
+  }
+
+  private func rejectContainerNotesProposal(isArea: Bool, id: String, currentNotes: String, proposal: NotesProposal) {
+    let current: String? = currentNotes.isEmpty ? nil : currentNotes
+    if isArea {
+      TaskUndo.recordAreaProposalDecision(
+        id: id, accepted: false, beforeNotes: current, afterNotes: current,
+        proposal: proposal, areas: SeptenaServices.shared.areasMutator)
+    } else {
+      TaskUndo.recordProjectProposalDecision(
+        id: id, accepted: false, beforeNotes: current, afterNotes: current,
+        proposal: proposal, projects: SeptenaServices.shared.projectsMutator)
+    }
+    Task { @MainActor in
+      do {
+        if isArea {
+          try await SeptenaServices.shared.areasMutator.rejectNotesProposal(id: id)
+        } else {
+          try await SeptenaServices.shared.projectsMutator.rejectNotesProposal(id: id)
+        }
+      } catch {
+        SeptenaLog.error("[notes] reject proposal failed for \(isArea ? "area" : "project") \(id)", error)
+      }
+      self.reload()
+    }
+  }
+
+  private func showContainerNotesHistory(isArea: Bool, id: String) {
+    let snapshot = StructureCache.snapshot(in: context)
+    let title: String
+    let currentNotes: String
+    if isArea {
+      let area = snapshot.areas.first(where: { $0.id == id })
+      title = area?.title ?? ""
+      currentNotes = area?.context ?? ""
+    } else {
+      let project = snapshot.projects.first(where: { $0.id == id })
+      title = project?.title ?? ""
+      currentNotes = project?.notes ?? ""
+    }
+    KitNotesHistorySheet.present(
+      container: isArea ? .area : .project,
+      id: id,
+      title: title,
+      currentNotes: currentNotes,
+      from: self
+    ) { [weak self] restored in
+      let before: String? = currentNotes.isEmpty ? nil : currentNotes
+      let after: String? = restored.isEmpty ? nil : restored
+      if isArea {
+        TaskUndo.recordAreaNotesRestore(id: id, before: before, after: after,
+                                        areas: SeptenaServices.shared.areasMutator)
+      } else {
+        TaskUndo.recordProjectNotesRestore(id: id, before: before, after: after,
+                                           projects: SeptenaServices.shared.projectsMutator)
+      }
+      Task { @MainActor in
+        do {
+          if isArea {
+            try await SeptenaServices.shared.areasMutator.setContext(id: id, context: after)
+          } else {
+            try await SeptenaServices.shared.projectsMutator.setNotes(id: id, notes: after)
+          }
+        } catch {
+          SeptenaLog.error("[notes] restore failed for \(isArea ? "area" : "project") \(id)", error)
         }
         self?.reload()
       }
@@ -2225,11 +2484,12 @@ final class SeptaskKitTaskListController: NSViewController {
   /// re-rendered here, and their presence forces the diff path even when a
   /// hard reload was asked for — `reloadData()` would tear the editor down
   /// mid-keystroke. Under Reduce Motion that diff runs without animation.
-  private func apply(_ new: [Row], animated: Bool, preserving: Set<String> = []) {
+  private func apply(_ new: [Row], animated: Bool, preserving: Set<String> = [],
+                     preserveInboxHeader: Bool = false) {
     let old = rows
     rows = new
 
-    let diffable = !old.isEmpty && (animated && !KitMotion.reduce || !preserving.isEmpty)
+    let diffable = !old.isEmpty && (animated && !KitMotion.reduce || !preserving.isEmpty || preserveInboxHeader)
     guard diffable else {
       tableView.reloadData()
       return
@@ -2238,6 +2498,9 @@ final class SeptaskKitTaskListController: NSViewController {
     let removeAnimation: NSTableView.AnimationOptions = moving ? KitMotion.removeRows : []
     let insertAnimation: NSTableView.AnimationOptions = moving ? KitMotion.insertRows : []
     func isPreserved(_ index: Int) -> Bool {
+      if preserveInboxHeader, case .header(let id, _, _, _) = new[index], id == "inbox" {
+        return true
+      }
       guard let id = new[index].task?.id else { return false }
       return preserving.contains(id)
     }
@@ -2436,6 +2699,12 @@ final class SeptaskKitTaskListController: NSViewController {
       }
     }
     guard !selection.isEmpty else { return }
+    switch destination {
+    case .none:
+      cancelInboxZeroMotion()
+    case .area, .project:
+      noteInboxGesture(ids: selection.map(\.id))
+    }
     // Captured before mutating, so undo can restore each task's exact prior
     // filing, including a heading. A batch move can start from several
     // different lists at once.
@@ -2870,6 +3139,7 @@ final class SeptaskKitTaskListController: NSViewController {
         // restyle in place and let the settle timer's own reload resolve the
         // list. Rows still lingering from the same batch keep their beat.
         settlingIDs.subtract(reopening.map(\.id))
+        inboxZeroTracker.cancelGesture(itemIDs: reopening.map(\.id))
         restyle(ids: reopening.map(\.id), to: .open)
         for task in reopening { mutator.uncomplete(id: task.id) }
         return
@@ -2896,6 +3166,7 @@ final class SeptaskKitTaskListController: NSViewController {
 
     isSettling = true
     settlingIDs.formUnion(completing.map(\.id))
+    noteInboxGesture(ids: completing.map(\.id))
     // The row stays where it is, restyled as completed, for the settle window
     // — you see what you just did before it leaves.
     restyle(ids: completing.map(\.id), to: .done)
@@ -2927,6 +3198,7 @@ final class SeptaskKitTaskListController: NSViewController {
 
     isSettling = true
     settlingIDs.formUnion(ids)
+    noteInboxGesture(ids: ids)
     restyle(ids: ids, to: .cancelled)
     for id in ids { mutator.cancel(id: id) }
     beginSettle()
@@ -3041,6 +3313,7 @@ final class SeptaskKitTaskListController: NSViewController {
       // Read the rows again from the store: a time-slot change in the same
       // popover can have moved them on since it opened.
       let liveSel = selection.map { LocalCache.task(id: $0.id, in: self.context) ?? $0 }
+      self.noteInboxGesture(ids: liveSel.map(\.id))
       let before = liveSel.map(self.scheduleSnapshot)
       var deferredTo: Date?
       for task in liveSel {
@@ -3131,6 +3404,7 @@ final class SeptaskKitTaskListController: NSViewController {
   /// task in Anytime. Matches the registry shortcut of `task.clearSchedule`.
   func clearScheduleSelection() {
     let before = actionableSelection.map(scheduleSnapshot)
+    noteInboxGesture(ids: actionableSelection.map(\.id))
     for task in actionableSelection {
       mutator.apply(.clearWhen, to: task.id)
     }
@@ -3145,6 +3419,7 @@ final class SeptaskKitTaskListController: NSViewController {
     // the store must already hold what was typed.
     commitComposerTextIfOpen()
     let before = actionableSelection.map(scheduleSnapshot)
+    noteInboxGesture(ids: actionableSelection.map(\.id))
     // Spec §4 A4: decided on `isOnToday` (pin OR arrived date), the same
     // test the menu label uses, never the raw pin.
     let joined = mutator.toggleToday(ids: actionableSelection.map(\.id))
@@ -3212,6 +3487,7 @@ final class SeptaskKitTaskListController: NSViewController {
       return
     }
     TaskUndo.recordDelete(ids: ids, mutator: mutator)
+    noteInboxGesture(ids: ids)
     let ticket = TaskUndoTicket()
     for id in ids { mutator.delete(id: id) }
     let message = victims.count == 1
@@ -3381,6 +3657,9 @@ final class SeptaskKitTaskListController: NSViewController {
     // on the line — not above it. A ⌘N that inherits a list from the focused
     // row still files into that group at the top, unchanged.
     let landsInInboxRun = inInbox || TaskInbox.isUnfiled(area: context.area, project: context.project)
+    if landsInInboxRun {
+      cancelInboxZeroMotion()
+    }
     let task = mutator.create(title: "", area: context.area, project: context.project,
                               scheduled: context.scheduled, today: context.today,
                               deferPush: true,
@@ -4864,6 +5143,11 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
     case .newTask: return SeptaskKitTheme.rowHeight
     // Same band as the logged footer — both are quiet meta-font page footers.
     case .addSection: return SeptenaTypeScale.size(.footnote) + 24
+    case .notesProposal(_, _, let currentNotes, let proposal):
+      return KitNotesProposalLayout.height(
+        currentNotes: currentNotes,
+        proposal: proposal,
+        rowWidth: tableView.bounds.width)
     case .containerNotes(let isArea, _, let text):
       return KitContainerNotes.height(
         text: text,
@@ -5388,7 +5672,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       }
     }
 
-    var anyMoved = false
+    var movedIDs: [String] = []
     for id in ids {
       // The store, not `rows`: a drag from another window's list carries ids
       // this table may not be showing.
@@ -5399,10 +5683,17 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       if destinationChanged {
         mutator.moveToList(id: id, area: targetArea, project: targetProject)
         mutator.acknowledge(id: id)
-        anyMoved = true
+        movedIDs.append(id)
       }
     }
-    return anyMoved
+    if !movedIDs.isEmpty {
+      if targetProject != nil || targetArea != nil {
+        noteInboxGesture(ids: movedIDs)
+      } else {
+        cancelInboxZeroMotion()
+      }
+    }
+    return !movedIDs.isEmpty
   }
 
   func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?,
@@ -5415,9 +5706,11 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       // Only area/project headers have a leaf to drill into — "Inbox" and
       // "Agenda" aren't destinations of their own.
       let target = navigationTarget(forHeaderId: id)
+      let keepCheckmark = (id == "inbox" && inboxZeroTracker.phase == .checkmark)
       cell.configure(title: title, icon: icon, count: count,
                      isNavigable: target != nil,
-                     showsQuickAdd: showsGroupedHeaderQuickAdd && target != nil)
+                     showsQuickAdd: showsGroupedHeaderQuickAdd && target != nil,
+                     keepAnimatedCheckmark: keepCheckmark)
       cell.onTap = target.map { filter in
         { [weak self] in self?.onNavigate?(.filter(filter, title: filter.title)) }
       }
@@ -5501,6 +5794,19 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       cell.onTap = { [weak self] in self?.menuNewSection() }
       return cell
 
+    case .notesProposal(let isArea, let id, let currentNotes, let proposal):
+      let identifier = NSUserInterfaceItemIdentifier("notesProposalCell")
+      let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? KitNotesProposalCell
+        ?? KitNotesProposalCell(identifier: identifier)
+      cell.configure(currentNotes: currentNotes, proposal: proposal)
+      cell.onAccept = { [weak self] in
+        self?.acceptContainerNotesProposal(isArea: isArea, id: id, currentNotes: currentNotes, proposal: proposal)
+      }
+      cell.onReject = { [weak self] in
+        self?.rejectContainerNotesProposal(isArea: isArea, id: id, currentNotes: currentNotes, proposal: proposal)
+      }
+      return cell
+
     case .containerNotes(let isArea, let id, let text):
       let identifier = NSUserInterfaceItemIdentifier("containerNotesCell")
       let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? KitContainerNotesCell
@@ -5509,6 +5815,9 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
                      placeholder: isArea ? ContainerNotes.areaPlaceholder : ContainerNotes.projectPlaceholder)
       cell.onEdit = { [weak self] anchor in
         self?.editContainerNotes(isArea: isArea, id: id, text: text, anchor: anchor)
+      }
+      cell.onHistory = { [weak self] in
+        self?.showContainerNotesHistory(isArea: isArea, id: id)
       }
       return cell
 
@@ -7644,11 +7953,53 @@ final class KitGroupHeaderCell: NSTableCellView {
     super.layout()
   }
 
+  private static func symbolImage(named name: String) -> NSImage? {
+    NSImage(systemSymbolName: name, accessibilityDescription: nil)?
+      .withSymbolConfiguration(.init(pointSize: 16, weight: .medium))
+  }
+
+  /// Spec §3: filled tray → check mark (SF Symbols replace + draw-on effect).
+  func playInboxZeroCheckmark() {
+    emoji.isHidden = true
+    icon.isHidden = false
+    icon.contentTintColor = SeptaskKitTheme.inkSecondary
+    icon.removeAllSymbolEffects(animated: false)
+    if icon.image == nil {
+      icon.image = Self.symbolImage(named: InboxZeroMotion.filledTraySymbol)
+    }
+    if let check = Self.symbolImage(named: InboxZeroMotion.checkmarkSymbol) {
+      icon.setSymbolImage(check, contentTransition: .replace)
+      icon.addSymbolEffect(.drawOn)
+    }
+  }
+
+  /// Spec §3 (+0.9 s): check mark → empty tray (`tray`) with replace transition.
+  func finishInboxZeroToEmptyTray() {
+    emoji.isHidden = true
+    icon.isHidden = false
+    icon.contentTintColor = SeptaskKitTheme.inkSecondary
+    icon.removeAllSymbolEffects(animated: false)
+    if let emptyTray = Self.symbolImage(named: InboxZeroMotion.emptyTraySymbol) {
+      icon.setSymbolImage(emptyTray, contentTransition: .replace)
+    }
+  }
+
+  /// Spec §5: cancel any in-flight motion straight to the resting symbol with
+  /// no reverse animation.
+  func cancelInboxZeroMotion(symbolName: String) {
+    emoji.isHidden = true
+    icon.isHidden = false
+    icon.contentTintColor = SeptaskKitTheme.inkSecondary
+    icon.removeAllSymbolEffects(animated: false)
+    icon.image = Self.symbolImage(named: symbolName)
+  }
+
   func configure(title titleText: String,
                  icon iconKind: SeptaskKitTaskListController.GroupIcon,
                  count countValue: Int,
                  isNavigable: Bool,
-                 showsQuickAdd: Bool) {
+                 showsQuickAdd: Bool,
+                 keepAnimatedCheckmark: Bool = false) {
     // Attributed, not `stringValue` + `.font`: a bare font assignment on an
     // NSTableCellView's textField is what AppKit overrides for any
     // `rowSizeStyle` other than `.custom` — belt and braces alongside setting
@@ -7663,22 +8014,29 @@ final class KitGroupHeaderCell: NSTableCellView {
 
     emoji.isHidden = true
     icon.isHidden = false
-    switch iconKind {
-    case .emoji(let glyph):
-      emoji.isHidden = false
-      emoji.stringValue = glyph
-      icon.isHidden = true
-    case .areaDot:
-      // 21 — matches `AreaIcon(diameter: 21)` in `TaskListView.groupHeaderBody`.
-      icon.image = KitGlyph.areaDot(diameter: 21)
-    case .project(let progress):
-      // 13 — SwiftUI's own `ProjectProgressIcon(diameter: 14)`, dialed down
-      // 1pt after visual review to sit better against the 17pt title.
-      icon.image = KitGlyph.progress(progress, diameter: 13)
-    case .symbol(let name):
-      icon.image = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
-        .withSymbolConfiguration(.init(pointSize: 16, weight: .medium))
+    if keepAnimatedCheckmark {
       icon.contentTintColor = SeptaskKitTheme.inkSecondary
+      if icon.image == nil {
+        icon.image = Self.symbolImage(named: InboxZeroMotion.checkmarkSymbol)
+      }
+    } else {
+      icon.removeAllSymbolEffects(animated: false)
+      switch iconKind {
+      case .emoji(let glyph):
+        emoji.isHidden = false
+        emoji.stringValue = glyph
+        icon.isHidden = true
+      case .areaDot:
+        // 21 — matches `AreaIcon(diameter: 21)` in `TaskListView.groupHeaderBody`.
+        icon.image = KitGlyph.areaDot(diameter: 21)
+      case .project(let progress):
+        // 13 — SwiftUI's own `ProjectProgressIcon(diameter: 14)`, dialed down
+        // 1pt after visual review to sit better against the 17pt title.
+        icon.image = KitGlyph.progress(progress, diameter: 13)
+      case .symbol(let name):
+        icon.image = Self.symbolImage(named: name)
+        icon.contentTintColor = SeptaskKitTheme.inkSecondary
+      }
     }
     if isNavigable {
       kitA11yButton(label: titleText)
