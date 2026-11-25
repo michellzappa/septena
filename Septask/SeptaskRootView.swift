@@ -410,6 +410,11 @@ private struct MagicPlusOrb: View {
           showingMenu = false
           onNewArea()
         }
+        menuRow(title: RegistryActions.title(.sidebarJoinShared),
+                icon: RegistryIcons.sfSymbol(for: "action.share_project")) {
+          showingMenu = false
+          SeptaskSharing.presentJoin()
+        }
       } else {
         menuRow(title: RegistryActions.title(.appNewTask), icon: "checkmark.circle") {
           showingMenu = false

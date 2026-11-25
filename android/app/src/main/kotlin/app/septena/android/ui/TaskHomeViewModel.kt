@@ -457,6 +457,18 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         }
     }
 
+    /** Assign To: [memberId] of the task's shared project, or null for nobody. */
+    fun assign(id: String, memberId: String?) {
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    graph.captureTaskEdit(id) { check(graph.taskMutator.assign(id, memberId) != null) }
+                }
+            }.onSuccess { errorMessage.value = null; noteLocalChangeAndSync() }
+                .onFailure { errorMessage.value = it.message }
+        }
+    }
+
     fun toggleStar(id: String) {
         viewModelScope.launch {
             runCatching {

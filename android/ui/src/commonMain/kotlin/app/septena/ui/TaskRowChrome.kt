@@ -404,7 +404,7 @@ fun TaskCardRow(
     val isBeingDragged = reorderDrag != null && reorderDrag.isDragging && task.id in reorderDrag.draggedIds
     val mutedInk = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.80f)
     val overdueRed = if (isDark) Color(0xFFFF453A) else Color(0xFFFF3B30)
-    val showSubtitleLine = task.subtitle != null || task.tagNames.isNotEmpty() || task.filingSuggestionLabel != null
+    val showSubtitleLine = task.subtitle != null || task.assigneeName != null || task.tagNames.isNotEmpty() || task.filingSuggestionLabel != null
     val hasLeadingSlot = selecting || canComplete || task.isCompleted
 
     TaskCardSlice(
@@ -662,6 +662,23 @@ fun TaskCardRow(
                                 modifier = Modifier.align(Alignment.CenterVertically),
                             )
                         }
+                        task.assigneeName?.let { assignee ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(3.dp),
+                                modifier = Modifier.align(Alignment.CenterVertically),
+                            ) {
+                                PersonSmallGlyph(tint = mutedInk, size = 11.dp)
+                                Text(
+                                    text = assignee,
+                                    fontSize = 12.5.sp,
+                                    lineHeight = 16.sp,
+                                    color = mutedInk,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
                         val visibleTags = task.tagNames.take(2)
                         val overflowCount = (task.tagNames.size - visibleTags.size).coerceAtLeast(0)
                         visibleTags.forEach { tag ->
@@ -708,6 +725,7 @@ fun TaskCardRow(
                     isDark = isDark,
                     groups = rowMenuGroups,
                     isTaskStarred = task.isStarred,
+                    canAssign = task.canAssign,
                     accessibilityLabel = rowMenuAccessibilityLabel,
                     onAction = { actionId -> onTaskAction(task.id, actionId) },
                 )
@@ -880,6 +898,7 @@ fun SeptenaContextMenu(
     isTaskStarred: Boolean,
     accessibilityLabel: String,
     onAction: (String) -> Unit,
+    canAssign: Boolean = false,
 ) {
     val menuBg = if (isDark) {
         MaterialTheme.colorScheme.surfaceContainerHigh
@@ -905,7 +924,10 @@ fun SeptenaContextMenu(
             .width(248.dp)
             .semantics { contentDescription = accessibilityLabel },
     ) {
-        groups.forEachIndexed { groupIndex, group ->
+        val shown = groups
+            .map { group -> group.filter { canAssign || !it.needsAssignees } }
+            .filter { it.isNotEmpty() }
+        shown.forEachIndexed { groupIndex, group ->
             if (groupIndex > 0) {
                 Box(
                     modifier = Modifier
@@ -983,6 +1005,7 @@ private fun TaskMenuActionGlyph(
         TaskMenuActionIcon.Delete -> SeptenaGlyph(kind = SeptenaIconKind.RecentlyDeleted, tint = tint, size = size)
         TaskMenuActionIcon.Restore -> RepeatSmallGlyph(tint = tint, size = size)
         TaskMenuActionIcon.Check -> CheckmarkGlyph(tint = tint, size = size)
+        TaskMenuActionIcon.Assign -> PersonSmallGlyph(tint = tint, size = size)
         TaskMenuActionIcon.Tags -> TagSmallGlyph(tint = tint, size = size)
         TaskMenuActionIcon.Open -> Canvas(modifier = Modifier.size(size)) {
             val w = this.size.width
@@ -1236,6 +1259,24 @@ fun ClockSmallGlyph(tint: Color, size: Dp = 12.dp, modifier: Modifier = Modifier
         drawCircle(tint, radius = r, center = Offset(cx, cy), style = Stroke(width = stroke))
         drawLine(tint, Offset(cx, cy), Offset(cx, cy - r * 0.56f), strokeWidth = stroke, cap = StrokeCap.Round)
         drawLine(tint, Offset(cx, cy), Offset(cx + r * 0.42f, cy + r * 0.22f), strokeWidth = stroke, cap = StrokeCap.Round)
+    }
+}
+
+/** A person (iOS `person`): who does a task in a shared project. */
+@Composable
+fun PersonSmallGlyph(tint: Color, size: Dp = 12.dp, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier.size(size)) {
+        val w = this.size.width
+        val h = this.size.height
+        val stroke = Stroke(width = (w * 0.10f).coerceAtLeast(1.2.dp.toPx()), cap = StrokeCap.Round, join = StrokeJoin.Round)
+        drawCircle(tint, radius = w * 0.19f, center = Offset(w * 0.5f, h * 0.30f), style = stroke)
+        val shoulders = Path().apply {
+            moveTo(w * 0.14f, h * 0.88f)
+            quadraticTo(w * 0.16f, h * 0.60f, w * 0.5f, h * 0.60f)
+            quadraticTo(w * 0.84f, h * 0.60f, w * 0.86f, h * 0.88f)
+            close()
+        }
+        drawPath(shoulders, tint, style = stroke)
     }
 }
 
@@ -1848,6 +1889,7 @@ fun ReviewTaskCardRow(
                     isDark = isDark,
                     groups = rowMenuGroups,
                     isTaskStarred = task.isStarred,
+                    canAssign = task.canAssign,
                     accessibilityLabel = rowMenuAccessibilityLabel,
                     onAction = { actionId -> onTaskAction(task.id, actionId) },
                 )

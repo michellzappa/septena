@@ -188,6 +188,7 @@ final class CloudKitTasksBackend {
       kind: entity.kind,
       heading: entity.heading
     )
+    next.assignedTo = entity.assignedTo
     next.recurrence = recurrence
     if let shifted = TaskReminderRules.shiftForRecurrence(
       sourceReminderAt: entity.reminderAt,
@@ -1396,6 +1397,13 @@ final class CloudKitTasksBackend {
     entity.starred = starred
     entity.pendingSync = true
     commitAndPush(entity, op: starred ? "setStarred(true)" : "setStarred(false)")
+  }
+
+  func setAssignee(id: String, memberID: String?) {
+    guard let entity = fetch(id: id), entity.assignedTo != memberID else { return }
+    entity.assignedTo = memberID
+    entity.pendingSync = true
+    commitAndPush(entity, op: "setAssignee")
   }
 
   func setRecurrence(id: String, recurrence: Recurrence?) {

@@ -31,6 +31,8 @@
     "place.section": { "sfSymbol": "text.alignleft", "material": "subject", "lucide": "heading" },
     "action.edit_details": { "sfSymbol": "info.circle", "material": "info", "lucide": "info" },
     "action.open": { "sfSymbol": "arrow.up.left.and.arrow.down.right", "material": "open_in_full", "lucide": "maximize-2" },
+    "action.share_project": { "sfSymbol": "person.crop.circle.badge.plus", "material": "person_add", "lucide": "user-plus" },
+    "action.assign": { "sfSymbol": "person", "material": "person", "lucide": "user" },
     "action.share": { "sfSymbol": "square.and.arrow.up", "material": "share", "lucide": "share" },
     "action.accept": { "sfSymbol": "checkmark.seal", "material": "verified", "lucide": "badge-check" },
     "action.send_back": { "sfSymbol": "arrowshape.turn.up.backward", "material": "reply", "lucide": "reply" },

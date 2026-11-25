@@ -1387,7 +1387,9 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
         case .projectRename: return .init { self.renameSelected() }
         case .projectMarkDone: return .init { self.markSelectedProjectDone() }
         case .projectCancel: return .init { self.cancelSelectedProject() }
-        case .projectDelete: return .init { self.deleteSelected() }
+        case .projectShare: return .init { SeptaskSharing.present(projectID: project.id) }
+        // A shared project ends from its Share screen.
+        case .projectDelete: return project.share == nil ? .init { self.deleteSelected() } : nil
         default: return nil
         }
       }, slot: { [weak self] id in
@@ -1400,6 +1402,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
         switch id {
         case .sidebarNewArea: return .init { self.newArea() }
         case .sidebarNewProject: return .init { self.newProjectLoose() }
+        case .sidebarJoinShared: return .init { SeptaskSharing.presentJoin() }
         default: return nil
         }
       }
@@ -1644,6 +1647,10 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
   }
 
   @objc private func deleteSelected() {
+    if case .project(let project, _) = selectedNode?.content, project.share != nil {
+      SeptaskSharing.present(projectID: project.id)
+      return
+    }
     // Copy matches the SwiftUI sidebar's confirmation exactly
     // (`RegistryPrompts.deleteArea` / `deleteProject`) — one deletion story between the two shells. A
     // window SHEET, not an app-modal alert, with Cancel as the Return default.

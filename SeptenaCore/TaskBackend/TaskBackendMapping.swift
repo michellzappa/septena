@@ -212,6 +212,7 @@ enum TaskBackendMapping {
       "fadedAt": t.fadedAt.map { .string(stamp($0)) } ?? .null,
       "dropReason": c.text("dropReason", t.dropReason, max: 16),
       "effort": c.text("effort", t.effort, max: 16),
+      "assignedTo": c.text("assignedTo", t.assignedTo, max: 64),
     ]
     return finish(.task, t.id, c, fields, deleted: t.deletedAt != nil)
   }

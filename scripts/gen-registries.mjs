@@ -1843,6 +1843,15 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("}");
   lines.push("");
 
+  // 8a. Shared projects (surfaces.json `sharing`, docs/PROJECT_SHARING_SPEC.md)
+  const sharing = surfaces.sharing;
+  lines.push("/// Shared projects (`registry/surfaces.json` `sharing`).");
+  lines.push("enum RegistrySharing {");
+  lines.push(`  static let title: String = ${L(sharing.title, sharing, "title")}`);
+  for (const e of sharing.copy) lines.push(`  static let ${e.id}: String = ${L(e.label, e, "label")}`);
+  lines.push("}");
+  lines.push("");
+
   // 8a. Sign-in by device approval (surfaces.json `deviceSignIn`, ADR 0016)
   const deviceSignIn = surfaces.deviceSignIn;
   lines.push("/// Sign-in by device approval (`registry/surfaces.json` `deviceSignIn`).");

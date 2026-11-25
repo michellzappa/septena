@@ -339,6 +339,7 @@ struct TaskListRowContextMenu: View {
     case "moveDestinations": return moveDestinations
     case "sectionDestinations": return sectionDestinations
     case "filingSuggestion": return filingSuggestionNodes
+    case "assignees": return SeptaskSharing.assigneeNodes(target.tasks)
     default: return []
     }
   }

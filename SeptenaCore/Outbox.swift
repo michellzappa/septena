@@ -269,6 +269,14 @@ final class TaskMutator {
     cloudBackend.dismissReminder(id: id, at: date)
   }
 
+  func setAssignee(id: String, memberID: String?) {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] setAssignee called before CK bound — dropping", nil)
+      return
+    }
+    cloudBackend.setAssignee(id: id, memberID: memberID)
+  }
+
   func setStarred(id: String, starred: Bool) {
     guard let cloudBackend else {
       SeptenaLog.error("[TaskMutator] setStarred called before CK bound — dropping", nil)

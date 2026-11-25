@@ -125,6 +125,8 @@ final class TaskEntity {
   var dropReason: String?
   /// `"light"` / `"heavy"`. nil = unknown.
   var effort: String?
+  /// Shared projects: the member id of the person who does this task.
+  var assignedTo: String?
   /// Legacy FastAPI-era optimistic-write guard; no longer consulted on the
   /// CloudKit path. Retained as a schema field pending Phase-2 cleanup.
   var pendingSync: Bool = false
@@ -409,6 +411,8 @@ final class ProjectEntity {
   /// Encoded `NotesProposal` JSON when an agent has suggested a new brief.
   var notesProposalJSON: String?
   var githubRepo: String?
+  /// Encoded `ProjectShare` when the project is shared. Pulled only, never pushed.
+  var shareJSON: String?
   /// Sidebar sort order (synced). `0` = unset (falls back to legacy device
   /// order / title); a reorder renumbers the whole group 1…N. Rides the
   /// reserved `reservedInt1` CK slot — additive in Prod, no record-type bump.
@@ -460,6 +464,8 @@ final class ProjectEntity {
     get { ProjectStatus(rawValue: statusRaw) ?? .active }
     set { statusRaw = newValue.rawValue }
   }
+
+  var share: ProjectShare? { ProjectShare.decode(shareJSON) }
 
   var notesProposal: NotesProposal? {
     get {
@@ -645,6 +651,7 @@ extension SeptenaTask {
       fadedAt: e.fadedAt,
       dropReason: e.dropReason,
       effort: e.effort,
+      assignedTo: e.assignedTo,
       kind: e.kind,
       heading: e.heading,
       conversation: conversation
@@ -802,6 +809,7 @@ extension Project {
               noteRev: e.noteRev,
               notesProposal: e.notesProposal,
               githubRepo: e.githubRepo,
+              share: e.share,
               position: e.position,
               updatedAt: e.updatedAt,
               deletedAt: e.deletedAt)

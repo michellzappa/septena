@@ -574,6 +574,11 @@ struct SidebarRootView: View {
     } label: {
       Label(RegistryActions.title(.sidebarNewProject), systemImage: "number")
     }
+    Button {
+      SeptaskSharing.presentJoin()
+    } label: {
+      Label(RegistryActions.title(.sidebarJoinShared), systemImage: RegistryIcons.sfSymbol(for: "action.share_project"))
+    }
     Divider()
     Button {
       SeptaskSettingsLink.request(RegistrySettings.PageID.smartLists)
@@ -1170,7 +1175,9 @@ struct SidebarRootView: View {
           })
         case .projectMarkDone: return .init { setProjectStatus(project, to: .done) }
         case .projectCancel: return .init { setProjectStatus(project, to: .cancelled) }
-        case .projectDelete: return .init { deleteProjectTarget = project }
+        case .projectShare: return .init { SeptaskSharing.present(projectID: project.id) }
+        // A shared project ends from its Share screen.
+        case .projectDelete: return project.share == nil ? .init { deleteProjectTarget = project } : nil
         default: return nil
         }
       },

@@ -163,6 +163,14 @@ object RegistryCatalog {
         return groups
     }
 
+    /** The title of a submenu in a registry context menu, localized. */
+    fun submenuTitle(menuId: String, submenuId: String, languageTag: String): String? =
+        document("actions").objectAt("contextMenus")?.arrayAt(menuId).orEmpty()
+            .mapNotNull { it as? JsonValue.ObjectValue }
+            .firstOrNull { it.stringAt("kind") == "submenu" && it.stringAt("id") == submenuId }
+            ?.stringAt("title")
+            ?.let { localizedString(it, languageTag) ?: it }
+
     fun actionRole(id: String): String? = action(id)?.stringAt("role")
 
     fun setting(key: String): JsonValue.ObjectValue? =

@@ -362,6 +362,38 @@
       }
     ]
   },
+  "sharing": {
+    "featureId": "sharing.projects",
+    "title": "Share Project",
+    "copy": [
+      { "id": "intro", "label": "Members see and edit this project's tasks, sections, deadlines and notes. Files, reminders and agent conversations stay private, and everyone keeps their own Today and When." },
+      { "id": "name", "label": "Your name" },
+      { "id": "start", "label": "Share Project" },
+      { "id": "members", "label": "Members" },
+      { "id": "owner", "label": "Owner" },
+      { "id": "you", "label": "You" },
+      { "id": "invite", "label": "Invite Someone" },
+      { "id": "inviteNote", "label": "Each link works for one person and lasts 7 days." },
+      { "id": "invites", "label": "Unused invites" },
+      { "id": "expires", "label": "Expires" },
+      { "id": "revoke", "label": "Revoke" },
+      { "id": "remove", "label": "Remove" },
+      { "id": "stop", "label": "Stop Sharing" },
+      { "id": "stopDetail", "label": "The other members lose this project. You keep it and its tasks." },
+      { "id": "leave", "label": "Leave Project" },
+      { "id": "leaveDetail", "label": "The project leaves your account. Everyone else keeps it." },
+      { "id": "joinTitle", "label": "Join a Shared Project" },
+      { "id": "joinLink", "label": "Invite link" },
+      { "id": "joinDetail", "label": "Joining is free." },
+      { "id": "sharedBy", "label": "Shared by" },
+      { "id": "join", "label": "Join" },
+      { "id": "invalid", "label": "This invite no longer works. Ask for a new link." },
+      { "id": "full", "label": "This project has no room for another member or invite." },
+      { "id": "signInFirst", "label": "Sign in to Septena first." },
+      { "id": "failed", "label": "Could not reach Septena." },
+      { "id": "nobody", "label": "Nobody" }
+    ]
+  },
   "deviceSignIn": {
     "featureId": "sync.backend",
     "title": "Sign in to Septena",

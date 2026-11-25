@@ -4670,6 +4670,7 @@ final class SeptaskKitTaskListController: NSViewController {
       case "moveDestinations": return self.moveDestinationNodes(selection: selection)
       case "sectionDestinations": return self.sectionDestinationNodes(selection: selection)
       case "filingSuggestion": return self.filingSuggestionNodes(selection: selection)
+      case "assignees": return SeptaskSharing.assigneeNodes(selection)
       default: return []
       }
     })
@@ -6156,6 +6157,8 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
   private let agentGlyph = NSImageView()
   private let chip = KitChipView()
   private let statusChip = KitChipView()
+  /// Shared projects: who does this task, when that is somebody else.
+  private let assigneeChip = KitChipView()
   private let suggestionChip = KitSuggestionChipView()
   /// The item the task was created from (its `from` reference).
   private let fromGlyph = NSImageView()
@@ -6346,7 +6349,7 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     let trailingShove = NSView()
     trailingShove.setContentHuggingPriority(.defaultLow, for: .horizontal)
     trailingShove.setContentCompressionResistancePriority(.fittingSizeCompression, for: .horizontal)
-    let trailing = NSStackView(views: [trailingShove, suggestionChip, chip, statusChip,
+    let trailing = NSStackView(views: [trailingShove, suggestionChip, chip, assigneeChip, statusChip,
                                       tagStack, attachmentGlyph, attachmentLabel,
                                       checklistGlyph, checklistLabel, reminderGlyph, reminderLabel,
                                       scheduleGlyph, detail, repeatGlyph, starGlyph, fromGlyph, notesGlyph, agentGlyph])
@@ -6371,6 +6374,7 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     trailing.kitA11yIgnore()
     chip.kitA11yIgnore()
     statusChip.kitA11yIgnore()
+    assigneeChip.kitA11yIgnore()
 
     addSubview(checkbox)
     addSubview(title)
@@ -6469,6 +6473,7 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
       agentGlyph.isHidden = true
       chip.isHidden = true
       statusChip.isHidden = true
+      assigneeChip.isHidden = true
       fromGlyph.isHidden = true
       tagStack.isHidden = true
       attachmentGlyph.isHidden = true
@@ -6577,6 +6582,13 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
       chip.configure(symbol: chipValue.symbol, title: chipValue.title)
     } else {
       chip.isHidden = true
+    }
+
+    if let name = SharedProjects.assigneeName(of: task, in: LocalStore.shared.container.mainContext) {
+      assigneeChip.isHidden = false
+      assigneeChip.configure(symbol: RegistryIcons.sfSymbol(for: "action.assign"), title: name)
+    } else {
+      assigneeChip.isHidden = true
     }
 
     if showFadedInScope {

@@ -4,6 +4,7 @@ import app.cash.sqldelight.db.SqlDriver
 import app.septena.core.JsonValue
 import app.septena.core.QueuedOperation
 import app.septena.core.RejectedSyncOperation
+import app.septena.core.ShareRejections
 import app.septena.core.SyncOperation
 import app.septena.core.SyncOperationResult
 import app.septena.core.SyncRecord
@@ -278,7 +279,8 @@ class SqlDelightTaskStore(private val database: SeptenaDatabase) : TaskStore {
                         queries.deleteOutbox(result.clientOpId)
                     }
                     SyncResultStatus.REJECTED -> {
-                        queries.upsertRejected(
+                        // A shared project's rule: the next pull brings the real row.
+                        if (result.reason !in ShareRejections.reasons) queries.upsertRejected(
                             client_op_id = result.clientOpId,
                             op_json = row.operationJson,
                             reason = result.reason?.takeIf(String::isNotBlank) ?: "The server rejected this change",
