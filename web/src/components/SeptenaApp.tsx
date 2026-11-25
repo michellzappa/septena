@@ -42,6 +42,7 @@ import {
   type CoreProjection,
 } from "@/lib/core";
 import { evaluateConversation, groupTurnsByTask } from "@/lib/conversation";
+import { addDays, attributeLabel, todayLabel, tomorrowLabel, type DateBoardAttribute } from "@/lib/dateBoard";
 import {
   SIDEBAR_DESTINATIONS,
   agentGroupOf,
@@ -78,6 +79,7 @@ import type {
 } from "@/lib/types";
 import { nextIsoDay } from "@/lib/upcomingGroups";
 import { ContextMenu, type ContextMenuState } from "./ContextMenu";
+import { DateBoardPopover, anchorOf, type DateBoardAnchor } from "./DateBoard";
 import { FadeSweepModal } from "./FadeSweepModal";
 import { FirstRunModal } from "./FirstRunModal";
 import { HeaderWash } from "./HeaderWash";
@@ -88,7 +90,13 @@ import { RegistryIcon } from "./RegistryIcon";
 import { SettingsModal } from "./SettingsModal";
 import { SignInScreen } from "./SignInScreen";
 import { TaskPageDrawer } from "./TaskPageDrawer";
-import { TaskRowItem, type TaskRowItemProps } from "./TaskRowItem";
+import {
+  TaskRowItem,
+  openRepeatSelect,
+  repeatTitle,
+  whenDay,
+  type TaskRowItemProps,
+} from "./TaskRowItem";
 
 interface EvaluatedTask {
   task: TaskRow;
@@ -137,22 +145,32 @@ function ProjectRing({ done, total }: { done: number; total: number }) {
   );
 }
 
-function formatDayHeading(ymd: string, todayYMD: string): string {
+function formatDayHeading(ymd: string, todayYMD: string, lang: string): string {
   const [y, m, d] = ymd.split("-").map(Number);
   const dt = new Date(y, (m || 1) - 1, d || 1);
   const [ty, tm, td] = todayYMD.split("-").map(Number);
   const todayDt = new Date(ty, (tm || 1) - 1, td || 1);
   const diffDays = Math.round((dt.getTime() - todayDt.getTime()) / (24 * 60 * 60 * 1000));
   const formatted = dt.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
-  if (diffDays === 1) return `Tomorrow · ${formatted}`;
-  if (diffDays === 0) return `Today · ${formatted}`;
+  if (diffDays === 1) return `${tomorrowLabel(lang)} · ${formatted}`;
+  if (diffDays === 0) return `${todayLabel(lang)} · ${formatted}`;
   return formatted;
 }
 
-function tomorrowYMD(todayYMD: string): string {
-  const [y, m, d] = todayYMD.split("-").map(Number);
-  const dt = new Date(y, (m || 1) - 1, (d || 1) + 1);
-  return localTodayYMD(dt);
+/** Every field that a date action can change: what its undo entry restores. */
+function dateFields(task: TaskRow): Record<string, unknown> {
+  return {
+    scheduled: task.scheduled ?? null,
+    deadline: task.deadline ?? null,
+    deferredDeadline: task.deferredDeadline ?? null,
+    today: Boolean(task.today),
+    todaySetOn: task.todaySetOn ?? null,
+    startTime: task.startTime ?? null,
+    durationMinutes: task.durationMinutes ?? null,
+    timeZone: task.timeZone ?? null,
+    reminderAt: task.reminderAt ?? null,
+    recurrenceAnchorDate: task.recurrenceAnchorDate ?? null,
+  };
 }
 
 export function SeptenaApp() {
@@ -196,6 +214,11 @@ export function SeptenaApp() {
   const [firstRunOpen, setFirstRunOpen] = useState(false);
   const [infoToast, setInfoToast] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+  const [datePicker, setDatePicker] = useState<{
+    attribute: DateBoardAttribute;
+    taskIds: string[];
+    anchor: DateBoardAnchor;
+  } | null>(null);
 
   // Inline creation & container notes
   const [creatingKind, setCreatingKind] = useState<"area" | "project" | "heading" | null>(null);
@@ -1022,6 +1045,52 @@ export function SeptenaApp() {
     return [];
   }, [selectedIds, selectedTaskId, visibleTasks]);
 
+  const findTasks = useCallback(
+    (ids: string[]) => {
+      const tasks = engine.getState().snapshot.tasks;
+      return ids.flatMap((id) => tasks.find((t) => t.id === id) ?? []);
+    },
+    [engine],
+  );
+
+  const setTaskDay = useCallback(
+    async (attribute: DateBoardAttribute, taskIds: string[], day: string | null) => {
+      const before = findTasks(taskIds);
+      const apply = async () => {
+        for (const task of findTasks(taskIds)) {
+          if (attribute === "when") await engine.setTaskScheduled(task, day);
+          else await engine.setTaskDeadline(task, day);
+        }
+      };
+      await apply();
+      const name = before.length === 1 ? `“${before[0].title}”` : `${before.length} tasks`;
+      undoStack.record({
+        label: `${attributeLabel(attribute, prefs.language)}: ${name}`,
+        undo: async () => {
+          for (const prev of before) {
+            const [task] = findTasks([prev.id]);
+            if (task) await engine.updateTaskFields(task, dateFields(prev));
+          }
+        },
+        redo: apply,
+      });
+    },
+    [engine, findTasks, prefs.language, undoStack],
+  );
+
+  const openDatePicker = useCallback(
+    (attribute: DateBoardAttribute, taskIds: string[], anchor?: DateBoardAnchor) => {
+      if (taskIds.length === 0) return;
+      const row = document.querySelector(`[data-task-id="${CSS.escape(taskIds[0])}"]`);
+      setDatePicker({
+        attribute,
+        taskIds,
+        anchor: anchor ?? (row ? anchorOf(row) : { left: window.innerWidth / 2, top: 96, bottom: 96 }),
+      });
+    },
+    [],
+  );
+
   const handleShareTask = useCallback(
     async (task: TaskRow) => {
       const text = task.notes ? `${task.title}\n\n${task.notes}` : task.title;
@@ -1100,11 +1169,11 @@ export function SeptenaApp() {
           showToast(`Moved “${task.title}” to Today`);
           break;
         case "scheduleTomorrow":
-          await engine.setTaskScheduled(task, tomorrowYMD(todayYMD));
+          await engine.setTaskScheduled(task, addDays(todayYMD, 1));
           showToast(`Scheduled “${task.title}” for tomorrow`);
           break;
         case "clearDates":
-          await engine.setTaskScheduled(task, null);
+          await engine.clearTaskWhen(task);
           showToast(`Moved “${task.title}” to Anytime`);
           break;
         case "complete":
@@ -1275,6 +1344,16 @@ export function SeptenaApp() {
           else void engine.bulkUpdateTasks(activeSelectedTasks, { starred: !single.starred });
           return;
         }
+        if (primary && !e.shiftKey && !e.altKey && key === "s") {
+          e.preventDefault();
+          openDatePicker("when", activeSelectedTasks.map((t) => t.id));
+          return;
+        }
+        if (primary && e.shiftKey && !e.altKey && key === "d") {
+          e.preventDefault();
+          openDatePicker("deadline", activeSelectedTasks.map((t) => t.id));
+          return;
+        }
         if (primary && !e.shiftKey && !e.altKey && key === "d") {
           e.preventDefault();
           void Promise.all(activeSelectedTasks.map((t) => engine.duplicateTask(t)));
@@ -1299,7 +1378,7 @@ export function SeptenaApp() {
         }
         if (primary && e.shiftKey && e.key === ".") {
           e.preventDefault();
-          void Promise.all(activeSelectedTasks.map((t) => engine.setTaskScheduled(t, null)));
+          void Promise.all(activeSelectedTasks.map((t) => engine.clearTaskWhen(t)));
           return;
         }
         if (primary && (e.key === "Backspace" || e.key === "Delete")) {
@@ -1358,6 +1437,7 @@ export function SeptenaApp() {
     handleCopyTasks,
     navigateTo,
     openTask,
+    openDatePicker,
     prefs.textSizeStep,
     quickAddOpen,
     quickFindOpen,
@@ -1375,6 +1455,9 @@ export function SeptenaApp() {
   ]);
 
   const lang = prefs.language;
+  const pickerTask = datePicker
+    ? syncState.snapshot.tasks.find((t) => t.id === datePicker.taskIds[0])
+    : undefined;
 
   const pageMeta = useMemo(() => {
     if (destination.kind === "smart") {
@@ -1592,6 +1675,8 @@ export function SeptenaApp() {
       expanded: expandedTaskId === task.id,
       isDeletedView,
       isFadedView,
+      todayYMD,
+      lang,
       isColorfulAccent,
       animateCompletion: prefs.loggingAnimationsEnabled,
       draggable: canManualOrder && !isDeletedView,
@@ -1639,6 +1724,8 @@ export function SeptenaApp() {
         e.preventDefault();
         setSelectedTaskId(task.id);
         if (!selectedIds.has(task.id)) setSelectedIds(new Set([task.id]));
+        const menuTaskIds = selectedIds.has(task.id) ? [...selectedIds] : [task.id];
+        const menuAnchor = { left: e.clientX, top: e.clientY, bottom: e.clientY };
 
         if (isDeletedView) {
           setContextMenu({
@@ -1709,6 +1796,18 @@ export function SeptenaApp() {
               label: task.starred ? "Unfavorite" : "Favorite",
               shortcut: "⌘⌥S",
               onSelect: () => void engine.toggleTaskStar(task),
+            },
+            {
+              kind: "item",
+              label: registryText(ACTIONS_CATALOG.actions["task.when"].title, lang),
+              shortcut: "⌘S",
+              onSelect: () => openDatePicker("when", menuTaskIds, menuAnchor),
+            },
+            {
+              kind: "item",
+              label: registryText(ACTIONS_CATALOG.actions["task.deadline"].title, lang),
+              shortcut: "⇧⌘D",
+              onSelect: () => openDatePicker("deadline", menuTaskIds, menuAnchor),
             },
             { kind: "divider" },
             {
@@ -1806,8 +1905,8 @@ export function SeptenaApp() {
       },
       onShare: () => void handleShareTask(task),
       onUpdateFields: (fields) => void engine.updateTaskFields(task, fields),
-      onSetScheduled: (day) => void engine.setTaskScheduled(task, day),
-      onSetDeadline: (day) => void engine.setTaskDeadline(task, day),
+      onSetScheduled: (day) => void setTaskDay("when", [task.id], day),
+      onSetDeadline: (day) => void setTaskDay("deadline", [task.id], day),
       onSetTimeSlot: (st, dur) => void engine.setTaskTimeSlot(task, st, dur),
       onSetReminder: (reminderAt) => void engine.setTaskReminder(task, reminderAt),
       onSetRecurrence: (rule) => void engine.setTaskRecurrence(task, rule),
@@ -2841,7 +2940,7 @@ export function SeptenaApp() {
                 {upcomingGroups.map(([day, items]) => (
                   <section key={day}>
                     <div className="mb-1.5 flex items-center justify-between border-b border-[var(--border-subtle)] pb-1.5 text-xs font-semibold text-[var(--text-secondary)]">
-                      <span>{formatDayHeading(day, todayYMD)}</span>
+                      <span>{formatDayHeading(day, todayYMD, lang)}</span>
                       <span className="font-mono-tabular font-normal text-[var(--text-muted)]">
                         {items.length}
                       </span>
@@ -3052,6 +3151,41 @@ export function SeptenaApp() {
 
       <ContextMenu menu={contextMenu} onClose={() => setContextMenu(null)} />
 
+      {datePicker && pickerTask && (
+        <DateBoardPopover
+          attribute={datePicker.attribute}
+          anchor={datePicker.anchor}
+          value={
+            datePicker.attribute === "when" ? whenDay(pickerTask, todayYMD) : (pickerTask.deadline ?? null)
+          }
+          today={todayYMD}
+          lang={lang}
+          startTime={pickerTask.startTime}
+          durationMinutes={pickerTask.durationMinutes}
+          repeatTitle={repeatTitle(pickerTask, lang)}
+          onPick={(day) => void setTaskDay(datePicker.attribute, datePicker.taskIds, day)}
+          onClear={() => void setTaskDay(datePicker.attribute, datePicker.taskIds, null)}
+          // The time and the repeat belong to one task, so a selection of several has no such rows.
+          {...(datePicker.attribute === "when" && datePicker.taskIds.length === 1
+            ? {
+                onTimeSlotChange: (start: string | null, minutes: number | null) =>
+                  void engine.setTaskTimeSlot(pickerTask, start, minutes),
+                onRepeat: () => {
+                  setExpandedTaskId(pickerTask.id);
+                  setTimeout(() =>
+                    openRepeatSelect(
+                      document.querySelector<HTMLSelectElement>(
+                        `[data-repeat-task="${CSS.escape(pickerTask.id)}"]`,
+                      ),
+                    ),
+                  );
+                },
+              }
+            : {})}
+          onClose={() => setDatePicker(null)}
+        />
+      )}
+
       <TaskPageDrawer
         open={Boolean(taskPageItem)}
         itemProps={taskPageItem ? buildTaskRowProps(taskPageItem) : null}
@@ -3063,6 +3197,8 @@ export function SeptenaApp() {
         initial={quickAddInitial}
         areas={activeAreas}
         projects={activeProjects}
+        todayYMD={todayYMD}
+        lang={lang}
         onClose={() => {
           setQuickAddOpen(false);
           setQuickAddInitial(null);

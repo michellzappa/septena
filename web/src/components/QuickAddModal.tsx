@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Calendar, Flag, Folder, Link2, Star, Sun, X } from "lucide-react";
+import { Folder, Link2, Star, Sun, X } from "lucide-react";
 import type { AreaRow, ProjectRow } from "@/lib/types";
+import { DateBoardButton } from "./DateBoard";
 
 export interface QuickAddInitial {
   title?: string;
@@ -18,6 +19,8 @@ interface QuickAddModalProps {
   initial?: QuickAddInitial | null;
   areas: AreaRow[];
   projects: ProjectRow[];
+  todayYMD: string;
+  lang: string;
   onClose: () => void;
   onCreate: (input: {
     title: string;
@@ -37,6 +40,8 @@ export function QuickAddModal({
   initial,
   areas,
   projects,
+  todayYMD,
+  lang,
   onClose,
   onCreate,
 }: QuickAddModalProps) {
@@ -173,7 +178,10 @@ export function QuickAddModal({
           <div className="flex flex-wrap items-center gap-2 border-t border-[var(--border-subtle)] pt-3 text-xs">
             <button
               type="button"
-              onClick={() => setToday((v) => !v)}
+              onClick={() => {
+                setToday((v) => !v);
+                setScheduled("");
+              }}
               className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-medium transition-colors ${
                 today
                   ? "bg-[var(--today-gold)]/20 text-[var(--text-primary)]"
@@ -187,27 +195,32 @@ export function QuickAddModal({
               Today
             </button>
 
-            <label className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--bg-hover)] px-2.5 py-1.5 text-[var(--text-secondary)]">
-              <Calendar className="h-3.5 w-3.5" />
-              <span>When</span>
-              <input
-                type="date"
-                value={scheduled}
-                onChange={(e) => setScheduled(e.target.value)}
-                className="font-mono-tabular bg-transparent text-[var(--text-primary)] outline-none"
-              />
-            </label>
+            <DateBoardButton
+              attribute="when"
+              className="px-2.5 py-1.5"
+              value={scheduled || (today ? todayYMD : null)}
+              today={todayYMD}
+              lang={lang}
+              onPick={(day) => {
+                // Today is the pin, and the pin and a date are exclusive (TASK_DATES_SPEC I1).
+                setToday(day === todayYMD);
+                setScheduled(day === todayYMD ? "" : day);
+              }}
+              onClear={() => {
+                setToday(false);
+                setScheduled("");
+              }}
+            />
 
-            <label className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--bg-hover)] px-2.5 py-1.5 text-[var(--text-secondary)]">
-              <Flag className="h-3.5 w-3.5" />
-              <span>Deadline</span>
-              <input
-                type="date"
-                value={deadline}
-                onChange={(e) => setDeadline(e.target.value)}
-                className="font-mono-tabular bg-transparent text-[var(--text-primary)] outline-none"
-              />
-            </label>
+            <DateBoardButton
+              attribute="deadline"
+              className="px-2.5 py-1.5"
+              value={deadline || null}
+              today={todayYMD}
+              lang={lang}
+              onPick={setDeadline}
+              onClear={() => setDeadline("")}
+            />
 
             <label className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--bg-hover)] px-2.5 py-1.5 text-[var(--text-secondary)]">
               <Folder className="h-3.5 w-3.5" />

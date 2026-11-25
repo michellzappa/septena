@@ -629,7 +629,7 @@ export class WebSyncEngine {
     const todayYMD = localTodayYMD();
     const datePatch = day
       ? applyDateAction(task, { type: "scheduleFor", day }, todayYMD, now)
-      : applyDateAction(task, { type: "clearWhen" }, todayYMD, now);
+      : applyDateAction(task, { type: "clearWhenDate" }, todayYMD, now);
     if (Object.keys(datePatch).length === 0) return;
 
     const shiftedReminder = shiftReminderOnReschedule({
@@ -652,7 +652,24 @@ export class WebSyncEngine {
     const todayYMD = localTodayYMD();
     const datePatch = applyDateAction(task, { type: "setDeadline", day }, todayYMD, now);
     if (Object.keys(datePatch).length === 0) return;
-    await this.patchTask(task, { ...datePatch, touchedAt: now });
+    await this.patchTask(task, {
+      ...datePatch,
+      touchedAt: now,
+      ...(task.source === "mcp" && !task.acknowledgedAt ? { acknowledgedAt: now } : {}),
+    });
+  }
+
+  /** Clear When (`task.clearSchedule`, TASK_DATES_SPEC A6): the When date, the deadline and the pin. */
+  async clearTaskWhen(task: TaskRow): Promise<void> {
+    await ensureCoreReady();
+    const now = new Date().toISOString();
+    const datePatch = applyDateAction(task, { type: "clearWhen" }, localTodayYMD(), now);
+    if (Object.keys(datePatch).length === 0) return;
+    await this.patchTask(task, {
+      ...datePatch,
+      touchedAt: now,
+      ...(task.source === "mcp" && !task.acknowledgedAt ? { acknowledgedAt: now } : {}),
+    });
   }
 
   async setTaskTimeSlot(
@@ -670,7 +687,11 @@ export class WebSyncEngine {
       todayYMD,
       now,
     );
-    await this.patchTask(task, { ...datePatch, touchedAt: now });
+    await this.patchTask(task, {
+      ...datePatch,
+      touchedAt: now,
+      ...(task.source === "mcp" && !task.acknowledgedAt ? { acknowledgedAt: now } : {}),
+    });
   }
 
   async setTaskRecurrence(

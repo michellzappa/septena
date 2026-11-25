@@ -3,10 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import {
   Bell,
-  Calendar,
   Check,
   CheckSquare,
-  Clock,
   CopyPlus,
   ExternalLink,
   Flag,
@@ -32,6 +30,8 @@ import {
   Upload,
   X,
 } from "lucide-react";
+import { attributeLabel } from "@/lib/dateBoard";
+import { ACTIONS_CATALOG, registryText } from "@/lib/generated/registries";
 import type { CoreConversationState, CoreMembership, CoreProjection } from "@/lib/core";
 import { agentStageTitle } from "@/lib/destinations";
 import type {
@@ -46,6 +46,7 @@ import type {
   TaskRow,
   TurnRow,
 } from "@/lib/types";
+import { DateBoardButton } from "./DateBoard";
 
 export interface TaskRowItemProps {
   task: TaskRow;
@@ -72,6 +73,8 @@ export interface TaskRowItemProps {
   convoState: CoreConversationState | null;
   areas: AreaRow[];
   projects: ProjectRow[];
+  todayYMD: string;
+  lang: string;
   onRowClick: (e: React.MouseEvent) => void;
   onContextMenu?: (e: React.MouseEvent) => void;
   onDragStart?: (e: React.DragEvent) => void;
@@ -136,6 +139,36 @@ function isoToLocalDatetimeInput(iso: string | null | undefined): string {
   return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
 }
 
+const REPEAT_UNITS: Record<string, string> = {
+  day: "Daily",
+  week: "Weekly",
+  month: "Monthly",
+  year: "Yearly",
+};
+
+/** The day the When board shows as chosen. The Today pin carries no date, so it is today. */
+export function whenDay(task: TaskRow, todayYMD: string): string | null {
+  return task.scheduled ?? (task.today ? todayYMD : null);
+}
+
+/** The When board's Repeat row: "Repeat…", or the rule when the task already repeats. */
+export function repeatTitle(task: TaskRow, lang: string): string {
+  const unit = task.recurrenceUnit ? REPEAT_UNITS[task.recurrenceUnit] : undefined;
+  return unit
+    ? `${attributeLabel("repeat", lang)}: ${unit}`
+    : registryText(ACTIONS_CATALOG.actions["task.repeat"].title, lang);
+}
+
+export function openRepeatSelect(select: HTMLSelectElement | null | undefined) {
+  if (!select) return;
+  select.focus();
+  try {
+    select.showPicker?.();
+  } catch {
+    // The browser opens a menu only inside a user gesture. The focus stays on the control.
+  }
+}
+
 export function TaskDetailEditor({
   props,
   isPageMode = false,
@@ -174,6 +207,7 @@ export function TaskDetailEditor({
   const [historyRows, setHistoryRows] = useState<ChangeEntry[] | null>(null);
   const [justChecked, setJustChecked] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const repeatSelectRef = useRef<HTMLSelectElement | null>(null);
 
   useEffect(() => {
     setTitleDraft(task.title);
@@ -233,6 +267,7 @@ export function TaskDetailEditor({
 
   return (
     <div
+      data-task-id={task.id}
       className={
         isPageMode
           ? "space-y-4"
@@ -336,42 +371,29 @@ export function TaskDetailEditor({
               {isToday ? "Today" : "Move to Today"}
             </button>
 
-            <label className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--bg-hover)] px-2.5 py-1 text-[var(--text-secondary)]">
-              <Calendar className="h-3.5 w-3.5" />
-              <span>When</span>
-              <input
-                type="date"
-                value={task.scheduled ?? ""}
-                onChange={(e) => props.onSetScheduled(e.target.value || null)}
-                className="font-mono-tabular bg-transparent text-[var(--text-primary)] outline-none"
-              />
-            </label>
+            <DateBoardButton
+              attribute="when"
+              value={whenDay(task, props.todayYMD)}
+              today={props.todayYMD}
+              lang={props.lang}
+              startTime={task.startTime}
+              durationMinutes={task.durationMinutes}
+              repeatTitle={repeatTitle(task, props.lang)}
+              onPick={props.onSetScheduled}
+              onClear={() => props.onSetScheduled(null)}
+              onTimeSlotChange={props.onSetTimeSlot}
+              onRepeat={() => openRepeatSelect(repeatSelectRef.current)}
+            />
 
-            <label className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--bg-hover)] px-2.5 py-1 text-[var(--text-secondary)]">
-              <Flag className="h-3.5 w-3.5" />
-              <span>Deadline</span>
-              <input
-                type="date"
-                value={task.deadline ?? ""}
-                onChange={(e) => props.onSetDeadline(e.target.value || null)}
-                className="font-mono-tabular bg-transparent text-[var(--text-primary)] outline-none"
-              />
-            </label>
-
-            <label className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--bg-hover)] px-2.5 py-1 text-[var(--text-secondary)]">
-              <Clock className="h-3.5 w-3.5" />
-              <input
-                type="time"
-                value={task.startTime ?? ""}
-                onChange={(e) =>
-                  props.onSetTimeSlot(
-                    e.target.value || null,
-                    task.durationMinutes ?? (e.target.value ? 30 : null),
-                  )
-                }
-                className="font-mono-tabular bg-transparent text-[var(--text-primary)] outline-none"
-              />
-            </label>
+            <DateBoardButton
+              attribute="deadline"
+              value={task.deadline ?? null}
+              today={props.todayYMD}
+              lang={props.lang}
+              red={membership.deadlineRed}
+              onPick={props.onSetDeadline}
+              onClear={() => props.onSetDeadline(null)}
+            />
 
             <label className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--bg-hover)] px-2.5 py-1 text-[var(--text-secondary)]">
               <Bell className="h-3.5 w-3.5" />
@@ -403,6 +425,8 @@ export function TaskDetailEditor({
             <label className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--bg-hover)] px-2.5 py-1 text-[var(--text-secondary)]">
               <Repeat className="h-3.5 w-3.5" />
               <select
+                ref={repeatSelectRef}
+                data-repeat-task={task.id}
                 value={task.recurrenceUnit ?? ""}
                 onChange={(e) => {
                   const v = e.target.value;
@@ -416,10 +440,11 @@ export function TaskDetailEditor({
                 className="bg-transparent text-[var(--text-primary)] outline-none"
               >
                 <option value="">No repeat</option>
-                <option value="day">Daily</option>
-                <option value="week">Weekly</option>
-                <option value="month">Monthly</option>
-                <option value="year">Yearly</option>
+                {Object.entries(REPEAT_UNITS).map(([unit, title]) => (
+                  <option key={unit} value={unit}>
+                    {title}
+                  </option>
+                ))}
               </select>
             </label>
 
@@ -1015,6 +1040,7 @@ export function TaskRowItem(props: TaskRowItemProps) {
 
   return (
     <div
+      data-task-id={task.id}
       draggable={draggable && !isDeletedView}
       onDragStart={props.onDragStart}
       onDragOver={props.onDragOver}

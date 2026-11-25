@@ -2143,7 +2143,7 @@ function generateTS({ entities, rules, icons, tokens, caps, settings, dests, act
   lines.push(`export const DESIGN_TOKENS = ${JSON.stringify({ accentPolicy: tokens.accentPolicy, fruitAccents: tokens.fruitAccents ?? [], textures: tokens.textures ?? [], selection: tokens.selection, colors: tokens.colors, multicolorGlyphs: tokens.multicolorGlyphs?.glyphs ?? {}, accentPalette: tokens.accentPalette, radii: tokens.radii, spacing: tokens.spacing, desktopColumn: tokens.desktopColumn, textScale: tokens.textScale })} as const;`);
   lines.push(`export const CAPABILITIES = ${JSON.stringify(caps.capabilities)} as const;`);
   lines.push(`export const ACTIONS_CATALOG = ${JSON.stringify({ actions: actions.actions, contextMenus: actions.contextMenus, menuBar: actions.menuBar, shortcutsSheet: actions.shortcutsSheet })} as const;`);
-  lines.push(`export const SURFACES_CATALOG = ${JSON.stringify({ notices: surfaces.notices, prompts: surfaces.prompts, toasts: surfaces.toasts, taskAttributes: surfaces.taskAttributes, taskPage: surfaces.taskPage })} as const;`);
+  lines.push(`export const SURFACES_CATALOG = ${JSON.stringify({ notices: surfaces.notices, prompts: surfaces.prompts, toasts: surfaces.toasts, taskAttributes: surfaces.taskAttributes, taskDateBoard: surfaces.taskDateBoard, taskPage: surfaces.taskPage })} as const;`);
   lines.push(`export const FIRST_RUN = ${JSON.stringify(surfaces.firstRun)} as const;`);
   lines.push("/** Plan limits (registry/plans.json). The server's plan table: every gate reads these, never a plan name. */");
   lines.push(`export const PLAN_LIMITS = ${JSON.stringify(plans.limits)} as const;`);
