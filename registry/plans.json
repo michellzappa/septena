@@ -44,7 +44,7 @@
     { "id": "plus", "title": "Plus", "detail": "€60 a year or €7 a month" },
     { "id": "pro", "title": "Pro", "detail": "Planned: €120 a year or €14 a month" }
   ],
-  "ladderHeadline": "Free on one device. Plus on all of them. Pro for all your agents.",
+  "ladderHeadline": "One device, all devices or all your agents.",
   "cardRows": ["devices", "connected", "files", "history"],
   "accountNote": "Backup, history and your agent need a free account. The app does not.",
   "agentNote": "An agent is an AI you connect to your list, such as Claude.",

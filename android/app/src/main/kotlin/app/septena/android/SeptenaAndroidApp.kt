@@ -143,6 +143,7 @@ class AndroidAppGraph(application: Application) {
             sync.dataVersion.collectLatest {
                 delay(1500)
                 runCatching { reminders.reconcile() }
+                runCatching { app.septena.android.widgets.SeptenaWidgetUpdater.refreshAll(application) }
             }
         }
     }

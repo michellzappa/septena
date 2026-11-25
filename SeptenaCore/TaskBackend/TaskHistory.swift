@@ -234,3 +234,8 @@ enum TaskHistory {
     return f.localizedString(for: date, relativeTo: now)
   }
 }
+
+extension BackendNoteRevision {
+  var date: Date? { TaskHistory.parseStamp(at) }
+  var who: String { TaskHistory.who(actor) }
+}

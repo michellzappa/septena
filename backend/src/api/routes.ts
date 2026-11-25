@@ -56,6 +56,7 @@ import {
   type NotificationV2,
 } from "../entitlement/appleJws.js";
 import { appleRow, rejectReason } from "../entitlement/apple.js";
+import { notesHistoryRest } from "./notesHistoryRest.js";
 import { tasksRest } from "./tasksRest.js";
 
 // Task backend API, mounted at /v1 (docs/SEPTASK_BACKEND.md in the app repo).
@@ -271,6 +272,7 @@ api.use("/account", requireUser);
 api.use("/devices/*", requireUser);
 api.use("/ical/settings", requireUser);
 api.use("/changes", requireUser, loadPlan("open", "changes"), requireSyncDevice);
+api.use("/notes/*", requireUser);
 api.use("/pair/*", requireUser);
 api.use("/auth/device", requireUser);
 // The watch is a companion of a signed-in phone or Mac: it loads the plan
@@ -365,6 +367,10 @@ api.get("/changes", async (c) => {
   // only on the free plan when older changes were hidden.
   return c.json({ changes, windowDays: plan!.limits.changeLogDays, hiddenOlder: hidden, upsell: historyEdgeUpsell(plan ?? null, hidden) });
 });
+
+// ---- project & area notes history (docs/PROJECT_NOTES_SPEC.md §6, #123) ----
+
+api.route("/notes", notesHistoryRest);
 
 // ---- attachments (bytes proxied through the Worker; §10 limits) ----
 

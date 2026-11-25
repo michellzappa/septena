@@ -238,6 +238,29 @@ actor TaskBackendClient {
     return try decode(BackendChangesResponse.self, from: data, what: "history")
   }
 
+  /// Permanent version history of a project's or area's notes, newest first
+  /// (`GET /v1/notes/history`, docs/PROJECT_NOTES_SPEC.md §6).
+  func noteHistory(
+    container: ContainerNotes.Container,
+    id: String,
+    before: Int? = nil,
+    limit: Int = 50,
+    includeBody: Bool = true
+  ) async throws -> BackendNoteHistoryResponse {
+    var parts = URLComponents()
+    parts.path = "/v1/notes/history"
+    parts.queryItems = [
+      URLQueryItem(name: "container", value: container.rawValue),
+      URLQueryItem(name: "id", value: id),
+      URLQueryItem(name: "limit", value: String(min(max(limit, 1), 100))),
+      URLQueryItem(name: "includeBody", value: includeBody ? "1" : "0"),
+    ] + (before.map { [URLQueryItem(name: "before", value: String($0))] } ?? [])
+    guard let path = parts.string else { throw TaskBackendError.badResponse("bad path") }
+    let (data, status) = try await authed(path: path, method: "GET", body: nil)
+    guard status == 200 else { throw Self.httpError(status, data) }
+    return try decode(BackendNoteHistoryResponse.self, from: data, what: "notes history")
+  }
+
   // MARK: - Sign-in approval (a new device, or the Claude connector)
 
   /// What a sign-in code asks for, read before the user approves it
