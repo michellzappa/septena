@@ -254,6 +254,9 @@ struct SeptaskRootView: View {
 private struct MagicPlusOrb: View {
   let drag: MagicPlusDragState
   @State private var showingMenu = false
+  /// New Task was picked in the menu. The task starts when the popover is gone:
+  /// a popover that closes takes the keyboard away from the new title field.
+  @State private var newTaskAfterMenu = false
   /// Finger-down state: the orb sinks while touched, so the press reads as
   /// received before the tap even ends.
   @GestureState private var isPressed = false
@@ -364,6 +367,11 @@ private struct MagicPlusOrb: View {
     .popover(isPresented: $showingMenu, attachmentAnchor: .rect(.bounds), arrowEdge: .bottom) {
       quickMenu
         .presentationCompactAdaptation(.popover)
+        .onDisappear {
+          guard newTaskAfterMenu else { return }
+          newTaskAfterMenu = false
+          onNewTask()
+        }
     }
   }
 
@@ -401,8 +409,8 @@ private struct MagicPlusOrb: View {
         }
       } else {
         menuRow(title: RegistryActions.title(.appNewTask), icon: "checkmark.circle") {
+          newTaskAfterMenu = true
           showingMenu = false
-          onNewTask()
         }
       }
       if isViewingProject {

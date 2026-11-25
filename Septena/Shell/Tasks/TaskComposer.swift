@@ -150,6 +150,15 @@ struct TaskComposerCard: View {
   /// Single keyboard cursor across the whole form (title, pills, terminal
   /// actions). Replaces the old title-only `titleFocused` bool.
   @FocusState private var focus: TaskEditFocus?
+  #if os(iOS)
+  /// The inline title still has to open the keyboard. The inline title is a
+  /// UIKit text view with no `.focused(_, equals: .title)`, so SwiftUI drops a
+  /// programmatic `focus = .title` and a new task opened without a keyboard.
+  /// The text view reads this, becomes first responder and clears it. It lives
+  /// here, not in the view, so a row that scrolls out of the `LazyVStack` and
+  /// back does not take the keyboard again.
+  @State private var titleFocusPending = false
+  #endif
   /// One-shot trigger: set to a pill to make `TaskAttributeBar` run its
   /// `select` for that pill (keyboard Space/Return on a focused pill). The bar
   /// resets it to nil after acting.
@@ -631,6 +640,7 @@ struct TaskComposerCard: View {
             else if focus == .title { focus = nil }
           }
         ),
+        focusPending: $titleFocusPending,
         onSubmit: {
           if canSave { commit() } else if isCreating { close() }
         },
@@ -1150,6 +1160,12 @@ struct TaskComposerCard: View {
   /// or started typing.
   private func focusTitle() {
     guard focus != .title else { return }
+    #if os(iOS)
+    if presentation == .inline {
+      titleFocusPending = true
+      return
+    }
+    #endif
     focus = .title
     #if os(macOS)
     DispatchQueue.main.async { septenaMoveCursorToEnd() }
@@ -1378,6 +1394,31 @@ extension View {
 private final class InlineTitleUITextView: UITextView {
   var onTab: ((Bool) -> Void)?
   var onEscape: (() -> Void)?
+  /// Set while the composer asks for the keyboard. The request holds until the
+  /// view is in a window: before that, `becomeFirstResponder` does nothing.
+  var focusPending = false
+  var onFocusClaimed: (() -> Void)?
+
+  override func didMoveToWindow() {
+    super.didMoveToWindow()
+    claimFocusIfPending()
+  }
+
+  /// One runloop turn later, because SwiftUI may be updating views now and the
+  /// claim writes composer state.
+  func claimFocusIfPending() {
+    guard focusPending, window != nil else { return }
+    DispatchQueue.main.async { [weak self] in
+      guard let self, self.focusPending, self.window != nil else { return }
+      if !self.isFirstResponder {
+        guard self.becomeFirstResponder() else { return }
+        let end = ((self.text ?? "") as NSString).length
+        self.selectedRange = NSRange(location: end, length: 0)
+      }
+      self.focusPending = false
+      self.onFocusClaimed?()
+    }
+  }
 
   override var contentOffset: CGPoint {
     get { .zero }
@@ -1408,6 +1449,7 @@ private final class InlineTitleUITextView: UITextView {
 private struct InlineTitleTextView: UIViewRepresentable {
   @Binding var text: String
   @Binding var isFocused: Bool
+  @Binding var focusPending: Bool
   let onSubmit: () -> Void
   let onDone: () -> Void
   let onTab: (Bool) -> Void
@@ -1449,6 +1491,7 @@ private struct InlineTitleTextView: UIViewRepresentable {
     let coordinator = context.coordinator
     view.onTab = { forward in coordinator.parent.onTab(forward) }
     view.onEscape = { coordinator.parent.onEscape() }
+    view.onFocusClaimed = { coordinator.parent.focusPending = false }
 
     // SwiftUI's `.keyboard` toolbar does not attach to a UIKit text view, so
     // carry the same Done accessory bar as `TaskMarkdownNotesEditor`.
@@ -1491,6 +1534,9 @@ private struct InlineTitleTextView: UIViewRepresentable {
       }
       coordinator.lastRequestedFocus = isFocused
     }
+
+    view.focusPending = focusPending
+    view.claimFocusIfPending()
   }
 
   func sizeThatFits(_ proposal: ProposedViewSize,
