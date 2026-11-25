@@ -591,10 +591,7 @@ final class KitConversationView: NSView {
 
   private func acceptReview() {
     guard let taskID else { return }
-    let previousNote = convo.endStateNote
-    mutator.complete(id: taskID)
-    mutator.acknowledge(id: taskID)
-    TaskUndo.recordAcceptReview(id: taskID, previousNote: previousNote, mutator: mutator)
+    TaskUndo.acceptReview(id: taskID, mutator: mutator)
     convo = mutator.conversation(id: taskID) ?? convo
     isTaskOpen = false
     if replyMode == .sendBack {

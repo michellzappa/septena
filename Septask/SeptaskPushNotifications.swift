@@ -25,6 +25,8 @@ import UIKit
 
 enum AgentQuestionNotification {
   static let categoryID = "AGENT_QUESTION"
+  /// An agent handed work over to Review. No actions: a tap opens the task.
+  static let reviewCategoryID = "AGENT_REVIEW"
   static let optionActionIDs = [
     "AGENT_OPTION_0",
     "AGENT_OPTION_1",
@@ -184,12 +186,13 @@ final class SeptaskPushNotifications {
 
   // MARK: - Interactive action response
 
-  /// Handles `AGENT_QUESTION` notification taps and option button actions.
+  /// Handles `AGENT_QUESTION` and `AGENT_REVIEW` taps and option button actions.
   /// Returns `true` if handled, `false` to fall through to `TaskReminderScheduler`.
   nonisolated static func handleNotificationResponse(_ response: UNNotificationResponse) async -> Bool {
     let content = response.notification.request.content
     let actionID = response.actionIdentifier
-    let isAgentCategory = content.categoryIdentifier == AgentQuestionNotification.categoryID
+    let isAgentCategory = [AgentQuestionNotification.categoryID, AgentQuestionNotification.reviewCategoryID]
+      .contains(content.categoryIdentifier)
     let optionIndex = AgentQuestionNotification.optionActionIDs.firstIndex(of: actionID)
 
     guard isAgentCategory || optionIndex != nil else { return false }

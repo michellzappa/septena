@@ -38,6 +38,9 @@ enum SeptaskSyncedSettings {
   /// so a previous account's preferences cannot leak into the next account.
   static func clearLocal() {
     UserDefaults.standard.removeObject(forKey: storeKey)
+    for key in [TaskFade.enabledDefaultsKey, TaskFade.lastSweepAtKey, TaskFade.dismissedSweepWeekKey] {
+      UserDefaults.standard.removeObject(forKey: key)
+    }
   }
 
   static func current() -> AppSettings {
@@ -68,6 +71,9 @@ enum SeptaskSyncedSettings {
     case "rolledInDismissedOn": return .from(s.rolledInDismissedOn)
     case "homeTimezone": return .from(s.time?.homeTimezone)
     case "agentsPaused": return s.agentsPaused.map { .bool($0) } ?? .null
+    case "tasksShowAging": return s.tasksShowAging.map { .bool($0) } ?? .null
+    case "fadeSweptAt": return s.fadeSweptAt.map { .string(stampFormatter.string(from: $0)) } ?? .null
+    case "fadeSweepDismissedOn": return .from(s.fadeSweepDismissedOn)
     case "getStartedDismissed": return s.getStartedDismissed.map { .bool($0) } ?? .null
     case "getStartedSteps": return s.getStartedSteps.map { .array($0.map { .string($0) }) } ?? .null
     case "upsellsSeen": return s.upsellsSeen.map { .array($0.map { .string($0) }) } ?? .null
@@ -122,6 +128,20 @@ enum SeptaskSyncedSettings {
       case .bool(let b): s.agentsPaused = b
       default: return false
       }
+    case "tasksShowAging":
+      switch v {
+      case .null: s.tasksShowAging = nil
+      case .bool(let b): s.tasksShowAging = b
+      default: return false
+      }
+    case "fadeSweptAt":
+      guard let x = string() else { return false }
+      guard let raw = x else { s.fadeSweptAt = nil; break }
+      guard let date = stampFormatter.date(from: raw) else { return false }
+      s.fadeSweptAt = date
+    case "fadeSweepDismissedOn":
+      guard let x = string() else { return false }
+      s.fadeSweepDismissedOn = x
     case "getStartedDismissed":
       switch v {
       case .null: s.getStartedDismissed = nil
