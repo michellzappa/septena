@@ -65,7 +65,8 @@ today's ball-in-court dot already does.
 
 ### 3.1 Review — canonical contract (shipped, `#87`)
 
-**Review** is the ONE surface by this name across the app, backend, MCP tools,
+**Review** is a group of the **Agent** list, not a list of its own (mz,
+2026-11-25: one agent list in the sidebar). It is the ONE surface by this name across the app, backend, MCP tools,
 and docs (Today rollover's default mode was renamed to **Ask** in ADR 0014, and
 the Faded sweep uses **Sweep**).
 
@@ -73,9 +74,10 @@ the Faded sweep uses **Sweep**).
   with `conversation.endState == "needs_verify"` (`TaskConvo.needsHumanReview`
   in `SeptenaCore/ConvoDerived.swift`, mirrored by `TaskStore.readReviewTasks`
   and MCP `tasks_list(view: "review")`).
-- **Sidebar visibility:** Progressive disclosure (`visibility: "whenNonEmpty"` in
-  `registry/destinations.json`). Appears right below **Today** when non-empty
-  (or while selected); always reachable via **Go ▸ Review** and **Quick Find**.
+- **Where it shows:** The second group of the Agent list, after **Your turn**:
+  the groups that wait on the human come first. Agent is
+  `visibility: "whenNonEmpty"` in `registry/destinations.json`, sits right below
+  **Today**, and is always reachable via **Go ▸ Agent** and **Quick Find**.
 - **Store enforcement (`human_accepts`, `TaskStore.ts`):** Agents cannot set
   `status = "done"` on a task assigned to an agent (`claude`), already in
   Review (`needs_verify`), or held under a live claim. The store rejects with

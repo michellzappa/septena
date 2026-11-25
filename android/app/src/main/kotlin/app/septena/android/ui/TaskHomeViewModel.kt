@@ -631,8 +631,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
 
     private suspend fun load(selected: TaskHomeLocation): LoadedTaskHome {
         val selectedDestId = (selected as? TaskHomeLocation.SmartList)?.destinationId
-        val needsFullHistory = selectedDestId == RegistryDestinationIds.LOGBOOK ||
-            selectedDestId == RegistryDestinationIds.AGENT
+        val needsFullHistory = selectedDestId == RegistryDestinationIds.LOGBOOK
         // Fast path for Today / active lists: read only open + soft-deleted tasks (skips thousands of Logbook rows).
         val taskRecords = if (needsFullHistory) {
             graph.taskStore.records(EntityNames.TASK)
@@ -732,7 +731,6 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         var upcomingCount = 0
         var repeatingCount = 0
         var anytimeCount = 0
-        var reviewCount = 0
         var agentCount = 0
         var starredCount = 0
         var fadedCount = 0
@@ -755,7 +753,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                 continue
             }
             val convoState = convoStates[snapshot.id]
-            if (convoState?.agentStage != null) agentCount += 1
+            if (isOpenVisible(snapshot) && convoState?.agentStage != null) agentCount += 1
 
             when (snapshot.status) {
                 RegistryEntityEnums.TaskStatus.OPEN -> {
@@ -765,7 +763,6 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                     if (membership.matchesView[RegistryDestinationIds.UPCOMING] == true) upcomingCount += 1
                     if (membership.matchesView[RegistryDestinationIds.ANYTIME] == true) anytimeCount += 1
                     if (TaskViewRules.matchesView(snapshot, membership, RegistryDestinationIds.REPEATING)) repeatingCount += 1
-                    if (convoState?.needsHumanReview == true) reviewCount += 1
                     if (TaskFadeRules.isFaded(snapshot.fadedAt)) {
                         fadedCount += 1
                         val fadedInstant = snapshot.fadedAt?.let { runCatching { java.time.Instant.parse(it) }.getOrNull() }
@@ -836,9 +833,6 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         }
 
         val nonEmptyDestinations = buildSet {
-            if (reviewCount > 0 || (selected as? TaskHomeLocation.SmartList)?.destinationId == RegistryDestinationIds.REVIEW) {
-                add(RegistryDestinationIds.REVIEW)
-            }
             if (agentCount > 0 || (selected as? TaskHomeLocation.SmartList)?.destinationId == RegistryDestinationIds.AGENT) {
                 add(RegistryDestinationIds.AGENT)
             }
@@ -852,7 +846,6 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             RegistryDestinationIds.UPCOMING -> upcomingCount
             RegistryDestinationIds.REPEATING -> repeatingCount
             RegistryDestinationIds.ANYTIME -> anytimeCount
-            RegistryDestinationIds.REVIEW -> reviewCount.takeIf { it > 0 }
             RegistryDestinationIds.AGENT -> agentCount.takeIf { it > 0 }
             RegistryDestinationIds.STARRED -> starredCount.takeIf { it > 0 }
             RegistryDestinationIds.LOGBOOK -> doneTodayCount.takeIf { it > 0 }
@@ -960,13 +953,8 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                     val convoState = convoStates[snapshot.id]
                     val stage = convoState?.agentStage
                     val listed = when (resolvedLocation.destinationId) {
-                        // Review: open tasks an agent handed back to verify.
-                        RegistryDestinationIds.REVIEW ->
-                            snapshot.status == RegistryEntityEnums.TaskStatus.OPEN && !snapshot.isHeading &&
-                                snapshot.deletedAt == null && convoState?.needsHumanReview == true
-                        // Agent: every task with an agent stage, grouped by stage.
-                        RegistryDestinationIds.AGENT ->
-                            stage != null && !snapshot.isHeading && snapshot.deletedAt == null
+                        // Agent: every open task with an agent stage, grouped by stage.
+                        RegistryDestinationIds.AGENT -> stage != null && isOpenVisible(snapshot)
                         else -> TaskViewRules.matchesView(snapshot, membership, resolvedLocation.destinationId)
                     }
                     if (!listed) continue
@@ -1012,7 +1000,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                         when (resolvedLocation.destinationId) {
                             RegistryDestinationIds.AGENT -> {
                                 val stageTitle = agentGroups[stage]
-                                item.copy(
+                                val grouped = item.copy(
                                     group = stageTitle?.let {
                                         TaskGroupHeader(
                                             key = "agent:${stage.orEmpty()}",
@@ -1023,29 +1011,27 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                                     groupTitle = stageTitle,
                                     position = rowPosition,
                                 )
-                            }
-                            RegistryDestinationIds.REVIEW -> {
-                                val note = conversation?.endStateNote?.trim()?.takeIf(String::isNotEmpty)
-                                    ?: reviewFallback
-                                val projTitle = snapshot.project?.let(projectTitles::get)
-                                val areaTitle = snapshot.area?.let(areaTitles::get)
-                                    ?: snapshot.project?.let(projectParentAreaTitle::get)
-                                val listLabel = when {
-                                    areaTitle != null && projTitle != null -> "$areaTitle › $projTitle"
-                                    projTitle != null -> projTitle
-                                    areaTitle != null -> areaTitle
-                                    else -> inboxLabel
+                                if (convoState?.needsHumanReview != true) {
+                                    grouped
+                                } else {
+                                    val note = conversation?.endStateNote?.trim()?.takeIf(String::isNotEmpty)
+                                        ?: reviewFallback
+                                    val projTitle = snapshot.project?.let(projectTitles::get)
+                                    val areaTitle = snapshot.area?.let(areaTitles::get)
+                                        ?: snapshot.project?.let(projectParentAreaTitle::get)
+                                    val listLabel = when {
+                                        areaTitle != null && projTitle != null -> "$areaTitle › $projTitle"
+                                        projTitle != null -> projTitle
+                                        areaTitle != null -> areaTitle
+                                        else -> inboxLabel
+                                    }
+                                    val askedAgo = relativeAgo(conversation?.endStateAt)?.let { "asked $it" }
+                                    val artifactTitle = (convoRecords[snapshot.id]?.fields?.get("artifact") as? JsonValue.ObjectValue)
+                                        ?.fields?.get("title")?.stringValue()?.trim()?.takeIf(String::isNotEmpty)
+                                    val metaLine = listOfNotNull(listLabel, askedAgo, artifactTitle)
+                                        .joinToString(" · ")
+                                    grouped.copy(reviewNote = note, reviewMeta = metaLine)
                                 }
-                                val askedAgo = relativeAgo(conversation?.endStateAt)?.let { "asked $it" }
-                                val artifactTitle = (convoRecords[snapshot.id]?.fields?.get("artifact") as? JsonValue.ObjectValue)
-                                    ?.fields?.get("title")?.stringValue()?.trim()?.takeIf(String::isNotEmpty)
-                                val metaLine = listOfNotNull(listLabel, askedAgo, artifactTitle)
-                                    .joinToString(" · ")
-                                item.copy(
-                                    position = rowPosition,
-                                    reviewNote = note,
-                                    reviewMeta = metaLine,
-                                )
                             }
                             else -> item.copy(position = rowPosition)
                         },
@@ -1380,7 +1366,6 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
     private companion object {
         val SHELL_DESTINATIONS = setOf(
             RegistryDestinationIds.TODAY,
-            RegistryDestinationIds.REVIEW,
             RegistryDestinationIds.AGENT,
             RegistryDestinationIds.UPCOMING,
             RegistryDestinationIds.REPEATING,

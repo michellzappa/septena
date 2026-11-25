@@ -2241,12 +2241,6 @@
       "destinations.destinations.today.emptyState.title"
     ]
   },
-  "Nothing to review": {
-    "text": "Nothing to review",
-    "paths": [
-      "destinations.destinations.review.emptyState.title"
-    ]
-  },
   "Nothing upcoming": {
     "text": "Nothing upcoming",
     "paths": [
@@ -2910,7 +2904,6 @@
   "Review": {
     "text": "Review",
     "paths": [
-      "destinations.destinations.review.title",
       "destinations.destinations.agent.groups.review.title",
       "surfaces.notices.items.weeklySweep.primaryTitle"
     ]
@@ -4064,12 +4057,6 @@
     "text": "Work",
     "paths": [
       "settings.copy.ai_explainer.workTitle.label"
-    ]
-  },
-  "Work an agent finished appears here so you can check and accept it.": {
-    "text": "Work an agent finished appears here so you can check and accept it.",
-    "paths": [
-      "destinations.destinations.review.emptyState.detail"
     ]
   },
   "Working": {

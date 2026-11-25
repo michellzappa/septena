@@ -59,7 +59,7 @@ Review row, in the task page and in the Mac inspector.
 
 ## Review row
 
-The row shows the title, the list (area › project), the full review note,
+Review rows are the Review group of the Agent list. The row shows the title, the list (area › project), the full review note,
 "asked {ago}", then Accept and Send back on their own line. Send back on the
 row does not open a field in the row: it opens the task page with the Send
 back field already open and focused. A tap anywhere else opens the task page.

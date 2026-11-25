@@ -230,7 +230,6 @@ pub mod entity_names {
 pub mod destination_ids {
     pub const INBOX: &str = "inbox";
     pub const TODAY: &str = "today";
-    pub const REVIEW: &str = "review";
     pub const AGENT: &str = "agent";
     pub const UPCOMING: &str = "upcoming";
     pub const REPEATING: &str = "repeating";

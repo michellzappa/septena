@@ -21,7 +21,7 @@ import Observation
 //     destination ID. Unset IDs fall back to `dest.sidebarSection` from the
 //     registry; destinations with `canMoveSection == false` stay in their
 //     registry section.
-//   • Destinations with `visibility == "whenNonEmpty"` (`review`, `agent`,
+//   • Destinations with `visibility == "whenNonEmpty"` (`agent`,
 //     `starred`, `faded`) still obey progressive disclosure
 //     when not hidden.
 

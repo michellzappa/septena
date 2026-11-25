@@ -206,7 +206,6 @@ internal fun buildTaskListItem(
 internal fun destinationIconKind(destinationId: String): SeptenaIconKind = when (destinationId) {
     RegistryDestinationIds.TODAY -> SeptenaIconKind.Today
     RegistryDestinationIds.INBOX -> SeptenaIconKind.Inbox
-    RegistryDestinationIds.REVIEW -> SeptenaIconKind.Review
     RegistryDestinationIds.AGENT -> SeptenaIconKind.Agent
     RegistryDestinationIds.UPCOMING -> SeptenaIconKind.Upcoming
     RegistryDestinationIds.REPEATING -> SeptenaIconKind.Repeating

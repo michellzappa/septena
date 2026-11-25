@@ -275,7 +275,7 @@ import Testing
     #expect(RegistryDestinations.viewAliases["someday"] == "anytime")
     #expect(RegistryDestinations.viewAliases["triage"] == "inbox")
     #expect(RegistryDestinations.byNavigationKey["today"]?.sfSymbol == "sun.max.fill")
-    #expect(RegistryDestinations.byNavigationKey["review"]?.title == "Review")
+    #expect(RegistryDestinations.byNavigationKey["agent"]?.title == "Agent")
     #expect(RegistryTokens.accentPalette.count == 16)
     #expect(RegistryTokens.textScaleFactors.count == 5)
     #expect(RegistryNotices.maxConcurrentExplainers == 1)

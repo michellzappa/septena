@@ -1318,7 +1318,7 @@ enum LocalCache {
           e.deletedAt == nil && !e.pendingDeletion && e.area == areaId
         }
       ))
-    case .today, .triage, .review, .agent, .upcoming, .repeating, .unscheduled, .starred, .faded:
+    case .today, .triage, .agent, .upcoming, .repeating, .unscheduled, .starred, .faded:
       return StoreHealth.fetch(context, FetchDescriptor<TaskEntity>(
         predicate: #Predicate { e in
           e.deletedAt == nil && !e.pendingDeletion && e.statusRaw == "open"
@@ -1492,10 +1492,6 @@ enum LocalCache {
     case .triage:
       // Unratified layer above Today — see `TaskEntity.isInTriageBand`.
       return e.isInTriageBand ? SeptenaTask(e) : nil
-    case .review:
-      // Agent-worked tasks awaiting the human's verification and acceptance (#87).
-      guard e.status == .open, e.conversation.needsHumanReview else { return nil }
-      return SeptenaTask(e)
     case .agent:
       // Agent work by stage (docs/TASK_FACTORY_SPEC.md §3). Only rows that
       // carry conversation JSON decode it. A claim lease is backend wall-clock

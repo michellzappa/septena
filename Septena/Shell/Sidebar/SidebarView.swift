@@ -33,7 +33,6 @@ struct SidebarRootView: View {
   @State private var counts: TasksCounts? = nil
   /// Tasks completed today — drives the Logbook tile/row count.
   @State private var doneTodayCount: Int = 0
-  @State private var reviewCount: Int = 0
   @State private var agentCount: Int = 0
   @State private var starredCount: Int = 0
   @State private var fadedCount: Int = 0
@@ -84,7 +83,6 @@ struct SidebarRootView: View {
     _projectProgress = State(initialValue: agg.projectProgress)
     _starredCount = State(initialValue: agg.starredCount)
     _fadedCount = State(initialValue: agg.fadedCount)
-    _reviewCount = State(initialValue: agg.reviewCount)
     _agentCount = State(initialValue: agg.agentCount)
     _repeatingCount = State(initialValue: agg.repeatingCount)
     _projectOpenCount = State(initialValue: agg.projectOpenCount)
@@ -654,9 +652,8 @@ struct SidebarRootView: View {
 
   private var nonEmptySmartListIDs: Set<RegistryDestinationID> {
     var ids = Set<RegistryDestinationID>()
-    // Review and Agent also stay while selected, so accepting the last item
-    // does not pull the row out from under the user.
-    if reviewCount > 0 || isSelected(.filter(.review)) { ids.insert(.review) }
+    // Agent also stays while selected, so accepting the last item does not
+    // pull the row out from under the user.
     if agentCount > 0 || isSelected(.filter(.agent)) { ids.insert(.agent) }
     if starredCount > 0 { ids.insert(.starred) }
     if fadedCount > 0 { ids.insert(.faded) }
@@ -710,7 +707,6 @@ struct SidebarRootView: View {
     // Today total = pinned-today + scheduled/due rolling in. Both buckets live
     // on Today, so the user-facing count is the sum.
     case .filter(.today):           return counts.map { $0.todayCount + $0.reviewCount }
-    case .filter(.review):          return reviewCount > 0 ? reviewCount : nil
     case .filter(.agent):           return agentCount > 0 ? agentCount : nil
     case .filter(.upcoming):        return counts?.upcomingCount
     case .filter(.repeating):       return repeatingCount
@@ -1366,7 +1362,6 @@ struct SidebarRootView: View {
     var areaOpenCount: [String: Int]
     var starredCount: Int = 0
     var fadedCount: Int = 0
-    var reviewCount: Int = 0
     var agentCount: Int = 0
     var repeatingCount: Int = 0
   }
@@ -1385,7 +1380,7 @@ struct SidebarRootView: View {
     // their own rows, so rolling them up would double-count.
     var areaDirectOpen: [String: Int] = [:]
     var inbox = 0, triage = 0, todayN = 0, upcoming = 0, unscheduled = 0, open = 0
-    var starred = 0, faded = 0, review = 0, agent = 0, repeating = 0
+    var starred = 0, faded = 0, agent = 0, repeating = 0
     let now = Date()
     for t in tasks {
       // Faded open tasks leave every count and project ratio (docs/TASK_FADE_SPEC.md §4).
@@ -1406,9 +1401,7 @@ struct SidebarRootView: View {
       // Check the raw columns first so only rows that carry JSON decode it.
       if t.recurrenceUnit != nil, t.recurrence != nil { repeating += 1 }
       if t.conversationJSON != nil {
-        let convo = t.conversation
-        if convo.needsHumanReview { review += 1 }
-        if convo.agentStage(at: now) != nil { agent += 1 }
+        if t.conversation.agentStage(at: now) != nil { agent += 1 }
       }
       if t.isInInbox { inbox += 1 }
       // The triage band (unratified) sits above Today and is excluded from it.
@@ -1435,7 +1428,6 @@ struct SidebarRootView: View {
       areaOpenCount: areaDirectOpen,
       starredCount: starred,
       fadedCount: faded,
-      reviewCount: review,
       agentCount: agent,
       repeatingCount: repeating)
   }
@@ -1448,7 +1440,6 @@ struct SidebarRootView: View {
     areaOpenCount = agg.areaOpenCount
     starredCount = agg.starredCount
     fadedCount = agg.fadedCount
-    reviewCount = agg.reviewCount
     agentCount = agg.agentCount
     repeatingCount = agg.repeatingCount
   }

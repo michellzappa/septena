@@ -29431,7 +29431,7 @@
       }
     },
     "Review" : {
-      "comment" : "Generated from registry destinations.destinations.review.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry destinations.destinations.agent.groups.review.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {

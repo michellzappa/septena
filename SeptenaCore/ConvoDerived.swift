@@ -36,7 +36,7 @@ extension TaskConvo {
 
   /// True when an agent finished work and handed the task back for the human
   /// to verify and accept or send back (`#87`). Single source of truth for the
-  /// Review smart list and badge. A single-field read: it stays in Swift.
+  /// Agent list's Review group and badge. A single-field read: it stays in Swift.
   var needsHumanReview: Bool { endState == .needsVerify }
 
   /// True when the conversation is waiting on a human action — either verifying
@@ -91,7 +91,7 @@ extension TaskConvo {
 /// §3). Derived, never stored. Raw values are the group ids of the `agent`
 /// destination in `registry/destinations.json`, which owns titles and icons.
 enum AgentStage: String, CaseIterable, Sendable {
-  case queued, working, yourTurn, review, done
+  case yourTurn, review, working, queued, done
 
   /// Registry title + symbol for this stage's section header.
   var group: RegistryDestinationGroup? {

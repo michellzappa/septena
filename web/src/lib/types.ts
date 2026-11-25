@@ -397,7 +397,6 @@ export interface StoreSnapshot {
 
 export type SmartDestination =
   | "today"
-  | "review"
   | "agent"
   | "upcoming"
   | "repeating"

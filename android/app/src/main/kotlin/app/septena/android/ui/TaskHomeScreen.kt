@@ -1291,7 +1291,7 @@ private fun TaskHomeScaffold(
                         )
                         is TaskHomeLocation.SmartList -> {
                             val isTodayList = location.destinationId == RegistryDestinationIds.TODAY
-                            val isReviewList = location.destinationId == RegistryDestinationIds.REVIEW
+                            val showsReviewRows = location.destinationId == RegistryDestinationIds.AGENT
                             val showingDeletedTab = location.destinationId == RegistryDestinationIds.LOGBOOK &&
                                 logbookShowingDeleted
                             val displayedTasks = if (showingDeletedTab) state.deletedTasks else state.tasks
@@ -1429,11 +1429,11 @@ private fun TaskHomeScaffold(
                                 }
                             } else null,
                             onApplyFilingSuggestion = homeViewModel::applyFilingSuggestion,
-                            isReviewList = isReviewList,
+                            showsReviewRows = showsReviewRows,
                             reviewAcceptTitle = reviewAcceptTitle,
                             reviewSendBackTitle = reviewSendBackTitle,
-                            onAcceptReview = if (isReviewList) homeViewModel::acceptReview else null,
-                            onSendBackReview = if (isReviewList) onSendBackReview else null,
+                            onAcceptReview = if (showsReviewRows) homeViewModel::acceptReview else null,
+                            onSendBackReview = if (showsReviewRows) onSendBackReview else null,
                         )
                         }
                     }

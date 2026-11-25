@@ -90,7 +90,7 @@ data class TaskListItem(
     val hasAttachments: Boolean = false,
     /** On-device filing suggestion target title shown as a one-tap capsule on Inbox rows (#368). */
     val filingSuggestionLabel: String? = null,
-    /** Full untruncated agent review note (`endStateNote` or fallback) for Review list rows (#412). */
+    /** Full untruncated agent review note (`endStateNote` or fallback) for the Agent list's Review rows (#412). */
     val reviewNote: String? = null,
     /** Single-line Review metadata (`Area › Project · asked {ago} · artifact`). */
     val reviewMeta: String? = null,
@@ -199,7 +199,7 @@ fun TaskHomeContent(
     onReorderTaskRow: ((ids: List<String>, index: Int, before: Boolean) -> Unit)? = null,
     onReorderGroupHeader: ((ids: List<String>, targetLocationKey: String) -> Unit)? = null,
     onApplyFilingSuggestion: ((String) -> Unit)? = null,
-    isReviewList: Boolean = false,
+    showsReviewRows: Boolean = false,
     reviewAcceptTitle: String = "",
     reviewSendBackTitle: String = "",
     onAcceptReview: ((String) -> Unit)? = null,
@@ -400,7 +400,7 @@ fun TaskHomeContent(
                 onReorderRow = onReorderTaskRow,
                 onReorderGroupHeader = onReorderGroupHeader,
                 onApplyFilingSuggestion = onApplyFilingSuggestion,
-                isReviewList = isReviewList,
+                showsReviewRows = showsReviewRows,
                 reviewAcceptTitle = reviewAcceptTitle,
                 reviewSendBackTitle = reviewSendBackTitle,
                 onAcceptReview = onAcceptReview,
@@ -439,7 +439,7 @@ private fun LazyListScope.taskCardRows(
     onReorderRow: ((ids: List<String>, index: Int, before: Boolean) -> Unit)? = null,
     onReorderGroupHeader: ((ids: List<String>, targetLocationKey: String) -> Unit)? = null,
     onApplyFilingSuggestion: ((String) -> Unit)? = null,
-    isReviewList: Boolean = false,
+    showsReviewRows: Boolean = false,
     reviewAcceptTitle: String = "",
     reviewSendBackTitle: String = "",
     onAcceptReview: ((String) -> Unit)? = null,
@@ -484,7 +484,7 @@ private fun LazyListScope.taskCardRows(
                 } else null,
             )
         }
-        if (isReviewList && onAcceptReview != null && onSendBackReview != null) {
+        if (showsReviewRows && task.reviewNote != null && onAcceptReview != null && onSendBackReview != null) {
             ReviewTaskCardRow(
                 task = task,
                 position = positions[index],

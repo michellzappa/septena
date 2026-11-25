@@ -49,10 +49,10 @@ Complete these checks before clicking Submit in either portal:
   Septena is a native task app for iPhone, iPad, and Mac built for one person and their agents. Connect Septena to Claude to read your lists, add or update tasks, keep project notes current, and work through tasks together without giving up control of your day.
 
   What you can do with this connector:
-  - Review Today, the Inbox at the top of Today, Upcoming, Anytime, Faded, and your Review list.
+  - Review Today, the Inbox at the top of Today, Upcoming, Anytime, Faded, and your Agent list.
   - Search tasks, look up tasks linked to a specific email, calendar event, GitHub issue, or URL, and inspect project and area briefs before acting.
   - Capture new tasks from a conversation. Tasks you ask for land where you put them; tasks Claude suggests wait as proposals in your Inbox until you accept them.
-  - Let Claude claim a task, post short tap-to-answer questions in the app when it needs a decision, attach a draft or summary, and send finished work to your Review list.
+  - Let Claude claim a task, post short tap-to-answer questions in the app when it needs a decision, attach a draft or summary, and send finished work to Review in your Agent list.
 
   Built with clear boundaries:
   - Claude never marks an assigned task done. Finished work waits in Review until you tap Accept or Send back.
@@ -113,10 +113,10 @@ Complete these checks before clicking Submit in either portal:
   Septena is a native task app for iPhone, iPad, and Mac built for one person and their agents. Connect Septena to ChatGPT to check your day, capture tasks, update project notes, and collaborate on open work while keeping final approval in your hands.
 
   What you can do with Septena in ChatGPT:
-  - Check Today, the Inbox at the top of Today, Upcoming, Anytime, Faded, and your Review list.
+  - Check Today, the Inbox at the top of Today, Upcoming, Anytime, Faded, and your Agent list.
   - Search open or completed tasks, find tasks linked to an email, calendar event, GitHub issue, or URL, and read project and area briefs for context.
   - Add tasks directly when you ask, or let ChatGPT propose tasks into your Inbox for one-tap review.
-  - Work a task step by step: claim a task, post short choices to the task conversation, attach a draft or summary, and send finished work to your Review list.
+  - Work a task step by step: claim a task, post short choices to the task conversation, attach a draft or summary, and send finished work to Review in your Agent list.
 
   Built with explicit limits:
   - ChatGPT never marks an assigned task done. Finished work waits in Review until you tap Accept or Send back in Septena.
@@ -306,7 +306,7 @@ Use these prompts in portal submission fields and reviewer walkthroughs to exerc
    > "Propose two follow-up tasks for my Inbox based on this meeting summary, without putting them directly on Today."
    *Expected tool:* `tasks_create` with `origin: "agent_suggestion"` (or omitted). Returns `placement: "inbox_proposal"`.
 6. **Agent work loop & Review handoff:**
-   > "Check my Septena reasoning queue, claim the first task, attach a short summary artifact, and send it to my Review list."
+   > "Check my Septena reasoning queue, claim the first task, attach a short summary artifact, and send it to Review."
    *Expected tools:* `tasks_pending_reasoning`, `tasks_claim`, `tasks_set_artifact`, `tasks_set_endstate(endState: "needs_verify")`. Task stays open and appears in `tasks_list(view: "review")`.
 7. **Project notes log:**
    > "Log a note in the Website Launch project saying we decided to ship the English listing first."
@@ -342,6 +342,6 @@ Prepare these assets before submitting:
   1. **Connect & Pair:** The OAuth pairing page (`api.septena.app/oauth/authorize`) alongside Septena's in-app approval confirmation showing the requesting client name.
   2. **Today & Inbox Proposals:** Septena's Today view with an agent-proposed task waiting in the Inbox at the top of Today, clearly marked with its source.
   3. **Task Conversation:** A task showing an agent question with tap-to-answer options (`Discuss`).
-  4. **Review List (`Accept` / `Send back`):** A finished task with an attached artifact waiting in Septena's Review list while still open.
+  4. **Review (`Accept` / `Send back`):** A finished task with an attached artifact waiting under Review in Septena's Agent list while still open.
   5. **Client Session:** Claude or ChatGPT listing Today's tasks and creating or updating a task via the connector, showing tool-call transparency and confirmation prompts on destructive tools.
 - [ ] **Optional Short Walkthrough Recording (OpenAI review):** A 60-to-90-second screen recording showing OAuth pairing, a read query (`tasks_list`), a non-destructive write (`tasks_create`), a confirmation-prompted destructive write (`tasks_complete`), and the resulting instant sync in Septena.

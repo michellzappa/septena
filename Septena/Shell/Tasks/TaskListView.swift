@@ -1231,7 +1231,7 @@ struct TaskListView: View {
   /// composer still treats this as CREATE, not edit, so its behavior is in
   /// lockstep with the drawer composer. Upcoming falls back to the drawer.
   private func startCreate(areaId: String? = nil, projectId: String? = nil) {
-    guard !showingRecentlyDeleted, filter != .repeating, filter != .review, filter != .agent else { return }
+    guard !showingRecentlyDeleted, filter != .repeating, filter != .agent else { return }
     // One press: fold (and so save) whatever editor is open, then start the
     // new task. This used to stop after the fold, so "+" while editing took
     // two presses.
@@ -1360,7 +1360,7 @@ struct TaskListView: View {
   /// The `from` reference icon and the Review rows' issue: one read each.
   private func refreshReferenceDecorations() {
     fromRefKinds = LocalCache.fromRefKinds(in: modelContext)
-    issueRefs = filter == .review ? LocalCache.newestIssueRefs(in: modelContext) : [:]
+    issueRefs = filter == .agent ? LocalCache.newestIssueRefs(in: modelContext) : [:]
   }
 
   private func refreshTodayNotices() {
@@ -1420,7 +1420,7 @@ struct TaskListView: View {
   /// the `+`/⌘N composer there (it lets you pick the day).
   private var allowsInlineCreate: Bool {
     switch filter {
-    case .logbook, .faded, .recentlyDeleted, .upcoming, .repeating, .review, .agent: return false
+    case .logbook, .faded, .recentlyDeleted, .upcoming, .repeating, .agent: return false
     default:                                    return true
     }
   }
@@ -2409,11 +2409,6 @@ struct TaskListView: View {
         AnyView(starFilterBar)
         AnyView(projectGroupedRows)
       })
-    case .review:
-      return AnyView(Group {
-        AnyView(starFilterBar)
-        AnyView(reviewRows)
-      })
     case .agent:
       return AnyView(Group {
         AnyView(starFilterBar)
@@ -2763,13 +2758,12 @@ struct TaskListView: View {
                reorderable: isManuallyOrderedList)
   }
 
-  /// Review stage rows (`needs_verify`, #87): each row carries Accept and Send
-  /// back right in the list. A tap opens the task page (pushed on iPhone, the
+  /// Review group rows (`needs_verify`, #87): each row carries Accept and Send
+  /// back right in the Agent list. A tap opens the task page (pushed on iPhone, the
   /// inspector on wide screens). It never expands inline: the review row's
   /// layout is not a task row, so the inline editor broke it.
   @ViewBuilder
-  private var reviewRows: some View {
-    let rows = visibleItems
+  private func reviewRows(_ rows: [SeptenaTask]) -> some View {
     ForEach(Array(rows.enumerated()), id: \.element.id) { idx, task in
       let position = TaskCardPosition(index: idx, count: rows.count)
       ReviewTaskRow(
@@ -2828,7 +2822,11 @@ struct TaskListView: View {
     ForEach(AgentStage.allCases, id: \.self) { stage in
       if let tasks = byStage[stage], !tasks.isEmpty {
         Section {
-          cardedRows(tasks)
+          if stage == .review {
+            reviewRows(tasks)
+          } else {
+            cardedRows(tasks)
+          }
         } header: {
           groupHeader(icon: stage.group?.sfSymbol ?? "circle",
                       title: stage.group?.title ?? stage.rawValue)
@@ -5081,7 +5079,7 @@ struct TaskListView: View {
     // Every open-work list hides done tasks (a just-completed one lingers via
     // the settle exception in `visibleItems`, then fades). Only the Logbook and
     // Recently Deleted — whose whole job is showing finished/trashed tasks — keep them.
-    case .project, .area, .unscheduled, .starred, .upcoming, .triage, .repeating, .review, .agent, .faded: return true
+    case .project, .area, .unscheduled, .starred, .upcoming, .triage, .repeating, .agent, .faded: return true
     case .today:
       return !todayShowCompleted
     case .logbook, .recentlyDeleted: return false

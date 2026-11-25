@@ -1098,7 +1098,7 @@ final class SeptaskKitTaskListController: NSViewController {
     checklistCounts = LocalCache.checklistSummaryByTask(in: context)
     attachmentCounts = SeptenaServices.shared.taskAttachmentStore.attachmentCountsByTask()
     fromRefKinds = LocalCache.fromRefKinds(in: context)
-    issueRefs = filter == .review ? LocalCache.newestIssueRefs(in: context) : [:]
+    issueRefs = filter == .agent ? LocalCache.newestIssueRefs(in: context) : [:]
     tagsByID = LocalCache.tagsByID(in: context)
 
     let locallyChanged = locallyChanged.union(takePendingReloadIDs())
@@ -2144,9 +2144,6 @@ final class SeptaskKitTaskListController: NSViewController {
     case .triage:
       return .screenTitle(title: TaskFilter.triage.title,
                           icon: .symbol("tray"))
-    case .review:
-      return .screenTitle(title: TaskFilter.review.title,
-                          icon: .symbol("eye"))
     case .agent:
       return .screenTitle(title: TaskFilter.agent.title,
                           icon: .symbol(Route.filter(.agent).icon))
@@ -3827,7 +3824,7 @@ final class SeptaskKitTaskListController: NSViewController {
     // Repeating lists the templates that already carry a recurrence rule;
     // a plain new task can't join it, so ⌘N stays off there — same as the
     // two read-only lists.
-    case .review, .agent, .repeating, .logbook, .faded, .recentlyDeleted: return nil
+    case .agent, .repeating, .logbook, .faded, .recentlyDeleted: return nil
     }
     return (area, project, today, scheduled)
   }
@@ -3948,7 +3945,7 @@ final class SeptaskKitTaskListController: NSViewController {
     }
     // A Review row opens the task page (the inspector), same as iPhone. It
     // never expands inline: the review cell is not a task row.
-    if filter == .review {
+    if isReviewRow(task) {
       onOpenInspector?()
       return
     }
@@ -5165,7 +5162,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       if task.id == composingTaskId {
         return composerRowHeight ?? KitComposerCell.baseHeight
       }
-      if filter == .review {
+      if isReviewRow(task) {
         return KitReviewTaskCell.height(for: task, issue: issueRefs[task.id],
                                         contextText: KitListPath.text(for: task, in: context),
                                         width: tableView.bounds.width)
@@ -5324,7 +5321,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
   /// don't reorder.
   private var allowsReorder: Bool {
     switch filter {
-    case .review, .agent, .logbook, .faded, .recentlyDeleted: return false
+    case .agent, .logbook, .faded, .recentlyDeleted: return false
     default: return true
     }
   }
@@ -5905,7 +5902,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
         wireComposer(cell, task: task)
         return cell
       }
-      if filter == .review, !task.isHeading {
+      if isReviewRow(task) {
         let identifier = NSUserInterfaceItemIdentifier("reviewTaskCell")
         let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? KitReviewTaskCell
           ?? KitReviewTaskCell(identifier: identifier)
@@ -5977,7 +5974,12 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
     return nil
   }
 
-  /// Accept a `needs_verify` task from the Review stage: completes it with
+  /// A row of the Agent list's Review group: it draws Accept and Send back.
+  private func isReviewRow(_ task: SeptenaTask) -> Bool {
+    filter == .agent && !task.isHeading && task.conversation.needsHumanReview
+  }
+
+  /// Accept a `needs_verify` task from the Review group: completes it with
   /// lossless undo back into Review (`needs_verify` + check note).
   private func acceptReviewTask(id: String) {
     guard let task = LocalCache.task(id: id, in: context), task.status == .open else { return }

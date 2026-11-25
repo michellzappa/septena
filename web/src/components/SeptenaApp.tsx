@@ -83,7 +83,6 @@ const AGENT_STAGE_ORDER: Array<{ id: Exclude<AgentStage, null>; title: string }>
 function iconForDestination(id: SmartDestination) {
   switch (id) {
     case "today": return Star;
-    case "review": return CheckCircle2;
     case "agent": return Sparkles;
     case "upcoming": return Calendar;
     case "repeating": return Repeat;
@@ -427,7 +426,6 @@ export function SeptenaApp() {
   const smartCounts = useMemo(() => {
     const counts: Record<SmartDestination, number> = {
       today: 0,
-      review: 0,
       agent: 0,
       upcoming: 0,
       repeating: 0,
@@ -450,7 +448,6 @@ export function SeptenaApp() {
       if (task.status !== "open") continue;
 
       if (membership.matchesView.today) counts.today++;
-      if (convoState?.needsHumanReview) counts.review++;
       if (convoState?.agentStage !== null && convoState?.agentStage !== undefined) counts.agent++;
       if (membership.matchesView.upcoming) counts.upcoming++;
       if (task.recurrenceUnit) counts.repeating++;
@@ -465,7 +462,6 @@ export function SeptenaApp() {
   const sidebarDestinations = useMemo(() => {
     const allowedIds = new Set<SmartDestination>([
       "today",
-      "review",
       "agent",
       "upcoming",
       "repeating",
@@ -519,7 +515,6 @@ export function SeptenaApp() {
         if (task.deletedAt || task.status !== "open") return false;
         switch (destination.id) {
           case "today": return membership.matchesView.today;
-          case "review": return Boolean(convoState?.needsHumanReview);
           case "agent": return convoState?.agentStage !== null && convoState?.agentStage !== undefined;
           case "upcoming": return membership.matchesView.upcoming;
           case "repeating": return Boolean(task.recurrenceUnit);
@@ -1272,7 +1267,7 @@ export function SeptenaApp() {
 
         <div className="flex-1 overflow-y-auto px-4 py-4 md:px-10 md:py-6">
           <div className="mx-auto max-w-2xl">
-            {agentsPaused && destination.kind === "smart" && (destination.id === "agent" || destination.id === "review") && (
+            {agentsPaused && destination.kind === "smart" && destination.id === "agent" && (
               <div className="mb-4 flex items-center justify-between rounded-lg border border-amber-500/30 bg-amber-500/10 px-3.5 py-2 text-xs text-amber-700 dark:text-amber-300">
                 <span>All agents are paused. Connected agents cannot claim or edit tasks.</span>
                 <button

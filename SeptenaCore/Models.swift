@@ -1073,8 +1073,6 @@ enum TaskFilter: Equatable, Hashable {
   /// This is the only home for loose captures; the standalone Inbox page was
   /// retired when the triage band absorbed it.
   case triage
-  /// Agent-worked tasks waiting for the human to verify and accept (`endState == .needsVerify`).
-  case review
   /// Every open task an agent owns or worked, grouped by `AgentStage`
   /// (docs/TASK_FACTORY_SPEC.md §3).
   case agent
@@ -1093,7 +1091,6 @@ enum TaskFilter: Equatable, Hashable {
     switch self {
     case .today: return "today"
     case .triage: return "triage"
-    case .review: return "all"
     case .agent: return "all"
     case .upcoming: return "upcoming"
     case .repeating: return "all"
@@ -1112,7 +1109,6 @@ enum TaskFilter: Equatable, Hashable {
     switch self {
     case .today: return "today"
     case .triage: return "triage"
-    case .review: return "review"
     case .agent: return "agent"
     case .upcoming: return "upcoming"
     case .repeating: return "repeating"
@@ -1131,7 +1127,6 @@ enum TaskFilter: Equatable, Hashable {
   var destinationID: RegistryDestinationID? {
     switch self {
     case .today: return .today
-    case .review: return .review
     case .agent: return .agent
     case .upcoming: return .upcoming
     case .repeating: return .repeating
@@ -1148,7 +1143,6 @@ enum TaskFilter: Equatable, Hashable {
   init?(destinationID: RegistryDestinationID) {
     switch destinationID {
     case .today: self = .today
-    case .review: self = .review
     case .agent: self = .agent
     case .upcoming: self = .upcoming
     case .repeating: self = .repeating

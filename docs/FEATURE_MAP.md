@@ -17,7 +17,7 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 |---|---|---|---|---|---|---|---|---|
 | `lists.inbox` | Inbox band on Today | ships | ships | ships | ships | ships | planned | partial |
 | `lists.today` | Today | ships | ships | ships | ships | ships | planned | partial |
-| `lists.review` | Review (needs_verify) | ships | ships | ships | ships | ships | planned | - |
+| `lists.review` | Review in the Agent list (needs_verify) | ships | ships | ships | ships | ships | planned | - |
 | `lists.agent` | Agent (claimed and assigned work by stage) | ships | ships | ships | ships | ships | planned | - |
 | `lists.upcoming` | Upcoming | ships | ships | ships | ships | ships | planned | - |
 | `lists.anytime` | Anytime | ships | ships | ships | ships | ships | planned | - |

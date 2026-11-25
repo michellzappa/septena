@@ -25,7 +25,6 @@ type ResultItem =
 
 const SMART_TARGETS: Array<{ id: SmartDestination; title: string }> = [
   { id: "today", title: "Today" },
-  { id: "review", title: "Review" },
   { id: "agent", title: "Agent" },
   { id: "upcoming", title: "Upcoming" },
   { id: "repeating", title: "Repeating" },
@@ -167,7 +166,7 @@ export function QuickFindModal({
                 if (item.id === "today") icon = <Star className="h-3.5 w-3.5 text-[var(--today-gold)]" />;
                 else if (item.id === "upcoming") icon = <Calendar className="h-3.5 w-3.5 text-[var(--text-muted)]" />;
                 else if (item.id === "repeating") icon = <Repeat className="h-3.5 w-3.5 text-[var(--text-muted)]" />;
-                else if (item.id === "agent" || item.id === "review") icon = <Sparkles className="h-3.5 w-3.5 text-[var(--accent)]" />;
+                else if (item.id === "agent") icon = <Sparkles className="h-3.5 w-3.5 text-[var(--accent)]" />;
                 else if (item.id === "logbook") icon = <CheckCircle2 className="h-3.5 w-3.5 text-[var(--text-muted)]" />;
                 else icon = <Layers className="h-3.5 w-3.5 text-[var(--text-muted)]" />;
               } else if (item.kind === "area") {

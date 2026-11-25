@@ -117,7 +117,6 @@ enum class SeptenaIconKind {
     None,
     Today,
     Inbox,
-    Review,
     Agent,
     Upcoming,
     Repeating,
@@ -1566,19 +1565,6 @@ fun SeptenaGlyph(
                 lineTo(w * 0.88f, h * 0.56f)
             }
             drawPath(dip, tint, style = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round))
-        }
-        SeptenaIconKind.Review -> Canvas(modifier = modifier.size(size)) {
-            val w = this.size.width
-            val h = this.size.height
-            val stroke = (w * 0.09f).coerceAtLeast(1.4.dp.toPx())
-            val eye = Path().apply {
-                moveTo(w * 0.10f, h * 0.50f)
-                quadraticTo(w * 0.50f, h * 0.14f, w * 0.90f, h * 0.50f)
-                quadraticTo(w * 0.50f, h * 0.86f, w * 0.10f, h * 0.50f)
-                close()
-            }
-            drawPath(eye, tint, style = Stroke(width = stroke, join = StrokeJoin.Round))
-            drawCircle(tint, radius = w * 0.14f, center = Offset(w * 0.50f, h * 0.50f))
         }
         SeptenaIconKind.Anytime -> Canvas(modifier = modifier.size(size)) {
             val w = this.size.width
