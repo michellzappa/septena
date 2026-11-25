@@ -423,7 +423,7 @@ function refInsert(taskId: string, id: string, r: ResolvedRef, position: number,
 }
 
 /// The reference part of a write's result: what is on the task now, and what
-/// the store refused (an agent's reference while agents are paused). Nothing
+/// the store refused (a task with too many references). Nothing
 /// is dropped without a word.
 function refResult(refs: ResolvedRef[], results: (OpResult | undefined)[]) {
   const ok = refs.filter((_, i) => applied(results[i]) || results[i]?.status === "noop");
@@ -439,9 +439,14 @@ function refResult(refs: ResolvedRef[], results: (OpResult | undefined)[]) {
 
 /// Whether an open row with these date fields is on Today: the core's rule
 /// (pinned, or a When date or deadline that has arrived).
-function onToday(t: { today?: unknown; scheduled?: unknown; deadline?: unknown }, today: string): boolean {
+function onToday(
+  t: { today?: unknown; scheduled?: unknown; deadline?: unknown; deferredDeadline?: unknown }, today: string,
+): boolean {
   return taskViewMembership(
-    { status: "open", today: t.today === true, scheduled: str(t.scheduled) ?? null, deadline: str(t.deadline) ?? null },
+    {
+      status: "open", today: t.today === true, scheduled: str(t.scheduled) ?? null,
+      deadline: str(t.deadline) ?? null, deferredDeadline: str(t.deferredDeadline) ?? null,
+    },
     today, new Date().toISOString(),
   ).isOnToday;
 }
@@ -454,6 +459,7 @@ function coreRow(r: Record<string, unknown>): CoreTask {
     area: str(r.area) ?? null, project: str(r.project) ?? null,
     created: str(r.created) ?? null, createdAt: str(r.createdAt) ?? null,
     scheduled: str(r.scheduled) ?? null, deadline: str(r.deadline) ?? null,
+    deferredDeadline: str(r.deferredDeadline) ?? null,
     today: r.today === true, todaySetOn: str(r.todaySetOn) ?? null,
     source: str(r.source) ?? null, acknowledgedAt: str(r.acknowledgedAt) ?? null,
     starred: r.starred === true,
@@ -485,7 +491,8 @@ function planDateEdits(
     actions.push({ type: "putOnToday" });
     if (when) actions.push({ type: "scheduleFor", day: when });
   } else if (p.today === false) {
-    // A day with the unpin is a move to that day (the deadline stays, Q1);
+    // A day with the unpin is a move to that day (the deadline stays, Q1; an
+    // arrived one no longer holds the task on Today, Q8);
     // an unpin alone is Remove from Today (A3, arrived dates go too, Q2).
     if (p.scheduled === undefined) actions.push({ type: "removeFromToday" });
     else actions.push(when ? { type: "scheduleFor", day: when } : { type: "clearWhenDate" });
@@ -585,7 +592,7 @@ async function createTask(ctx: WriteContext, input: CreateTaskInput) {
     fields.reminderAt = plan.reminder.reminderAt;
     fields.reminderMode = plan.reminder.reminderMode;
   }
-  // The date invariants (I1–I7): a pin with a future When date keeps the
+  // The date invariants (I1–I8): a pin with a future When date keeps the
   // date, a pin with an arrived one keeps the pin.
   Object.assign(fields, normalizeTaskDates(coreRow(fields), today));
   if (onToday(fields, today)) fields.todayPosition = position;
@@ -593,8 +600,7 @@ async function createTask(ctx: WriteContext, input: CreateTaskInput) {
   const ops: NewOp[] = [];
   let resolvedTagNames: string[] = [];
   if (input.tags && input.tags.length > 0) {
-    const paused = (await store.readSetting("agentsPaused")) === true;
-    const resolved = await resolveTagNames(store, input.tags, !paused);
+    const resolved = await resolveTagNames(store, input.tags, true);
     ops.push(...resolved.tagOps);
     if (resolved.tagIds.length > 0) fields.tags = resolved.tagIds;
     resolvedTagNames = resolved.tagNames;
@@ -650,7 +656,7 @@ async function createTask(ctx: WriteContext, input: CreateTaskInput) {
     results = await push(store, ctx.actor, ops);
   }
   const r = results[taskOpIdx];
-  if (!applied(r)) throw new Error(`Task was not created: ${r?.status === "rejected" ? r.reason : r?.status ?? "no result"}`);
+  if (!applied(r)) throw new Error(`Task was not created: ${r?.status === "rejected" ? (r.rule ? `${r.reason}: ${r.rule}` : r.reason) : r?.status ?? "no result"}`);
   return {
     id,
     title: input.title,
@@ -728,9 +734,10 @@ async function updateTask(ctx: WriteContext, input: UpdateTaskInput) {
     if (input.tags === null || input.tags.length === 0) {
       fields.tags = null;
     } else {
-      // Never auto-create tags when the task is stopped or agents are paused;
-      // the task op itself still hits TaskStore so the store refuses cleanly.
-      const allowCreate = !current.convo?.stoppedAt && (await store.readSetting("agentsPaused")) !== true;
+      // Never auto-create tags when the task is stopped; the task op itself
+      // still hits TaskStore so the store refuses cleanly. While agents are
+      // paused the store refuses the tags too.
+      const allowCreate = !current.convo?.stoppedAt;
       const resolved = await resolveTagNames(store, input.tags, allowCreate);
       if (allowCreate) ops.push(...resolved.tagOps);
       fields.tags = resolved.tagIds.length > 0 ? resolved.tagIds : null;
@@ -742,7 +749,7 @@ async function updateTask(ctx: WriteContext, input: UpdateTaskInput) {
 
   const results = await push(store, ctx.actor, ops);
   requireApplied(results[taskOpIdx], input.id);
-  // The task changed. A refused reference (agents are paused) is named, so
+  // The task changed. A refused reference (the limit) is named, so
   // the caller does not retry the fields that landed.
   const refused = results.slice(taskOpIdx + 1).flatMap((r) =>
     r.status === "rejected" ? [{ reason: r.reason, ...(r.rule ? { rule: r.rule } : {}) }] : []);

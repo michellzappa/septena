@@ -90,8 +90,8 @@ export const SETTING_VALUES = {
   /// IANA zone of the device that last opened the app. The MCP connector
   /// reads it for "today".
   homeTimezone: z.string().max(64).refine(isValidTz, "unknown time zone"),
-  /// "Pause all agents" (docs/TASK_FACTORY_SPEC.md §10). While true, no
-  /// agent claim succeeds and the agent queue reads as empty.
+  /// "Pause all agents" (docs/TASK_FACTORY_SPEC.md §10). While true, the
+  /// store refuses every agent write and claim, and the agent queue reads as empty.
   agentsPaused: z.boolean(),
   /// "Get started" checklist (Septask): true once dismissed or all steps finished.
   getStartedDismissed: z.boolean(),
@@ -155,6 +155,9 @@ export const ENTITIES = {
       durationMinutes: { kind: "int", zod: z.number().int().min(5).max(1440).nullable() },
       timeZone: { kind: "text", zod: zIanaTz },
       deadline: day(),
+      // The deadline the user planned past (docs/TASK_DATES_SPEC.md I8). The
+      // core owns it: it keeps that deadline from holding the task on Today.
+      deferredDeadline: day(),
       today: bool(),
       starred: bool(),
       tags: json(z.array(zId).max(MAX_TAGS_PER_TASK)),

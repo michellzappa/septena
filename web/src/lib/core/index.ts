@@ -69,6 +69,7 @@ function toCoreTask(task: TaskRow) {
     createdAt: task.createdAt ?? null,
     scheduled: task.scheduled ?? null,
     deadline: task.deadline ?? null,
+    deferredDeadline: task.deferredDeadline ?? null,
     today: Boolean(task.today),
     todaySetOn: task.todaySetOn ?? null,
     source: task.source ?? null,

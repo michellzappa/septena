@@ -197,10 +197,6 @@
       "reason": "Android ships Recently Deleted but does not read the retention rule; the purge moves to the shared core.",
       "issue": "#247"
     },
-    "RegistryRules.UPCOMING_CALENDAR_DAYS": {
-      "reason": "Calendar events in Upcoming are not on Android yet.",
-      "issue": "#252"
-    },
     "RegistryRules.TOAST_DURATION_SECONDS": {
       "reason": "Android has no undo toast yet.",
       "issue": "#241"

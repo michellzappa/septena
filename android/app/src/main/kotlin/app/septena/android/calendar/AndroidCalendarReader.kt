@@ -200,6 +200,7 @@ object AndroidCalendarReader {
                     timeLabel = timeLabel,
                     isAllDay = event.isAllDay,
                     dayLabel = if (includeDayLabel) dayFmt.format(event.day) else null,
+                    dayIso = event.day.toString(),
                 )
             }
     }

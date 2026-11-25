@@ -79,6 +79,9 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
   /// data but with auto-pinning behavior baked in; the server still emits
   /// `due` as a mirror for the transition window, so we read either.
   var deadline: String?
+  /// The deadline the user planned past (`TaskEntity.deferredDeadline`).
+  /// Populated from the entity, not the wire.
+  var deferredDeadline: String? = nil
   var today: Bool
   var starred: Bool = false
   /// Canonical `TagEntity.id` values assigned to this task (max 20, flat tags, docs/TAGS_SPEC.md).
@@ -239,13 +242,7 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
   ///
   /// `docs/TASK_DATES_SPEC.md` R8 (decision Q7): this is the ONE "arrived on
   /// its own" rule. The row dot and the rolled-into-Today notice both read it.
-  func showsArrivedToday() -> Bool {
-    guard status == .open, !isHeading, fadedAt == nil, deletedAt == nil, !today,
-          source != TaskSource.mcp,
-          let created, created < SeptenaDate.today else { return false }
-    let today = SeptenaDate.today
-    return scheduled == today || deadline == today
-  }
+  func showsArrivedToday() -> Bool { listMembership()?.arrivedOnOwn ?? false }
 
   /// "Carry-age": how many whole days this open task has sat on the Today list
   /// without being completed — the *self-deferral* signal, deliberately
@@ -391,6 +388,7 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     durationMinutes: Int? = nil,
     timeZone: String? = nil,
     deadline: String?,
+    deferredDeadline: String? = nil,
     today: Bool,
     starred: Bool = false,
     tags: [String] = [],
@@ -430,6 +428,7 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     self.durationMinutes = durationMinutes
     self.timeZone = timeZone
     self.deadline = deadline
+    self.deferredDeadline = deferredDeadline
     self.today = today
     self.starred = starred
     self.tags = tags
