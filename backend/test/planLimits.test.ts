@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { createTestTaskStore, installWorkerTestHooks } from "./taskStoreHarness.ts";
+import { createTestTaskStore, ensureSession, installWorkerTestHooks } from "./taskStoreHarness.ts";
 
 installWorkerTestHooks();
 
@@ -109,6 +109,7 @@ async function makeRouteHarness(opts: { enforce?: boolean; failPlanRead?: boolea
     ensureStore,
     setFailPlanRead(v: boolean) { failPlanRead = v; },
     async authHeader(userId: string, sid: string) {
+      ensureSession(await ensureStore(userId), sid);
       return `Bearer ${await signAccessToken(env, userId, sid)}`;
     },
   };
@@ -228,14 +229,13 @@ describe("device slot", () => {
     assert.equal(store.deviceAccess(c, null, 1).syncing, false);
   });
 
-  it("keeps the session id across refresh-token rotation", async () => {
+  it("keeps the session id across refresh-token renewal", async () => {
     const { store, db } = await createTestTaskStore();
     const sid = session(store, "x");
-    assert.equal(store.rotateSession("hash-x", "hash-x2", Date.now() + 86_400_000), sid);
-    assert.equal(store.rotateSession("hash-x", "hash-x3", Date.now() + 86_400_000), null, "old token is single-use");
+    assert.equal(store.renewSession("hash-x", "hash-x2", Date.now() + 86_400_000, sid).ok, true);
+    assert.equal(store.sessionIdFor("hash-x2"), sid);
     db.prepare("INSERT INTO sessions (hash, createdAt, expiresAt) VALUES (?, ?, ?)").run("legacy", Date.now(), Date.now() + 86_400_000);
-    const fresh = store.rotateSession("legacy", "legacy2", Date.now() + 86_400_000);
-    assert.equal(typeof fresh, "string", "a session from before session ids gets one");
+    assert.equal(typeof store.sessionIdFor("legacy"), "string", "a session from before session ids gets one");
   });
 });
 

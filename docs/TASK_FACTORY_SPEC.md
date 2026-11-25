@@ -150,7 +150,7 @@ Two LaunchAgent templates live under `docs/agents/`:
 **Install on `mz-mini`:**
 
 1. Ensure Claude Code is paired with `https://api.septena.app/mcp` (see §4.1).
-2. Store a bearer token (`sa1.*` app session or `sm1.*` MCP OAuth token with `tasks:read`) in a private file for the wake listener:
+2. Store a bearer token (`sa1.*` app session or `sm2.*` MCP OAuth token with `tasks:read`) in a private file for the wake listener:
    ```bash
    mkdir -p ~/.config/septena ~/Library/Logs/septena-runner
    chmod 700 ~/.config/septena

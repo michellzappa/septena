@@ -44,6 +44,7 @@ a new ADR and set the old one to `superseded by NNNN`.
 | [0037](0037-show-free-plus-and-planned-pro.md) | Show three plans: Free, Plus and a planned Pro (amends 0036) | accepted |
 | [0038](0038-agents-are-the-integrations.md) | Agents are the integrations; Septena connects to no source (extends 0033, amends 0003) | accepted |
 | [0039](0039-unanswered-proposals-expire.md) | An unanswered agent proposal expires to the Faded pile | accepted |
+| [0040](0040-sessions-survive-lost-replies-and-end-on-reuse.md) | Sessions survive lost replies and end on reuse | accepted |
 
 ## Template
 

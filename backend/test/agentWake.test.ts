@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { createTestTaskStore, installWorkerTestHooks } from "./taskStoreHarness.ts";
+import { createTestTaskStore, ensureSession, installWorkerTestHooks } from "./taskStoreHarness.ts";
 
 installWorkerTestHooks();
 
@@ -116,6 +116,7 @@ async function makeRouteHarness() {
   } as never;
 
   async function userAuth(userId: string, sid = "11111111-1111-4111-8111-111111111111") {
+    ensureSession((await ensureStore(userId)).store, sid);
     return `Bearer ${await signAccessToken(env, userId, sid)}`;
   }
 

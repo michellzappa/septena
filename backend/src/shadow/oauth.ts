@@ -23,8 +23,8 @@ import { AGENT_NAME_MAX, MCP_CLIENT_PREFIX, MCP_GRANT_SCOPE, MCP_SCOPES, issueMc
 //      to the pending authorization (PairingStore).
 //   4. The page's next refresh sees the approval and redirects back to Claude
 //      with an auth code (+ RFC 9207 `iss`).
-//   5. Claude trades the code (PKCE) at /oauth/token for an `sm1.` access token
-//      and a rotating `smr1.` refresh token, scope `tasks:read tasks:write`.
+//   5. Claude trades the code (PKCE) at /oauth/token for an `sm2.` access token
+//      and a rotating `smr2.` refresh token, scope `tasks:read tasks:write`.
 //
 // KV keys are under `v2:`.
 

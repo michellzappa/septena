@@ -19,7 +19,10 @@ export interface Env {
   MAINTENANCE?: string;
 
   // Secrets (set via `wrangler secret put`)
-  SESSION_SIGNING_KEY: string; // 32-byte base64; signs task-backend access tokens
+  SESSION_SIGNING_KEY: string; // 32-byte base64; signs access and refresh tokens
+  /// Optional. The key before the current one. Set it while the key changes,
+  /// so live sessions keep working (backend/README.md).
+  SESSION_SIGNING_KEY_PREVIOUS?: string;
   /// Optional. Unset = the /v1/admin routes answer 404. Grants entitlements.
   ADMIN_TOKEN?: string;
   /// Optional APNs provider key (.p8 PEM) and identifiers for agent question pushes (F1b #213).

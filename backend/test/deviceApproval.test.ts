@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { Hono } from "hono";
-import { createTestPairingStore, createTestTaskStore, installWorkerTestHooks } from "./taskStoreHarness.ts";
+import { createTestPairingStore, createTestTaskStore, ensureSession, installWorkerTestHooks } from "./taskStoreHarness.ts";
 
 installWorkerTestHooks();
 
@@ -96,6 +96,7 @@ async function makeHarness() {
   app.route("/v1", api);
 
   async function authHeader(userId: string, sid = "11111111-1111-4111-8111-111111111111") {
+    ensureSession(await ensureTaskStore(userId), sid);
     return `Bearer ${await signAccessToken(env, userId, sid)}`;
   }
 
@@ -246,7 +247,7 @@ describe("Sign-in S3: device approval flow (ADR 0016, #170)", () => {
     assert.equal(session.userId, userId);
     assert.equal(session.expiresIn, 3600);
     assert.ok(session.accessToken.startsWith("sa1."));
-    assert.ok(session.refreshToken.startsWith("sr1."));
+    assert.ok(session.refreshToken.startsWith("sr2."));
 
     const claims = await verifyAccessToken(h.env, session.accessToken);
     assert.ok(claims);

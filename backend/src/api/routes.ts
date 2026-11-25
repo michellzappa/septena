@@ -9,7 +9,8 @@ import { zPushBody, type Op } from "../store/ops.js";
 import type { ChangeEntry } from "../store/TaskStore.js";
 import { USER_ID_RE, accountStoreFor } from "../store/AccountStore.js";
 import { AppleIdentityError, userIdForAppleSub, verifyAppleIdentityToken } from "./appleIdentity.js";
-import { issueSession, refreshSession, revokeSession, storeFor, verifyAccessToken } from "./session.js";
+import { authenticate, issueSession, refreshSession, revokeSession, storeFor, withSession } from "./session.js";
+import { SESSION_HEADER } from "../store/sessions.js";
 import {
   approvePairing,
   denyPairing,
@@ -23,7 +24,7 @@ import {
   zPairDenyBody,
   zPairInspectBody,
 } from "../shadow/oauth.js";
-import { MCP_READ_SCOPE, disconnectFamily, hasScope, verifyMcpAccess } from "../shadow/tokens.js";
+import { MCP_READ_SCOPE, disconnectFamily, hasScope, isMcpAccessToken, verifyMcpAccess } from "../shadow/tokens.js";
 import { MAX_AGENT_WEBHOOKS, validateWebhookUrl } from "./agentWake.js";
 import {
   TRIAL_ROW_ID,
@@ -65,9 +66,11 @@ import { tasksRest } from "./tasksRest.js";
 type Vars = {
   userId: string;
   actor: string;
-  /// The session id from the access token (null for a token from before
-  /// session ids). One session = one device for the sync slot.
+  /// The app session's id (null for an agent). One session = one device for
+  /// the sync slot.
   sid: string | null;
+  /// The session behind the call, an app's or an agent's.
+  session: string;
   /// `X-Septena-Client`, when valid. Labels the device.
   client: string | null;
   /// Set by `loadPlan`. null when the check failed and failed open (sync paths
@@ -82,7 +85,7 @@ const zAppleBody = z.object({
   identityToken: z.string().min(20).max(8_000),
   nonce: z.string().min(16).max(256),
 }).strict();
-const zRefreshBody = z.object({ refreshToken: z.string().min(20).max(200) }).strict();
+const zRefreshBody = z.object({ refreshToken: z.string().min(20).max(400) }).strict();
 const zClientName = z.string().regex(/^[\w .()-]{1,40}$/);
 
 function attachmentKey(userId: string, id: string): string {
@@ -171,25 +174,26 @@ api.post("/auth/device/poll", async (c) => {
 async function requireUser(c: Ctx, next: Next) {
   const header = c.req.header("Authorization") ?? "";
   const token = header.startsWith("Bearer ") ? header.slice(7) : "";
-  const claims = token ? await verifyAccessToken(c.env, token) : null;
+  const claims = token ? await authenticate(c.env, token) : null;
   if (!claims) return c.json({ error: "unauthorized" }, 401, { "WWW-Authenticate": "Bearer" });
   const client = zClientName.safeParse(c.req.header("X-Septena-Client"));
   c.set("userId", claims.userId);
   c.set("sid", claims.sid);
+  c.set("session", claims.sid);
   c.set("client", client.success ? client.data : null);
   c.set("actor", `app:${client.success ? client.data : "unknown"}`);
   await next();
 }
 
 /// Accepts either an app session bearer token (`sa1.*`) or an MCP OAuth access
-/// token (`sm1.*`) with `tasks:read` scope. Used by the agent wake event stream
+/// token (`sm2.*`) with `tasks:read` scope. Used by the agent wake event stream
 /// so both the app and background runners can subscribe.
 async function requireAgentOrUser(c: Ctx, next: Next) {
   const header = c.req.header("Authorization") ?? "";
   const token = header.startsWith("Bearer ") ? header.slice(7) : "";
   if (!token) return c.json({ error: "unauthorized" }, 401, { "WWW-Authenticate": "Bearer" });
 
-  if (token.startsWith("sm1.")) {
+  if (isMcpAccessToken(token)) {
     const grant = await verifyMcpAccess(c.env, token);
     if (!grant) return c.json({ error: "unauthorized" }, 401, { "WWW-Authenticate": "Bearer" });
     if (!hasScope(grant, MCP_READ_SCOPE)) {
@@ -197,17 +201,19 @@ async function requireAgentOrUser(c: Ctx, next: Next) {
     }
     c.set("userId", grant.userId);
     c.set("sid", null);
+    c.set("session", grant.familyId ?? "");
     c.set("client", null);
     c.set("actor", `mcp:${grant.clientId}`);
     await next();
     return;
   }
 
-  const claims = await verifyAccessToken(c.env, token);
+  const claims = await authenticate(c.env, token);
   if (!claims) return c.json({ error: "unauthorized" }, 401, { "WWW-Authenticate": "Bearer" });
   const client = zClientName.safeParse(c.req.header("X-Septena-Client"));
   c.set("userId", claims.userId);
   c.set("sid", claims.sid);
+  c.set("session", claims.sid);
   c.set("client", client.success ? client.data : null);
   c.set("actor", `app:${client.success ? client.data : "unknown"}`);
   await next();
@@ -332,7 +338,7 @@ async function liveSocket(c: Ctx) {
     const breach: LimitBreach = { limit: "liveSync", upsell: null };
     if (decide(c.env, c.get("userId"), "sync_live", plan, breach) === "block") return limitRefusal(c, "live_sync_not_in_plan", breach);
   }
-  return storeFor(c.env, c.get("userId")).fetch(c.req.raw);
+  return storeFor(c.env, c.get("userId")).fetch(withSession(c.req.raw, c.get("session"), SESSION_HEADER));
 }
 
 api.get("/sync/ws", liveSocket);
@@ -539,7 +545,6 @@ api.delete("/access/devices/:sid", async (c) => {
   const userId = c.get("userId");
   const hashes = await storeFor(c.env, userId).revokeDevice(sid.data);
   if (!hashes.length) return c.json({ error: "not_found" }, 404);
-  await Promise.all(hashes.map((h) => c.env.TOKENS.delete(`api-refresh:${h}`)));
   logEvent("access_device_signed_out", { userId, by: c.get("actor") });
   return c.body(null, 204);
 });
@@ -985,7 +990,7 @@ api.get("/agent/events/stream", async (c) => {
       return c.json({ error: "invalid_request" }, 400);
     }
   }
-  return storeFor(c.env, c.get("userId")).fetch(c.req.raw);
+  return storeFor(c.env, c.get("userId")).fetch(withSession(c.req.raw, c.get("session"), SESSION_HEADER));
 });
 
 const zCreateWebhookBody = z.object({
@@ -1049,7 +1054,6 @@ api.delete("/account", async (c) => {
     cursor = page.truncated ? page.cursor : undefined;
   } while (cursor);
   logEvent("api_account_deleted", {});
-  // Refresh-token KV entries now point at an empty store and fail rotation.
-  // Access tokens live out their hour against an empty store.
+  // The store held every session, so no token of this account works now.
   return c.body(null, 204);
 });

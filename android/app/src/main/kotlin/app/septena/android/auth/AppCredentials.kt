@@ -8,10 +8,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.io.IOException
 
 /**
- * Supplies access tokens to the sync transport. Refresh tokens are single use, so every refresh runs
- * under one mutex, and a caller that waited re-uses the token the previous holder fetched.
+ * Supplies access tokens to the sync transport. The server keeps a refresh token good until the one
+ * that replaces it is used (ADR 0040), so the new one is stored before its access token is used. Every
+ * refresh runs under one mutex, and a caller that waited re-uses the token the previous holder fetched.
  */
 class AppCredentials(
     private val store: SessionStore,
@@ -82,7 +84,7 @@ class AppCredentials(
     }
 
     private fun remember(tokens: SessionTokens) {
-        store.save(tokens.refreshToken, tokens.userId)
+        if (!store.save(tokens.refreshToken, tokens.userId)) throw IOException("The session was not stored")
         access = tokens.accessToken
         accessExpiresAtMs = nowMs() + tokens.expiresInSeconds * 1000L
         _signedIn.value = true

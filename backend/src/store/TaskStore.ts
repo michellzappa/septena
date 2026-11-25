@@ -39,6 +39,7 @@ import {
   isWakeEventKind,
   type AgentWebhookTarget,
 } from "../api/agentWake.js";
+import { SESSION_HEADER, SessionBook, type RenewResult, type SessionGrant } from "./sessions.js";
 
 /// Task fields only the app writes (docs/TASK_FADE_SPEC.md §3): the fade
 /// clock and its outcome. An agent cannot keep a task alive by touching it.
@@ -286,18 +287,23 @@ export interface PushOutcome {
   purgedAttachmentIds: string[];
 }
 
+const sessionTag = (sid: string) => `sid:${sid}`;
+
 export class TaskStore extends DurableObject<Env> {
   private sql: SqlStorage;
+  private sessions: SessionBook;
   private sseSubscribers = new Set<{
     send: (chunk: string) => boolean;
     close: () => void;
     lastRev: number;
+    sid: string | null;
   }>();
   private sseHeartbeatMs = SSE_HEARTBEAT_MS;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     this.sql = ctx.storage.sql;
+    this.sessions = new SessionBook(this.sql);
     ctx.blockConcurrencyWhile(async () => {
       this.migrate();
       if ((await ctx.storage.getAlarm()) === null) {
@@ -514,10 +520,7 @@ export class TaskStore extends DurableObject<Env> {
         failureCount INTEGER NOT NULL DEFAULT 0
       );
     `);
-    // A session's stable id (one per sign-in on one install). It survives
-    // refresh-token rotation, so it names the device for the sync slot.
-    const sessionCols = this.sql.exec<{ name: string }>("PRAGMA table_info(sessions)").toArray().map((r) => r.name);
-    if (!sessionCols.includes("sid")) this.sql.exec("ALTER TABLE sessions ADD COLUMN sid TEXT");
+    this.sessions.migrate();
     // The name the user gave an agent (pairing or Settings rename). Null =
     // the client's registered name.
     const connectionCols = this.sql.exec<{ name: string }>("PRAGMA table_info(connections)").toArray().map((r) => r.name);
@@ -1665,44 +1668,77 @@ export class TaskStore extends DurableObject<Env> {
     return row ?? null;
   }
 
-  // ---- sessions (refresh tokens, stored hashed) ----
+  // ---- sessions (refresh tokens, stored hashed; src/store/sessions.ts) ----
 
-  createSession(hash: string, expiresAt: number, sid: string): void {
-    this.sql.exec("INSERT INTO sessions (hash, createdAt, expiresAt, sid) VALUES (?, ?, ?, ?)", hash, Date.now(), expiresAt, sid);
+  createSession(hash: string, expiresAt: number, sid: string, grant: SessionGrant | null = null): void {
+    this.sessions.create(hash, expiresAt, sid, grant);
   }
 
-  /// Single-use rotation: the old refresh token dies whether or not the new
-  /// one is ever used. Returns the session id the new token carries (kept
-  /// across rotations; a session from before session ids gets one now), or
-  /// null when the old token is unknown or expired.
-  rotateSession(oldHash: string, newHash: string, expiresAt: number): string | null {
-    return this.ctx.storage.transactionSync(() => {
-      const row = this.sql.exec<{ expiresAt: number; sid: string | null }>("SELECT expiresAt, sid FROM sessions WHERE hash = ?", oldHash).toArray()[0];
-      this.sql.exec("DELETE FROM sessions WHERE hash = ?", oldHash);
-      if (!row || row.expiresAt < Date.now()) return null;
-      const sid = row.sid ?? crypto.randomUUID();
-      this.sql.exec("INSERT INTO sessions (hash, createdAt, expiresAt, sid) VALUES (?, ?, ?, ?)", newHash, Date.now(), expiresAt, sid);
-      return sid;
+  sessionIdFor(hash: string): string | null {
+    return this.sessions.idFor(hash);
+  }
+
+  /// Trades a refresh token for its child. A reused token ends the session.
+  renewSession(hash: string, newHash: string, expiresAt: number, sid: string, clientId: string | null = null, now = Date.now()): RenewResult {
+    const res = this.ctx.storage.transactionSync(() => this.sessions.renew(hash, newHash, expiresAt, sid, clientId, now));
+    if (!res.ok && res.reason === "reused") this.endSession(sid);
+    return res;
+  }
+
+  /// The check behind every access token: is the session alive, and what may
+  /// it do? Null = refuse.
+  authorizeSession(sid: string, hash: string | null, now = Date.now()): { grant: SessionGrant | null } | null {
+    return this.ctx.storage.transactionSync(() => this.sessions.authorize(sid, hash, now));
+  }
+
+  revokeSessionAccess(sid: string, hash: string): boolean {
+    return this.sessions.revokeAccess(sid, hash);
+  }
+
+  /// Adopts an agent's refresh token from KV (issued before ADR 0040). Only
+  /// for an agent that is still connected and has no session here yet, so a
+  /// disconnected agent never comes back.
+  adoptSession(hash: string, expiresAt: number, sid: string, grant: SessionGrant): void {
+    const connected = this.sql.exec<{ n: number }>("SELECT COUNT(*) AS n FROM connections WHERE familyId = ?", sid).one().n > 0;
+    if (connected && !this.sessions.exists(sid)) this.sessions.create(hash, expiresAt, sid, grant);
+  }
+
+  /// Sign-out with a refresh token. Any token the session ever issued ends it.
+  revokeSession(hash: string, sid: string | null = null): void {
+    const id = sid ?? this.sessions.idFor(hash);
+    if (id) this.endSession(id);
+  }
+
+  /// Ends one session at once: its tokens, its device or agent row, its push
+  /// tokens and its open sockets. Returns its refresh hashes.
+  endSession(sid: string): string[] {
+    const hashes = this.ctx.storage.transactionSync(() => {
+      const ended = this.sessions.end(sid);
+      this.sql.exec("DELETE FROM devices WHERE sid = ?", sid);
+      this.sql.exec("DELETE FROM connections WHERE familyId = ?", sid);
+      this.sql.exec("DELETE FROM push_tokens WHERE deviceId = ?", sid);
+      return ended;
     });
+    for (const sub of [...this.sseSubscribers]) if (sub.sid === sid) sub.close();
+    for (const ws of this.ctx.getWebSockets(sessionTag(sid))) {
+      try { ws.close(1008, "signed out"); } catch { /* already closed */ }
+    }
+    return hashes;
   }
 
-  revokeSession(hash: string): void {
-    this.sql.exec("DELETE FROM sessions WHERE hash = ?", hash);
+  /// The rotation call of a Worker from before ADR 0040, for the seconds both
+  /// versions run during a deploy. Remove after 2026-12.
+  rotateSession(oldHash: string, newHash: string, expiresAt: number): string | null {
+    const sid = this.sessions.idFor(oldHash);
+    return sid && this.renewSession(oldHash, newHash, expiresAt, sid).ok ? sid : null;
   }
 
   // ---- Devices & Access (Settings ▸ Account ▸ Devices & Access) ----
 
-  /// Signs one device out: drops every refresh token of session `sid` and
-  /// its device row. Returns the refresh hashes so the caller can drop their
-  /// KV index. Its access token lives out its hour (it is stateless).
+  /// Signs one device out. Returns its refresh hashes; empty when the session
+  /// is not in this store.
   revokeDevice(sid: string): string[] {
-    return this.ctx.storage.transactionSync(() => {
-      const hashes = this.sql.exec<{ hash: string }>("SELECT hash FROM sessions WHERE sid = ?", sid).toArray().map((r) => r.hash);
-      this.sql.exec("DELETE FROM sessions WHERE sid = ?", sid);
-      this.sql.exec("DELETE FROM devices WHERE sid = ?", sid);
-      this.sql.exec("DELETE FROM push_tokens WHERE deviceId = ?", sid);
-      return hashes;
-    });
+    return this.endSession(sid);
   }
 
   // ---- APNs push tokens (F1b #213, docs/TASK_FACTORY_SPEC.md §8) ----
@@ -2361,6 +2397,9 @@ export class TaskStore extends DurableObject<Env> {
     for (const ws of this.ctx.getWebSockets()) ws.close(1000, "account deleted");
     await this.ctx.storage.deleteAlarm();
     await this.ctx.storage.deleteAll();
+    // This instance may serve the next request: an empty store refuses every
+    // token, a store without tables would answer 500 to the same request.
+    this.migrate();
   }
 
   // ---- live nudge (§6.3) & agent event stream (docs/TASK_FACTORY_SPEC.md §8) ----
@@ -2373,8 +2412,9 @@ export class TaskStore extends DurableObject<Env> {
     if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket") {
       return new Response("expected websocket", { status: 426 });
     }
+    const sid = request.headers.get(SESSION_HEADER);
     const pair = new WebSocketPair();
-    this.ctx.acceptWebSocket(pair[1]);
+    this.ctx.acceptWebSocket(pair[1], sid ? [sessionTag(sid)] : []);
     pair[1].send(JSON.stringify({ rev: this.meta("rev") }));
     return new Response(null, { status: 101, webSocket: pair[0] });
   }
@@ -2400,6 +2440,7 @@ export class TaskStore extends DurableObject<Env> {
       hasCursor = true;
     }
 
+    const sid = request.headers.get(SESSION_HEADER);
     const head = this.meta("rev");
     const paused = this.readSetting("agentsPaused") === true;
     const replay: AgentEvent[] = [];
@@ -2415,7 +2456,7 @@ export class TaskStore extends DurableObject<Env> {
 
     if (request.headers.get("Upgrade")?.toLowerCase() === "websocket") {
       const pair = new WebSocketPair();
-      this.ctx.acceptWebSocket(pair[1], ["agent-events"]);
+      this.ctx.acceptWebSocket(pair[1], sid ? ["agent-events", sessionTag(sid)] : ["agent-events"]);
       pair[1].send(JSON.stringify({ type: "ready", head, paused }));
       for (const ev of replay) {
         pair[1].send(JSON.stringify({ type: "event", event: ev }));
@@ -2447,6 +2488,7 @@ export class TaskStore extends DurableObject<Env> {
 
         const sub = {
           lastRev: initialLastRev,
+          sid,
           send(chunk: string): boolean {
             if (closed) return false;
             try {
@@ -2529,7 +2571,7 @@ export class TaskStore extends DurableObject<Env> {
       this.setMeta("purgedThrough", purged);
       this.sql.exec("DELETE FROM client_ops WHERE at < ?", now - CLIENT_OP_TTL_MS);
       this.sql.exec("DELETE FROM changes WHERE at < ?", new Date(now - CHANGE_LOG_TTL_MS).toISOString());
-      this.sql.exec("DELETE FROM sessions WHERE expiresAt < ?", now);
+      this.sessions.purge(now);
       this.sql.exec("DELETE FROM devices WHERE sid NOT IN (SELECT sid FROM sessions WHERE sid IS NOT NULL)");
       this.sql.exec("DELETE FROM connections WHERE lastUsed < ?", now - CONNECTION_TTL_MS);
       // Day and month counters: two months covers the current month.

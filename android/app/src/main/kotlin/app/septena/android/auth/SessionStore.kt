@@ -26,11 +26,11 @@ class SessionStore(context: Context) {
         return Saved(refresh, userId)
     }
 
+    /** False when the write failed: the previous session is still the stored one. */
     @Synchronized
-    fun save(refreshToken: String, userId: String) {
-        // commit(), not apply(): refresh tokens are single use, so a lost write signs the user out.
+    fun save(refreshToken: String, userId: String): Boolean =
+        // commit(), not apply(): the token must be on disk before its access token is used.
         prefs.edit().putString(KEY_REFRESH, encrypt(refreshToken)).putString(KEY_USER, userId).commit()
-    }
 
     @Synchronized
     fun clear() {

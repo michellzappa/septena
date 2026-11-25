@@ -1488,7 +1488,7 @@ final class TaskSyncEngine {
 
   /// The same, with the session a signed-in device approved (ADR 0016).
   func signIn(deviceSession session: BackendSession) async throws {
-    try await signIn { await $0.adoptDeviceSession(session) }
+    try await signIn { try await $0.adoptDeviceSession(session) }
   }
 
   private func signIn(_ authenticate: (TaskBackendClient) async throws -> String) async throws {

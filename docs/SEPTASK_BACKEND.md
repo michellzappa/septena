@@ -373,12 +373,18 @@ tasks through CloudKit.
   account is signed in: app sessions (the `devices` and `sessions` tables,
   one row per install, `current` marks the caller) and MCP connections (the
   `connections` table, one row per token family, named from the OAuth client
-  registration). `DELETE /v1/access/devices/:sid` kills that device's refresh
-  tokens; its stateless access token lives out its hour. It refuses the
+  registration). `DELETE /v1/access/devices/:sid` ends that device's session
+  from the next request and closes its sockets (ADR 0040). It refuses the
   caller's own sid (sign out through `/v1/auth/signout`).
   `DELETE /v1/access/connections/:id` revokes the token family. A connection
   appears on its first token issue or refresh after deploy, and drops out
   after 30 days without a refresh.
+- **Sessions (2026-11-25, ADR 0040).** Apps and agents share one session
+  model, in `backend/src/store/sessions.ts`. The Durable Object is the only
+  authority, every request asks it, and KV holds no live token. A lost
+  renewal reply never signs anyone out. A spent token that comes back ends
+  the session. A client gives up its session only on a 401 whose body says
+  `invalid_grant`.
 - **Agents (2026-11-24).** One agent is one MCP connection (one token
   family). The apps show devices and agents as separate lists: Settings ▸
   Account ▸ Devices, and Settings ▸ AI & Agents ▸ Agents. Each agent has a

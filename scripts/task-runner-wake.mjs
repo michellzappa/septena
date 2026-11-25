@@ -9,7 +9,7 @@
  * `resumed` events.
  *
  * Auth:
- *   SEPTENA_WAKE_TOKEN       Bearer token (`sa1.*` app session or `sm1.*` MCP OAuth)
+ *   SEPTENA_WAKE_TOKEN       Bearer token (`sa1.*` app session or `sm2.*` MCP OAuth)
  *   SEPTENA_WAKE_TOKEN_FILE  Path to a chmod 600 file holding the bearer token
  *                            (re-read on every reconnect so rotation needs no restart)
  *
