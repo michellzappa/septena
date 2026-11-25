@@ -59,7 +59,7 @@ import type {
   SmartDestination,
   TaskRow,
 } from "@/lib/types";
-import { groupUpcomingByDate, nextIsoDay } from "@/lib/upcomingGroups";
+import { nextIsoDay } from "@/lib/upcomingGroups";
 import { QuickFindModal } from "./QuickFindModal";
 import { SettingsModal } from "./SettingsModal";
 import { SignInScreen } from "./SignInScreen";
@@ -693,12 +693,6 @@ export function SeptenaApp() {
     };
   }, [areaById, destination, language, logbookTab, projectById]);
 
-  const isUpcoming = destination.kind === "smart" && destination.id === "upcoming";
-  const upcomingGroups = useMemo(
-    () => (isUpcoming ? groupUpcomingByDate(visibleTasks, localTodayYMD()) : []),
-    [isUpcoming, visibleTasks],
-  );
-
   const handleQuickAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     const title = composerTitle.trim();
@@ -709,7 +703,7 @@ export function SeptenaApp() {
     if (tagFilterId) opts.tags = [tagFilterId];
     if (destination.kind === "smart") {
       if (destination.id === "today") opts.today = true;
-      else if (destination.id === "upcoming") opts.scheduled = nextIsoDay(localTodayYMD());
+      else if (destination.id === "upcoming") opts.scheduled = nextIsoDay(todayYMD);
       else if (destination.id === "starred") opts.starred = true;
     } else if (destination.kind === "area") {
       opts.area = destination.id;
@@ -1436,48 +1430,6 @@ export function SeptenaApp() {
               <div className="py-16 text-center">
                 <p className="text-sm font-medium text-[var(--text-secondary)]">{pageMeta.emptyTitle}</p>
                 <p className="mt-1 text-xs text-[var(--text-muted)]">{pageMeta.emptyDetail}</p>
-              </div>
-            ) : isUpcoming ? (
-              <div className="space-y-5">
-                {upcomingGroups.map((group) => (
-                  <section key={group.day} aria-label={group.label}>
-                    <div className="mb-1.5 flex items-center gap-2 border-b border-[var(--border-subtle)] pb-1.5 text-xs font-semibold tracking-wide text-[var(--text-secondary)]">
-                      <Calendar className="h-3.5 w-3.5 shrink-0 text-[var(--text-muted)]" />
-                      <h2>{group.label}</h2>
-                    </div>
-                    <div className="space-y-0.5">
-                      {group.items.map(({ task, membership }) => {
-                        let containerLabel: string | null = null;
-                        if (task.project && projectById.has(task.project)) {
-                          containerLabel = projectById.get(task.project)!.title;
-                        } else if (task.area && areaById.has(task.area)) {
-                          const a = areaById.get(task.area)!;
-                          containerLabel = `${a.emoji ? `${a.emoji} ` : ""}${a.title}`;
-                        }
-                        return (
-                          <TaskRowItem
-                            key={task.id}
-                            task={task}
-                            membership={membership}
-                            containerLabel={containerLabel}
-                            hasPendingOp={pendingTaskIds.has(task.id)}
-                            expanded={expandedTaskId === task.id}
-                            onSelect={() => setExpandedTaskId((prev) => (prev === task.id ? null : task.id))}
-                            onToggleDone={() => void engine.toggleTaskDone(task)}
-                            onToggleToday={() => void engine.toggleTaskToday(task)}
-                            onUpdateFields={(fields) => void engine.updateTaskFields(task, fields)}
-                            onSetScheduled={(day) => void engine.setTaskScheduled(task, day)}
-                            onSetDeadline={(day) => void engine.setTaskDeadline(task, day)}
-                            onDelete={() => {
-                              setExpandedTaskId(null);
-                              void engine.deleteTask(task);
-                            }}
-                          />
-                        );
-                      })}
-                    </div>
-                  </section>
-                ))}
               </div>
             ) : destination.kind === "smart" && destination.id === "today" && todayInboxTasks.length > 0 ? (
               <div className="space-y-5">
