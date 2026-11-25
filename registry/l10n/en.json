@@ -333,12 +333,6 @@
       "settings.copy.access_devices.deviceAndroid.label"
     ]
   },
-  "Anonymous usage data": {
-    "text": "Anonymous usage data",
-    "paths": [
-      "settings.pages.privacy.sections.telemetry.header"
-    ]
-  },
   "Anyone can join a shared project for free. Plus lets you create one and invite people.": {
     "text": "Anyone can join a shared project for free. Plus lets you create one and invite people.",
     "paths": [
@@ -3929,12 +3923,6 @@
       "surfaces.prompts.items.rescheduleFixedRepeat.options.updateRule.title"
     ]
   },
-  "Usage data": {
-    "text": "Usage data",
-    "paths": [
-      "settings.pages.privacy.sections.telemetry.items.0.label"
-    ]
-  },
   "Use a device where Septena is already signed in.": {
     "text": "Use a device where Septena is already signed in.",
     "paths": [
@@ -4289,12 +4277,6 @@
     "text": "Your task conversations",
     "paths": [
       "settings.copy.delete_account.conversations.label"
-    ]
-  },
-  "Your task text and titles are never sent through analytics. This setting syncs across your devices.": {
-    "text": "Your task text and titles are never sent through analytics. This setting syncs across your devices.",
-    "paths": [
-      "settings.pages.privacy.sections.telemetry.footer"
     ]
   },
   "Your tasks stay in step on iPhone, iPad and Mac.": {

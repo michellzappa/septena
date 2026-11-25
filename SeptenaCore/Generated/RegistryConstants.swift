@@ -644,9 +644,6 @@ enum RegistrySettings {
       RegistrySettingsSection(id: "transfer", header: nil, footer: nil, platforms: nil, items: [
         RegistrySettingsItem(kind: "pageLink", key: nil, page: "import_export", surface: nil, label: RegistryL10n.t("Import & Export"), detail: nil, iconId: "settings.data", sfSymbol: "square.and.arrow.up", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "sync.backend"),
       ]),
-      RegistrySettingsSection(id: "telemetry", header: RegistryL10n.t("Anonymous usage data"), footer: RegistryL10n.t("Your task text and titles are never sent through analytics. This setting syncs across your devices."), platforms: nil, items: [
-        RegistrySettingsItem(kind: "setting", key: "telemetryLevel", page: nil, surface: nil, label: RegistryL10n.t("Usage data"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "settings.display"),
-      ]),
     ]),
     RegistrySettingsPage(id: "about", title: RegistryL10n.t("About"), iconId: "settings.about", sfSymbol: "info.circle", depth: 1, platforms: nil, featureId: "settings.display", sections: [
       RegistrySettingsSection(id: "version", header: nil, footer: nil, platforms: nil, items: [
