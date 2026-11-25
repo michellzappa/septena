@@ -216,6 +216,10 @@ pub fn derive_conversation(conversation: TaskConversation, now: String) -> Resul
     } else {
         "inProgress"
     };
-    let next = if facts.is_claimed { "Claude is working" } else { "Claude's move" };
+    let next = if facts.is_claimed {
+        "Claude is working"
+    } else {
+        "Claude's move"
+    };
     Ok(projection(stage, Some("working"), next.into(), pending))
 }
