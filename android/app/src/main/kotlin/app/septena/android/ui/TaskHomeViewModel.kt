@@ -538,6 +538,22 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         }
     }
 
+    /** Reschedules dragged Upcoming tasks onto [dayIso] (`YYYY-MM-DD`) in one undoable edit. */
+    fun rescheduleToDay(ids: List<String>, dayIso: String) {
+        if (ids.isEmpty()) return
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    graph.captureTaskEdits(ids.toSet()) { id -> graph.taskMutator.setWhen(id, dayIso) }
+                }
+            }.onSuccess {
+                clearSelection()
+                errorMessage.value = null
+                noteLocalChangeAndSync()
+            }.onFailure { errorMessage.value = it.message }
+        }
+    }
+
     fun restore(id: String) {
         viewModelScope.launch {
             runCatching {
@@ -1047,6 +1063,24 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                                     reviewMeta = metaLine,
                                 )
                             }
+                            RegistryDestinationIds.UPCOMING -> {
+                                val dayIso = membership.upcomingDay
+                                val dayHeader = dayIso?.let { iso ->
+                                    val parsed = runCatching { java.time.LocalDate.parse(iso) }.getOrNull()
+                                    val label = parsed?.let { formatUpcomingDayHeader(it, today) } ?: iso
+                                    TaskGroupHeader(
+                                        key = "day:$iso",
+                                        title = label,
+                                        iconKind = SeptenaIconKind.Upcoming,
+                                        targetLocationKey = "day:$iso",
+                                    )
+                                }
+                                item.copy(
+                                    group = dayHeader,
+                                    groupTitle = dayHeader?.title,
+                                    position = rowPosition,
+                                )
+                            }
                             else -> item.copy(position = rowPosition)
                         },
                         rowPosition,
@@ -1054,6 +1088,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                             RegistryDestinationIds.LOGBOOK ->
                                 record.fields[RegistryEntityFields.Task.COMPLETED_AT].stringValue()
                             RegistryDestinationIds.RECENTLY_DELETED -> record.deletedAt
+                            RegistryDestinationIds.UPCOMING -> membership.upcomingDay
                             else -> null
                         },
                         areaId = snapshot.area,
@@ -1277,13 +1312,15 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
 
     private fun List<PositionedTask>.sortedTaskItems(destinationId: String? = null): List<TaskListItem> =
         sortedWith(
-            if (destinationId == RegistryDestinationIds.LOGBOOK ||
-                destinationId == RegistryDestinationIds.RECENTLY_DELETED
-            ) {
-                compareByDescending<PositionedTask> { it.archiveDate.orEmpty() }
-                    .thenBy { it.item.title.lowercase() }
-            } else {
-                compareBy<PositionedTask>({ it.position ?: Double.MAX_VALUE }, { it.item.title.lowercase() })
+            when (destinationId) {
+                RegistryDestinationIds.LOGBOOK,
+                RegistryDestinationIds.RECENTLY_DELETED ->
+                    compareByDescending<PositionedTask> { it.archiveDate.orEmpty() }
+                        .thenBy { it.item.title.lowercase() }
+                RegistryDestinationIds.UPCOMING ->
+                    compareBy<PositionedTask>({ it.archiveDate ?: "9999-99-99" }, { it.position ?: Double.MAX_VALUE }, { it.item.title.lowercase() })
+                else ->
+                    compareBy<PositionedTask>({ it.position ?: Double.MAX_VALUE }, { it.item.title.lowercase() })
             },
         )
             .map(PositionedTask::item)

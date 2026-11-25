@@ -27,6 +27,7 @@ import {
 } from "@/lib/core";
 import { WebSyncEngine, type SyncState } from "@/lib/sync/engine";
 import { FRUIT_ACCENTS, type ActiveDestination, type SessionResponse, type SmartDestination, type TaskRow } from "@/lib/types";
+import { groupUpcomingByDate, nextIsoDay } from "@/lib/upcomingGroups";
 import { SignInScreen } from "./SignInScreen";
 import { TaskRowItem } from "./TaskRowItem";
 
@@ -268,6 +269,12 @@ export function SeptenaApp() {
     };
   }, [areaById, destination, projectById]);
 
+  const isUpcoming = destination.kind === "smart" && destination.id === "upcoming";
+  const upcomingGroups = useMemo(
+    () => (isUpcoming ? groupUpcomingByDate(visibleTasks, localTodayYMD()) : []),
+    [isUpcoming, visibleTasks],
+  );
+
   const handleQuickAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     const title = composerTitle.trim();
@@ -277,6 +284,7 @@ export function SeptenaApp() {
     const opts: Parameters<WebSyncEngine["createTask"]>[0] = { title };
     if (destination.kind === "smart") {
       if (destination.id === "today") opts.today = true;
+      else if (destination.id === "upcoming") opts.scheduled = nextIsoDay(localTodayYMD());
     } else if (destination.kind === "area") {
       opts.area = destination.id;
     } else if (destination.kind === "project") {
@@ -591,6 +599,50 @@ export function SeptenaApp() {
             {visibleTasks.length === 0 ? (
               <div className="py-16 text-center text-sm text-[var(--text-muted)]">
                 Nothing here yet.
+              </div>
+            ) : isUpcoming ? (
+              <div className="space-y-5">
+                {upcomingGroups.map((group) => (
+                  <section key={group.day} aria-label={group.label}>
+                    <div className="mb-1.5 flex items-center gap-2 px-2">
+                      <Calendar className="h-3.5 w-3.5 shrink-0 text-[var(--text-muted)]" />
+                      <h2 className="text-xs font-semibold tracking-wide text-[var(--text-secondary)]">
+                        {group.label}
+                      </h2>
+                    </div>
+                    <div className="space-y-0.5">
+                      {group.items.map(({ task, membership }) => {
+                        let containerLabel: string | null = null;
+                        if (task.project && projectById.has(task.project)) {
+                          containerLabel = projectById.get(task.project)!.title;
+                        } else if (task.area && areaById.has(task.area)) {
+                          const a = areaById.get(task.area)!;
+                          containerLabel = `${a.emoji ? `${a.emoji} ` : ""}${a.title}`;
+                        }
+                        return (
+                          <TaskRowItem
+                            key={task.id}
+                            task={task}
+                            membership={membership}
+                            containerLabel={containerLabel}
+                            hasPendingOp={pendingTaskIds.has(task.id)}
+                            expanded={expandedTaskId === task.id}
+                            onSelect={() => setExpandedTaskId((prev) => (prev === task.id ? null : task.id))}
+                            onToggleDone={() => void engine.toggleTaskDone(task)}
+                            onToggleToday={() => void engine.toggleTaskToday(task)}
+                            onUpdateFields={(fields) => void engine.updateTaskFields(task, fields)}
+                            onSetScheduled={(day) => void engine.setTaskScheduled(task, day)}
+                            onSetDeadline={(day) => void engine.setTaskDeadline(task, day)}
+                            onDelete={() => {
+                              setExpandedTaskId(null);
+                              void engine.deleteTask(task);
+                            }}
+                          />
+                        );
+                      })}
+                    </div>
+                  </section>
+                ))}
               </div>
             ) : (
               <div className="space-y-0.5">

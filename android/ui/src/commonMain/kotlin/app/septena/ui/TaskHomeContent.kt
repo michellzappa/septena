@@ -40,6 +40,8 @@ data class CalendarAgendaRow(
     val timeLabel: String? = null,
     val isAllDay: Boolean = false,
     val dayLabel: String? = null,
+    /** ISO day (`YYYY-MM-DD`) used to weave Upcoming events into chronological date buckets. */
+    val dayIso: String? = null,
 )
 
 /**
@@ -170,6 +172,8 @@ fun TaskHomeContent(
     todayTint: Color,
     hasLoaded: Boolean,
     isToday: Boolean,
+    isUpcoming: Boolean = false,
+    upcomingDayLabelForIso: ((String) -> String)? = null,
     inboxTasks: List<TaskListItem>,
     tasks: List<TaskListItem>,
     calendarEvents: List<CalendarAgendaRow> = emptyList(),
@@ -232,7 +236,7 @@ fun TaskHomeContent(
                 }
             }
 
-            if (calendarEvents.isNotEmpty()) {
+            if (!isUpcoming && calendarEvents.isNotEmpty()) {
                 itemsIndexed(calendarEvents, key = { _, event -> "cal:${event.id}" }) { index, event ->
                     val prevDay = calendarEvents.getOrNull(index - 1)?.dayLabel
                     val showDayHeader = event.dayLabel != null && event.dayLabel != prevDay
@@ -251,51 +255,12 @@ fun TaskHomeContent(
                             ),
                         )
                     }
-                    TaskCardSlice(
+                    CalendarAgendaCardRow(
+                        event = event,
                         position = slicePos,
-                        isSelected = false,
                         isDark = isDarkTheme,
                         hasActiveTexture = hasActiveTexture,
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = TaskCardMetrics.ContentInset, vertical = 6.dp),
-                        ) {
-                            Box(
-                                contentAlignment = Alignment.Center,
-                                modifier = Modifier.width(TaskCardMetrics.LeadingColumnWidth + 14.dp),
-                            ) {
-                                if (event.timeLabel != null) {
-                                    Text(
-                                        text = event.timeLabel,
-                                        style = TextStyle(
-                                            fontSize = 11.sp,
-                                            lineHeight = 14.sp,
-                                            fontFeatureSettings = "tnum",
-                                        ),
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1,
-                                    )
-                                }
-                            }
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = event.title,
-                                fontSize = 13.5.sp,
-                                lineHeight = 18.sp,
-                                color = if (event.isAllDay) {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                } else {
-                                    MaterialTheme.colorScheme.onSurface
-                                },
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f),
-                            )
-                        }
-                    }
+                    )
                 }
             }
 
@@ -348,7 +313,8 @@ fun TaskHomeContent(
                 )
             }
 
-            if (hasLoaded && tasks.isEmpty() && inboxTasks.isEmpty() && emptyTitle.isNotBlank()) {
+            val hasUpcomingAgenda = isUpcoming && calendarEvents.isNotEmpty()
+            if (hasLoaded && tasks.isEmpty() && inboxTasks.isEmpty() && !hasUpcomingAgenda && emptyTitle.isNotBlank()) {
                 item(key = "empty-state") {
                     Column(
                         modifier = Modifier
@@ -374,38 +340,149 @@ fun TaskHomeContent(
                 }
             }
 
-            taskCardRows(
-                tasks = tasks,
-                keyPrefix = "task",
-                completeTitle = completeTitle,
-                canComplete = canComplete,
-                todayTitle = todayTitle,
-                todayTint = todayTint,
-                fadedTitle = fadedTitle,
-                showTodayIndicator = !isToday,
-                showFadedIndicator = showFadedIndicator,
-                isDark = isDarkTheme,
-                hasActiveTexture = hasActiveTexture,
-                onComplete = onComplete,
-                onOpenTask = onOpenTask,
-                rowMenuGroups = rowMenuGroups,
-                rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
-                selection = selection,
-                onTaskAction = onTaskAction,
-                onOpenGroupTarget = onOpenGroupTarget,
-                onDropRow = onDropTaskRow,
-                onDropGroupHeader = onDropGroupHeader,
-                canReorder = canReorder && onReorderTaskRow != null,
-                orderedDragIds = orderedSelectionIds,
-                onReorderRow = onReorderTaskRow,
-                onReorderGroupHeader = onReorderGroupHeader,
-                onApplyFilingSuggestion = onApplyFilingSuggestion,
-                isReviewList = isReviewList,
-                reviewAcceptTitle = reviewAcceptTitle,
-                reviewSendBackTitle = reviewSendBackTitle,
-                onAcceptReview = onAcceptReview,
-                onSendBackReview = onSendBackReview,
-            )
+            if (isUpcoming) {
+                // Chronological date buckets merging the union of task days and calendar event days
+                // (mirrors Apple `TaskListView.groupedUpcomingItems` and `SeptaskKitTaskList.upcomingBuckets`).
+                val tasksByDay = linkedMapOf<String, MutableList<Pair<Int, TaskListItem>>>()
+                tasks.forEachIndexed { index, task ->
+                    val iso = task.resolvedGroup()?.key?.removePrefix("day:") ?: return@forEachIndexed
+                    tasksByDay.getOrPut(iso) { mutableListOf() }.add(index to task)
+                }
+                val eventsByDay = linkedMapOf<String, MutableList<CalendarAgendaRow>>()
+                calendarEvents.forEach { event ->
+                    val iso = event.dayIso ?: return@forEach
+                    eventsByDay.getOrPut(iso) { mutableListOf() }.add(event)
+                }
+                val sortedDays = (tasksByDay.keys + eventsByDay.keys).sorted()
+                for (dayIso in sortedDays) {
+                    val dayTasks = tasksByDay[dayIso].orEmpty()
+                    val dayEvents = eventsByDay[dayIso].orEmpty()
+                    val targetKey = "day:$dayIso"
+                    val headerLabel = dayTasks.firstOrNull()?.second?.resolvedGroup()?.title
+                        ?: upcomingDayLabelForIso?.invoke(dayIso)
+                        ?: dayEvents.firstOrNull()?.dayLabel
+                        ?: dayIso
+                    val dayHeader = TaskGroupHeader(
+                        key = targetKey,
+                        title = headerLabel,
+                        iconKind = SeptenaIconKind.Upcoming,
+                        targetLocationKey = targetKey,
+                    )
+                    item(key = "upcoming-header:$dayIso") {
+                        val headerModifier = Modifier
+                            .then(
+                                if (onDropGroupHeader != null) {
+                                    Modifier.magicPlusSectionDrop(
+                                        id = "mp-group-upcoming-$targetKey",
+                                        enabled = true,
+                                        onDrop = { onDropGroupHeader(targetKey) },
+                                    )
+                                } else {
+                                    Modifier
+                                },
+                            )
+                            .then(
+                                if (canReorder && onReorderGroupHeader != null) {
+                                    Modifier.taskReorderSectionDrop(
+                                        id = "reorder-group-upcoming-$targetKey",
+                                        enabled = true,
+                                        onDrop = { ids -> onReorderGroupHeader(ids, targetKey) },
+                                    )
+                                } else {
+                                    Modifier
+                                },
+                            )
+                        // Date headers are non-tappable (matching Apple `groupedUpcomingItems`).
+                        TaskGroupHeaderRow(
+                            header = dayHeader,
+                            modifier = headerModifier,
+                            onClick = null,
+                        )
+                    }
+                    if (dayEvents.isNotEmpty()) {
+                        itemsIndexed(dayEvents, key = { _, event -> "cal:$dayIso:${event.id}" }) { idx, event ->
+                            CalendarAgendaCardRow(
+                                event = event,
+                                position = cardPosition(idx, dayEvents.size),
+                                isDark = isDarkTheme,
+                                hasActiveTexture = hasActiveTexture,
+                            )
+                        }
+                    }
+                    if (dayTasks.isNotEmpty()) {
+                        val slicePositions = List(dayTasks.size) { i -> cardPosition(i, dayTasks.size) }
+                        itemsIndexed(dayTasks, key = { _, (_, task) -> "task:${task.id}" }) { localIdx, (globalIdx, task) ->
+                            TaskCardRow(
+                                task = task,
+                                position = slicePositions[localIdx],
+                                completeTitle = completeTitle,
+                                canComplete = canComplete,
+                                todayTitle = todayTitle,
+                                todayTint = todayTint,
+                                fadedTitle = fadedTitle,
+                                showTodayIndicator = false,
+                                showFadedIndicator = showFadedIndicator,
+                                isDark = isDarkTheme,
+                                hasActiveTexture = hasActiveTexture,
+                                onComplete = onComplete,
+                                onOpenTask = onOpenTask,
+                                rowMenuGroups = rowMenuGroups,
+                                rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
+                                selection = selection,
+                                onTaskAction = onTaskAction,
+                                canReorder = canReorder && onReorderTaskRow != null,
+                                orderedDragIds = orderedSelectionIds,
+                                onApplyFilingSuggestion = onApplyFilingSuggestion,
+                                dropModifier = Modifier
+                                    .magicPlusRowDrop(
+                                        id = "mp-task-${task.id}",
+                                        enabled = onDropTaskRow != null,
+                                        onDrop = { before -> onDropTaskRow?.invoke(globalIdx, before) },
+                                    )
+                                    .taskReorderRowDrop(
+                                        id = "reorder-task-${task.id}",
+                                        taskId = task.id,
+                                        enabled = canReorder && onReorderTaskRow != null,
+                                        onDrop = { ids, before -> onReorderTaskRow?.invoke(ids, globalIdx, before) },
+                                    ),
+                            )
+                        }
+                    }
+                }
+            } else {
+                taskCardRows(
+                    tasks = tasks,
+                    keyPrefix = "task",
+                    completeTitle = completeTitle,
+                    canComplete = canComplete,
+                    todayTitle = todayTitle,
+                    todayTint = todayTint,
+                    fadedTitle = fadedTitle,
+                    showTodayIndicator = !isToday,
+                    showFadedIndicator = showFadedIndicator,
+                    isDark = isDarkTheme,
+                    hasActiveTexture = hasActiveTexture,
+                    onComplete = onComplete,
+                    onOpenTask = onOpenTask,
+                    rowMenuGroups = rowMenuGroups,
+                    rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
+                    selection = selection,
+                    onTaskAction = onTaskAction,
+                    onOpenGroupTarget = onOpenGroupTarget,
+                    onDropRow = onDropTaskRow,
+                    onDropGroupHeader = onDropGroupHeader,
+                    canReorder = canReorder && onReorderTaskRow != null,
+                    orderedDragIds = orderedSelectionIds,
+                    onReorderRow = onReorderTaskRow,
+                    onReorderGroupHeader = onReorderGroupHeader,
+                    onApplyFilingSuggestion = onApplyFilingSuggestion,
+                    isReviewList = isReviewList,
+                    reviewAcceptTitle = reviewAcceptTitle,
+                    reviewSendBackTitle = reviewSendBackTitle,
+                    onAcceptReview = onAcceptReview,
+                    onSendBackReview = onSendBackReview,
+                )
+            }
         }
     }
 }
@@ -534,6 +611,61 @@ private fun LazyListScope.taskCardRows(
                         enabled = canReorder && onReorderRow != null,
                         onDrop = { ids, before -> onReorderRow?.invoke(ids, index, before) },
                     ),
+            )
+        }
+    }
+}
+
+/** Single read-only calendar agenda row framed inside a glass card slice (Today & Upcoming). */
+@Composable
+private fun CalendarAgendaCardRow(
+    event: CalendarAgendaRow,
+    position: TaskCardPosition,
+    isDark: Boolean,
+    hasActiveTexture: Boolean,
+) {
+    TaskCardSlice(
+        position = position,
+        isSelected = false,
+        isDark = isDark,
+        hasActiveTexture = hasActiveTexture,
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = TaskCardMetrics.ContentInset, vertical = 6.dp),
+        ) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.width(TaskCardMetrics.LeadingColumnWidth + 14.dp),
+            ) {
+                if (event.timeLabel != null) {
+                    Text(
+                        text = event.timeLabel,
+                        style = TextStyle(
+                            fontSize = 11.sp,
+                            lineHeight = 14.sp,
+                            fontFeatureSettings = "tnum",
+                        ),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = event.title,
+                fontSize = 13.5.sp,
+                lineHeight = 18.sp,
+                color = if (event.isAllDay) {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                },
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
             )
         }
     }
