@@ -1,10 +1,10 @@
 # 0035. Make companion voice push-to-talk, unstored and confirmed
 
-- Status: proposed
+- Status: accepted (2026-11-25)
 - Date: 2026-11-24
 - Deciders: mz
-- Depends on: [ADR 0009](0009-trustable-private-ai.md) (proposed),
-  [ADR 0034](0034-companion-devices-get-a-limited-session.md) (proposed)
+- Depends on: [ADR 0009](0009-trustable-private-ai.md),
+  [ADR 0034](0034-companion-devices-get-a-limited-session.md)
 
 ## Context
 

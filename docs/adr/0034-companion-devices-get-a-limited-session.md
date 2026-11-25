@@ -1,6 +1,6 @@
 # 0034. Give companion devices a limited session and a small verb set
 
-- Status: proposed
+- Status: accepted (2026-11-25)
 - Date: 2026-11-24
 - Deciders: mz
 - Builds on: [ADR 0008](0008-agent-loop-rules-live-in-the-store.md),

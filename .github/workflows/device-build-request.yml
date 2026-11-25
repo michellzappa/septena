@@ -1,0 +1,19 @@
+name: Device build request
+
+# A push to device/<name> asks for a TestFlight build that only mz gets. This
+# job holds no secrets and does nothing: it only starts testflight-ios.yml
+# through workflow_run, so the workflow that signs is always the copy on main.
+# See docs/DEVICE_BUILDS.md.
+
+on:
+  push:
+    branches: ["device/**"]
+
+permissions: {}
+
+jobs:
+  request:
+    name: Ask for a device build
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Device build requested. testflight-ios.yml takes it from here."

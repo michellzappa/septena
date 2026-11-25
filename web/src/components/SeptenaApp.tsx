@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Calendar,
   CheckCircle2,
+  ChevronDown,
+  ChevronRight,
   Circle,
   CloudOff,
   Folder,
@@ -34,9 +36,8 @@ import { TaskRowItem } from "./TaskRowItem";
 const SMART_LISTS: Array<{
   id: SmartDestination;
   label: string;
-  icon: typeof Inbox;
+  icon: typeof Star;
 }> = [
-  { id: "inbox", label: "Inbox", icon: Inbox },
   { id: "today", label: "Today", icon: Star },
   { id: "upcoming", label: "Upcoming", icon: Calendar },
   { id: "anytime", label: "Anytime", icon: Layers },
@@ -56,6 +57,7 @@ export function SeptenaApp() {
   const [syncState, setSyncState] = useState<SyncState>(() => engine.getState());
   const [destination, setDestination] = useState<ActiveDestination>({ kind: "smart", id: "today" });
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
+  const [inboxCollapsed, setInboxCollapsed] = useState(false);
   const [composerTitle, setComposerTitle] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [coreVersion, setCoreVersion] = useState<string>("");
@@ -194,7 +196,6 @@ export function SeptenaApp() {
 
   const smartCounts = useMemo(() => {
     const counts: Record<SmartDestination, number> = {
-      inbox: 0,
       today: 0,
       upcoming: 0,
       anytime: 0,
@@ -206,7 +207,6 @@ export function SeptenaApp() {
         continue;
       }
       if (task.status !== "open") continue;
-      if (membership.matchesView.inbox) counts.inbox++;
       if (membership.matchesView.today) counts.today++;
       if (membership.matchesView.upcoming) counts.upcoming++;
       if (membership.matchesView.anytime) counts.anytime++;
@@ -248,6 +248,23 @@ export function SeptenaApp() {
       return String(b.task.createdAt ?? "").localeCompare(String(a.task.createdAt ?? ""));
     });
   }, [destination, evaluatedTasks, projectById]);
+
+  // On Today, unfiled Inbox items sit in a foldable Inbox band above the Today
+  // list (matching iOS/Mac, docs/TRIAGE_BAND_SPEC.md).
+  const { todayInboxTasks, todayCommittedTasks } = useMemo(() => {
+    if (!(destination.kind === "smart" && destination.id === "today")) {
+      return { todayInboxTasks: [] as typeof visibleTasks, todayCommittedTasks: visibleTasks };
+    }
+    const inboxBand: typeof visibleTasks = [];
+    const committed: typeof visibleTasks = [];
+    for (const item of visibleTasks) {
+      if (item.membership.inInbox) inboxBand.push(item);
+      else committed.push(item);
+    }
+    // Triage band items first, then Inbox items pinned to Today (TRIAGE_BAND_SPEC.md).
+    inboxBand.sort((a, b) => Number(b.membership.inTriageBand) - Number(a.membership.inTriageBand));
+    return { todayInboxTasks: inboxBand, todayCommittedTasks: committed };
+  }, [destination, visibleTasks]);
 
   const pageMeta = useMemo(() => {
     if (destination.kind === "smart") {
@@ -604,11 +621,9 @@ export function SeptenaApp() {
               <div className="space-y-5">
                 {upcomingGroups.map((group) => (
                   <section key={group.day} aria-label={group.label}>
-                    <div className="mb-1.5 flex items-center gap-2 px-2">
+                    <div className="mb-1.5 flex items-center gap-2 border-b border-[var(--border-subtle)] pb-1.5 text-xs font-semibold tracking-wide text-[var(--text-secondary)]">
                       <Calendar className="h-3.5 w-3.5 shrink-0 text-[var(--text-muted)]" />
-                      <h2 className="text-xs font-semibold tracking-wide text-[var(--text-secondary)]">
-                        {group.label}
-                      </h2>
+                      <h2>{group.label}</h2>
                     </div>
                     <div className="space-y-0.5">
                       {group.items.map(({ task, membership }) => {
@@ -643,6 +658,99 @@ export function SeptenaApp() {
                     </div>
                   </section>
                 ))}
+              </div>
+            ) : destination.kind === "smart" && destination.id === "today" && todayInboxTasks.length > 0 ? (
+              <div className="space-y-5">
+                <section aria-label="Inbox">
+                  <button
+                    type="button"
+                    onClick={() => setInboxCollapsed((v) => !v)}
+                    className="mb-1.5 flex w-full items-center gap-2 border-b border-[var(--border-subtle)] pb-1.5 text-left text-xs font-semibold tracking-wide text-[var(--text-secondary)] uppercase hover:text-[var(--text-primary)]"
+                  >
+                    <Inbox className="h-3.5 w-3.5 text-[var(--accent)]" />
+                    <span>Inbox</span>
+                    <span className="font-mono-tabular font-normal text-[var(--text-muted)]">
+                      {todayInboxTasks.length}
+                    </span>
+                    <span className="ml-auto text-[var(--text-muted)]">
+                      {inboxCollapsed ? (
+                        <ChevronRight className="h-3.5 w-3.5" />
+                      ) : (
+                        <ChevronDown className="h-3.5 w-3.5" />
+                      )}
+                    </span>
+                  </button>
+                  {!inboxCollapsed && (
+                    <div className="space-y-0.5">
+                      {todayInboxTasks.map(({ task, membership }) => (
+                        <TaskRowItem
+                          key={task.id}
+                          task={task}
+                          membership={membership}
+                          containerLabel={null}
+                          hasPendingOp={pendingTaskIds.has(task.id)}
+                          expanded={expandedTaskId === task.id}
+                          onSelect={() => setExpandedTaskId((prev) => (prev === task.id ? null : task.id))}
+                          onToggleDone={() => void engine.toggleTaskDone(task)}
+                          onToggleToday={() => void engine.toggleTaskToday(task)}
+                          onUpdateFields={(fields) => void engine.updateTaskFields(task, fields)}
+                          onSetScheduled={(day) => void engine.setTaskScheduled(task, day)}
+                          onSetDeadline={(day) => void engine.setTaskDeadline(task, day)}
+                          onDelete={() => {
+                            setExpandedTaskId(null);
+                            void engine.deleteTask(task);
+                          }}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </section>
+
+                {todayCommittedTasks.length > 0 && (
+                  <section aria-label="Today">
+                    <div className="mb-1.5 flex items-center gap-2 border-b border-[var(--border-subtle)] pb-1.5 text-xs font-semibold tracking-wide text-[var(--text-secondary)] uppercase">
+                      <Star
+                        className="h-3.5 w-3.5"
+                        style={{ color: "var(--today-gold)", fill: "var(--today-gold)" }}
+                      />
+                      <span>Today</span>
+                      <span className="font-mono-tabular font-normal text-[var(--text-muted)]">
+                        {todayCommittedTasks.length}
+                      </span>
+                    </div>
+                    <div className="space-y-0.5">
+                      {todayCommittedTasks.map(({ task, membership }) => {
+                        let containerLabel: string | null = null;
+                        if (task.project && projectById.has(task.project)) {
+                          containerLabel = projectById.get(task.project)!.title;
+                        } else if (task.area && areaById.has(task.area)) {
+                          const a = areaById.get(task.area)!;
+                          containerLabel = `${a.emoji ? `${a.emoji} ` : ""}${a.title}`;
+                        }
+                        return (
+                          <TaskRowItem
+                            key={task.id}
+                            task={task}
+                            membership={membership}
+                            containerLabel={containerLabel}
+                            hasPendingOp={pendingTaskIds.has(task.id)}
+                            expanded={expandedTaskId === task.id}
+                            onSelect={() => setExpandedTaskId((prev) => (prev === task.id ? null : task.id))}
+                            onToggleDone={() => void engine.toggleTaskDone(task)}
+                            onToggleToday={() => void engine.toggleTaskToday(task)}
+                            onUpdateFields={(fields) => void engine.updateTaskFields(task, fields)}
+                            onSetScheduled={(day) => void engine.setTaskScheduled(task, day)}
+                            onSetDeadline={(day) => void engine.setTaskDeadline(task, day)}
+                            onDelete={() => {
+                              setExpandedTaskId(null);
+                              void engine.deleteTask(task);
+                            }}
+                          />
+                        );
+                      })}
+                    </div>
+                  </section>
+                )}
               </div>
             ) : (
               <div className="space-y-0.5">

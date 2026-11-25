@@ -1,6 +1,6 @@
 # 0009. Run AI on tasks with checkable privacy guarantees
 
-- Status: proposed
+- Status: accepted (2026-11-25)
 - Date: 2026-11-20
 - Deciders: mz
 
@@ -57,7 +57,11 @@ Septena-hosted inference, then the user's Claude for steps that need it.
 copy that a user can hold us to, the same in every market. We do not frame
 them around one region's law.
 
-Open before this ADR is accepted:
+Accepted on 2026-11-25: the six guarantees. These three choices stay open. The
+spec of each hosted feature answers them before it ships, and no hosted feature
+ships without an answer to all three. Companion voice (ADR 0035) answers the
+first two for itself: Workers AI, and off by default.
+
 
 - **Hosted provider.** Workers AI (same company as the data store, open-weight
   models) or Anthropic with zero data retention (stronger models, one more
