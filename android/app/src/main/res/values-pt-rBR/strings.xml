@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_today_name">Hoje</string>
+    <string name="widget_today_description">Tarefas de hoje com conclusão em um toque.</string>
+    <string name="widget_upcoming_name">Em breve</string>
+    <string name="widget_upcoming_description">Tarefas agendadas para os próximos dias.</string>
+    <string name="widget_add_task">Nova tarefa</string>
+    <string name="widget_complete_task">Concluir tarefa</string>
+</resources>
