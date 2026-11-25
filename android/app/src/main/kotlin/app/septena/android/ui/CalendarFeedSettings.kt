@@ -88,10 +88,10 @@ internal fun CalendarFeedSection(
     var confirmRotate by remember { mutableStateOf(false) }
     fun copy(id: String) = settingsCopy(CALENDAR, id, languageTag)
 
-    SectionHeader("Device calendars")
+    SectionHeader(copy("deviceHeader"))
     ListItem(
-        headlineContent = { Text("Show calendar events") },
-        supportingContent = { Text("Read-only agenda in Today and Upcoming") },
+        headlineContent = { Text(copy("deviceToggle")) },
+        supportingContent = { Text(copy("deviceToggleDetail")) },
         trailingContent = {
             Switch(
                 checked = showEvents && hasCalendarPermission,
@@ -109,7 +109,7 @@ internal fun CalendarFeedSection(
     )
     if (showEvents && !hasCalendarPermission) {
         ListItem(
-            headlineContent = { Text("Allow calendar access", color = MaterialTheme.colorScheme.primary) },
+            headlineContent = { Text(copy("devicePermissionAction"), color = MaterialTheme.colorScheme.primary) },
             modifier = Modifier.fillMaxWidth().clickable {
                 requestCalendarPermission.launch(Manifest.permission.READ_CALENDAR)
             },
