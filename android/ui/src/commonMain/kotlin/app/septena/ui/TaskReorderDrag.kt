@@ -25,12 +25,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -323,7 +320,7 @@ fun Modifier.taskReorderRowDrop(
         .onGloballyPositioned { coords ->
             drag.register(id, TaskReorderDropKind.TaskRow, coords.boundsInRoot(), ownerTaskId = taskId, onDrop = onDrop)
         }
-        .drawReorderInsertionMark(tint, markAlpha, atTop = hoveredBefore == true, visible = hoveredBefore != null)
+        .drawInsertionMark(tint, markAlpha, atTop = hoveredBefore == true, visible = hoveredBefore != null)
 }
 
 /** Registers a group / section header as a task-reorder drop target; draws the 6dp mark below it. */
@@ -349,7 +346,7 @@ fun Modifier.taskReorderSectionDrop(
         .onGloballyPositioned { coords ->
             drag.register(id, TaskReorderDropKind.SectionHeader, coords.boundsInRoot()) { ids, _ -> onDrop(ids) }
         }
-        .drawReorderInsertionMark(tint, markAlpha, atTop = false, visible = isTargeted)
+        .drawInsertionMark(tint, markAlpha, atTop = false, visible = isTargeted)
 }
 
 /**
@@ -374,28 +371,6 @@ fun rememberTaskContainerDropTarget(
         drag.register(id, TaskReorderDropKind.ContainerRow, coords.boundsInRoot()) { ids, _ -> onDrop(ids) }
     }
     return mod to isTargeted
-}
-
-private fun Modifier.drawReorderInsertionMark(
-    tint: Color,
-    alpha: Float,
-    atTop: Boolean,
-    visible: Boolean,
-): Modifier = drawWithContent {
-    drawContent()
-    if (!visible && alpha <= 0.01f) return@drawWithContent
-    val color = if (tint == Color.Unspecified) Color(0xFFD9643A) else tint
-    val inset = TaskCardMetrics.Margin.toPx()
-    val width = (size.width - inset * 2f).coerceAtLeast(0f)
-    val height = 6.dp.toPx()
-    val y = if (atTop) 0f else size.height - height
-    val radius = CornerRadius(height / 2f, height / 2f)
-    drawRoundRect(
-        color = color.copy(alpha = alpha),
-        topLeft = Offset(inset, y),
-        size = Size(width, height),
-        cornerRadius = radius,
-    )
 }
 
 /**
