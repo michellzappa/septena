@@ -128,6 +128,11 @@ fun TaskHomeScreen(
     var openedTaskSendBack by rememberSaveable { mutableStateOf(false) }
     /** The task whose Add Reference dialog is open (row menu). */
     var referenceTaskId by rememberSaveable { mutableStateOf<String?>(null) }
+    /** The task whose Assign To dialog is open (row menu). */
+    var assignTaskId by rememberSaveable { mutableStateOf<String?>(null) }
+    /** Join a Shared Project: the open dialog, and the token of the link that opened it. */
+    var joinOpen by rememberSaveable { mutableStateOf(false) }
+    var joinToken by rememberSaveable { mutableStateOf<String?>(null) }
     var quickFindOpen by rememberSaveable { mutableStateOf(false) }
     var settingsOpen by rememberSaveable { mutableStateOf(false) }
     // On mobile, opens on Today with the Lists Homepage one Back away (Things / iOS `SeptaskRootView`).
@@ -171,6 +176,11 @@ fun TaskHomeScreen(
                 homeQuickAddDraft = QuickAddDraft(today = launchAction.today)
                 onConsumeLaunchAction()
             }
+            is WidgetLaunchAction.JoinShare -> {
+                joinToken = launchAction.token
+                joinOpen = true
+                onConsumeLaunchAction()
+            }
         }
     }
     val undoSnackbarHostState = remember { SnackbarHostState() }
@@ -181,7 +191,7 @@ fun TaskHomeScreen(
     val showingDeleted = currentDestId == RegistryDestinationIds.RECENTLY_DELETED ||
         (currentDestId == RegistryDestinationIds.LOGBOOK && logbookShowingDeleted)
     val effectiveDestId = if (showingDeleted) RegistryDestinationIds.RECENTLY_DELETED else currentDestId
-    val rowMenuId = if (showingDeleted) "task.recentlyDeleted" else "task.row"
+    val rowMenuId = if (showingDeleted) "task.recentlyDeleted" else TASK_ROW_MENU
     val rowMenuGroups = remember(rowMenuId, languageTag, effectiveDestId) {
         taskRowMenuGroups(rowMenuId, effectiveDestId, languageTag)
     }
@@ -206,6 +216,7 @@ fun TaskHomeScreen(
                 openTaskWithAttribute(id, RegistryCatalog.actionOpensAttribute(actionId))
             actionId == RegistryActionIds.TASK_TOGGLE_STAR -> homeViewModel.toggleStar(id)
             actionId == RegistryActionIds.TASK_ADD_REFERENCE -> referenceTaskId = id
+            actionId == ASSIGN_SUBMENU -> assignTaskId = id
             actionId == RegistryActionIds.TASK_DUPLICATE -> homeViewModel.duplicate(id)
             actionId == RegistryActionIds.TASK_SHARE -> homeViewModel.shareText(id) { shareText ->
                 val intent = Intent(Intent.ACTION_SEND).apply {
@@ -340,6 +351,32 @@ fun TaskHomeScreen(
 
     referenceTaskId?.let { id ->
         AddReferenceDialog(graph = graph, taskId = id, onDismiss = { referenceTaskId = null })
+    }
+
+    assignTaskId?.let { id ->
+        AssignTaskDialog(
+            graph = graph,
+            taskId = id,
+            title = RegistryCatalog.submenuTitle(TASK_ROW_MENU, ASSIGN_SUBMENU, languageTag).orEmpty(),
+            languageTag = languageTag,
+            onDismiss = { assignTaskId = null },
+            onPick = { memberId ->
+                assignTaskId = null
+                homeViewModel.assign(id, memberId)
+            },
+        )
+    }
+
+    if (joinOpen) {
+        JoinSharedProjectDialog(
+            graph = graph,
+            languageTag = languageTag,
+            initialToken = joinToken,
+            onDismiss = {
+                joinOpen = false
+                joinToken = null
+            },
+        )
     }
 
     homeQuickAddDraft?.let { initialDraft ->
@@ -500,6 +537,10 @@ fun TaskHomeScreen(
                     },
                     onCreateProject = { title ->
                         homeViewModel.createProject(title) { created -> selectHomeLocation(created) }
+                    },
+                    onJoinShared = {
+                        joinToken = null
+                        joinOpen = true
                     },
                     onRefresh = graph.sync::syncAndWait,
                 )
@@ -1287,6 +1328,9 @@ private fun TaskHomeScaffold(
                             onTaskAction = onTaskAction,
                             selection = selection,
                             newSectionTrigger = newSectionTrigger,
+                            onLeftProject = {
+                                onSelectHomeLocation(TaskHomeLocation.SmartList(RegistryDestinationIds.TODAY))
+                            },
                             onMagicPlusDrop = { draft -> quickAddDraft = draft },
                         )
                         is TaskHomeLocation.SmartList -> {
@@ -1542,9 +1586,28 @@ private fun taskRowMenuGroups(
                 } else null,
                 icon = actionMenuIcon(id),
             )
-        }.takeIf { it.isNotEmpty() }
+        }.withAssign(menuId, languageTag).takeIf { it.isNotEmpty() }
     }
 }
+
+/** Assign To follows Move, as in the registry menu; a row shows it only in a shared project. */
+private fun List<TaskRowMenuAction>.withAssign(menuId: String, languageTag: String): List<TaskRowMenuAction> {
+    val move = indexOfFirst { it.id == RegistryActionIds.TASK_MOVE }
+    val title = RegistryCatalog.submenuTitle(menuId, ASSIGN_SUBMENU, languageTag)
+    if (move < 0 || title == null) return this
+    val assign = TaskRowMenuAction(
+        id = ASSIGN_SUBMENU,
+        title = title,
+        icon = TaskMenuActionIcon.Assign,
+        needsAssignees = true,
+    )
+    return take(move + 1) + assign + drop(move + 1)
+}
+
+private const val TASK_ROW_MENU = "task.row"
+
+/** The `task.row` submenu that opens the member list. */
+private const val ASSIGN_SUBMENU = "assign"
 
 private fun actionMenuIcon(actionId: String): TaskMenuActionIcon = when (actionId) {
     RegistryActionIds.TASK_WHEN -> TaskMenuActionIcon.When

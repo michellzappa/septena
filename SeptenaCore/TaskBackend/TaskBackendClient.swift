@@ -437,6 +437,63 @@ actor TaskBackendClient {
     guard status == 204 else { throw Self.httpError(status, data) }
   }
 
+  // MARK: - Shared projects (docs/PROJECT_SHARING_SPEC.md)
+
+  func createShare(projectID: String, name: String) async throws -> ProjectShare {
+    let body = try JSONEncoder().encode(["projectId": projectID, "name": name])
+    let (data, status) = try await authed(path: "/v1/shares", method: "POST", body: body)
+    guard status == 201 else { throw Self.httpError(status, data) }
+    return try decode(BackendShareCreated.self, from: data, what: "share").share
+  }
+
+  func shareDetails(id: String) async throws -> BackendShareDetails {
+    let (data, status) = try await authed(path: "/v1/shares/\(id)", method: "GET", body: nil)
+    guard status == 200 else { throw Self.httpError(status, data) }
+    return try decode(BackendShareDetails.self, from: data, what: "share")
+  }
+
+  /// A new invite link. The server shows it once.
+  func inviteToShare(id: String) async throws -> URL {
+    let (data, status) = try await authed(path: "/v1/shares/\(id)/invites", method: "POST", body: Data("{}".utf8))
+    guard status == 201 else { throw Self.httpError(status, data) }
+    guard let url = URL(string: try decode(BackendShareInvite.self, from: data, what: "invite").url) else {
+      throw TaskBackendError.badResponse("invite")
+    }
+    return url
+  }
+
+  func revokeShareInvite(shareID: String, inviteID: String) async throws {
+    try await deleteShare("/v1/shares/\(shareID)/invites/\(inviteID)")
+  }
+
+  /// Removes a member; with this account's own member id, leaves.
+  func endShareMembership(shareID: String, memberID: String) async throws {
+    try await deleteShare("/v1/shares/\(shareID)/members/\(memberID)")
+  }
+
+  func stopSharing(id: String) async throws {
+    try await deleteShare("/v1/shares/\(id)")
+  }
+
+  private func deleteShare(_ path: String) async throws {
+    let (data, status) = try await authed(path: path, method: "DELETE", body: nil)
+    guard status == 204 else { throw Self.httpError(status, data) }
+  }
+
+  func previewShare(token: String) async throws -> BackendSharePreview {
+    let body = try JSONEncoder().encode(["token": token])
+    let (data, status) = try await authed(path: "/v1/shares/preview", method: "POST", body: body)
+    guard status == 200 else { throw Self.httpError(status, data) }
+    return try decode(BackendSharePreview.self, from: data, what: "invite")
+  }
+
+  func joinShare(token: String, name: String) async throws -> BackendShareJoined {
+    let body = try JSONEncoder().encode(["token": token, "name": name])
+    let (data, status) = try await authed(path: "/v1/shares/join", method: "POST", body: body)
+    guard status == 200 else { throw Self.httpError(status, data) }
+    return try decode(BackendShareJoined.self, from: data, what: "join")
+  }
+
   // MARK: - Companion device (Apple Watch)
 
   /// Mints a SEPARATE session for the paired watch (`POST /v1/auth/device`).

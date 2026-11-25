@@ -643,6 +643,7 @@ extension TaskSyncEngine {
     take("fadedAt") { t.fadedAt = Self.parseStamp($0.stringValue) }
     take("dropReason") { t.dropReason = $0.stringValue }
     take("effort") { t.effort = $0.stringValue }
+    take("assignedTo") { t.assignedTo = $0.stringValue }
     return applied
   }
 
@@ -721,6 +722,7 @@ extension TaskSyncEngine {
     take("noteRev") { p.noteRev = Self.int($0) ?? 0 }
     take("notesProposal") { p.notesProposal = Self.notesProposal(from: $0) }
     take("githubRepo") { p.githubRepo = $0.stringValue }
+    take("share") { p.shareJSON = $0.jsonText }
     take("position") { p.position = Self.int($0) ?? 0 }
     return applied
   }

@@ -48,6 +48,9 @@ only), the filing suggestion (only when the top group does not already show
 it), Inbox, areas and top-level projects, then Move… for the full picker.
 It replaces the two old submenus, Move and Move to Section.
 
+Assign To ▸ is the one exception to rule 1 *(default)*: it shows only for tasks
+in a shared project, and lists its members (docs/PROJECT_SHARING_SPEC.md §8).
+
 Open opens the task page (ADR 0029, `docs/TASK_PAGE_SPEC.md`), never the
 inline editor: a row tap is inline, Open is the page. On the Mac it shows
 the inspector pane. On iPhone it pushes the page; on iPad it shows the
