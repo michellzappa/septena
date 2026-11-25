@@ -24,7 +24,7 @@ object SyncWireCodec {
         }
         return when (operation) {
             is SyncOperation.Upsert -> {
-                RegistryValidator.requireValidUpsert(operation.entity, operation.id, operation.fields, insert = false)
+                RegistryValidator.requireValidUpsert(operation.entity, operation.id, operation.fields, insert = null)
                 JsonValue.ObjectValue(linkedMapOf(
                     "clientOpId" to JsonValue.StringValue(operation.clientOpId),
                     "op" to JsonValue.StringValue("upsert"),
