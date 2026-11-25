@@ -8480,7 +8480,7 @@
       }
     },
     "Check for Updates…" : {
-      "comment" : "Generated from registry settings.pages.about.sections.actions.items.0.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.pages.about.sections.actions.items.1.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
@@ -17110,7 +17110,7 @@
       }
     },
     "Help" : {
-      "comment" : "Generated from registry actions.menuBar.help.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.pages.about.sections.actions.items.0.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
@@ -31649,7 +31649,7 @@
       }
     },
     "Send feedback" : {
-      "comment" : "Generated from registry settings.pages.about.sections.actions.items.3.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.pages.about.sections.actions.items.4.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
@@ -31912,6 +31912,48 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Como o app Septena não tem um modelo local neste dispositivo, o recurso Conversar encaminha a tarefa para o seu Claude. Recomendado."
+          }
+        }
+      }
+    },
+    "Septena Help" : {
+      "comment" : "Generated from registry actions.actions.app.help.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Septena-Hilfe"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ayuda de Septena"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aide de Septena"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aiuto di Septena"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Septena-hulp"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajuda do Septena"
           }
         }
       }
@@ -33134,7 +33176,7 @@
       }
     },
     "Show Get Started Again" : {
-      "comment" : "Generated from registry settings.pages.about.sections.actions.items.1.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.pages.about.sections.actions.items.2.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
@@ -33385,7 +33427,7 @@
       }
     },
     "Show Welcome Again" : {
-      "comment" : "Generated from registry settings.pages.about.sections.actions.items.2.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.pages.about.sections.actions.items.3.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {

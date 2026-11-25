@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.septena.android.AndroidAppGraph
 import app.septena.core.JsonValue
+import app.septena.core.ProjectShare
 import app.septena.core.RegistryActionContext
 import app.septena.core.RegistryActionResolver
 import app.septena.core.RegistryCatalog
@@ -57,6 +58,8 @@ data class TaskHomeNavigationItem(
     val count: Int? = null,
     /** Done fraction (0..1) for projects, driving the progress ring glyph. */
     val progress: Float = 0f,
+    /** Who shares a project. Null = private. */
+    val share: ProjectShare? = null,
 )
 
 data class TaskHomeUiState(
@@ -745,6 +748,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                             location = TaskHomeLocation.Project(record.id, title),
                             title = title,
                             parentAreaId = parentAreaId,
+                            share = ProjectShare.of(record),
                         ),
                     )
                 }

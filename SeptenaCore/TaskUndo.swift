@@ -414,14 +414,15 @@ enum TaskUndo {
       return
     }
     mutator.touch(id: id)
-    func apply(title: String, notes: String?) {
+    func apply(title: String, notes: String?, from: String?) {
       mutator.update(id: id,
                      title: titleChanged ? title : nil,
-                     notes: notesChanged ? (notes ?? "") : nil)
+                     notes: notesChanged ? (notes ?? "") : nil,
+                     notesFrom: from ?? "")
     }
     record(name: String(localized: "Edit Task", comment: "Undo action name"),
-           undo: { apply(title: beforeTitle, notes: beforeNotes) },
-           redo: { apply(title: afterTitle, notes: afterNotes) })
+           undo: { apply(title: beforeTitle, notes: beforeNotes, from: afterNotes) },
+           redo: { apply(title: afterTitle, notes: afterNotes, from: beforeNotes) })
   }
 
   /// Move between area / project / heading. Captured together because the
@@ -841,8 +842,8 @@ enum TaskUndo {
                                         projects: ProjectsMutator) {
     guard (before ?? "") != (after ?? "") else { return }
     record(name: ContainerNotesCopy.undoRestoreName,
-           undo: { Task { @MainActor in try? await projects.setNotes(id: id, notes: before) } },
-           redo: { Task { @MainActor in try? await projects.setNotes(id: id, notes: after) } })
+           undo: { Task { @MainActor in try? await projects.setNotes(id: id, notes: before, from: after ?? "") } },
+           redo: { Task { @MainActor in try? await projects.setNotes(id: id, notes: after, from: before ?? "") } })
   }
 
   static func recordAreaNotesRestore(id: String,

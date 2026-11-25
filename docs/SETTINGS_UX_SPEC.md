@@ -71,7 +71,7 @@ Every setting and custom surface currently in `Septask/` and shared `Septena/She
 |---|---|---|
 | **`account`** | `welcomeName` (`synced` string), `sync_account_status` (Sign in / live status / Sign out), `delete_account` (`signedIn` only) | Removes duplicate Sync from `Task backend`; moves `store_health` to Depth 2 (still surfaces inline banner only if failures > 0, or inside Advanced diagnostics). Future home for `#46` Sync subscription & ADR 0016 sign-in methods |
 | **`privacy`** | Concise 1-section `privacy_summary` (accurate `api.septena.app` + Claude copy, no `"Task backend"` reference) | The usage-data picker was removed on 2026-11-25 (#436): the app sends no usage data. Moves `diagnosticsEnabled` / Community Pulse to Depth 2 *(default)* |
-| **`about`** | `about_header` (icon, name, tagline, version/build), `check_updates` (`macos`, `windows`), `send_feedback`, `reset_get_started`, `septena_life_link`, **Advanced →** (`advanced` subpage) | Trims multi-paragraph marketing prose; removes `"Task backend"` row in favor of unified `Advanced` |
+| **`about`** | `about_header` (icon, name, tagline, version/build), `open_help` (opens `helpURL`), `check_updates` (`macos`, `windows`), `send_feedback`, `reset_get_started`, `septena_life_link`, **Advanced →** (`advanced` subpage) | Trims multi-paragraph marketing prose; removes `"Task backend"` row in favor of unified `Advanced` |
 
 ### Depth 2 — `About ▸ Advanced` (diagnostics, power-user & beta tools)
 

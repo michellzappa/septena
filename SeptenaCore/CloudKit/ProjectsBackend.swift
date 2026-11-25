@@ -9,7 +9,8 @@ import SwiftData
 protocol ProjectsBackend: AnyObject {
   func create(title: String, area: String?) async throws -> Project
   func rename(id: String, to title: String) async throws
-  func setNotes(id: String, notes: String?) async throws
+  /// `from`: the notes the editor opened with (`TaskMutator.update`).
+  func setNotes(id: String, notes: String?, from: String?) async throws
   func acceptNotesProposal(id: String) async throws
   func rejectNotesProposal(id: String) async throws
   func restoreNotesState(id: String, notes: String?, proposal: NotesProposal?) async throws
@@ -58,8 +59,8 @@ final class ProjectsMutator: ProjectsBackend {
   func rename(id: String, to title: String) async throws {
     try await requireBackend().rename(id: id, to: title)
   }
-  func setNotes(id: String, notes: String?) async throws {
-    try await requireBackend().setNotes(id: id, notes: notes)
+  func setNotes(id: String, notes: String?, from: String? = nil) async throws {
+    try await requireBackend().setNotes(id: id, notes: notes, from: from)
   }
   func acceptNotesProposal(id: String) async throws {
     try await requireBackend().acceptNotesProposal(id: id)
@@ -262,9 +263,10 @@ final class CloudKitProjectsBackend: ProjectsBackend {
     commitAndPush(entity, op: "rename")
   }
 
-  func setNotes(id: String, notes: String?) async throws {
+  func setNotes(id: String, notes: String?, from: String?) async throws {
     guard let entity = fetch(id: id) else { return }
     entity.notes = (notes?.isEmpty == true) ? nil : notes
+    TaskSyncEngine.shared.noteEditedNotes(.project, id, from: from)
     commitAndPush(entity, op: "setNotes")
   }
 

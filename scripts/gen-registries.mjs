@@ -180,6 +180,7 @@ function validateCapabilities(caps) {
 
 function validateSettings(settings, entities, icons, caps) {
   assert(settings.version === 2, "settings.json: version must be 2");
+  assert(/^https:\/\/[^\s]+[^/\s]$/.test(settings.helpURL ?? ""), "settings.json: helpURL must be an https URL with no trailing slash");
   const validTypes = new Set(["bool", "int", "enum", "string", "string[]", "record"]);
   const validScopes = new Set(["synced", "device"]);
   const validPlatforms = new Set(caps.platforms);
@@ -1096,6 +1097,8 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("");
   lines.push("/// Unified task-app settings keys, defaults, synced-key list, and taxonomy (`registry/settings.json`).");
   lines.push("enum RegistrySettings {");
+  lines.push("  /// The help center. Help rows and menu items open it or a page below it.");
+  lines.push(`  static let helpURL = URL(string: ${swiftStr(settings.helpURL)})!`);
   lines.push(`  static let syncedKeys: [String] = [${syncedKeys.map(swiftStr).join(", ")}]`);
   lines.push("");
   lines.push("  enum StorageKey {");
@@ -2131,6 +2134,7 @@ function generateTS({ entities, rules, icons, tokens, caps, settings, dests, act
   lines.push("");
   const syncedKeys = Object.entries(settings.keys).filter(([, v]) => v.scope === "synced").map(([k]) => k);
   lines.push(`export const SYNCED_SETTING_KEYS = ${JSON.stringify(syncedKeys)} as const;`);
+  lines.push(`export const HELP_URL = ${JSON.stringify(settings.helpURL)};`);
   lines.push(`export const SETTINGS_REGISTRY = ${JSON.stringify({ version: settings.version, keys: settings.keys, desktopTabs: settings.desktopTabs, rootGroups: settings.rootGroups, pages: settings.pages })} as const;`);
   lines.push(`export const VIEW_ALIASES = ${JSON.stringify(dests.viewAliases)} as const;`);
   lines.push(`export const DESTINATIONS = ${JSON.stringify(dests.destinations)} as const;`);
@@ -2325,6 +2329,11 @@ function generateKotlinCore(bundle) {
   };
 
   emitIdObject("RegistrySettingKeys", Object.keys(settings.keys));
+  lines.push("object RegistryLinks {");
+  lines.push("    /** The help center (`settings.json` `helpURL`). */");
+  lines.push(`    const val HELP: String = ${JSON.stringify(settings.helpURL)}`);
+  lines.push("}");
+  lines.push("");
   emitIdObject("RegistryDestinationIds", dests.destinations.map((destination) => destination.id));
   emitIdObject("RegistryActionIds", Object.keys(actions.actions));
   emitIdObject("RegistryCapabilityIds", Object.keys(caps.capabilities));

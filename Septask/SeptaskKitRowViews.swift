@@ -705,6 +705,27 @@ enum KitGlyph {
   /// picked up the right ink soon after a switch, but the sidebar sets its row
   /// images only on a structure reload — its project rings kept the
   /// light-mode `secondaryLabelColor` (near-black) on the dark sidebar.
+  /// The members of a shared project as initials. AppKit twin of
+  /// `MemberAvatars`.
+  static func members(_ share: ProjectShare, size: CGFloat = 24) -> NSImage {
+    var texts = share.members.prefix(MemberAvatars.limit).map(\.initials)
+    if share.members.count > MemberAvatars.limit { texts.append("+\(share.members.count - MemberAvatars.limit)") }
+    let step = size + 4
+    return draw(size: NSSize(width: size + step * CGFloat(max(texts.count - 1, 0)), height: size)) { rect in
+      for (i, text) in texts.enumerated() {
+        let circle = NSRect(x: CGFloat(i) * step, y: rect.minY, width: size, height: size)
+        NSColor.secondaryLabelColor.withAlphaComponent(0.18).setFill()
+        NSBezierPath(ovalIn: circle).fill()
+        let label = NSAttributedString(string: text, attributes: [
+          .font: NSFont.systemFont(ofSize: size * 0.4, weight: .semibold),
+          .foregroundColor: SeptaskKitTheme.inkSecondary,
+        ])
+        let bounds = label.size()
+        label.draw(at: NSPoint(x: circle.midX - bounds.width / 2, y: circle.midY - bounds.height / 2))
+      }
+    }
+  }
+
   private static func draw(size: NSSize, _ body: @escaping (NSRect) -> Void) -> NSImage {
     NSImage(size: size, flipped: false) { rect in
       body(rect)

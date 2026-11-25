@@ -940,6 +940,10 @@ private struct SeptaskAboutPane: View {
       } label: {
         label(item)
       }
+    case "open_help":
+      Link(destination: RegistrySettings.helpURL) {
+        label(item)
+      }
     case "send_feedback":
       Link(destination: URL(string: "mailto:mz@envisioning.com?subject=Septena%20feedback")!) {
         label(item)

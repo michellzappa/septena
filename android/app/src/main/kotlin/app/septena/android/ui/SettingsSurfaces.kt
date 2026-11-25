@@ -32,6 +32,7 @@ import app.septena.core.JsonValue
 import app.septena.core.RegistryCatalog
 import app.septena.core.RejectedSyncOperation
 import app.septena.core.SyncOperation
+import app.septena.core.generated.RegistryLinks
 import app.septena.core.generated.RegistrySettingKeys
 import app.septena.core.generated.RegistryTaskPageBlockIds
 import app.septena.core.stringValue
@@ -50,7 +51,7 @@ internal class SettingsSurfaceEnv(
 
 /** The custom surfaces this file renders; the others stay in SettingsScreen or their own files. */
 internal val SETTINGS_SURFACES = setOf(
-    "about_header", "open_source", "send_feedback", "privacy_explainer", "ai_explainer",
+    "about_header", "open_source", "open_help", "send_feedback", "privacy_explainer", "ai_explainer",
     "mcp_skills", "sync_diagnostics", "smart_lists_editor", "plus_offer", "calendar_detail",
     "reset_first_run", DELETE_ACCOUNT,
     "sign_in_approval", "claude_connector", "import_export",
@@ -68,6 +69,7 @@ internal fun SettingsCustomSurface(
     when (surface) {
         "about_header" -> AboutHeader(label, detail, context)
         "open_source" -> OpenSourceRow(label, detail) { openUrl(context, REPO_URL) }
+        "open_help" -> ActionRow(label) { openUrl(context, RegistryLinks.HELP) }
         "send_feedback" -> ActionRow(label) {
             if (!openUrl(context, FEEDBACK_URL)) {
                 copyToClipboard(context, label.orEmpty(), FEEDBACK_EMAIL)

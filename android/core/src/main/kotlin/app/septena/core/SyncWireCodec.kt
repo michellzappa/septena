@@ -25,13 +25,17 @@ object SyncWireCodec {
         return when (operation) {
             is SyncOperation.Upsert -> {
                 RegistryValidator.requireValidUpsert(operation.entity, operation.id, operation.fields, insert = null)
-                JsonValue.ObjectValue(linkedMapOf(
+                val encoded = linkedMapOf<String, JsonValue>(
                     "clientOpId" to JsonValue.StringValue(operation.clientOpId),
                     "op" to JsonValue.StringValue("upsert"),
                     "entity" to JsonValue.StringValue(operation.entity),
                     "id" to JsonValue.StringValue(operation.id),
                     "fields" to JsonValue.ObjectValue(operation.fields),
-                ))
+                )
+                operation.base?.let {
+                    encoded["base"] = JsonValue.ObjectValue(mapOf("notes" to JsonValue.stringOrNull(it.notes)))
+                }
+                JsonValue.ObjectValue(encoded)
             }
             is SyncOperation.Delete -> {
                 require(operation.entity in RegistryEntityNames.deletable) { "Entity '${operation.entity}' cannot be deleted" }
@@ -67,6 +71,7 @@ object SyncWireCodec {
                 entity = value.stringRequired("entity"),
                 id = value.stringRequired("id"),
                 fields = value.objectRequired("fields").fields,
+                base = value.objectAt("base")?.let { NotesBase(it.fields["notes"].stringValue()) },
             )
             "delete" -> SyncOperation.Delete(
                 clientOpId = clientOpId,

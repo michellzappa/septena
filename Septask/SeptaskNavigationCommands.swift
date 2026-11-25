@@ -238,6 +238,7 @@ private struct SmartListCommands: View {
 /// (`registry/actions.json`): the App, File, View, Task and Help items, their
 /// order, titles and shortcuts. This struct binds each action ID to a handler.
 struct SeptaskCommandMenus: Commands {
+  @Environment(\.openURL) private var openURL
   @FocusedValue(\.septaskNavigationActions) private var actions
   @FocusedValue(\.taskActions) private var taskActions
   @AppStorage(SettingsKey.textSizeStep) private var textSizeRaw = 0
@@ -367,11 +368,15 @@ struct SeptaskCommandMenus: Commands {
       // The registry gates Quick Add off macOS (Quick Entry covers capture).
       return .init(perform: actions.map { actions in { actions.showQuickAdd() } })
 
+    case .appHelp:
+      return .init { openURL(RegistrySettings.helpURL) }
+
     case .appKeyboardShortcuts:
       #if os(macOS)
-      // SwiftUI-window only: the AppKit shell has no shortcuts sheet, and a
-      // permanently disabled item is worse than none.
-      guard let actions else { return nil }
+      // The AppKit shell has no shortcuts sheet, so it opens the help page.
+      guard let actions else {
+        return .init { openURL(RegistrySettings.helpURL.appending(path: "keyboard-shortcuts")) }
+      }
       return .init { actions.showKeyboardShortcuts() }
       #else
       return .init(perform: actions.map { actions in { actions.showKeyboardShortcuts() } })
@@ -502,7 +507,8 @@ struct SeptaskCommandMenus: Commands {
 
     CommandGroup(replacing: .appSettings) { menuBar(.app) }
 
-    CommandGroup(after: .help) { menuBar(.help) }
+    // Replaces the system "Septena Help", which looks for a help book.
+    CommandGroup(replacing: .help) { menuBar(.help) }
 
     #if os(macOS)
     SeptaskMacAppCommands()

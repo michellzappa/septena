@@ -136,6 +136,7 @@ fun TaskHomeScreen(
     /** Join a Shared Project: the open dialog, and the token of the link that opened it. */
     var joinOpen by rememberSaveable { mutableStateOf(false) }
     var joinToken by rememberSaveable { mutableStateOf<String?>(null) }
+    var shareProjectId by rememberSaveable { mutableStateOf<String?>(null) }
     var quickFindOpen by rememberSaveable { mutableStateOf(false) }
     var settingsOpen by rememberSaveable { mutableStateOf(false) }
     // On mobile, opens on Today with the Lists Homepage one Back away (Things / iOS `SeptaskRootView`).
@@ -374,6 +375,20 @@ fun TaskHomeScreen(
         )
     }
 
+    shareProjectId?.let { id ->
+        ShareProjectDialog(
+            graph = graph,
+            projectId = id,
+            languageTag = languageTag,
+            onDismiss = { shareProjectId = null },
+            onEnded = {
+                if ((state.location as? TaskHomeLocation.Project)?.id == id) {
+                    selectHomeLocation(TaskHomeLocation.SmartList(RegistryDestinationIds.TODAY))
+                }
+            },
+        )
+    }
+
     if (joinOpen) {
         JoinSharedProjectDialog(
             graph = graph,
@@ -466,6 +481,11 @@ fun TaskHomeScreen(
                             onSelect = selectHomeLocation,
                             onSetAreaEmoji = homeViewModel::setAreaEmoji,
                             onOpenSettings = { settingsOpen = true },
+                            onShareProject = { shareProjectId = it },
+                            onJoinShared = {
+                                joinToken = null
+                                joinOpen = true
+                            },
                             modifier = Modifier.padding(top = 8.dp),
                         )
                     }
@@ -488,6 +508,7 @@ fun TaskHomeScreen(
                     TaskHomeScaffold(
                         graph = graph,
                         state = state,
+                        onShareProject = { shareProjectId = it },
                         title = pageTitle,
                         sidebarActionTitle = sidebarActionTitle,
                         quickAddTitle = quickAddTitle,
@@ -568,12 +589,14 @@ fun TaskHomeScreen(
                         joinToken = null
                         joinOpen = true
                     },
+                    onShareProject = { shareProjectId = it },
                     onRefresh = graph.sync::syncAndWait,
                 )
             } else {
                 TaskHomeScaffold(
                     graph = graph,
                     state = state,
+                    onShareProject = { shareProjectId = it },
                     title = pageTitle,
                     sidebarActionTitle = sidebarActionTitle,
                     quickAddTitle = quickAddTitle,
@@ -640,12 +663,17 @@ private fun SectionTitleDropdownHeader(
     settingsTitle: String,
     onSelectLocation: (TaskHomeLocation) -> Unit,
     onOpenSettings: () -> Unit,
+    onShareProject: (String) -> Unit,
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     val todayTint = MaterialTheme.colorScheme.secondary
     val mutedIcon = MaterialTheme.colorScheme.onSurfaceVariant
     val currentAreaEmoji = (state.location as? TaskHomeLocation.Area)?.let { area ->
         state.areas.firstOrNull { (it.location as? TaskHomeLocation.Area)?.id == area.id }?.emoji
+    }
+
+    val share = (state.location as? TaskHomeLocation.Project)?.let { project ->
+        state.projects.firstOrNull { (it.location as? TaskHomeLocation.Project)?.id == project.id }?.share
     }
 
     val (iconKind, iconTint) = when (val loc = state.location) {
@@ -672,10 +700,19 @@ private fun SectionTitleDropdownHeader(
                 bottom = 14.dp,
             ),
     ) {
+        share?.let {
+            ShareMembersRow(
+                share = it,
+                languageTag = languageTag,
+                onClick = { (state.location as? TaskHomeLocation.Project)?.id?.let(onShareProject) },
+                modifier = Modifier.align(Alignment.CenterEnd),
+            )
+        }
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(TaskCardMetrics.IconTextGap),
             modifier = Modifier
+                .padding(end = if (share != null) 132.dp else 0.dp)
                 .clip(RoundedCornerShape(10.dp))
                 .clickable { menuExpanded = true }
                 .padding(vertical = 4.dp),
@@ -894,6 +931,7 @@ private fun SectionTitleDropdownHeader(
 private fun TaskHomeScaffold(
     graph: AndroidAppGraph,
     state: TaskHomeUiState,
+    onShareProject: (String) -> Unit,
     title: String,
     sidebarActionTitle: String,
     quickAddTitle: String,
@@ -1121,6 +1159,7 @@ private fun TaskHomeScaffold(
             settingsTitle = settingsTitle,
             onSelectLocation = onSelectHomeLocation,
             onOpenSettings = onOpenSettings,
+            onShareProject = onShareProject,
         )
         val noticedDo = doing.current?.takeIf { doing.showsNotice }
         val needsYou = doing.endedSince?.let { since -> state.agentRequestTimes.count { !it.isBefore(since) } } ?: 0

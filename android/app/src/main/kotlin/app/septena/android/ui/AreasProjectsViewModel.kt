@@ -5,6 +5,8 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import app.septena.android.AndroidAppGraph
 import app.septena.core.JsonValue
+import app.septena.core.NotesBase
+import app.septena.core.ProjectShare
 import app.septena.core.RegistryCatalog
 import app.septena.core.TaskFadeRules
 import app.septena.core.TaskSnapshot
@@ -44,6 +46,7 @@ data class PlaceProjectRow(
     val title: String,
     val progress: Float = 0f,
     val openCount: Int = 0,
+    val share: ProjectShare? = null,
 )
 data class PlaceTaskRow(
     val id: String,
@@ -123,7 +126,8 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         }
     }
 
-    fun saveNotes(notes: String) {
+    /** [base]: the notes the editor started from. */
+    fun saveNotes(notes: String, base: String) {
         val selected = destination.value ?: return
         mutate {
             val field = when (selected) {
@@ -134,6 +138,7 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                 selected.entityName(),
                 selected.id,
                 mapOf(field to JsonValue.stringOrNull(notes)),
+                notesBase = NotesBase(base.ifEmpty { null }),
             ) != null
         }
     }
@@ -370,7 +375,9 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                             val (open, done) = projectStats[record.id] ?: (0 to 0)
                             val total = open + done
                             val progress = if (total > 0) done.toFloat() / total.toFloat() else 0f
-                            record to PlaceProjectRow(record.id, name, progress = progress, openCount = open)
+                            record to PlaceProjectRow(
+                                record.id, name, progress = progress, openCount = open, share = ProjectShare.of(record),
+                            )
                         }
                     }
                     .sortedWith(compareBy({ it.first.fields[RegistryEntityFields.Project.POSITION].numberValue() ?: Double.MAX_VALUE }, { it.second.title.lowercase() }))

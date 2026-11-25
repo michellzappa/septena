@@ -1009,7 +1009,8 @@ struct SidebarRootView: View {
     cardRow(.project(id: project.id)) {
       SidebarProjectRow(name: project.title,
                         progress: projectProgress[project.id] ?? 0,
-                        count: projectOpenCount[project.id] ?? 0)
+                        count: projectOpenCount[project.id] ?? 0,
+                        share: project.share)
     } menu: {
       projectMenu(project)
     }
@@ -1017,7 +1018,8 @@ struct SidebarRootView: View {
     navRow(.project(id: project.id)) {
       SidebarProjectRow(name: project.title,
                         progress: projectProgress[project.id] ?? 0,
-                        count: projectOpenCount[project.id] ?? 0)
+                        count: projectOpenCount[project.id] ?? 0,
+                        share: project.share)
     }
     .contextMenu { projectMenu(project) }
     #endif
@@ -1763,6 +1765,7 @@ struct SidebarProjectRow: View {
   var tint: Color = Theme.inkSecondary
   /// Open task count — muted gray, right-aligned alongside the pie.
   var count: Int = 0
+  var share: ProjectShare? = nil
 
   var body: some View {
     HStack(spacing: Theme.sidebarRowSpacing) {
@@ -1773,6 +1776,12 @@ struct SidebarProjectRow: View {
       Text(name)
         .scaledFont(size: Theme.sidebarTitleSize, weight: Theme.sidebarTitleWeight)
         .foregroundStyle(SidebarRowTitleStyle.color)
+      if let share {
+        Image(systemName: RegistryIcons.sfSymbol(for: "project.shared"))
+          .scaledFont(size: 11)
+          .foregroundStyle(Theme.inkSecondary)
+          .accessibilityLabel(share.membersLabel)
+      }
       Spacer()
       SidebarCount(count: count)
     }
