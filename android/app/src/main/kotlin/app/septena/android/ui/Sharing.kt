@@ -56,11 +56,11 @@ private val sharing: JsonValue.ObjectValue?
 private fun sharingTitle(languageTag: String): String =
     registryText(sharing?.fields?.get("title").stringValue(), languageTag)
 
-/** The ids of surfaces.json `sharing.copy`: an entry's name is its id. */
+/** The ids of surfaces.json `sharing.copy`: an entry's name is its id, except `name`, which every enum owns. */
 @Suppress("EnumEntryName")
-internal enum class SharingCopy {
+internal enum class SharingCopy(private val key: String? = null) {
     intro,
-    name,
+    memberName("name"),
     start,
     members,
     owner,
@@ -85,12 +85,15 @@ internal enum class SharingCopy {
     signInFirst,
     failed,
     nobody,
+    ;
+
+    val id: String get() = key ?: name
 }
 
 /** One line of surfaces.json `sharing.copy`, localized. */
 internal fun sharingCopy(id: SharingCopy, languageTag: String): String {
     val entries = (sharing?.fields?.get("copy") as? JsonValue.ArrayValue)?.values.orEmpty()
-    val entry = entries.firstOrNull { (it as? JsonValue.ObjectValue)?.fields?.get("id").stringValue() == id.name }
+    val entry = entries.firstOrNull { (it as? JsonValue.ObjectValue)?.fields?.get("id").stringValue() == id.id }
         as? JsonValue.ObjectValue
     return registryText(entry?.fields?.get("label").stringValue(), languageTag)
 }
@@ -214,7 +217,7 @@ internal fun ShareProjectDialog(
                     !loaded -> CircularProgressIndicator()
                     current == null -> {
                         Text(copy(SharingCopy.intro))
-                        NameField(name, copy(SharingCopy.name), enabled = !working) { name = it }
+                        NameField(name, copy(SharingCopy.memberName), enabled = !working) { name = it }
                         TextButton(
                             enabled = !working && name.isNotBlank(),
                             onClick = {
@@ -387,7 +390,7 @@ internal fun JoinSharedProjectDialog(
                     if (found != null) {
                         Text(found.title, style = MaterialTheme.typography.titleMedium)
                         if (found.from.isNotBlank()) Text("${copy(SharingCopy.sharedBy)} ${found.from}")
-                        NameField(name, copy(SharingCopy.name), enabled = !working) { name = it }
+                        NameField(name, copy(SharingCopy.memberName), enabled = !working) { name = it }
                         Text(
                             copy(SharingCopy.joinDetail),
                             style = MaterialTheme.typography.bodySmall,
