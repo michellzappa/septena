@@ -122,6 +122,9 @@ final class SeptaskKitTaskListController: NSViewController {
     /// Return, ⌘K, type-select, right-click) that is never a task. Every task
     /// command reads `task`, which is nil here, so it does nothing.
     case noticeStep(TaskNoticeStep)
+    /// An agent's proposed brief update, rendered directly above the notes row
+    /// (`KitNotesProposalCell`, ADR 0012, #123). Not selectable.
+    case notesProposal(isArea: Bool, id: String, currentNotes: String, proposal: NotesProposal)
     /// The project's or area's notes, under the page title
     /// (`KitContainerNotesCell`, ADR 0012). Not selectable: it carries no
     /// task, and a click opens its editor popover.
@@ -143,6 +146,7 @@ final class SeptaskKitTaskListController: NSViewController {
       case .notice(let notice): return "notice:" + notice.id.rawValue
       case .noticeStep(let step): return step.selectionID
       case .importAllReminders: return "import-all-reminders"
+      case .notesProposal: return "notes-proposal"
       case .containerNotes: return "container-notes"
       }
     }
@@ -170,7 +174,7 @@ final class SeptaskKitTaskListController: NSViewController {
     /// so they break the card run the same way a Today area/project header does.
     var isCardRow: Bool {
       switch self {
-      case .header, .screenTitle, .tagFilterBar, .fadedFooter, .loggedFooter, .addSection, .containerNotes: return false
+      case .header, .screenTitle, .tagFilterBar, .fadedFooter, .loggedFooter, .addSection, .notesProposal, .containerNotes: return false
       // A standalone notice sits on the page with its own card fill. A notice
       // with checklist steps (`Get started`) heads its steps' card so the
       // header and rows share one seamless frosted surface (matching iOS).
@@ -803,9 +807,15 @@ final class SeptaskKitTaskListController: NSViewController {
     let width = tableView.bounds.width
     guard abs(width - notesRowMeasuredWidth) > 0.5 else { return }
     notesRowMeasuredWidth = width
-    guard let index = rows.firstIndex(where: { if case .containerNotes = $0 { return true }; return false }),
-          index < tableView.numberOfRows else { return }
-    tableView.noteHeightOfRows(withIndexesChanged: [index])
+    let indexes = IndexSet(rows.indices.filter { idx in
+      guard idx < tableView.numberOfRows else { return false }
+      switch rows[idx] {
+      case .containerNotes, .notesProposal: return true
+      default: return false
+      }
+    })
+    guard !indexes.isEmpty else { return }
+    tableView.noteHeightOfRows(withIndexesChanged: indexes)
   }
 
   deinit {
@@ -1999,17 +2009,29 @@ final class SeptaskKitTaskListController: NSViewController {
     }
   }
 
-  /// The notes row under a project's or area's title — on every such page,
-  /// empty or not, so the notes are always one click away (ADR 0012).
+  /// The notes row (plus any open proposal card directly above it) under a
+  /// project's or area's title — always one click away (ADR 0012).
   private func containerNotesRows() -> [Row] {
     let snapshot = StructureCache.snapshot(in: context)
     switch filter {
     case .project(let id):
       guard let project = snapshot.projects.first(where: { $0.id == id }) else { return [] }
-      return [.containerNotes(isArea: false, id: id, text: project.notes ?? "")]
+      let text = project.notes ?? ""
+      var out: [Row] = []
+      if let proposal = project.notesProposal {
+        out.append(.notesProposal(isArea: false, id: id, currentNotes: text, proposal: proposal))
+      }
+      out.append(.containerNotes(isArea: false, id: id, text: text))
+      return out
     case .area(let id):
       guard let area = snapshot.areas.first(where: { $0.id == id }) else { return [] }
-      return [.containerNotes(isArea: true, id: id, text: area.context ?? "")]
+      let text = area.context ?? ""
+      var out: [Row] = []
+      if let proposal = area.notesProposal {
+        out.append(.notesProposal(isArea: true, id: id, currentNotes: text, proposal: proposal))
+      }
+      out.append(.containerNotes(isArea: true, id: id, text: text))
+      return out
     default:
       return []
     }
@@ -2018,7 +2040,14 @@ final class SeptaskKitTaskListController: NSViewController {
   /// Opens the notes editor anchored to the notes row; closing it saves
   /// through the same mutators the SwiftUI project and area pages use.
   private func editContainerNotes(isArea: Bool, id: String, text: String, anchor: NSView) {
-    KitContainerNotesPopover.present(isArea: isArea, notes: text, relativeTo: anchor) { [weak self] newText in
+    KitContainerNotesPopover.present(
+      isArea: isArea,
+      notes: text,
+      relativeTo: anchor,
+      onHistory: { [weak self] in
+        self?.showContainerNotesHistory(isArea: isArea, id: id)
+      }
+    ) { [weak self] newText in
       let value: String? = newText.isEmpty ? nil : newText
       Task { @MainActor in
         do {
@@ -2029,6 +2058,102 @@ final class SeptaskKitTaskListController: NSViewController {
           }
         } catch {
           SeptenaLog.error("[notes] save failed for \(isArea ? "area" : "project") \(id)", error)
+        }
+        self?.reload()
+      }
+    }
+  }
+
+  private func acceptContainerNotesProposal(isArea: Bool, id: String, currentNotes: String, proposal: NotesProposal) {
+    let before: String? = currentNotes.isEmpty ? nil : currentNotes
+    let merged = ContainerNotes.replacingBrief(in: before, with: proposal.body)
+    let after: String? = merged.isEmpty ? nil : merged
+    if isArea {
+      TaskUndo.recordAreaProposalDecision(
+        id: id, accepted: true, beforeNotes: before, afterNotes: after,
+        proposal: proposal, areas: SeptenaServices.shared.areasMutator)
+    } else {
+      TaskUndo.recordProjectProposalDecision(
+        id: id, accepted: true, beforeNotes: before, afterNotes: after,
+        proposal: proposal, projects: SeptenaServices.shared.projectsMutator)
+    }
+    Task { @MainActor in
+      do {
+        if isArea {
+          try await SeptenaServices.shared.areasMutator.acceptNotesProposal(id: id)
+        } else {
+          try await SeptenaServices.shared.projectsMutator.acceptNotesProposal(id: id)
+        }
+      } catch {
+        SeptenaLog.error("[notes] accept proposal failed for \(isArea ? "area" : "project") \(id)", error)
+      }
+      self.reload()
+    }
+  }
+
+  private func rejectContainerNotesProposal(isArea: Bool, id: String, currentNotes: String, proposal: NotesProposal) {
+    let current: String? = currentNotes.isEmpty ? nil : currentNotes
+    if isArea {
+      TaskUndo.recordAreaProposalDecision(
+        id: id, accepted: false, beforeNotes: current, afterNotes: current,
+        proposal: proposal, areas: SeptenaServices.shared.areasMutator)
+    } else {
+      TaskUndo.recordProjectProposalDecision(
+        id: id, accepted: false, beforeNotes: current, afterNotes: current,
+        proposal: proposal, projects: SeptenaServices.shared.projectsMutator)
+    }
+    Task { @MainActor in
+      do {
+        if isArea {
+          try await SeptenaServices.shared.areasMutator.rejectNotesProposal(id: id)
+        } else {
+          try await SeptenaServices.shared.projectsMutator.rejectNotesProposal(id: id)
+        }
+      } catch {
+        SeptenaLog.error("[notes] reject proposal failed for \(isArea ? "area" : "project") \(id)", error)
+      }
+      self.reload()
+    }
+  }
+
+  private func showContainerNotesHistory(isArea: Bool, id: String) {
+    let snapshot = StructureCache.snapshot(in: context)
+    let title: String
+    let currentNotes: String
+    if isArea {
+      let area = snapshot.areas.first(where: { $0.id == id })
+      title = area?.title ?? ""
+      currentNotes = area?.context ?? ""
+    } else {
+      let project = snapshot.projects.first(where: { $0.id == id })
+      title = project?.title ?? ""
+      currentNotes = project?.notes ?? ""
+    }
+    KitNotesHistorySheet.present(
+      container: isArea ? .area : .project,
+      id: id,
+      title: title,
+      currentNotes: currentNotes,
+      from: self
+    ) { [weak self] restored in
+      let before: String? = currentNotes.isEmpty ? nil : currentNotes
+      let after: String? = restored.isEmpty ? nil : restored
+      if isArea {
+        TaskUndo.recordAreaNotesRestore(id: id, before: before, after: after,
+                                        areas: SeptenaServices.shared.areasMutator)
+      } else {
+        TaskUndo.recordProjectNotesRestore(id: id, before: before, after: after,
+                                           projects: SeptenaServices.shared.projectsMutator)
+      }
+      Task { @MainActor in
+        do {
+          if isArea {
+            try await SeptenaServices.shared.areasMutator.setContext(id: id, context: after)
+          } else {
+            try await SeptenaServices.shared.projectsMutator.setNotes(id: id, notes: after)
+          }
+        } catch {
+          SeptenaLog.error("[notes] restore failed for \(isArea ? "area" : "project") \(id)", error)
         }
         self?.reload()
       }
@@ -4864,6 +4989,11 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
     case .newTask: return SeptaskKitTheme.rowHeight
     // Same band as the logged footer — both are quiet meta-font page footers.
     case .addSection: return SeptenaTypeScale.size(.footnote) + 24
+    case .notesProposal(_, _, let currentNotes, let proposal):
+      return KitNotesProposalLayout.height(
+        currentNotes: currentNotes,
+        proposal: proposal,
+        rowWidth: tableView.bounds.width)
     case .containerNotes(let isArea, _, let text):
       return KitContainerNotes.height(
         text: text,
@@ -5501,6 +5631,19 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       cell.onTap = { [weak self] in self?.menuNewSection() }
       return cell
 
+    case .notesProposal(let isArea, let id, let currentNotes, let proposal):
+      let identifier = NSUserInterfaceItemIdentifier("notesProposalCell")
+      let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? KitNotesProposalCell
+        ?? KitNotesProposalCell(identifier: identifier)
+      cell.configure(currentNotes: currentNotes, proposal: proposal)
+      cell.onAccept = { [weak self] in
+        self?.acceptContainerNotesProposal(isArea: isArea, id: id, currentNotes: currentNotes, proposal: proposal)
+      }
+      cell.onReject = { [weak self] in
+        self?.rejectContainerNotesProposal(isArea: isArea, id: id, currentNotes: currentNotes, proposal: proposal)
+      }
+      return cell
+
     case .containerNotes(let isArea, let id, let text):
       let identifier = NSUserInterfaceItemIdentifier("containerNotesCell")
       let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? KitContainerNotesCell
@@ -5509,6 +5652,9 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
                      placeholder: isArea ? ContainerNotes.areaPlaceholder : ContainerNotes.projectPlaceholder)
       cell.onEdit = { [weak self] anchor in
         self?.editContainerNotes(isArea: isArea, id: id, text: text, anchor: anchor)
+      }
+      cell.onHistory = { [weak self] in
+        self?.showContainerNotesHistory(isArea: isArea, id: id)
       }
       return cell
 

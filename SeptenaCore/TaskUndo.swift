@@ -817,4 +817,66 @@ enum TaskUndo {
              if let next = store.removeForUndo(id: live.id) { live = next }
            })
   }
+
+  // MARK: - Project & area notes (proposals & history restore, #123)
+
+  static func recordProjectNotesRestore(id: String,
+                                        before: String?,
+                                        after: String?,
+                                        projects: ProjectsMutator) {
+    guard (before ?? "") != (after ?? "") else { return }
+    record(name: ContainerNotesCopy.undoRestoreName,
+           undo: { Task { @MainActor in try? await projects.setNotes(id: id, notes: before) } },
+           redo: { Task { @MainActor in try? await projects.setNotes(id: id, notes: after) } })
+  }
+
+  static func recordAreaNotesRestore(id: String,
+                                     before: String?,
+                                     after: String?,
+                                     areas: AreasMutator) {
+    guard (before ?? "") != (after ?? "") else { return }
+    record(name: ContainerNotesCopy.undoRestoreName,
+           undo: { Task { @MainActor in try? await areas.setContext(id: id, context: before) } },
+           redo: { Task { @MainActor in try? await areas.setContext(id: id, context: after) } })
+  }
+
+  static func recordProjectProposalDecision(id: String,
+                                            accepted: Bool,
+                                            beforeNotes: String?,
+                                            afterNotes: String?,
+                                            proposal: NotesProposal,
+                                            projects: ProjectsMutator) {
+    let name = accepted ? ContainerNotesCopy.undoAcceptProposalName : ContainerNotesCopy.undoRejectProposalName
+    record(name: name,
+           undo: {
+             Task { @MainActor in
+               try? await projects.restoreNotesState(id: id, notes: beforeNotes, proposal: proposal)
+             }
+           },
+           redo: {
+             Task { @MainActor in
+               try? await projects.restoreNotesState(id: id, notes: afterNotes, proposal: nil)
+             }
+           })
+  }
+
+  static func recordAreaProposalDecision(id: String,
+                                         accepted: Bool,
+                                         beforeNotes: String?,
+                                         afterNotes: String?,
+                                         proposal: NotesProposal,
+                                         areas: AreasMutator) {
+    let name = accepted ? ContainerNotesCopy.undoAcceptProposalName : ContainerNotesCopy.undoRejectProposalName
+    record(name: name,
+           undo: {
+             Task { @MainActor in
+               try? await areas.restoreNotesState(id: id, context: beforeNotes, proposal: proposal)
+             }
+           },
+           redo: {
+             Task { @MainActor in
+               try? await areas.restoreNotesState(id: id, context: afterNotes, proposal: nil)
+             }
+           })
+  }
 }
