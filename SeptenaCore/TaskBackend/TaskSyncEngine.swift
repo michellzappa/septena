@@ -43,6 +43,11 @@ import SwiftData
 final class TaskSyncEngine {
   static let shared = TaskSyncEngine()
 
+  /// Notes a pull replaced on this device, per row, since launch.
+  @ObservationIgnored private var replacedNotes: [String: [String]] = [:]
+  /// The base of a notes write that is saved but not captured yet.
+  @ObservationIgnored private var editedNotes: [String: String] = [:]
+
   // MARK: Status (observable, for the settings pane)
 
   private(set) var signedIn: Bool = TaskBackendClient.hasSession
@@ -533,7 +538,7 @@ final class TaskSyncEngine {
     } else {
       for (k, v) in mapped where (old[k] ?? .null).canonical != v.canonical { patch[k] = v }
     }
-    if !patch.isEmpty { enqueueUpsert(.task, id, patch, store: store) }
+    if !patch.isEmpty { enqueueUpsert(.task, id, withNotesBase(patch, key: key, old: old), store: store) }
     for (k, v) in mapped { base[k] = v }
     base["_deleted"] = .bool(false)
     writeShadow(shadow, key, old: old, new: base, store: store)
@@ -685,7 +690,9 @@ final class TaskSyncEngine {
       // Task and key are fixed at insert (registry/entities.json, `updatable`).
       patch = patch.filter { $0.key == "role" || $0.key == "snapshot" || $0.key == "position" }
     }
-    if !patch.isEmpty { enqueueUpsert(entity, id, patch, store: store) }
+    if !patch.isEmpty {
+      enqueueUpsert(entity, id, entity == .project ? withNotesBase(patch, key: key, old: old) : patch, store: store)
+    }
     var nextShadow = mapped
     if entity == .attachment {
       // Preserve local-only / server-upload state stored alongside the shadow.
@@ -705,12 +712,48 @@ final class TaskSyncEngine {
     if let last = store.lastRowOp(entity: entity.rawValue, rowID: id),
        last.kind == TaskSyncOpKind.upsert, !last.sent {
       var merged = TaskSyncJSON.decode(last.payload)
+      // The op still starts from the text its first edit started from.
+      let base = merged[Self.notesBaseKey]
       for (k, v) in fields { merged[k] = v }
+      if let base { merged[Self.notesBaseKey] = base }
       last.payload = TaskSyncJSON.encode(merged)
       store.saveSoon()
     } else {
       store.append(kind: TaskSyncOpKind.upsert, entity: entity.rawValue, rowID: id, payload: fields)
     }
+  }
+
+  // MARK: Notes base
+
+  /// Beside the fields of a queued upsert: the notes that edit started from.
+  /// The backend merges when somebody else changed them meanwhile
+  /// (docs/PROJECT_SHARING_SPEC.md §5a).
+  static let notesBaseKey = "_notesBase"
+
+  private func withNotesBase(_ patch: [String: BackendJSON], key: String,
+                             old: [String: BackendJSON]) -> [String: BackendJSON] {
+    guard patch["notes"] != nil else { return patch }
+    var out = patch
+    out[Self.notesBaseKey] = editedNotes.removeValue(forKey: key).map { $0.isEmpty ? .null : .string($0) }
+      ?? old["notes"] ?? .null
+    return out
+  }
+
+  /// A pull replaced these notes. An editor that was open then still holds
+  /// them as the text it started from.
+  func noteReplacedNotes(_ key: String, old: String?, new: String?) {
+    guard (old ?? "") != (new ?? "") else { return }
+    replacedNotes[key, default: []].append(old ?? "")
+  }
+
+  /// An editor saves notes it opened as `text`. Only a text that a pull has
+  /// replaced since counts; otherwise the last synced notes are the base.
+  func noteEditedNotes(_ entity: BackendEntity, _ id: String, from text: String?) {
+    guard let text else { return }
+    let key = "\(entity.rawValue):\(id)"
+    func plain(_ s: String) -> String { s.trimmingCharacters(in: .whitespacesAndNewlines) }
+    guard let index = replacedNotes[key]?.lastIndex(where: { plain($0) == plain(text) }) else { return }
+    editedNotes[key] = replacedNotes[key]?.remove(at: index)
   }
 
   private func queueDeleteIfNeeded(_ entity: BackendEntity, _ id: String, hold: Bool = false,
@@ -990,7 +1033,9 @@ final class TaskSyncEngine {
     default:
       body["entity"] = .string(op.opEntity)
       body["id"] = .string(op.rowID)
-      body["fields"] = .object(TaskSyncJSON.decode(op.payload))
+      var fields = TaskSyncJSON.decode(op.payload)
+      if let base = fields.removeValue(forKey: Self.notesBaseKey) { body["base"] = .object(["notes": base]) }
+      body["fields"] = .object(fields)
     }
     return BackendOp(clientOpId: op.clientOpId, body: .object(body), entity: entity, id: op.rowID)
   }

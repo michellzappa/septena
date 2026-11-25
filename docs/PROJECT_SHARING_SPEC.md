@@ -134,8 +134,8 @@ therefore valid for its own account only.
   Sharing or Leave.
 - New menu ▸ Join a Shared Project…, and the invite link.
 - A shared project has a people mark (`project.shared`) in the project list and
-  the sidebar. Its page shows the members' initials under the title; they open
-  Share Project…, which is also in the page's menu.
+  the sidebar. Its page shows the members' initials (3, then "+n") at the end of
+  the title; they open Share Project…, which is also in the page's menu.
 - Task row menu ▸ Assign To; a row shows the assignee when it is not you.
 - Delete is hidden on a shared project. An area delete moves it out.
 - Copy, actions and icons: `registry/` (`sharing`, `project.share`,

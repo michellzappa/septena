@@ -599,17 +599,19 @@ final class TaskMutator {
   }
 
   /// False when the write did not land (CK not bound yet, the row is gone, or
-  /// the save was rolled back). Every caller that would DESTROY the row on the
+  /// the save was rolled back). `notesFrom`: the notes the editor opened with,
+  /// so that an edit made elsewhere meanwhile is merged, not overwritten. Every
+  /// caller that would DESTROY the row on the
   /// strength of this write must check the result — see `lastWriteFailed(id:)`
   /// for the paths that can only consult it later.
   @discardableResult
-  func update(id: String, title: String? = nil, notes: String? = nil) -> Bool {
+  func update(id: String, title: String? = nil, notes: String? = nil, notesFrom: String? = nil) -> Bool {
     guard let cloudBackend else {
       SeptenaLog.error("[TaskMutator] update called before CK bound — dropping", nil)
       noteWriteFailed(id)
       return false
     }
-    let ok = cloudBackend.update(id: id, title: title, notes: notes)
+    let ok = cloudBackend.update(id: id, title: title, notes: notes, notesFrom: notesFrom)
     if ok { failedWriteIDs.remove(id) } else { noteWriteFailed(id) }
     return ok
   }

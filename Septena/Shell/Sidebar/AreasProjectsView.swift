@@ -679,6 +679,14 @@ struct ProjectDetailView: View {
               }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            if let share = project.share {
+              Button { SeptaskSharing.present(projectID: project.id) } label: {
+                MemberAvatars(share: share)
+                  .frame(minHeight: 44)
+                  .contentShape(Rectangle())
+              }
+              .buttonStyle(.plain)
+            }
           }
           if let proposal = notesProposal {
             NotesProposalCard(
@@ -828,6 +836,12 @@ struct ProjectDetailView: View {
         Label("Move to Area…", systemImage: "folder")
       }
       Button {
+        SeptaskSharing.present(projectID: project.id)
+      } label: {
+        Label(RegistryActions.title(.projectShare), systemImage: RegistryIcons.sfSymbol(for: "action.share_project"))
+      }
+      Divider()
+      Button {
         setStatus(.done)
       } label: {
         Label(RegistryActions.title(.projectMarkDone), systemImage: "checkmark.circle")
@@ -837,11 +851,14 @@ struct ProjectDetailView: View {
       } label: {
         Label(RegistryActions.title(.projectCancel), systemImage: "xmark.circle")
       }
-      Divider()
-      Button(role: .destructive) {
-        showingDeleteConfirm = true
-      } label: {
-        Label(RegistryActions.title(.projectDelete), systemImage: "trash")
+      // A shared project ends from its Share screen.
+      if project.share == nil {
+        Divider()
+        Button(role: .destructive) {
+          showingDeleteConfirm = true
+        } label: {
+          Label(RegistryActions.title(.projectDelete), systemImage: "trash")
+        }
       }
     }
   }
@@ -917,9 +934,10 @@ struct ProjectDetailView: View {
 
   private func commitNotes() {
     guard draftNotes != originalNotes else { return }
+    let from = originalNotes
     originalNotes = draftNotes
     Task {
-      do { try await projectsMutator.setNotes(id: project.id, notes: draftNotes) }
+      do { try await projectsMutator.setNotes(id: project.id, notes: draftNotes, from: from) }
       catch { errorMessage = error.localizedDescription }
     }
   }
