@@ -15,7 +15,7 @@ import {
 } from "../rpc.js";
 import { TURN_FIELDS } from "../generated/registries.js";
 import { zId } from "../store/columns.js";
-import type { Row, TaskLinkRow } from "../store/TaskStore.js";
+import type { Doing, Row, TaskLinkRow } from "../store/TaskStore.js";
 import { isValidTz, todayYMD } from "../tz.js";
 import { TASK_TOOLS } from "../tools/taskTools.js";
 import {

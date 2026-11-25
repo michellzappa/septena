@@ -22,6 +22,7 @@ function makeRpcStore(store: Awaited<ReturnType<typeof createTestTaskStore>>["st
     readTags: async () => store.readTags(),
     readTagByName: async (name: string) => store.readTagByName(name),
     readOrderTop: async () => store.readOrderTop(),
+    readDoing: async () => store.readDoing(),
     readSetting: async (key: string) => store.readSetting(key),
     push: async (ops: Parameters<typeof store.push>[0], actor: string) => store.push(ops, actor),
   };

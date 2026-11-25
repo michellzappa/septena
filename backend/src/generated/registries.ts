@@ -26,6 +26,8 @@ export const ENTITY_LIMITS = {
   maxRefsPerTask: 20,
   refKeyMax: 1000,
   refSnapshotMax: 2048,
+  doPlannedMinutesMax: 240,
+  doNoteMax: 500,
   maxArtifactRefs: 100,
   turnProviderMax: 32,
   turnQuestionMax: 10000,
@@ -60,7 +62,7 @@ export const ENTITY_ENUMS = {
 
 export const TURN_FIELDS = ["role","step","provider","confidence","question","options","chosen","otherText","inReplyTo","note","ts"] as const;
 
-export const DELETABLE_ENTITIES = ["task","area","project","attachment","checklistItem","taskRef","tag"] as const;
+export const DELETABLE_ENTITIES = ["task","area","project","attachment","checklistItem","taskRef","tag","doSession"] as const;
 
 export const DOMAIN_RULES = {
   cueDecayDays: 7,

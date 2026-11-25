@@ -322,6 +322,15 @@ async function push(store: StoreRpc, actor: string | undefined, ops: NewOp[]): P
   return result.results;
 }
 
+/// One push by a person's client. Throws when an op was refused.
+export async function pushOps(ctx: WriteContext, ops: NewOp[]): Promise<void> {
+  const results = await push(ctx.store, ctx.actor, ops);
+  for (const r of results) {
+    if (r.status === "rejected") throw new Error(/unknown_task|missing_required/.test(r.reason) ? "Task not found" : r.reason);
+    if (r.status === "dropped") throw new Error("Task not found");
+  }
+}
+
 /// The ops with their clientOpIds, checked.
 function mintOps(ops: NewOp[]): Op[] {
   const base = `mcp-${randomId(12)}`;

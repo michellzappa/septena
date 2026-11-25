@@ -64,6 +64,14 @@
     "RegistryRules.doLapseHours": {
       "reason": "The shared core applies it (resolve_do_sessions).",
       "issue": "#517"
+    },
+    "RegistryEntityLimits.doPlannedMinutesMax": {
+      "reason": "Do (ADR 0041): the client half reads it.",
+      "issue": "#517"
+    },
+    "RegistryEntityLimits.doNoteMax": {
+      "reason": "Do (ADR 0041): the client half reads it.",
+      "issue": "#517"
     }
   },
   "ts": {
@@ -239,6 +247,38 @@
     },
     "RegistryRules.DO_LAPSE_HOURS": {
       "reason": "The shared core applies it (resolve_do_sessions).",
+      "issue": "#517"
+    },
+    "RegistryEntityFields.DoSession.STARTED_AT": {
+      "reason": "Do (ADR 0041): the client half reads it.",
+      "issue": "#517"
+    },
+    "RegistryEntityFields.DoSession.PLANNED_MINUTES": {
+      "reason": "Do (ADR 0041): the client half reads it.",
+      "issue": "#517"
+    },
+    "RegistryEntityFields.DoSession.CONFIRMED_AT": {
+      "reason": "Do (ADR 0041): the client half reads it.",
+      "issue": "#517"
+    },
+    "RegistryEntityFields.DoSession.ENDED_AT": {
+      "reason": "Do (ADR 0041): the client half reads it.",
+      "issue": "#517"
+    },
+    "RegistryEntityFields.DoSession.EXIT": {
+      "reason": "Do (ADR 0041): the client half reads it.",
+      "issue": "#517"
+    },
+    "RegistryEntityFields.DoSession.LAPSED": {
+      "reason": "Do (ADR 0041): the client half reads it.",
+      "issue": "#517"
+    },
+    "RegistryEntityFields.DoSession.NOTE": {
+      "reason": "Do (ADR 0041): the client half reads it.",
+      "issue": "#517"
+    },
+    "RegistryEntityNames.DO_SESSION": {
+      "reason": "Do (ADR 0041): the client half reads it.",
       "issue": "#517"
     }
   }

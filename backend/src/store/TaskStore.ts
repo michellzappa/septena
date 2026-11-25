@@ -16,7 +16,7 @@ import {
   type EntitySpec,
   type RefSnapshot,
 } from "./columns.js";
-import { CoreInputError, findIssueRefs, parseRef, taskRefId, type CoreRef } from "../core/index.js";
+import { CoreInputError, doEndWins, findIssueRefs, parseRef, resolveDoSessions, taskRefId, type CoreDoSession, type CoreRef } from "../core/index.js";
 import type { Op, OpResult, PullResult, PushResult, Turn } from "./ops.js";
 import type { EntitlementRow } from "../entitlement/entitlement.js";
 import type { IcalTask } from "../ical.js";
@@ -76,7 +76,7 @@ export interface ChangeEntry {
 /// not a transient error to retry.
 export type ClaimRefusal =
   | "not_found" | "closed" | "terminal" | "stopped" | "paused"
-  | "your_turn" | "held" | "budget";
+  | "your_turn" | "held" | "budget" | "doing";
 
 export type ClaimResult =
   | { ok: true; holder: string; claimUntil: string; renewed: boolean; runsSinceUser: number }

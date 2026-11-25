@@ -186,7 +186,7 @@ MCP tools, on the api.septena.app connector only (ADR 0008):
 |---|---|
 | `tasks_claim(id, agent, ttlMinutes?, why?)` | Takes or renews the claim. Refuses with a rule: `paused`, `stopped`, `your_turn`, `held`, `budget`, `terminal`, `closed`, `not_found`. The DO serializes, so two agents cannot both win. |
 | `tasks_release(id, agent, why)` | Clears the agent's own claim. `why` goes to the activity log. |
-| `tasks_agent_events(since?, limit?)` | Pointer events since a cursor: `assigned`, `user_turn`, `stopped`, `resumed`, `paused`, `unpaused`. |
+| `tasks_agent_events(since?, limit?)` | Pointer events since a cursor: `assigned`, `user_turn`, `stopped`, `resumed`, `paused`, `unpaused`, `do_started`, `do_ended`. |
 | `tasks_activity(id?, limit?)` | The change log in words, with reasons. |
 
 Rules the store enforces:
