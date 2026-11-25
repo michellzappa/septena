@@ -61,16 +61,18 @@ struct FreeAccountBadge: View {
   }
 }
 
-/// Compact "Plus" pill worn on the profile of a Septena Plus account. Ink
+/// Compact "Plus" or "Pro" pill worn on the profile of a paid account. Ink
 /// capsule with a champagne-foil hairline and a small foil mark. The server
 /// decides the plan (`PlanStatus`); this badge only shows it.
 struct SeptenaPlusBadge: View {
+  var isPro = false
+
   var body: some View {
     HStack(spacing: 3) {
-      Image(systemName: "plus")
+      Image(systemName: isPro ? RegistryIcons.sfSymbols["plans.pro"] ?? "infinity" : "plus")
         .font(.system(size: 8, weight: .bold))
         .foregroundStyle(SeptenaPlus.foil)
-      Text(RegistryPlans.shortName)
+      Text(isPro ? RegistryPlans.proName : RegistryPlans.shortName)
         .foregroundStyle(.white)
     }
     .font(.caption2.weight(.bold))

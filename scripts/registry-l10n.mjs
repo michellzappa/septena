@@ -37,11 +37,11 @@ const FIELDS = {
   importSources: new Set(["detail"]),
   tokens: new Set(["name", "tag", "label"]),
   plans: new Set([
-    "name", "shortName", "headline", "subhead", "notice", "title", "detail", "label", "priceLabel",
+    "name", "shortName", "proName", "headline", "subhead", "notice", "title", "detail", "label", "priceLabel",
     "footnote", "priceFootnote", "device", "account", "plus", "free", "trial", "trialEnds",
-    "paidThrough", "subscribe", "restore", "manage", "notNow", "learnMore", "yourPlan", "planned", "included", "notIncluded",
+    "paidThrough", "proThrough", "subscribe", "restore", "manage", "notNow", "learnMore", "yourPlan", "planned", "included", "notIncluded",
     "seePlus", "startTrial", "trialStarted", "trialBilling", "welcomeBack", "cancelNote", "success", "pending",
-    "serverRetry", "failed", "ownedApple", "ownedWeb", "ownedGoogle", "ownedGrant", "ownedOtherAccount", "done",
+    "serverRetry", "failed", "ownedApple", "ownedWeb", "ownedGoogle", "ownedGrant", "ownedGrantPro", "ownedOtherAccount", "done",
     "syncThisDevice", "syncThisDeviceFailed",
   ]),
 };

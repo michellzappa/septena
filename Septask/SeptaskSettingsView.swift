@@ -357,7 +357,7 @@ struct SeptaskSettingsView: View {
           .foregroundStyle(.primary)
         HStack(spacing: 6) {
           if TaskSyncEngine.shared.signedIn {
-            if PlanStatus.shared.isPlus { SeptenaPlusBadge() } else { FreeAccountBadge() }
+            if PlanStatus.shared.isPlus { SeptenaPlusBadge(isPro: PlanStatus.shared.isPro) } else { FreeAccountBadge() }
             Text("·")
               .font(.caption)
               .foregroundStyle(.tertiary)
@@ -721,7 +721,7 @@ private struct SeptaskAccountPane: View {
               }
             if TaskSyncEngine.shared.signedIn {
               if PlanStatus.shared.isPlus {
-                SeptenaPlusBadge()
+                SeptenaPlusBadge(isPro: PlanStatus.shared.isPro)
               } else {
                 FreeAccountBadge()
               }
