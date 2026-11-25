@@ -91,6 +91,17 @@ describe("app session renewal", () => {
     assert.ok(await h.refresh(s0.refreshToken));
   });
 
+  it("lets an unused handoff expire in days, and a used one live on", async () => {
+    const h = await harness();
+    const lost = await session.issueSession(h.e, USER, session.HANDOFF_TTL_S);
+    const taken = await session.issueSession(h.e, USER, session.HANDOFF_TTL_S);
+    const s1 = await h.refresh(taken.refreshToken);
+    assert.ok(s1 && await h.uses(s1.accessToken));
+    h.db.prepare("UPDATE sessions SET expiresAt = expiresAt - ?").run(8 * DAY);
+    assert.equal(await h.refresh(lost.refreshToken), null);
+    assert.ok(await h.refresh(s1.refreshToken));
+  });
+
   it("needs no KV", async () => {
     const h = await harness();
     const s0 = await session.issueSession(h.e, USER);

@@ -22,7 +22,8 @@ api.septena.app  ◀────────────────────
   can't share the phone's. The phone calls `POST /v1/auth/device` and hands
   the new session over with `transferUserInfo` (`Septask/WatchBridge.swift`).
   This happens when the watch asks (`requestSession`) and once per account
-  when a watch app is installed. Sign-out / account switch sends `signedOut`;
+  when a watch app is installed. An unused handoff expires after 7 days, and
+  the watch ends the session a new handoff replaces. Sign-out / account switch sends `signedOut`;
   the watch revokes its token and wipes its cache.
 - **Instant first frame.** After every task change (2 s debounce) the phone
   pushes Today (`WatchTaskList`) as application context. The watch draws it
