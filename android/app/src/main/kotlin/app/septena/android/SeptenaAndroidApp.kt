@@ -32,6 +32,7 @@ import app.septena.store.SqlDelightTaskStore
 import app.septena.store.db.SeptenaDatabase
 import app.septena.transport.SeptenaAccessClient
 import app.septena.transport.SeptenaAuthClient
+import app.septena.transport.SeptenaShareClient
 import app.septena.transport.SeptenaTaskBackendClient
 import app.septena.transport.SyncLiveSocket
 import app.septena.transport.UrlConnectionSyncTransport
@@ -88,6 +89,7 @@ class AndroidAppGraph(application: Application) {
     val credentials = AppCredentials(SessionStore(application), auth, beforeAdopt = ::finishPendingWipe)
     private val transport = UrlConnectionSyncTransport(credentials, clientVersion)
     val access = SeptenaAccessClient(credentials, clientVersion)
+    val shares = SeptenaShareClient(access)
     val taskBackend = SeptenaTaskBackendClient(credentials, clientVersion)
     val attachments = TaskAttachmentStore(application, taskStore, registryEntityMutator, clock, taskBackend)
     val accountWipe = AccountWipe(application, taskStore, attachments, taskUndoHistory)

@@ -23,6 +23,8 @@ data class TaskSnapshot(
     val deadline: String? = null,
     val today: Boolean = false,
     val todaySetOn: String? = null,
+    /** The deadline the user planned past (docs/TASK_DATES_SPEC.md I8). */
+    val deferredDeadline: String? = null,
     val source: String? = null,
     val sourceClient: String? = null,
     val acknowledgedAt: String? = null,
@@ -52,6 +54,7 @@ data class TaskSnapshot(
                 createdAt = f[RegistryEntityFields.Task.CREATED_AT].stringValue(),
                 scheduled = f[RegistryEntityFields.Task.SCHEDULED].stringValue(),
                 deadline = f[RegistryEntityFields.Task.DEADLINE].stringValue(),
+                deferredDeadline = f[RegistryEntityFields.Task.DEFERRED_DEADLINE].stringValue(),
                 today = f[RegistryEntityFields.Task.TODAY].booleanValue() ?: false,
                 todaySetOn = f[RegistryEntityFields.Task.TODAY_SET_ON].stringValue(),
                 source = f[RegistryEntityFields.Task.SOURCE].stringValue(),
@@ -86,6 +89,8 @@ data class TaskViewMembership(
     val dueState: String? = null,
     /** Core R4: true when the deadline renders in red. */
     val deadlineRed: Boolean = false,
+    /** Core upcoming bucket day (`YYYY-MM-DD`) when the task matches Upcoming, else null. */
+    val upcomingDay: String? = null,
 )
 
 /**
@@ -138,6 +143,7 @@ object TaskViewRules {
             ),
             dueState = m.dueState,
             deadlineRed = m.deadlineRed,
+            upcomingDay = m.upcomingDay,
         )
     }
 
@@ -212,6 +218,7 @@ internal fun TaskSnapshot.toCore(): CoreTaskSnapshot = CoreTaskSnapshot(
     createdAt = createdAt,
     scheduled = scheduled,
     deadline = deadline,
+    deferredDeadline = deferredDeadline,
     today = today,
     todaySetOn = todaySetOn,
     source = source,

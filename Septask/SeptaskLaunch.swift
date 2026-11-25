@@ -431,6 +431,8 @@ enum SeptaskDeepLinkRouter {
       navigation.go(to: route(forListID: id))
     case .task(let taskID):
       openTask(taskID, navigation: navigation, context: context)
+    case .join(let token):
+      SeptaskSharing.presentJoin(link: token)
     }
   }
 
@@ -464,6 +466,8 @@ enum SeptaskDeepLinkRouter {
       shell.go(to: filter(forListID: id))
     case .task(let taskID):
       openTaskMac(taskID)
+    case .join(let token):
+      SeptaskSharing.presentJoin(link: token)
     }
   }
 

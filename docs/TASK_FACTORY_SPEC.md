@@ -186,7 +186,7 @@ MCP tools, on the api.septena.app connector only (ADR 0008):
 |---|---|
 | `tasks_claim(id, agent, ttlMinutes?, why?)` | Takes or renews the claim. Refuses with a rule: `paused`, `stopped`, `your_turn`, `held`, `budget`, `terminal`, `closed`, `not_found`. The DO serializes, so two agents cannot both win. |
 | `tasks_release(id, agent, why)` | Clears the agent's own claim. `why` goes to the activity log. |
-| `tasks_agent_events(since?, limit?)` | Pointer events since a cursor: `assigned`, `user_turn`, `stopped`, `resumed`, `paused`, `unpaused`. |
+| `tasks_agent_events(since?, limit?)` | Pointer events since a cursor: `assigned`, `user_turn`, `stopped`, `resumed`, `paused`, `unpaused`, `do_started`, `do_ended`. |
 | `tasks_activity(id?, limit?)` | The change log in words, with reasons. |
 
 Rules the store enforces:
@@ -196,7 +196,8 @@ Rules the store enforces:
 - A human turn sets `runsSinceUser` to 0. The 6th fresh claim without one is
   refused (`budget`): the agent must ask.
 - While `stoppedAt` is set, every agent write to the task is refused.
-- While `agentsPaused` is true, every claim is refused and
+- While `agentsPaused` is true, every claim and every other agent write is
+  refused (`paused`; a release still works), and
   `tasks_pending_reasoning` returns no tasks.
 - A turn written by a non-holder while a claim is live is accepted (mz can
   always write), but the runner re-reads the thread before its next write.
@@ -335,7 +336,7 @@ links (issue, PR, commit).
 - **Least privilege:** the runner uses a per-user API token with the `tasks`
   scope (backend spec §8), and GitHub access only through the repo links of
   its profile.
-- **Kill switch:** one setting, "Pause all agents", stops claims at once.
+- **Kill switch:** one setting, "Pause all agents", stops claims and agent writes at once.
   Built: synced setting `agentsPaused`, toggle in Septask ▸ Settings ▸
   Connections & AI. Per task: **Stop** / **Resume** in the conversation.
 

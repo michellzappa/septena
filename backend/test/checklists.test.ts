@@ -28,6 +28,7 @@ describe("Checklists (1-level subtasks, CL0 #153)", () => {
       readTaskLinks: async () => store.readTaskLinks(),
       readTaskRefs: async (id: string) => store.readTaskRefs(id),
       readOrderTop: async () => store.readOrderTop(),
+      readDoing: async () => store.readDoing(),
       push: async (ops: Parameters<typeof store.push>[0], actor: string) => store.push(ops, actor),
     };
     const ctx = { store: rpcStore as never, timeZone: "UTC" };
@@ -80,6 +81,7 @@ describe("Checklists (1-level subtasks, CL0 #153)", () => {
       readTaskLinks: async () => store.readTaskLinks(),
       readTaskRefs: async (id: string) => store.readTaskRefs(id),
       readOrderTop: async () => store.readOrderTop(),
+      readDoing: async () => store.readDoing(),
       push: async (ops: Parameters<typeof store.push>[0], actor: string) => store.push(ops, actor),
     };
     const ctx = { store: rpcStore as never, timeZone: "UTC" };

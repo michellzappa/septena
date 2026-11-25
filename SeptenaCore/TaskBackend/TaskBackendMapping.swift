@@ -171,6 +171,7 @@ enum TaskBackendMapping {
       "durationMinutes": t.durationMinutes.map { .int(Int64($0)) } ?? .null,
       "timeZone": c.text("timeZone", t.timeZone, max: 64),
       "deadline": c.day("deadline", t.deadline),
+      "deferredDeadline": c.day("deferredDeadline", t.deferredDeadline),
       "today": .bool(t.today),
       "starred": .bool(t.starred),
       "tags": t.tagIDs.isEmpty ? .null : .array(t.tagIDs.map { .string($0) }),
@@ -212,6 +213,7 @@ enum TaskBackendMapping {
       "fadedAt": t.fadedAt.map { .string(stamp($0)) } ?? .null,
       "dropReason": c.text("dropReason", t.dropReason, max: 16),
       "effort": c.text("effort", t.effort, max: 16),
+      "assignedTo": c.text("assignedTo", t.assignedTo, max: 64),
     ]
     return finish(.task, t.id, c, fields, deleted: t.deletedAt != nil)
   }

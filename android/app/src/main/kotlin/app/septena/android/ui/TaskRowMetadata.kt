@@ -2,6 +2,7 @@ package app.septena.android.ui
 
 import app.septena.core.DateBoardRowKinds
 import app.septena.core.JsonValue
+import app.septena.core.ProjectShare
 import app.septena.core.RegistryCatalog
 import app.septena.core.SyncRecord
 import app.septena.core.TaskFadeRules
@@ -27,11 +28,13 @@ import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.Locale
 
-/** Preloaded per-task secondary metadata (checklist counts, tag names, attachments) for one list render. */
+/** Preloaded per-task secondary metadata (checklist counts, tag names, attachments, shared projects) for one list render. */
 internal data class TaskRowMetadataCatalog(
     val checklistCounts: Map<String, Pair<Int, Int>> = emptyMap(),
     val tagNames: Map<String, String> = emptyMap(),
     val attachmentTaskIds: Set<String> = emptySet(),
+    /** The shared projects, by project id. */
+    val shares: Map<String, ProjectShare> = emptyMap(),
 ) {
     companion object {
         suspend fun load(store: TaskStore): TaskRowMetadataCatalog {
@@ -62,6 +65,7 @@ internal data class TaskRowMetadataCatalog(
                 checklistCounts = checklist,
                 tagNames = tags,
                 attachmentTaskIds = attachments,
+                shares = ProjectShare.byProject(store),
             )
         }
     }
@@ -177,10 +181,17 @@ internal fun buildTaskListItem(
         null
     }
 
+    val share = snapshot.project?.let(catalog.shares::get)
+    val assignee = record.fields[RegistryEntityFields.Task.ASSIGNED_TO].stringValue()
+        ?.takeIf { it != share?.me }
+        ?.let { share?.member(it)?.name }
+
     return TaskListItem(
         id = record.id,
         title = snapshot.title,
         agentName = agent,
+        canAssign = share != null,
+        assigneeName = assignee,
         subtitle = subtitle,
         isCompleted = snapshot.status == RegistryEntityEnums.TaskStatus.DONE,
         isOnToday = membership.isOnToday,
@@ -235,6 +246,30 @@ internal fun formatShortLocalDay(
         val pattern = if (day.year == today.year) "MMM d" else "MMM d, yyyy"
         DateTimeFormatter.ofPattern(pattern, locale).format(day)
     }
+}
+
+/**
+ * Upcoming day header matching Apple `SeptenaDate.scheduleHeaderLabel`:
+ * Today, Tomorrow (from registry), full weekday (`EEEE`) within 6 days,
+ * else short weekday + month + day (`EEE, MMM d`).
+ */
+internal fun formatUpcomingDayHeader(
+    day: LocalDate,
+    today: LocalDate,
+    languageTag: String = Locale.getDefault().toLanguageTag(),
+): String {
+    val diff = java.time.temporal.ChronoUnit.DAYS.between(today, day)
+    if (diff == 0L) {
+        return RegistryCatalog.destinationTitle(RegistryDestinationIds.TODAY, languageTag).orEmpty()
+    }
+    if (diff == 1L) {
+        return RegistryCatalog.dateBoardRows(RegistryTaskAttributeIds.WHEN, languageTag = languageTag)
+            .firstOrNull { it.kind == DateBoardRowKinds.TOMORROW }?.label.orEmpty()
+    }
+    val locale = Locale.forLanguageTag(languageTag)
+    val pattern = if (diff in 2L..6L) "EEEE" else if (day.year == today.year) "EEE, MMM d" else "EEE, MMM d, yyyy"
+    val formatted = DateTimeFormatter.ofPattern(pattern, locale).format(day)
+    return formatted.replaceFirstChar { ch -> if (ch.isLowerCase()) ch.titlecase(locale) else ch.toString() }
 }
 
 private fun formatShortInstantDay(

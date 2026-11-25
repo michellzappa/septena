@@ -90,6 +90,8 @@ private struct SeptaskTaskMenu: View {
     switch id {
     case .sidebarNewProject:
       return .init(perform: canNavigate ? newProject : nil)
+    case .sidebarJoinShared:
+      return .init { SeptaskSharing.presentJoin() }
     case .sidebarNewArea:
       return .init(perform: canNavigate ? newArea : nil)
     default:

@@ -237,6 +237,16 @@ final class TaskMutator {
     cloudBackend.setDeadline(id: id, date: date)
   }
 
+  /// Put back a deferral exactly as it was (undo, duplicate). The date
+  /// actions decide it in every other case.
+  func setDeferredDeadline(id: String, day: String?) {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] setDeferredDeadline called before CK bound — dropping", nil)
+      return
+    }
+    cloudBackend.setDeferredDeadline(id: id, day: day)
+  }
+
   func setReminder(id: String, reminder: TaskReminder?) {
     guard let cloudBackend else {
       SeptenaLog.error("[TaskMutator] setReminder called before CK bound — dropping", nil)
@@ -267,6 +277,14 @@ final class TaskMutator {
       return
     }
     cloudBackend.dismissReminder(id: id, at: date)
+  }
+
+  func setAssignee(id: String, memberID: String?) {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] setAssignee called before CK bound — dropping", nil)
+      return
+    }
+    cloudBackend.setAssignee(id: id, memberID: memberID)
   }
 
   func setStarred(id: String, starred: Bool) {
@@ -569,6 +587,7 @@ final class TaskMutator {
       notes: task.notes,
       source: source
     )
+    if let deferred = task.deferredDeadline { setDeferredDeadline(id: copy.id, day: deferred) }
     if let heading = task.heading { setHeading(id: copy.id, heading: heading) }
     if task.starred { setStarred(id: copy.id, starred: true) }
     if !task.tags.isEmpty { setTaskTags(id: copy.id, tagIDs: task.tags) }

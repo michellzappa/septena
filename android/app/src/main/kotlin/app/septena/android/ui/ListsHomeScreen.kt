@@ -106,6 +106,7 @@ internal fun ListsHomePage(
     onNewTask: (QuickAddDraft) -> Unit,
     onCreateArea: (String) -> Unit,
     onCreateProject: (String) -> Unit,
+    onJoinShared: () -> Unit,
     onRefresh: (suspend () -> Unit)? = null,
 ) {
     val isDark = LocalSeptenaDarkTheme.current
@@ -125,6 +126,8 @@ internal fun ListsHomePage(
     val newTaskTitle = RegistryCatalog.actionTitle(RegistryActionIds.APP_QUICK_ADD, languageTag = languageTag)
         ?.takeIf(String::isNotBlank) ?: quickAddTitle
     val newProjectTitle = RegistryCatalog.actionTitle(RegistryActionIds.SIDEBAR_NEW_PROJECT, languageTag = languageTag)
+        .orEmpty()
+    val joinSharedTitle = RegistryCatalog.actionTitle(RegistryActionIds.SIDEBAR_JOIN_SHARED, languageTag = languageTag)
         .orEmpty()
     val newAreaTitle = RegistryCatalog.actionTitle(RegistryActionIds.SIDEBAR_NEW_AREA, languageTag = languageTag)
         .orEmpty()
@@ -250,6 +253,15 @@ internal fun ListsHomePage(
                             onClick = {
                                 createMenuOpen = false
                                 promptMode = HomeCreatePrompt.Area
+                            },
+                        )
+                    }
+                    if (joinSharedTitle.isNotEmpty()) {
+                        DropdownMenuItem(
+                            text = { Text(joinSharedTitle) },
+                            onClick = {
+                                createMenuOpen = false
+                                onJoinShared()
                             },
                         )
                     }

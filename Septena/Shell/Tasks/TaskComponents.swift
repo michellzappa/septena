@@ -726,6 +726,9 @@ struct TaskRow: View {
       TaskStatusPill(symbol: "sun.max.fill",
                      title: TaskFilter.today.title)
     }
+    if let name = SharedProjects.assigneeName(of: task, in: LocalStore.shared.container.mainContext) {
+      TaskStatusPill(symbol: RegistryIcons.sfSymbol(for: "action.assign"), title: name)
+    }
     trailingDate
     if task.status == .open, task.deletedAt == nil,
        let slot = task.timeSlotLabel {

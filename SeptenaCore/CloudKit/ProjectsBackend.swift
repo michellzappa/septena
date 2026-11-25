@@ -86,6 +86,12 @@ final class ProjectsMutator: ProjectsBackend {
   /// (`TaskUndo.recordProjectDelete`), never here.
   func delete(id: String) async throws {
     let backend = try requireBackend()
+    // A shared project is never deleted: its owner stops sharing first, and a
+    // member leaves. An area delete puts it outside the area.
+    if SharedProjects.share(ofProject: id, in: context) != nil {
+      try await backend.setArea(id: id, area: nil)
+      return
+    }
     DeletedContainerLedger.record(.project, id)
     let trashed = trashTasks(inProject: id)
     if trashed > 0 {

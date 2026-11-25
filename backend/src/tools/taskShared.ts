@@ -16,12 +16,16 @@ export interface TaskOut {
   status: string;
   today: boolean;
   starred?: boolean;
+  /// The user does this task now (docs/DO_SPEC.md §6).
+  doing?: true;
   tags?: string[];
   scheduled?: string;
   startTime?: string;
   durationMinutes?: number;
   timeZone?: string;
   deadline?: string;
+  // The deadline the user planned past (docs/TASK_DATES_SPEC.md I8).
+  deferredDeadline?: string;
   area?: string;
   project?: string;
   completedAt?: string;
@@ -140,6 +144,7 @@ export function coreTask(t: TaskOut): CoreTask {
     createdAt: t.createdAt !== undefined ? new Date(t.createdAt).toISOString() : null,
     scheduled: t.scheduled ?? null,
     deadline: t.deadline ?? null,
+    deferredDeadline: t.deferredDeadline ?? null,
     today: t.today,
     todaySetOn: t.todaySetOn ?? null,
     source: t.source ?? null,

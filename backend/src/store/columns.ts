@@ -36,6 +36,8 @@ const zIanaTz = z.string().max(64).refine(isValidTz, "unknown time zone").nullab
 // (yyyy-MM-dd'T'HH:mm:ss, no zone) also passes.
 const zStamp = z.string().regex(new RegExp(ENTITY_PATTERNS.stamp), "expected ISO time").max(ENTITY_LIMITS.stampMax).nullable();
 const stamp = (): Column => ({ kind: "text", zod: zStamp });
+// A stamp with its zone: the core reads it as an instant.
+const zInstant = z.string().datetime({ offset: true }).max(ENTITY_LIMITS.stampMax);
 
 // An agent's proposed new brief for a project's or an area's notes (ADR 0012).
 // The user accepts or rejects it in the app, which clears it with null.
@@ -88,8 +90,8 @@ export const SETTING_VALUES = {
   /// IANA zone of the device that last opened the app. The MCP connector
   /// reads it for "today".
   homeTimezone: z.string().max(64).refine(isValidTz, "unknown time zone"),
-  /// "Pause all agents" (docs/TASK_FACTORY_SPEC.md §10). While true, no
-  /// agent claim succeeds and the agent queue reads as empty.
+  /// "Pause all agents" (docs/TASK_FACTORY_SPEC.md §10). While true, the
+  /// store refuses every agent write and claim, and the agent queue reads as empty.
   agentsPaused: z.boolean(),
   /// "Get started" checklist (Septask): true once dismissed or all steps finished.
   getStartedDismissed: z.boolean(),
@@ -153,6 +155,9 @@ export const ENTITIES = {
       durationMinutes: { kind: "int", zod: z.number().int().min(5).max(1440).nullable() },
       timeZone: { kind: "text", zod: zIanaTz },
       deadline: day(),
+      // The deadline the user planned past (docs/TASK_DATES_SPEC.md I8). The
+      // core owns it: it keeps that deadline from holding the task on Today.
+      deferredDeadline: day(),
       today: bool(),
       starred: bool(),
       tags: json(z.array(zId).max(MAX_TAGS_PER_TASK)),
@@ -311,6 +316,25 @@ export const ENTITIES = {
     },
     requiredOnInsert: ["name"],
     updatable: ["name", "color", "position"],
+  },
+  // One Do of a task (docs/DO_SPEC.md §2, ADR 0041). The open row is the
+  // current Do; the closed rows are the history. TaskStore.resolveDo keeps the
+  // rules of §2.1 with the shared core.
+  doSession: {
+    table: "do_sessions",
+    columns: {
+      taskId: { kind: "text", zod: zId },
+      startedAt: { kind: "text", zod: zInstant },
+      plannedMinutes: { kind: "int", zod: z.number().int().min(1).max(ENTITY_LIMITS.doPlannedMinutesMax).nullable() },
+      confirmedAt: { kind: "text", zod: zInstant.nullable() },
+      endedAt: { kind: "text", zod: zInstant.nullable() },
+      exit: { kind: "text", zod: z.enum(ENTITY_ENUMS.doExit).nullable() },
+      lapsed: bool(),
+      note: text(ENTITY_LIMITS.doNoteMax),
+      sourceClient: text(64),
+    },
+    requiredOnInsert: ["taskId", "startedAt"],
+    updatable: ["plannedMinutes", "confirmedAt", "endedAt", "exit", "lapsed", "note"],
   },
   // The non-turn half of `TaskConvo` (SeptenaCore/TaskConvo.swift), keyed by
   // the task id. Turns are their own append-only table (§5.3).

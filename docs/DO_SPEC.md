@@ -186,7 +186,7 @@ That is accepted.
 ## 6. Agents
 
 - `tasks_orientation` and `tasks_list` show which task is being done
-  (`doing: true`). `tasks_agent_events` gets `do_started` and `do_ended`, as
+  (`doing: true`). `tasks_get` shows it too. `tasks_agent_events` gets `do_started` and `do_ended`, as
   pointers.
 - `tasks_claim` on that task is refused with the new reason `doing`. A start
   ends a live claim, in the same transaction, with the reason "the user does
@@ -210,10 +210,11 @@ device can correct its clock. No task notes.
 
 | Verb | Effect |
 |---|---|
-| `POST /v1/tasks/:id/do` with optional `plannedMinutes` | Start. The client sends the session id, so a retry starts nothing new |
-| `POST /v1/do/:sessionId/stop` with optional `note` | Stop for now |
-| `POST /v1/do/:sessionId/confirm` | Still on it |
-| `complete`, `defer` and the others | As today. They end the Do by rule 5, or by `later` when the request names the session |
+| `POST /v1/tasks/:id/do` with `sessionId` and optional `plannedMinutes` | Start. The client makes the session id, so a retry starts nothing new |
+| `POST /v1/tasks/do/:sessionId/stop` with optional `note` | Stop for now |
+| `POST /v1/tasks/do/:sessionId/confirm` | Still on it |
+| `complete` and the others | As today. They end the Do by rule 5 |
+| `defer` with `session` | Later: the Do ends with exit `later` |
 
 These routes are on the companion scope's list when CD2 (#358) builds it. Each
 one needs a deliberate gesture on the device (ADR 0034). The watch queues them

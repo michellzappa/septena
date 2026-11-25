@@ -272,3 +272,24 @@ test("a repeat: one shared first day, and one next occurrence when both complete
   await w.settle();
   for (const u of ["ann", "ben"]) assert.equal(w.rows(u, "tasks").filter((t) => t.scheduled === "2026-12-03").length, 1);
 });
+
+test("a Do is private, and ends when another member closes or deletes the task", async () => {
+  const { w, join } = await shared();
+  await join("ben", "Ben");
+  const id = replica(w, "ben", "Paint")!.id as string;
+  w.push("ben", up("doSession", "do-1", { taskId: id, startedAt: new Date().toISOString() }));
+  await w.settle();
+  assert.equal(w.store("ben").readDoing()!.taskId, id);
+  assert.equal(w.rows("ann", "do_sessions").length, 0);
+  w.push("ann", up("task", "t1", { status: "done", completedAt: "2026-11-25T10:00:00" }));
+  await w.settle();
+  assert.equal(w.store("ben").readDoing(), null);
+  assert.equal(w.store("ben").readDoSession("do-1")!.exit, "done");
+  w.push("ann", up("task", "t1", { status: "open" }));
+  await w.settle();
+  w.push("ben", up("doSession", "do-2", { taskId: id, startedAt: new Date().toISOString() }));
+  w.push("ann", del("task", "t1"));
+  await w.settle();
+  assert.equal(w.store("ben").readDoing(), null);
+  assert.equal(w.store("ben").readDoSession("do-2"), null);
+});

@@ -50,6 +50,11 @@ enum BackendJSON: Codable, Hashable, Sendable {
 
   var stringValue: String? { if case .string(let s) = self { return s }; return nil }
   var isNull: Bool { self == .null }
+  /// The value as JSON text; nil for null.
+  var jsonText: String? {
+    guard !isNull, let data = try? JSONEncoder().encode(self) else { return nil }
+    return String(data: data, encoding: .utf8)
+  }
 
   /// A stable text form: object keys sorted, and a number prints the same
   /// whether it arrived as `1` or `1.0`. Two values with equal canonical text
