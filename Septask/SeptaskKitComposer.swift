@@ -104,10 +104,10 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
   private let checklistPill = KitPillButton()
   private let attachPill = KitPillButton()
   private let discussPill = KitPillButton()
-  /// "Paste" on a blank new task when the clipboard holds text (#210). A
-  /// text stadium at the front of the rail, NOT a rail attribute: it has
-  /// registry tier `chip`, so it is outside `taskAttributePills`. Hidden by
-  /// a paste or the first keystroke.
+  /// "Paste" on a blank new task when the clipboard holds text (#210). It
+  /// is drawn like the attribute pills and leads the rail, but it has registry
+  /// tier `chip`, so it is outside `taskAttributePills`. Hidden by a paste or
+  /// the first keystroke.
   private let pastePill = KitPillButton()
   /// Registry id → pill. The rail's order, labels and icons come from
   /// `RegistrySurfaces.taskAttributePills` (ADR 0020), the same list the
@@ -161,7 +161,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
 
   /// The pill rail's height: the 30pt pills plus room for the focus ring.
   fileprivate static let pillRowHeight: CGFloat = 34
-  private static let ringRoom: CGFloat = 4
+  fileprivate static let ringRoom: CGFloat = 4
   /// Empty / short notes — two lines of room before the field grows. Things'
   /// open task shows about this much under the title.
   private static var notesMinHeight: CGFloat {
@@ -325,13 +325,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     checklistPill.onPress = { [weak self] _ in self?.addChecklistItemAndFocus() }
     attachPill.onPress = { [weak self] _ in self?.attachmentsView.pickFilesToAttach() }
     discussPill.onPress = { [weak self] _ in self?.onAction?(.discuss) }
-    let pasteChip = RegistrySurfaces.taskAttribute(.paste)
-    pastePill.image = NSImage(systemSymbolName: pasteChip.sfSymbol, accessibilityDescription: nil)?
-      .withSymbolConfiguration(.init(pointSize: 11, weight: .semibold))
-    pastePill.imagePosition = .imageLeading
-    pastePill.title = pasteChip.label
-    pastePill.toolTip = pasteChip.label
-    pastePill.setAccessibilityLabel(pasteChip.label)
+    pastePill.attribute = RegistrySurfaces.taskAttribute(.paste)
     pastePill.isHidden = true
     pastePill.onPress = { [weak self] _ in self?.pasteFromClipboard() }
     pillRow.addArrangedSubview(pastePill)
@@ -1403,6 +1397,14 @@ final class KitPillButton: NSButton {
   }
 
   @objc private func pressed() { onPress?(self) }
+
+  /// Tab onto a rail pill past the rail's visible edge scrolls it into view,
+  /// focus ring included.
+  override func becomeFirstResponder() -> Bool {
+    let became = super.becomeFirstResponder()
+    if became, attribute != nil { scrollToVisible(bounds.insetBy(dx: -KitComposerCell.ringRoom, dy: 0)) }
+    return became
+  }
 
   fileprivate static let horizontalPadding: CGFloat = 12
   fileprivate static let iconGap: CGFloat = 4
