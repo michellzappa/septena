@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="quick_add"
+        android:enabled="true"
+        android:icon="@drawable/ic_widget_plus"
+        android:shortcutShortLabel="@string/widget_add_task"
+        android:shortcutLongLabel="@string/widget_add_task">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="app.septena.android"
+            android:targetClass="app.septena.android.MainActivity">
+            <extra
+                android:name="app.septena.android.widgets.EXTRA_QUICK_ADD_TODAY"
+                android:value="false" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:shortcutId="open_today"
+        android:enabled="true"
+        android:icon="@drawable/ic_widget_sun"
+        android:shortcutShortLabel="@string/widget_today_name"
+        android:shortcutLongLabel="@string/widget_today_name">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="app.septena.android"
+            android:targetClass="app.septena.android.MainActivity">
+            <extra
+                android:name="app.septena.android.widgets.EXTRA_DESTINATION_ID"
+                android:value="today" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:shortcutId="open_inbox"
+        android:enabled="true"
+        android:icon="@drawable/ic_notification"
+        android:shortcutShortLabel="@string/shortcut_inbox_label"
+        android:shortcutLongLabel="@string/shortcut_inbox_label">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="app.septena.android"
+            android:targetClass="app.septena.android.MainActivity">
+            <extra
+                android:name="app.septena.android.widgets.EXTRA_DESTINATION_ID"
+                android:value="inbox" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:shortcutId="open_upcoming"
+        android:enabled="true"
+        android:icon="@drawable/ic_widget_calendar"
+        android:shortcutShortLabel="@string/widget_upcoming_name"
+        android:shortcutLongLabel="@string/widget_upcoming_name">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="app.septena.android"
+            android:targetClass="app.septena.android.MainActivity">
+            <extra
+                android:name="app.septena.android.widgets.EXTRA_DESTINATION_ID"
+                android:value="upcoming" />
+        </intent>
+    </shortcut>
+</shortcuts>

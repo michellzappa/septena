@@ -23,6 +23,9 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
         </activity>
         <activity
             android:name=".ShareCaptureActivity"
@@ -32,7 +35,23 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="text/plain" />
             </intent-filter>
+            <intent-filter android:label="@string/process_text_add_to_septena">
+                <action android:name="android.intent.action.PROCESS_TEXT" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
         </activity>
+        <!-- Quick Settings tile: one-tap Quick Add from anywhere on Android. -->
+        <service
+            android:name=".SeptenaQuickAddTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_widget_plus"
+            android:label="@string/tile_quick_add_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
         <!-- Timed reminders (#362): the alarm, the notification actions, re-arming. -->
         <receiver
             android:name=".reminders.ReminderAlarmReceiver"

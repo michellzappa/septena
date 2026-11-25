@@ -119,6 +119,13 @@ interface TaskStore {
         notBefore: Instant = Instant.EPOCH,
     )
 
+    /** Permanently removes a local row and enqueues an immediate delete op (Delete Permanently / Empty Trash). */
+    suspend fun purgeLocalAndEnqueue(
+        entity: String,
+        id: String,
+        operation: SyncOperation.Delete,
+    ) {}
+
     suspend fun appendTurnAndEnqueue(taskId: String, turn: Map<String, JsonValue>, operation: SyncOperation.AppendTurn)
 
     /** Seals due operations before returning them; sent payloads never change under their clientOpId. */

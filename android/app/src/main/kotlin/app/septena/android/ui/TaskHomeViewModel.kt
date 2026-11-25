@@ -69,6 +69,8 @@ data class TaskHomeUiState(
     val projects: List<TaskHomeNavigationItem> = emptyList(),
     val inboxTasks: List<TaskListItem> = emptyList(),
     val tasks: List<TaskListItem> = emptyList(),
+    /** Soft-deleted tasks shown in Logbook's Deleted tab (#460 / #202). */
+    val deletedTasks: List<TaskListItem> = emptyList(),
     val canQuickAdd: Boolean = false,
     val canComplete: Boolean = false,
     val agentsPaused: Boolean = false,
@@ -109,6 +111,7 @@ private data class LoadedTaskHome(
     val projects: List<TaskHomeNavigationItem>,
     val inboxTasks: List<TaskListItem>,
     val tasks: List<TaskListItem>,
+    val deletedTasks: List<TaskListItem> = emptyList(),
     val canQuickAdd: Boolean,
     val canComplete: Boolean,
     val agentsPaused: Boolean,
@@ -155,6 +158,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             projects = home.projects,
             inboxTasks = if (applyStar) home.inboxTasks.filter(TaskListItem::isStarred) else home.inboxTasks,
             tasks = if (applyStar) home.tasks.filter(TaskListItem::isStarred) else home.tasks,
+            deletedTasks = home.deletedTasks,
             canQuickAdd = home.canQuickAdd,
             canComplete = home.canComplete,
             agentsPaused = home.agentsPaused,
@@ -545,6 +549,24 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         }
     }
 
+    /** Permanently deletes one or more trashed tasks (Delete Permanently / Empty Trash, #460). */
+    fun purgeTasks(ids: List<String>) {
+        if (ids.isEmpty()) return
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    for (id in ids) {
+                        graph.taskMutator.purge(id)
+                    }
+                }
+            }.onSuccess {
+                clearSelection()
+                errorMessage.value = null
+                noteLocalChangeAndSync()
+            }.onFailure { errorMessage.value = it.message }
+        }
+    }
+
     fun duplicate(id: String) {
         viewModelScope.launch {
             runCatching {
@@ -875,6 +897,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
 
         val inbox = mutableListOf<PositionedTask>()
         val visible = mutableListOf<PositionedTask>()
+        val deleted = mutableListOf<PositionedTask>()
         val currentDestinationId = (resolvedLocation as? TaskHomeLocation.SmartList)?.destinationId
         val filingSuggestionsEnabled = graph.deviceSettings.bool(RegistrySettingKeys.TASKS_FILING_SUGGESTIONS)
         val shouldSuggestInline = filingSuggestionsEnabled && (
@@ -907,6 +930,32 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             val membership = memberships[snapshot.id] ?: TaskViewRules.INACTIVE_MEMBERSHIP
             when (resolvedLocation) {
                 is TaskHomeLocation.SmartList -> {
+                    if (resolvedLocation.destinationId == RegistryDestinationIds.LOGBOOK &&
+                        snapshot.deletedAt != null &&
+                        !snapshot.isHeading
+                    ) {
+                        val deletedItem = taskListItem(
+                            record = record,
+                            snapshot = snapshot,
+                            membership = membership,
+                            selected = resolvedLocation,
+                            areaTitles = areaTitles,
+                            projectTitles = projectTitles,
+                            catalog = metadataCatalog,
+                            today = today,
+                            now = now,
+                            showTodayIndicator = false,
+                            isLogbook = true,
+                        )
+                        deleted += PositionedTask(
+                            item = deletedItem,
+                            position = null,
+                            archiveDate = record.deletedAt,
+                            areaId = snapshot.area,
+                            projectId = snapshot.project,
+                        )
+                        continue
+                    }
                     val conversation = conversations[snapshot.id]
                     val convoState = convoStates[snapshot.id]
                     val stage = convoState?.agentStage
@@ -1121,6 +1170,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             projects = countedProjects,
             inboxTasks = inbox.sortedTaskItems(),
             tasks = orderedTasks,
+            deletedTasks = deleted.sortedTaskItems(RegistryDestinationIds.RECENTLY_DELETED),
             canQuickAdd = canQuickAdd,
             canComplete = canComplete,
             agentsPaused = agentsPaused,

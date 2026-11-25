@@ -46,6 +46,12 @@
             "state" : "translated",
             "value" : "%lld records die geen taken zijn, worden overgeslagen."
           }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld registros que não são tarefas serão ignorados."
+          }
         }
       }
     },
@@ -2729,6 +2735,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Geef toegang tot je agenda"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Permitir acesso ao calendário"
           }
         }
       }
@@ -5649,6 +5661,12 @@
             "state" : "translated",
             "value" : "Agenda’s op dit apparaat"
           }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Calendários do dispositivo"
+          }
         }
       }
     },
@@ -6441,6 +6459,12 @@
             "state" : "translated",
             "value" : "Bestaande items met overeenkomende ID’s blijven behouden; nieuwe items worden toegevoegd en gesynchroniseerd."
           }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Itens existentes com o mesmo ID são mantidos; novos itens são adicionados e sincronizados."
+          }
         }
       }
     },
@@ -6487,6 +6511,12 @@
             "state" : "translated",
             "value" : "CSV exporteren"
           }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exportar CSV"
+          }
         }
       }
     },
@@ -6517,6 +6547,12 @@
             "state" : "translated",
             "value" : "Exporteren mislukt."
           }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não foi possível exportar."
+          }
         }
       }
     },
@@ -6529,6 +6565,12 @@
             "state" : "translated",
             "value" : "JSON-reservekopie exporteren"
           }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exportar backup JSON"
+          }
         }
       }
     },
@@ -6540,6 +6582,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Markdown exporteren"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exportar Markdown"
           }
         }
       }
@@ -6587,6 +6635,12 @@
             "state" : "translated",
             "value" : "CSV geëxporteerd."
           }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CSV exportado."
+          }
         }
       }
     },
@@ -6599,6 +6653,12 @@
             "state" : "translated",
             "value" : "JSON-reservekopie geëxporteerd."
           }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Backup JSON exportado."
+          }
         }
       }
     },
@@ -6610,6 +6670,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Markdown geëxporteerd."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Markdown exportado."
           }
         }
       }
@@ -6658,6 +6724,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Vervaagde taken"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tarefas esmaecidas"
           }
         }
       }
@@ -6913,6 +6985,12 @@
             "state" : "translated",
             "value" : "%@ gebieden, %@ projecten en %@ taken gevonden."
           }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Encontradas %@ áreas, %@ projetos e %@ tarefas."
+          }
         }
       }
     },
@@ -7010,6 +7088,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Alle Septena-taken, gebieden, projecten en checklists (importeerbaar)"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tarefas, áreas, projetos e checklists completos do Septena (importável)"
           }
         }
       }
@@ -7851,6 +7935,12 @@
             "state" : "translated",
             "value" : "Importeren mislukt."
           }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não foi possível importar."
+          }
         }
       }
     },
@@ -7935,6 +8025,12 @@
             "state" : "translated",
             "value" : "JSON-reservekopie importeren…"
           }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importar backup JSON…"
+          }
         }
       }
     },
@@ -7947,6 +8043,12 @@
             "state" : "translated",
             "value" : "Septena-reservekopie importeren"
           }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importar backup do Septena"
+          }
         }
       }
     },
@@ -7958,6 +8060,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld items geïmporteerd."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld itens importados."
           }
         }
       }
@@ -11609,6 +11717,12 @@
             "state" : "translated",
             "value" : "Septena JSON-export bekijken en importeren"
           }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Visualize e importe uma exportação JSON do Septena"
+          }
         }
       }
     },
@@ -11978,6 +12092,12 @@
             "state" : "translated",
             "value" : "Alleen-lezen agenda in Vandaag en Binnenkort"
           }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agenda somente leitura em Hoje e Em breve"
+          }
         }
       }
     },
@@ -12007,6 +12127,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Leesbare checklist, gegroepeerd per gebied en project"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lista legível agrupada por área e projeto"
           }
         }
       }
@@ -13798,6 +13924,12 @@
             "state" : "translated",
             "value" : "Agenda-afspraken tonen"
           }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrar eventos do calendário"
+          }
         }
       }
     },
@@ -14413,6 +14545,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Spreadsheetvriendelijke tabel met taken"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tabela de tarefas pronta para planilhas"
           }
         }
       }

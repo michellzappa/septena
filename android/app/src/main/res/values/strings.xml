@@ -6,4 +6,7 @@
     <string name="widget_upcoming_description">Scheduled tasks coming up next.</string>
     <string name="widget_add_task">New Task</string>
     <string name="widget_complete_task">Complete task</string>
+    <string name="shortcut_inbox_label">Inbox</string>
+    <string name="process_text_add_to_septena">Add to Septena</string>
+    <string name="tile_quick_add_label">Add Task</string>
 </resources>
