@@ -2,7 +2,11 @@ package app.septena.android.widgets
 
 import app.septena.core.DayClock
 import app.septena.core.JsonValue
+import app.septena.core.QueuedOperation
+import app.septena.core.RejectedSyncOperation
 import app.septena.core.SyncOperation
+import app.septena.core.SyncOperationResult
+import app.septena.core.SyncPullPage
 import app.septena.core.SyncRecord
 import app.septena.core.SyncTurn
 import app.septena.core.TaskSnapshot
@@ -22,8 +26,9 @@ import java.time.LocalDate
 
 class SeptenaWidgetSnapshotTest {
     private val fixedClock = object : DayClock {
+        override fun today(): LocalDate = LocalDate.of(2026, 11, 25)
         override fun now(): Instant = Instant.parse("2026-11-25T10:00:00Z")
-        override fun today(instant: Instant): LocalDate = LocalDate.of(2026, 11, 25)
+        override fun today(at: Instant): LocalDate = LocalDate.of(2026, 11, 25)
     }
 
     private fun fakeMembership(snap: TaskSnapshot, today: LocalDate, @Suppress("UNUSED_PARAMETER") now: Instant): TaskViewMembership {
@@ -53,21 +58,18 @@ class SeptenaWidgetSnapshotTest {
     }
 
     private fun storeWith(records: List<SyncRecord>): TaskStore = object : TaskStore {
-        override suspend fun records(entity: String): List<SyncRecord> = records.filter { it.entity == entity }
         override suspend fun record(entity: String, id: String): SyncRecord? = records.firstOrNull { it.entity == entity && it.id == id }
+        override suspend fun records(entity: String): List<SyncRecord> = records.filter { it.entity == entity }
         override suspend fun turns(taskId: String): List<SyncTurn> = emptyList()
+        override suspend fun writeLocalAndEnqueue(record: SyncRecord, operation: SyncOperation, notBefore: Instant) = Unit
+        override suspend fun appendTurnAndEnqueue(taskId: String, turn: Map<String, JsonValue>, operation: SyncOperation.AppendTurn) = Unit
+        override suspend fun claimPendingOperations(limit: Int, now: Instant): List<QueuedOperation> = emptyList()
+        override suspend fun applyPushResults(results: List<SyncOperationResult>, at: Instant) = Unit
+        override suspend fun notSyncedOperations(): List<RejectedSyncOperation> = emptyList()
+        override suspend fun retryNotSynced(clientOpId: String, replacementClientOpId: String) = Unit
+        override suspend fun applyPullPage(page: SyncPullPage, at: Instant) = Unit
         override suspend fun syncCursor(): Long = 0L
-        override suspend fun outbox(): List<SyncOperation> = emptyList()
-        override suspend fun writeLocalAndEnqueue(record: SyncRecord, operation: SyncOperation) = Unit
-        override suspend fun appendLocalTurnAndEnqueue(turn: SyncTurn, operation: SyncOperation) = Unit
-        override suspend fun applyPull(
-            cursor: Long,
-            records: List<SyncRecord>,
-            turns: List<SyncTurn>,
-            ackedClientOpIds: Set<String>,
-        ) = Unit
-        override suspend fun dropOutbox(clientOpIds: Set<String>) = Unit
-        override suspend fun resetAll() = Unit
+        override suspend fun resetForFullPull() = Unit
     }
 
     private fun openTask(id: String, title: String, extra: Map<String, JsonValue> = emptyMap()): SyncRecord = SyncRecord(
