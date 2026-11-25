@@ -385,6 +385,12 @@ export class TaskStore extends DurableObject<Env> {
     if (!changeCols.has("diff")) this.sql.exec("ALTER TABLE changes ADD COLUMN diff TEXT");
     if (!changeCols.has("reason")) this.sql.exec("ALTER TABLE changes ADD COLUMN reason TEXT");
     if (this.meta("notesV1") === 0) this.ctx.storage.transactionSync(() => this.migrateNotesV1());
+    if (this.meta("staleFadesV1") === 0) {
+      this.ctx.storage.transactionSync(() => {
+        this.endStaleFades();
+        this.setMeta("staleFadesV1", 1);
+      });
+    }
     if (this.meta("issueRefsV1") === 0) {
       // A store must open even when this fails. The next start tries again.
       try {
@@ -396,6 +402,30 @@ export class TaskStore extends DurableObject<Env> {
         logEvent("issue_refs_backfill_failed", { error: e instanceof CoreInputError ? e.message : "unexpected" });
       }
     }
+  }
+
+  /// True when an open row is marked faded and may not be
+  /// (docs/TASK_FADE_SPEC.md §4.1): it has a deadline, or a touch is newer
+  /// than the fade. The second case is a device that pushes an old fade over
+  /// a task the human touched since.
+  private fadeEnds(task: Record<string, unknown>): boolean {
+    if (!task.fadedAt || task.status !== "open") return false;
+    if (task.deadline) return true;
+    return !!task.touchedAt && Date.parse(task.touchedAt as string) > Date.parse(task.fadedAt as string);
+  }
+
+  /// One time: ends the fade of every row `fadeEnds` is true for, so rows
+  /// written before the rule come back on every device.
+  endStaleFades(): number {
+    const now = new Date().toISOString();
+    const rows = this.sql.exec("SELECT * FROM tasks WHERE fadedAt IS NOT NULL AND deletedAt IS NULL").toArray()
+      .filter((r) => this.fadeEnds(r));
+    for (const r of rows) {
+      const rev = this.nextRev();
+      this.sql.exec("UPDATE tasks SET fadedAt = NULL, rev = ?, updatedAt = ? WHERE id = ?", rev, now, r.id);
+      this.log(rev, "task", r.id as string, "upsert", ["fadedAt"], null, "system:migration", now, { fadedAt: [r.fadedAt, null] });
+    }
+    return rows.length;
   }
 
   /// One time (docs/TASK_REFERENCES_SPEC.md §6.6, ADR 0033): every task whose
@@ -893,6 +923,11 @@ export class TaskStore extends DurableObject<Env> {
       }
     }
 
+    if (op.entity === "task" && this.fadeEnds({ ...row, ...op.fields })) {
+      if (!names.includes("fadedAt")) names.push("fadedAt");
+      op.fields.fadedAt = null;
+    }
+
     const rev = this.nextRev();
     const cols = Object.entries(spec.columns);
     if (!row) {
@@ -1249,6 +1284,8 @@ export class TaskStore extends DurableObject<Env> {
         Object.assign(next, { project: projectId, source: "app", acknowledgedAt: now, touchedAt: now, status: next.status ?? "open" });
       }
     }
+    // Another member's deadline ends the fade here too.
+    if (entity === "task" && before && this.fadeEnds({ ...before, ...next })) next.fadedAt = null;
     const names = Object.keys(next);
     if (!names.length) return;
     const rev = this.nextRev();
