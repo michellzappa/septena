@@ -15,6 +15,18 @@ import UIKit
 /// The flow itself: a nonce for Apple, then the identity token to the backend.
 @MainActor
 enum SeptaskSignIn {
+  /// Whether this build may use native Sign in with Apple. Apple grants that
+  /// entitlement to App Store and development builds only, never to a
+  /// Developer ID one, so the Mac download signs in with a code (ADR 0016).
+  static let appleAvailable: Bool = {
+    #if os(macOS)
+    guard let task = SecTaskCreateFromSelf(nil) else { return false }
+    return SecTaskCopyValueForEntitlement(task, "com.apple.developer.applesignin" as CFString, nil) != nil
+    #else
+    return true
+    #endif
+  }()
+
   /// Fills Apple's request. Returns the raw nonce, which the backend needs.
   static func prepare(_ request: ASAuthorizationAppleIDRequest) -> String {
     let nonce = TaskBackendClient.makeNonce()
@@ -65,6 +77,10 @@ struct SeptaskSignInButton: View {
     VStack(alignment: .leading, spacing: 6) {
       if working {
         ProgressView().controlSize(.small)
+      } else if !SeptaskSignIn.appleAvailable {
+        #if os(macOS)
+        SeptaskDeviceSignInButton()
+        #endif
       } else {
         SignInWithAppleButton(.signIn) { request in
           rawNonce = SeptaskSignIn.prepare(request)
@@ -117,7 +133,9 @@ struct SeptaskSyncAccountSection: View {
         Text(header)
       }
     } footer: {
-      Text("Your tasks sync through Septena's own server at api.septena.app. Sign in with Apple once on each device.")
+      if SeptaskSignIn.appleAvailable {
+        Text("Your tasks sync through Septena's own server at api.septena.app. Sign in with Apple once on each device.")
+      }
     }
   }
 
@@ -126,6 +144,7 @@ struct SeptaskSyncAccountSection: View {
       return String(localized: "Not signed in. \(sync.pendingOps) changes are waiting on this device and sync when you sign in.",
                     comment: "Septask sync: signed out with queued edits")
     }
+    if !SeptaskSignIn.appleAvailable { return RegistryDeviceSignIn.intro }
     return String(localized: "Your tasks stay on this device. Sign in with Apple when you want to sync across devices.",
                   comment: "Septask sync: free no-account mode")
   }
@@ -247,6 +266,10 @@ final class SeptaskAppKitSignIn: NSObject, ASAuthorizationControllerDelegate,
 
   func start() {
     guard controller == nil else { return }
+    guard SeptaskSignIn.appleAvailable else {
+      SeptaskDeviceSignInWindow.present()
+      return
+    }
     let request = ASAuthorizationAppleIDProvider().createRequest()
     rawNonce = SeptaskSignIn.prepare(request)
     let controller = ASAuthorizationController(authorizationRequests: [request])

@@ -1795,6 +1795,18 @@ enum RegistryTaskReferences {
   static let failedMessage: String = RegistryL10n.t("Couldn’t add the reference.")
 }
 
+/// Sign-in by device approval (`registry/surfaces.json` `deviceSignIn`).
+enum RegistryDeviceSignIn {
+  static let title: String = RegistryL10n.t("Sign in to Septena")
+  static let intro: String = RegistryL10n.t("Use a device where Septena is already signed in.")
+  static let start: String = RegistryL10n.t("Get a sign-in code")
+  static let approve: String = RegistryL10n.t("On your iPhone, iPad or Mac, open Septena and go to Settings ▸ Account ▸ Approve a sign-in. Tap Scan Code and point the camera at this screen, or enter this code:")
+  static let lifetime: String = RegistryL10n.t("The code works for 10 minutes. After you approve it, this screen continues by itself.")
+  static let expired: String = RegistryL10n.t("The code expired.")
+  static let unreachable: String = RegistryL10n.t("Could not reach Septena.")
+  static let retry: String = RegistryL10n.t("Get a new code")
+}
+
 /// One button in the first run. `action` is one of a closed set the client implements.
 struct RegistryFirstRunButton: Sendable, Hashable {
   let title: String

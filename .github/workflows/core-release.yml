@@ -100,4 +100,4 @@ jobs:
           gh release create "$GITHUB_REF_NAME" "$RUNNER_TEMP"/assets/* \
             --title "Shared core $VERSION" \
             --notes "Shared Rust core $VERSION (ADR 0025). Built and tested by core.yml: every conformance vector passed in each packaged artifact. Pin it with \`scripts/core-pin.sh $VERSION\`." \
-            --verify-tag
+            --verify-tag --latest=false

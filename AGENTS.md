@@ -133,6 +133,10 @@ Full guide: `docs/VERSIONING.md`. The rules that bite:
   live activity) reads `$(CURRENT_PROJECT_VERSION)`/`$(MARKETING_VERSION)` so the
   whole bundle stays version-consistent — mismatched extensions fail App Store
   validation.
+- **0.9.x is the public beta on every platform (mz, 2026-11-25).** The Mac
+  download ships with `scripts/release-macos.sh` from mz-mini, when mz says
+  release (`docs/RELEASING-MAC.md`). The newest GitHub release must be a Mac
+  release: installed copies read their update feed from it.
 - **SemVer, pre-1.0.** Bump MINOR (`0.2.0`) for a batch of user-facing
   features, PATCH (`0.1.1`) for fixes-only. `1.0.0` = public App Store launch.
 - **The cron keeps an `"Unreleased"` changelog entry current.** Each run,
