@@ -21,6 +21,7 @@ import app.septena.core.TaskMutator
 import app.septena.core.TaskSyncEngine
 import app.septena.core.UuidTaskIdGenerator
 import app.septena.core.WireTimestamp
+import app.septena.core.asSyncRecord
 import app.septena.core.generated.RegistryEntityEnums
 import app.septena.core.generated.RegistryEntityFields
 import app.septena.core.generated.RegistryEntityNames
