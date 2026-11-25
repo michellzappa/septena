@@ -486,7 +486,6 @@ export class TaskStore extends DurableObject<Env> {
   ): { reason: string; current?: { notes: string | null; noteRev: number } } | null {
     const field = NOTE_FIELD[container];
     if (!(field in op.fields)) return null;
-    if (this.readSetting("agentsPaused") === true) return { reason: "paused" };
     if (!row) return null; // A new container has nothing to overwrite.
     const before = (row[field] as string | null) ?? null;
     const noteRev = (row.noteRev as number | null) ?? 0;
@@ -1308,13 +1307,16 @@ export class TaskStore extends DurableObject<Env> {
   }
 
   /// The rules an agent write must pass, enforced here so no connector can
-  /// skip them: the stop is the human's alone, a stopped task takes no agent
-  /// writes at all, and an agent cannot mark an agent-worked task done —
-  /// only the human accepts it after review (`human_accepts`).
+  /// skip them: the stop and the pause are the human's alone, a paused account
+  /// takes no agent writes at all, nor does a stopped task, and an agent cannot
+  /// mark an agent-worked task done — only the human accepts it after review
+  /// (`human_accepts`). Ending a claim (`release`) is not an op, so an agent
+  /// can still let go of a task.
   private agentRefusal(op: Op): string | null {
     if (op.op !== "appendTurn" && op.entity === "doSession") return "human_only_do";
     if (op.op === "upsert" && op.entity === "convo" && "stoppedAt" in op.fields) return "human_only:stoppedAt";
     if (op.op === "upsert" && op.entity === "setting" && op.id === "agentsPaused") return "human_only:agentsPaused";
+    if (this.readSetting("agentsPaused") === true) return "paused";
     if (op.op === "upsert" && op.entity === "project" && "context" in op.fields) return "retired:context";
     if (op.op === "upsert" && op.entity === "task") {
       const appOnly = APP_ONLY_TASK_FIELDS.find((f) => f in op.fields);
@@ -1327,7 +1329,6 @@ export class TaskStore extends DurableObject<Env> {
       : op.entity === "taskRef" ? this.taskRefTaskId(op)
       : null;
     if (taskId && this.convoStopped(taskId)) return "stopped";
-    if (op.op !== "appendTurn" && op.entity === "taskRef" && this.readSetting("agentsPaused") === true) return "paused";
     if (op.op === "upsert" && op.entity === "task" && op.fields.status === "done" && this.convoRequiresHumanAccept(op.id)) {
       return "human_accepts";
     }

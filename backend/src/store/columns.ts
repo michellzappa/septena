@@ -90,8 +90,8 @@ export const SETTING_VALUES = {
   /// IANA zone of the device that last opened the app. The MCP connector
   /// reads it for "today".
   homeTimezone: z.string().max(64).refine(isValidTz, "unknown time zone"),
-  /// "Pause all agents" (docs/TASK_FACTORY_SPEC.md §10). While true, no
-  /// agent claim succeeds and the agent queue reads as empty.
+  /// "Pause all agents" (docs/TASK_FACTORY_SPEC.md §10). While true, the
+  /// store refuses every agent write and claim, and the agent queue reads as empty.
   agentsPaused: z.boolean(),
   /// "Get started" checklist (Septask): true once dismissed or all steps finished.
   getStartedDismissed: z.boolean(),
