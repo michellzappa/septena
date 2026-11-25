@@ -144,7 +144,7 @@ private final class KitReferenceRowView: NSView {
   }
 
   private func rowMenu() -> NSMenu? {
-    KitRegistryMenu.build(RegistryActions.menu("task.reference"),
+    KitRegistryMenu.build(RegistryActions.menu(.taskReference),
                           bind: { TaskRefActions.bind($0, row: self.row, navigation: nil) })
   }
 
@@ -230,7 +230,7 @@ private final class KitAddReferenceBoard: NSView, NSTextFieldDelegate {
     super.init(frame: .zero)
     translatesAutoresizingMaskIntoConstraints = false
 
-    let heading = NSTextField(labelWithString: RegistryActions.title("task.addReference", .short))
+    let heading = NSTextField(labelWithString: RegistryActions.title(.taskAddReference, .short))
     heading.font = SeptaskKitTheme.chip
     heading.textColor = SeptaskKitTheme.inkSecondary
 

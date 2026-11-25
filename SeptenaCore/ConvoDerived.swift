@@ -95,7 +95,7 @@ enum AgentStage: String, CaseIterable, Sendable {
 
   /// Registry title + symbol for this stage's section header.
   var group: RegistryDestinationGroup? {
-    RegistryDestinations.groups["agent"]?.first { $0.id == rawValue }
+    RegistryDestinations.groups[.agent]?.first { $0.id == rawValue }
   }
 }
 

@@ -905,7 +905,7 @@ struct ProjectDetailView: View {
       Button {
         nav.shouldCreateHeading = true
       } label: {
-        Label(RegistryActions.title("section.new"), systemImage: "rectangle.split.1x2")
+        Label(RegistryActions.title(.sectionNew), systemImage: "rectangle.split.1x2")
       }
       Divider()
       Button {
@@ -916,18 +916,18 @@ struct ProjectDetailView: View {
       Button {
         setStatus(.done)
       } label: {
-        Label(RegistryActions.title("project.markDone"), systemImage: "checkmark.circle")
+        Label(RegistryActions.title(.projectMarkDone), systemImage: "checkmark.circle")
       }
       Button {
         setStatus(.cancelled)
       } label: {
-        Label(RegistryActions.title("project.cancel"), systemImage: "xmark.circle")
+        Label(RegistryActions.title(.projectCancel), systemImage: "xmark.circle")
       }
       Divider()
       Button(role: .destructive) {
         showingDeleteConfirm = true
       } label: {
-        Label(RegistryActions.title("project.delete"), systemImage: "trash")
+        Label(RegistryActions.title(.projectDelete), systemImage: "trash")
       }
     }
   }
@@ -1082,7 +1082,7 @@ struct ProjectDetailView: View {
   /// every pass.
   private var deleteCopy: RegistryPromptCopy {
     guard showingDeleteConfirm else {
-      return RegistryPromptCopy(id: "deleteProject", title: "", message: "", confirmTitle: nil, options: [])
+      return RegistryPromptCopy(id: .deleteProject, title: "", message: "", confirmTitle: nil, options: [])
     }
     return RegistryPrompts.deleteProject(id: project.id, title: project.title, context: modelContext)
   }

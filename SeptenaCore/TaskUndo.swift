@@ -238,7 +238,7 @@ enum TaskUndo {
                                   position: Double? = nil,
                                   mutator: TaskMutator) {
     recordCreate(
-      name: RegistryActions.title("section.new"),
+      name: RegistryActions.title(.sectionNew),
       ids: [id],
       mutator: mutator,
       rebuild: { [mutator] in

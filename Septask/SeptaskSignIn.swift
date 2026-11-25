@@ -122,7 +122,7 @@ struct SeptaskSyncAccountSection: View {
         Button(role: .destructive) {
           Task { await sync.signOut() }
         } label: {
-          Label(RegistryActions.title("account.signOut"), systemImage: "rectangle.portrait.and.arrow.right")
+          Label(RegistryActions.title(.accountSignOut), systemImage: "rectangle.portrait.and.arrow.right")
         }
       } else {
         Text(signedOutLine).foregroundStyle(.secondary)

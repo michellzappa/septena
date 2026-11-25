@@ -42,7 +42,7 @@ struct TaskNavMenu<Trigger: View>: View {
   /// Smart lists that hide while empty and currently have rows. Read once per
   /// task change, not per render: iOS builds the `Menu` content on every
   /// body pass, and the read runs five filtered fetches of the whole store.
-  @State private var nonEmptyIDs: Set<String> = []
+  @State private var nonEmptyIDs: Set<RegistryDestinationID> = []
 
   var body: some View {
     Menu {

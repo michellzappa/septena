@@ -212,12 +212,9 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
   /// "Added by Claude" / "Added by You": the provenance label and the name,
   /// for the row glyph's accessibility label and tooltip.
   var addedByPhrase: String {
-    let label = RegistrySurfaces.taskPageBlocks.first { $0.id == Self.provenanceBlockID }?.label ?? ""
+    let label = RegistrySurfaces.taskPageBlock(.provenance).label ?? ""
     return "\(label) \(addedByName)"
   }
-
-  /// The task page block that owns the provenance copy (`surfaces.json`).
-  private static let provenanceBlockID = "taskPage.provenance"
 
   /// True while this row should glow as a freshly agent-created item the
   /// user hasn't engaged yet. Provenance (`source`) is permanent; this cue
@@ -1122,8 +1119,8 @@ enum TaskFilter: Equatable, Hashable {
     case .unscheduled: return "unscheduled"
     case .starred: return "starred"
     case .logbook: return "logbook"
-    case .faded: return "faded"
-    case .recentlyDeleted: return "recentlyDeleted"
+    case .faded: return RegistryDestinationID.faded.rawValue
+    case .recentlyDeleted: return RegistryDestinationID.recentlyDeleted.rawValue
     case .project(let id): return "project.\(id)"
     case .area(let id): return "area.\(id)"
     }
@@ -1131,36 +1128,36 @@ enum TaskFilter: Equatable, Hashable {
 
   /// Canonical `registry/destinations.json` ID for smart-list filters, or nil
   /// for area/project/triage filters.
-  var destinationID: String? {
+  var destinationID: RegistryDestinationID? {
     switch self {
-    case .today: return "today"
-    case .review: return "review"
-    case .agent: return "agent"
-    case .upcoming: return "upcoming"
-    case .repeating: return "repeating"
-    case .unscheduled: return "anytime"
-    case .logbook: return "logbook"
-    case .starred: return "starred"
-    case .faded: return "faded"
-    case .recentlyDeleted: return "recentlyDeleted"
+    case .today: return .today
+    case .review: return .review
+    case .agent: return .agent
+    case .upcoming: return .upcoming
+    case .repeating: return .repeating
+    case .unscheduled: return .anytime
+    case .logbook: return .logbook
+    case .starred: return .starred
+    case .faded: return .faded
+    case .recentlyDeleted: return .recentlyDeleted
     case .triage, .project, .area: return nil
     }
   }
 
   /// Maps a canonical `registry/destinations.json` ID back to its `TaskFilter`.
-  init?(destinationID: String) {
+  init?(destinationID: RegistryDestinationID) {
     switch destinationID {
-    case "today": self = .today
-    case "review": self = .review
-    case "agent": self = .agent
-    case "upcoming": self = .upcoming
-    case "repeating": self = .repeating
-    case "anytime", "unscheduled": self = .unscheduled
-    case "logbook": self = .logbook
-    case "starred": self = .starred
-    case "faded": self = .faded
-    case "recentlyDeleted": self = .recentlyDeleted
-    default: return nil
+    case .today: self = .today
+    case .review: self = .review
+    case .agent: self = .agent
+    case .upcoming: self = .upcoming
+    case .repeating: self = .repeating
+    case .anytime: self = .unscheduled
+    case .logbook: self = .logbook
+    case .starred: self = .starred
+    case .faded: self = .faded
+    case .recentlyDeleted: self = .recentlyDeleted
+    case .inbox: return nil
     }
   }
 

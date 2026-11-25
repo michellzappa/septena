@@ -69,14 +69,14 @@ struct SeptaskFirstRunView: View {
   @Environment(SettingsStore.self) private var settings
   @Environment(DayClock.self) private var dayClock
   @Environment(\.modelContext) private var modelContext
-  @State private var currentID: String = RegistryFirstRun.steps.first?.id ?? ""
-  @State private var history: [String] = []
+  @State private var currentID: RegistryFirstRunStepID = RegistryFirstRun.steps.first?.id ?? .welcome
+  @State private var history: [RegistryFirstRunStepID] = []
   /// Sign-in found an account that already finished its first run.
   @State private var returning = false
   @State private var checkingAccount = false
   /// Step ids whose work is done (paired, imported): they show `afterDone`.
-  @State private var doneSteps: Set<String> = []
-  @State private var copiedAction: String?
+  @State private var doneSteps: Set<RegistryFirstRunStepID> = []
+  @State private var copiedAction: RegistryFirstRunActionID?
   @State private var showingThings = false
   @State private var showingReminders = false
   @State private var taskCountBeforeImport = 0
@@ -287,30 +287,28 @@ struct SeptaskFirstRunView: View {
 
   // MARK: Actions (the closed set `scripts/gen-registries.mjs` allows)
 
-  private func perform(_ action: String, in step: RegistryFirstRunStep) {
+  private func perform(_ action: RegistryFirstRunActionID, in step: RegistryFirstRunStep) {
     switch action {
-    case "next":
+    case .next:
       advance(from: step)
-    case "finish":
+    case .finish:
       finish()
-    case "signIn":
+    case .signIn:
       // The Apple button starts sign-in itself; `onChange(of: signedIn)`
       // continues the flow.
       break
-    case "importThings":
+    case .importThings:
       taskCountBeforeImport = taskCount()
       showingThings = true
-    case "importReminders":
+    case .importReminders:
       taskCountBeforeImport = taskCount()
       showingReminders = true
-    case "copySetupPrompt":
+    case .copySetupPrompt:
       SeptaskClipboard.copy(RegistryFirstRun.setupPrompt)
       copiedAction = action
-    case "copyFirstPrompt":
+    case .copyFirstPrompt:
       SeptaskClipboard.copy(RegistryFirstRun.firstPrompt)
       copiedAction = action
-    default:
-      break
     }
   }
 
@@ -335,7 +333,7 @@ struct SeptaskFirstRunView: View {
     let platform = SeptaskFirstRunGate.platform
     if step.kind == "account" {
       // A build without Sign in with Apple takes the code step, as Android does.
-      let usesCode = step.id == "accountDevice"
+      let usesCode = step.id == .accountDevice
       if usesCode == SeptaskSignIn.appleAvailable { return false }
     } else if !step.platforms.isEmpty, !step.platforms.contains(platform) {
       return false

@@ -21,8 +21,8 @@ struct SeptaskApproveSignInFlow: View {
   /// replaces (a connection id; nil = a new agent).
   @State private var agentName = ""
   @State private var replaces: String?
-  private static let namePrompt = RegistryPrompts.text["nameAgent"]
-  private static let replacesPrompt = RegistryPrompts.fixed["agentReplaces"]
+  private static let namePrompt = RegistryPrompts.text[.nameAgent]
+  private static let replacesPrompt = RegistryPrompts.fixed[.agentReplaces]
 
   private enum Step: Equatable {
     case enter

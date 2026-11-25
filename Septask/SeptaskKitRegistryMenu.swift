@@ -33,7 +33,7 @@ enum KitRegistryMenu {
 
   /// Resolve and build in one step.
   static func build(_ items: [RegistryMenuItem],
-                    bind: (String) -> RegistryActionBinding?,
+                    bind: (RegistryActionID) -> RegistryActionBinding?,
                     slot: (String) -> [RegistryMenuNode] = { _ in [] }) -> NSMenu {
     build(RegistryMenuResolver.resolve(items, bind: bind, slot: slot))
   }

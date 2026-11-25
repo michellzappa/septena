@@ -240,7 +240,7 @@ protocol KitInlineSurfaceHost: AnyObject {
                 focus: NSView?, onClose: (() -> Void)?) -> KitInlineFold
   /// The anchor of another attribute's row in the same pane, for a surface
   /// that hands off to the next one (When's Repeat row opens Repeat).
-  func inlineAnchor(forAttribute attributeId: String) -> KitSurfaceAnchor?
+  func inlineAnchor(forAttribute attributeId: RegistryTaskAttributeID) -> KitSurfaceAnchor?
 }
 
 /// One open fold. The host holds it; a `KitPopoverHandle` holds it weakly,
@@ -278,7 +278,7 @@ final class KitInlineFold {
 extension KitSurfaceAnchor {
   /// The row for `attributeId` in the same pane, when this anchor is a row
   /// that folds its surface open in a pane. Nil otherwise.
-  func inlineSibling(attribute attributeId: String) -> KitSurfaceAnchor? {
+  func inlineSibling(attribute attributeId: RegistryTaskAttributeID) -> KitSurfaceAnchor? {
     guard case .rect(_, let view) = self,
           let inline = view as? KitInlineSurfaceAnchor,
           let host = inline.inlineHost else { return nil }

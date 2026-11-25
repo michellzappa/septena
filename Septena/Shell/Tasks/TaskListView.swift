@@ -704,21 +704,21 @@ struct TaskListView: View {
         SeptaskPlusSheet(upsellID: plusSheetUpsell)
       }
       .confirmationDialog(
-        RegistryPrompts.prompt("rescheduleFixedRepeat").title,
+        RegistryPrompts.prompt(.rescheduleFixedRepeat).title,
         isPresented: Binding(
           get: { reschedulePrompt != nil },
           set: { if !$0 { reschedulePrompt = nil } }
         ),
         titleVisibility: .visible
       ) {
-        Button(RegistryPrompts.prompt("rescheduleFixedRepeat").optionTitle("exception")) {
+        Button(RegistryPrompts.prompt(.rescheduleFixedRepeat).optionTitle(.exception)) {
           guard let prompt = reschedulePrompt else { return }
           reschedulePrompt = nil
           for id in prompt.taskIDs {
             applyScheduledWhen(id: id, date: prompt.date, mode: .makeException)
           }
         }
-        Button(RegistryPrompts.prompt("rescheduleFixedRepeat").optionTitle("updateRule")) {
+        Button(RegistryPrompts.prompt(.rescheduleFixedRepeat).optionTitle(.updateRule)) {
           guard let prompt = reschedulePrompt else { return }
           reschedulePrompt = nil
           for id in prompt.taskIDs {
@@ -727,7 +727,7 @@ struct TaskListView: View {
         }
         Button(RegistryPrompts.cancelTitle, role: .cancel) { reschedulePrompt = nil }
       } message: {
-        Text(RegistryPrompts.prompt("rescheduleFixedRepeat").message)
+        Text(RegistryPrompts.prompt(.rescheduleFixedRepeat).message)
       }
     // A rolled-back save is reported here, on the surface where a lost task is
     // noticed. NOT the snackbar below it: that is a one-line auto-dismissing
@@ -873,43 +873,43 @@ struct TaskListView: View {
     }
     // Section (heading) create — a standard alert TextField, never an inline
     // row field (the macOS selectable-List focus trap). See ORDERING_AND_HEADINGS_PLAN.
-    .alert(RegistryPrompts.textPrompt("newSection").title, isPresented: Binding(
+    .alert(RegistryPrompts.textPrompt(.newSection).title, isPresented: Binding(
       get: { headingCreateProject != nil },
       set: { if !$0 { headingCreateProject = nil } }
     )) {
-      TextField(RegistryPrompts.textPrompt("newSection").placeholder, text: $headingDraftTitle)
-      Button(RegistryPrompts.textPrompt("newSection").confirmTitle) {
+      TextField(RegistryPrompts.textPrompt(.newSection).placeholder, text: $headingDraftTitle)
+      Button(RegistryPrompts.textPrompt(.newSection).confirmTitle) {
         if let pid = headingCreateProject { commitHeadingCreate(title: headingDraftTitle, project: pid) }
         headingCreateProject = nil
       }
       Button(RegistryPrompts.cancelTitle, role: .cancel) { headingCreateProject = nil }
     }
-    .alert(RegistryPrompts.textPrompt("renameSection").title, isPresented: Binding(
+    .alert(RegistryPrompts.textPrompt(.renameSection).title, isPresented: Binding(
       get: { headingRenameTarget != nil },
       set: { if !$0 { headingRenameTarget = nil } }
     )) {
-      TextField(RegistryPrompts.textPrompt("renameSection").placeholder, text: $headingDraftTitle)
-      Button(RegistryPrompts.textPrompt("renameSection").confirmTitle) {
+      TextField(RegistryPrompts.textPrompt(.renameSection).placeholder, text: $headingDraftTitle)
+      Button(RegistryPrompts.textPrompt(.renameSection).confirmTitle) {
         if let h = headingRenameTarget { commitHeadingRename(h, title: headingDraftTitle) }
         headingRenameTarget = nil
       }
       Button(RegistryPrompts.cancelTitle, role: .cancel) { headingRenameTarget = nil }
     }
     .confirmationDialog(
-      RegistryPrompts.prompt("deleteSection").title,
+      RegistryPrompts.prompt(.deleteSection).title,
       isPresented: Binding(
         get: { headingDeleteTarget != nil },
         set: { if !$0 { headingDeleteTarget = nil } }
       ),
       titleVisibility: .visible
     ) {
-      Button(RegistryPrompts.prompt("deleteSection").confirmTitle ?? "", role: .destructive) {
+      Button(RegistryPrompts.prompt(.deleteSection).confirmTitle ?? "", role: .destructive) {
         if let h = headingDeleteTarget { mutator.delete(id: h.id); Task { await load() } }
         headingDeleteTarget = nil
       }
       Button(RegistryPrompts.cancelTitle, role: .cancel) { headingDeleteTarget = nil }
     } message: {
-      Text(RegistryPrompts.prompt("deleteSection").message)
+      Text(RegistryPrompts.prompt(.deleteSection).message)
     }
     // Registry `clearLogged`, the same copy the AppKit shell's sheet shows.
     .confirmationDialog(
@@ -1799,7 +1799,7 @@ struct TaskListView: View {
       Spacer(minLength: 4)
 
       Button { openWhenForSelected() } label: {
-        Label(RegistrySurfaces.taskAttribute("when").label, systemImage: "calendar")
+        Label(RegistrySurfaces.taskAttribute(.when).label, systemImage: "calendar")
           .labelStyle(.iconOnly)
           .frame(width: 40, height: 38)
           .contentShape(Rectangle())
@@ -1807,7 +1807,7 @@ struct TaskListView: View {
       .accessibilityLabel("Schedule selected tasks")
 
       Button { openMoveForSelected() } label: {
-        Label(RegistryActions.title("task.move", .short), systemImage: "arrow.right.circle")
+        Label(RegistryActions.title(.taskMove, .short), systemImage: "arrow.right.circle")
           .labelStyle(.iconOnly)
           .frame(width: 40, height: 38)
           .contentShape(Rectangle())
@@ -1827,7 +1827,7 @@ struct TaskListView: View {
       .accessibilityLabel("Move selected tasks")
 
       Button { toggleSelected() } label: {
-        Label(RegistryActions.title("task.toggleComplete", .short), systemImage: "checkmark.circle")
+        Label(RegistryActions.title(.taskToggleComplete, .short), systemImage: "checkmark.circle")
           .labelStyle(.iconOnly)
           .frame(width: 40, height: 38)
           .contentShape(Rectangle())
@@ -1846,7 +1846,7 @@ struct TaskListView: View {
         Button {
           toggleTodayForSelected()
         } label: {
-          Label(allSelectedAreToday ? RegistryActions.title("task.toggleToday", .remove) : RegistryActions.title("task.toggleToday", .add),
+          Label(allSelectedAreToday ? RegistryActions.title(.taskToggleToday, .remove) : RegistryActions.title(.taskToggleToday, .add),
                 systemImage: allSelectedAreToday ? "sun.max" : "sun.max.fill")
         }
         Button {
@@ -1858,14 +1858,14 @@ struct TaskListView: View {
         Button {
           selectAllOrClearVisibleTasks()
         } label: {
-          Label(RegistryActions.title("task.selectAll", allSelectableVisibleSelected ? .active : .base),
+          Label(RegistryActions.title(.taskSelectAll, allSelectableVisibleSelected ? .active : .base),
                 systemImage: allSelectableVisibleSelected ? "checklist.unchecked" : "checklist")
         }
         Divider()
         Button(role: .destructive) {
           cancelSelected()
         } label: {
-          Label(RegistryActions.title("task.cancel", .plural), systemImage: "xmark.circle")
+          Label(RegistryActions.title(.taskCancel, .plural), systemImage: "xmark.circle")
         }
       } label: {
         Label("More", systemImage: "ellipsis.circle")
@@ -1896,10 +1896,10 @@ struct TaskListView: View {
         .font(.septenaMeta)
         .foregroundStyle(Theme.inkSecondary)
       Spacer(minLength: 0)
-      Button(RegistrySurfaces.taskAttribute("when").label) { openWhenForSelected() }
+      Button(RegistrySurfaces.taskAttribute(.when).label) { openWhenForSelected() }
       Button("Copy") { copyTasks(orderedActionIDs()) }
-      Button(RegistryActions.title("task.move", .short)) { openMoveForSelected() }
-      Button(RegistryActions.title("task.toggleComplete", .short)) { toggleSelected() }
+      Button(RegistryActions.title(.taskMove, .short)) { openMoveForSelected() }
+      Button(RegistryActions.title(.taskToggleComplete, .short)) { toggleSelected() }
       Button("Delete", role: .destructive) { deleteSelected() }
     }
     .padding(.horizontal, Theme.hPadding)
@@ -2510,7 +2510,7 @@ struct TaskListView: View {
             Button(role: .destructive) {
               requestEmptyTrash()
             } label: {
-              Label(RegistryActions.title("task.emptyTrash"), systemImage: "trash")
+              Label(RegistryActions.title(.taskEmptyTrash), systemImage: "trash")
                 .font(.septenaCaption.weight(.medium))
                 .foregroundStyle(Color.red)
                 .padding(.horizontal, 10)
@@ -2615,10 +2615,10 @@ struct TaskListView: View {
       toggleNoticeStep(step)
     } label: {
       if step.done {
-        Label(RegistryActions.title("notice.toggleStep", .active),
+        Label(RegistryActions.title(.noticeToggleStep, .active),
               systemImage: "circle")
       } else {
-        Label(RegistryActions.title("notice.toggleStep"),
+        Label(RegistryActions.title(.noticeToggleStep),
               systemImage: "checkmark.circle")
       }
     }
@@ -2626,7 +2626,7 @@ struct TaskListView: View {
     Button {
       dismissNotice(.getStarted)
     } label: {
-      Label(RegistryActions.title("notice.hideGetStarted"),
+      Label(RegistryActions.title(.noticeHideGetStarted),
             systemImage: "eye.slash")
     }
   }
@@ -3076,15 +3076,15 @@ struct TaskListView: View {
   private func headingContextMenu(_ heading: SeptenaTask) -> some View {
     // Registry `project.heading`, the same menu the AppKit shell renders.
     RegistryMenuContent(nodes: RegistryMenuResolver.resolve(
-      RegistryActions.menu("project.heading")) { id in
+      RegistryActions.menu(.projectHeading)) { id in
         switch id {
-        case "section.rename":
+        case .sectionRename:
           return .init {
             headingDraftTitle = heading.title
             headingRenameTarget = heading
           }
-        case "section.newTask": return .init { startCreateUnderHeading(heading) }
-        case "section.delete": return .init { headingDeleteTarget = heading }
+        case .sectionNewTask: return .init { startCreateUnderHeading(heading) }
+        case .sectionDelete: return .init { headingDeleteTarget = heading }
         default: return nil
         }
       })
@@ -3328,8 +3328,8 @@ struct TaskListView: View {
   @ViewBuilder
   private var scopeLoggedContextMenu: some View {
     RegistryMenuContent(nodes: RegistryMenuResolver.resolve(
-      RegistryActions.menu("scope.loggedFooter")) { id in
-        guard id == "logged.clear" else { return nil }
+      RegistryActions.menu(.scopeLoggedFooter)) { id in
+        guard id == .loggedClear else { return nil }
         return .init { requestClearLogged() }
       })
   }
@@ -3664,7 +3664,7 @@ struct TaskListView: View {
     let undoBefore = scheduleSnapshots(ids)
     for id in ids { mutator.apply(.removeFromToday, to: id) }
     TaskUndo.recordScheduleChange(
-      name: RegistryActions.title("task.toggleToday", .remove),
+      name: RegistryActions.title(.taskToggleToday, .remove),
       before: undoBefore, context: modelContext, mutator: mutator)
     if filter == .today {
       func drop(_ list: inout [SeptenaTask]) {
@@ -3687,7 +3687,7 @@ struct TaskListView: View {
     // one undo group because `TaskUndo.manager.groupsByEvent` is true, so a
     // single gesture stays a single ⌘Z.
     TaskUndo.recordScheduleChange(
-      name: RegistryActions.title("task.toggleToday", .add),
+      name: RegistryActions.title(.taskToggleToday, .add),
       before: undoBefore, context: modelContext, mutator: mutator)
   }
 
@@ -3749,7 +3749,7 @@ struct TaskListView: View {
     guard !ids.isEmpty else { return }
     Haptics.commit()
     noteInboxGesture(ids: ids)
-    recordingSchedule(RegistryActions.title("task.clearSchedule"), ids) {
+    recordingSchedule(RegistryActions.title(.taskClearSchedule), ids) {
       for id in ids { mutator.apply(.clearWhen, to: id) }
     }
     Task { await load() }
@@ -4191,7 +4191,7 @@ struct TaskListView: View {
       Button {
         restoreTasks([task.id])
       } label: {
-        Text(RegistryActions.title("task.restore"))
+        Text(RegistryActions.title(.taskRestore))
           .scaledFont(size: 12, weight: .medium)
           .lineLimit(1)
           .padding(.horizontal, 10)
@@ -4212,7 +4212,7 @@ struct TaskListView: View {
     Haptics.commit()
     let mutator = self.mutator
     TaskUndo.record(
-      name: RegistryActions.title("task.restore"),
+      name: RegistryActions.title(.taskRestore),
       undo: { for id in ids { mutator.delete(id: id) } },
       redo: { for id in ids { mutator.restore(id: id) } }
     )
@@ -4259,7 +4259,7 @@ struct TaskListView: View {
       Button {
         keepFadedTasks([task.id])
       } label: {
-        Text(RegistryActions.title("task.keepFaded"))
+        Text(RegistryActions.title(.taskKeepFaded))
           .scaledFont(size: 12, weight: .medium)
           .lineLimit(1)
           .padding(.horizontal, 10)
@@ -4451,11 +4451,11 @@ struct TaskListView: View {
       // Delete Permanently — no scheduling, no move, no normal task lifecycle
       // actions apply to trashed rows.
       RegistryMenuContent(nodes: RegistryMenuResolver.resolve(
-        RegistryActions.menu("task.recentlyDeleted")) { id in
+        RegistryActions.menu(.taskRecentlyDeleted)) { id in
           switch id {
-          case "task.restore":
+          case .taskRestore:
             return .init { restoreTasks(target.ids) }
-          case "task.deletePermanently":
+          case .taskDeletePermanently:
             return .init { requestPurge(ids: target.ids) }
           default: return nil
           }
@@ -4465,11 +4465,11 @@ struct TaskListView: View {
       // restores to the task's original list with undo; Let Go cancels with
       // dropReason = "faded".
       RegistryMenuContent(nodes: RegistryMenuResolver.resolve(
-        RegistryActions.menu("task.faded")) { id in
+        RegistryActions.menu(.taskFaded)) { id in
           switch id {
-          case "task.keepFaded": return .init { keepFadedTasks(target.ids) }
-          case "task.letGoFaded": return .init { dropFadedTasks(target.ids) }
-          case "task.delete":
+          case .taskKeepFaded: return .init { keepFadedTasks(target.ids) }
+          case .taskLetGoFaded: return .init { dropFadedTasks(target.ids) }
+          case .taskDelete:
             return .init(variant: target.count > 1 ? .plural : .base) {
               Haptics.warning()
               for id in target.ids { applyDelete(id) }
@@ -4505,8 +4505,8 @@ struct TaskListView: View {
         onToggleStar: { ids, starred in
           Haptics.commit()
           recordingSchedule(starred
-                            ? RegistryActions.title("task.toggleStar", .add)
-                            : RegistryActions.title("task.toggleStar", .remove),
+                            ? RegistryActions.title(.taskToggleStar, .add)
+                            : RegistryActions.title(.taskToggleStar, .remove),
                             ids) {
             for id in ids { mutator.setStarred(id: id, starred: starred) }
           }

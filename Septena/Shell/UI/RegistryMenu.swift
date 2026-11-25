@@ -54,17 +54,17 @@ enum RegistryTitleVariant: String {
 extension RegistryActions {
   /// The localized title of `id` in `variant`, falling back to the base title.
   /// The base title is the desktop title on a desktop platform.
-  static func title(_ id: String, _ variant: RegistryTitleVariant = .base) -> String {
+  static func title(_ id: RegistryActionID, _ variant: RegistryTitleVariant = .base) -> String {
     let alternates = alternateTitles[id] ?? [:]
     if variant != .base, let title = alternates[variant.rawValue] { return title }
     if RegistryPlatform.isDesktop, let desktop = alternates[RegistryTitleVariant.desktop.rawValue] {
       return desktop
     }
-    return titles[id] ?? id
+    return titles[id] ?? id.rawValue
   }
 
   /// The action's shortcut on this platform, nil when it has none here.
-  static func shortcut(for id: String) -> RegistryShortcut? {
+  static func shortcut(for id: RegistryActionID) -> RegistryShortcut? {
     guard let shortcut = shortcuts[id],
           !shortcut.excludePlatforms.contains(RegistryPlatform.current) else { return nil }
     return shortcut
@@ -73,18 +73,18 @@ extension RegistryActions {
   /// True when the action exists on this platform: `availability.platforms`
   /// lists it and its capability ships here (`registry/capabilities.json`,
   /// ADR 0015). A planned feature shows no menu item.
-  static func isAvailableOnPlatform(_ id: String) -> Bool {
+  static func isAvailableOnPlatform(_ id: RegistryActionID) -> Bool {
     guard let availability = availability[id] else { return true }
     let platform = RegistryPlatform.current
     if !availability.platforms.isEmpty, !availability.platforms.contains(platform) { return false }
     return RegistryCapabilities.isAvailable(availability.featureId, on: platform)
   }
 
-  static func menu(_ id: String) -> [RegistryMenuItem] {
+  static func menu(_ id: RegistryContextMenuID) -> [RegistryMenuItem] {
     contextMenus[id] ?? []
   }
 
-  static func menuBarMenu(_ id: String) -> RegistryMenu? {
+  static func menuBarMenu(_ id: RegistryMenuBarID) -> RegistryMenu? {
     menuBar.first { $0.id == id }
   }
 }
@@ -162,24 +162,26 @@ enum RegistryMenuResolver {
   /// leave an action out; a submenu with nothing left in it is dropped, and
   /// dividers never lead, trail or double up.
   static func resolve(_ items: [RegistryMenuItem],
-                      bind: (String) -> RegistryActionBinding?,
+                      bind: (RegistryActionID) -> RegistryActionBinding?,
                       slot: (String) -> [RegistryMenuNode] = { _ in [] }) -> [RegistryMenuNode] {
     var nodes: [RegistryMenuNode] = []
     for item in items {
       switch item.kind {
       case "action":
-        guard RegistryActions.isAvailableOnPlatform(item.id), let binding = bind(item.id) else { continue }
+        guard let actionId = item.actionId,
+              RegistryActions.isAvailableOnPlatform(actionId),
+              let binding = bind(actionId) else { continue }
         // A menu-bar item may name another title field (`titleField`); the
         // generator already put that title on the item. Variants win over it.
         let title = binding.variant == .base
-          ? (RegistryPlatform.isDesktop ? RegistryActions.title(item.id) : (item.title ?? RegistryActions.title(item.id)))
-          : RegistryActions.title(item.id, binding.variant)
+          ? (RegistryPlatform.isDesktop ? RegistryActions.title(actionId) : (item.title ?? RegistryActions.title(actionId)))
+          : RegistryActions.title(actionId, binding.variant)
         nodes.append(.item(RegistryMenuEntry(
           id: item.id,
           title: title,
           sfSymbol: item.sfSymbol,
-          shortcut: binding.showsShortcut ? RegistryActions.shortcut(for: item.id) : nil,
-          isDestructive: RegistryActions.destructive.contains(item.id),
+          shortcut: binding.showsShortcut ? RegistryActions.shortcut(for: actionId) : nil,
+          isDestructive: RegistryActions.destructive.contains(actionId),
           isOn: binding.isOn,
           perform: binding.perform)))
       case "submenu":

@@ -817,8 +817,8 @@ private final class KitRepeatBoard: NSView {
   /// Mixed paused state offers the action that makes the selection uniform.
   private var pauseTitle: String {
     paused == true
-      ? RegistryActions.title("task.pauseResumeRepeat", .active)
-      : RegistryActions.title("task.pauseResumeRepeat")
+      ? RegistryActions.title(.taskPauseResumeRepeat, .active)
+      : RegistryActions.title(.taskPauseResumeRepeat)
   }
 
   private var pauseSymbol: String { paused == true ? "play.circle" : "pause.circle" }

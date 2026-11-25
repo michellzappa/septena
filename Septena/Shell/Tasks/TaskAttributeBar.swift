@@ -73,11 +73,27 @@ struct TaskAttributeBar: View {
     case history
     var id: Self { self }
 
-    private var registry: RegistryTaskAttribute { RegistrySurfaces.taskAttribute(rawValue) }
+    var registryID: RegistryTaskAttributeID {
+      switch self {
+      case .when: return .when
+      case .deadline: return .deadline
+      case .reminder: return .reminder
+      case .repeatRule: return .repeat
+      case .star: return .star
+      case .list: return .list
+      case .tags: return .tags
+      case .checklist: return .checklist
+      case .attachments: return .attachments
+      case .discuss: return .discuss
+      case .history: return .history
+      }
+    }
+
+    private var registry: RegistryTaskAttribute { RegistrySurfaces.taskAttribute(registryID) }
 
     /// Every pill that ships on this platform, in registry rail order.
     static let rail: [Attribute] = RegistrySurfaces.taskAttributePills(on: RegistryPlatform.current)
-      .compactMap { Attribute(rawValue: $0.id) }
+      .compactMap { Attribute(rawValue: $0.id.rawValue) }
     /// The pills a draft without a saved task can use (registry `editOnly` false).
     static let draftCases: [Attribute] = rail.filter { !$0.editOnly }
 
@@ -225,7 +241,7 @@ struct TaskAttributeBar: View {
               TaskChecklistPanel(taskID: task.id, addRequest: checklistAddRequest,
                                  focus: $focus, moveFocus: moveFocus)
             }
-            AttributeRow(icon: "plus", label: RegistryActions.title("task.addChecklistItem"),
+            AttributeRow(icon: "plus", label: RegistryActions.title(.taskAddChecklistItem),
                          value: nil, isSet: false, opensPicker: false, isLoading: false,
                          accent: accent) { select(.checklist) }
           }
@@ -371,16 +387,16 @@ struct TaskAttributeBar: View {
   private func value(for attr: Attribute, edit: EditOnlyState?) -> String? {
     switch attr {
     case .discuss:
-      return discussWorking ? RegistrySurfaces.taskAttribute(attr.rawValue).workingLabel : nil
+      return discussWorking ? RegistrySurfaces.taskAttribute(attr.registryID).workingLabel : nil
     case .tags:
       guard let names = edit?.tagNames, !names.isEmpty else { return nil }
-      return names.count == 1 ? names[0] : RegistrySurfaces.taskAttributeCount(attr.rawValue, count: names.count)
+      return names.count == 1 ? names[0] : RegistrySurfaces.taskAttributeCount(attr.registryID, count: names.count)
     case .checklist:
       guard let edit, edit.stepsTotal > 0 else { return nil }
       return "\(edit.stepsDone)/\(edit.stepsTotal)"
     case .attachments:
       guard let count = edit?.attachments, count > 0 else { return nil }
-      return RegistrySurfaces.taskAttributeCount(attr.rawValue, count: count)
+      return RegistrySurfaces.taskAttributeCount(attr.registryID, count: count)
     // "When" folds in Today: a task pinned to today (no date) reads "Today", a
     // future planning date reads its date, nothing set reads as Anytime (nil).
     case .when:

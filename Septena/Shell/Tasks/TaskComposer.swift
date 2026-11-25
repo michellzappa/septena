@@ -255,7 +255,7 @@ struct TaskComposerCard: View {
     return nil
   }
 
-  private var headerTitle: String { isEditing ? "Edit Task" : RegistryActions.title("app.newTask") }
+  private var headerTitle: String { isEditing ? "Edit Task" : RegistryActions.title(.appNewTask) }
   private var saveTitle: String { isEditing ? "Save" : "Add" }
 
   /// Close: fold the inline editor (`onClose`) when hosted inline, else go
@@ -526,7 +526,7 @@ struct TaskComposerCard: View {
       if kinds.contains(.header) { titleNotesCard }
       // The review depth has no List row: name where the task lives, read-only.
       if pageDepth == .review {
-        Label(reviewListLabel, systemImage: RegistrySurfaces.taskAttribute("list").sfSymbol)
+        Label(reviewListLabel, systemImage: RegistrySurfaces.taskAttribute(.list).sfSymbol)
           .font(.septenaMeta)
           .foregroundStyle(Theme.inkSecondary)
       }
@@ -883,7 +883,7 @@ struct TaskComposerCard: View {
     .buttonStyle(.glass)
     .tint(.blue)
     #else
-    let attr = RegistrySurfaces.taskAttribute("paste")
+    let attr = RegistrySurfaces.taskAttribute(.paste)
     Button {
       if let image = PastedImage.fromGeneralPasteboard() {
         applyPastedImage(image)
@@ -1236,7 +1236,7 @@ struct TaskComposerCard: View {
   private func recordCreateUndo(id: String) {
     let saved = draft
     TaskUndo.recordCreate(
-      name: RegistryActions.title("app.newTask"),
+      name: RegistryActions.title(.appNewTask),
       ids: [id], mutator: mutator,
       rebuild: { [mutator] in [saved.create(via: mutator).id] })
   }

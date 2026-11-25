@@ -55,6 +55,18 @@ struct TaskNotice: Identifiable, Equatable {
     case trialEnd
     /// Upsell (spec §3.2): the free account syncs another device, not this one.
     case secondDevice
+
+    var registryID: RegistryNoticeID {
+      switch self {
+      case .signIn: return .signIn
+      case .rolledIn: return .rolledIn
+      case .weeklySweep: return .weeklySweep
+      case .fadeIntro: return .fadeIntro
+      case .getStarted: return .getStarted
+      case .trialEnd: return .trialEnd
+      case .secondDevice: return .secondDevice
+      }
+    }
   }
 
   let id: ID
@@ -128,7 +140,7 @@ enum TaskNotices {
   }
 
   private static func isShippedHere(_ notice: TaskNotice) -> Bool {
-    guard let row = RegistryNotices.byId[notice.id.rawValue] else { return true }
+    guard let row = RegistryNotices.byId[notice.id.registryID] else { return true }
     return RegistryCapabilities.isAvailable(row.featureId, on: RegistryPlatform.current)
   }
 
@@ -231,7 +243,7 @@ enum TaskNotices {
   /// The registry owns symbol, kind, copy and dismissibility; this file owns
   /// only when a notice shows.
   private static func registry(_ id: TaskNotice.ID) -> RegistryNotice {
-    guard let row = RegistryNotices.byId[id.rawValue] else {
+    guard let row = RegistryNotices.byId[id.registryID] else {
       preconditionFailure("registry/surfaces.json has no notice \(id.rawValue)")
     }
     return row
@@ -385,7 +397,7 @@ enum TaskNotices {
   /// from the registry (`registry/surfaces.json` `fadedPile`), so the Mac and
   /// iOS shells cannot drift.
   static var fadedPile: TaskNotice {
-    guard let row = RegistryNotices.byId["fadedPile"] else {
+    guard let row = RegistryNotices.byId[.fadedPile] else {
       preconditionFailure("registry/surfaces.json has no notice fadedPile")
     }
     return TaskNotice(

@@ -407,7 +407,7 @@ final class SeptaskKitTaskListController: NSViewController {
     let scheduled = KitDayFormat.date(fromWire: task.scheduled)
     let today = task.today
     let mutator = self.mutator
-    recordCreateUndo(name: RegistryActions.title("app.newTask"),
+    recordCreateUndo(name: RegistryActions.title(.appNewTask),
                      ids: [id],
                      rebuild: {
                        [mutator.create(title: title, area: area, project: project,
@@ -1640,7 +1640,7 @@ final class SeptaskKitTaskListController: NSViewController {
     case .signIn: return { SeptaskAppKitSignIn.shared.start() }
     case .weeklySweep: return { [weak self] in self?.presentWeeklySweepSheet() }
     case .trialEnd, .secondDevice:
-      guard let upsell = RegistryNotices.byId[id.rawValue]?.upsellId else { return nil }
+      guard let upsell = RegistryNotices.byId[id.registryID]?.upsellId else { return nil }
       return { [weak self] in self?.presentPlusSheet(upsellID: upsell) }
     default: return nil
     }
@@ -2821,7 +2821,7 @@ final class SeptaskKitTaskListController: NSViewController {
     guard !selection.isEmpty else { return }
     let single = selection.count == 1
     let title = single
-      ? RegistryActions.title("task.move", .short)
+      ? RegistryActions.title(.taskMove, .short)
       : String(localized: "Move \(selection.count) Tasks",
                comment: "SeptaskKit: Move picker title (plural)")
     let current = single ? currentMoveDestination(for: selection[0]) : nil
@@ -2990,8 +2990,8 @@ final class SeptaskKitTaskListController: NSViewController {
     }
     reload()
     recordScheduleUndo(name: paused
-                       ? RegistryActions.title("task.pauseResumeRepeat")
-                       : RegistryActions.title("task.pauseResumeRepeat", .active),
+                       ? RegistryActions.title(.taskPauseResumeRepeat)
+                       : RegistryActions.title(.taskPauseResumeRepeat, .active),
                        before: before)
     onStoreChanged?()
   }
@@ -3363,7 +3363,7 @@ final class SeptaskKitTaskListController: NSViewController {
       // inspector, where When folds open under its row, Repeat folds open
       // under the Repeat row instead (the iOS task page does the same).
       onRepeat: kind == .when ? { [weak self] in
-        self?.presentRecurrencePanel(anchor: anchor?.inlineSibling(attribute: "repeat") ?? anchor)
+        self?.presentRecurrencePanel(anchor: anchor?.inlineSibling(attribute: .repeat) ?? anchor)
       } : nil
     ) { [weak self] date, today in
       guard let self else { return }
@@ -3412,21 +3412,21 @@ final class SeptaskKitTaskListController: NSViewController {
   /// pills and the inspector rows all come here, so one attribute has one
   /// picker with the same options from every entry point. `anchor` is the
   /// control that asked; nil anchors to the selected row.
-  func openPicker(action actionId: String, anchor: KitSurfaceAnchor? = nil) {
+  func openPicker(action actionId: RegistryActionID, anchor: KitSurfaceAnchor? = nil) {
     switch actionId {
-    case "task.when": presentDatePopover(kind: .when, anchor: anchor)
-    case "task.deadline": presentDatePopover(kind: .deadline, anchor: anchor)
-    case "task.reminder": presentReminderPopover(anchor: anchor)
-    case "task.repeat": presentRecurrencePanel(anchor: anchor)
-    case "task.move": presentMoveMenu(anchor: anchor)
-    case "task.tags": presentTagPopover(anchor: anchor)
+    case .taskWhen: presentDatePopover(kind: .when, anchor: anchor)
+    case .taskDeadline: presentDatePopover(kind: .deadline, anchor: anchor)
+    case .taskReminder: presentReminderPopover(anchor: anchor)
+    case .taskRepeat: presentRecurrencePanel(anchor: anchor)
+    case .taskMove: presentMoveMenu(anchor: anchor)
+    case .taskTags: presentTagPopover(anchor: anchor)
     default: assertionFailure("no AppKit picker for \(actionId)")
     }
   }
 
   /// Open the picker for the task attribute `attributeId` (a composer pill or
   /// an inspector row). The registry names the action that owns the picker.
-  func openPicker(attribute attributeId: String, anchor: KitSurfaceAnchor?) {
+  func openPicker(attribute attributeId: RegistryTaskAttributeID, anchor: KitSurfaceAnchor?) {
     guard let actionId = RegistryActions.action(opening: attributeId) else {
       assertionFailure("attribute \(attributeId) has no picker")
       return
@@ -3450,9 +3450,9 @@ final class SeptaskKitTaskListController: NSViewController {
       return .makeException
     }
 
-    switch KitPrompt.choice(RegistryPrompts.prompt("rescheduleFixedRepeat")) {
-    case "exception": return .makeException
-    case "updateRule": return .updateRule
+    switch KitPrompt.choice(RegistryPrompts.prompt(.rescheduleFixedRepeat)) {
+    case .exception: return .makeException
+    case .updateRule: return .updateRule
     default: return nil
     }
   }
@@ -3484,7 +3484,7 @@ final class SeptaskKitTaskListController: NSViewController {
     for task in actionableSelection { refreshComposerRow(taskId: task.id) }
     reload()
     playPendingPromoteFlashes()
-    recordScheduleUndo(name: RegistryActions.title("task.toggleToday"), before: before)
+    recordScheduleUndo(name: RegistryActions.title(.taskToggleToday), before: before)
   }
 
   /// ⌥⌘S — star or unstar the current selection (if all are starred, unstar
@@ -3502,8 +3502,8 @@ final class SeptaskKitTaskListController: NSViewController {
     reload()
     recordScheduleUndo(
       name: nextStarred
-        ? RegistryActions.title("task.toggleStar", .add)
-        : RegistryActions.title("task.toggleStar", .remove),
+        ? RegistryActions.title(.taskToggleStar, .add)
+        : RegistryActions.title(.taskToggleStar, .remove),
       before: before
     )
     onStoreChanged?()
@@ -4433,22 +4433,22 @@ final class SeptaskKitTaskListController: NSViewController {
       // attribute (`openPicker`, ADR 0029). It acts on the current selection,
       // which is this row: selecting it is how compose mode began.
       case .when(let anchor):
-        self.openPicker(attribute: "when", anchor: .rect(anchor.bounds, anchor))
+        self.openPicker(attribute: .when, anchor: .rect(anchor.bounds, anchor))
         self.refreshComposerRow(taskId: task.id)
 
       case .deadline(let anchor):
-        self.openPicker(attribute: "deadline", anchor: .rect(anchor.bounds, anchor))
+        self.openPicker(attribute: .deadline, anchor: .rect(anchor.bounds, anchor))
         self.refreshComposerRow(taskId: task.id)
 
       case .reminder(let anchor):
-        self.openPicker(attribute: "reminder", anchor: .rect(anchor.bounds, anchor))
+        self.openPicker(attribute: .reminder, anchor: .rect(anchor.bounds, anchor))
         self.refreshComposerRow(taskId: task.id)
 
       case .toggleStar:
         self.toggleStarSelection()
 
       case .tags(let anchor):
-        self.openPicker(attribute: "tags", anchor: .rect(anchor.bounds, anchor))
+        self.openPicker(attribute: .tags, anchor: .rect(anchor.bounds, anchor))
         self.refreshComposerRow(taskId: task.id)
 
       case .list(let anchor):
@@ -4456,11 +4456,11 @@ final class SeptaskKitTaskListController: NSViewController {
         // second to keep in sync — anchored to the pill the user clicked. It
         // acts on the current selection, which is this row (selecting it is
         // how compose mode began).
-        self.openPicker(attribute: "list", anchor: .rect(anchor.bounds, anchor))
+        self.openPicker(attribute: .list, anchor: .rect(anchor.bounds, anchor))
         self.refreshComposerRow(taskId: task.id)
 
       case .repeatRule(let anchor):
-        self.openPicker(attribute: "repeat", anchor: .rect(anchor.bounds, anchor))
+        self.openPicker(attribute: .repeat, anchor: .rect(anchor.bounds, anchor))
         self.refreshComposerRow(taskId: task.id)
       }
     }
@@ -4476,67 +4476,67 @@ final class SeptaskKitTaskListController: NSViewController {
     let selection = actionableSelection
     let single = selection.count == 1 ? selection.first : nil
     let plural: RegistryTitleVariant = selection.count > 1 ? .plural : .base
-    return KitRegistryMenu.build(RegistryActions.menu("task.row"), bind: { [weak self] id in
+    return KitRegistryMenu.build(RegistryActions.menu(.taskRow), bind: { [weak self] id in
       guard let self else { return nil }
       switch id {
-      case "task.editDetails": return .init { self.beginEditSelectedRow() }
+      case .taskEditDetails: return .init { self.beginEditSelectedRow() }
       // Open = the task page (ADR 0029): on the Mac that is the inspector
       // pane. A row double-click and Return stay the inline composer. The
       // inspector follows the selection, so an open pane needs no toggle.
-      case "task.open":
+      case .taskOpen:
         guard single != nil else { return nil }
         return .init { self.onOpenInspector?() }
-      case "task.share":
+      case .taskShare:
         guard !selection.isEmpty else { return nil }
         return .init { self.shareSelection() }
-      case "task.acceptReview":
+      case .taskAcceptReview:
         guard let single, single.conversation.needsHumanReview else { return nil }
         return .init { self.acceptReviewTask(id: single.id) }
-      case "task.sendBackReview":
+      case .taskSendBackReview:
         guard let single, single.conversation.needsHumanReview else { return nil }
         return .init { self.presentSendBackForSelectedRow(taskID: single.id) }
-      case "task.toggleInfo":
+      case .taskToggleInfo:
         let visible = UserDefaults.standard.bool(forKey: SettingsKey.septaskInspectorVisible)
         return .init(variant: visible ? .active : .base) { self.onToggleInspector?() }
-      case "task.duplicate": return .init(variant: plural) { self.duplicateSelection() }
-      case "task.toggleComplete":
+      case .taskDuplicate: return .init(variant: plural) { self.duplicateSelection() }
+      case .taskToggleComplete:
         // Several tasks only: one task completes from its checkbox
         // (docs/TASK_ROW_MENU_SPEC.md). ⌘K and the menu bar still do one.
         guard selection.count > 1 else { return nil }
         return .init { self.toggleCompleteSelection() }
-      case "task.cancel": return .init(variant: plural) { self.cancelSelection() }
-      case "task.delete": return .init(variant: plural) { self.deleteSelection() }
-      case "task.toggleToday":
+      case .taskCancel: return .init(variant: plural) { self.cancelSelection() }
+      case .taskDelete: return .init(variant: plural) { self.deleteSelection() }
+      case .taskToggleToday:
         // On Today every row is already "on Today", so a Today action just
         // competes with Clear Schedule. Hide it; ⌘T still works via the key
         // binding on the table.
         guard self.filter != .today, !selection.isEmpty else { return nil }
         let remove = selection.allSatisfy(\.isOnToday)
         return .init(variant: remove ? .remove : .add) { self.toggleTodaySelection() }
-      case "task.toggleStar":
+      case .taskToggleStar:
         guard !selection.isEmpty else { return nil }
         let allStarred = selection.allSatisfy(\.starred)
         return .init(variant: allStarred ? .remove : .add) { self.toggleStarSelection() }
-      case "task.addReference":
+      case .taskAddReference:
         guard single != nil, TaskRefActions.canAdd else { return nil }
         return .init { self.presentAddReference() }
-      case "task.tags", "task.when", "task.deadline": return .init { self.openPicker(action: id) }
-      case "task.reminder":
+      case .taskTags, .taskWhen, .taskDeadline: return .init { self.openPicker(action: id) }
+      case .taskReminder:
         guard single != nil else { return nil }
         return .init { self.openPicker(action: id) }
-      case "task.clearSchedule":
+      case .taskClearSchedule:
         guard selection.contains(where: { $0.isOnToday || $0.scheduled != nil || $0.deadline != nil })
         else { return nil }
         return .init { self.clearScheduleSelection() }
-      case "task.move": return .init { self.openPicker(action: id) }
-      case "task.repeat":
+      case .taskMove: return .init { self.openPicker(action: id) }
+      case .taskRepeat:
         guard single != nil else { return nil }
         return .init { self.openPicker(action: id) }
-      case "task.pauseResumeRepeat":
+      case .taskPauseResumeRepeat:
         guard !selection.isEmpty, selection.allSatisfy({ $0.recurrence != nil }) else { return nil }
         let paused = selection.allSatisfy(\.recurrencePaused)
         return .init(variant: paused ? .active : .base) { self.setRecurrencePaused(!paused) }
-      case "task.createNextCopy":
+      case .taskCreateNextCopy:
         guard let single, single.recurrence != nil else { return nil }
         return .init { self.createNextCopySelection() }
       default:
@@ -4585,11 +4585,11 @@ final class SeptaskKitTaskListController: NSViewController {
   /// The trash's own vocabulary (registry `task.recentlyDeleted`) — nothing
   /// else on the normal menu means anything for an already-deleted row.
   private func buildRecentlyDeletedMenu() -> NSMenu {
-    KitRegistryMenu.build(RegistryActions.menu("task.recentlyDeleted")) { [weak self] id in
+    KitRegistryMenu.build(RegistryActions.menu(.taskRecentlyDeleted)) { [weak self] id in
       guard let self else { return nil }
       switch id {
-      case "task.restore": return .init { self.restoreTasks(self.actionableSelection.map(\.id)) }
-      case "task.deletePermanently": return .init { self.deleteSelection() }
+      case .taskRestore: return .init { self.restoreTasks(self.actionableSelection.map(\.id)) }
+      case .taskDeletePermanently: return .init { self.deleteSelection() }
       default: return nil
       }
     }
@@ -4598,12 +4598,12 @@ final class SeptaskKitTaskListController: NSViewController {
   /// The Faded pile's menu (registry `task.faded`).
   private func buildFadedMenu() -> NSMenu {
     let plural: RegistryTitleVariant = actionableSelection.count > 1 ? .plural : .base
-    return KitRegistryMenu.build(RegistryActions.menu("task.faded")) { [weak self] id in
+    return KitRegistryMenu.build(RegistryActions.menu(.taskFaded)) { [weak self] id in
       guard let self else { return nil }
       switch id {
-      case "task.keepFaded": return .init { self.menuKeepFaded() }
-      case "task.letGoFaded": return .init { self.menuDropFaded() }
-      case "task.delete": return .init(variant: plural) { self.deleteSelection() }
+      case .taskKeepFaded: return .init { self.menuKeepFaded() }
+      case .taskLetGoFaded: return .init { self.menuDropFaded() }
+      case .taskDelete: return .init(variant: plural) { self.deleteSelection() }
       default: return nil
       }
     }
@@ -4768,8 +4768,8 @@ final class SeptaskKitTaskListController: NSViewController {
   /// Section" lives when there's no heading row to right-click yet
   /// (registry `project.blankSpace`).
   private func buildBlankSpaceMenu() -> NSMenu {
-    KitRegistryMenu.build(RegistryActions.menu("project.blankSpace")) { [weak self] id in
-      guard let self, id == "section.new", case .project = self.filter else { return nil }
+    KitRegistryMenu.build(RegistryActions.menu(.projectBlankSpace)) { [weak self] id in
+      guard let self, id == .sectionNew, case .project = self.filter else { return nil }
       return .init { self.menuNewSection() }
     }
   }
@@ -4853,12 +4853,12 @@ final class SeptaskKitTaskListController: NSViewController {
   /// field-editor path as any task), a new task in the section, and delete —
   /// nothing else on the normal task menu applies to a section divider.
   private func buildHeadingContextMenu() -> NSMenu {
-    KitRegistryMenu.build(RegistryActions.menu("project.heading")) { [weak self] id in
+    KitRegistryMenu.build(RegistryActions.menu(.projectHeading)) { [weak self] id in
       guard let self else { return nil }
       switch id {
-      case "section.rename": return .init { self.beginEditSelectedRow() }
-      case "section.newTask": return .init { self.createTaskUnderSelectedHeading() }
-      case "section.delete": return .init { self.menuDeleteHeading() }
+      case .sectionRename: return .init { self.beginEditSelectedRow() }
+      case .sectionNewTask: return .init { self.createTaskUnderSelectedHeading() }
+      case .sectionDelete: return .init { self.menuDeleteHeading() }
       default: return nil
       }
     }
@@ -4870,15 +4870,15 @@ final class SeptaskKitTaskListController: NSViewController {
   private func buildNoticeStepMenu() -> NSMenu {
     let steps = selectedNoticeSteps
     let allDone = !steps.isEmpty && steps.allSatisfy(\.done)
-    return KitRegistryMenu.build(RegistryActions.menu("notice.getStartedStep")) { [weak self] id in
+    return KitRegistryMenu.build(RegistryActions.menu(.noticeGetStartedStep)) { [weak self] id in
       guard let self else { return nil }
       switch id {
-      case "notice.openStep":
+      case .noticeOpenStep:
         return .init(perform: steps.isEmpty ? nil : { self.menuOpenNoticeStep() })
-      case "notice.toggleStep":
+      case .noticeToggleStep:
         return .init(variant: allDone ? .active : .base,
                      perform: steps.isEmpty ? nil : { self.toggleSelectedNoticeSteps() })
-      case "notice.hideGetStarted": return .init { self.dismissNotice(.getStarted) }
+      case .noticeHideGetStarted: return .init { self.dismissNotice(.getStarted) }
       default: return nil
       }
     }
@@ -4924,12 +4924,12 @@ final class SeptaskKitTaskListController: NSViewController {
     KitRegistryMenu.build([
       RegistryMenuEntry.slot(
         id: "project.newSection",
-        title: RegistryActions.title("section.new"),
+        title: RegistryActions.title(.sectionNew),
         sfSymbol: "rectangle.split.1x2"
       ) { [weak self] in self?.menuNewSection() },
       RegistryMenuEntry.slot(
         id: "project.newTask",
-        title: RegistryActions.title("app.newTask"),
+        title: RegistryActions.title(.appNewTask),
         sfSymbol: "checkmark.circle"
       ) { [weak self] in self?.createTask() },
     ])
@@ -4979,7 +4979,7 @@ final class SeptaskKitTaskListController: NSViewController {
     guard case .project(let projectId) = filter else { return }
     commitOpenEdits()
     guard let heading = mutator.createHeading(
-      title: RegistryActions.title("section.new"),
+      title: RegistryActions.title(.sectionNew),
       project: projectId) else { return }
     pendingNewTaskId = heading.id
     reload(animated: false)
@@ -4994,8 +4994,8 @@ final class SeptaskKitTaskListController: NSViewController {
   /// Right-click on a project's or area's logged footer: "Clear Logged…",
   /// the same registry menu the SwiftUI footer shows on long press.
   private func buildLoggedFooterMenu() -> NSMenu {
-    KitRegistryMenu.build(RegistryActions.menu("scope.loggedFooter")) { [weak self] id in
-      guard let self, id == "logged.clear" else { return nil }
+    KitRegistryMenu.build(RegistryActions.menu(.scopeLoggedFooter)) { [weak self] id in
+      guard let self, id == .loggedClear else { return nil }
       return .init { self.menuClearLogged() }
     }
   }
@@ -5040,7 +5040,7 @@ final class SeptaskKitTaskListController: NSViewController {
     guard row >= 0, let heading = rows[row].task, heading.isHeading else { return }
     // Registry copy, the same prompt TaskListView's confirmationDialog shows.
     let headingId = heading.id
-    KitPrompt.confirmDestructive(RegistryPrompts.prompt("deleteSection"), in: view.window) { [weak self] in
+    KitPrompt.confirmDestructive(RegistryPrompts.prompt(.deleteSection), in: view.window) { [weak self] in
       guard let self else { return }
       self.mutator.delete(id: headingId)
       self.reload()
@@ -7020,7 +7020,7 @@ final class KitScreenTitleCell: NSTableCellView {
     glyphButton.action = #selector(pickGlyph)
     glyphButton.refusesFirstResponder = true
     glyphButton.isHidden = true
-    glyphButton.setAccessibilityLabel(RegistryActions.title("area.changeEmoji"))
+    glyphButton.setAccessibilityLabel(RegistryActions.title(.areaChangeEmoji))
 
     moreButton.translatesAutoresizingMaskIntoConstraints = false
     moreButton.isBordered = false
@@ -7034,8 +7034,8 @@ final class KitScreenTitleCell: NSTableCellView {
     moreButton.action = #selector(openOverflowMenu)
     moreButton.refusesFirstResponder = true
     moreButton.isHidden = true
-    moreButton.toolTip = RegistryActions.title("section.new")
-    moreButton.setAccessibilityLabel(RegistryActions.title("section.new"))
+    moreButton.toolTip = RegistryActions.title(.sectionNew)
+    moreButton.setAccessibilityLabel(RegistryActions.title(.sectionNew))
 
     icon.kitA11yIgnore()
     emoji.kitA11yIgnore()
@@ -8652,7 +8652,7 @@ private final class KitLogbookBarCell: NSTableCellView {
     segmented.selectedSegment = tab.rawValue
 
     emptyTrashButton.isHidden = !canEmptyTrash
-    let emptyTitle = RegistryActions.title("task.emptyTrash")
+    let emptyTitle = RegistryActions.title(.taskEmptyTrash)
     emptyTrashButton.attributedTitle = NSAttributedString(
       string: emptyTitle,
       attributes: [

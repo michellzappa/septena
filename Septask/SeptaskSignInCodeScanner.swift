@@ -20,8 +20,8 @@ struct SeptaskSignInCodeScanner: View {
 
   @Environment(\.dismiss) private var dismiss
   @State private var camera = SignInCodeCamera()
-  private static let prompt = RegistryPrompts.fixed["scanSignInCode"]
-  private static let unavailable = RegistryPrompts.fixed["cameraUnavailable"]
+  private static let prompt = RegistryPrompts.fixed[.scanSignInCode]
+  private static let unavailable = RegistryPrompts.fixed[.cameraUnavailable]
 
   var body: some View {
     NavigationStack {
@@ -101,7 +101,7 @@ struct SeptaskSignInCodeScanner: View {
 struct SeptaskScanCodeButton: View {
   var onCode: (String) -> Void
   @State private var scanning = false
-  private static let prompt = RegistryPrompts.fixed["scanSignInCode"]
+  private static let prompt = RegistryPrompts.fixed[.scanSignInCode]
 
   var body: some View {
     if SignInCodeCamera.hasCamera {

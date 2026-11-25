@@ -112,10 +112,10 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
   /// `RegistrySurfaces.taskAttributePills` (ADR 0020), the same list the
   /// SwiftUI `TaskAttributeBar` renders. Notes is a field, not a pill (#203),
   /// and Today folds into When, as on SwiftUI.
-  private lazy var pillsByID: [String: KitPillButton] = [
-    "when": whenPill, "deadline": deadlinePill, "reminder": reminderPill,
-    "repeat": repeatPill, "star": starPill, "list": listPill, "tags": tagPill,
-    "checklist": checklistPill, "attachments": attachPill, "discuss": discussPill,
+  private lazy var pillsByID: [RegistryTaskAttributeID: KitPillButton] = [
+    .when: whenPill, .deadline: deadlinePill, .reminder: reminderPill,
+    .repeat: repeatPill, .star: starPill, .list: listPill, .tags: tagPill,
+    .checklist: checklistPill, .attachments: attachPill, .discuss: discussPill,
   ]
   /// The pills in registry rail order.
   private var orderedPills: [KitPillButton] {
@@ -277,7 +277,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     titleView.textColor = .labelColor
     titleView.typingAttributes = Self.titleAttributes
     titleView.textContainerInset = .zero
-    titleView.placeholder = RegistryActions.title("app.newTask")
+    titleView.placeholder = RegistryActions.title(.appNewTask)
     Self.styleTextView(titleView, in: titleScroll)
     // A task title is ONE line, enforced in the view itself (see
     // `isSingleLine`) so no delegate wiring — present or absent — can put a
@@ -290,7 +290,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     notesView.typingAttributes = MarkdownNotesStyle.baseAttributes(
       fontSize: SeptaskKitTheme.notesFontSize)
     notesView.font = .systemFont(ofSize: SeptaskKitTheme.notesFontSize)
-    notesView.placeholder = RegistrySurfaces.taskAttribute("notes").label
+    notesView.placeholder = RegistrySurfaces.taskAttribute(.notes).label
     Self.styleTextView(notesView, in: notesScroll)
     notesScroll.isHidden = true
 
@@ -322,7 +322,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     checklistPill.onPress = { [weak self] _ in self?.addChecklistItemAndFocus() }
     attachPill.onPress = { [weak self] _ in self?.attachmentsView.pickFilesToAttach() }
     discussPill.onPress = { [weak self] _ in self?.onAction?(.discuss) }
-    let pasteChip = RegistrySurfaces.taskAttribute("paste")
+    let pasteChip = RegistrySurfaces.taskAttribute(.paste)
     pastePill.image = NSImage(systemSymbolName: pasteChip.sfSymbol, accessibilityDescription: nil)?
       .withSymbolConfiguration(.init(pointSize: 11, weight: .semibold))
     pastePill.imagePosition = .imageLeading
@@ -641,7 +641,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
 
   private func updateAttachPill() {
     let count = attachmentsView.attachmentCount
-    attachPill.show(value: count > 0 ? RegistrySurfaces.taskAttributeCount("attachments", count: count) : nil)
+    attachPill.show(value: count > 0 ? RegistrySurfaces.taskAttributeCount(.attachments, count: count) : nil)
     attachPill.isOn = count > 0
   }
 
@@ -709,7 +709,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     )
     tagPill.show(value: resolvedTags.isEmpty ? nil
       : resolvedTags.count == 1 ? resolvedTags[0].name
-      : RegistrySurfaces.taskAttributeCount("tags", count: resolvedTags.count))
+      : RegistrySurfaces.taskAttributeCount(.tags, count: resolvedTags.count))
     tagPill.isOn = !resolvedTags.isEmpty
     updateChecklistPill()
     attachmentsView.reload()

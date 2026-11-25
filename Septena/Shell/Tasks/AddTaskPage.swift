@@ -89,7 +89,7 @@ struct AddTaskPage: View {
       if hostsTitleField {
         Section {
           // Return adds. One line: a capture is a title, details come later.
-          TextField(RegistryActions.title("app.newTask"), text: $router.query)
+          TextField(RegistryActions.title(.appNewTask), text: $router.query)
             .focused($titleFocused)
             .submitLabel(.done)
             .onSubmit { if !trimmed.isEmpty { commit(title: trimmed) } }
@@ -140,7 +140,7 @@ struct AddTaskPage: View {
               Button { pullToToday(task) } label: {
                 AddInfoRow(
                   title: task.title,
-                  subtitle: RegistryActions.title("task.toggleToday", .add),
+                  subtitle: RegistryActions.title(.taskToggleToday, .add),
                   systemImage: "circle",
                   tint: tint
                 )
@@ -187,7 +187,7 @@ struct AddTaskPage: View {
     let created = draft.create(via: mutator)
     let saved = draft
     TaskUndo.recordCreate(
-      name: RegistryActions.title("app.newTask"),
+      name: RegistryActions.title(.appNewTask),
       ids: [created.id], mutator: mutator,
       rebuild: { [mutator] in [saved.create(via: mutator).id] })
     Haptics.commit()
@@ -198,7 +198,7 @@ struct AddTaskPage: View {
     let before = TaskUndo.ScheduleSnapshot(task)
     mutator.apply(.putOnToday, to: task.id)
     TaskUndo.recordScheduleChange(
-      name: RegistryActions.title("task.toggleToday", .add),
+      name: RegistryActions.title(.taskToggleToday, .add),
       before: [before], context: modelContext, mutator: mutator)
     Haptics.commit()
     dismiss()
