@@ -44,6 +44,7 @@ class UrlConnectionSyncTransport(
         includeChecklists: Boolean,
         includeTags: Boolean,
         includeRefs: Boolean,
+        includeDoSessions: Boolean,
     ): SyncPullPage {
         require(since >= 0) { "Sync cursor cannot be negative" }
         require(limit > 0) { "Sync page limit must be positive" }
@@ -54,6 +55,7 @@ class UrlConnectionSyncTransport(
             "checklists=${includeChecklists.flag()}",
             "tags=${includeTags.flag()}",
             "refs=${includeRefs.flag()}",
+            "doSessions=${includeDoSessions.flag()}",
         ).joinToString("&")
         return SyncWireCodec.decodePullPage(request(path, "GET", body = null))
     }

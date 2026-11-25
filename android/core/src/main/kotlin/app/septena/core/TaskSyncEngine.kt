@@ -1,6 +1,7 @@
 package app.septena.core
 
 import app.septena.core.generated.RegistryEntityLimits
+import app.septena.core.generated.RegistryEntityNames
 import app.septena.sharedcore.PullPageDecision
 import app.septena.sharedcore.PullPageHeader
 import app.septena.sharedcore.PushOutcome
@@ -105,12 +106,17 @@ class TaskSyncEngine(
         val pageLimit = RegistryEntityLimits.MAX_PULL.toInt()
         var pages = 0
         var resets = 0u
+        // The server skips Do rows for a client that did not ask for them. Read
+        // everything once, so the rows another device wrote arrive.
+        val readAll = !store.hasPulled(RegistryEntityNames.DO_SESSION)
+        if (readAll) store.rewindCursor()
         var cursor = store.syncCursor()
         while (true) {
             val page = transport.pull(cursor, pageLimit)
             when (val decision = checkPullPage(cursor, PullPageHeader(page.resetRequired, page.nextSince, page.hasMore), resets)) {
                 PullPageDecision.Apply -> {
                     store.applyPullPage(page, clock.now())
+                    if (readAll) store.markPulled(RegistryEntityNames.DO_SESSION)
                     return pages + 1
                 }
                 is PullPageDecision.ApplyAndContinue -> {

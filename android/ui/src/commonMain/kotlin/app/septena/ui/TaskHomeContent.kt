@@ -134,6 +134,7 @@ const val SELECTION_WASH_ALPHA = 0.14f
 /** Icon kind for task row context-menu items (matches iOS `UIContextMenu` trailing symbols). */
 enum class TaskMenuActionIcon {
     None,
+    Do,
     When,
     Move,
     Tags,

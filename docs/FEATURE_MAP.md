@@ -8,9 +8,9 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 
 | Status | iPhone | iPad | Mac | Web | Android | Windows | Watch |
 |---|---|---|---|---|---|---|---|
-| ships | 54 | 55 | 54 | 0 | 50 | 0 | 1 |
+| ships | 54 | 55 | 54 | 0 | 51 | 0 | 1 |
 | partial | 1 | 1 | 1 | 0 | 2 | 0 | 3 |
-| planned | 0 | 0 | 1 | 52 | 2 | 55 | 2 |
+| planned | 0 | 0 | 1 | 52 | 1 | 55 | 2 |
 | - | 4 | 3 | 3 | 7 | 5 | 4 | 53 |
 
 | ID | Feature | iPhone | iPad | Mac | Web | Android | Windows | Watch |
@@ -33,7 +33,7 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 | `task.repeat` | Repeat from schedule or after completion, pause | ships | ships | ships | planned | ships | planned | - |
 | `task.notes` | Notes | ships | ships | ships | planned | ships | planned | - |
 | `task.attachments` | Attachments | ships | ships | ships | planned | ships | planned | - |
-| `task.do` | Do: one task now, on every screen | ships | ships | planned | planned | planned | planned | planned |
+| `task.do` | Do: one task now, on every screen | ships | ships | planned | planned | ships | planned | planned |
 | `task.references` | References: the email, link, issue or task that a task is about | ships | ships | ships | planned | ships | planned | - |
 | `task.history` | Per-task change history | ships | ships | ships | planned | ships | planned | - |
 | `task.provenance` | Who added a task: you or a named agent, on the row and the task page | ships | ships | ships | planned | ships | planned | - |

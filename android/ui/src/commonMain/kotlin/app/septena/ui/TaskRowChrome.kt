@@ -974,6 +974,7 @@ private fun TaskMenuActionGlyph(
 ) {
     when (icon) {
         TaskMenuActionIcon.None -> Unit
+        TaskMenuActionIcon.Do -> DoGlyph(tint = tint, size = size)
         TaskMenuActionIcon.When -> CalendarSmallGlyph(tint = tint, size = size)
         TaskMenuActionIcon.Move -> SeptenaGlyph(kind = SeptenaIconKind.Area, tint = tint, size = size)
         TaskMenuActionIcon.Deadline -> DeadlineFlagGlyph(tint = tint, size = size)
@@ -1478,6 +1479,73 @@ fun AreaDotGlyph(tint: Color, size: Dp = 18.dp, modifier: Modifier = Modifier) {
             radius = this.size.minDimension * 0.22f,
             center = Offset(this.size.width / 2f, this.size.height / 2f),
         )
+    }
+}
+
+/** Do (registry icon `action.do`): a play sign in a ring, never a checkmark. */
+@Composable
+fun DoGlyph(tint: Color, size: Dp = 16.dp, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier.size(size)) {
+        val w = this.size.width
+        val h = this.size.height
+        val stroke = (w * 0.095f).coerceAtLeast(1.3.dp.toPx())
+        drawCircle(tint, radius = (w - stroke) * 0.46f, style = Stroke(width = stroke))
+        val play = Path().apply {
+            moveTo(w * 0.41f, h * 0.33f)
+            lineTo(w * 0.70f, h * 0.50f)
+            lineTo(w * 0.41f, h * 0.67f)
+            close()
+        }
+        drawPath(play, tint)
+    }
+}
+
+/** Stop for Now (registry icon `action.do_stop`): a pause sign in a ring. */
+@Composable
+fun DoStopGlyph(tint: Color, size: Dp = 16.dp, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier.size(size)) {
+        val w = this.size.width
+        val h = this.size.height
+        val stroke = (w * 0.095f).coerceAtLeast(1.3.dp.toPx())
+        drawCircle(tint, radius = (w - stroke) * 0.46f, style = Stroke(width = stroke))
+        for (x in listOf(0.41f, 0.59f)) {
+            drawLine(tint, Offset(w * x, h * 0.36f), Offset(w * x, h * 0.64f), strokeWidth = stroke, cap = StrokeCap.Round)
+        }
+    }
+}
+
+/** Do Here (registry icon `action.do_here`): two arrows to the corners. */
+@Composable
+fun DoHereGlyph(tint: Color, size: Dp = 16.dp, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier.size(size)) {
+        val w = this.size.width
+        val h = this.size.height
+        val stroke = (w * 0.095f).coerceAtLeast(1.3.dp.toPx())
+        val arrows = Path().apply {
+            moveTo(w * 0.56f, h * 0.16f)
+            lineTo(w * 0.84f, h * 0.16f)
+            lineTo(w * 0.84f, h * 0.44f)
+            moveTo(w * 0.44f, h * 0.84f)
+            lineTo(w * 0.16f, h * 0.84f)
+            lineTo(w * 0.16f, h * 0.56f)
+            moveTo(w * 0.84f, h * 0.16f)
+            lineTo(w * 0.16f, h * 0.84f)
+        }
+        drawPath(arrows, tint, style = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round))
+    }
+}
+
+/** Show List (registry icon `action.do_show_list`). */
+@Composable
+fun DoShowListGlyph(tint: Color, size: Dp = 20.dp, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier.size(size)) {
+        val w = this.size.width
+        val h = this.size.height
+        val stroke = (w * 0.095f).coerceAtLeast(1.4.dp.toPx())
+        for (y in listOf(0.26f, 0.50f, 0.74f)) {
+            drawCircle(tint, radius = stroke * 0.75f, center = Offset(w * 0.16f, h * y))
+            drawLine(tint, Offset(w * 0.34f, h * y), Offset(w * 0.88f, h * y), strokeWidth = stroke, cap = StrokeCap.Round)
+        }
     }
 }
 

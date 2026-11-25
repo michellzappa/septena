@@ -213,22 +213,6 @@
       "reason": "Server-owned re-capture timestamp rendered in task history.",
       "issue": "#390"
     },
-    "RegistryEntityEnums.DoExit.STOPPED": {
-      "reason": "Do (ADR 0041): the core holds the rule; the client half reads it.",
-      "issue": "#517"
-    },
-    "RegistryEntityEnums.DoExit.LATER": {
-      "reason": "Do (ADR 0041): the core holds the rule; the client half reads it.",
-      "issue": "#517"
-    },
-    "RegistryEntityEnums.DoExit.REPLACED": {
-      "reason": "Do (ADR 0041): the core holds the rule; the client half reads it.",
-      "issue": "#517"
-    },
-    "RegistryEntityEnums.DoExit.CLOSED": {
-      "reason": "Do (ADR 0041): the core holds the rule; the client half reads it.",
-      "issue": "#517"
-    },
     "RegistryRules.DO_STALE_HOURS": {
       "reason": "The shared core applies it (resolve_do_sessions).",
       "issue": "#517"
@@ -237,36 +221,12 @@
       "reason": "The shared core applies it (resolve_do_sessions).",
       "issue": "#517"
     },
-    "RegistryEntityFields.DoSession.STARTED_AT": {
-      "reason": "Do (ADR 0041): the client half reads it.",
+    "RegistryEntityEnums.DoExit.REPLACED": {
+      "reason": "The shared core decides this exit (resolve_do_sessions); Android stores what it answers.",
       "issue": "#517"
     },
-    "RegistryEntityFields.DoSession.PLANNED_MINUTES": {
-      "reason": "Do (ADR 0041): the client half reads it.",
-      "issue": "#517"
-    },
-    "RegistryEntityFields.DoSession.CONFIRMED_AT": {
-      "reason": "Do (ADR 0041): the client half reads it.",
-      "issue": "#517"
-    },
-    "RegistryEntityFields.DoSession.ENDED_AT": {
-      "reason": "Do (ADR 0041): the client half reads it.",
-      "issue": "#517"
-    },
-    "RegistryEntityFields.DoSession.EXIT": {
-      "reason": "Do (ADR 0041): the client half reads it.",
-      "issue": "#517"
-    },
-    "RegistryEntityFields.DoSession.LAPSED": {
-      "reason": "Do (ADR 0041): the client half reads it.",
-      "issue": "#517"
-    },
-    "RegistryEntityFields.DoSession.NOTE": {
-      "reason": "Do (ADR 0041): the client half reads it.",
-      "issue": "#517"
-    },
-    "RegistryEntityNames.DO_SESSION": {
-      "reason": "Do (ADR 0041): the client half reads it.",
+    "RegistryEntityEnums.DoExit.CLOSED": {
+      "reason": "The shared core decides this exit (resolve_do_sessions); Android stores what it answers.",
       "issue": "#517"
     }
   }
