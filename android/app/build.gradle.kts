@@ -49,7 +49,9 @@ android {
         targetSdk = 36
         // CI passes the commit count, so each APK updates the one before it.
         versionCode = (findProperty("septenaBuildNumber") as String?)?.toInt() ?: 1
-        versionName = "0.1.0"
+        // One version on every platform: MARKETING_VERSION in project.yml.
+        versionName = Regex("MARKETING_VERSION: \"([^\"]+)\"")
+            .find(rootProject.file("../project.yml").readText())!!.groupValues[1]
     }
 
     // The fixed tester key (scripts/android-tester-keystore.sh). android.yml

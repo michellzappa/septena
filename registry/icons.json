@@ -109,6 +109,7 @@
     "settings.backend": { "sfSymbol": "arrow.up.doc", "material": "cloud_sync", "lucide": "cloud" },
     "settings.animations": { "sfSymbol": "party.popper", "material": "celebration", "lucide": "party-popper" },
     "settings.feedback": { "sfSymbol": "paperplane", "material": "send", "lucide": "send" },
+    "settings.open_source": { "sfSymbol": "chevron.left.forwardslash.chevron.right", "material": "code", "lucide": "code" },
     "settings.paste": { "sfSymbol": "doc.on.clipboard", "material": "content_paste", "lucide": "clipboard-paste" },
     "settings.plus": { "sfSymbol": "plus.circle.fill", "material": "add_circle", "lucide": "circle-plus" },
     "plans.free": { "sfSymbol": "iphone", "material": "smartphone", "lucide": "smartphone" },

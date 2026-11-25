@@ -86,7 +86,18 @@ async function waitForBuild() {
 
 async function ensureWhatToTest(buildId) {
   const r = await asc("GET", `/v1/builds/${buildId}/betaBuildLocalizations`);
-  if (r.ok && r.json.data?.some((l) => l.attributes?.locale === "en-US")) return;
+  if (!r.ok) throw new Error(`What to Test lookup failed (${r.status}): ${errors(r)}`);
+  // App Store Connect creates an empty en-US row for every build, so an
+  // existing row does not mean that the text is there.
+  const row = r.json.data?.find((l) => l.attributes?.locale === "en-US");
+  if (row?.attributes?.whatsNew) return;
+  if (row) {
+    const u = await asc("PATCH", `/v1/betaBuildLocalizations/${row.id}`, {
+      data: { type: "betaBuildLocalizations", id: row.id, attributes: { whatsNew: WHAT_TO_TEST } },
+    });
+    if (!u.ok) throw new Error(`What to Test failed (${u.status}): ${errors(u)}`);
+    return;
+  }
   const c = await asc("POST", "/v1/betaBuildLocalizations", {
     data: {
       type: "betaBuildLocalizations",

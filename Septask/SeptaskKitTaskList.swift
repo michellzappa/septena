@@ -86,12 +86,19 @@ final class SeptaskKitTaskListController: NSViewController {
     let time: String
   }
 
+  /// Sub-view inside Logbook (issue #202): Completed tasks vs. Recently Deleted.
+  enum LogbookTab: Int, Equatable {
+    case completed = 0
+    case deleted = 1
+  }
+
   /// One list line: a synthetic group header, a task row, a calendar event,
   /// the project/area page's own big title, or the "N logged items" footer.
   /// `key` is the stable identity the animated diff runs on.
   private enum Row: Equatable {
     case header(id: String, title: String, icon: GroupIcon, count: Int)
     case screenTitle(title: String, icon: GroupIcon)
+    case logbookBar(tab: LogbookTab, deletedCount: Int, showsSegmented: Bool, canEmptyTrash: Bool)
     case tagFilterBar(tags: [TaskTag], active: [String])
     case projectTarget(id: String, title: String, progress: Double)
     case task(SeptenaTask, chip: Chip?, suggestion: SuggestionEngine.Suggestion?)
@@ -134,6 +141,7 @@ final class SeptaskKitTaskListController: NSViewController {
       switch self {
       case .header(let id, _, _, _): return "h:" + id
       case .screenTitle: return "screen-title"
+      case .logbookBar: return "logbook-bar"
       case .tagFilterBar: return "tag-filter-bar"
       case .projectTarget(let id, _, _): return "project-target:" + id
       case .task(let task, _, _): return task.id
@@ -174,7 +182,7 @@ final class SeptaskKitTaskListController: NSViewController {
     /// so they break the card run the same way a Today area/project header does.
     var isCardRow: Bool {
       switch self {
-      case .header, .screenTitle, .tagFilterBar, .fadedFooter, .loggedFooter, .addSection, .notesProposal, .containerNotes: return false
+      case .header, .screenTitle, .logbookBar, .tagFilterBar, .fadedFooter, .loggedFooter, .addSection, .notesProposal, .containerNotes: return false
       // A standalone notice sits on the page with its own card fill. A notice
       // with checklist steps (`Get started`) heads its steps' card so the
       // header and rows share one seamless frosted surface (matching iOS).
@@ -197,7 +205,19 @@ final class SeptaskKitTaskListController: NSViewController {
   private let emptyStack = NSStackView()
   private var rows: [Row] = []
   private var filter: TaskFilter = .today
+  private var logbookTab: LogbookTab = .completed
   private var observers: [NSObjectProtocol] = []
+
+  /// True when the list is displaying soft-deleted tasks — either inside
+  /// Logbook's Deleted sub-view or via a direct `.recentlyDeleted` filter.
+  private var showingRecentlyDeleted: Bool {
+    filter == .recentlyDeleted || (filter == .logbook && logbookTab == .deleted)
+  }
+
+  /// Effective filter backing the current rows and empty state.
+  private var activeFilter: TaskFilter {
+    showingRecentlyDeleted ? .recentlyDeleted : filter
+  }
   /// A ⌘N row whose first title is still being typed — abandoned (empty on
   /// commit) it's purged, so escaping a fresh row leaves nothing behind.
   private var pendingNewTaskId: String?
@@ -411,8 +431,8 @@ final class SeptaskKitTaskListController: NSViewController {
     } else {
       // Registry copy (`registry/destinations.json`), the same words the
       // SwiftUI list's empty state shows.
-      emptyLabel.stringValue = filter.emptyTitle
-      emptyDetailLabel.stringValue = filter.emptyDetail
+      emptyLabel.stringValue = activeFilter.emptyTitle
+      emptyDetailLabel.stringValue = activeFilter.emptyDetail
       emptyDetailLabel.isHidden = false
     }
   }
@@ -575,7 +595,7 @@ final class SeptaskKitTaskListController: NSViewController {
       let menu: NSMenu
       if let task = self.rows[row].task, task.isHeading {
         menu = self.buildHeadingContextMenu()
-      } else if self.filter == .recentlyDeleted {
+      } else if self.showingRecentlyDeleted {
         menu = self.buildRecentlyDeletedMenu()
       } else if self.filter == .faded || (self.rows[row].task?.isFaded == true) {
         menu = self.buildFadedMenu()
@@ -874,6 +894,7 @@ final class SeptaskKitTaskListController: NSViewController {
     cancelSettle()
     resetInboxZeroMotionForFilterChange()
     activeTagFilterIDs.removeAll()
+    logbookTab = .completed
     self.filter = filter
     if case .project(let id) = filter {
       headerWashView.projectID = id
@@ -1100,13 +1121,14 @@ final class SeptaskKitTaskListController: NSViewController {
 
     // Today and its triage band come from one fetch of the open rows; the
     // band feeds the suggestion snapshot, the tag bar and `triageBand(_:)`.
+    let logbookDeletedCount = filter == .logbook ? LocalCache.recentlyDeletedCount(in: context) : 0
     let todayLists = filter == .today ? LocalCache.todayAndTriage(in: context) : nil
-    let rawPool = todayLists?.today ?? LocalCache.tasks(in: context, filter: filter)
+    let rawPool = todayLists?.today ?? LocalCache.tasks(in: context, filter: activeFilter)
     let rawTriage = todayLists?.triage ?? []
     // Progressive disclosure: discover ONLY tags actually present in this list;
     // when none exist, no tag filter bar appears (docs/TAGS_SPEC.md §3).
     let listTags: [TaskTag] = {
-      guard filter != .recentlyDeleted else { return [] }
+      guard !showingRecentlyDeleted else { return [] }
       var ids = Set<String>()
       for t in rawPool { for tid in t.tags { ids.insert(tid) } }
       for t in rawTriage { for tid in t.tags { ids.insert(tid) } }
@@ -1133,12 +1155,20 @@ final class SeptaskKitTaskListController: NSViewController {
     // Today — the band is exactly where most suggestions land.
     refreshFilingSuggestions(pool: pool + rawTriage)
     // One standard title row, on every page — computed once here rather than
-    // duplicated into each branch below, followed by the progressive-disclosure
-    // tag filter bar when tagged tasks exist in this list.
+    // duplicated into each branch below, followed by Logbook's Deleted toggle
+    // bar (issue #202) and the progressive-disclosure tag filter bar.
+    let showsLogbookSegmented = filter == .logbook && (logbookDeletedCount > 0 || logbookTab == .deleted)
+    let showsLogbookBar = showsLogbookSegmented || (showingRecentlyDeleted && !rawPool.isEmpty)
+    let logbookBarRows: [Row] = showsLogbookBar
+      ? [.logbookBar(tab: logbookTab,
+                     deletedCount: logbookDeletedCount,
+                     showsSegmented: showsLogbookSegmented,
+                     canEmptyTrash: showingRecentlyDeleted && !rawPool.isEmpty)]
+      : []
     let tagBarRows: [Row] = listTags.isEmpty
       ? []
       : [.tagFilterBar(tags: listTags, active: Array(activeTagFilterIDs).sorted())]
-    let titleRows: [Row] = (screenTitleRow().map { [$0] } ?? []) + tagBarRows
+    let titleRows: [Row] = (screenTitleRow().map { [$0] } ?? []) + logbookBarRows + tagBarRows
     var newRows: [Row]
     loggedClearIDs = []
     switch filter {
@@ -1240,8 +1270,12 @@ final class SeptaskKitTaskListController: NSViewController {
           + loggedFooterRows(completed: completed)
       }
     case .logbook:
-      // Already most-recent-first from LocalCache; cap what one screen needs.
-      newRows = titleRows + pool.prefix(200).map(chipped)
+      if logbookTab == .deleted {
+        newRows = titleRows + pool.map(chipped)
+      } else {
+        // Already most-recent-first from LocalCache; cap what one screen needs.
+        newRows = titleRows + pool.prefix(200).map(chipped)
+      }
     case .faded:
       var fadedRows = titleRows
       if !pool.isEmpty {
@@ -1307,8 +1341,10 @@ final class SeptaskKitTaskListController: NSViewController {
     apply(nextRows, animated: animated, preserving: live, preserveInboxHeader: preserveInboxHeader)
     applyInboxZeroOutcome(inboxZeroOutcome, inboxCount: currentInboxIDs.count)
     let hasContent = rows.contains { row in
-      if case .screenTitle = row { return false }
-      return true
+      switch row {
+      case .screenTitle, .logbookBar: return false
+      default: return true
+      }
     }
     emptyStack.isHidden = hasContent
     refreshEmptyLabel()
@@ -1869,7 +1905,7 @@ final class SeptaskKitTaskListController: NSViewController {
       case .task(let task, _, _):
         ids.insert(task.id)
       case .header, .loggedFooter, .fadedFooter, .addSection,
-           .screenTitle, .tagFilterBar, .projectTarget, .containerNotes,
+           .screenTitle, .logbookBar, .tagFilterBar, .projectTarget, .containerNotes,
            .notice, .noticeStep, .event, .notesProposal:
         return ids
       }
@@ -3032,7 +3068,7 @@ final class SeptaskKitTaskListController: NSViewController {
     }
     // Mark-complete has no meaning in the trash — checkbox tap and ⌘K both
     // route to restore there (see `toggle(id:)`).
-    guard filter != .recentlyDeleted else {
+    guard !showingRecentlyDeleted else {
       restoreTasks(actionableSelection.map(\.id))
       return
     }
@@ -3063,7 +3099,7 @@ final class SeptaskKitTaskListController: NSViewController {
   /// (linger struck-through, then leave for the Logbook). Already-finished
   /// rows are left alone; trash has nothing to cancel.
   func cancelSelection() {
-    guard filter != .recentlyDeleted else { return }
+    guard !showingRecentlyDeleted else { return }
     let open = actionableSelection.filter { $0.status == .open }
     guard !open.isEmpty else { return }
     applyCancel(open)
@@ -3072,7 +3108,7 @@ final class SeptaskKitTaskListController: NSViewController {
   private func toggle(id: String) {
     // In the trash, a checkbox tap means "bring this back" — mark-complete
     // has no meaning for an already-deleted row.
-    guard filter != .recentlyDeleted else {
+    guard !showingRecentlyDeleted else {
       restoreTasks([id])
       return
     }
@@ -3101,6 +3137,23 @@ final class SeptaskKitTaskListController: NSViewController {
     // no state left to restore from.
     for id in ids { mutator.purge(id: id) }
     reload()
+  }
+
+  private func emptyTrash() {
+    let ids = LocalCache.tasks(in: context, filter: .recentlyDeleted).map(\.id)
+    guard !ids.isEmpty else { return }
+    KitPrompt.confirmDestructive(RegistryPrompts.emptyTrash(count: ids.count),
+                                 in: view.window) { [weak self] in
+      self?.purgeTasks(ids)
+    }
+  }
+
+  private func selectLogbookTab(_ tab: LogbookTab) {
+    guard tab != logbookTab else { return }
+    commitOpenEdits()
+    logbookTab = tab
+    tableView.deselectAll(nil)
+    reload(animated: false)
   }
 
   /// Complete/reopen a batch. Completed rows in drop-done lists get the
@@ -3483,7 +3536,7 @@ final class SeptaskKitTaskListController: NSViewController {
     let victims = actionableSelection
     guard !victims.isEmpty else { return }
     let ids = victims.map(\.id)
-    if filter == .recentlyDeleted {
+    if showingRecentlyDeleted {
       // ⌘⌫ already means "delete" everywhere else; in the trash itself that
       // naturally reads as the final, permanent delete — which has no undo,
       // so it asks first.
@@ -3856,7 +3909,7 @@ final class SeptaskKitTaskListController: NSViewController {
     // Nothing about a deleted task is editable — Return/double-click there
     // restores it instead (matching the checkbox), rather than opening dead
     // controls.
-    guard filter != .recentlyDeleted else {
+    guard !showingRecentlyDeleted else {
       restoreTasks(actionableSelection.map(\.id))
       return
     }
@@ -3946,7 +3999,7 @@ final class SeptaskKitTaskListController: NSViewController {
   /// into the title; ⌘↩ no longer does this, it only ever finishes.
   func beginComposingSelectedRowInNotes() {
     guard composingTaskId == nil else { return }
-    guard filter != .recentlyDeleted else { return }
+    guard !showingRecentlyDeleted else { return }
     let row = tableView.selectedRow
     guard row >= 0, let task = rows[row].task, !task.isHeading else { return }
     beginComposing(id: task.id, focusNotes: true)
@@ -4723,9 +4776,8 @@ final class SeptaskKitTaskListController: NSViewController {
 
   /// The page title's own navigation dropdown — the AppKit counterpart of
   /// `TaskNavMenu`: every sidebar destination in the SAME order (smart
-  /// lists, top-level projects, each area + its projects, Recently Deleted
-  /// when non-empty), a checkmark on whichever one is current, jump on
-  /// click.
+  /// lists, top-level projects, each area + its projects), a checkmark on
+  /// whichever one is current, jump on click.
   ///
   /// The smart-list set and order come from
   /// `KitSidebarDestination.smartLists` — the SAME list the AppKit sidebar
@@ -5085,6 +5137,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
     // The page's own title — noticeably taller than an in-list header, the
     // same visual weight a big navigation title would carry.
     case .screenTitle: return SeptenaTypeScale.size(.title2) + 40
+    case .logbookBar: return 38
     case .tagFilterBar: return 34
     case .projectTarget: return SeptaskKitTheme.rowHeight
     case .task(let task, _, _):
@@ -5709,6 +5762,18 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       }
       return cell
 
+    case .logbookBar(let tab, let deletedCount, let showsSegmented, let canEmptyTrash):
+      let identifier = NSUserInterfaceItemIdentifier("logbookBarCell")
+      let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? KitLogbookBarCell
+        ?? KitLogbookBarCell(identifier: identifier)
+      cell.configure(tab: tab,
+                     deletedCount: deletedCount,
+                     showsSegmented: showsSegmented,
+                     canEmptyTrash: canEmptyTrash)
+      cell.onSelectTab = { [weak self] next in self?.selectLogbookTab(next) }
+      cell.onEmptyTrash = { [weak self] in self?.emptyTrash() }
+      return cell
+
     case .tagFilterBar(let tags, let active):
       let identifier = NSUserInterfaceItemIdentifier("tagFilterBarCell")
       let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? KitTagFilterBarCell
@@ -6328,7 +6393,7 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     if showFadedInScope {
       checkbox.tenureFill = 1.0
     } else {
-      checkbox.tenureFill = (done || !TaskRowFlags.agingEnabled || filter == .recentlyDeleted || filter == .faded)
+      checkbox.tenureFill = (done || !TaskRowFlags.agingEnabled || filter == .recentlyDeleted || task.deletedAt != nil || filter == .faded)
         ? nil : task.fadeFill()
     }
     // The whole row fades, checkbox included: same curve as `CheckableRow`.
@@ -8508,6 +8573,102 @@ private final class KitTagFilterBarCell: NSTableCellView {
 
   @objc private func clearPressed() {
     onClear?()
+  }
+}
+
+/// Logbook sub-view bar (issue #202): segmented `Completed | Deleted (N)`
+/// switcher + trailing destructive `Empty Trash` action when viewing Deleted.
+@MainActor
+private final class KitLogbookBarCell: NSTableCellView {
+  var onSelectTab: ((SeptaskKitTaskListController.LogbookTab) -> Void)?
+  var onEmptyTrash: (() -> Void)?
+
+  private let segmented = NSSegmentedControl(labels: ["", ""], trackingMode: .selectOne, target: nil, action: nil)
+  private let emptyTrashButton = NSButton()
+  private var leadingConstraint: NSLayoutConstraint!
+  private var trailingConstraint: NSLayoutConstraint!
+
+  init(identifier: NSUserInterfaceItemIdentifier) {
+    super.init(frame: .zero)
+    self.identifier = identifier
+
+    segmented.translatesAutoresizingMaskIntoConstraints = false
+    segmented.segmentStyle = .automatic
+    segmented.controlSize = .regular
+    segmented.refusesFirstResponder = true
+    segmented.target = self
+    segmented.action = #selector(segmentChanged)
+
+    emptyTrashButton.translatesAutoresizingMaskIntoConstraints = false
+    emptyTrashButton.isBordered = false
+    emptyTrashButton.bezelStyle = .inline
+    emptyTrashButton.font = .systemFont(ofSize: SeptenaTypeScale.size(.caption1), weight: .medium)
+    emptyTrashButton.contentTintColor = .systemRed
+    emptyTrashButton.image = NSImage(systemSymbolName: "trash", accessibilityDescription: nil)?
+      .withSymbolConfiguration(.init(pointSize: 11, weight: .medium))
+    emptyTrashButton.imagePosition = .imageLeading
+    emptyTrashButton.refusesFirstResponder = true
+    emptyTrashButton.target = self
+    emptyTrashButton.action = #selector(emptyTrashPressed)
+
+    addSubview(segmented)
+    addSubview(emptyTrashButton)
+
+    leadingConstraint = segmented.leadingAnchor.constraint(equalTo: leadingAnchor, constant: SeptaskKitLayout.rowLeadingPad)
+    trailingConstraint = emptyTrashButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -SeptaskKitLayout.rowLeadingPad)
+    NSLayoutConstraint.activate([
+      leadingConstraint,
+      segmented.centerYAnchor.constraint(equalTo: centerYAnchor),
+      trailingConstraint,
+      emptyTrashButton.centerYAnchor.constraint(equalTo: centerYAnchor),
+      emptyTrashButton.leadingAnchor.constraint(greaterThanOrEqualTo: segmented.trailingAnchor, constant: 12),
+    ])
+  }
+
+  required init?(coder: NSCoder) { fatalError("KitLogbookBarCell is code-only") }
+
+  override func layout() {
+    let inset = SeptaskKitLayout.inset(for: bounds.width)
+    leadingConstraint.constant = inset + SeptaskKitLayout.rowLeadingPad
+    trailingConstraint.constant = -(inset + SeptaskKitLayout.rowLeadingPad)
+    super.layout()
+  }
+
+  override func resetCursorRects() {
+    if !emptyTrashButton.isHidden {
+      addCursorRect(emptyTrashButton.frame, cursor: .pointingHand)
+    }
+  }
+
+  func configure(tab: SeptaskKitTaskListController.LogbookTab,
+                 deletedCount: Int,
+                 showsSegmented: Bool,
+                 canEmptyTrash: Bool) {
+    segmented.isHidden = !showsSegmented
+    segmented.setLabel(RegistrySurfaces.quickFindCompletedLabel, forSegment: 0)
+    let deletedBase = TaskFilter.recentlyDeleted.title
+    let deletedLabel = deletedCount > 0 ? "\(deletedBase) (\(deletedCount))" : deletedBase
+    segmented.setLabel(deletedLabel, forSegment: 1)
+    segmented.selectedSegment = tab.rawValue
+
+    emptyTrashButton.isHidden = !canEmptyTrash
+    let emptyTitle = RegistryActions.title("task.emptyTrash")
+    emptyTrashButton.attributedTitle = NSAttributedString(
+      string: emptyTitle,
+      attributes: [
+        .font: NSFont.systemFont(ofSize: SeptenaTypeScale.size(.caption1), weight: .medium),
+        .foregroundColor: NSColor.systemRed,
+      ])
+    window?.invalidateCursorRects(for: self)
+  }
+
+  @objc private func segmentChanged() {
+    guard let tab = SeptaskKitTaskListController.LogbookTab(rawValue: segmented.selectedSegment) else { return }
+    onSelectTab?(tab)
+  }
+
+  @objc private func emptyTrashPressed() {
+    onEmptyTrash?()
   }
 }
 #endif

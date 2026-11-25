@@ -24,7 +24,7 @@ struct SeptaskClaudePairingSections: View {
   var body: some View {
     if !sync.signedIn {
       Section {
-        Text("Sign in with Apple so Claude can connect to your tasks through your private Septena account.")
+        Text(RegistrySettings.copy("claude_connector", "signInBody"))
           .font(.callout)
           .foregroundStyle(.secondary)
         SeptaskSignInButton()

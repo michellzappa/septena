@@ -3,7 +3,7 @@ import SwiftData
 
 // A bog-standard SwiftUI navigation dropdown for the Tasks domain — the
 // Things-style title menu. It lists every sidebar destination (smart lists,
-// areas + their projects, top-level projects, Recently Deleted) and routes
+// areas + their projects, top-level projects) and routes
 // via `NavigationState.go(to:)` on tap, so you can jump anywhere WITHOUT the
 // sidebar — shown only when the sidebar is hidden or unavailable (compact
 // stack on iPhone / narrow iPad, or collapsed via ⌘/ on iPad / macOS — see

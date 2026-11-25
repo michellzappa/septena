@@ -534,11 +534,6 @@
     },
     {
       "file": "Septask/SeptaskClaudePairingPane.swift",
-      "literal": "Sign in with Apple so Claude can connect to your tasks through your private Septena account.",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septask/SeptaskClaudePairingPane.swift",
       "literal": "Connect Claude",
       "reasonId": "predates-rule"
     },

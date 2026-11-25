@@ -150,6 +150,10 @@
   "Delete Section": "Apagar seção",
   "Delete Tasks": "Apagar tarefas",
   "Delete account": "Excluir conta",
+  "Delete all {count} deleted tasks permanently?": {
+    "one": "Apagar 1 tarefa apagada permanentemente?",
+    "other": "Apagar todas as {count} tarefas apagadas permanentemente?"
+  },
   "Delete this section?": "Apagar esta seção?",
   "Delete your account?": "Excluir sua conta?",
   "Delete {count} tasks permanently?": {
@@ -183,6 +187,7 @@
   "Elevation": "Elevação",
   "Email": "E-mail",
   "Email thread": "Conversa por e-mail",
+  "Empty Trash": "Esvaziar lixeira",
   "Enter the code from the other device. If you're connecting Claude, the code is in your browser.": "Digite o código do outro dispositivo. Se estiver conectando o Claude, o código aparece no navegador.",
   "Error": "Erro",
   "Every new account starts with 14 days of Plus": "Toda conta nova começa com 14 dias de Plus",
@@ -270,6 +275,7 @@
   "Logbook is empty": "O registro está vazio",
   "Look up": "Pesquisar",
   "MCP Skills": "Skills MCP",
+  "MIT License": "Licença MIT",
   "Mac": "Mac",
   "Manage Subscription": "Gerenciar assinatura",
   "Mark Done": "Marcar como feito",
@@ -357,6 +363,7 @@
   "Open Today": "Abrir Hoje",
   "Open a task or choose Keep to bring it back, or review the list and let the rest go.": "Abra uma tarefa ou escolha Manter para recuperá-la, ou revise a lista e descarte o restante.",
   "Open in Calendar": "Abrir no Calendário",
+  "Open source": "Código aberto",
   "Open tasks without a date live here.": "Tarefas em aberto sem data ficam aqui.",
   "Open {name}": "Abrir {name}",
   "Or press ⌃⌥Space anywhere on your Mac": "Ou pressione ⌃⌥Espaço em qualquer lugar do Mac",

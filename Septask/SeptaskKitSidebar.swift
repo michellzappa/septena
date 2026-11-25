@@ -156,7 +156,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
   /// `heightOfRowByItem`, so each area still reads as its own section without
   /// the "Areas & Projects" text header that used to separate them.
   private var topLevelAreaOrProjectKeys: Set<String> = []
-  /// Smart lists in the bottom section (Logbook, Faded, Deleted). Their
+  /// Smart lists in the bottom section (Logbook, Faded). Their
   /// titles draw in secondary ink so the fixed lists recede below the work.
   private var bottomSmartListKeys: Set<String> = []
   /// Where `organize` (loose projects, then areas) begins and ends within
@@ -498,7 +498,6 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
       if convo.needsHumanReview { reviewCount += 1 }
       if convo.agentStage(at: now) != nil { agentCount += 1 }
     }
-    let recentlyDeletedCount = LocalCache.recentlyDeletedCount(in: context)
     let smartCounts: [TaskFilter: Int] = [
       .review: reviewCount,
       .agent: agentCount,
@@ -509,7 +508,6 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
       }.count,
       .starred: starredCount,
       .faded: fadedCount,
-      .recentlyDeleted: recentlyDeletedCount,
     ]
     let openByProject = Dictionary(grouping: open.compactMap(\.project), by: { $0 })
       .mapValues(\.count)
@@ -559,7 +557,6 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     }
     if starredCount > 0 { nonEmptyIDs.insert("starred") }
     if fadedCount > 0 { nonEmptyIDs.insert("faded") }
-    if recentlyDeletedCount > 0 { nonEmptyIDs.insert("recentlyDeleted") }
     let makeViewNode: (KitSidebarDestination) -> Node = { destination in
       Node(destination.nodeContent, count: self.smartListCount(destination,
                                                                counts: smartCounts,

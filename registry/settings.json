@@ -1054,6 +1054,18 @@
           ]
         },
         {
+          "id": "open_source",
+          "items": [
+            {
+              "kind": "customSurface",
+              "surface": "open_source",
+              "label": "Open source",
+              "detail": "MIT License",
+              "icon": "settings.open_source"
+            }
+          ]
+        },
+        {
           "id": "actions",
           "items": [
             { "kind": "customSurface", "surface": "check_updates", "label": "Check for Updates…", "platforms": ["macos", "windows"], "featureId": "mac.updates" },

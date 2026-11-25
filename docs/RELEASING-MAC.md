@@ -1,45 +1,68 @@
-# Septask Mac releases
+# Mac releases
 
-Septask Mac is distributed outside the Mac App Store as a Developer ID signed
-and Apple-notarized ZIP attached to a GitHub Release. Sparkle checks the signed
-feed at `https://updates.centaur-labs.io/appcast.xml`.
+The Mac app ships on two channels (ADR 0026):
 
-The appcast is deployed as a GitHub Pages site from the `release-macos` workflow;
-the ZIP remains a GitHub Release asset. Sparkle verifies both the Apple code
-signature and its Ed25519 archive signature before installing an update.
+- **The download:** a Developer ID signed and Apple-notarized app on GitHub
+  Releases. It updates itself with Sparkle. This page is about this channel.
+- **The Mac App Store:** planned for launch (#266). It sells Plus through
+  Apple. The download cannot, and honors a Plus bought anywhere else.
 
-## Release flow
+## Release
 
-1. Bump `MARKETING_VERSION` in `project.yml` and update the release entry in
-   `Septena/Resources/changelog.json` when appropriate.
-2. Commit the clean tree.
-3. Run `scripts/cut-macos-release.sh` (or push a matching `vX.Y.Z` tag).
-4. GitHub Actions builds `Septask.app`, signs it with Developer ID, notarizes
-   and staples it, creates the GitHub Release, then publishes the appcast and
-   release landing page to GitHub Pages.
+MZ decides when a release goes out. Then, in one session on mz-mini:
 
-The Mac app exposes **Check for Updates…** in the application menu and in
-Settings → About. Sparkle owns the download, verification, installation, and
-relaunch UI.
+1. Set `MARKETING_VERSION` in `project.yml` (`docs/VERSIONING.md`), run
+   `xcodegen generate`, and land it on `main`. Every user-visible change needs
+   its file in `changelog/updates/`: the release notes come from there.
+2. In a clean checkout of `origin/main`:
+   - `scripts/release-macos.sh` builds, signs, notarizes and checks. It
+     publishes nothing. The files are in `dist/`.
+   - `scripts/release-macos.sh --publish` does the same, then pushes the tag
+     `vX.Y.Z` and publishes the GitHub release.
 
-## One-time secrets
+The version is `MARKETING_VERSION`. The build number is the git commit count.
+A tag is used once: a bad release is fixed by the next version.
 
-Configure these GitHub Actions secrets:
+A release has three files:
 
-| Secret | Purpose |
+| File | For |
 | --- | --- |
-| `MACOS_CERTIFICATE_P12` / `MACOS_CERTIFICATE_PASSWORD` | Developer ID Application certificate |
-| `KEYCHAIN_PASSWORD` | Temporary CI keychain password |
-| `APPLE_API_KEY` / `APPLE_API_KEY_ID` / `APPLE_API_ISSUER_ID` | notarization |
-| `SPARKLE_PUBLIC_ED_KEY` | Public Sparkle Ed25519 key compiled into the app |
-| `SPARKLE_PRIVATE_ED_KEY` | Private key used only to sign update archives/appcast |
-| `SEPTASK_PROVISION_PROFILE_BASE64` | Optional CloudKit provisioning profile |
-| `SEPTASK_TEAM_ID` | Apple team ID used when expanding app-group entitlements |
+| `Septena.dmg` | People. `https://septena.app/mac/download` always gives the newest. |
+| `Septena-X.Y.Z.zip` | Sparkle. |
+| `appcast.xml` | The update feed. |
 
-Generate the Sparkle key pair with Sparkle's `generate_keys`. Store the private
-key in GitHub Actions only. The public value is not secret and may also be put
-in a local `Config/Secrets.xcconfig` for release testing.
+## The update feed
 
-The custom domain also needs a one-time DNS CNAME from
-`updates.centaur-labs.io` to the GitHub Pages hostname for this repository, and
-GitHub repository Settings → Pages must use **GitHub Actions** as its source.
+Installed copies read `https://septena.app/mac/appcast.xml`. The site redirects
+it (`septena-site/public/_redirects`) to `appcast.xml` on the newest GitHub
+release. So **the newest release must be a Mac release**: anything else
+published in this repo uses `gh release create --latest=false`
+(`core-release.yml` does).
+
+Two values are permanent, because every installed copy holds them: the feed
+address, and the public update key in `scripts/release-macos.sh`.
+
+## Signing material
+
+Signing runs on the Mac mini. GitHub holds no Developer ID key and no update
+key. `~/.config/signing/README.md` lists the files:
+
+| What | Where |
+| --- | --- |
+| Developer ID Application (team 992N457T8D) | login keychain |
+| Provisioning profile `Septena Mac Developer ID` | `centaur-labs/profiles/` |
+| Sparkle private key | `centaur-labs/septena-sparkle-ed25519.key` |
+| App Store Connect key, for notarization | `centaur-labs/asc-centaur.env` |
+
+The Developer ID certificate expires on 2027-02-01. Only the account holder
+can make the next one. Published apps keep running after that date; a new
+release needs the new certificate and a profile that names it.
+
+## What the download does not have
+
+- **Sign in with Apple.** Apple never grants that entitlement to Developer ID.
+  The app sees that it is missing (`SeptaskSignIn.appleAvailable`) and signs in
+  with a code that a signed-in Septena approves (ADR 0016). A person with no
+  signed-in device cannot make an account in the download until email codes
+  exist (#169).
+- **Buying Plus**, until the Mac App Store build.

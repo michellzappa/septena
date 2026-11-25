@@ -941,6 +941,18 @@
       "settings.copy.delete_account.button.label"
     ]
   },
+  "Delete all {count} deleted tasks permanently?": {
+    "forms": {
+      "one": "Delete 1 deleted task permanently?",
+      "other": "Delete all {count} deleted tasks permanently?"
+    },
+    "placeholders": [
+      "count"
+    ],
+    "paths": [
+      "surfaces.prompts.items.emptyTrash.title"
+    ]
+  },
   "Delete this section?": {
     "text": "Delete this section?",
     "paths": [
@@ -1153,6 +1165,13 @@
     "text": "Email thread",
     "paths": [
       "surfaces.taskReferences.kinds.thread.label"
+    ]
+  },
+  "Empty Trash": {
+    "text": "Empty Trash",
+    "paths": [
+      "actions.actions.task.emptyTrash.title",
+      "surfaces.prompts.items.emptyTrash.confirmTitle"
     ]
   },
   "Enter the code from the other device. If you're connecting Claude, the code is in your browser.": {
@@ -1688,6 +1707,12 @@
       "settings.pages.claude_pairing.sections.agent_tools.items.0.label"
     ]
   },
+  "MIT License": {
+    "text": "MIT License",
+    "paths": [
+      "settings.pages.about.sections.open_source.items.0.detail"
+    ]
+  },
   "Mac": {
     "text": "Mac",
     "paths": [
@@ -2212,6 +2237,12 @@
     "text": "Open in Calendar",
     "paths": [
       "settings.copy.calendar_detail.openInCalendar.label"
+    ]
+  },
+  "Open source": {
+    "text": "Open source",
+    "paths": [
+      "settings.pages.about.sections.open_source.items.0.label"
     ]
   },
   "Open tasks without a date live here.": {
@@ -3904,7 +3935,8 @@
   "You can’t undo this.": {
     "text": "You can’t undo this.",
     "paths": [
-      "surfaces.prompts.items.deletePermanently.message"
+      "surfaces.prompts.items.deletePermanently.message",
+      "surfaces.prompts.items.emptyTrash.message"
     ]
   },
   "You decide when it’s done.": {

@@ -88,6 +88,25 @@ struct TaskListView: View {
   /// archive page. Expand only for that explicit reveal; normal Logbook opens
   /// keep their bounded, fast materialization path.
   @State private var logbookRevealAll = false
+  /// Recently Deleted lives inside Logbook (issue #202) as a secondary sub-view
+  /// rather than a top-level sidebar destination.
+  private enum LogbookTab: Hashable {
+    case completed
+    case deleted
+  }
+  @State private var logbookTab: LogbookTab = .completed
+  @State private var logbookDeletedCount: Int = 0
+
+  /// True when the list is displaying soft-deleted tasks — either inside
+  /// Logbook's Deleted sub-view or via a direct `.recentlyDeleted` route.
+  private var showingRecentlyDeleted: Bool {
+    filter == .recentlyDeleted || (filter == .logbook && logbookTab == .deleted)
+  }
+
+  /// The effective filter whose rows are currently shown.
+  private var activeFilter: TaskFilter {
+    showingRecentlyDeleted ? .recentlyDeleted : filter
+  }
 
   @State private var areas: [Area]
   @State private var projects: [Project]
@@ -183,8 +202,8 @@ struct TaskListView: View {
   private func localTasks() -> [SeptenaTask] {
     LocalCache.tasks(
       in: modelContext,
-      filter: filter,
-      limit: filter == .logbook && !logbookRevealAll ? logbookLimit : nil
+      filter: activeFilter,
+      limit: activeFilter == .logbook && !logbookRevealAll ? logbookLimit : nil
     )
   }
 
@@ -293,7 +312,7 @@ struct TaskListView: View {
 
   private var allowsTouchMultiSelect: Bool {
     #if os(iOS)
-    filter != .recentlyDeleted && expandedEditId == nil
+    !showingRecentlyDeleted && expandedEditId == nil
     #else
     false
     #endif
@@ -358,6 +377,9 @@ struct TaskListView: View {
   /// completed ids the logged footer counted when the menu opened, plus the
   /// registry prompt copy that names the page and that exact count.
   @State private var clearLoggedRequest: ClearLoggedRequest?
+  /// Pending permanent-delete / Empty Trash confirmation (registry
+  /// `deletePermanently` or `emptyTrash`).
+  @State private var purgeTasksRequest: PurgeTasksRequest?
 
   // The title/checkbox hero-glide (`matchedGeometryEffect`) was removed: it
   // ANIMATED the title's position between the closed row and the inline editor,
@@ -798,11 +820,11 @@ struct TaskListView: View {
     // for creation; top-right stays Search (and Project's overflow menu).
     // Split layouts (iPad / unfolded Duo) have no Magic Plus orb, so embedded
     // Area/Project lists keep the toolbar "+" there.
-    embedded && filter != .recentlyDeleted && filter != .faded && usesPushNavigation
+    embedded && !showingRecentlyDeleted && filter != .faded && usesPushNavigation
     #elseif os(iOS)
-    embedded && filter != .recentlyDeleted && filter != .faded && !usesPushNavigation
+    embedded && !showingRecentlyDeleted && filter != .faded && !usesPushNavigation
     #else
-    embedded && filter != .recentlyDeleted && filter != .faded
+    embedded && !showingRecentlyDeleted && filter != .faded
     #endif
   }
 
@@ -823,7 +845,7 @@ struct TaskListView: View {
     // regular the "+" merges with the sidebar's "···" in the tab bar; on iPhone
     // a pushed list shows gear + "+" in its own nav bar.
     .modifier(TaskListStandaloneChrome(embedded: embedded,
-                                       recentlyDeleted: filter == .recentlyDeleted || filter == .faded,
+                                       recentlyDeleted: showingRecentlyDeleted || filter == .faded,
                                        starFilter: starFilterInToolbar && showsStarFilterPill
                                          ? $starredOnlyFilter : nil,
                                        onNew: { handleExternalCreateTrigger() }))
@@ -904,6 +926,25 @@ struct TaskListView: View {
         clearLoggedRequest = nil
       }
       Button(RegistryPrompts.cancelTitle, role: .cancel) { clearLoggedRequest = nil }
+    } message: { request in
+      Text(request.copy.message)
+    }
+    // Permanent delete & Empty Trash confirmation (registry `deletePermanently`
+    // / `emptyTrash`), matching the AppKit sheet.
+    .confirmationDialog(
+      purgeTasksRequest?.copy.title ?? "",
+      isPresented: Binding(
+        get: { purgeTasksRequest != nil },
+        set: { if !$0 { purgeTasksRequest = nil } }
+      ),
+      titleVisibility: .visible,
+      presenting: purgeTasksRequest
+    ) { request in
+      Button(request.copy.confirmTitle ?? "", role: .destructive) {
+        purgeTasks(request.ids)
+        purgeTasksRequest = nil
+      }
+      Button(RegistryPrompts.cancelTitle, role: .cancel) { purgeTasksRequest = nil }
     } message: { request in
       Text(request.copy.message)
     }
@@ -999,6 +1040,8 @@ struct TaskListView: View {
       if old == .logbook {
         logbookLimit = Self.logbookPageSize
         logbookRevealAll = false
+        logbookTab = .completed
+        logbookDeletedCount = 0
       }
       model.resetSession()
       resetInboxZeroMotionForFilterChange()
@@ -1030,6 +1073,14 @@ struct TaskListView: View {
       refreshCalendarEvents()
       hydrateFilterStorageIfNeeded()
       refreshTodayNotices()
+      Task { await load() }
+    }
+    .onChange(of: logbookTab) { _, _ in
+      guard filter == .logbook else { return }
+      clearSelection()
+      expandedEditId = nil
+      itemsStorage = localTasks()
+      storageFilter = filter
       Task { await load() }
     }
     .onChange(of: nav.pendingTaskReveal) { _, _ in
@@ -1166,7 +1217,7 @@ struct TaskListView: View {
   /// composer still treats this as CREATE, not edit, so its behavior is in
   /// lockstep with the drawer composer. Upcoming falls back to the drawer.
   private func startCreate(areaId: String? = nil, projectId: String? = nil) {
-    guard filter != .recentlyDeleted, filter != .repeating, filter != .review, filter != .agent else { return }
+    guard !showingRecentlyDeleted, filter != .repeating, filter != .review, filter != .agent else { return }
     // One press: fold (and so save) whatever editor is open, then start the
     // new task. This used to stop after the fold, so "+" while editing took
     // two presses.
@@ -1223,7 +1274,7 @@ struct TaskListView: View {
   /// capture row (Inbox on Today, foot line on project/area/unscheduled, composer
   /// on Upcoming). Re-tapping while a capture is already open scrolls back to it.
   private func openContextualQuickAdd() {
-    guard filter != .recentlyDeleted else { return }
+    guard !showingRecentlyDeleted else { return }
     // One press: save + fold the open editor (a capture line included: its
     // typed title lives in the editor, not the store, so only its own teardown
     // can save it) and start the new task. `startCreate` does the fold. A blank
@@ -1276,6 +1327,7 @@ struct TaskListView: View {
     itemsStorage = preHydrationItems()
     triageStorage = preHydrationTriage()
     fadedScopeStorage = (showFadedInLists && scopeLoggedFilterId != nil) ? preHydrationFaded() : []
+    logbookDeletedCount = filter == .logbook ? LocalCache.recentlyDeletedCount(in: modelContext) : 0
     storageFilter = filter
   }
 
@@ -1364,6 +1416,9 @@ struct TaskListView: View {
   /// `List`) precisely because the container can host an inline-editable
   /// `TextField` on macOS without the List focus/selection corruption.
   private func beginEdit(_ task: SeptenaTask) {
+    // Deleted tasks are read-only history — restore via the row capsule,
+    // checkbox, or context menu rather than opening an editor on a trashed row.
+    guard !showingRecentlyDeleted else { return }
     // Opening a row while another is open folds (and so saves) the other and
     // opens this one in the SAME tap. This used to stop after the fold, which
     // (with select-first on iPad) made switching rows cost three taps.
@@ -1655,7 +1710,7 @@ struct TaskListView: View {
     }
     #endif
     .safeAreaInset(edge: .bottom, spacing: 0) {
-      if filter != .recentlyDeleted &&
+      if !showingRecentlyDeleted &&
           ((touchSelectionActive && selectionScope.count > 0) ||
            (usesSelectionModel && selectionScope.isMulti)) {
         taskBatchActionBar
@@ -1866,7 +1921,7 @@ struct TaskListView: View {
   /// When a task editor or inline text field is active, native text editing
   /// commands (Copy, Paste, Select All) must stay with the focused control.
   private var rowCommandShortcutsEnabled: Bool {
-    filter != .recentlyDeleted
+    !showingRecentlyDeleted
       && !listInputActive
       && whenSheet == nil
       && !showingMoveSheet
@@ -1973,6 +2028,7 @@ struct TaskListView: View {
   @ViewBuilder
   private var taskListHeader: some View {
     titleRow
+    logbookSubViewBar
     noticesRow
     todayCalendarRow
     remindersRow
@@ -2199,7 +2255,7 @@ struct TaskListView: View {
   /// disclosure: zero tags on tasks in this list => zero tag bar chrome
   /// (`docs/TAGS_SPEC.md` §3).
   private var availableTagsInList: [TaskTag] {
-    guard filter != .recentlyDeleted else { return [] }
+    guard !showingRecentlyDeleted else { return [] }
     var presentIDs = Set<String>()
     for task in items {
       for tid in task.tags { presentIDs.insert(tid) }
@@ -2362,7 +2418,7 @@ struct TaskListView: View {
   // tidy end-of-list margin, not the 240pt dead-zone it used to be.
   @ViewBuilder
   private var taskListFooter: some View {
-    if filter == .logbook, items.count == logbookLimit {
+    if activeFilter == .logbook, items.count == logbookLimit {
       Button("Show \(Self.logbookPageSize) More") {
         logbookLimit += Self.logbookPageSize
         Task { await load() }
@@ -2421,6 +2477,55 @@ struct TaskListView: View {
       embeddedHeader()
         .plainListChrome()
         .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
+    }
+  }
+
+  /// Segmented sub-view switcher inside Logbook (issue #202): Completed | Deleted.
+  /// Progressively disclosed once deleted tasks exist (and stays visible while
+  /// viewing Deleted so emptying/restoring the last item never pulls the toggle
+  /// out from under the user). Also hosts the destructive Empty Trash button
+  /// when viewing Deleted with items.
+  private var logbookDeletedSegmentTitle: String {
+    let base = TaskFilter.recentlyDeleted.title
+    return logbookDeletedCount > 0 ? "\(base) (\(logbookDeletedCount))" : base
+  }
+
+  @ViewBuilder
+  private var logbookSubViewBar: some View {
+    let showsSegmented = filter == .logbook && (logbookDeletedCount > 0 || logbookTab == .deleted)
+    let showsEmptyTrash = showingRecentlyDeleted && !visibleItems.isEmpty
+    if showsSegmented || showsEmptyTrash {
+      VStack(alignment: .leading, spacing: 8) {
+        if showsSegmented {
+          Picker("", selection: $logbookTab) {
+            Text(RegistrySurfaces.quickFindCompletedLabel).tag(LogbookTab.completed)
+            Text(logbookDeletedSegmentTitle).tag(LogbookTab.deleted)
+          }
+          .pickerStyle(.segmented)
+          .labelsHidden()
+        }
+        if showsEmptyTrash {
+          HStack {
+            Spacer(minLength: 0)
+            Button(role: .destructive) {
+              requestEmptyTrash()
+            } label: {
+              Label(RegistryActions.title("task.emptyTrash"), systemImage: "trash")
+                .font(.septenaCaption.weight(.medium))
+                .foregroundStyle(Color.red)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .inlineHover(cornerRadius: 6)
+          }
+        }
+      }
+      .padding(.horizontal, TaskCardMetrics.margin)
+      .padding(.bottom, 10)
+      .plainListChrome()
+      .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
     }
   }
 
@@ -2622,12 +2727,12 @@ struct TaskListView: View {
     // words the AppKit list shows.
     if showsEmptyTaskList && !allowsInlineCreate {
       ContentUnavailableView(
-        filter.emptyTitle,
-        systemImage: titleIcon,
+        activeFilter.emptyTitle,
+        systemImage: showingRecentlyDeleted ? "trash" : titleIcon,
         description: Text(
-          filter.registryDestination == nil && showsQuickAddAtTop
+          activeFilter.registryDestination == nil && showsQuickAddAtTop
             ? RegistryDestinations.GenericEmpty.detail
-            : filter.emptyDetail
+            : activeFilter.emptyDetail
         )
       )
       .frame(maxWidth: .infinity)
@@ -3440,7 +3545,7 @@ struct TaskListView: View {
   private var duplicateSelectedAction: (() -> Void)? {
     guard expandedEditId == nil,
           !composerIsOpen, whenSheet == nil, !showingMoveSheet, !showingRepeatSheet,
-          !nav.showQuickFind, filter != .recentlyDeleted,
+          !nav.showQuickFind, !showingRecentlyDeleted,
           !orderedActionIDs().isEmpty
     else { return nil }
     return { duplicate(orderedActionIDs()) }
@@ -3449,7 +3554,7 @@ struct TaskListView: View {
   private var copySelectedAction: (() -> Void)? {
     guard expandedEditId == nil,
           !composerIsOpen, whenSheet == nil, !showingMoveSheet, !showingRepeatSheet,
-          !nav.showQuickFind, filter != .recentlyDeleted,
+          !nav.showQuickFind, !showingRecentlyDeleted,
           !orderedActionIDs().isEmpty
     else { return nil }
     return { copyTasks(orderedActionIDs()) }
@@ -3602,17 +3707,21 @@ struct TaskListView: View {
 
   /// ⌘M / ⌘⇧M — open the Move destination picker for the focused row(s).
   private func openMoveForSelected() {
-    guard filter != .recentlyDeleted else { return }
+    guard !showingRecentlyDeleted else { return }
     let ids = orderedActionIDs()
     guard !ids.isEmpty else { return }
     moveTargetIds = ids
     showingMoveSheet = true
   }
 
-  /// ⌘⌫ — delete every selected row.
+  /// ⌘⌫ — delete every selected row (or confirm permanent delete in Trash).
   private func deleteSelected() {
     let ids = orderedActionIDs()
     guard !ids.isEmpty else { return }
+    if showingRecentlyDeleted {
+      requestPurge(ids: ids)
+      return
+    }
     Haptics.warning()
     clearSelection()
     for id in ids { applyDelete(id) }
@@ -3652,7 +3761,7 @@ struct TaskListView: View {
 
   /// ⌘D — duplicate the focused row(s).
   private func duplicateSelected() {
-    guard filter != .recentlyDeleted else { return }
+    guard !showingRecentlyDeleted else { return }
     duplicate(orderedActionIDs())
   }
 
@@ -3708,7 +3817,7 @@ struct TaskListView: View {
     TaskUndo.recordDelete(ids: [id], mutator: mutator)
     // Show undo snackbar (not in the Recently Deleted view — there the
     // gesture is always intentional and Restore is a first-class action).
-    guard filter != .recentlyDeleted else { return }
+    guard !showingRecentlyDeleted else { return }
     // The toast undoes THIS delete only. While the delete is still the newest
     // entry it goes through the shared stack (so the toast and ⌘Z agree and no
     // stale entry is left); once anything newer landed, a plain
@@ -4015,9 +4124,11 @@ struct TaskListView: View {
     // menu, Select included (touch multi-select starts there). `quickMenu`
     // still gates the one-tap "file here" suggestion capsule, now threaded into
     // the row as the inboard-most trailing accessory (left of the date).
-    staticRow(task, accessory: filter == .faded
-              ? keepFadedCapsule(for: task)
-              : (quickMenu ? suggestionCapsule(for: task) : nil))
+    staticRow(task, accessory: showingRecentlyDeleted
+              ? restoreDeletedCapsule(for: task)
+              : (filter == .faded
+                 ? keepFadedCapsule(for: task)
+                 : (quickMenu ? suggestionCapsule(for: task) : nil)))
     // Drag a row (or the whole selection) to a sidebar area/project to re-home
     // it, onto an Area's project card, or between rows of a manually-ordered
     // list to reorder. `.draggable` pairs with `SidebarTaskDrop`, `TaskMoveDrop`,
@@ -4071,6 +4182,73 @@ struct TaskListView: View {
       .fixedSize()
       .accessibilityLabel("File in \(suggestion.title)")
     )
+  }
+
+  /// One-tap "Restore" capsule shown on each row in Recently Deleted
+  /// (Logbook ▸ Deleted, issue #202), matching Faded's one-tap "Keep" capsule.
+  private func restoreDeletedCapsule(for task: SeptenaTask) -> AnyView? {
+    AnyView(
+      Button {
+        restoreTasks([task.id])
+      } label: {
+        Text(RegistryActions.title("task.restore"))
+          .scaledFont(size: 12, weight: .medium)
+          .lineLimit(1)
+          .padding(.horizontal, 10)
+          .padding(.vertical, 3)
+          .background(Capsule().fill(Theme.mutedSurface))
+          .foregroundStyle(Theme.inkPrimary)
+          .contentShape(Capsule())
+      }
+      .buttonStyle(.plain)
+      .inlineHover(capsule: true)
+      .fixedSize()
+      .accessibilityLabel(String(localized: "Restore \(task.title)", comment: "Recently Deleted restore button accessibility"))
+    )
+  }
+
+  private func restoreTasks(_ ids: [String]) {
+    guard !ids.isEmpty else { return }
+    Haptics.commit()
+    let mutator = self.mutator
+    TaskUndo.record(
+      name: RegistryActions.title("task.restore"),
+      undo: { for id in ids { mutator.delete(id: id) } },
+      redo: { for id in ids { mutator.restore(id: id) } }
+    )
+    for id in ids {
+      mutator.restore(id: id)
+      removeLocally(id: id)
+    }
+    Task { await load() }
+  }
+
+  private func requestPurge(ids: [String]) {
+    guard !ids.isEmpty else { return }
+    purgeTasksRequest = PurgeTasksRequest(
+      ids: ids,
+      copy: RegistryPrompts.deletePermanently(count: ids.count)
+    )
+  }
+
+  private func requestEmptyTrash() {
+    let ids = LocalCache.tasks(in: modelContext, filter: .recentlyDeleted).map(\.id)
+    guard !ids.isEmpty else { return }
+    purgeTasksRequest = PurgeTasksRequest(
+      ids: ids,
+      copy: RegistryPrompts.emptyTrash(count: ids.count)
+    )
+  }
+
+  private func purgeTasks(_ ids: [String]) {
+    guard !ids.isEmpty else { return }
+    Haptics.warning()
+    clearSelection()
+    for id in ids {
+      removeLocally(id: id)
+      mutator.purge(id: id)
+    }
+    Task { await load() }
   }
 
   /// One-tap "Keep" capsule shown on each row in the Faded pile
@@ -4268,7 +4446,7 @@ struct TaskListView: View {
   /// surfaces at once.
   @ViewBuilder
   private func rowActionsMenu(target: ActionTarget) -> some View {
-    if filter == .recentlyDeleted {
+    if showingRecentlyDeleted {
       // Recently Deleted (registry `task.recentlyDeleted`): only Restore and
       // Delete Permanently — no scheduling, no move, no normal task lifecycle
       // actions apply to trashed rows.
@@ -4276,21 +4454,9 @@ struct TaskListView: View {
         RegistryActions.menu("task.recentlyDeleted")) { id in
           switch id {
           case "task.restore":
-            return .init {
-              for id in target.ids {
-                mutator.restore(id: id)
-                removeLocally(id: id)
-              }
-              Task { await load() }
-            }
+            return .init { restoreTasks(target.ids) }
           case "task.deletePermanently":
-            return .init {
-              Haptics.warning()
-              for id in target.ids {
-                removeLocally(id: id)
-                mutator.purge(id: id)
-              }
-            }
+            return .init { requestPurge(ids: target.ids) }
           default: return nil
           }
         })
@@ -5276,6 +5442,12 @@ struct TaskListView: View {
   /// from inbox/today/upcoming/unscheduled views, so they're gone the next
   /// time the screen reloads (which happens when you leave & return).
   private func toggle(_ task: SeptenaTask) {
+    // In Recently Deleted, tapping the checkbox restores the task (matching the
+    // AppKit shell) rather than toggling completion on a trashed row.
+    if showingRecentlyDeleted {
+      restoreTasks([task.id])
+      return
+    }
     let newStatus: TaskStatus = task.status == .done ? .open : .done
     if newStatus == .open { Haptics.commit() }
 
@@ -5542,6 +5714,9 @@ struct TaskListView: View {
     fadedScopeStorage = (showFadedInLists && scopeLoggedFilterId != nil)
       ? LocalCache.fadedTasks(in: modelContext, scope: filter)
       : []
+    logbookDeletedCount = filter == .logbook
+      ? LocalCache.recentlyDeletedCount(in: modelContext)
+      : 0
     // Prune stale selection IDs (e.g. tasks moved out of this list via
     // SidebarTaskDrop or AreaDetailView project drop) so selection chrome
     // never lingers over vanished rows.
@@ -5608,11 +5783,20 @@ struct TaskListView: View {
     // one intentionally-unbounded read needed to locate it, never on a normal
     // archive open.
     if filter == .logbook,
-       !logbookRevealAll,
-       LocalCache.taskMatches(id: reveal.taskID, filter: filter, in: modelContext) {
-      logbookRevealAll = true
-      Task { await load() }
-      return
+       LocalCache.taskMatches(id: reveal.taskID, filter: .logbook, in: modelContext) {
+      var needsReload = false
+      if logbookTab != .completed {
+        logbookTab = .completed
+        needsReload = true
+      }
+      if !logbookRevealAll {
+        logbookRevealAll = true
+        needsReload = true
+      }
+      if needsReload {
+        Task { await load() }
+        return
+      }
     }
 
     // The current mirror has finished loading this destination and the row no
@@ -5638,7 +5822,10 @@ struct TaskListView: View {
     guard let ids = note.changedTaskIDs else { return true }
     let visible = Set((triageItems + items).map(\.id))
     if !visible.isDisjoint(with: ids) { return true }
-    return ids.contains { LocalCache.taskMatches(id: $0, filter: filter, in: modelContext) }
+    return ids.contains {
+      LocalCache.taskMatches(id: $0, filter: activeFilter, in: modelContext)
+        || (filter == .logbook && LocalCache.taskMatches(id: $0, filter: .recentlyDeleted, in: modelContext))
+    }
   }
 
   /// Pull the day's calendar events for the lists that weave them in. Owned by
@@ -5688,6 +5875,13 @@ struct TaskListView: View {
 /// One pending "Clear Logged…" confirmation: the task ids it will clear and
 /// the prompt copy built for them (registry `clearLogged`).
 private struct ClearLoggedRequest {
+  let ids: [String]
+  let copy: RegistryPromptCopy
+}
+
+/// One pending permanent-delete or Empty Trash confirmation (registry
+/// `deletePermanently` or `emptyTrash`).
+private struct PurgeTasksRequest {
   let ids: [String]
   let copy: RegistryPromptCopy
 }

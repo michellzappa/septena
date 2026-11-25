@@ -93,7 +93,7 @@ stay.
 - **septena-life consumes it** by URL, pinned to a commit:
   `packages: SeptenaKit: { url: https://github.com/michellzappa/septena, revision: <sha> }`.
   *(default)* Reason: this repo tags app releases `vX.Y.Z`
-  (`docs/VERSIONING.md`, `.github/workflows/release-macos.yml` runs on `v*`).
+  (`docs/VERSIONING.md`, `scripts/release-macos.sh` makes the tag).
   SPM reads every semver tag as a package version, so `from:`/`exact:` pins
   would follow task-app releases, not package changes. A revision pin is
   exact and needs no tag scheme. For local work, septena-life switches the
@@ -239,7 +239,7 @@ Rule: these become per-repo files. septena-life is a full-history copy
 | `fastlane/Deliverfile` | both; this repo's default `app_identifier` becomes `com.septena.tasks` |
 | `scripts/build.sh`, `lint-*`, `wt-new`, `wt-done`, `stamp-version.sh`, `check-version-wiring.sh` | both (copy at clone) |
 | `scripts/changelog-stamp.sh`, `changelog-draft.sh` | septena-life (they edit `changelog.json`) |
-| `scripts/build-macos-release.sh`, `cut-macos-release.sh`, `generate-update-site.sh`, `.github/workflows/release-macos.yml`, Sparkle | stays (task app Mac direct distribution) |
+| `scripts/release-macos.sh`, Sparkle | stays (task app Mac direct distribution) |
 | `Config/Base.xcconfig`, `Config/Septena.storekit` | both. `Config/Secrets.xcconfig` (Withings) is life-only and gitignored. |
 | `tools/logo-configurator` | stays |
 | docs | §5 |

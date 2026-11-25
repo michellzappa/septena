@@ -922,6 +922,23 @@ private struct SeptaskAboutPane: View {
       .frame(maxWidth: .infinity)
       .padding(.vertical, 12)
       .listRowBackground(Color.clear)
+    case "open_source":
+      Link(destination: URL(string: "https://github.com/michellzappa/septena")!) {
+        LabeledContent {
+          HStack(spacing: 4) {
+            if let detail = item.detail {
+              Text(detail)
+                .foregroundStyle(.secondary)
+            }
+            Image(systemName: "arrow.up.right")
+              .imageScale(.small)
+              .foregroundStyle(.tertiary)
+          }
+        } label: {
+          label(item)
+            .foregroundStyle(.primary)
+        }
+      }
     case "check_updates":
       #if os(macOS)
       Button {

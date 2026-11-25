@@ -94,6 +94,10 @@ Rules that apply on every platform:
   ships as a Developer ID build with Sparkle updates (`docs/RELEASING-MAC.md`),
   where StoreKit sells nothing. The release moves to the Mac App Store
   (sandbox, no Sparkle) before Plus launches on the Mac.
+  **Amended by mz, 2026-11-25:** the Developer ID build stays, as a permanent
+  second channel on GitHub Releases. It sells nothing, honors a Plus bought
+  anywhere, and signs in with a code (ADR 0016), because Apple grants Sign in
+  with Apple to no Developer ID build.
 - The app shows "manage" text by source. A user who paid on the web and
   opens the iOS app sees where to manage it, and no Apple button.
 - A user can still pay twice by buying on two stores while signed in to two
