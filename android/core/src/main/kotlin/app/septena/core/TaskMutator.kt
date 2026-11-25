@@ -194,6 +194,7 @@ class TaskMutator(
             changes[name] = when (name) {
                 RegistryEntityFields.Task.SCHEDULED -> JsonValue.stringOrNull(f.scheduled)
                 RegistryEntityFields.Task.DEADLINE -> JsonValue.stringOrNull(f.deadline)
+                RegistryEntityFields.Task.DEFERRED_DEADLINE -> JsonValue.stringOrNull(f.deferredDeadline)
                 RegistryEntityFields.Task.TODAY -> JsonValue.BooleanValue(f.today)
                 RegistryEntityFields.Task.TODAY_SET_ON -> JsonValue.stringOrNull(f.todaySetOn)
                 RegistryEntityFields.Task.START_TIME -> JsonValue.stringOrNull(f.startTime)
@@ -309,6 +310,7 @@ class TaskMutator(
         source.fields[RegistryEntityFields.Task.TAGS]
             ?.let { extra[RegistryEntityFields.Task.TAGS] = it }
         for (field in listOf(
+            RegistryEntityFields.Task.DEFERRED_DEADLINE,
             RegistryEntityFields.Task.START_TIME,
             RegistryEntityFields.Task.DURATION_MINUTES,
             RegistryEntityFields.Task.TIME_ZONE,

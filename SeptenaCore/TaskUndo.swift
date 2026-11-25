@@ -122,6 +122,7 @@ enum TaskUndo {
     let today: Bool
     let starred: Bool
     let deadline: Date?
+    let deferredDeadline: String?
     let recurrence: Recurrence?
     let recurrencePaused: Bool
     let reminder: TaskReminder?
@@ -135,6 +136,7 @@ enum TaskUndo {
       today = task.today
       starred = task.starred
       deadline = SeptenaDate.parse(task.deadline)
+      deferredDeadline = task.deferredDeadline
       recurrence = task.recurrence
       recurrencePaused = task.recurrencePaused
       reminder = task.reminder
@@ -164,6 +166,7 @@ enum TaskUndo {
                           durationMinutes: snapshot.durationMinutes,
                           timeZone: snapshot.timeZone)
       mutator.setDeadline(id: snapshot.id, date: snapshot.deadline)
+      mutator.setDeferredDeadline(id: snapshot.id, day: snapshot.deferredDeadline)
       mutator.setRecurrence(id: snapshot.id, recurrence: snapshot.recurrence)
       if snapshot.recurrence != nil {
         mutator.setRecurrencePaused(id: snapshot.id, paused: snapshot.recurrencePaused)
@@ -205,6 +208,7 @@ enum TaskUndo {
   /// not a defer.
   private static func isDefer(from b: ScheduleSnapshot, to a: ScheduleSnapshot) -> Bool {
     if b.today && !a.today { return true }
+    if let deferred = a.deferredDeadline, deferred != b.deferredDeadline { return true }
     if let was = b.scheduled, let now = a.scheduled,
        Calendar.current.startOfDay(for: now) > Calendar.current.startOfDay(for: was) {
       return true

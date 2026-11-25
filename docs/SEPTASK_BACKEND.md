@@ -109,13 +109,13 @@ iOS / Mac / Watch apps                 Claude (web, mobile, Code, agents)
   retired 2026-11-21; the column stays on the wire only so older clients'
   pushes still validate.)
 - Dates keep their current shapes (`YYYY-MM-DD` strings for `created`,
-  `scheduled`, `deadline`, `todaySetOn`; the existing `completedAt` string).
+  `scheduled`, `deadline`, `deferredDeadline`, `todaySetOn`; the existing `completedAt` string).
   Changing them is a separate decision, not part of the move.
 
 ### 5.2 Tables
 
 **tasks:** id, title, status, kind, heading, area, project, created,
-scheduled, deadline, today, todaySetOn, completedAt, notes, position,
+scheduled, deadline, deferredDeadline, today, todaySetOn, completedAt, notes, position,
 todayPosition, recurrenceUnit, recurrenceInterval, recurrenceAfterCompletion,
 recurrencePaused, recurrenceSeriesID, recurrenceAnchorDate, source,
 sourceClient, acknowledgedAt, createdAt, rev, updatedAt, deletedAt.

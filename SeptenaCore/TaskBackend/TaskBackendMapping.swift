@@ -171,6 +171,7 @@ enum TaskBackendMapping {
       "durationMinutes": t.durationMinutes.map { .int(Int64($0)) } ?? .null,
       "timeZone": c.text("timeZone", t.timeZone, max: 64),
       "deadline": c.day("deadline", t.deadline),
+      "deferredDeadline": c.day("deferredDeadline", t.deferredDeadline),
       "today": .bool(t.today),
       "starred": .bool(t.starred),
       "tags": t.tagIDs.isEmpty ? .null : .array(t.tagIDs.map { .string($0) }),
