@@ -159,7 +159,12 @@ export const createTaskJsonSchema = {
     },
     refs: {
       ...refsJsonSchema,
-      description: "Optional references: the email, issue, event, page or task this task is about or was made from. Use role 'from' for the item you made it from.",
+      description: "Optional references: the email, issue, event, page or task this task is about or was made from. Use role 'from' for the item you made it from: Septena then creates no second task from the same item.",
+    },
+    allow_duplicate: {
+      type: "boolean",
+      default: false,
+      description: "Create the task even when an active task was made from the same item (the same `from` reference).",
     },
     origin: {
       type: "string",
@@ -270,6 +275,8 @@ export interface CreateTaskInput {
   checklist?: string[];
   tags?: string[];
   refs?: RefInput[];
+  /** Create it even when an active task has the same `from` reference. */
+  allow_duplicate?: boolean;
   /**
    * Provenance (docs/TASK_ROW_LANGUAGE_SPEC.md §3.4). `user_request` commits the
    * task (placed where specified); `agent_suggestion` (or omitted — the gateway's

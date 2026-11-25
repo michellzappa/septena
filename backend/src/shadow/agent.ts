@@ -269,6 +269,7 @@ function describeChange(e: ChangeEntry) {
     case "append": what = "wrote a turn"; break;
     case "delete": what = `deleted the ${e.entity}`; break;
     case "dropped": what = `write to a deleted ${e.entity} dropped`; break;
+    case "capture": what = "captured again"; break;
     case "upload": what = "uploaded an attachment"; break;
     default: what = `changed ${e.entity} ${(e.fields ?? []).join(", ")}`.trim();
   }
