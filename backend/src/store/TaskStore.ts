@@ -39,6 +39,21 @@ import {
   isWakeEventKind,
   type AgentWebhookTarget,
 } from "../api/agentWake.js";
+import { projectStoreFor } from "./ProjectStore.js";
+import {
+  SEED_FIELDS,
+  SHARED_FIELDS,
+  SHARED_PROJECT_ROW,
+  ShareBook,
+  newSharedRowId,
+  sharedColumn,
+  type ShareDelivery,
+  type ShareFields,
+  type ShareInfo,
+  type ShareRow,
+  type ShareValue,
+  type SharedEntity,
+} from "./shares.js";
 import { SESSION_HEADER, SessionBook, type RenewResult, type SessionGrant } from "./sessions.js";
 
 /// Task fields only the app writes (docs/TASK_FADE_SPEC.md §3): the fade
@@ -212,6 +227,9 @@ const CONNECTION_TTL_MS = MCP_REFRESH_TTL_S * 1000;
 /// How long the store remembers an item whose proposal the user turned down (#497).
 const DISMISSED_REF_TTL_MS = 365 * DAY_MS;
 const CHANGE_LOG_TTL_MS = DOMAIN_RULES.changeLogTtlDays * DAY_MS;
+/// The most tasks a project may hold when it becomes shared.
+const MAX_SHARE_TASKS = 5_000;
+const SHARE_RETRY_MS = 30_000;
 const MAX_PULL = ENTITY_LIMITS.maxPull;
 const PAIR_FAIL_WINDOW_MS = 10 * 60 * 1000;
 
@@ -297,6 +315,10 @@ const sessionTag = (sid: string) => `sid:${sid}`;
 export class TaskStore extends DurableObject<Env> {
   private sql: SqlStorage;
   private sessions: SessionBook;
+  private shares: ShareBook;
+  private drainingShares = false;
+  /// Shared projects this push asks to delete (`shareRefusal`).
+  private doomedShares = new Set<string>();
   private sseSubscribers = new Set<{
     send: (chunk: string) => boolean;
     close: () => void;
@@ -309,6 +331,7 @@ export class TaskStore extends DurableObject<Env> {
     super(ctx, env);
     this.sql = ctx.storage.sql;
     this.sessions = new SessionBook(this.sql);
+    this.shares = new ShareBook(this.sql);
     ctx.blockConcurrencyWhile(async () => {
       this.migrate();
       if ((await ctx.storage.getAlarm()) === null) {
@@ -527,6 +550,7 @@ export class TaskStore extends DurableObject<Env> {
       );
     `);
     this.sessions.migrate();
+    this.shares.migrate();
     // The name the user gave an agent (pairing or Settings rename). Null =
     // the client's registered name.
     const connectionCols = this.sql.exec<{ name: string }>("PRAGMA table_info(connections)").toArray().map((r) => r.name);
@@ -621,6 +645,10 @@ export class TaskStore extends DurableObject<Env> {
     const agentQuestions: AgentQuestionPush[] = [];
     const prevRev = this.meta("rev");
     this.reason = reason;
+    const sharing = this.shares.any();
+    this.doomedShares = new Set(sharing
+      ? ops.flatMap((op) => (op.op === "delete" && op.entity === "project" && this.shares.forProject(op.id) ? [op.id] : []))
+      : []);
     let results: OpResult[];
     try {
       results = this.ctx.storage.transactionSync(() => ops.map((op) => {
@@ -632,7 +660,9 @@ export class TaskStore extends DurableObject<Env> {
       }));
     } finally {
       this.reason = null;
+      this.doomedShares.clear();
     }
+    if (sharing) this.kickShares();
     const appliedThrough = this.meta("rev");
     if (results.some((r) => r.status === "applied")) {
       this.broadcast(appliedThrough);
@@ -676,6 +706,15 @@ export class TaskStore extends DurableObject<Env> {
     const spec: EntitySpec = ENTITIES[op.entity];
     const row = this.sql.exec(`SELECT * FROM ${spec.table} WHERE id = ?`, op.id).toArray()[0];
 
+    const sharing = this.shares.any();
+    const shareRefusal = sharing ? this.shareRefusal(op, row as Record<string, unknown> | undefined) : null;
+    if (shareRefusal) {
+      // A new rev sends the row again, so the client that wrote it gets the
+      // real state back.
+      this.sql.exec(`UPDATE ${spec.table} SET rev = ? WHERE id = ?`, this.nextRev(), op.id);
+      return { clientOpId: op.clientOpId, status: "rejected", reason: shareRefusal };
+    }
+
     if (op.op === "delete") {
       if (!row || row.deletedAt) return { clientOpId: op.clientOpId, status: "noop" };
       const rev = this.nextRev();
@@ -700,6 +739,7 @@ export class TaskStore extends DurableObject<Env> {
         // A user's own removal wins over every automatic add (§6.6).
         this.sql.exec("INSERT OR REPLACE INTO task_ref_removals (taskId, key, at) VALUES (?, ?, ?)", gone.taskId, gone.key, now);
       }
+      if (sharing) this.shareOut(op.entity, op.id, null);
       return { clientOpId: op.clientOpId, status: "applied", rev };
     }
 
@@ -844,7 +884,370 @@ export class TaskStore extends DurableObject<Env> {
       // Handing off to Review puts the ball in the human's court, so the claim ends.
       this.writeConvoServerFields(op.id, { claimedBy: null, claimUntil: null }, "release", actor, now, true);
     }
+    if (sharing) this.shareOut(op.entity, op.id, names);
     return { clientOpId: op.clientOpId, status: "applied", rev };
+  }
+
+  // ---- shared projects (docs/PROJECT_SHARING_SPEC.md, store/shares.ts) ----
+
+  /// What a write may not do to a shared project: delete it (the app stops
+  /// sharing or leaves), or, as a member, move its tasks somewhere private.
+  /// A client that does not know sharing deletes a project by deleting its
+  /// tasks first, so those deletes fail with it.
+  private shareRefusal(op: Extract<Op, { op: "upsert" | "delete" }>, row: Record<string, unknown> | undefined): string | null {
+    if (op.entity === "project") return op.op === "delete" && this.doomedShares.has(op.id) ? "shared_project" : null;
+    if (op.entity !== "task" || !row || row.deletedAt) return null;
+    const from = row.project as string | null;
+    const moves = op.op === "upsert" && "project" in op.fields && ((op.fields.project as string | null) ?? null) !== from;
+    if (from && this.doomedShares.has(from) && (op.op === "delete" || moves)) return "shared_project";
+    if (moves && this.shares.shared("task", op.id) && this.shares.forProject(from)?.role !== "owner") return "shared_move_out";
+    return null;
+  }
+
+  private rowOf(entity: SharedEntity, id: string): Record<string, unknown> | null {
+    const raw = this.sql.exec(`SELECT * FROM ${ENTITIES[entity].table} WHERE id = ?`, id).toArray()[0];
+    return raw ? (decodeRow(ENTITIES[entity], raw as Record<string, unknown>)) : null;
+  }
+
+  /// A local row's shared values. A heading or a task becomes its shared id.
+  private outFields(entity: SharedEntity, row: Record<string, unknown>, names: readonly string[]): ShareFields {
+    const out: ShareFields = {};
+    for (const name of names) {
+      let v = (row[name] ?? null) as ShareValue;
+      if (name === "heading" && typeof v === "string") v = this.shares.shared("task", v)?.sharedId ?? null;
+      if (name === "taskId" && typeof v === "string") v = this.shares.shared("task", v)?.sharedId ?? v;
+      out[name] = v;
+    }
+    return out;
+  }
+
+  /// Queues one applied local write for the ProjectStore. `names`: the
+  /// changed fields, or null for a delete.
+  private shareOut(entity: string, id: string, names: string[] | null): void {
+    if (entity === "project") {
+      const share = this.shares.forProject(id);
+      const fields = (names ?? []).filter((n) => SHARED_FIELDS.project.includes(n));
+      if (share && fields.length) {
+        this.shares.enqueue(share.id, "project", SHARED_PROJECT_ROW, false, this.outFields("project", this.rowOf("project", id)!, fields));
+      }
+    } else if (entity === "task") {
+      this.shareOutTask(id, names);
+    } else if (entity === "checklistItem") {
+      this.shareOutItem(id, names);
+    }
+  }
+
+  private shareOutTask(id: string, names: string[] | null): void {
+    const mapping = this.shares.shared("task", id);
+    if (names === null) {
+      if (mapping) this.shares.enqueue(mapping.shareId, "task", mapping.sharedId, true, {});
+      return;
+    }
+    const row = this.rowOf("task", id)!;
+    const share = this.shares.forProject(row.project as string | null);
+    if (mapping && mapping.shareId !== share?.id) this.shareMovedOut(id, mapping);
+    if (!share) return;
+    if (mapping && mapping.shareId === share.id) {
+      const fields = names.filter((n) => SHARED_FIELDS.task.includes(n));
+      if (fields.length) this.shares.enqueue(share.id, "task", mapping.sharedId, false, this.outFields("task", row, fields));
+      return;
+    }
+    this.shareTaskIn(share.id, id, row);
+  }
+
+  /// The owner moved a task out: it leaves the project for everyone.
+  private shareMovedOut(taskId: string, mapping: { shareId: string; sharedId: string }): void {
+    for (const { id } of this.sql.exec<{ id: string }>("SELECT id FROM checklist_items WHERE taskId = ?", taskId).toArray()) {
+      const item = this.shares.shared("checklistItem", id);
+      if (!item) continue;
+      this.shares.enqueue(item.shareId, "checklistItem", item.sharedId, true, {});
+      this.shares.retire(item.shareId, "checklistItem", item.sharedId);
+    }
+    this.shares.enqueue(mapping.shareId, "task", mapping.sharedId, true, {});
+    this.shares.retire(mapping.shareId, "task", mapping.sharedId);
+  }
+
+  /// A task that is new in a shared project. An agent's proposal stays
+  /// private until the user accepts it.
+  private shareTaskIn(shareId: string, id: string, row: Record<string, unknown>): void {
+    if (row.source === "mcp" && !row.acknowledgedAt) return;
+    const repeats = !!row.recurrenceUnit;
+    let sharedId = newSharedRowId();
+    if (repeats && typeof row.recurrenceSeriesID === "string" && typeof row.scheduled === "string" && id.startsWith("recur-")) {
+      // Two members who complete one repeat make the same next occurrence.
+      const series = `s-r-${row.recurrenceSeriesID}-${row.scheduled}`;
+      if (/^[A-Za-z0-9._:-]{1,128}$/.test(series)) sharedId = series;
+      const other = this.shares.localId(shareId, "task", sharedId);
+      if (other && other !== id) {
+        this.tombstoneReplica("task", id, new Date().toISOString());
+        return;
+      }
+    }
+    this.shares.map(shareId, "task", sharedId, id);
+    this.shares.enqueue(shareId, "task", sharedId, false,
+      this.outFields("task", row, repeats ? [...SHARED_FIELDS.task, ...SEED_FIELDS] : SHARED_FIELDS.task));
+    for (const item of this.sql.exec<{ id: string }>("SELECT id FROM checklist_items WHERE taskId = ? AND deletedAt IS NULL", id).toArray()) {
+      this.shareOutItem(item.id, []);
+    }
+  }
+
+  private shareOutItem(id: string, names: string[] | null): void {
+    const mapping = this.shares.shared("checklistItem", id);
+    if (names === null) {
+      if (mapping) this.shares.enqueue(mapping.shareId, "checklistItem", mapping.sharedId, true, {});
+      return;
+    }
+    const row = this.rowOf("checklistItem", id);
+    if (!row || row.deletedAt) return;
+    if (mapping) {
+      const fields = names.filter((n) => SHARED_FIELDS.checklistItem.includes(n));
+      if (fields.length) {
+        this.shares.enqueue(mapping.shareId, "checklistItem", mapping.sharedId, false, this.outFields("checklistItem", row, fields));
+      }
+      return;
+    }
+    const task = this.shares.shared("task", row.taskId as string);
+    if (!task) return;
+    const sharedId = newSharedRowId();
+    this.shares.map(task.shareId, "checklistItem", sharedId, id);
+    this.shares.enqueue(task.shareId, "checklistItem", sharedId, false, this.outFields("checklistItem", row, SHARED_FIELDS.checklistItem));
+  }
+
+  /// Turns a private project into the owner's replica of a shared one. Every
+  /// row goes out through the same queue as a later edit.
+  startShare(userId: string, projectId: string, info: ShareInfo): "ok" | "not_found" | "already_shared" | "too_large" {
+    const result = this.ctx.storage.transactionSync(() => {
+      const project = this.rowOf("project", projectId);
+      if (!project || project.deletedAt) return "not_found" as const;
+      if (this.shares.forProject(projectId)) return "already_shared" as const;
+      const tasks = this.sql.exec<{ id: string }>(
+        "SELECT id FROM tasks WHERE project = ? AND deletedAt IS NULL ORDER BY kind IS NULL OR kind != 'heading', rev", projectId,
+      ).toArray();
+      if (tasks.length > MAX_SHARE_TASKS) return "too_large" as const;
+      this.shares.put({ id: info.id, userId, localProjectId: projectId, info });
+      this.shares.map(info.id, "project", SHARED_PROJECT_ROW, projectId);
+      this.shares.enqueue(info.id, "project", SHARED_PROJECT_ROW, false, this.outFields("project", project, SHARED_FIELDS.project));
+      for (const { id } of tasks) this.shareTaskIn(info.id, id, this.rowOf("task", id)!);
+      this.setProjectShare(projectId, info);
+      return "ok" as const;
+    });
+    if (result === "ok") {
+      this.broadcast(this.meta("rev"));
+      this.kickShares();
+    }
+    return result;
+  }
+
+  /// The local project id a share request may name, checked before anything
+  /// is created.
+  canShare(projectId: string): "ok" | "not_found" | "already_shared" {
+    const project = this.rowOf("project", projectId);
+    if (!project || project.deletedAt) return "not_found";
+    return this.shares.forProject(projectId) ? "already_shared" : "ok";
+  }
+
+  listShares(): { id: string; projectId: string; role: "owner" | "editor"; memberId: string; info: ShareInfo }[] {
+    return this.shares.list().map((s) => ({ id: s.id, projectId: s.localProjectId, role: s.role, memberId: s.memberId, info: s.info }));
+  }
+
+  private setProjectShare(projectId: string, info: ShareInfo | null): void {
+    const next = info ? JSON.stringify(info) : null;
+    const row = this.sql.exec<{ share: string | null }>("SELECT share FROM projects WHERE id = ? AND deletedAt IS NULL", projectId).toArray()[0];
+    if (!row || row.share === next) return;
+    this.sql.exec("UPDATE projects SET share = ?, rev = ?, updatedAt = ? WHERE id = ?", next, this.nextRev(), new Date().toISOString(), projectId);
+  }
+
+  /// Sends queued writes to their ProjectStores. A failure is tried again by
+  /// the alarm; nothing is lost in between.
+  private kickShares(): void {
+    if (this.drainingShares || !this.shares.pendingShares().length) return;
+    this.ctx.waitUntil(this.drainShares());
+  }
+
+  async drainShares(): Promise<void> {
+    if (this.drainingShares) return;
+    this.drainingShares = true;
+    let failed = false;
+    try {
+      for (const shareId of this.shares.pendingShares()) {
+        const share = this.shares.get(shareId);
+        if (!share) { this.shares.remove(shareId); continue; }
+        try {
+          for (let batch = this.shares.nextBatch(shareId); batch; batch = this.shares.nextBatch(shareId)) {
+            const res = await projectStoreFor(this.env, shareId).push(share.userId, batch.ops);
+            if (!res.ok) {
+              // The membership ended. Its notice may still be on the way.
+              await this.receiveShare({ shareId, userId: share.userId, state: "ended", keepCopy: share.role === "owner" });
+              break;
+            }
+            this.shares.sent(shareId, batch.through);
+          }
+          for (let ids = this.shares.maskedRows(shareId); ids.length; ids = this.shares.maskedRows(shareId)) {
+            const rows = await projectStoreFor(this.env, shareId).rows(share.userId, ids);
+            if (!rows) {
+              await this.receiveShare({ shareId, userId: share.userId, state: "ended", keepCopy: share.role === "owner" });
+              break;
+            }
+            for (const { entity, id } of ids) {
+              if (!rows.some((r) => r.entity === entity && r.id === id)) this.shares.took(shareId, entity, id, 0, false);
+            }
+            // Deliver them like any other rows. A write that came in
+            // meanwhile masks its row again; it is sent first, next round.
+            const before = this.meta("rev");
+            const purged: string[] = [];
+            this.ctx.storage.transactionSync(() => {
+              for (const row of rows) this.applyShared(shareId, share.localProjectId, row, purged);
+            });
+            if (this.meta("rev") > before) this.broadcast(this.meta("rev"));
+            this.purgeAttachments(share.userId, purged);
+            if (this.shares.nextBatch(shareId)) break;
+          }
+        } catch (e) {
+          failed = true;
+          logEvent("share_push_failed", { shareId, error: String(e) });
+        }
+      }
+    } finally {
+      this.drainingShares = false;
+    }
+    if (failed) await this.ctx.storage.setAlarm(Date.now() + SHARE_RETRY_MS);
+    else this.kickShares();
+  }
+
+  /// Takes a delivery from a ProjectStore. Only a ProjectStore calls it, and
+  /// it only writes shared fields.
+  async receiveShare(d: ShareDelivery): Promise<"ok" | "account_gone"> {
+    if (this.deletedAt() > 0) return "account_gone";
+    const purged: string[] = [];
+    const before = this.meta("rev");
+    this.ctx.storage.transactionSync(() => {
+      if (d.state === "ended") this.endShare(d.shareId, d.keepCopy, purged);
+      else this.applyDelivery(d, purged);
+    });
+    const rev = this.meta("rev");
+    if (rev > before) this.broadcast(rev);
+    this.purgeAttachments(d.userId, purged);
+    return "ok";
+  }
+
+  private purgeAttachments(userId: string, ids: string[]): void {
+    if (ids.length) this.ctx.waitUntil(this.env.ATTACHMENTS.delete(ids.map((id) => `u/${userId}/att/${id}`)));
+  }
+
+  private applyDelivery(d: Extract<ShareDelivery, { state: "live" }>, purged: string[]): void {
+    let share = this.shares.get(d.shareId);
+    if (!share) {
+      // The first delivery is what makes the replica.
+      const projectId = newSharedRowId();
+      const now = new Date().toISOString();
+      this.sql.exec(
+        "INSERT INTO projects (id, title, status, created, rev, updatedAt) VALUES (?, '', 'active', ?, ?, ?)",
+        projectId, now.slice(0, 10), this.nextRev(), now,
+      );
+      this.shares.put({ id: d.shareId, userId: d.userId, localProjectId: projectId, info: d.info });
+      this.shares.map(d.shareId, "project", SHARED_PROJECT_ROW, projectId);
+      share = this.shares.get(d.shareId)!;
+    } else {
+      this.shares.put({ id: d.shareId, userId: d.userId, localProjectId: share.localProjectId, info: d.info });
+    }
+    this.setProjectShare(share.localProjectId, d.info);
+    for (const row of d.rows) this.applyShared(d.shareId, share.localProjectId, row, purged);
+  }
+
+  /// The local id of a shared row, reserved when the row is not here yet.
+  private localFor(shareId: string, entity: SharedEntity, sharedId: string): string {
+    const known = this.shares.localId(shareId, entity, sharedId);
+    if (known) return known;
+    // A row from an earlier membership is a tombstone under this id.
+    const id = this.rowOf(entity, sharedId) ? newSharedRowId() : sharedId;
+    this.shares.map(shareId, entity, sharedId, id);
+    return id;
+  }
+
+  private applyShared(shareId: string, projectId: string, row: ShareRow, purged: string[]): void {
+    const { entity } = row;
+    if (row.rev < this.shares.revOf(shareId, entity, row.id)) return;
+    const known = this.shares.localId(shareId, entity, row.id);
+    if (row.deleted) {
+      if (known) purged.push(...this.tombstoneReplica(entity, known, new Date().toISOString(), row.by));
+      return;
+    }
+    const id = this.localFor(shareId, entity, row.id);
+    // Moved out of the project here: the delete is on its way.
+    if (ShareBook.isRetired(id)) return;
+    const spec: EntitySpec = ENTITIES[entity];
+    const before = this.rowOf(entity, id);
+    if (before?.deletedAt) return;
+    const pending = this.shares.pendingFields(shareId, entity, row.id);
+    this.shares.took(shareId, entity, row.id, row.rev, Object.keys(row.fields).some((f) => pending.has(f)));
+    const now = new Date().toISOString();
+    const allowed = before ? SHARED_FIELDS[entity] : [...SHARED_FIELDS[entity], ...(entity === "task" ? SEED_FIELDS : [])];
+    const next: Record<string, unknown> = {};
+    for (const [name, value] of Object.entries(row.fields)) {
+      if (!allowed.includes(name) || pending.has(name)) continue;
+      let v: unknown = value;
+      if (typeof v === "string" && (name === "heading" || name === "taskId")) v = this.localFor(shareId, "task", v);
+      if (!before || JSON.stringify(before[name] ?? null) !== JSON.stringify(v ?? null)) next[name] = v;
+    }
+    if (!before) {
+      if (typeof next.title !== "string") return;
+      if (entity === "task") {
+        // Not a proposal, not filed yet, and its fade clock starts today.
+        Object.assign(next, { project: projectId, source: "app", acknowledgedAt: now, touchedAt: now, status: next.status ?? "open" });
+      }
+    }
+    const names = Object.keys(next);
+    if (!names.length) return;
+    const rev = this.nextRev();
+    const encode = (n: string) => encodeValue(sharedColumn(entity, n), next[n]);
+    if (before) {
+      this.sql.exec(
+        `UPDATE ${spec.table} SET ${names.map((n) => `"${n}" = ?`).join(", ")}, rev = ?, updatedAt = ? WHERE id = ?`,
+        ...names.map(encode), rev, now, id,
+      );
+    } else {
+      for (const [n, c] of Object.entries(spec.columns)) if (!(n in next) && c.dflt !== undefined) { next[n] = c.kind === "bool" ? c.dflt === 1 : c.dflt; names.push(n); }
+      this.sql.exec(
+        `INSERT INTO ${spec.table} (${names.map((n) => `"${n}"`).join(", ")}, id, rev, updatedAt) VALUES (${names.map(() => "?").join(", ")}, ?, ?, ?)`,
+        ...names.map(encode), id, rev, now,
+      );
+    }
+    const actor = `member:${row.by}`;
+    this.log(rev, entity, id, "upsert", names, null, actor, now, this.diffFor(before, next));
+    if (entity === "project" && "notes" in next) {
+      this.recordNoteRevision("project", id, (next.notes as string | null) ?? null, actor, now, (before?.noteRev as number | null) ?? 0, null);
+    }
+  }
+
+  /// Deletes a replica row here without telling the project. Returns the
+  /// attachments whose bytes to purge.
+  private tombstoneReplica(entity: SharedEntity, id: string, now: string, by: string | null = null): string[] {
+    const before = this.rowOf(entity, id);
+    if (!before || before.deletedAt) return [];
+    const rev = this.nextRev();
+    this.sql.exec(`UPDATE ${ENTITIES[entity].table} SET deletedAt = ?, rev = ?, updatedAt = ? WHERE id = ?`, now, rev, now, id);
+    this.log(rev, entity, id, "delete", null, null, by ? `member:${by}` : "system:share", now);
+    if (entity !== "task") return [];
+    this.tombstoneConvo(id, now);
+    const purged = this.tombstoneAttachments(id, now);
+    this.tombstoneChecklistItems(id, now);
+    this.tombstoneTaskRefs(id, now);
+    return purged;
+  }
+
+  private endShare(shareId: string, keepCopy: boolean, purged: string[]): void {
+    const share = this.shares.get(shareId);
+    if (!share) return;
+    const rows = this.shares.mapped(shareId);
+    this.shares.remove(shareId);
+    if (keepCopy) {
+      this.setProjectShare(share.localProjectId, null);
+      return;
+    }
+    const now = new Date().toISOString();
+    for (const entity of ["checklistItem", "task", "project"] as const) {
+      for (const r of rows) if (r.entity === entity) purged.push(...this.tombstoneReplica(entity, r.localId, now));
+    }
   }
 
   /// The rules an agent write must pass, enforced here so no connector can
@@ -2671,5 +3074,7 @@ export class TaskStore extends DurableObject<Env> {
       this.sql.exec("DELETE FROM usage WHERE updatedAt < ?", now - 62 * DAY_MS);
     });
     await this.ctx.storage.setAlarm(now + DAY_MS);
+    // A failed drain sets its own, earlier alarm.
+    await this.drainShares();
   }
 }

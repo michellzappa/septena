@@ -67,6 +67,8 @@ import {
 } from "../entitlement/appleJws.js";
 import { appleRow, rejectReason } from "../entitlement/apple.js";
 import { notesHistoryRest } from "./notesHistoryRest.js";
+import { shares } from "./shares.js";
+import { projectStoreFor } from "../store/ProjectStore.js";
 import { tasksRest } from "./tasksRest.js";
 
 // Task backend API, mounted at /v1 (docs/SEPTASK_BACKEND.md in the app repo).
@@ -380,6 +382,8 @@ api.use("/auth/device", requireUser);
 // but takes no sync device slot of its own.
 api.use("/tasks", requireUser, loadPlan("open", "tasks"));
 api.use("/tasks/*", requireUser, loadPlan("open", "tasks"));
+api.use("/shares", apiHostOnly, requireUser);
+api.use("/shares/*", apiHostOnly, requireUser);
 api.use("/access", apiHostOnly, requireUser);
 api.use("/access/*", apiHostOnly, requireUser);
 api.use("/agent/events/*", apiHostOnly, requireAgentOrUser);
@@ -600,6 +604,10 @@ api.delete("/devices/push-token", async (c) => {
 // number only.
 api.get("/tasks/live", liveSocket);
 api.route("/tasks", tasksRest);
+
+// ---- shared projects (src/api/shares.ts) ----
+
+api.route("/shares", shares);
 
 api.post("/pair/approve", async (c) => {
   const body = await parse(c, zPairApproveBody);
@@ -1153,6 +1161,8 @@ async function emptyAttachments(env: Env, userId: string): Promise<void> {
 api.delete("/account", async (c) => {
   const userId = c.get("userId");
   const store = storeFor(c.env, userId);
+  // Shared projects first: each one lets this account go while it exists.
+  for (const share of await store.listShares()) await projectStoreFor(c.env, share.id).accountDeleted(userId);
   const [ical, entitlements] = await Promise.all([store.getIcalFeed(), store.entitlements()]);
   if (ical) await c.env.TOKENS.delete(icalKvKey(ical.tokenHash));
   // Preserve `trial-used:<userId>` in KV across account deletion so re-signing

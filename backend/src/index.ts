@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { Env } from "./env.js";
 import { api } from "./api/routes.js";
+import { joinLanding } from "./api/shares.js";
 import * as oauth from "./shadow/oauth.js";
 import { previewMcpHandler } from "./shadow/mcp.js";
 import { ONBOARD_MARKDOWN } from "./shadow/prompts.js";
@@ -13,6 +14,7 @@ import { initCore } from "./core/index.js";
 initCore(coreWasm);
 
 export { TaskStore } from "./store/TaskStore.js";
+export { ProjectStore } from "./store/ProjectStore.js";
 export { AccountStore } from "./store/AccountStore.js";
 export { PairingStore } from "./shadow/PairingStore.js";
 
@@ -67,6 +69,8 @@ app.get("/oauth/authorize", oauth.authorize);
 app.get("/oauth/pair/continue", oauth.pairContinue);
 // Where a sign-in QR lands when a system camera opens it (src/shadow/pairQr.ts).
 app.get("/pair/:code", oauth.pairLanding);
+// Where an invite to a shared project opens (src/api/shares.ts).
+app.get("/join/:token", joinLanding);
 app.post("/oauth/token", oauth.token);
 app.post("/oauth/revoke", oauth.revoke);
 

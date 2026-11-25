@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_today_name">Heute</string>
+    <string name="widget_today_description">Heutige Aufgaben mit einem Tipp erledigen.</string>
+    <string name="widget_upcoming_name">Anstehend</string>
+    <string name="widget_upcoming_description">Als Nächstes geplante Aufgaben.</string>
+    <string name="widget_add_task">Neue Aufgabe</string>
+    <string name="widget_complete_task">Aufgabe erledigen</string>
+    <string name="shortcut_inbox_label">Eingang</string>
+    <string name="process_text_add_to_septena">Zu Septena hinzufügen</string>
+    <string name="tile_quick_add_label">Neue Aufgabe</string>
+</resources>

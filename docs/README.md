@@ -77,7 +77,7 @@ See [ADR 0007](adr/0007-septena-is-the-task-app.md).
 | [LINKED_PROJECTS_SPEC.md](LINKED_PROJECTS_SPEC.md) | rewrite for Starlings before work (#12) |
 | [GITHUB_SPEC.md](GITHUB_SPEC.md) | dropped (ADR 0033) |
 | [TASK_REFERENCES_SPEC.md](TASK_REFERENCES_SPEC.md) | building (ADR 0031, ADR 0033; first release #386, #387) |
-| [PROJECT_SHARING_SPEC.md](PROJECT_SHARING_SPEC.md) | accepted |
+| [PROJECT_SHARING_SPEC.md](PROJECT_SHARING_SPEC.md) | MVP built |
 | [PUBLIC_LINKS_SPEC.md](PUBLIC_LINKS_SPEC.md) | proposal (#22, phase S4 of project sharing) |
 | [TASK_FACTORY_SPEC.md](TASK_FACTORY_SPEC.md) | accepted |
 | [DO_SPEC.md](DO_SPEC.md) | building (ADR 0041): Do one task, full on one device, a notice on the others, the orb takes over |

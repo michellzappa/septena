@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_today_name">Hoy</string>
+    <string name="widget_today_description">Tareas de hoy, se completan con un toque.</string>
+    <string name="widget_upcoming_name">Próximas</string>
+    <string name="widget_upcoming_description">Próximas tareas programadas.</string>
+    <string name="widget_add_task">Nueva tarea</string>
+    <string name="widget_complete_task">Completar tarea</string>
+    <string name="shortcut_inbox_label">Bandeja de entrada</string>
+    <string name="process_text_add_to_septena">Añadir a Septena</string>
+    <string name="tile_quick_add_label">Añadir tarea</string>
+</resources>
