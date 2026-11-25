@@ -9,6 +9,10 @@
 > `tasks_list view=inbox`; `triage` is an alias). Deleting an area or project
 > never puts tasks in the Inbox (`docs/RECENTLY_DELETED_SPEC.md`).
 
+> **Decided 2026-11-25, not built (#499):** an unanswered agent proposal expires
+> to the Faded pile ([ADR 0039](adr/0039-unanswered-proposals-expire.md)). The
+> "ratification-by-timeout" below goes when that ships.
+
 **Status:** **Built + fully unified, rendered as a native "Inbox" section** —
 Inbox is a normal section (area-style header, standard checkbox rows, all items)
 on top of Today, on both the drawer and the full Tasks tab; the separate Inbox

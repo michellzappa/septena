@@ -1,6 +1,6 @@
 # 0003. External links run on the server; the remote owns mapped fields
 
-- Status: accepted (2026-11-19); GitHub dropped by [0033](0033-no-github-integration-issue-links-are-references.md)
+- Status: accepted (2026-11-19); GitHub dropped by [0033](0033-no-github-integration-issue-links-are-references.md), capture feeds by [0038](0038-agents-are-the-integrations.md)
 - Date: 2026-11-19
 - Deciders: mz
 

@@ -532,6 +532,11 @@ The product is Septena; the code targets keep the working names `Septask` (iOS),
   fights the framework (and that we then chase across sessions). When the
   idiomatic API genuinely can't do it, say so plainly and pick the closest
   standard behavior — don't invent.
+- **Never write a list of instances into copy.** Importers, agents, platforms,
+  lists and languages each have one canonical list (`registry/import-sources.json`,
+  `capabilities.json`, `destinations.json`). Copy either says the general thing
+  ("Import from other task apps") or is built from that list, with its status.
+  A hand-written "Import from X and Y" goes stale when Z ships (mz, 2026-11-25).
 - **Same behavior on every platform.** iPhone, iPad, Mac and Android do
   the same thing for the same feature. A platform-specific behavior needs a
   strong reason (a platform rule, a missing API, a different input device),
@@ -600,6 +605,11 @@ The product is Septena; the code targets keep the working names `Septask` (iOS),
   hard-to-reverse decision. Mark a superseded doc with a header; never delete
   or move it. **Septena is leaving iCloud** (ADR 0002): new specs design for
   the own backend only.
+- **Agents are the integrations (ADR 0038).** Septena connects to no source
+  (Slack, mail accounts, issue trackers, meeting notes). The user's agent reads
+  the source and proposes tasks. Never add a connector, a capture feed or a
+  "send to Septena" button in another product. An import, the calendar, the
+  mail forwarding address, system capture and the public API stay.
 - **This repo is PUBLIC — keep only app-relevant docs here. Strategy lives in the
   Septena Starlings workspace** (`septena.starlings.work`, Docs `/strategy` and
   `/brand`, connector "Starlings: Septena"). Competitive strategy, positioning,
