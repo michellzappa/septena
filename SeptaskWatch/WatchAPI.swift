@@ -34,7 +34,7 @@ actor WatchAPI {
   private let session: URLSession
   private var accessToken: String?
   private var accessExpiry: Date = .distantPast
-  /// One refresh at a time: the token is single-use.
+  /// One refresh at a time: a reply that loses the race is of no use.
   private var refreshTask: Task<String, Error>?
 
   init() {
@@ -91,15 +91,22 @@ actor WatchAPI {
     guard let token = WatchKeychain.load() else { throw WatchAPIError.notConnected }
     let body = try JSONEncoder().encode(["refreshToken": token])
     let (data, status) = try await perform(path: "/v1/auth/refresh", method: "POST", body: body, auth: nil)
-    if status == 401 {
+    struct Refusal: Decodable { let error: String }
+    if status == 401, (try? JSONDecoder().decode(Refusal.self, from: data))?.error == "invalid_grant" {
+      // Our server ended the session. A 401 from anything else is a failure
+      // to retry. A session the phone handed over while we waited stays.
+      guard WatchKeychain.load() == token else { throw WatchAPIError.network("the session changed") }
       clear()
       throw WatchAPIError.notConnected
     }
     guard status == 200, let s = try? JSONDecoder().decode(Session.self, from: data) else {
       throw WatchAPIError.server(status)
     }
-    // Store the rotated token first: the old one is already spent.
-    WatchKeychain.store(s.refreshToken)
+    // A sign-out, or a session the phone handed over while we waited, wins.
+    guard WatchKeychain.load() == token else { throw WatchAPIError.network("the session changed") }
+    // Store the new token first. Using the access token retires the old one
+    // (ADR 0040), so a token that was not stored must stay unused.
+    guard WatchKeychain.store(s.refreshToken) else { throw WatchAPIError.network("keychain unavailable") }
     accessToken = s.accessToken
     accessExpiry = Date().addingTimeInterval(TimeInterval(max(s.expiresIn - 60, 0)))
     return s.accessToken
@@ -251,15 +258,16 @@ enum WatchKeychain {
     return String(data: data, encoding: .utf8)
   }
 
-  static func store(_ token: String) {
+  @discardableResult
+  static func store(_ token: String) -> Bool {
     let data = Data(token.utf8)
     let update: [String: Any] = [kSecValueData as String: data]
-    if SecItemUpdate(query as CFDictionary, update as CFDictionary) == errSecItemNotFound {
-      var add = query
-      add[kSecValueData as String] = data
-      add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-      SecItemAdd(add as CFDictionary, nil)
-    }
+    let status = SecItemUpdate(query as CFDictionary, update as CFDictionary)
+    guard status == errSecItemNotFound else { return status == errSecSuccess }
+    var add = query
+    add[kSecValueData as String] = data
+    add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+    return SecItemAdd(add as CFDictionary, nil) == errSecSuccess
   }
 
   static func delete() {

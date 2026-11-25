@@ -19,9 +19,15 @@ export interface Env {
   MAINTENANCE?: string;
 
   // Secrets (set via `wrangler secret put`)
-  SESSION_SIGNING_KEY: string; // 32-byte base64; signs task-backend access tokens
+  SESSION_SIGNING_KEY: string; // 32-byte base64; signs access and refresh tokens
+  /// Optional. The key before the current one. Set it while the key changes,
+  /// so live sessions keep working (backend/README.md).
+  SESSION_SIGNING_KEY_PREVIOUS?: string;
   /// Optional. Unset = the /v1/admin routes answer 404. Grants entitlements.
   ADMIN_TOKEN?: string;
+  /// "true" issues the signed tokens of ADR 0040 (src/api/session.ts). Anything
+  /// else still issues the KV tokens, and accepts both.
+  SIGNED_SESSIONS?: string;
   /// Optional APNs provider key (.p8 PEM) and identifiers for agent question pushes (F1b #213).
   /// When any of APNS_KEY / APNS_KEY_ID / APNS_TEAM_ID is unset, pushes no-op cleanly.
   APNS_KEY?: string;

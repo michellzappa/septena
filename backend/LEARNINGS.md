@@ -97,8 +97,12 @@ it (`POST /v1/pair/approve`), like a TV device code.
   localhost) to the live handlers unchanged. The JSON-RPC envelope moved to
   `src/rpc.ts` and the pure task rules to `src/tools/taskShared.ts`; both
   endpoints use them, so the live output did not change.
-- **Token prefixes keep kinds apart:** `sa1.`/`sr1.` app session, `sm1.`/`smr1.`
-  MCP preview, unprefixed live. KV keys for the preview are under `v2:`.
+- **Token prefixes keep kinds apart:** `sa1.`/`sr2.` app session, `sm2.`/`smr2.`
+  MCP connector (ADR 0040). `sr1.`, `sm1.` and `smr1.` are the KV-era tokens.
+- **Never make a token store out of KV.** KV is eventually consistent and has no
+  transaction with the Durable Object. The KV-era refresh deleted the KV entry,
+  then called the object: an error or a lost reply in between signed the user
+  out. The object alone decides now, and a signed token routes to it.
 - **"Today" needs a time zone and the DO has no Settings record.** The app
   sends `TimeZone.current` at approve time; it rides in the grant. Travel
   changes need a re-pair. Fallback is UTC.

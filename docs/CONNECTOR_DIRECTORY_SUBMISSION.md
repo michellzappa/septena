@@ -88,7 +88,7 @@ Complete these checks before clicking Submit in either portal:
 ### Data handling and compliance notes (for portal questionnaire)
 
 - **Data accessed**: Only the authenticated user's private Septena store (tasks, checklists, tags, references, areas, projects, notes, task conversations, and change history). No third-party accounts or public web resources are queried by the server (`openWorldHint: false` on all 36 tools).
-- **Isolation**: Each user has an isolated Cloudflare Durable Object (`TaskStore`). OAuth access tokens (`sm1.`, 1-hour TTL) and rotating refresh tokens (`smr1.`, 30-day sliding TTL) are stored hashed (`SHA-256`) in KV; refresh replay revokes the entire token family.
+- **Isolation**: Each user has an isolated Cloudflare Durable Object (`TaskStore`). OAuth access tokens (`sm2.`, 1-hour TTL) are signed and checked against the user's Durable Object on every request. Rotating refresh tokens (`smr2.`, 30-day sliding TTL) are stored hashed (`SHA-256`) there; refresh replay revokes the entire token family at once.
 - **No training / no ads**: User task data is never used to train models, sold, or shared with advertisers.
 - **User revocation & deletion**: Users can disconnect any agent in Settings (immediately revoking its token family) or delete their entire account in one step.
 
@@ -160,8 +160,8 @@ Septena uses standard **OAuth 2.1 + PKCE (`S256`) + Dynamic Client Registration*
 5. **In-App Approval**: The user opens Septena on a signed-in iPhone, iPad, or Mac (`Settings ▸ AI & Agents` / `Connect Claude`), scans the QR code or types the 8-character code. The app calls `POST /v1/pair/inspect` so the user sees the requesting client name before confirming, then `POST /v1/pair/approve` with the app's bearer session token.
    - *Security note*: Scanning the QR code with a phone's system camera lands on `GET /pair/:code`, which approves nothing and instructs the user to scan only inside Septena. Users should only enter a pairing code from a browser window they opened themselves.
 6. **Redirect & Token Exchange**: On the next poll of `/oauth/pair/continue`, Septena issues a single-use authorization code (5-minute TTL) and redirects (`302`) to `redirect_uri` with `code`, `state`, and `iss=https://api.septena.app`. The client exchanges the code and PKCE `code_verifier` at `POST /oauth/token` for:
-   - `access_token`: prefix `sm1.`, 1-hour lifetime, scope `tasks:read tasks:write`.
-   - `refresh_token`: prefix `smr1.`, 30-day sliding lifetime, rotated on every refresh (reusing a spent refresh token revokes the entire token family).
+   - `access_token`: prefix `sm2.`, 1-hour lifetime, scope `tasks:read tasks:write`.
+   - `refresh_token`: prefix `smr2.`, 30-day sliding lifetime, rotated on every refresh (reusing a spent refresh token revokes the entire token family).
 7. **Revocation**: Clients can revoke via `POST /oauth/revoke`, or the user can disconnect the agent at any time in Septena `Settings ▸ AI & Agents`, which deletes the token family immediately.
 
 ---

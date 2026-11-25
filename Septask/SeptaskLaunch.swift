@@ -277,6 +277,20 @@ final class SeptaskMacAppDelegate: NSObject, NSApplicationDelegate {
     return true
   }
 
+  /// A quit waits for a running session refresh, at most 3 seconds. Without
+  /// the reply the stored token still works (ADR 0040); this saves a retry.
+  func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+    guard TaskBackendClient.isRefreshing else { return .terminateNow }
+    Task { @MainActor in
+      let deadline = ContinuousClock.now + .seconds(3)
+      while TaskBackendClient.isRefreshing, ContinuousClock.now < deadline {
+        try? await Task.sleep(for: .milliseconds(50))
+      }
+      sender.reply(toApplicationShouldTerminate: true)
+    }
+    return .terminateLater
+  }
+
   /// ⌘Q must not lose an open edit: the shell's text editors commit on blur,
   /// and quitting blurs nothing. Save them explicitly before the process ends.
   func applicationWillTerminate(_ notification: Notification) {

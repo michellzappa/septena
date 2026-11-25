@@ -91,12 +91,15 @@ class SeptenaAuthClient(
         }
     }
 
-    /** Null when the refresh token is no longer valid (the user must sign in again). Throws on network errors. */
+    /**
+     * Null when our server ended the session (the user must sign in again). Any other 401 (a proxy, a
+     * captive portal) throws like a network error: it is not a sign-out.
+     */
     suspend fun refresh(refreshToken: String): SessionTokens? {
         val response = post("/v1/auth/refresh", obj("refreshToken" to JsonValue.StringValue(refreshToken)))
         return when (response.statusCode) {
             200 -> parseSession(response.body)
-            401 -> null
+            401 -> if (isInvalidGrant(response.body)) null else throw AuthHttpException(401, response.body)
             else -> throw AuthHttpException(response.statusCode, response.body)
         }
     }
@@ -117,6 +120,9 @@ class SeptenaAuthClient(
             userId = json["userId"].stringValue() ?: error("Session is missing userId"),
         )
     }
+
+    private fun isInvalidGrant(body: String): Boolean =
+        runCatching { parseObject(body)["error"].stringValue() }.getOrNull() == "invalid_grant"
 
     private fun obj(vararg fields: Pair<String, JsonValue>) = JsonValue.ObjectValue(mapOf(*fields))
 

@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { Hono } from "hono";
-import { createTestPairingStore, createTestTaskStore, installWorkerTestHooks } from "./taskStoreHarness.ts";
+import { createTestPairingStore, createTestTaskStore, ensureSession, installWorkerTestHooks } from "./taskStoreHarness.ts";
 
 installWorkerTestHooks();
 
@@ -20,6 +20,7 @@ function makeMemoryKv() {
   return {
     map,
     async get(key: string) { return map.get(key) ?? null; },
+    async getWithMetadata(key: string) { return { value: map.get(key) ?? null, metadata: null }; },
     async put(key: string, value: string) { map.set(key, value); },
     async delete(key: string) { map.delete(key); },
   };
@@ -96,6 +97,7 @@ async function makeHarness() {
   app.route("/v1", api);
 
   async function authHeader(userId: string, sid = "11111111-1111-4111-8111-111111111111") {
+    ensureSession(await ensureTaskStore(userId), sid);
     return `Bearer ${await signAccessToken(env, userId, sid)}`;
   }
 

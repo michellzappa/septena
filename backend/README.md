@@ -37,6 +37,9 @@ pnpm run deploy
 
 `--env production` would deploy a separate, unconfigured Worker. Secrets are
 set without `--env` (`wrangler secret put SESSION_SIGNING_KEY`).
+To change `SESSION_SIGNING_KEY` without signing anyone out, put the old value
+in `SESSION_SIGNING_KEY_PREVIOUS` first, then set the new key. Remove the old
+one after 180 days. After a leak, set the new key only: every session ends.
 Columns added to `src/store/columns.ts` migrate themselves on the next object
 start (`addMissingColumnsSQL`); a new Durable Object class needs a
 `[[migrations]]` entry.

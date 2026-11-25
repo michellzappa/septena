@@ -172,7 +172,10 @@ export async function createTestTaskStore(existing?: DatabaseSync, envOverrides:
       async getAlarm() { return alarm; },
       async setAlarm(ts: number) { alarm = ts; },
       async deleteAlarm() { alarm = null; },
-      async deleteAll() { /* noop for in-memory test db */ },
+      async deleteAll() {
+        const tables = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'").all() as { name: string }[];
+        for (const { name } of tables) db.exec(`DROP TABLE "${name}"`);
+      },
     },
     blockConcurrencyWhile<T>(fn: () => Promise<T>): Promise<T> {
       return fn();
@@ -200,6 +203,12 @@ export async function createTestTaskStore(existing?: DatabaseSync, envOverrides:
   // Expose an RPC-like async proxy matching `StoreRpc` as well as direct calls.
   const store = new TaskStore(ctx as never, envOverrides as never);
   return { store, db, flushWaitUntil, sockets };
+}
+
+/// Gives `sid` a live app session, so an access token a test signs for it is
+/// accepted (every request asks the store, ADR 0040).
+export function ensureSession(store: Awaited<ReturnType<typeof createTestTaskStore>>["store"], sid: string): void {
+  if (!store.authorizeSession(sid, null)) store.createSession(`h-${sid}`, Date.now() + 86_400_000, sid);
 }
 
 /// Creates a real `AccountStore` instance backed by an in-memory SQLite
