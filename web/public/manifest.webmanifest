@@ -1,7 +1,7 @@
 {
   "name": "Septena",
   "short_name": "Septena",
-  "description": "Calm, local-first task manager on the web.",
+  "description": "Tasks that think with you — calm, local-first task manager on the web.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
@@ -12,5 +12,14 @@
       "sizes": "any",
       "type": "image/svg+xml"
     }
-  ]
+  ],
+  "share_target": {
+    "action": "/",
+    "method": "GET",
+    "params": {
+      "title": "share_title",
+      "text": "share_text",
+      "url": "share_url"
+    }
+  }
 }

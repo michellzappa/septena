@@ -78,10 +78,6 @@
     "PLAN_PRODUCTS": {
       "reason": "The server accepts any product under the sync prefix; the StoreKit work narrows it to these IDs.",
       "issue": "#46"
-    },
-    "FIRST_RUN": {
-      "reason": "For the web client's first run.",
-      "issue": "#21"
     }
   },
   "kotlin": {

@@ -2,6 +2,7 @@ import {
   zAccessSummary,
   zChangesResponse,
   zDeviceStartResponse,
+  zIcalFeedSettings,
   zPullResponse,
   zPushResponse,
   zSessionResponse,
@@ -9,6 +10,7 @@ import {
   type AccessSummary,
   type ChangeEntry,
   type DeviceStartResponse,
+  type IcalFeedSettings,
   type OutboxOp,
   type PullResponse,
   type PushResponse,
@@ -342,6 +344,69 @@ export class SeptenaApiClient {
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  }
+
+  async uploadAttachmentBytes(id: string, file: File): Promise<{ rev: number }> {
+    const buf = await file.arrayBuffer();
+    const res = await this.authedFetch(`/v1/attachments/${encodeURIComponent(id)}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": file.type || "application/octet-stream",
+      },
+      body: buf,
+    });
+    if (!res.ok) {
+      const raw = await res.text().catch(() => "");
+      const err = parseErr(raw);
+      throw new ApiError(res.status, err.error ?? "upload_failed", err.message, raw);
+    }
+    return (await res.json()) as { rev: number };
+  }
+
+  async getIcalSettings(): Promise<IcalFeedSettings> {
+    const res = await this.authedFetch("/v1/ical/settings", { method: "GET" });
+    if (!res.ok) {
+      const raw = await res.text().catch(() => "");
+      const err = parseErr(raw);
+      throw new ApiError(res.status, err.error ?? "ical_settings_failed", err.message, raw);
+    }
+    return zIcalFeedSettings.parse(await res.json());
+  }
+
+  async updateIcalSettings(body: {
+    enabled?: boolean;
+    scope?: "all" | "timed";
+    rotate?: boolean;
+  }): Promise<IcalFeedSettings> {
+    const res = await this.authedFetch("/v1/ical/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const raw = await res.text().catch(() => "");
+      const err = parseErr(raw);
+      throw new ApiError(res.status, err.error ?? "ical_update_failed", err.message, raw);
+    }
+    return zIcalFeedSettings.parse(await res.json());
+  }
+
+  async deleteAccount(): Promise<void> {
+    const res = await this.authedFetch("/v1/account", { method: "DELETE" });
+    if (!res.ok) {
+      const raw = await res.text().catch(() => "");
+      const err = parseErr(raw);
+      throw new ApiError(res.status, err.error ?? "delete_account_failed", err.message, raw);
+    }
+    this.clearInMemorySession();
+  }
+
+  async fetchSkillMarkdown(): Promise<string> {
+    const res = await fetch(`${this.apiBase}/skill.md`, { method: "GET" });
+    if (!res.ok) {
+      throw new ApiError(res.status, "skill_fetch_failed");
+    }
+    return res.text();
   }
 }
 
