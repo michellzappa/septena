@@ -9,6 +9,7 @@ import app.septena.android.sync.SyncController
 import app.septena.android.ui.AppearanceStore
 import app.septena.core.ConversationMutator
 import app.septena.core.ConversationRules
+import app.septena.core.JsonValue
 import app.septena.core.RecurrenceRules
 import app.septena.core.RegistryEntityMutator
 import app.septena.core.SyncRecord
@@ -17,8 +18,13 @@ import app.septena.core.SyncedSettingsMutator
 import app.septena.core.SystemDayClock
 import app.septena.core.TaskConversation
 import app.septena.core.TaskMutator
+import app.septena.core.TaskRefMutator
 import app.septena.core.TaskSyncEngine
 import app.septena.core.UuidTaskIdGenerator
+import app.septena.core.WireTimestamp
+import app.septena.core.asSyncRecord
+import app.septena.core.generated.RegistryEntityEnums
+import app.septena.core.generated.RegistryEntityFields
 import app.septena.core.generated.RegistryEntityNames
 import app.septena.store.SqlDelightTaskStore
 import app.septena.store.db.SeptenaDatabase
@@ -64,7 +70,10 @@ class AndroidAppGraph(application: Application) {
     val taskMutator = TaskMutator(taskStore, clock, ids)
     val taskUndoHistory = TaskUndoHistory()
     val deviceSettings = app.septena.android.ui.AndroidDeviceSettings(application)
+    val filingSuggestions = app.septena.android.ui.FilingSuggestionEngine(application)
+    val fadeSweepStore = app.septena.android.ui.FadeSweepStore(application)
     val registryEntityMutator = RegistryEntityMutator(taskStore, clock, ids)
+    val taskRefMutator = TaskRefMutator(taskStore, clock, ids)
     val conversationMutator = ConversationMutator(taskStore, ids)
     val recurrenceRules = RecurrenceRules
     val conversationRules = ConversationRules
@@ -105,6 +114,7 @@ class AndroidAppGraph(application: Application) {
                 taskStore.records(RegistryEntityNames.CONVO)
                 taskStore.allTurnsByTask()
                 taskStore.records(RegistryEntityNames.CHECKLIST_ITEM)
+                taskStore.records(RegistryEntityNames.TASK_REF)
                 taskStore.records(RegistryEntityNames.TAG)
             }
         }
@@ -162,6 +172,78 @@ class AndroidAppGraph(application: Application) {
         taskStore.onRemoteDelete = { entity, id ->
             if (entity == RegistryEntityNames.ATTACHMENT) attachments.deleteLocalCopy(id)
         }
+    }
+
+    /**
+     * One unified Accept for both Review rows and the conversation card (#415):
+     * completes the task, acknowledges any MCP provenance, stamps the fade clock,
+     * moves the conversation to `agent_assisted_done`, and records a single undo
+     * step that reverts both task and conversation fields.
+     */
+    suspend fun acceptReview(taskId: String): Boolean {
+        val beforeTask = taskStore.record(RegistryEntityNames.TASK, taskId) ?: return false
+        val beforeConvo = taskStore.record(RegistryEntityNames.CONVO, taskId)
+        val completed = taskMutator.acceptReview(taskId) ?: return false
+        conversationMutator.update(
+            taskId,
+            mapOf(
+                RegistryEntityFields.Convo.END_STATE to
+                    JsonValue.StringValue(RegistryEntityEnums.ConvoEndState.AGENT_ASSISTED_DONE),
+            ),
+        )
+        val afterTask = taskStore.record(RegistryEntityNames.TASK, taskId) ?: completed.asSyncRecord()
+        val afterConvo = taskStore.record(RegistryEntityNames.CONVO, taskId)
+        taskUndoHistory.recordTaskAndConvoEdit(
+            taskId = taskId,
+            beforeTask = beforeTask,
+            afterTask = afterTask,
+            beforeConvo = beforeConvo,
+            afterConvo = afterConvo,
+        )
+        return true
+    }
+
+    /**
+     * One unified Send back (#412, #415): appends the user's note, reopens the
+     * conversation for Claude, stamps the fade clock, and records a single undo
+     * step restoring both task and conversation state.
+     */
+    suspend fun sendBackReview(taskId: String, note: String): Boolean {
+        val clean = note.trim()
+        if (clean.isEmpty()) return false
+        val beforeTask = taskStore.record(RegistryEntityNames.TASK, taskId) ?: return false
+        val beforeConvo = taskStore.record(RegistryEntityNames.CONVO, taskId)
+        conversationMutator.appendTurn(
+            taskId,
+            mapOf(
+                "role" to JsonValue.StringValue(RegistryEntityEnums.ConvoTurnRole.USER),
+                "step" to JsonValue.StringValue(RegistryEntityEnums.ConvoTurnStep.WORK),
+                "note" to JsonValue.StringValue(clean),
+                "ts" to JsonValue.StringValue(WireTimestamp.format(clock.now())),
+            ),
+        )
+        conversationMutator.update(
+            taskId,
+            mapOf(
+                RegistryEntityFields.Convo.END_STATE to
+                    JsonValue.StringValue(RegistryEntityEnums.ConvoEndState.OPEN),
+                RegistryEntityFields.Convo.END_STATE_NOTE to JsonValue.Null,
+                RegistryEntityFields.Convo.STOPPED_AT to JsonValue.Null,
+                RegistryEntityFields.Convo.ASSIGNEE to
+                    JsonValue.StringValue(RegistryEntityEnums.ConvoAssignee.CLAUDE),
+            ),
+        )
+        taskMutator.touch(taskId)
+        val afterTask = taskStore.record(RegistryEntityNames.TASK, taskId)
+        val afterConvo = taskStore.record(RegistryEntityNames.CONVO, taskId)
+        taskUndoHistory.recordTaskAndConvoEdit(
+            taskId = taskId,
+            beforeTask = beforeTask,
+            afterTask = afterTask,
+            beforeConvo = beforeConvo,
+            afterConvo = afterConvo,
+        )
+        return true
     }
 
     /**

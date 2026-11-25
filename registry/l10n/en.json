@@ -279,6 +279,12 @@
       "plans.outcomes.everywhere.rows.devices.cells.plus"
     ]
   },
+  "Allow calendar access": {
+    "text": "Allow calendar access",
+    "paths": [
+      "settings.copy.calendar_detail.devicePermissionAction.label"
+    ]
+  },
   "Allow camera access for Septena in Settings, or enter the code instead.": {
     "text": "Allow camera access for Septena in Settings, or enter the code instead.",
     "paths": [
@@ -1043,6 +1049,12 @@
       "actions.actions.task.selectAll.activeTitle"
     ]
   },
+  "Device calendars": {
+    "text": "Device calendars",
+    "paths": [
+      "settings.copy.calendar_detail.deviceHeader.label"
+    ]
+  },
   "Devices": {
     "text": "Devices",
     "paths": [
@@ -1228,6 +1240,30 @@
       "plans.cards.pro.footnote"
     ]
   },
+  "Existing items with matching IDs are kept; new items are added and synced.": {
+    "text": "Existing items with matching IDs are kept; new items are added and synced.",
+    "paths": [
+      "settings.copy.import_export.importNote.label"
+    ]
+  },
+  "Export CSV": {
+    "text": "Export CSV",
+    "paths": [
+      "settings.copy.import_export.exportCsvTitle.label"
+    ]
+  },
+  "Export JSON backup": {
+    "text": "Export JSON backup",
+    "paths": [
+      "settings.copy.import_export.exportJsonTitle.label"
+    ]
+  },
+  "Export Markdown": {
+    "text": "Export Markdown",
+    "paths": [
+      "settings.copy.import_export.exportMarkdownTitle.label"
+    ]
+  },
   "Export as JSON": {
     "text": "Export as JSON",
     "paths": [
@@ -1240,10 +1276,34 @@
       "plans.fullApp.points.export.title"
     ]
   },
+  "Export failed.": {
+    "text": "Export failed.",
+    "paths": [
+      "settings.copy.import_export.exportFailed.label"
+    ]
+  },
   "Export works on every plan. A limit hides older items. It never deletes them, and Plus shows them again.": {
     "text": "Export works on every plan. A limit hides older items. It never deletes them, and Plus shows them again.",
     "paths": [
       "plans.promises.no_hostage.detail"
+    ]
+  },
+  "Exported CSV.": {
+    "text": "Exported CSV.",
+    "paths": [
+      "settings.copy.import_export.exportedCsv.label"
+    ]
+  },
+  "Exported JSON backup.": {
+    "text": "Exported JSON backup.",
+    "paths": [
+      "settings.copy.import_export.exportedJson.label"
+    ]
+  },
+  "Exported Markdown.": {
+    "text": "Exported Markdown.",
+    "paths": [
+      "settings.copy.import_export.exportedMarkdown.label"
     ]
   },
   "Fade inactive tasks": {
@@ -1256,6 +1316,12 @@
     "text": "Faded",
     "paths": [
       "destinations.destinations.faded.title"
+    ]
+  },
+  "Faded Tasks": {
+    "text": "Faded Tasks",
+    "paths": [
+      "surfaces.fadeSweep.title"
     ]
   },
   "Favorite": {
@@ -1320,6 +1386,17 @@
       "plans.cards.pro.detail"
     ]
   },
+  "Found {areas} areas, {projects} projects, and {tasks} tasks.": {
+    "text": "Found {areas} areas, {projects} projects, and {tasks} tasks.",
+    "placeholders": [
+      "areas",
+      "projects",
+      "tasks"
+    ],
+    "paths": [
+      "settings.copy.import_export.importSummary.label"
+    ]
+  },
   "Free": {
     "text": "Free",
     "paths": [
@@ -1344,6 +1421,12 @@
     "paths": [
       "surfaces.taskDetail.weekdays.4.title",
       "surfaces.taskDetail.calendarWeekdays.5.title"
+    ]
+  },
+  "Full Septena tasks, areas, projects, and checklists (importable)": {
+    "text": "Full Septena tasks, areas, projects, and checklists (importable)",
+    "paths": [
+      "settings.copy.import_export.exportJsonDetail.label"
     ]
   },
   "General": {
@@ -1498,11 +1581,35 @@
       "plans.paywall.trialBilling"
     ]
   },
+  "Import": {
+    "text": "Import",
+    "paths": [
+      "settings.copy.import_export.importConfirm.label"
+    ]
+  },
   "Import & Export": {
     "text": "Import & Export",
     "paths": [
       "settings.pages.import_export.title",
       "settings.pages.privacy.sections.transfer.items.0.label"
+    ]
+  },
+  "Import JSON backup…": {
+    "text": "Import JSON backup…",
+    "paths": [
+      "settings.copy.import_export.importJsonTitle.label"
+    ]
+  },
+  "Import Septena backup": {
+    "text": "Import Septena backup",
+    "paths": [
+      "settings.copy.import_export.importDialogTitle.label"
+    ]
+  },
+  "Import failed.": {
+    "text": "Import failed.",
+    "paths": [
+      "settings.copy.import_export.importFailed.label"
     ]
   },
   "Import from another app": {
@@ -1515,6 +1622,15 @@
     "text": "Import from other task apps",
     "paths": [
       "plans.fullApp.points.import.title"
+    ]
+  },
+  "Imported {count} items.": {
+    "text": "Imported {count} items.",
+    "placeholders": [
+      "count"
+    ],
+    "paths": [
+      "settings.copy.import_export.importedCount.label"
     ]
   },
   "Inactive tasks start to fade": {
@@ -2055,7 +2171,8 @@
   "Not now": {
     "text": "Not now",
     "paths": [
-      "surfaces.firstRun.steps.account.secondary.title"
+      "surfaces.firstRun.steps.account.secondary.title",
+      "surfaces.fadeSweep.dismissTitle"
     ]
   },
   "Not signed in": {
@@ -2292,6 +2409,12 @@
       "surfaces.prompts.text.conversationOther.title"
     ]
   },
+  "Overdue": {
+    "text": "Overdue",
+    "paths": [
+      "surfaces.taskDateBoard.overdue.label"
+    ]
+  },
   "Overdue app icon badge": {
     "text": "Overdue app icon badge",
     "paths": [
@@ -2460,6 +2583,12 @@
       "settings.copy.aiMode.useMyClaude.label"
     ]
   },
+  "Preview and import a Septena JSON export": {
+    "text": "Preview and import a Septena JSON export",
+    "paths": [
+      "settings.copy.import_export.importJsonDetail.label"
+    ]
+  },
   "Prices include VAT where it applies. Outside the euro area, the App Store charges its matching local price.": {
     "text": "Prices include VAT where it applies. Outside the euro area, the App Store charges its matching local price.",
     "paths": [
@@ -2553,10 +2682,22 @@
       "actions.actions.app.quickFind.title"
     ]
   },
+  "Read-only agenda in Today and Upcoming": {
+    "text": "Read-only agenda in Today and Upcoming",
+    "paths": [
+      "settings.copy.calendar_detail.deviceToggleDetail.label"
+    ]
+  },
   "Read-only subscription feed for your scheduled tasks and deadlines. Anyone with the private URL can read titles and notes in the feed; rotate or disable it anytime.": {
     "text": "Read-only subscription feed for your scheduled tasks and deadlines. Anyone with the private URL can read titles and notes in the feed; rotate or disable it anytime.",
     "paths": [
       "settings.copy.calendar_detail.feedFooter.label"
+    ]
+  },
+  "Readable checklist grouped by area and project": {
+    "text": "Readable checklist grouped by area and project",
+    "paths": [
+      "settings.copy.import_export.exportMarkdownDetail.label"
     ]
   },
   "Ready for review": {
@@ -3073,6 +3214,12 @@
       "settings.pages.about.sections.actions.items.2.label"
     ]
   },
+  "Show calendar events": {
+    "text": "Show calendar events",
+    "paths": [
+      "settings.copy.calendar_detail.deviceToggle.label"
+    ]
+  },
   "Show completed tasks": {
     "text": "Show completed tasks",
     "paths": [
@@ -3211,6 +3358,12 @@
     "text": "Some tasks need thinking before you can act. Tap Discuss and talk them through, right on the task.",
     "paths": [
       "settings.copy.ai_explainer.intro.label"
+    ]
+  },
+  "Spreadsheet-friendly table of tasks": {
+    "text": "Spreadsheet-friendly table of tasks",
+    "paths": [
+      "settings.copy.import_export.exportCsvDetail.label"
     ]
   },
   "Starlings record": {
@@ -4214,6 +4367,15 @@
     ],
     "paths": [
       "surfaces.taskAttributes.attachments.countLabel"
+    ]
+  },
+  "{count} non-task records will be skipped.": {
+    "text": "{count} non-task records will be skipped.",
+    "placeholders": [
+      "count"
+    ],
+    "paths": [
+      "settings.copy.import_export.importSkipped.label"
     ]
   },
   "{count} projects": {

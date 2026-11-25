@@ -25,6 +25,7 @@ import app.septena.core.generated.RegistryEntityFields
 import app.septena.core.generated.RegistryEntityNames as EntityNames
 import app.septena.core.generated.RegistryPlatformIds
 import app.septena.core.generated.RegistrySettingKeys
+import app.septena.core.generated.RegistryTaskPageBlockIds
 import app.septena.ui.SeptenaIconKind
 import app.septena.ui.TaskGroupHeader
 import app.septena.ui.TaskListItem
@@ -75,6 +76,12 @@ data class TaskHomeUiState(
     val starredOnly: Boolean = false,
     /** Task ids picked by a long-press; non-empty means the list is in selection mode. */
     val selectedIds: Set<String> = emptySet(),
+    /** All currently faded open tasks ready for the Faded sweep sheet. */
+    val fadedSweepItems: List<FadeSweepItem> = emptyList(),
+    /** Subset of faded tasks since last sweep, shown in the Sunday weekly banner. */
+    val weeklySweepItems: List<FadeSweepItem> = emptyList(),
+    /** True on sweep day (Sunday) when unswept faded tasks exist and banner wasn't dismissed. */
+    val showWeeklySweepBanner: Boolean = false,
     val errorMessage: String? = null,
 )
 
@@ -105,6 +112,9 @@ private data class LoadedTaskHome(
     val canQuickAdd: Boolean,
     val canComplete: Boolean,
     val agentsPaused: Boolean,
+    val fadedSweepItems: List<FadeSweepItem> = emptyList(),
+    val weeklySweepItems: List<FadeSweepItem> = emptyList(),
+    val showWeeklySweepBanner: Boolean = false,
 )
 
 /** Reads the store on IO and refreshes from the sync controller's data version flow. */
@@ -114,14 +124,17 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
     )
     private val starredOnly = MutableStateFlow(false)
     private val selectedIds = MutableStateFlow<Set<String>>(emptySet())
+    private val sweepRefresh = MutableStateFlow(0L)
     private val errorMessage = MutableStateFlow<String?>(null)
+    @Volatile private var filingSuggestionsByTask: Map<String, FilingSuggestion> = emptyMap()
 
     @OptIn(ExperimentalCoroutinesApi::class)
     private val loaded: StateFlow<LoadedTaskHome> = combine(
         location,
         graph.sync.dataVersion,
         graph.deviceSettings.changes,
-    ) { selected, _, _ ->
+        sweepRefresh,
+    ) { selected, _, _, _ ->
         selected
     }.mapLatest { selected ->
         withContext(Dispatchers.IO) { load(selected) }
@@ -147,6 +160,9 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             agentsPaused = home.agentsPaused,
             starredOnly = applyStar,
             selectedIds = selected,
+            fadedSweepItems = home.fadedSweepItems,
+            weeklySweepItems = home.weeklySweepItems,
+            showWeeklySweepBanner = home.showWeeklySweepBanner,
             errorMessage = error,
         )
     }.stateIn(
@@ -454,11 +470,57 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         }
     }
 
-    fun acceptReview(id: String) = editTask(id) { graph.taskMutator.acceptReview(id) }
+    fun acceptReview(id: String) {
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) { check(graph.acceptReview(id)) }
+            }.onSuccess { errorMessage.value = null; noteLocalChangeAndSync() }
+                .onFailure { errorMessage.value = it.message }
+        }
+    }
 
     fun keepFaded(id: String) = editTask(id) { graph.taskMutator.keepFaded(id) }
 
     fun letGoFaded(id: String) = editTask(id) { graph.taskMutator.letGoFaded(id) }
+
+    /** One-tap filing from an Inbox suggestion capsule (`edit.filing-suggestion`, #368). */
+    fun applyFilingSuggestion(id: String) {
+        val suggestion = filingSuggestionsByTask[id] ?: return
+        val changes = when (suggestion.kind) {
+            FilingSuggestion.Kind.AREA -> mapOf(
+                RegistryEntityFields.Task.AREA to JsonValue.StringValue(suggestion.id),
+                RegistryEntityFields.Task.PROJECT to JsonValue.Null,
+            )
+            FilingSuggestion.Kind.PROJECT -> mapOf(
+                RegistryEntityFields.Task.AREA to JsonValue.Null,
+                RegistryEntityFields.Task.PROJECT to JsonValue.StringValue(suggestion.id),
+            )
+        }
+        editTask(id) { graph.taskMutator.updateFields(id, changes) }
+    }
+
+    /** Drops all remaining sweep rows in ONE undo entry (`docs/TASK_FADE_SPEC.md` §5). */
+    fun letGoFadedBatch(ids: List<String>) {
+        if (ids.isEmpty()) return
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    graph.captureTaskEdits(ids) { id -> graph.taskMutator.letGoFaded(id) }
+                }
+            }.onSuccess { errorMessage.value = null; noteLocalChangeAndSync() }
+                .onFailure { errorMessage.value = it.message; noteLocalChangeAndSync() }
+        }
+    }
+
+    fun dismissWeeklySweepBanner() {
+        graph.fadeSweepStore.dismissSweepForCurrentWeek(graph.clock.now())
+        sweepRefresh.value += 1
+    }
+
+    fun markSweepCompleted() {
+        graph.fadeSweepStore.markSweepCompleted(graph.clock.now())
+        sweepRefresh.value += 1
+    }
 
     /** One undoable task edit off the main thread, then a sync. */
     private fun editTask(id: String, edit: suspend () -> Any?) {
@@ -618,11 +680,24 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         // Load all turns in 2 bulk queries (cached) and evaluate only relevant conversations ONCE.
         val turnsByTask = graph.taskStore.allTurnsByTask()
         val relevantTaskIds = if (needsFullHistory) null else allSnapshots.mapTo(HashSet(allSnapshots.size)) { it.second.id }
-        val conversations = graph.taskStore.records(EntityNames.CONVO)
+        val convoRecords = graph.taskStore.records(EntityNames.CONVO)
             .asSequence()
             .filter { it.deletedAt == null }
             .filter { relevantTaskIds == null || it.id in relevantTaskIds }
-            .associate { it.id to runCatching { TaskConversation.from(it, turnsByTask[it.id].orEmpty()) }.getOrNull() }
+            .associateBy(SyncRecord::id)
+        val conversations = convoRecords.mapValues { (id, record) ->
+            runCatching { TaskConversation.from(record, turnsByTask[id].orEmpty()) }.getOrNull()
+        }
+        val projectParentAreaTitle = projectRecords.mapNotNull { item ->
+            val proj = item.location as? TaskHomeLocation.Project ?: return@mapNotNull null
+            val areaTitle = item.parentAreaId?.let(areaTitles::get) ?: return@mapNotNull null
+            proj.id to areaTitle
+        }.toMap()
+        val reviewFallback = RegistryCatalog.surface(RegistryTaskPageBlockIds.TASK_PAGE_CONVERSATION)
+            ?.fields?.get("reviewFallback")?.stringValue()?.takeIf(String::isNotBlank)
+            ?: "Ready for review"
+        val inboxLabel = RegistryCatalog.destinationTitle(RegistryDestinationIds.INBOX)?.takeIf(String::isNotBlank)
+            ?: "Inbox"
         val convoStates = HashMap<String, app.septena.core.ConversationSnapshotState>(conversations.size)
         for ((id, convo) in conversations) {
             if (convo != null) {
@@ -652,6 +727,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             item.parentAreaId?.let { proj.id to it }
         }.toMap()
 
+        val fadedSweepList = mutableListOf<FadeSweepItem>()
         for ((record, snapshot) in allSnapshots) {
             if (snapshot.isHeading) continue
             if (snapshot.deletedAt != null) {
@@ -672,6 +748,25 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                     if (convoState?.needsHumanReview == true) reviewCount += 1
                     if (TaskFadeRules.isFaded(snapshot.fadedAt)) {
                         fadedCount += 1
+                        val fadedInstant = snapshot.fadedAt?.let { runCatching { java.time.Instant.parse(it) }.getOrNull() }
+                        val touchedInstant = snapshot.touchedAt?.let { runCatching { java.time.Instant.parse(it) }.getOrNull() }
+                        val createdInstant = snapshot.createdAt?.let { runCatching { java.time.Instant.parse(it) }.getOrNull() }
+                        val listName = snapshot.project?.let(projectTitles::get) ?: snapshot.area?.let(areaTitles::get)
+                        fadedSweepList += FadeSweepItem(
+                            id = snapshot.id,
+                            title = snapshot.title,
+                            reason = FadeSweepRules.sweepReason(
+                                touchedAt = touchedInstant,
+                                createdAt = createdInstant,
+                                created = snapshot.created,
+                                listName = listName,
+                                scheduled = snapshot.scheduled,
+                                now = now,
+                                inboxLabel = inboxLabel,
+                                zoneId = zoneId,
+                            ),
+                            fadedAt = fadedInstant,
+                        )
                     } else {
                         if (snapshot.starred) starredCount += 1
                         val projId = snapshot.project
@@ -782,6 +877,34 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
 
         val inbox = mutableListOf<PositionedTask>()
         val visible = mutableListOf<PositionedTask>()
+        val currentDestinationId = (resolvedLocation as? TaskHomeLocation.SmartList)?.destinationId
+        val filingSuggestionsEnabled = graph.deviceSettings.bool(RegistrySettingKeys.TASKS_FILING_SUGGESTIONS)
+        val shouldSuggestInline = filingSuggestionsEnabled && (
+            currentDestinationId == RegistryDestinationIds.TODAY ||
+                currentDestinationId == RegistryDestinationIds.INBOX
+            )
+        val nextSuggestions = linkedMapOf<String, FilingSuggestion>()
+        if (shouldSuggestInline && (areaRecords.isNotEmpty() || projectRecords.isNotEmpty())) {
+            val training = allSnapshots.map { (rec, snap) ->
+                FilingTrainingTask(
+                    id = snap.id,
+                    title = snap.title,
+                    notes = rec.fields[RegistryEntityFields.Task.NOTES].stringValue(),
+                    areaId = snap.area,
+                    projectId = snap.project,
+                    isCancelled = snap.status == RegistryEntityEnums.TaskStatus.CANCELLED,
+                )
+            }
+            val areaTargets = areaRecords.mapNotNull { item ->
+                val a = item.location as? TaskHomeLocation.Area ?: return@mapNotNull null
+                FilingTarget(FilingSuggestion.Kind.AREA, a.id, a.title)
+            }
+            val projectTargets = projectRecords.mapNotNull { item ->
+                val p = item.location as? TaskHomeLocation.Project ?: return@mapNotNull null
+                FilingTarget(FilingSuggestion.Kind.PROJECT, p.id, p.title)
+            }
+            graph.filingSuggestions.prepare(training, areaTargets, projectTargets)
+        }
         for ((record, snapshot) in allSnapshots) {
             val membership = memberships[snapshot.id] ?: TaskViewRules.INACTIVE_MEMBERSHIP
             when (resolvedLocation) {
@@ -801,6 +924,25 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                     }
                     if (!listed) continue
                     val inTodayInbox = resolvedLocation.destinationId == RegistryDestinationIds.TODAY && membership.inTodayInbox
+                    val isLooseTodayCapture = resolvedLocation.destinationId == RegistryDestinationIds.TODAY &&
+                        snapshot.status == RegistryEntityEnums.TaskStatus.OPEN &&
+                        snapshot.scheduled == null &&
+                        snapshot.deadline == null &&
+                        snapshot.area == null &&
+                        snapshot.project == null &&
+                        snapshot.today
+                    val suggestedTarget = if (shouldSuggestInline &&
+                        snapshot.project == null &&
+                        (inTodayInbox || isLooseTodayCapture || resolvedLocation.destinationId == RegistryDestinationIds.INBOX)
+                    ) {
+                        graph.filingSuggestions.suggest(
+                            title = snapshot.title,
+                            notes = record.fields[RegistryEntityFields.Task.NOTES].stringValue(),
+                        )?.takeUnless { s ->
+                            (s.kind == FilingSuggestion.Kind.AREA && snapshot.area == s.id) ||
+                                (s.kind == FilingSuggestion.Kind.PROJECT && snapshot.project == s.id)
+                        }?.also { nextSuggestions[snapshot.id] = it }
+                    } else null
                     val item = taskListItem(
                         record = record,
                         snapshot = snapshot,
@@ -814,24 +956,51 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                         showTodayIndicator = resolvedLocation.destinationId != RegistryDestinationIds.TODAY && !inTodayInbox,
                         isLogbook = resolvedLocation.destinationId == RegistryDestinationIds.LOGBOOK,
                     ).withFade(snapshot, conversation, convoState, now, today, showAging)
+                        .let { base ->
+                            if (suggestedTarget != null) base.copy(filingSuggestionLabel = suggestedTarget.title) else base
+                        }
                     val rowPosition = record.fields[positionField(resolvedLocation.destinationId)].numberValue()
                         ?: record.fields[RegistryEntityFields.Task.POSITION].numberValue()
                     val positioned = PositionedTask(
-                        if (resolvedLocation.destinationId == RegistryDestinationIds.AGENT) {
-                            val stageTitle = agentGroups[stage]
-                            item.copy(
-                                group = stageTitle?.let {
-                                    TaskGroupHeader(
-                                        key = "agent:${stage.orEmpty()}",
-                                        title = it,
-                                        iconKind = SeptenaIconKind.None,
-                                    )
-                                },
-                                groupTitle = stageTitle,
-                                position = rowPosition,
-                            )
-                        } else {
-                            item.copy(position = rowPosition)
+                        when (resolvedLocation.destinationId) {
+                            RegistryDestinationIds.AGENT -> {
+                                val stageTitle = agentGroups[stage]
+                                item.copy(
+                                    group = stageTitle?.let {
+                                        TaskGroupHeader(
+                                            key = "agent:${stage.orEmpty()}",
+                                            title = it,
+                                            iconKind = SeptenaIconKind.None,
+                                        )
+                                    },
+                                    groupTitle = stageTitle,
+                                    position = rowPosition,
+                                )
+                            }
+                            RegistryDestinationIds.REVIEW -> {
+                                val note = conversation?.endStateNote?.trim()?.takeIf(String::isNotEmpty)
+                                    ?: reviewFallback
+                                val projTitle = snapshot.project?.let(projectTitles::get)
+                                val areaTitle = snapshot.area?.let(areaTitles::get)
+                                    ?: snapshot.project?.let(projectParentAreaTitle::get)
+                                val listLabel = when {
+                                    areaTitle != null && projTitle != null -> "$areaTitle › $projTitle"
+                                    projTitle != null -> projTitle
+                                    areaTitle != null -> areaTitle
+                                    else -> inboxLabel
+                                }
+                                val askedAgo = relativeAgo(conversation?.endStateAt)?.let { "asked $it" }
+                                val artifactTitle = (convoRecords[snapshot.id]?.fields?.get("artifact") as? JsonValue.ObjectValue)
+                                    ?.fields?.get("title")?.stringValue()?.trim()?.takeIf(String::isNotEmpty)
+                                val metaLine = listOfNotNull(listLabel, askedAgo, artifactTitle)
+                                    .joinToString(" · ")
+                                item.copy(
+                                    position = rowPosition,
+                                    reviewNote = note,
+                                    reviewMeta = metaLine,
+                                )
+                            }
+                            else -> item.copy(position = rowPosition)
                         },
                         rowPosition,
                         archiveDate = when (resolvedLocation.destinationId) {
@@ -930,6 +1099,21 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                 }
             }
         }
+        filingSuggestionsByTask = nextSuggestions
+        val lastSweepAt = graph.fadeSweepStore.lastSweepAt()
+        val dismissedWeek = graph.fadeSweepStore.dismissedSweepWeek()
+        val sortedFadedSweep = fadedSweepList.sortedWith(
+            compareByDescending<FadeSweepItem> { it.fadedAt ?: java.time.Instant.EPOCH }
+                .thenBy { it.title.lowercase() },
+        )
+        val currentWeekSweep = sortedFadedSweep.filter { FadeSweepRules.isInCurrentSweep(it.fadedAt, lastSweepAt) }
+        val showSweepBanner = FadeSweepRules.isSweepDue(
+            now = now,
+            lastSweepAt = lastSweepAt,
+            dismissedWeek = dismissedWeek,
+            fadedDates = sortedFadedSweep.mapNotNull(FadeSweepItem::fadedAt),
+            zoneId = zoneId,
+        )
         return LoadedTaskHome(
             hasLoaded = true,
             location = resolvedLocation,
@@ -942,6 +1126,9 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             canQuickAdd = canQuickAdd,
             canComplete = canComplete,
             agentsPaused = agentsPaused,
+            fadedSweepItems = sortedFadedSweep,
+            weeklySweepItems = currentWeekSweep,
+            showWeeklySweepBanner = showSweepBanner,
         )
     }
 
