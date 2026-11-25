@@ -200,8 +200,7 @@ cd appstore && npm install            #    first time only (Playwright)
 ./capture.sh ipad13 light             #    (per device class)
 ./capture.sh mac light
 npm run all                           # 2. metadata + render composites + validate
-npm run viz                           # 3. open the App Store viz to verify
-fastlane deliver                      # 4. upload iOS metadata + screenshots (no binary)
+fastlane deliver                      # 3. upload iOS metadata + screenshots (no binary)
 fastlane deliver --app_identifier com.septena.cloud --platform osx \
   --metadata_path appstore/metadata-mac --screenshots_path appstore/screenshots-mac
 ```

@@ -9,7 +9,6 @@
   const items = [
     { id: 'competitors', label: '39 Competitors', href: `${root}/competitor-gallery/index.html` },
     { id: 'language', label: 'Language Gallery', href: `${root}/language-gallery/index.html` },
-    { id: 'appstore', label: 'App Store Viz ↗', href: `${root}/../../appstore/viz/index.html` },
   ];
 
   const style = document.createElement('style');
