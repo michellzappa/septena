@@ -84,11 +84,13 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
   private let notesScroll = KitNestedScrollView()
   private let checklistView = KitChecklistView()
   private let attachmentsView = KitAttachmentsView()
+  private let referencesView = KitReferencesView(style: .chips)
   /// Title, notes, checklist (when shown), attachments (when shown), pills — stacked.
   private let column = NSStackView()
   private let pillRow = NSStackView()
   /// Holds `pillRow` so the rail scrolls sideways (trackpad, shift-wheel)
   /// when the labelled pills are wider than the card, instead of clipping.
+  private let pillHost = NSView()
   private let pillScroll = KitNestedScrollView()
 
   private let whenPill = KitPillButton()
@@ -128,6 +130,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
   private var notesHeightConstraint: NSLayoutConstraint!
   private var checklistHeightConstraint: NSLayoutConstraint!
   private var attachmentsHeightConstraint: NSLayoutConstraint!
+  private var referencesHeightConstraint: NSLayoutConstraint!
   /// False only before `configure(with:)` has run — an open row always shows
   /// its notes. Kept as a guard so a cell the table measures before it is
   /// configured doesn't reserve notes height it isn't drawing yet.
@@ -157,6 +160,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
 
   /// The pill rail's height: the 30pt pills plus room for the focus ring.
   fileprivate static let pillRowHeight: CGFloat = 34
+  private static let ringRoom: CGFloat = 4
   /// Empty / short notes — two lines of room before the field grows. Things'
   /// open task shows about this much under the title.
   private static var notesMinHeight: CGFloat {
@@ -226,18 +230,21 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
   /// Row height for a one-line title with no notes — the controller's answer
   /// until the live cell has measured itself (`expandedHeight`).
   static var baseHeight: CGFloat {
-    height(titleHeight: titleLineHeight, notesHeight: nil, checklistHeight: 0, attachmentsHeight: 0)
+    height(titleHeight: titleLineHeight, notesHeight: nil, checklistHeight: 0, attachmentsHeight: 0,
+           referencesHeight: 0)
   }
 
   /// Layout: a closed-row-height band at the top (checkbox + first title line
   /// centered exactly as `SeptaskKitTaskCell`), any extra title lines, then
-  /// notes, optional checklist, optional attachments, and pills hanging below.
+  /// notes, optional checklist, attachments and references, and pills hanging below.
   private static func height(titleHeight: CGFloat, notesHeight: CGFloat?,
-                             checklistHeight: CGFloat, attachmentsHeight: CGFloat) -> CGFloat {
+                             checklistHeight: CGFloat, attachmentsHeight: CGFloat,
+                             referencesHeight: CGFloat) -> CGFloat {
     var height = SeptaskKitTheme.rowHeight + max(0, titleHeight - titleLineHeight) + interRowGap
     if let notesHeight { height += notesHeight + interRowGap }
     if checklistHeight > 0 { height += checklistHeight + interRowGap }
     if attachmentsHeight > 0 { height += attachmentsHeight + interRowGap }
+    if referencesHeight > 0 { height += referencesHeight + interRowGap }
     return height + pillRowHeight + bottomPadding
   }
 
@@ -248,7 +255,8 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     return Self.height(titleHeight: measuredTitleHeight,
                        notesHeight: notesShown ? measuredNotesHeight : nil,
                        checklistHeight: checklistH,
-                       attachmentsHeight: attachH)
+                       attachmentsHeight: attachH,
+                       referencesHeight: referencesView.preferredHeight)
   }
 
   init(identifier: NSUserInterfaceItemIdentifier) {
@@ -301,6 +309,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     pillRow.orientation = .horizontal
     pillRow.spacing = 8
     pillRow.alignment = .centerY
+    pillRow.edgeInsets = NSEdgeInsets(top: 0, left: Self.ringRoom, bottom: 0, right: Self.ringRoom)
     pillRow.translatesAutoresizingMaskIntoConstraints = false
 
     whenPill.onPress = { [weak self] view in self?.onAction?(.when(view)) }
@@ -358,6 +367,9 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     column.addArrangedSubview(notesScroll)
     column.addArrangedSubview(checklistView)
     column.addArrangedSubview(attachmentsView)
+    referencesView.translatesAutoresizingMaskIntoConstraints = false
+    referencesView.isHidden = true
+    column.addArrangedSubview(referencesView)
     pillScroll.drawsBackground = false
     pillScroll.hasHorizontalScroller = false
     pillScroll.hasVerticalScroller = false
@@ -365,7 +377,11 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     pillScroll.horizontalScrollElasticity = .automatic
     pillScroll.translatesAutoresizingMaskIntoConstraints = false
     pillScroll.documentView = pillRow
-    column.addArrangedSubview(pillScroll)
+    // The scroll view reaches past the column on every side, so it does not
+    // clip the focus ring of the first pill.
+    pillHost.translatesAutoresizingMaskIntoConstraints = false
+    pillHost.addSubview(pillScroll)
+    column.addArrangedSubview(pillHost)
     // The one-line title ends `titleTop` short of the closed-row band's
     // bottom; add that back so the rail hangs `interRowGap` under the BAND
     // (where it always sat), not under the glyphs.
@@ -388,6 +404,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
       equalToConstant: Self.notesMinHeight)
     checklistHeightConstraint = checklistView.heightAnchor.constraint(equalToConstant: 0)
     attachmentsHeightConstraint = attachmentsView.heightAnchor.constraint(equalToConstant: 0)
+    referencesHeightConstraint = referencesView.heightAnchor.constraint(equalToConstant: 0)
     NSLayoutConstraint.activate([
       leadingConstraint,
       // Match `SeptaskKitTaskCell`: checkbox on the vertical center of a
@@ -408,8 +425,14 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
       checklistHeightConstraint,
       attachmentsView.widthAnchor.constraint(equalTo: column.widthAnchor),
       attachmentsHeightConstraint,
-      pillScroll.heightAnchor.constraint(equalToConstant: Self.pillRowHeight),
-      pillScroll.widthAnchor.constraint(equalTo: column.widthAnchor),
+      referencesView.widthAnchor.constraint(equalTo: column.widthAnchor),
+      referencesHeightConstraint,
+      pillHost.heightAnchor.constraint(equalToConstant: Self.pillRowHeight),
+      pillHost.widthAnchor.constraint(equalTo: column.widthAnchor),
+      pillScroll.topAnchor.constraint(equalTo: pillHost.topAnchor, constant: -Self.ringRoom),
+      pillScroll.bottomAnchor.constraint(equalTo: pillHost.bottomAnchor, constant: Self.ringRoom),
+      pillScroll.leadingAnchor.constraint(equalTo: pillHost.leadingAnchor, constant: -Self.ringRoom),
+      pillScroll.trailingAnchor.constraint(equalTo: pillHost.trailingAnchor, constant: Self.ringRoom),
       pillRow.topAnchor.constraint(equalTo: pillScroll.contentView.topAnchor),
       pillRow.leadingAnchor.constraint(equalTo: pillScroll.contentView.leadingAnchor),
       pillRow.heightAnchor.constraint(equalTo: pillScroll.contentView.heightAnchor),
@@ -524,6 +547,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     syncChecklistHeight(notify: false)
     attachmentsView.configure(taskID: task.id)
     syncAttachmentsHeight(notify: false)
+    refreshReferences(notify: false)
     updateKeyChain()
     recomputeContentHeights(notify: false)
     refreshPills(with: task, listName: listName)
@@ -597,6 +621,20 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     let h = attachmentsView.isHidden ? 0 : attachmentsView.preferredHeight
     if abs(attachmentsHeightConstraint.constant - h) > 0.5 {
       attachmentsHeightConstraint.constant = h
+      if notify { onContentHeightChanged?() }
+    }
+  }
+
+  /// Also the list's answer to a task change, so a reference added, removed or
+  /// undone while the row is open shows at once.
+  func refreshReferences(notify: Bool = true) {
+    guard let taskID = configuredTaskID else { return }
+    referencesView.configure(rows: LocalCache.taskRefRows(
+      forTaskID: taskID, in: LocalStore.shared.container.mainContext))
+    referencesView.isHidden = referencesView.isEmpty
+    let h = referencesView.preferredHeight
+    if abs(referencesHeightConstraint.constant - h) > 0.5 {
+      referencesHeightConstraint.constant = h
       if notify { onContentHeightChanged?() }
     }
   }
@@ -1145,6 +1183,11 @@ final class KitComposerTextView: NSTextView {
 final class KitPillButton: NSButton {
   var onPress: ((NSView) -> Void)?
 
+  override class var cellClass: AnyClass? {
+    get { KitPillButtonCell.self }
+    set {}
+  }
+
   /// The registry attribute this pill stands for (`taskAttributes`). An
   /// attribute pill is a stadium with the symbol and a short label (the set
   /// value when there is one, else the registry label), the iOS
@@ -1255,7 +1298,20 @@ final class KitPillButton: NSButton {
 
   override func layout() {
     super.layout()
+    keepGlassAtBack()
     applyCapsule()
+  }
+
+  /// AppKit makes the button's image view after `init` and puts it at the
+  /// back, under the glass, where the icon cannot be seen. `sortSubviews`
+  /// moves the glass without dropping its constraints.
+  private func keepGlassAtBack() {
+    guard subviews.first !== glass else { return }
+    sortSubviews({ a, b, glass in
+      if Unmanaged.passUnretained(a).toOpaque() == glass { return .orderedAscending }
+      if Unmanaged.passUnretained(b).toOpaque() == glass { return .orderedDescending }
+      return .orderedSame
+    }, context: Unmanaged.passUnretained(glass).toOpaque())
   }
 
   override func viewDidChangeEffectiveAppearance() {
@@ -1327,8 +1383,26 @@ final class KitPillButton: NSButton {
 
   @objc private func pressed() { onPress?(self) }
 
-  private static let horizontalPadding: CGFloat = 12
-  private static let iconGap: CGFloat = 4
+  fileprivate static let horizontalPadding: CGFloat = 12
+  fileprivate static let iconGap: CGFloat = 4
+}
+
+/// Icon, gap, label, in the padding that `intrinsicContentSize` counts. Left
+/// to itself, AppKit draws the icon on the pill's edge, away from the label.
+private final class KitPillButtonCell: NSButtonCell {
+  override func imageRect(forBounds rect: NSRect) -> NSRect {
+    guard let size = image?.size else { return super.imageRect(forBounds: rect) }
+    return NSRect(x: rect.minX + KitPillButton.horizontalPadding, y: rect.midY - size.height / 2,
+                  width: size.width, height: size.height)
+  }
+
+  override func titleRect(forBounds rect: NSRect) -> NSRect {
+    guard let size = image?.size else { return super.titleRect(forBounds: rect) }
+    let x = rect.minX + KitPillButton.horizontalPadding + size.width + KitPillButton.iconGap
+    let height = ceil(attributedTitle.size().height)
+    return NSRect(x: x, y: rect.midY - height / 2,
+                  width: max(0, rect.maxX - KitPillButton.horizontalPadding - x), height: height)
+  }
 }
 
 // MARK: - 1-level Checklist editor (CL1, docs/CHECKLISTS_SPEC.md)

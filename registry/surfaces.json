@@ -399,7 +399,7 @@
       { "id": "taskPage.attributes", "kind": "attributes", "depths": ["inline", "page"], "featureId": "lists.today" },
       { "id": "taskPage.checklist", "kind": "checklist", "attribute": "checklist", "depths": ["inline", "page"], "featureId": "task.checklists", "editOnly": true },
       { "id": "taskPage.attachments", "kind": "attachments", "attribute": "attachments", "depths": ["inline", "page"], "featureId": "task.attachments", "editOnly": true },
-      { "id": "taskPage.references", "kind": "references", "label": "References", "depths": ["page"], "featureId": "task.references", "editOnly": true },
+      { "id": "taskPage.references", "kind": "references", "label": "References", "depths": ["inline", "page"], "featureId": "task.references", "editOnly": true },
       { "id": "taskPage.conversation", "kind": "conversation", "label": "Conversation", "askKicker": "Your agent asks", "reviewKicker": "Review requested", "reviewFallback": "Ready for review", "acceptedLabel": "Accepted", "depths": ["page", "review"], "featureId": "ai.discuss", "editOnly": true },
       { "id": "taskPage.provenance", "kind": "provenance", "label": "Added by", "selfLabel": "You", "agentFallbackName": "Claude", "icon": "task.added_by_agent", "depths": ["page", "review"], "featureId": "task.provenance", "editOnly": true },
       { "id": "taskPage.history", "kind": "history", "attribute": "history", "depths": ["page"], "featureId": "task.history", "editOnly": true }

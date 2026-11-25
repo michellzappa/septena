@@ -195,6 +195,11 @@ gh release create "$TAG" "$DMG" "$ZIP" "$DIST/appcast.xml" --repo "$REPO" --veri
   --draft --title "Septena $VERSION for Mac" --notes-file "$WORK/notes.md"
 gh release edit "$TAG" --repo "$REPO" --draft=false --latest
 
-curl -fsSL "https://github.com/$REPO/releases/latest/download/appcast.xml" | cmp -s - "$DIST/appcast.xml" \
-  || die "the published feed does not match dist/appcast.xml"
+# GitHub takes a moment to move "latest" to the new release.
+LIVE=0
+for _ in $(seq 24); do
+  curl -fsSL "https://septena.app/mac/appcast.xml" 2>/dev/null | cmp -s - "$DIST/appcast.xml" && { LIVE=1; break; }
+  sleep 5
+done
+[[ "$LIVE" -eq 1 ]] || die "the release is public, but https://septena.app/mac/appcast.xml does not match dist/appcast.xml"
 echo "Published https://github.com/$REPO/releases/tag/$TAG"

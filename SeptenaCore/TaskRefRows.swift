@@ -185,6 +185,7 @@ enum TaskRefRows {
     let title = [named, opens].compactMap(\.title).first ?? kind.label
     let role = group.compactMap { RegistryTaskReferences.roleLabels[$0.role] }.first
     let detail = opens.snapshot.subtitle ?? named.snapshot.subtitle ?? place(of: opens, title: title)
+      ?? (title == kind.label ? nil : kind.label)
     let subtitle = [role, detail].compactMap { $0?.isEmpty == false ? $0 : nil }.joined(separator: " · ")
     return TaskRefRow(refs: group, title: title, subtitle: subtitle.isEmpty ? nil : subtitle,
                       sfSymbol: kind.sfSymbol,

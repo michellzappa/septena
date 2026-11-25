@@ -700,7 +700,11 @@ final class SeptaskKitTaskListController: NSViewController {
         // `queueTodayArrivalFlashes` in `reload`). Notifications are posted
         // synchronously, but the actual repaint is coalesced so a multi-field
         // gesture does not rebuild the whole page once per write.
-        MainActor.assumeIsolated { self?.scheduleReload(locallyChanged: note.changedTaskIDs ?? []) }
+        MainActor.assumeIsolated {
+          guard let self else { return }
+          self.scheduleReload(locallyChanged: note.changedTaskIDs ?? [])
+          if let id = self.composingTaskId { self.composerCell(for: id)?.refreshReferences() }
+        }
       })
     }
     observers.append(NotificationCenter.default.addObserver(
@@ -3819,43 +3823,6 @@ final class SeptaskKitTaskListController: NSViewController {
     return (area, project, today, scheduled)
   }
 
-  /// Grouped Today only, mirroring `TaskListView.showsGroupedHeaderQuickAdd`
-  /// (`filter == .today && todayGroupByList && allowsInlineCreate`). A flat
-  /// Today has no per-list headers to hang a "+" on, and every other list is
-  /// already scoped to one place, so ⌘N there needs no disambiguation.
-  private var showsGroupedHeaderQuickAdd: Bool {
-    filter == .today && todayGroupsByList
-  }
-
-  /// The header "+" — create straight into the area/project that header
-  /// names. Deliberately the bare title editor rather than ⌘N's composer:
-  /// this is a quick-add affordance, the same weight as SwiftUI's inline
-  /// quick-add draft and the foot-of-Inbox "New task" line.
-  private func createTask(underHeaderId id: String) {
-    guard let target = navigationTarget(forHeaderId: id) else { return }
-    switch target {
-    case .project(let projectId): createTask(inArea: nil, project: projectId)
-    case .area(let areaId): createTask(inArea: areaId, project: nil)
-    default: break
-    }
-  }
-
-  /// Create with filing given OUTRIGHT, rather than derived from the filter
-  /// and the focused row the way `createTask(inInbox:)` does. `today: true`
-  /// because the only caller is a Today header — the row belongs both to
-  /// Today and to that list, which is exactly what the header represents.
-  private func createTask(inArea area: String?, project: String?) {
-    commitOpenEdits()
-    let task = mutator.create(title: "", area: area, project: project,
-                              scheduled: nil, today: true, deferPush: true, atBottom: false)
-    pendingNewTaskId = task.id
-    reload(animated: false)
-    guard let row = rows.firstIndex(where: { $0.task?.id == task.id }) else { return }
-    tableView.selectRowIndexes([row], byExtendingSelection: false)
-    tableView.scrollRowToVisible(row)
-    beginComposing(id: task.id)
-  }
-
   /// The task that should seed ⌘N's area/project — the table's focused row,
   /// falling back to the sole selected task when focus is on a header/empty.
   private func focusedTaskForCreate() -> SeptenaTask? {
@@ -5762,12 +5729,10 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       let keepCheckmark = (id == "inbox" && inboxZeroTracker.phase == .checkmark)
       cell.configure(title: title, icon: icon, count: count,
                      isNavigable: target != nil,
-                     showsQuickAdd: showsGroupedHeaderQuickAdd && target != nil,
                      keepAnimatedCheckmark: keepCheckmark)
       cell.onTap = target.map { filter in
         { [weak self] in self?.onNavigate?(.filter(filter, title: filter.title)) }
       }
-      cell.onQuickAdd = { [weak self] in self?.createTask(underHeaderId: id) }
       return cell
 
     case .screenTitle(let title, let icon):
@@ -7872,19 +7837,9 @@ final class KitGroupHeaderCell: NSTableCellView {
   /// being tall is the air ABOVE it that separates one card from the next;
   /// neither should navigate. `TaskListView.groupHeaderBody` says the same
   /// outright: "Tappable target is JUST the title (+ chevron) — not the whole
-  /// row… so clicks in empty horizontal space don't navigate." A full-bleed
-  /// overlay here would also swallow `plus` below.
+  /// row… so clicks in empty horizontal space don't navigate."
   /// Hidden for a non-navigable header so its clicks reach the table.
   private let hit = NSButton()
-
-  /// Trailing quick-add — the AppKit counterpart of SwiftUI's
-  /// `HeaderQuickAddButton`. Creates straight into this header's area/project
-  /// rather than deriving filing from the list being looked at. Shown on the
-  /// same terms as SwiftUI's `showsGroupedHeaderQuickAdd`: grouped Today only,
-  /// and only on a header that names a real list.
-  private let plus = NSButton()
-  private var plusTrailingConstraint: NSLayoutConstraint!
-  var onQuickAdd: (() -> Void)?
 
   /// Matches SwiftUI's ACTUAL group header exactly —
   /// `sectionGroupHeaderTitleStyle()` (`Theme.groupHeaderFontSize` = 15 on
@@ -7941,25 +7896,10 @@ final class KitGroupHeaderCell: NSTableCellView {
     hit.action = #selector(fire)
     hit.kitA11yIgnore()
 
-    plus.translatesAutoresizingMaskIntoConstraints = false
-    plus.isBordered = false
-    plus.bezelStyle = .inline
-    plus.imagePosition = .imageOnly
-    plus.image = NSImage(systemSymbolName: "plus", accessibilityDescription: nil)?
-      .withSymbolConfiguration(.init(pointSize: 11, weight: .semibold))
-    plus.contentTintColor = SeptaskKitTheme.iconMuted
-    plus.target = self
-    plus.action = #selector(quickAdd)
-    // Pointer affordance only — arrow keys stay with the table, the same
-    // contract the checkbox and the screen-title dropdown keep.
-    plus.refusesFirstResponder = true
-    plus.isHidden = true
-
     addSubview(icon)
     addSubview(emoji)
     addSubview(title)
     addSubview(count)
-    addSubview(plus)
     // Last, so it layers above the title it covers.
     addSubview(hit)
     textField = title
@@ -7976,8 +7916,6 @@ final class KitGroupHeaderCell: NSTableCellView {
       constant: KitCardRowView.horizontalInset + SeptaskKitLayout.headerTitleLeading)
     trailingConstraint = count.trailingAnchor.constraint(
       lessThanOrEqualTo: trailingAnchor, constant: -(KitCardRowView.horizontalInset + 8))
-    plusTrailingConstraint = plus.trailingAnchor.constraint(
-      equalTo: trailingAnchor, constant: -(KitCardRowView.horizontalInset + 6))
     NSLayoutConstraint.activate([
       leadingConstraint,
       icon.centerYAnchor.constraint(equalTo: title.centerYAnchor),
@@ -7998,10 +7936,6 @@ final class KitGroupHeaderCell: NSTableCellView {
       hit.trailingAnchor.constraint(equalTo: title.trailingAnchor),
       hit.topAnchor.constraint(equalTo: title.topAnchor, constant: -2),
       hit.bottomAnchor.constraint(equalTo: title.bottomAnchor, constant: 2),
-      plus.centerYAnchor.constraint(equalTo: title.centerYAnchor),
-      plus.widthAnchor.constraint(equalToConstant: 20),
-      plus.heightAnchor.constraint(equalToConstant: 20),
-      plusTrailingConstraint,
     ])
   }
 
@@ -8014,7 +7948,6 @@ final class KitGroupHeaderCell: NSTableCellView {
     leadingConstraint.constant = inset + SeptaskKitLayout.leadingGlyphCenterX
     titleLeadingConstraint.constant = inset + SeptaskKitLayout.headerTitleLeading
     trailingConstraint.constant = -(inset + 8)
-    plusTrailingConstraint.constant = -(inset + 6)
     super.layout()
   }
 
@@ -8063,7 +7996,6 @@ final class KitGroupHeaderCell: NSTableCellView {
                  icon iconKind: SeptaskKitTaskListController.GroupIcon,
                  count countValue: Int,
                  isNavigable: Bool,
-                 showsQuickAdd: Bool,
                  keepAnimatedCheckmark: Bool = false) {
     // Attributed, not `stringValue` + `.font`: a bare font assignment on an
     // NSTableCellView's textField is what AppKit overrides for any
@@ -8111,8 +8043,6 @@ final class KitGroupHeaderCell: NSTableCellView {
     // A recycled cell keeps the previous row's overlay state otherwise, which
     // would make a plain "Inbox" header swallow clicks the table should get.
     hit.isHidden = !isNavigable
-    plus.isHidden = !showsQuickAdd
-    plus.setAccessibilityLabel(TaskA11y.addTaskTo(titleText))
     // Reused cells carry a stale cursor rect otherwise — a scrolled-in
     // non-navigable header could keep the pointing-hand from whatever row
     // used to occupy this recycled view.
@@ -8120,8 +8050,6 @@ final class KitGroupHeaderCell: NSTableCellView {
   }
 
   @objc private func fire() { onTap?() }
-
-  @objc private func quickAdd() { onQuickAdd?() }
 
   override func accessibilityPerformPress() -> Bool {
     guard onTap != nil else { return false }
@@ -8133,13 +8061,11 @@ final class KitGroupHeaderCell: NSTableCellView {
   /// signal — it's what makes "clickable" discoverable without a hover state
   /// to lean on in an `NSTableCellView`.
   override func resetCursorRects() {
-    // Both live controls, and only them — the title text and the "+". A
-    // cursor rect does NOT go through hit-testing, so anything wider would
-    // advertise dead space as clickable; that false signal is what cost three
-    // rounds of debugging in the 2026-08-09 pass. The `isHidden` checks stand
-    // in for "is this header navigable / does it offer quick-add".
+    // The title text, and only it. A cursor rect does NOT go through
+    // hit-testing, so anything wider would advertise dead space as clickable;
+    // that false signal is what cost three rounds of debugging in the
+    // 2026-08-09 pass. `isHidden` stands in for "is this header navigable".
     if !hit.isHidden { addCursorRect(hit.frame, cursor: .pointingHand) }
-    if !plus.isHidden { addCursorRect(plus.frame, cursor: .pointingHand) }
   }
 }
 
