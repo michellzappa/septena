@@ -1,4 +1,4 @@
-# 0050. Admin growth comes from daily snapshots now, and from an event stream at scale
+# 0058. Admin growth comes from daily snapshots now, and from an event stream at scale
 
 - Status: accepted (2026-11-26)
 - Date: 2026-11-26
@@ -46,5 +46,10 @@ page load, which stops working long before a million accounts.
   "opened the app", and an app that syncs in the background counts.
 - Plausible counts a custom event only after mz adds it as a goal. The page
   lists the site events that have no goal yet.
+- The Plausible Stats API needs the Business plan; septena.app is on Growth
+  (#685). Until mz upgrades, the page embeds a Plausible shared-dashboard link
+  (`PLAUSIBLE_SHARED_LINK`, a secret), and the website funnel and goal
+  conversion stay empty. The code for the API block is in place and turns on
+  with `PLAUSIBLE_API_KEY`.
 - Adding App Store Connect, Google Play or Stripe needs a key per source and a
   change to this ADR's list of sources.

@@ -4,7 +4,7 @@ import { accountStoreFor, type AccountIndexRow } from "../store/AccountStore.js"
 import { deviceLabel, isActivated, lastSeen, overview, planView } from "./accounts.js";
 import { signupTotals } from "./signups.js";
 
-// Growth for the admin page (ADR 0050). Two kinds of history:
+// Growth for the admin page (ADR 0058). Two kinds of history:
 // - Series that the data can rebuild (accounts and signups by the day they
 //   started) come from the rows themselves, so they reach back to day one.
 // - Counts that only exist "now" (active, paid, trial) are kept as one

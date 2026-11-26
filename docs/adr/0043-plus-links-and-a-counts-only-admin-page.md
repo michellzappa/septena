@@ -5,7 +5,7 @@
 - Deciders: mz (product), agent (mechanism)
 - Amended by: [ADR 0045](0045-pro-is-a-real-plan-that-is-only-given.md) (a link
   carries a plan, and the page can give one account a plan),
-  [ADR 0050](0050-admin-growth-from-daily-snapshots-then-an-event-stream.md)
+  [ADR 0058](0058-admin-growth-from-daily-snapshots-then-an-event-stream.md)
   (daily history and third-party aggregates)
 - Amends: [ADR 0016](0016-sign-in-beyond-apple.md) (how a sign-in subject is
   stored). Implements #198, with one change: the page stores a summary per

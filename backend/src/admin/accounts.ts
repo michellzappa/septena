@@ -111,7 +111,7 @@ export function planView(summary: AccountSummary | null, now = Date.now()): Plan
 const DAY_MS = 24 * 60 * 60 * 1000;
 const WEEK_MS = 7 * DAY_MS;
 
-/// An account that used Septena for real: it completed a task (ADR 0050).
+/// An account that used Septena for real: it completed a task (ADR 0058).
 export const isActivated = (summary: AccountSummary | null) => (summary?.closedTasks ?? 0) >= 1;
 
 /// The funnel counts of docs/SYNC_SUBSCRIPTION_SPEC.md §3.3, from server data.

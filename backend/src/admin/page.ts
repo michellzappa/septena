@@ -18,7 +18,7 @@ export const PAGE_HEADERS = {
   "Cache-Control": "no-store",
   "Referrer-Policy": "same-origin",
   "X-Robots-Tag": "noindex, nofollow",
-  "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
+  "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; frame-src https://plausible.io; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
 };
 
 export interface AdminView {
@@ -30,7 +30,7 @@ export interface AdminView {
   query: string;
   emailSignups: SignupRow[];
   emailUserId: string | null;
-  /// Daily snapshots, oldest first (ADR 0050).
+  /// Daily snapshots, oldest first (ADR 0058).
   history: MetricDay[];
   traffic: TrafficResult;
   releases: MacRelease[] | null;
@@ -147,7 +147,7 @@ const signupTable = (rows: SignupRow[]) => table(["Email", "List", "Screens", "T
   `<tr>${[r.email, r.list, r.platforms, r.tools, r.agents, r.source, r.created_at.slice(0, 10)].map((x) => `<td>${esc(x.replace(/[[\]"]/g, ""))}</td>`).join("")}</tr>`), "No signups.");
 
 
-// ---- growth (ADR 0050) ----
+// ---- growth (ADR 0058) ----
 
 const fmt = (n: number) => n >= 10_000 ? `${(n / 1000).toFixed(n >= 100_000 ? 0 : 1)}k` : n.toLocaleString("en-US");
 const pct = (x: number | null, digits = 0) => (x === null || !Number.isFinite(x) ? "n/a" : `${(x * 100).toFixed(digits)}%`);
@@ -207,7 +207,11 @@ const duration = (s: number) => (s >= 60 ? `${Math.floor(s / 60)}m ${Math.round(
 
 function websiteSection(t: TrafficResult, signupsByDay: Map<string, number>): string {
   if (t.state === "off") {
-    return `<p class="warn">Plausible is not connected. Make a Stats API key in Plausible (Account settings ▸ API keys) and store it with <code>wrangler secret put PLAUSIBLE_API_KEY</code>.</p>`;
+    return `<p class="warn">Plausible is not connected. On the Growth plan: make a shared link (Site settings ▸ Visibility ▸ Shared links) and store it with <code>wrangler secret put PLAUSIBLE_SHARED_LINK</code>. On Business: a Stats API key in <code>PLAUSIBLE_API_KEY</code> gives the full block.</p>`;
+  }
+  if (t.state === "embed") {
+    return `<iframe src="${esc(t.url)}" title="Plausible dashboard" loading="lazy" referrerpolicy="no-referrer" style="width:100%;height:1700px;border:1px solid var(--line);border-radius:10px;background:var(--card)"></iframe>
+  <p class="dim">The Plausible dashboard, embedded from a shared link. Funnels, goal conversion in the growth tiles and the website funnel need a Stats API key (Business plan).</p>`;
   }
   if (t.state === "error") return `<p class="warn">Plausible does not answer (${esc(t.reason)}). The rest of the page is current.</p>`;
   const v = t.view;
@@ -276,7 +280,7 @@ function growthSection(v: AdminView): string {
       { name: "Visitors", n: traffic.totals.visitors },
       { name: "Left an email", n: traffic.goals.find((g) => g.name === "Signup")?.visitors ?? 0, note: "Plausible goal Signup" },
       { name: "Clicked a download", n: traffic.goals.find((g) => g.name === "Download click")?.visitors ?? 0 },
-    ] : [{ name: "Visitors", n: 0, note: "Plausible is not connected" }])}
+    ] : [{ name: "Visitors", n: 0, note: "needs a Plausible Stats API key" }])}
     ${funnel("Product, every account", [
       { name: "Accounts", n: o.accounts },
       { name: "Activated", n: o.activated, note: "completed a task" },

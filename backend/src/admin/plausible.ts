@@ -6,6 +6,8 @@ import { logEvent } from "../util.js";
 // (https://plausible.io/docs/stats-api). Plausible is anonymous and aggregate
 // (septena-site docs/marketing.md), so nothing here names a person.
 // The key is a read-only Stats API key: `wrangler secret put PLAUSIBLE_API_KEY`.
+// The Stats API needs the Plausible Business plan. On Growth the page embeds a
+// shared-dashboard link instead (PLAUSIBLE_SHARED_LINK).
 // The answer is cached in KV for CACHE_SECONDS so a page load does not wait on
 // eight API calls.
 
@@ -39,7 +41,7 @@ export interface TrafficView {
   fetchedAt: number;
 }
 
-export type TrafficResult = { state: "off" } | { state: "error"; reason: string } | { state: "ok"; view: TrafficView };
+export type TrafficResult = { state: "off" } | { state: "embed"; url: string } | { state: "error"; reason: string } | { state: "ok"; view: TrafficView };
 
 async function query(env: Env, site: string, body: Record<string, unknown>) {
   const res = await fetch(ENDPOINT, {
@@ -101,8 +103,27 @@ export async function forgetTraffic(env: Env): Promise<void> {
   await env.STATE.delete(CACHE_KEY);
 }
 
+/// The shared-dashboard link as an embed URL, or null when it is not a
+/// plausible.io share link.
+export function embedUrl(link: string | undefined): string | null {
+  if (!link) return null;
+  try {
+    const u = new URL(link.trim());
+    if (u.protocol !== "https:" || u.hostname !== "plausible.io" || !u.pathname.startsWith("/share/")) return null;
+    u.searchParams.set("embed", "true");
+    u.searchParams.set("theme", "system");
+    u.searchParams.set("background", "transparent");
+    return u.toString();
+  } catch {
+    return null;
+  }
+}
+
 export async function trafficView(env: Env): Promise<TrafficResult> {
-  if (!env.PLAUSIBLE_API_KEY) return { state: "off" };
+  if (!env.PLAUSIBLE_API_KEY) {
+    const url = embedUrl(env.PLAUSIBLE_SHARED_LINK);
+    return url ? { state: "embed", url } : { state: "off" };
+  }
   const site = env.PLAUSIBLE_SITE_ID || "septena.app";
   const cached = await env.STATE.get(CACHE_KEY);
   if (cached) {

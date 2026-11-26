@@ -4,10 +4,11 @@ import { createTestAccountStore, installWorkerTestHooks } from "./taskStoreHarne
 
 installWorkerTestHooks();
 
-// Growth on the admin page (ADR 0050).
+// Growth on the admin page (ADR 0058).
 
 const { change, cumulative, lastDays, perDay, snapshotSeries, weeklyCohorts, windowChange } = await import("../src/admin/metrics.ts");
 const { renderAdmin } = await import("../src/admin/page.ts");
+const { embedUrl } = await import("../src/admin/plausible.ts");
 
 const DAY = 86_400_000;
 const NOW = Date.UTC(2026, 10, 26, 12);
@@ -79,5 +80,13 @@ describe("admin growth", () => {
     assert.ok(on.includes("&lt;script&gt;") && !on.includes("<script>"));
     assert.match(on, /20\.00%/);
     assert.match(on, /no goal for: Download click/);
+  });
+
+  it("embeds only a plausible.io share link", () => {
+    assert.match(embedUrl("https://plausible.io/share/septena.app?auth=abc")!, /^https:\/\/plausible\.io\/share\/septena\.app\?auth=abc&embed=true/);
+    assert.equal(embedUrl("https://evil.example/share/x"), null);
+    assert.equal(embedUrl("http://plausible.io/share/x"), null);
+    assert.equal(embedUrl("https://plausible.io/septena.app"), null);
+    assert.equal(embedUrl(undefined), null);
   });
 });
