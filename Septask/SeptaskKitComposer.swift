@@ -1240,6 +1240,20 @@ final class KitPillButton: NSButton {
     setAccessibilityLabel(summary)
   }
   private let glass = KitPassthroughGlassView()
+  /// The leading symbol, drawn by our own image view ABOVE the glass, the
+  /// way `KitChipView` draws its icon. The button's own `image` stays nil:
+  /// AppKit draws it in an internal image view that it creates late and puts
+  /// under the `NSGlassEffectView`, so the glass blurred the icon into a
+  /// dark smudge in dark mode (reported again on 26.11 after 6e69c481).
+  private let iconView = KitPillIconView()
+  /// The pill's leading symbol (nil: a text-only pill).
+  fileprivate var icon: NSImage? {
+    didSet {
+      iconView.image = icon
+      iconView.isHidden = icon == nil
+      needsLayout = true
+    }
+  }
   /// Text stadiums stay 24pt (popovers, conversation options); an attribute
   /// pill is taller, inside the rail height (room for the focus ring).
   private static let textHeight: CGFloat = 24
@@ -1288,6 +1302,9 @@ final class KitPillButton: NSButton {
     glass.style = .regular
     glass.translatesAutoresizingMaskIntoConstraints = false
     addSubview(glass, positioned: .below, relativeTo: nil)
+    iconView.imageScaling = .scaleNone
+    iconView.isHidden = true
+    addSubview(iconView, positioned: .above, relativeTo: glass)
     NSLayoutConstraint.activate([
       glass.leadingAnchor.constraint(equalTo: leadingAnchor),
       glass.trailingAnchor.constraint(equalTo: trailingAnchor),
@@ -1304,8 +1321,8 @@ final class KitPillButton: NSButton {
 
   override var intrinsicContentSize: NSSize {
     let text = attributedTitle.size()
-    let icon = image.map { $0.size.width + Self.iconGap } ?? 0
-    let width = ceil(text.width + icon) + Self.horizontalPadding * 2
+    let iconWidth = icon.map { $0.size.width + Self.iconGap } ?? 0
+    let width = ceil(text.width + iconWidth) + Self.horizontalPadding * 2
     if attribute != nil {
       return NSSize(width: min(width, Self.maxAttributeWidth), height: Self.attributeHeight)
     }
@@ -1315,12 +1332,16 @@ final class KitPillButton: NSButton {
   override func layout() {
     super.layout()
     keepGlassAtBack()
+    if let size = icon?.size {
+      iconView.frame = NSRect(x: Self.horizontalPadding, y: ((bounds.height - size.height) / 2).rounded(),
+                              width: size.width, height: size.height)
+    }
     applyCapsule()
   }
 
-  /// AppKit makes the button's image view after `init` and puts it at the
-  /// back, under the glass, where the icon cannot be seen. `sortSubviews`
-  /// moves the glass without dropping its constraints.
+  /// AppKit makes the button's title view after `init` and can put it at the
+  /// back, under the glass, where it cannot be seen. `sortSubviews` moves the
+  /// glass without dropping its constraints.
   private func keepGlassAtBack() {
     guard subviews.first !== glass else { return }
     sortSubviews({ a, b, glass in
@@ -1356,9 +1377,9 @@ final class KitPillButton: NSButton {
     // unless a dynamic icon override (such as an area emoji or project ring)
     // supplies the pill's leading glyph.
     if let iconProvider {
-      image = iconProvider(contentTintColor ?? .labelColor)
+      icon = iconProvider(contentTintColor ?? .labelColor)
     } else if let attribute {
-      image = symbolImage(attribute.sfSymbol(on: isOn), ink: contentTintColor ?? .labelColor)
+      icon = symbolImage(attribute.sfSymbol(on: isOn), ink: contentTintColor ?? .labelColor)
     }
     isRestyling = false
     applyCapsule()
@@ -1411,17 +1432,24 @@ final class KitPillButton: NSButton {
   fileprivate static let iconGap: CGFloat = 4
 }
 
-/// Icon, gap, label, in the padding that `intrinsicContentSize` counts. Left
-/// to itself, AppKit draws the icon on the pill's edge, away from the label.
+/// The pill's icon view. Clicks pass through to the button.
+private final class KitPillIconView: NSImageView {
+  override func hitTest(_ point: NSPoint) -> NSView? { nil }
+}
+
+/// Icon, gap, label, in the padding that `intrinsicContentSize` counts. The
+/// icon view sits at the leading padding; the title starts after it.
 private final class KitPillButtonCell: NSButtonCell {
-  override func imageRect(forBounds rect: NSRect) -> NSRect {
-    guard let size = image?.size else { return super.imageRect(forBounds: rect) }
-    return NSRect(x: rect.minX + KitPillButton.horizontalPadding, y: rect.midY - size.height / 2,
-                  width: size.width, height: size.height)
+  override func drawTitle(_ title: NSAttributedString, withFrame frame: NSRect,
+                          in controlView: NSView) -> NSRect {
+    guard (controlView as? KitPillButton)?.icon != nil else {
+      return super.drawTitle(title, withFrame: frame, in: controlView)
+    }
+    return super.drawTitle(title, withFrame: titleRect(forBounds: controlView.bounds), in: controlView)
   }
 
   override func titleRect(forBounds rect: NSRect) -> NSRect {
-    guard let size = image?.size else { return super.titleRect(forBounds: rect) }
+    guard let size = (controlView as? KitPillButton)?.icon?.size else { return super.titleRect(forBounds: rect) }
     let x = rect.minX + KitPillButton.horizontalPadding + size.width + KitPillButton.iconGap
     let height = ceil(attributedTitle.size().height)
     return NSRect(x: x, y: rect.midY - height / 2,

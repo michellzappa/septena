@@ -846,6 +846,21 @@ final class SeptaskKitTaskListController: NSViewController {
   private var unfoldedNotes = Set<String>()
   /// The table width the notes row was last measured at.
   private var notesRowMeasuredWidth: CGFloat = 0
+  /// The width the notes cell reported it draws at, when that differs from
+  /// the table's. Cleared when the table width moves.
+  private var notesCellWidth: CGFloat?
+
+  /// The notes cell found its row too short or too tall for its text (long
+  /// notes ran under the task card, 2026-11-26). Measure again at the width
+  /// the cell draws at.
+  private func remeasureNotesRow(id: String, cellWidth: CGFloat) {
+    guard let row = rows.firstIndex(where: {
+      if case .containerNotes(_, id, _) = $0 { return true }
+      return false
+    }), row < tableView.numberOfRows else { return }
+    notesCellWidth = cellWidth
+    tableView.noteHeightOfRows(withIndexesChanged: [row])
+  }
 
   /// The notes row wraps, so its height depends on the width: re-note it when
   /// the width moves. Guarded on a real change, for the same re-entry reason
@@ -854,6 +869,7 @@ final class SeptaskKitTaskListController: NSViewController {
     let width = tableView.bounds.width
     guard abs(width - notesRowMeasuredWidth) > 0.5 else { return }
     notesRowMeasuredWidth = width
+    notesCellWidth = nil
     let indexes = IndexSet(rows.indices.filter { idx in
       guard idx < tableView.numberOfRows else { return false }
       switch rows[idx] {
@@ -1233,8 +1249,6 @@ final class SeptaskKitTaskListController: NSViewController {
       newRows = titleRows + upcomingBuckets(pool)
     case .review:
       newRows = titleRows + reviewGroupRows(pool)
-    case .agent:
-      newRows = titleRows + agentStageRows(pool)
     case .unscheduled, .starred:
       newRows = titleRows + groupedByList(pool)
     case .project, .area:
@@ -2186,7 +2200,8 @@ final class SeptaskKitTaskListController: NSViewController {
   }
 
   /// Review (docs/REVIEW_SPEC.md §1): one header per non-empty `ReviewGroup`,
-  /// in registry order. Faded is last, behind its toggle. The AppKit twin of
+  /// in registry order: what waits on the user, then agent work in progress
+  /// (ADR 0046). Faded is last, behind its toggle. The AppKit twin of
   /// `TaskListView.reviewGroupRows`.
   private func reviewGroupRows(_ pool: [SeptenaTask]) -> [Row] {
     let byGroup = Dictionary(grouping: pool) { $0.reviewGroup }
@@ -2209,27 +2224,6 @@ final class SeptaskKitTaskListController: NSViewController {
   /// A Finished work row of Review: it draws Accept and Send back.
   private func isReviewRow(_ task: SeptenaTask) -> Bool {
     filter == .review && !task.isHeading && task.conversation.needsHumanReview
-  }
-
-  /// Agent smart list (docs/TASK_FACTORY_SPEC.md §3): one header per
-  /// non-empty `AgentStage`, in registry order, then that stage's tasks. The
-  /// AppKit twin of `TaskListView.agentStageRows`.
-  private func agentStageRows(_ pool: [SeptenaTask]) -> [Row] {
-    // A claim lease is backend wall-clock time, not the app's day.
-    let now = Date()
-    let byStage = Dictionary(grouping: pool.filter { !$0.isHeading }) {
-      $0.conversation.agentStage(at: now) ?? .queued
-    }
-    var result: [Row] = []
-    for stage in AgentStage.allCases {
-      guard let tasks = byStage[stage], !tasks.isEmpty else { continue }
-      result.append(.header(id: "agent-\(stage.rawValue)",
-                            title: stage.group?.title ?? stage.rawValue,
-                            icon: .symbol(stage.group?.sfSymbol ?? "circle"),
-                            count: tasks.count))
-      result += tasks.map(chipped)
-    }
-    return result
   }
 
   /// The grouped open list — reference implementation is TaskListView's
@@ -2269,9 +2263,6 @@ final class SeptaskKitTaskListController: NSViewController {
     case .review:
       return .screenTitle(title: TaskFilter.review.title,
                           icon: .symbol("eye"))
-    case .agent:
-      return .screenTitle(title: TaskFilter.agent.title,
-                          icon: .symbol(Route.filter(.agent).icon))
     case .upcoming:
       return .screenTitle(title: TaskFilter.upcoming.title,
                           icon: .symbol("calendar"))
@@ -3968,7 +3959,7 @@ final class SeptaskKitTaskListController: NSViewController {
     // Repeating lists the templates that already carry a recurrence rule;
     // a plain new task can't join it, so ⌘N stays off there — same as the
     // two read-only lists.
-    case .review, .agent, .repeating, .logbook, .faded, .recentlyDeleted: return nil
+    case .review, .repeating, .logbook, .faded, .recentlyDeleted: return nil
     }
     return (area, project, today, scheduled)
   }
@@ -5344,7 +5335,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       return KitContainerNotes.height(
         text: text,
         placeholder: isArea ? ContainerNotes.areaPlaceholder : ContainerNotes.projectPlaceholder,
-        rowWidth: tableView.bounds.width,
+        rowWidth: notesCellWidth ?? tableView.bounds.width,
         expanded: unfoldedNotes.contains(id))
     // Reminder rows read as task rows (they become tasks on click); their
     // header sits on the page like every other group header.
@@ -5483,7 +5474,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
   /// don't reorder.
   private var allowsReorder: Bool {
     switch filter {
-    case .review, .agent, .logbook, .faded, .recentlyDeleted: return false
+    case .review, .logbook, .faded, .recentlyDeleted: return false
     default: return true
     }
   }
@@ -6019,6 +6010,9 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       }
       cell.onHistory = { [weak self] in
         self?.showContainerNotesHistory(isArea: isArea, id: id)
+      }
+      cell.onHeightMismatch = { [weak self] width in
+        self?.remeasureNotesRow(id: id, cellWidth: width)
       }
       return cell
 

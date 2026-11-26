@@ -659,10 +659,10 @@ struct SidebarRootView: View {
 
   private var nonEmptySmartListIDs: Set<RegistryDestinationID> {
     var ids = Set<RegistryDestinationID>()
-    // Review and Agent also stay while selected, so accepting the last item
-    // does not pull the row out from under the user.
-    if reviewCount + fadedCount > 0 || isSelected(.filter(.review)) { ids.insert(.review) }
-    if agentCount > 0 || isSelected(.filter(.agent)) { ids.insert(.agent) }
+    // Review also stays while selected, so accepting the last item does not
+    // pull the row out from under the user. Agent work in progress is a
+    // Review group (ADR 0046).
+    if reviewCount + agentCount + fadedCount > 0 || isSelected(.filter(.review)) { ids.insert(.review) }
     if starredCount > 0 { ids.insert(.starred) }
     return ids
   }
@@ -715,7 +715,6 @@ struct SidebarRootView: View {
     // on Today, so the user-facing count is the sum.
     case .filter(.today):           return counts.map { $0.todayCount + $0.reviewCount }
     case .filter(.review):          return reviewCount > 0 ? reviewCount : nil
-    case .filter(.agent):           return agentCount > 0 ? agentCount : nil
     case .filter(.upcoming):        return counts?.upcomingCount
     case .filter(.repeating):       return repeatingCount
     case .filter(.unscheduled):     return counts?.unscheduledCount
@@ -1414,8 +1413,10 @@ struct SidebarRootView: View {
       if t.recurrenceUnit != nil, t.recurrence != nil { repeating += 1 }
       if t.conversationJSON != nil {
         let convo = t.conversation
-        if convo.reviewGroup != nil { review += 1 }
-        if convo.agentStage(at: now) != nil { agent += 1 }
+        // Review shows both; only what waits on the user counts in its badge.
+        if let group = convo.reviewGroup(at: now) {
+          if group.countsInBadge { review += 1 } else { agent += 1 }
+        }
       }
       if t.isInInbox { inbox += 1 }
       // The triage band (unratified) sits above Today and is excluded from it.

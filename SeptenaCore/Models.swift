@@ -159,7 +159,7 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
   /// The one Review group an open task shows in, or nil.
   var reviewGroup: ReviewGroup? {
     guard status == .open, deletedAt == nil, !isHeading else { return nil }
-    return conversation.reviewGroup ?? (isFaded ? .faded : nil)
+    return conversation.reviewGroup() ?? (isFaded ? .faded : nil)
   }
 
   /// Countdown progress (0…1) toward the 14-day fade window (`TaskFade.fadeFill`).
@@ -1090,11 +1090,10 @@ enum TaskFilter: Equatable, Hashable {
   /// This is the only home for loose captures; the standalone Inbox page was
   /// retired when the triage band absorbed it.
   case triage
-  /// Everything that waits on the user, grouped by `ReviewGroup` (docs/REVIEW_SPEC.md).
+  /// Everything about your agent and what waits on you, grouped by
+  /// `ReviewGroup` (docs/REVIEW_SPEC.md). Agent work in progress is a group
+  /// here, not its own list (ADR 0046).
   case review
-  /// Agent work in progress, grouped by `AgentStage`
-  /// (docs/TASK_FACTORY_SPEC.md §3).
-  case agent
   case upcoming
   case repeating
   case unscheduled
@@ -1112,7 +1111,6 @@ enum TaskFilter: Equatable, Hashable {
     case .today: return "today"
     case .triage: return "triage"
     case .review: return "all"
-    case .agent: return "all"
     case .upcoming: return "upcoming"
     case .repeating: return "all"
     case .unscheduled: return "unscheduled"
@@ -1131,7 +1129,6 @@ enum TaskFilter: Equatable, Hashable {
     case .today: return "today"
     case .triage: return "triage"
     case .review: return "review"
-    case .agent: return "agent"
     case .upcoming: return "upcoming"
     case .repeating: return "repeating"
     case .unscheduled: return "unscheduled"
@@ -1150,7 +1147,6 @@ enum TaskFilter: Equatable, Hashable {
     switch self {
     case .today: return .today
     case .review: return .review
-    case .agent: return .agent
     case .upcoming: return .upcoming
     case .repeating: return .repeating
     case .unscheduled: return .anytime
@@ -1167,7 +1163,7 @@ enum TaskFilter: Equatable, Hashable {
     switch destinationID {
     case .today: self = .today
     case .review: self = .review
-    case .agent: self = .agent
+    case .agent: self = .review // its Working, Queued and Stopped groups (ADR 0046)
     case .upcoming: self = .upcoming
     case .repeating: self = .repeating
     case .anytime: self = .unscheduled

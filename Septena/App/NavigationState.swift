@@ -92,7 +92,6 @@ enum TaskDestinations {
   static func nonEmptySmartListIDs(in context: ModelContext) -> Set<RegistryDestinationID> {
     var nonEmpty = Set<RegistryDestinationID>()
     if !LocalCache.tasks(in: context, filter: .review).isEmpty { nonEmpty.insert(.review) }
-    if !LocalCache.tasks(in: context, filter: .agent).isEmpty { nonEmpty.insert(.agent) }
     if !LocalCache.tasks(in: context, filter: .starred).isEmpty { nonEmpty.insert(.starred) }
     return nonEmpty
   }

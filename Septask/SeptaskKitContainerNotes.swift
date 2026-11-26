@@ -181,10 +181,19 @@ final class KitContainerNotesCell: NSTableCellView {
   var onEdit: ((NSView) -> Void)?
   /// Opens the notes history sheet (available when signed in to the backend).
   var onHistory: (() -> Void)?
+  /// The row is not as tall as the notes need at this cell's width. Passes
+  /// the width, so the list measures the row at the width the cell draws.
+  var onHeightMismatch: ((CGFloat) -> Void)?
+  /// The last (width, height) reported, so a mismatch reports once.
+  private var reportedMismatch: NSSize?
 
   init(identifier: NSUserInterfaceItemIdentifier) {
     super.init(frame: .zero)
     self.identifier = identifier
+    // Long notes never draw past the row into the task card below it. If the
+    // row is ever shorter than the text, the text is cut here and
+    // `layout()` asks the list for the right height.
+    clipsToBounds = true
 
     label.translatesAutoresizingMaskIntoConstraints = false
     KitContainerNotes.style(label)
@@ -262,6 +271,26 @@ final class KitContainerNotesCell: NSTableCellView {
     hitPin.update(width: bounds.width)
     toggle.isHidden = !hasToggle
     super.layout()
+    reportHeightMismatch()
+  }
+
+  /// Notes that unfold, sync in or rewrap must never sit under the next row.
+  /// The list measures the row ahead of layout; when that height is not the
+  /// one the text needs at this cell's real width, the cell says so once.
+  private func reportHeightMismatch() {
+    guard bounds.width > 1, onHeightMismatch != nil else { return }
+    let needed = KitContainerNotes.height(text: text, placeholder: placeholder,
+                                          rowWidth: bounds.width, expanded: expanded)
+    guard abs(needed - bounds.height) > 1 else {
+      reportedMismatch = nil
+      return
+    }
+    let key = NSSize(width: bounds.width, height: bounds.height)
+    guard reportedMismatch != key else { return }
+    reportedMismatch = key
+    let width = bounds.width
+    // Not inside this layout pass: the list re-notes row heights.
+    DispatchQueue.main.async { [weak self] in self?.onHeightMismatch?(width) }
   }
 
   private var hasToggle: Bool {

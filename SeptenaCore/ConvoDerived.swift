@@ -87,24 +87,29 @@ extension TaskConvo {
   }
 }
 
-/// The stages the Agent smart list groups by: work in progress
-/// (docs/TASK_FACTORY_SPEC.md §3). Derived, never stored. Raw values are the
-/// group ids of the `agent` destination in `registry/destinations.json`, which
-/// owns titles and icons. The core's `yourTurn` and `review` stages wait on
-/// the user: they are Review groups, not Agent groups.
+/// The stages of agent work in progress (docs/TASK_FACTORY_SPEC.md §3).
+/// Derived, never stored. Raw values are the core's stage ids; `working`,
+/// `queued` and `stopped` are also group ids of the `review` destination in
+/// `registry/destinations.json`. The core's `yourTurn` and `review` stages
+/// wait on the user: they are the Questions and Finished work groups.
 enum AgentStage: String, CaseIterable, Sendable {
   case working, queued, stopped, done
 
-  /// Registry title + symbol for this stage's section header.
-  var group: RegistryDestinationGroup? {
-    RegistryDestinations.groups[.agent]?.first { $0.id == rawValue }
+  /// The Review group that shows this stage, or nil for `done` (the Logbook
+  /// holds finished agent work).
+  var reviewGroup: ReviewGroup? {
+    switch self {
+    case .working: return .working
+    case .queued: return .queued
+    case .stopped: return .stopped
+    case .done: return nil
+    }
   }
 }
 
 extension TaskConvo {
-  /// The Agent-list stage of this conversation, or nil when the task is not
-  /// agent work in progress: nobody works on it, or it waits on the user and
-  /// is in Review.
+  /// The agent stage of this conversation, or nil when the task is not
+  /// agent work in progress: nobody works on it, or it waits on the user.
   func agentStage(at now: Date) -> AgentStage? {
     coreState(at: now)?.agentStage.flatMap(AgentStage.init(rawValue:))
   }
@@ -113,9 +118,10 @@ extension TaskConvo {
 
 /// The groups of the Review list (docs/REVIEW_SPEC.md §1), in order. Raw
 /// values are the group ids of the `review` destination in
-/// `registry/destinations.json`, which owns titles and icons.
+/// `registry/destinations.json`, which owns titles and icons. Review holds
+/// everything about your agent and what waits on you (ADR 0046).
 enum ReviewGroup: String, CaseIterable, Sendable {
-  case questions, finished, faded
+  case questions, finished, working, queued, stopped, faded
 
   /// Device-local: whether the Faded group is open. It starts closed.
   static let fadedExpandedKey = "septena.tasks.reviewFadedExpanded"
@@ -124,13 +130,21 @@ enum ReviewGroup: String, CaseIterable, Sendable {
   var group: RegistryDestinationGroup? {
     RegistryDestinations.groups[.review]?.first { $0.id == rawValue }
   }
+
+  /// True for the groups that wait on the user. Only they count in the
+  /// Review badge; agent work in progress and Faded do not.
+  var countsInBadge: Bool { self == .questions || self == .finished }
 }
 
 extension TaskConvo {
   /// The Review group this conversation puts an open task in: a question or
-  /// finished work waits on the user.
-  var reviewGroup: ReviewGroup? {
-    coreState()?.reviewGroup.flatMap(ReviewGroup.init(rawValue:))
+  /// finished work waits on the user, and agent work in progress shows by
+  /// its stage. A claim lease is backend wall-clock time, so this reads the
+  /// real clock (as `deriveConvo` does).
+  func reviewGroup(at now: Date = Date()) -> ReviewGroup? {
+    guard let state = coreState(at: now) else { return nil }
+    if let id = state.reviewGroup, let group = ReviewGroup(rawValue: id) { return group }
+    return state.agentStage.flatMap(AgentStage.init(rawValue:))?.reviewGroup
   }
 }
 
