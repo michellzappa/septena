@@ -17,6 +17,7 @@ class TaskMutator(
     private val ids: TaskIdGenerator,
     /** Ends the open Do of a task that this mutator closes. Null in hosts without Do. */
     private val doSessions: DoSessionMutator? = null,
+    private val sourceClient: String = "Septena Android",
 ) {
     suspend fun create(
         title: String,
@@ -86,6 +87,7 @@ class TaskMutator(
             todaySetOn = if (today) todayString else null,
             notes = notes,
             source = source,
+            sourceClient = sourceClient,
             kind = kind,
             heading = heading,
             position = position,

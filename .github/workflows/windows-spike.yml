@@ -1,0 +1,57 @@
+name: Windows spike
+
+on:
+  push:
+    branches: ["wt/windows-spike"]
+    paths:
+      - "windows/**"
+      - "android/core/**"
+      - "android/store/**"
+      - "android/gradle/**"
+      - "android/gradlew*"
+      - "core/release/release.json"
+      - ".github/workflows/windows-spike.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-spike-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows-x64:
+    name: Windows x64 spike
+    runs-on: windows-2025
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          architecture: x64
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Run the core, store and offline sync checks
+        run: android\gradlew.bat -p windows --no-daemon :core:test :store:test smokeTest
+
+      - name: Build the self-contained desktop image
+        run: android\gradlew.bat -p windows --no-daemon createDistributable
+
+      - name: Record the source and bundle the image
+        run: |
+          $image = "windows/build/compose/binaries/main/app/SeptenaSpike"
+          if (!(Test-Path "$image/SeptenaSpike.exe")) { throw "Desktop launcher missing" }
+          if (!(Test-Path "$image/runtime/bin/java.dll")) { throw "Bundled Java runtime missing" }
+          git rev-parse HEAD | Set-Content -Encoding ascii "$image/source-commit.txt"
+          "Fixture-only Windows x64 build. Extract the whole artifact, then open SeptenaSpike.exe." |
+            Set-Content -Encoding ascii "$image/README.txt"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: septena-windows-spike-x64
+          path: windows/build/compose/binaries/main/app/SeptenaSpike
+          if-no-files-found: error
+          retention-days: 14
