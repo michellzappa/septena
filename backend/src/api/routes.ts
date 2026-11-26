@@ -1,6 +1,7 @@
 import { Hono, type Context, type Next } from "hono";
 import { z } from "zod";
 import type { Env } from "../env.js";
+import { support } from "../support/routes.js";
 import { logEvent, randomId, sha256Base64Url } from "../util.js";
 import { buildIcalFeed, icalEtag, type IcalScope } from "../ical.js";
 import { isValidTz, todayYMD } from "../tz.js";
@@ -124,6 +125,8 @@ export const api = new Hono<{ Bindings: Env; Variables: Vars }>();
 
 // CORS for browser clients (docs/WEB_CLIENT_SPEC.md §5).
 api.use("*", webCorsMiddleware);
+// Contact Support (ADR 0054): its own sender rules, signed in or not.
+api.route("/support", support);
 // The one error envelope, for a caller that asks for it (src/errors.ts).
 api.use("*", async (c, next) => {
   await next();

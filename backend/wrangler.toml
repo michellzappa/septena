@@ -120,6 +120,16 @@ class_name = "ProjectStore"
 tag = "v4-project-store"
 new_sqlite_classes = ["ProjectStore"]
 
+# Contact Support (ADR 0054, src/support/): one object holds every support
+# conversation and queues messages until Starlings takes them.
+[[durable_objects.bindings]]
+name = "SUPPORT_STORE"
+class_name = "SupportStore"
+
+[[migrations]]
+tag = "v5-support-store"
+new_sqlite_classes = ["SupportStore"]
+
 # Sign-in code mail through Cloudflare Email Service (septena.app is onboarded:
 # `wrangler email sending list`).
 [[send_email]]
@@ -135,6 +145,9 @@ bucket_name = "septena-attachments"
 #                   task backend's access tokens.
 # ADMIN_TOKEN     — optional, 32-byte base64. Enables POST/DELETE
 #                   /v1/admin/grants (entitlement grant rows). Unset = 404.
+# APP_INTAKE_KEY  — 64 hex; signs the Starlings app channel both ways (ADR 0054).
+#                   The same value is SEPTENA_APP_INTAKE_KEY in the Starlings
+#                   Secrets Store and in mz's keychain (septena-starlings-app-intake).
 # APNS_KEY        — optional, contents of Apple Push Notifications .p8 key file.
 # APNS_KEY_ID     — optional, 10-character APNs Key ID from Apple Developer.
 # APNS_TEAM_ID    — optional, 10-character Apple Developer Team ID.
