@@ -5,7 +5,7 @@ description: Use the Septena tasks MCP at api.septena.app to read and write the 
 
 # Septena tasks MCP
 
-The connector at `https://api.septena.app/mcp` exposes the user's tasks, areas, projects and task conversations, the same data the Septena app shows. The user pairs it from the Septena app. Changes reach the app within seconds.
+The connector at `https://api.septena.app/mcp` exposes the user's tasks, areas, projects and task conversations, the same data the Septena app shows. The user pairs it from the Septena app. An agent that cannot sign in (a script, cron, n8n) uses an agent key the user creates in the app: send it as `Authorization: Bearer sk1.…`. Changes reach the app within seconds.
 
 ## Conventions
 
