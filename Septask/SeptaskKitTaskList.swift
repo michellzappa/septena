@@ -1947,7 +1947,7 @@ final class SeptaskKitTaskListController: NSViewController {
   private func showRemindersImported(ids: [String]) {
     guard !ids.isEmpty else { return }
     let ticket = TaskUndoTicket()
-    showToast(RegistryToasts.importedReminders(count: ids.count)) { [weak self, mutator] in
+    toastStore.show(RegistryToasts.importedReminders(count: ids.count)) { [weak self, mutator] in
       ticket.undo { for id in ids { mutator.delete(id: id) } }
       self?.reload()
     }
