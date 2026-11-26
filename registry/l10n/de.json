@@ -808,5 +808,13 @@
   "{count} reminders moved to the Inbox": {
     "one": "Erinnerung in den Eingang verschoben",
     "other": "{count} Erinnerungen in den Eingang verschoben"
-  }
+  },
+  "Replace the tasks on this device?": "Aufgaben auf diesem Gerät ersetzen?",
+  "You signed in with a different account. The tasks on this device belong to the account you used before. They are removed from this device, and this account’s tasks take their place.": "Du hast dich mit einem anderen Konto angemeldet. Die Aufgaben auf diesem Gerät gehören zu dem Konto, das du vorher benutzt hast. Sie werden von diesem Gerät entfernt, und die Aufgaben dieses Kontos treten an ihre Stelle.",
+  "1 task is on this device.": "1 Aufgabe ist auf diesem Gerät.",
+  "{count} tasks are on this device.": "{count} Aufgaben sind auf diesem Gerät.",
+  "1 change was not sent yet and will be lost.": "1 Änderung wurde noch nicht gesendet und geht verloren.",
+  "{count} changes were not sent yet and will be lost.": "{count} Änderungen wurden noch nicht gesendet und gehen verloren.",
+  "Export a Backup First": "Zuerst ein Backup exportieren",
+  "Replace": "Ersetzen"
 }

@@ -2171,6 +2171,19 @@ enum RegistryDeviceSignIn {
   static let retry: String = RegistryL10n.t("Get a new code")
 }
 
+/// The question before a sign-in replaces another account's tasks (`registry/surfaces.json` `accountSwitch`).
+enum RegistryAccountSwitch {
+  static let title: String = RegistryL10n.t("Replace the tasks on this device?")
+  static let body: String = RegistryL10n.t("You signed in with a different account. The tasks on this device belong to the account you used before. They are removed from this device, and this account’s tasks take their place.")
+  static let tasksOne: String = RegistryL10n.t("1 task is on this device.")
+  static let tasksOther: String = RegistryL10n.t("{count} tasks are on this device.")
+  static let unsentOne: String = RegistryL10n.t("1 change was not sent yet and will be lost.")
+  static let unsentOther: String = RegistryL10n.t("{count} changes were not sent yet and will be lost.")
+  static let export: String = RegistryL10n.t("Export a Backup First")
+  static let replace: String = RegistryL10n.t("Replace")
+  static let cancel: String = RegistryL10n.t("Cancel")
+}
+
 /// Canonical first-run step IDs (`registry/surfaces.json` `firstRun.steps`).
 enum RegistryFirstRunStepID: String, CaseIterable, Hashable, Sendable {
   case welcome = "welcome"

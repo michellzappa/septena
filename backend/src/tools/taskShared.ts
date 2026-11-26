@@ -62,8 +62,7 @@ export interface TaskOut {
   checklistDoneCount?: number;
   // Derived on output by `annotate` (absent = false / 0):
   // `inbox` = the row sits in Today's Inbox section in the app.
-  // `daysOnToday` = days the row has carried over on Today undone; the app
-  // darkens the checkbox one seventh per day (SeptenaCore todayTenureFill).
+  // `daysOnToday` = days the row has carried over on Today undone.
   inbox?: true;
   daysOnToday?: number;
   reviewNote?: string;

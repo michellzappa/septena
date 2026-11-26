@@ -42,6 +42,8 @@ struct SeptaskApp: App {
     // first, so `launch.localStoreOpen` lands before this milestone.
     LaunchTrace.milestone("launch.appInit")
     SeptaskLaunchMetrics.shared.start()
+    // Before any sign-in can run: another account's sign-in asks first (#575).
+    SeptaskAccountSwitchPrompt.install()
   }
 
   var body: some Scene {

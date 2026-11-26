@@ -67,7 +67,7 @@ import type {
 } from "@/lib/types";
 import { HeaderWashPreview } from "./HeaderWash";
 
-type SettingsTab =
+export type SettingsTab =
   | "account"
   | "general"
   | "ai_agents"
@@ -93,6 +93,8 @@ interface SettingsModalProps {
   onDeleteAccount: () => Promise<void>;
   onShowWelcomeAgain: () => void;
   onOpenShortcuts: () => void;
+  /** The tab to show when the modal opens. Without it, the last tab stays. */
+  initialTab?: SettingsTab;
 }
 
 const TABS: Array<{ id: SettingsTab; title: string; icon: typeof UserCircle }> = [
@@ -164,6 +166,7 @@ export function SettingsModal({
   onDeleteAccount,
   onShowWelcomeAgain,
   onOpenShortcuts,
+  initialTab,
 }: SettingsModalProps) {
   const [tab, setTab] = useState<SettingsTab>("general");
   const [access, setAccess] = useState<AccessSummary | null>(null);
@@ -200,6 +203,10 @@ export function SettingsModal({
     if (typeof window === "undefined" || !("Notification" in window)) return "unsupported";
     return Notification.permission;
   });
+
+  useEffect(() => {
+    if (open && initialTab) setTab(initialTab);
+  }, [initialTab, open]);
 
   useEffect(() => {
     if (open) {

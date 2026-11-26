@@ -1865,6 +1865,15 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("}");
   lines.push("");
 
+  // 8a'. Signing in with another account (surfaces.json `accountSwitch`, #575)
+  const accountSwitch = surfaces.accountSwitch;
+  lines.push("/// The question before a sign-in replaces another account's tasks (`registry/surfaces.json` `accountSwitch`).");
+  lines.push("enum RegistryAccountSwitch {");
+  lines.push(`  static let title: String = ${L(accountSwitch.title, accountSwitch, "title")}`);
+  for (const e of accountSwitch.copy) lines.push(`  static let ${e.id}: String = ${L(e.label, e, "label")}`);
+  lines.push("}");
+  lines.push("");
+
   // 8b. First run (surfaces.json `firstRun`)
   const fr = surfaces.firstRun;
   emitIdEnum("RegistryFirstRunStepID", "Canonical first-run step IDs (`registry/surfaces.json` `firstRun.steps`).", fr.steps.map((s) => s.id));
@@ -2143,7 +2152,7 @@ function generateTS({ entities, rules, icons, tokens, caps, settings, dests, act
   lines.push(`export const DESIGN_TOKENS = ${JSON.stringify({ accentPolicy: tokens.accentPolicy, fruitAccents: tokens.fruitAccents ?? [], textures: tokens.textures ?? [], selection: tokens.selection, colors: tokens.colors, multicolorGlyphs: tokens.multicolorGlyphs?.glyphs ?? {}, accentPalette: tokens.accentPalette, radii: tokens.radii, spacing: tokens.spacing, desktopColumn: tokens.desktopColumn, textScale: tokens.textScale })} as const;`);
   lines.push(`export const CAPABILITIES = ${JSON.stringify(caps.capabilities)} as const;`);
   lines.push(`export const ACTIONS_CATALOG = ${JSON.stringify({ actions: actions.actions, contextMenus: actions.contextMenus, menuBar: actions.menuBar, shortcutsSheet: actions.shortcutsSheet })} as const;`);
-  lines.push(`export const SURFACES_CATALOG = ${JSON.stringify({ notices: surfaces.notices, prompts: surfaces.prompts, toasts: surfaces.toasts, taskAttributes: surfaces.taskAttributes, taskDateBoard: surfaces.taskDateBoard, taskPage: surfaces.taskPage })} as const;`);
+  lines.push(`export const SURFACES_CATALOG = ${JSON.stringify({ notices: surfaces.notices, prompts: surfaces.prompts, toasts: surfaces.toasts, taskAttributes: surfaces.taskAttributes, taskDateBoard: surfaces.taskDateBoard, taskPage: surfaces.taskPage, accountSwitch: surfaces.accountSwitch })} as const;`);
   lines.push(`export const FIRST_RUN = ${JSON.stringify(surfaces.firstRun)} as const;`);
   lines.push("/** Plan limits (registry/plans.json). The server's plan table: every gate reads these, never a plan name. */");
   lines.push(`export const PLAN_LIMITS = ${JSON.stringify(plans.limits)} as const;`);
