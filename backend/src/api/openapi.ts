@@ -23,6 +23,9 @@ import {
 } from "../shadow/oauth.js";
 import { zAgentSignupPollBody, zAgentSignupStartBody } from "../shadow/agentSignup.js";
 import { zEmailStartBody, zEmailVerifyBody } from "./emailSignIn.js";
+import { zLinkCompleteBody, zLinkEmailVerifyBody } from "./authLink.js";
+import { zGoogleNativeBody, zOidcLinkStartBody, zOidcRedeemBody } from "./oidc.js";
+import { SUPPORT_KEY_HEADER, zSupportMessageBody } from "../support/routes.js";
 import {
   zAgentEventsQuery,
   zAppleBody,
@@ -64,7 +67,8 @@ type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 /// - `appOrAgent`: an app session or an MCP access token with `tasks:read`.
 /// - `uploadToken`: the one-use token from the `tasks_attachment_add` tool.
 /// - `feedToken`: the secret in the path is the credential.
-type Auth = "none" | "app" | "appOrAgent" | "uploadToken" | "feedToken";
+/// - `appOrSupportKey`: an app session, or the install's support key header.
+type Auth = "none" | "app" | "appOrAgent" | "uploadToken" | "feedToken" | "appOrSupportKey";
 
 interface RouteDoc {
   method: Method;
@@ -92,6 +96,7 @@ const TAGS = {
   auth: "Sign-in and sessions.",
   sync: "The sync protocol of the apps (ADR 0002).",
   account: "Devices, connections, agent keys, the plan and the account.",
+  support: "Contact Support: messages to the Septena team and their replies.",
   shares: "Shared projects.",
   calendar: "The calendar feed.",
 } as const;
@@ -131,6 +136,16 @@ export const ROUTES: RouteDoc[] = [
   { method: "POST", path: "/auth/device/start", tag: "auth", auth: "none", summary: "Start a device sign-in that a signed-in app approves.", body: zDeviceStartBody, ok: { 200: "The code to show and the poll secret." } },
   { method: "POST", path: "/auth/device/poll", tag: "auth", auth: "none", summary: "Poll a device sign-in.", body: zDevicePollBody, ok: { 200: "Approved: a session.", 202: "Still pending." } },
   { method: "POST", path: "/auth/device", tag: "auth", auth: "app", summary: "Make a separate session for a companion device.", ok: { 200: "A session." } },
+  { method: "POST", path: "/auth/google/native", tag: "auth", auth: "none", summary: "Sign in with a Google identity token from the device's own account picker.", body: zGoogleNativeBody, ok: { 200: "A session." } },
+  { method: "POST", path: "/auth/oidc/redeem", tag: "auth", auth: "none", summary: "Swap the one-use code from a web sign-in redirect for a session.", body: zOidcRedeemBody, ok: { 200: "A session." } },
+  { method: "POST", path: "/auth/link/complete", tag: "auth", auth: "none", summary: "Finish adding a sign-in method to an existing account with the emailed code.", body: zLinkCompleteBody, ok: { 200: "A session." } },
+  { method: "GET", path: "/auth/identities", tag: "auth", auth: "app", summary: "The sign-in methods on the account.", ok: { 200: "The methods." } },
+  { method: "DELETE", path: "/auth/identities/:id", tag: "auth", auth: "app", summary: "Remove a sign-in method.", params: { id: z.string() }, ok: { 204: "Removed." } },
+  { method: "POST", path: "/auth/link/email/start", tag: "auth", auth: "app", summary: "Send a code to add an email sign-in.", body: zEmailStartBody, ok: { 202: "The code is sent." } },
+  { method: "POST", path: "/auth/link/email/verify", tag: "auth", auth: "app", summary: "Add an email sign-in with the emailed code.", body: zLinkEmailVerifyBody, ok: { 200: "Added." } },
+  { method: "POST", path: "/auth/link/apple", tag: "auth", auth: "app", summary: "Add Sign in with Apple to the account.", body: zAppleBody, ok: { 200: "Added." } },
+  { method: "POST", path: "/auth/link/google/native", tag: "auth", auth: "app", summary: "Add a Google sign-in from the device's own account picker.", body: zGoogleNativeBody, ok: { 200: "Added." } },
+  { method: "POST", path: "/auth/link/oidc/start", tag: "auth", auth: "app", summary: "Start adding a web sign-in provider. The answer names the address to open.", body: zOidcLinkStartBody, ok: { 200: "The address to open." } },
   { method: "POST", path: "/auth/refresh", tag: "auth", auth: "none", summary: "Swap a refresh token (body or web cookie) for a new session.", body: zRefreshBody.optional(), ok: { 200: "A session." } },
   { method: "POST", path: "/auth/signout", tag: "auth", auth: "none", summary: "Revoke a refresh token (body or web cookie).", body: zRefreshBody.optional(), ok: { 204: "Signed out." } },
   { method: "POST", path: "/pair/inspect", tag: "auth", auth: "app", summary: "Read what a sign-in code is for (a device or an agent connector) before approving it.", body: zPairInspectBody, ok: { 200: "The kind and the client." } },
@@ -160,6 +175,11 @@ export const ROUTES: RouteDoc[] = [
   { method: "POST", path: "/entitlement/apple", tag: "account", auth: "app", summary: "Record a signed App Store transaction.", body: zEntitlementAppleBody, ok: { 200: "The entitlement it gives." } },
   { method: "DELETE", path: "/account", tag: "account", auth: "app", summary: "Delete the account and everything in it.", ok: { 204: "Deleted." } },
 
+  // ---- support ----
+  { method: "POST", path: "/support/messages", tag: "support", auth: "appOrSupportKey", summary: "Send a message to Support. The client makes `message_id`, so a retry sends nothing twice.", body: zSupportMessageBody, ok: { 202: "Received." } },
+  { method: "GET", path: "/support/messages", tag: "support", auth: "appOrSupportKey", summary: "The conversation with Support.", ok: { 200: "The messages and replies." } },
+  { method: "POST", path: "/support/read", tag: "support", auth: "appOrSupportKey", summary: "Mark the replies as read.", ok: { 204: "Marked." } },
+
   // ---- shares ----
   { method: "GET", path: "/shares", tag: "shares", auth: "app", summary: "The shared projects the account owns or joined.", ok: { 200: "The shares." } },
   { method: "POST", path: "/shares", tag: "shares", auth: "app", summary: "Share a project.", body: zShareCreateBody, ok: { 201: "The share." } },
@@ -181,6 +201,10 @@ export const ROUTES: RouteDoc[] = [
 /// /v1 routes that are not part of the contract, and why.
 export const INTERNAL_ROUTES: Array<{ method: Method; path: string; why: string }> = [
   { method: "POST", path: "/webhooks/apple", why: "Called by the App Store only." },
+  { method: "POST", path: "/support/replies", why: "Called by the support workspace only (signed)." },
+  { method: "GET", path: "/auth/oidc/:provider/start", why: "A browser redirect in the web sign-in flow, not an API call." },
+  { method: "GET", path: "/auth/oidc/:provider/callback", why: "The provider's redirect back, not an API call." },
+  { method: "POST", path: "/auth/oidc/:provider/callback", why: "The provider's form post back, not an API call." },
   { method: "POST", path: "/admin/grants", why: "Operator only (X-Admin-Token)." },
   { method: "DELETE", path: "/admin/grants/:userId/:name", why: "Operator only." },
   { method: "POST", path: "/admin/reviewer/prepare", why: "Operator only." },
@@ -198,6 +222,7 @@ const SECURITY: Record<Auth, Array<Record<string, string[]>>> = {
   appOrAgent: [{ appSession: [] }, { agentToken: [] }],
   uploadToken: [{ uploadToken: [] }],
   feedToken: [],
+  appOrSupportKey: [{ appSession: [] }, { supportKey: [] }],
 };
 
 function openApiPath(path: string): string {
@@ -308,6 +333,7 @@ export function buildOpenApi(): JsonSchema {
         appSession: { type: "http", scheme: "bearer", description: "An app session access token (`sa1.…`) from a sign-in route or /v1/auth/refresh." },
         agentToken: { type: "http", scheme: "bearer", description: "An MCP access token (`sm2.…`) from OAuth, an agent key or an agent sign-up." },
         uploadToken: { type: "http", scheme: "bearer", description: "The one-use upload token from the tasks_attachment_add tool." },
+        supportKey: { type: "apiKey", in: "header", name: SUPPORT_KEY_HEADER, description: "A random key the app makes once per install, for Support before sign-in." },
       },
       parameters: {
         IdempotencyKey: {
