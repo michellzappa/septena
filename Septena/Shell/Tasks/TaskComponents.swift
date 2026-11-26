@@ -517,10 +517,11 @@ struct TaskCheckboxModel {
     let isDeleted = task.deletedAt != nil
     isToday = task.isOnToday && showsTodayIndicator && !isDeleted && !task.isFaded
     dashed = TaskRowFlags.languageV2 && isProposal
-    // Accent corner dot for a committed task carrying unread agent context.
-    // Proposals are excluded (they already read as dashed).
+    // Accent corner dot for an open, committed task with an active or finished
+    // conversation (agent work or Discuss). Proposals read as dashed instead,
+    // and completed/cancelled or stopped tasks hide the dot.
     cornerDot = {
-      guard TaskRowFlags.languageV2, !isProposal else { return nil }
+      guard TaskRowFlags.languageV2, task.status == .open, !isProposal else { return nil }
       if task.conversation.hasStarted, deriveConvo(task.conversation).badge != nil { return accent }
       return nil
     }()

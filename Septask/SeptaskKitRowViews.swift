@@ -276,14 +276,15 @@ private final class KitCheckboxCueOverlay: NSView {
       ring.stroke()
     }
 
-    // Unread-context dot, haloed so it reads on any row background.
+    // Conversation corner dot in the app's active accent color, haloed so it
+    // reads cleanly on any row background (matches iOS TaskCheckbox and Web).
     if cornerDot {
       let center = NSPoint(x: box.maxX + 1, y: box.minY - 1)
       let halo = NSRect(x: center.x - 3.4, y: center.y - 3.4, width: 6.8, height: 6.8)
       SeptaskKitTheme.cardSurface.setFill()
       NSBezierPath(ovalIn: halo).fill()
       let dot = NSRect(x: center.x - 2.1, y: center.y - 2.1, width: 4.2, height: 4.2)
-      SeptaskKitTheme.todayAccent.setFill()
+      SeptaskKitTheme.checkboxFill.setFill()
       NSBezierPath(ovalIn: dot).fill()
     }
   }
