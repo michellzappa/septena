@@ -80,6 +80,16 @@ export interface Env {
   PROJECT_STORE?: DurableObjectNamespace<ProjectStore>;
   /// Website signups (septena-site). The admin page reads it; nothing here writes.
   SIGNUPS?: D1Database;
+  /// Read-only Plausible Stats API key for the admin page's website block
+  /// (src/admin/plausible.ts). Unset: the page says the block is off.
+  PLAUSIBLE_API_KEY?: string;
+  /// The Plausible site id; defaults to septena.app.
+  PLAUSIBLE_SITE_ID?: string;
+  /// A Plausible shared-dashboard link (https://plausible.io/share/…). The
+  /// page embeds it when there is no Stats API key: the Stats API needs the
+  /// Business plan, a shared link works on Growth. Secret: anyone with the
+  /// link sees the dashboard.
+  PLAUSIBLE_SHARED_LINK?: string;
   ATTACHMENTS: R2Bucket;                         // attachment bytes, u/{userId}/att/{id}
   PAIRING: DurableObjectNamespace<PairingStore>; // one object per pending app-pairing code (src/shadow/)
 }

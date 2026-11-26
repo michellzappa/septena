@@ -11,6 +11,9 @@ import { verifyAccessJwt } from "./access.js";
 import { ADMIN_GRANT_ID, refreshAccounts, sweepAccounts } from "./accounts.js";
 import { PAGE_HEADERS, renderAdmin } from "./page.js";
 import { signupView, signupsByEmail, signupsCsv } from "./signups.js";
+import { SERIES_DAYS, dayKey, recordMetrics } from "./metrics.js";
+import { forgetTraffic, trafficView } from "./plausible.js";
+import { macReleases } from "./releases.js";
 
 // The admin page, https://api.septena.app/admin (ADR 0043, #198). It shows
 // counts, dates and plans, never content. Its only writes are plans:
@@ -45,16 +48,20 @@ async function renderPage(c: Ctx, opts: { query?: string; newUrl?: string; error
   if (!accounts) return c.notFound();
   const query = (opts.query ?? "").trim().slice(0, 200);
   const isEmail = query.includes("@");
-  const [list, plus, signups, found, identity] = await Promise.all([
+  const now = Date.now();
+  const [list, plus, signups, found, identity, history, traffic, releases] = await Promise.all([
     accounts.listAccounts(),
     accounts.listPlusLinks(),
     signupView(c.env),
     isEmail ? signupsByEmail(c.env, query) : [],
     isEmail ? accounts.resolveIdentity("email", query) : null,
+    accounts.listMetricDays(dayKey(now - (SERIES_DAYS + 7) * 86_400_000)),
+    trafficView(c.env),
+    macReleases(c.env),
   ]);
   const html = renderAdmin({
-    admin: c.get("email"), accounts: list, links: plus.links, uses: plus.uses, signups, query,
-    emailSignups: found, emailUserId: identity?.userId ?? null, newUrl: opts.newUrl, error: opts.error, now: Date.now(),
+    admin: c.get("email"), accounts: list, links: plus.links, uses: plus.uses, signups, query, history, traffic, releases,
+    emailSignups: found, emailUserId: identity?.userId ?? null, newUrl: opts.newUrl, error: opts.error, now,
   });
   return new Response(html, { status: opts.error ? 400 : 200, headers: PAGE_HEADERS });
 }
@@ -80,6 +87,7 @@ const back = (c: Ctx) => c.redirect("/admin", 303);
 
 admin.post("/refresh", async (c) => {
   await sweepAccounts(c.env, 60_000);
+  await Promise.all([recordMetrics(c.env), forgetTraffic(c.env)]);
   return back(c);
 });
 

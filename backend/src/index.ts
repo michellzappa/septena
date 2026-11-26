@@ -5,6 +5,7 @@ import { plusContinue, plusLanding, plusStart } from "./api/plusLinks.js";
 import { joinLanding } from "./api/shares.js";
 import { admin } from "./admin/routes.js";
 import { sweepAccounts } from "./admin/accounts.js";
+import { recordMetrics } from "./admin/metrics.js";
 import * as oauth from "./shadow/oauth.js";
 import * as agentSignup from "./shadow/agentSignup.js";
 import { previewMcpHandler } from "./shadow/mcp.js";
@@ -113,6 +114,9 @@ app.route("/admin", admin);
 export default {
   fetch: app.fetch,
   async scheduled(_event, env) {
-    if (env.MAINTENANCE !== "true") await sweepAccounts(env);
+    if (env.MAINTENANCE !== "true") {
+      await sweepAccounts(env);
+      await recordMetrics(env);
+    }
   },
 } satisfies ExportedHandler<Env>;
