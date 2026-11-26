@@ -35,7 +35,12 @@ import {
 } from "lucide-react";
 import { attributeLabel } from "@/lib/dateBoard";
 import { ACTIONS_CATALOG, registryText } from "@/lib/generated/registries";
-import type { CoreConversationState, CoreMembership, CoreProjection } from "@/lib/core";
+import {
+  completedLocalDay,
+  type CoreConversationState,
+  type CoreMembership,
+  type CoreProjection,
+} from "@/lib/core";
 import { agentStageTitle } from "@/lib/destinations";
 import type {
   AreaRow,
@@ -1160,7 +1165,7 @@ export function TaskRowItem(props: TaskRowItemProps) {
       !(!showsTodayIndicator && scheduledYMD <= todayYMD) &&
       !(showTodayPill && scheduledYMD <= todayYMD),
   );
-  const completedShort = formatShortDate(task.completedAt, todayYMD);
+  const completedShort = formatShortDate(completedLocalDay(task.completedAt), todayYMD);
 
   return (
     <div

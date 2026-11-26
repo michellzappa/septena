@@ -50,6 +50,7 @@ a new ADR and set the old one to `superseded by NNNN`.
 | [0043](0043-plus-links-and-a-counts-only-admin-page.md) | Plus is given by link, and the admin page sees counts only (amends 0016) | accepted |
 | [0044](0044-review-is-one-place.md) | Review is the one place for everything that waits on you (amends 0006, 0008) | accepted |
 | [0045](0045-pro-is-a-real-plan-that-is-only-given.md) | Pro is a real plan that is only given, never sold yet (amends 0037, 0043) | accepted |
+| [0046](0046-agent-work-is-a-review-group.md) | Agent work in progress is a group of Review, not its own list (amends 0044) | accepted |
 
 ## Template
 

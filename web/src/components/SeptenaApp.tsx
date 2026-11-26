@@ -29,11 +29,13 @@ import {
 } from "lucide-react";
 import { SeptenaApiClient } from "@/lib/api/client";
 import {
+  completedLocalDay,
   ensureCoreReady,
   fadeFill,
   getCoreVersion,
   localTodayYMD,
   localUtcOffsetSeconds,
+  localWallClockTimestamp,
   rowOpacity,
   shouldArmReminder,
   taskViewMembership,
@@ -45,7 +47,7 @@ import { evaluateConversation, groupTurnsByTask } from "@/lib/conversation";
 import { addDays, attributeLabel, todayLabel, tomorrowLabel, type DateBoardAttribute } from "@/lib/dateBoard";
 import {
   SIDEBAR_DESTINATIONS,
-  agentGroupOf,
+  BADGE_GROUP_IDS,
   destinationGroups,
   destinationInfo,
   reviewGroupOf,
@@ -198,6 +200,8 @@ export function SeptenaApp() {
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
   const [taskPageId, setTaskPageId] = useState<string | null>(null);
   const [inboxCollapsed, setInboxCollapsed] = useState(false);
+  const [todayLoggedExpanded, setTodayLoggedExpanded] = useState(true);
+  const [scopeLoggedExpandedIds, setScopeLoggedExpandedIds] = useState<Set<string>>(() => new Set());
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [tagFilterId, setTagFilterId] = useState<string | null>(null);
   const [composerTitle, setComposerTitle] = useState("");
@@ -627,15 +631,16 @@ export function SeptenaApp() {
         continue;
       }
       if (task.status === "done" || task.status === "cancelled") {
-        if (String(task.completedAt ?? "").startsWith(todayYMD)) counts.logbook++;
+        if (completedLocalDay(task.completedAt) === todayYMD) counts.logbook++;
         continue;
       }
       if (task.status !== "open") continue;
 
       if (membership.matchesView.today) counts.today++;
+      // Review holds agent work in progress too (ADR 0046); only what waits on the user is in its badge.
       const reviewGroup = reviewGroupOf(task, convoState);
-      if (reviewGroup && reviewGroup !== "faded") counts.review++;
-      if (agentGroupOf(task, convoState)) counts.agent++;
+      if (reviewGroup && BADGE_GROUP_IDS.has(reviewGroup)) counts.review++;
+      else if (reviewGroup && reviewGroup !== "faded") counts.agent++;
       if (membership.matchesView.upcoming) counts.upcoming++;
       if (task.recurrenceUnit) counts.repeating++;
       if (membership.matchesView.anytime) counts.anytime++;
@@ -663,8 +668,10 @@ export function SeptenaApp() {
 
     const destById = new Map(SIDEBAR_DESTINATIONS.map((d) => [d.id, d]));
     const isEmpty = (id: SmartDestination) =>
-      // The Faded group keeps Review in the sidebar, but it is not in the badge.
-      (id === "review" ? smartCounts.counts.review + smartCounts.counts.faded : smartCounts.counts[id]) === 0;
+      // Agent work in progress and the Faded group keep Review in the sidebar, but they are not in the badge.
+      (id === "review"
+        ? smartCounts.counts.review + smartCounts.counts.agent + smartCounts.counts.faded
+        : smartCounts.counts[id]) === 0;
 
     const orderedIds: SmartDestination[] = [
       ...rawOrder.filter((id): id is SmartDestination => destById.has(id as SmartDestination)),
@@ -718,7 +725,7 @@ export function SeptenaApp() {
         switch (destination.id) {
           case "today": return membership.matchesView.today;
           case "review": return reviewGroupOf(task, convoState) !== null;
-          case "agent": return agentGroupOf(task, convoState) !== null;
+          case "agent": return false; // a group of Review: navigateTo opens Review
           case "upcoming": return membership.matchesView.upcoming;
           case "repeating": return Boolean(task.recurrenceUnit);
           case "anytime": return membership.matchesView.anytime;
@@ -779,7 +786,7 @@ export function SeptenaApp() {
     });
   }, [destination, destinationTasks, logbookTab, tagFilterId]);
 
-  // Review grouped by what waits on the user (docs/REVIEW_SPEC.md §1), in registry order.
+  // Review grouped by what waits on the user, then agent work in progress (docs/REVIEW_SPEC.md §1), in registry order.
   const reviewGroups = useMemo(() => {
     if (!(destination.kind === "smart" && destination.id === "review")) return [];
     return destinationGroups("review")
@@ -803,19 +810,45 @@ export function SeptenaApp() {
       ? sumRows(reviewGroups.filter((g) => g.id !== "faded"))
       : listedTasks.length;
 
+  // Today's logged block: tasks completed or cancelled TODAY (local calendar
+  // day), newest first — 1:1 with Apple LocalCache.tasksCompleted(onDay: today)
+  // and Mac SeptaskKitTaskList.todayLoggedRows().
   const completedTodayTasks = useMemo(() => {
     if (!(destination.kind === "smart" && destination.id === "today" && prefs.todayShowCompleted)) {
       return [];
     }
     return evaluatedTasks
-      .filter(
-        ({ task }) =>
-          !task.deletedAt &&
-          task.status === "done" &&
-          String(task.completedAt ?? "").startsWith(todayYMD),
-      )
+      .filter(({ task }) => {
+        if (task.deletedAt) return false;
+        if (task.status !== "done" && task.status !== "cancelled") return false;
+        if (completedLocalDay(task.completedAt) !== todayYMD) return false;
+        if (tagFilterId) {
+          const tags = Array.isArray(task.tags) ? task.tags : [];
+          if (!tags.includes(tagFilterId)) return false;
+        }
+        return true;
+      })
       .sort((a, b) => String(b.task.completedAt ?? "").localeCompare(String(a.task.completedAt ?? "")));
-  }, [destination, evaluatedTasks, prefs.todayShowCompleted, todayYMD]);
+  }, [destination, evaluatedTasks, prefs.todayShowCompleted, tagFilterId, todayYMD]);
+
+  // Project / Area logged footer: completed tasks in this scope, newest first
+  // (collapsed by default, matching iOS TaskListView.scopeLoggedSection & Mac).
+  const loggedScopeTasks = useMemo(() => {
+    if (destination.kind !== "area" && destination.kind !== "project") return [];
+    return evaluatedTasks
+      .filter(({ task }) => {
+        if (task.deletedAt || task.status !== "done") return false;
+        if (tagFilterId) {
+          const tags = Array.isArray(task.tags) ? task.tags : [];
+          if (!tags.includes(tagFilterId)) return false;
+        }
+        if (destination.kind === "project") return task.project === destination.id;
+        if (task.area === destination.id) return true;
+        const proj = task.project ? projectById.get(task.project) : null;
+        return proj?.area === destination.id;
+      })
+      .sort((a, b) => String(b.task.completedAt ?? "").localeCompare(String(a.task.completedAt ?? "")));
+  }, [destination, evaluatedTasks, projectById, tagFilterId]);
 
   // On Today: foldable Inbox band at top (matching iOS/Mac, docs/TRIAGE_BAND_SPEC.md).
   const { todayInboxTasks, todayCommittedTasks } = useMemo(() => {
@@ -890,17 +923,6 @@ export function SeptenaApp() {
     return Array.from(byDay.entries()).sort((a, b) => a[0].localeCompare(b[0]));
   }, [destination, visibleTasks]);
 
-  // Agent grouped by the registry's stages.
-  const agentGroups = useMemo(() => {
-    if (!(destination.kind === "smart" && destination.id === "agent")) return [];
-    return destinationGroups("agent")
-      .map((group) => ({
-        ...group,
-        items: listedTasks.filter((i) => agentGroupOf(i.task, i.convoState) === group.id),
-      }))
-      .filter((g) => g.items.length > 0);
-  }, [destination, listedTasks]);
-
   // Every faded task (the Faded group's sheet), and those of this week's sweep (the prompt on Today).
   const fadedTasks = useMemo(
     () =>
@@ -915,11 +937,13 @@ export function SeptenaApp() {
   );
   const sweepDue = isSweepDue(new Date(), fade, fadedTasks.map((t) => t.fadedAt));
 
-  // Go to a place and clear the selection. Faded is a group of Review: going to it opens the group.
+  // Go to a place and clear the selection. Faded and Agent are groups of Review: going to one opens Review.
   const navigateTo = useCallback(
     (dest: ActiveDestination) => {
       if (dest.kind === "smart" && dest.id === "faded") {
         handleChangePref("reviewFadedExpanded", true);
+        setDestination({ kind: "smart", id: "review" });
+      } else if (dest.kind === "smart" && dest.id === "agent") {
         setDestination({ kind: "smart", id: "review" });
       } else {
         setDestination(dest);
@@ -1353,7 +1377,7 @@ export function SeptenaApp() {
           e.preventDefault();
           void engine.bulkUpdateTasks(activeSelectedTasks, {
             status: "cancelled",
-            completedAt: new Date().toISOString(),
+            completedAt: localWallClockTimestamp(),
             dropReason: "user",
           });
           return;
@@ -2641,7 +2665,7 @@ export function SeptenaApp() {
               </button>
             )}
 
-            {destination.kind === "smart" && destination.id === "agent" && (
+            {destination.kind === "smart" && destination.id === "review" && (
               <button
                 type="button"
                 onClick={() => void engine.setSetting("agentsPaused", !agentsPaused)}
@@ -2789,7 +2813,7 @@ export function SeptenaApp() {
 
             {agentsPaused &&
               destination.kind === "smart" &&
-              (destination.id === "agent" || destination.id === "review") && (
+              destination.id === "review" && (
                 <div className="mb-4 flex items-center justify-between rounded-lg border border-amber-500/30 bg-amber-500/10 px-3.5 py-2 text-xs text-amber-700 dark:text-amber-300">
                   <span>All agents are paused. Connected agents cannot claim or edit tasks.</span>
                   <button
@@ -3028,15 +3052,22 @@ export function SeptenaApp() {
                 )}
 
                 {completedTodayTasks.length > 0 && (
-                  <section aria-label="Completed today">
-                    {renderSectionHeader({
-                      title: "Completed today",
-                      count: completedTodayTasks.length,
-                      muted: true,
-                    })}
-                    <div className={taskCardClass}>
-                      {completedTodayTasks.map((i) => renderTaskRow(i))}
-                    </div>
+                  <section aria-label="Logged today" className="pt-2">
+                    <button
+                      type="button"
+                      aria-expanded={todayLoggedExpanded}
+                      onClick={() => setTodayLoggedExpanded((v) => !v)}
+                      className="font-mono-tabular flex w-full items-center px-3 py-2 text-left text-[13px] font-medium text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]"
+                    >
+                      {todayLoggedExpanded
+                        ? `Hide ${completedTodayTasks.length} logged ${completedTodayTasks.length === 1 ? "item" : "items"}`
+                        : `Show ${completedTodayTasks.length} logged ${completedTodayTasks.length === 1 ? "item" : "items"}`}
+                    </button>
+                    {todayLoggedExpanded && (
+                      <div className={taskCardClass}>
+                        {completedTodayTasks.map((i) => renderTaskRow(i))}
+                      </div>
+                    )}
                   </section>
                 )}
               </div>
@@ -3049,15 +3080,6 @@ export function SeptenaApp() {
                       count: items.length,
                     })}
                     <div className={taskCardClass}>{items.map((i) => renderTaskRow(i))}</div>
-                  </section>
-                ))}
-              </div>
-            ) : destination.kind === "smart" && destination.id === "agent" ? (
-              <div className="space-y-6">
-                {agentGroups.map((group) => (
-                  <section key={group.id}>
-                    {renderGroupHeader(group)}
-                    <div className={taskCardClass}>{group.items.map((i) => renderTaskRow(i))}</div>
                   </section>
                 ))}
               </div>
@@ -3163,6 +3185,40 @@ export function SeptenaApp() {
             ) : (
               <div className={taskCardClass}>{visibleTasks.map((i) => renderTaskRow(i))}</div>
             )}
+
+            {/* Project / Area collapsible logged items footer (1:1 with iOS/Mac) */}
+            {(destination.kind === "area" || destination.kind === "project") &&
+              loggedScopeTasks.length > 0 && (() => {
+                const scopeKey = `${destination.kind}:${destination.id}`;
+                const expanded = scopeLoggedExpandedIds.has(scopeKey);
+                const count = loggedScopeTasks.length;
+                return (
+                  <section aria-label="Logged items" className="pt-5">
+                    <button
+                      type="button"
+                      aria-expanded={expanded}
+                      onClick={() =>
+                        setScopeLoggedExpandedIds((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(scopeKey)) next.delete(scopeKey);
+                          else next.add(scopeKey);
+                          return next;
+                        })
+                      }
+                      className="font-mono-tabular flex w-full items-center px-3 py-2 text-left text-[13px] font-medium text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]"
+                    >
+                      {expanded
+                        ? `Hide ${count} logged ${count === 1 ? "item" : "items"}`
+                        : `Show ${count} logged ${count === 1 ? "item" : "items"}`}
+                    </button>
+                    {expanded && (
+                      <div className={taskCardClass}>
+                        {loggedScopeTasks.map((i) => renderTaskRow(i))}
+                      </div>
+                    )}
+                  </section>
+                );
+              })()}
           </div>
         </div>
 

@@ -66,9 +66,12 @@
       "groups": [
         { "id": "questions", "title": "Questions", "icon": "agent.your_turn" },
         { "id": "finished", "title": "Finished work", "icon": "list.review" },
+        { "id": "working", "title": "Working", "icon": "agent.working" },
+        { "id": "queued", "title": "Queued", "icon": "agent.queued" },
+        { "id": "stopped", "title": "Stopped", "icon": "agent.stopped" },
         { "id": "faded", "title": "Faded", "icon": "list.faded" }
       ],
-      "emptyState": { "title": "Nothing to review", "detail": "Questions and finished work from your agent show up here. So do tasks that faded." }
+      "emptyState": { "title": "Nothing to review", "detail": "Your agent's questions, finished work and tasks in progress show up here. Faded tasks do too." }
     },
     {
       "id": "agent",
@@ -76,10 +79,8 @@
       "serverView": "all",
       "title": "Agent",
       "icon": "list.agent",
-      "sidebarOrder": 2,
-      "sidebarSection": "top",
-      "visibility": "whenNonEmpty",
-      "canHide": true,
+      "visibility": "reviewGroup",
+      "canHide": false,
       "canMoveSection": false,
       "countRule": "agentWork",
       "supportsManualOrder": false,
@@ -89,13 +90,7 @@
       "supportsInlineCreate": false,
       "dropBehavior": "none",
       "featureId": "lists.agent",
-      "groups": [
-        { "id": "working", "title": "Working", "icon": "agent.working" },
-        { "id": "queued", "title": "Queued", "icon": "agent.queued" },
-        { "id": "stopped", "title": "Stopped", "icon": "agent.stopped" },
-        { "id": "done", "title": "Done", "icon": "agent.done" }
-      ],
-      "emptyState": { "title": "No agent work", "detail": "Tasks you assign to Claude appear here, grouped by where the work stands." }
+      "emptyState": { "title": "No agent work", "detail": "Tasks you assign to Claude show up in Review, grouped by where the work stands." }
     },
     {
       "id": "upcoming",

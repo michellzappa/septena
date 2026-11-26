@@ -28414,7 +28414,7 @@
       }
     },
     "Queued" : {
-      "comment" : "Generated from registry destinations.destinations.agent.groups.queued.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry destinations.destinations.review.groups.queued.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
@@ -34943,7 +34943,7 @@
       }
     },
     "Stopped" : {
-      "comment" : "Generated from registry destinations.destinations.agent.groups.stopped.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry destinations.destinations.review.groups.stopped.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
@@ -36717,6 +36717,52 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "As tarefas que você atribuir ao Claude aparecem aqui, agrupadas pelo andamento do trabalho."
+          }
+        }
+      }
+    },
+    "Tasks you assign to Claude appear in Review, grouped by where the work stands." : {
+      "comment" : "Generated from registry destinations.destinations.agent.emptyState.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Tasks you assign to Claude show up in Review, grouped by where the work stands." : {
+      "comment" : "Generated from registry destinations.destinations.agent.emptyState.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aufgaben, die du Claude zuweist, erscheinen in Prüfen, gruppiert nach Arbeitsstand."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las tareas que asignas a Claude aparecen en Revisar, agrupadas según su estado."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les tâches confiées à Claude apparaissent dans Vérifier, regroupées selon leur avancement."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le attività assegnate a Claude appaiono in Revisione, raggruppate in base allo stato del lavoro."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Taken die je aan Claude toewijst, verschijnen in Beoordelen, gegroepeerd op de voortgang."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "As tarefas que você atribuir ao Claude aparecem em Revisar, agrupadas pelo andamento do trabalho."
           }
         }
       }
@@ -41025,7 +41071,7 @@
       }
     },
     "Working" : {
-      "comment" : "Generated from registry destinations.destinations.agent.groups.working.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry destinations.destinations.review.groups.working.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
@@ -41935,6 +41981,52 @@
           }
         }
       }
+    },
+    "Your agent's questions, finished work and tasks in progress show up here. Faded tasks do too." : {
+      "comment" : "Generated from registry destinations.destinations.review.emptyState.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hier erscheinen Fragen, fertige Arbeit und laufende Aufgaben deines Agenten. Verblasste Aufgaben ebenfalls."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aquí aparecen las preguntas, el trabajo terminado y las tareas en curso de tu agente. También las tareas atenuadas."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les questions, le travail terminé et les tâches en cours de votre agent apparaissent ici. Les tâches estompées aussi."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qui appaiono le domande, il lavoro completato e le attività in corso del tuo agente. Anche le attività inattive."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vragen, afgerond werk en lopende taken van je agent verschijnen hier. Vervaagde taken ook."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "As perguntas, o trabalho concluído e as tarefas em andamento do seu agente aparecem aqui. As tarefas inativas também."
+          }
+        }
+      }
+    },
+    "Your agent's questions, finished work and work in progress show up here. So do tasks that faded." : {
+      "comment" : "Generated from registry destinations.destinations.review.emptyState.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Your agents do the work" : {
       "comment" : "Generated from registry surfaces.firstRun.steps.welcome.points.1.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
