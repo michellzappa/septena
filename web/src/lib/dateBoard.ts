@@ -9,11 +9,15 @@ import {
 /** Which attribute the board edits. The registry picks the rows for it. */
 export type DateBoardAttribute = "when" | "deadline";
 
-export type DateBoardRowKind = "tomorrow" | "calendar" | "clear" | "repeatRule" | "time";
+export type DateBoardRowKind = "calendar" | "time" | "repeatRule" | "clear";
+
+/** The row groups, in order. The day strip opens "pick"; a divider separates groups. */
+export type DateBoardGroup = "pick" | "refine" | "remove";
 
 export interface DateBoardRow {
   id: string;
   kind: DateBoardRowKind;
+  group: DateBoardGroup;
   label: string;
   /** The Lucide name of the row's registry icon. */
   lucide: string;
@@ -22,6 +26,7 @@ export interface DateBoardRow {
 interface RegistryRow {
   id: string;
   kind: DateBoardRowKind;
+  group: DateBoardGroup;
   label?: string;
   valueLabel?: string;
   action?: string;
@@ -56,7 +61,7 @@ export function dateBoardRows(attribute: DateBoardAttribute, lang: string): Date
         r.label ??
         actionTitles[r.action ?? ""]?.title ??
         "";
-      return { id: r.id, kind: r.kind, label: registryText(key, lang), lucide: icons[r.icon]?.lucide ?? "" };
+      return { id: r.id, kind: r.kind, group: r.group, label: registryText(key, lang), lucide: icons[r.icon]?.lucide ?? "" };
     });
 }
 
@@ -74,7 +79,7 @@ export function todayLabel(lang: string): string {
 }
 
 export function tomorrowLabel(lang: string): string {
-  return registryText(registryRows.find((r) => r.kind === "tomorrow")?.label ?? "", lang);
+  return registryText(SURFACES_CATALOG.taskDateBoard.tomorrow.label, lang);
 }
 
 /** The calendar row's label when it names a value past the strip. */

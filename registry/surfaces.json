@@ -573,20 +573,22 @@
   "taskDateBoard": {
     "id": "taskDateBoard",
     "overdue": { "label": "Overdue" },
+    "tomorrow": { "label": "Tomorrow" },
+    "groups": ["pick", "refine", "remove"],
     "rows": [
-      { "id": "dateBoard.tomorrow", "kind": "tomorrow", "label": "Tomorrow", "icon": "date.tomorrow", "attributes": ["when", "deadline"], "featureId": "task.when-deadline" },
-      { "id": "dateBoard.calendar", "kind": "calendar", "label": "Pick another date", "valueLabel": "Pick another date ({date})", "icon": "action.when", "attributes": ["when", "deadline"], "featureId": "task.when-deadline" },
+      { "id": "dateBoard.calendar", "kind": "calendar", "group": "pick", "label": "Pick another date", "valueLabel": "Pick another date ({date})", "icon": "action.when", "attributes": ["when", "deadline"], "featureId": "task.when-deadline" },
+      { "id": "dateBoard.time", "kind": "time", "group": "refine", "label": "Add time", "icon": "date.time", "attributes": ["when"], "featureId": "task.when-deadline" },
+      { "id": "dateBoard.repeatRule", "kind": "repeatRule", "group": "refine", "action": "task.repeat", "icon": "action.repeat", "attributes": ["when"], "featureId": "task.repeat" },
       {
         "id": "dateBoard.clear",
         "kind": "clear",
+        "group": "remove",
         "label": "Clear (Anytime)",
         "attributeLabels": [{ "attribute": "deadline", "label": "No Deadline" }],
         "icon": "date.clear",
         "attributes": ["when", "deadline"],
         "featureId": "task.when-deadline"
-      },
-      { "id": "dateBoard.repeatRule", "kind": "repeatRule", "action": "task.repeat", "icon": "action.repeat", "attributes": ["when"], "featureId": "task.repeat" },
-      { "id": "dateBoard.time", "kind": "time", "label": "Add time", "icon": "date.time", "attributes": ["when"], "featureId": "task.when-deadline" }
+      }
     ]
   },
   "taskTagsPicker": {
