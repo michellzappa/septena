@@ -18,6 +18,8 @@ export interface DestinationInfo {
   visibility: string;
   sidebarOrder?: number;
   sidebarSection?: "top" | "bottom";
+  /** False: the list stays in its registry section; a stored placement is ignored. */
+  canMoveSection?: boolean;
   supportsInlineCreate: boolean;
   dropBehavior: string;
   groups?: readonly DestinationGroup[];

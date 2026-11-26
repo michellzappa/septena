@@ -277,9 +277,10 @@ export function SettingsModal({
 
   const sectionFor = (id: SmartDestination): "top" | "bottom" => {
     if (id === "today") return "top";
-    const override = placementMap[id];
+    const info = destinationInfo(id);
+    const override = info?.canMoveSection ? placementMap[id] : undefined;
     if (override === "top" || override === "bottom") return override;
-    return destinationInfo(id)?.sidebarSection ?? "top";
+    return info?.sidebarSection ?? "top";
   };
 
   const moveSmartListOrder = async (id: SmartDestination, delta: -1 | 1) => {
@@ -777,6 +778,7 @@ export function SettingsModal({
                                       </button>
                                       {!locked && (
                                         <>
+                                          {destinationInfo(id)?.canMoveSection && (
                                           <button
                                             type="button"
                                             onClick={() => void toggleSmartListSection(id)}
@@ -785,6 +787,7 @@ export function SettingsModal({
                                           >
                                             {sec === "top" ? "↓ Below" : "↑ Above"}
                                           </button>
+                                          )}
                                           <button
                                             type="button"
                                             onClick={() => void toggleSmartListHidden(id)}

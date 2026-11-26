@@ -684,7 +684,7 @@ export function SeptenaApp() {
       const sec =
         id === "today"
           ? "top"
-          : placementMap[id] === "top" || placementMap[id] === "bottom"
+          : d.canMoveSection && (placementMap[id] === "top" || placementMap[id] === "bottom")
             ? placementMap[id]
             : (d.sidebarSection ?? "top");
       if (sec === "bottom") bottom.push(d);
