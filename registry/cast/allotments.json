@@ -41,6 +41,7 @@
       "artifact": "Minutes",
       "bodies": ["Present: 27 members. Rents stay the same. The path gets new gravel. The hedge question moves to the next meeting.", "1. Welcome, 27 members present. 2. Rents stay the same, 21 for and 6 against. 3. New gravel for the path before April. 4. The hedge, discussed and moved to the next meeting."],
       "otherBody": "Present: 27 members. Rents, the path and the hedge were discussed. Your direction: {answer}",
+      "otherAnswer": "Half a page, decisions only",
       "handoff": "Read the minutes", "acceptance": "The minutes are ready for the meeting to agree."
     },
     "discuss": {
@@ -49,6 +50,7 @@
       "artifact": "Reply about the hedge",
       "bodies": ["Thank you for your note about the hedge. I have put it on the agenda for the meeting, so everyone can hear it and vote.", "Thank you for your note about the hedge. I would like the three of us to look at it with Gerald first. He planted it and may have an idea."],
       "otherBody": "Thank you for your note about the hedge. Here is what I suggest: {answer}",
+      "otherAnswer": "Trim it in March, before the birds nest",
       "draftHandoff": "Read the reply", "handoff": "Your next step: send it", "acceptance": "Plot 14 has an answer.",
       "with": ["key", "agenda", "wellies", "gutter"]
     },
