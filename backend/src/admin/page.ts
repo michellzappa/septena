@@ -210,7 +210,7 @@ function websiteSection(t: TrafficResult, signupsByDay: Map<string, number>): st
     return `<p class="warn">Plausible is not connected. On the Growth plan: make a shared link (Site settings ▸ Visibility ▸ Shared links) and store it with <code>wrangler secret put PLAUSIBLE_SHARED_LINK</code>. On Business: a Stats API key in <code>PLAUSIBLE_API_KEY</code> gives the full block.</p>`;
   }
   if (t.state === "embed") {
-    return `<iframe src="${esc(t.url)}" title="Plausible dashboard" loading="lazy" referrerpolicy="no-referrer" style="width:100%;height:1700px;border:1px solid var(--line);border-radius:10px;background:var(--card)"></iframe>
+    return `<iframe src="${esc(t.url)}" title="Plausible dashboard" loading="lazy" referrerpolicy="no-referrer" style="width:100%;height:1700px;border:1px solid var(--line);border-radius:10px"></iframe>
   <p class="dim">The Plausible dashboard, embedded from a shared link. Funnels, goal conversion in the growth tiles and the website funnel need a Stats API key (Business plan).</p>`;
   }
   if (t.state === "error") return `<p class="warn">Plausible does not answer (${esc(t.reason)}). The rest of the page is current.</p>`;

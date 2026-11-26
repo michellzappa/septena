@@ -112,7 +112,6 @@ export function embedUrl(link: string | undefined): string | null {
     if (u.protocol !== "https:" || u.hostname !== "plausible.io" || !u.pathname.startsWith("/share/")) return null;
     u.searchParams.set("embed", "true");
     u.searchParams.set("theme", "system");
-    u.searchParams.set("background", "transparent");
     return u.toString();
   } catch {
     return null;
