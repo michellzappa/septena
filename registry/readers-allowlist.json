@@ -1,5 +1,5 @@
 {
-  "description": "Generated registry members with no reader yet (scripts/registry-readers.mjs, run by gen-registries --check). Each entry names why and the issue that removes it. An entry that gains a reader fails the check, so this list only shrinks. The kotlin lane also accepts `Object.*` for a catalog that Android reads member by member as features ship. An optional `ships` lane, keyed `<platform>:<featureId>`, excuses a capabilities.json ships or partial claim whose registry entries no source on that platform reads (#285).",
+  "description": "Generated registry members with no reader yet (scripts/registry-readers.mjs, run by gen-registries --check). Each entry names why and the issue that removes it. An entry that gains a reader fails the check, so this list only shrinks. Wildcard entries (`Object.*`) are frozen to dynamic-lookup catalogs (icons, capabilities, task-page blocks, platform IDs, and settings.json-driven option enums) — never add a new wildcard for settings, prompts, notices, actions, surfaces, or entity fields. The `ships` lane, keyed `<platform>:<featureId>`, excuses a capabilities.json ships or partial claim on Apple, Android, or Web whose registry entries no source on that platform reads (#285).",
   "swift": {
     "RegistryEntityEnums.taskStatus": {
       "reason": "Swift model enums (TaskStatus, ...) are hand-written; nothing compares them with the registry yet.",
@@ -69,109 +69,345 @@
     }
   },
   "kotlin": {
-    "RegistryCountPhraseIds.*": {
-      "reason": "Android reads count phrases as their screens ship (agents, waitingDays); Tasks and Projects counts have no Android screen yet.",
-      "issue": "#174"
-    },
     "RegistryTaskPageBlockIds.*": {
-      "reason": "Android renders taskPage.blocks by kind (ADR 0029, #305) and reads no block by its ID.",
+      "reason": "Android renders taskPage.blocks dynamically by kind (ADR 0029, #305) and reads no block by its ID.",
       "issue": "#305"
     },
-    "RegistrySurfaceIds.*": {
-      "reason": "Android reads top-level surfaces as their screens ship; the rest still name their ID as a literal.",
-      "issue": "#174"
-    },
-    "RegistryActionIds.*": {
-      "reason": "Android implements a subset of the registry; members gain readers as features ship (ADR 0028). Actions and menus.",
-      "issue": "#174"
-    },
     "RegistryCapabilityIds.*": {
-      "reason": "Android implements a subset of the registry; members gain readers as features ship (ADR 0028). A ships claim with no reader is checked by #285.",
+      "reason": "Capability ships claims are enforced directly by checkShipsClaims (#285); Android does not reference capability ID constants by name.",
       "issue": "#285"
     },
     "RegistryIconIds.*": {
-      "reason": "Android draws Material icons chosen in code; it does not read the registry icon map yet.",
+      "reason": "Android draws Compose vector glyphs and Material icons directly rather than indexing SF Symbol IDs.",
       "issue": "#180"
     },
-    "RegistrySettingKeys.*": {
-      "reason": "Android has no Settings surface yet.",
-      "issue": "#244"
-    },
-    "RegistryNoticeIds.*": {
-      "reason": "Android shows no notices yet.",
-      "issue": "#174"
-    },
-    "RegistryPromptIds.*": {
-      "reason": "Android implements a subset of the registry; members gain readers as features ship (ADR 0028). Delete and account prompts.",
-      "issue": "#174"
-    },
-    "RegistryFirstRunStepIds.*": {
-      "reason": "Android has no first-run flow yet; it reads only the done step.",
-      "issue": "#174"
-    },
-    "RegistryTaskAttributeIds.*": {
-      "reason": "Android implements a subset of the registry; members gain readers as features ship (ADR 0028). Reminder, star, discuss and paste attributes.",
-      "issue": "#174"
-    },
     "RegistryPlatformIds.*": {
-      "reason": "Android reads only its own platform ID; the others exist for the capability table.",
+      "reason": "Android reads only its own platform ID; the others exist for the capability matrix.",
       "issue": "#180"
     },
     "RegistryEntityEnums.AccentColor.*": {
-      "reason": "Appearance settings are not on Android yet.",
-      "issue": "#244"
+      "reason": "Android reads accent options dynamically from registry/settings.json values rather than enum constants.",
+      "issue": "#180"
     },
     "RegistryEntityEnums.AppIconFinish.*": {
-      "reason": "Appearance settings are not on Android yet.",
-      "issue": "#244"
+      "reason": "Apple-only alternate app icon finish setting.",
+      "issue": "#180"
     },
     "RegistryEntityEnums.AppearanceMode.*": {
-      "reason": "Appearance settings are not on Android yet.",
-      "issue": "#244"
+      "reason": "Android reads appearance mode options dynamically from registry/settings.json values.",
+      "issue": "#180"
     },
     "RegistryEntityEnums.CanvasTexture.*": {
-      "reason": "Appearance settings are not on Android yet.",
-      "issue": "#244"
+      "reason": "Android reads canvas texture options dynamically from registry/settings.json values.",
+      "issue": "#180"
     },
     "RegistryEntityEnums.TextureMotion.*": {
-      "reason": "Appearance settings are not on Android yet.",
-      "issue": "#244"
+      "reason": "Android reads texture motion options dynamically from registry/settings.json values.",
+      "issue": "#180"
     },
     "RegistryEntityEnums.TelemetryLevel.*": {
       "reason": "Retired setting (#436): the backend still accepts it from older builds, no client reads it.",
       "issue": "#436"
     },
-    "RegistryEntityEnums.ConvoAssignee.*": {
-      "reason": "Task conversations are not on Android yet.",
+    "RegistryCountPhraseIds.TASKS": {
+      "reason": "Android does not yet render this count phrase via RegistryCountPhraseIds.",
+      "issue": "#367"
+    },
+    "RegistryCountPhraseIds.PROJECTS": {
+      "reason": "Android does not yet render this count phrase via RegistryCountPhraseIds.",
+      "issue": "#367"
+    },
+    "RegistrySurfaceIds.TASK_PAGE": {
+      "reason": "Android reads taskPage metadata dynamically via RegistryCatalog; Task Page parity is tracked in #305.",
+      "issue": "#305"
+    },
+    "RegistrySurfaceIds.TASK_DATE_BOARD": {
+      "reason": "Android reads Date Board copy via RegistryTaskDateBoard rather than RegistrySurfaceIds.",
+      "issue": "#367"
+    },
+    "RegistrySurfaceIds.TASK_DETAIL": {
+      "reason": "Android reads Task Detail copy via RegistryTaskDetail rather than RegistrySurfaceIds.",
+      "issue": "#367"
+    },
+    "RegistryFirstRunStepIds.WELCOME": {
+      "reason": "Android FirstRunScreen iterates steps dynamically from registry/surfaces.json.",
+      "issue": "#367"
+    },
+    "RegistryFirstRunStepIds.ACCOUNT": {
+      "reason": "Android FirstRunScreen iterates steps dynamically from registry/surfaces.json.",
+      "issue": "#367"
+    },
+    "RegistryFirstRunStepIds.ACCOUNT_DEVICE": {
+      "reason": "Android FirstRunScreen iterates steps dynamically from registry/surfaces.json.",
+      "issue": "#367"
+    },
+    "RegistryTaskAttributeIds.PASTE": {
+      "reason": "Apple-only clipboard paste attribute.",
+      "issue": "#180"
+    },
+    "RegistrySignInMethodIds.MICROSOFT": {
+      "reason": "Microsoft sign-in provider on Android is tracked in SI4.",
+      "issue": "#640"
+    },
+    "RegistryNoticeIds.SIGN_IN": {
+      "reason": "Today notices on Android are not rendered yet.",
+      "issue": "#682"
+    },
+    "RegistryNoticeIds.ROLLED_IN": {
+      "reason": "Today rolled-in notice on Android is not rendered yet.",
+      "issue": "#682"
+    },
+    "RegistryNoticeIds.TRIAL_END": {
+      "reason": "Today trial-end notice on Android is tracked in #682.",
+      "issue": "#682"
+    },
+    "RegistryNoticeIds.SECOND_DEVICE": {
+      "reason": "Today second-device notice on Android is tracked in #682.",
+      "issue": "#682"
+    },
+    "RegistryNoticeIds.FADE_INTRO": {
+      "reason": "Today fade-intro notice on Android is not rendered yet.",
+      "issue": "#682"
+    },
+    "RegistryPromptIds.DELETE_AREA": {
+      "reason": "Android AreasProjectsScreen deletes areas without using RegistryPromptIds.DELETE_AREA yet.",
+      "issue": "#367"
+    },
+    "RegistryPromptIds.DELETE_PROJECT": {
+      "reason": "Android AreasProjectsScreen deletes projects without using RegistryPromptIds.DELETE_PROJECT yet.",
+      "issue": "#367"
+    },
+    "RegistrySettingKeys.TELEMETRY_LEVEL": {
+      "reason": "Retired setting (#436); no client reads it.",
+      "issue": "#436"
+    },
+    "RegistrySettingKeys.ROLLED_IN_DISMISSED_ON": {
+      "reason": "Today rolled-in notice on Android is not rendered yet.",
+      "issue": "#682"
+    },
+    "RegistrySettingKeys.HOME_TIMEZONE": {
+      "reason": "Android settings screen renders settings.json rows dynamically; task time zone picker uses device timezone.",
+      "issue": "#367"
+    },
+    "RegistrySettingKeys.APP_ICON_FINISH": {
+      "reason": "Apple-only alternate app icon setting.",
+      "issue": "#180"
+    },
+    "RegistrySettingKeys.TODAY_SHOW_COMPLETED": {
+      "reason": "Android Today completed band reads settings dynamically via SettingsScreen; direct constant reader pending.",
+      "issue": "#367"
+    },
+    "RegistrySettingKeys.TASKS_SHOW_FADED": {
+      "reason": "Android reads task fade settings dynamically via SettingsScreen; direct constant reader pending.",
+      "issue": "#367"
+    },
+    "RegistrySettingKeys.TASKS_TITLE_LINES": {
+      "reason": "Android task row title line limit does not read TASKS_TITLE_LINES constant yet.",
+      "issue": "#367"
+    },
+    "RegistrySettingKeys.BADGE_SHOW_OVERDUE": {
+      "reason": "Apple-only app icon badge setting.",
+      "issue": "#180"
+    },
+    "RegistrySettingKeys.LOGGING_ANIMATIONS_ENABLED": {
+      "reason": "Apple-only logging animation toggle.",
+      "issue": "#180"
+    },
+    "RegistrySettingKeys.INBOX_ZERO_MOTION_ENABLED": {
+      "reason": "Apple-only inbox-zero motion toggle.",
+      "issue": "#180"
+    },
+    "RegistrySettingKeys.SIDEBAR_COUNTS": {
+      "reason": "Desktop/Apple sidebar counts setting.",
+      "issue": "#180"
+    },
+    "RegistrySettingKeys.DIAGNOSTICS_ENABLED": {
+      "reason": "Apple-only diagnostics setting.",
+      "issue": "#180"
+    },
+    "RegistrySettingKeys.SHOW_MODEL_LABELS": {
+      "reason": "Apple-only AI model label setting.",
+      "issue": "#180"
+    },
+    "RegistrySettingKeys.PCC_ROUTING_ENABLED": {
+      "reason": "Apple-only Private Cloud Compute routing setting.",
+      "issue": "#180"
+    },
+    "RegistrySettingKeys.PCC_REASONING": {
+      "reason": "Apple-only Private Cloud Compute reasoning setting.",
+      "issue": "#180"
+    },
+    "RegistryActionIds.TASK_EDIT_DETAILS": {
+      "reason": "Android opens Task Detail on row tap rather than via a separate menu action.",
+      "issue": "#367"
+    },
+    "RegistryActionIds.TASK_TOGGLE_INFO": {
+      "reason": "Desktop inspector toggle action (macOS/iPadOS/Web).",
+      "issue": "#180"
+    },
+    "RegistryActionIds.TASK_REMINDER": {
+      "reason": "Android edits reminders inside Task Detail rather than a task row menu action.",
+      "issue": "#367"
+    },
+    "RegistryActionIds.TASK_MOVE_SUGGESTED": {
+      "reason": "Filing suggestion quick-move menu action not yet wired on Android.",
+      "issue": "#367"
+    },
+    "RegistryActionIds.TASK_CLEAR_SCHEDULE": {
+      "reason": "Android clears schedule inside the Date Board rather than a standalone menu action.",
+      "issue": "#367"
+    },
+    "RegistryActionIds.TASK_REPEAT": {
+      "reason": "Android edits recurrence inside Task Detail rather than a row menu action.",
+      "issue": "#367"
+    },
+    "RegistryActionIds.TASK_CREATE_NEXT_COPY": {
+      "reason": "Android edits recurrence inside Task Detail rather than a standalone menu action.",
+      "issue": "#367"
+    },
+    "RegistryActionIds.PROJECT_MARK_DONE": {
+      "reason": "Android project completion does not reference RegistryActionIds.PROJECT_MARK_DONE constant yet.",
+      "issue": "#367"
+    },
+    "RegistryActionIds.PROJECT_CANCEL": {
+      "reason": "Android project cancellation does not reference RegistryActionIds.PROJECT_CANCEL constant yet.",
+      "issue": "#367"
+    },
+    "RegistryActionIds.LOGGED_CLEAR": {
+      "reason": "Clear Logbook action is not yet wired on Android.",
+      "issue": "#367"
+    },
+    "RegistryActionIds.NOTICE_OPEN_STEP": {
+      "reason": "Get Started notice step action is not rendered as a Today notice on Android yet.",
+      "issue": "#682"
+    },
+    "RegistryActionIds.NOTICE_TOGGLE_STEP": {
+      "reason": "Get Started notice step toggle is not rendered as a Today notice on Android yet.",
+      "issue": "#682"
+    },
+    "RegistryActionIds.NOTICE_HIDE_GET_STARTED": {
+      "reason": "Get Started notice dismiss action is not rendered as a Today notice on Android yet.",
+      "issue": "#682"
+    },
+    "RegistryActionIds.APP_QUICK_ENTRY": {
+      "reason": "macOS global Quick Entry shortcut action.",
+      "issue": "#180"
+    },
+    "RegistryActionIds.APP_PAUSE_AGENTS": {
+      "reason": "Android pauses agents via Settings switch rather than an app menu action.",
+      "issue": "#367"
+    },
+    "RegistryActionIds.APP_HELP": {
+      "reason": "Android opens Help via Settings ▸ About rather than a menu-bar action.",
+      "issue": "#180"
+    },
+    "RegistryActionIds.APP_KEYBOARD_SHORTCUTS": {
+      "reason": "Keyboard shortcuts cheatsheet action (macOS/iPadOS/Web).",
+      "issue": "#180"
+    },
+    "RegistryActionIds.APP_TOGGLE_SIDEBAR_COUNTS": {
+      "reason": "macOS menu-bar sidebar counts toggle.",
+      "issue": "#180"
+    },
+    "RegistryActionIds.APP_TEXT_SIZE_INCREASE": {
+      "reason": "macOS/desktop text-size menu shortcut.",
+      "issue": "#180"
+    },
+    "RegistryActionIds.APP_TEXT_SIZE_DECREASE": {
+      "reason": "macOS/desktop text-size menu shortcut.",
+      "issue": "#180"
+    },
+    "RegistryActionIds.APP_TEXT_SIZE_RESET": {
+      "reason": "macOS/desktop text-size menu shortcut.",
+      "issue": "#180"
+    },
+    "RegistryActionIds.APP_SEPTENA_WINDOW": {
+      "reason": "macOS window menu action.",
+      "issue": "#180"
+    },
+    "RegistryActionIds.APP_CLASSIC_WINDOW": {
+      "reason": "macOS window menu action.",
+      "issue": "#180"
+    },
+    "RegistryEntityEnums.ConvoAssignee.ME": {
+      "reason": "Discuss conversation parity on Android is tracked as partial in capabilities.json.",
       "issue": "#242"
     },
-    "RegistryEntityEnums.ConvoEndState.*": {
-      "reason": "Task conversations are not on Android yet.",
+    "RegistryEntityEnums.ConvoAssignee.LOCAL": {
+      "reason": "Discuss conversation parity on Android is tracked as partial in capabilities.json.",
       "issue": "#242"
     },
-    "RegistryEntityEnums.ConvoTurnStep.*": {
-      "reason": "Task conversations are not on Android yet.",
+    "RegistryEntityEnums.ConvoEndState.AGENT_DONE": {
+      "reason": "Discuss conversation parity on Android is tracked as partial in capabilities.json.",
       "issue": "#242"
     },
-    "RegistryEntityFields.Convo.*": {
-      "reason": "Task conversations are not on Android yet.",
+    "RegistryEntityEnums.ConvoEndState.HUMAN_DONE": {
+      "reason": "Discuss conversation parity on Android is tracked as partial in capabilities.json.",
       "issue": "#242"
     },
-    "RegistryEntityFields.Tag.*": {
-      "reason": "Quick Find indexes task tag names; tag editing is not on Android yet.",
-      "issue": "#174"
+    "RegistryEntityEnums.ConvoEndState.DECOMPOSED": {
+      "reason": "Discuss conversation parity on Android is tracked as partial in capabilities.json.",
+      "issue": "#242"
     },
-    "RegistryEntityFields.Area.*": {
-      "reason": "Area notes proposals, emoji and attachments are not on Android yet.",
-      "issue": "#174"
+    "RegistryEntityEnums.ConvoEndState.PROMOTED_TO_TODAY": {
+      "reason": "Discuss conversation parity on Android is tracked as partial in capabilities.json.",
+      "issue": "#242"
     },
-    "RegistryEntityFields.Project.*": {
-      "reason": "Project notes proposals, GitHub repo and attachments are not on Android yet.",
-      "issue": "#174"
+    "RegistryEntityEnums.ConvoTurnStep.GROUND": {
+      "reason": "Discuss conversation parity on Android is tracked as partial in capabilities.json.",
+      "issue": "#242"
     },
-    "RegistryEntityFields.Task.*": {
-      "reason": "deferCount, dropReason and effort: Android does not read or write them yet.",
-      "issue": "#174"
+    "RegistryEntityEnums.ConvoTurnStep.SCOPE": {
+      "reason": "Discuss conversation parity on Android is tracked as partial in capabilities.json.",
+      "issue": "#242"
+    },
+    "RegistryEntityEnums.ConvoTurnStep.DECIDE": {
+      "reason": "Discuss conversation parity on Android is tracked as partial in capabilities.json.",
+      "issue": "#242"
+    },
+    "RegistryEntityFields.Convo.SUBTASKS": {
+      "reason": "Discuss conversation parity on Android is tracked as partial in capabilities.json.",
+      "issue": "#242"
+    },
+    "RegistryEntityFields.Convo.CLAIMED_BY": {
+      "reason": "Discuss conversation parity on Android is tracked as partial in capabilities.json.",
+      "issue": "#242"
+    },
+    "RegistryEntityFields.Convo.CLAIM_UNTIL": {
+      "reason": "Discuss conversation parity on Android is tracked as partial in capabilities.json.",
+      "issue": "#242"
+    },
+    "RegistryEntityFields.Convo.RUNS_SINCE_USER": {
+      "reason": "Discuss conversation parity on Android is tracked as partial in capabilities.json.",
+      "issue": "#242"
+    },
+    "RegistryEntityFields.Tag.COLOR": {
+      "reason": "Tag color swatches are not rendered on Android yet.",
+      "issue": "#367"
+    },
+    "RegistryEntityFields.Area.NOTE_REV": {
+      "reason": "Area notes revision history is not rendered on Android yet.",
+      "issue": "#367"
+    },
+    "RegistryEntityFields.Area.NOTES_PROPOSAL": {
+      "reason": "Area notes agent proposals are not rendered on Android yet.",
+      "issue": "#367"
+    },
+    "RegistryEntityFields.Project.NOTE_REV": {
+      "reason": "Project notes revision history is not rendered on Android yet.",
+      "issue": "#367"
+    },
+    "RegistryEntityFields.Project.NOTES_PROPOSAL": {
+      "reason": "Project notes agent proposals are not rendered on Android yet.",
+      "issue": "#367"
+    },
+    "RegistryEntityFields.Project.GITHUB_REPO": {
+      "reason": "Project GitHub repo metadata is not rendered on Android yet.",
+      "issue": "#367"
+    },
+    "RegistryEntityFields.Task.EFFORT": {
+      "reason": "Task effort field is not rendered on Android yet.",
+      "issue": "#367"
     },
     "RegistryRules.CUE_DECAY_DAYS": {
       "reason": "The shared core holds the agent-cue window (views.rs); Android calls it.",
@@ -186,7 +422,7 @@
       "issue": "#247"
     },
     "RegistryRules.TOAST_DURATION_SECONDS": {
-      "reason": "Android has no undo toast yet.",
+      "reason": "Android uses Material Snackbar durations rather than TOAST_DURATION_SECONDS.",
       "issue": "#241"
     },
     "RegistryEntityFields.TaskRef.CREATED_BY": {
@@ -212,10 +448,52 @@
     "RegistryEntityEnums.DoExit.CLOSED": {
       "reason": "The shared core decides this exit (resolve_do_sessions); Android stores what it answers.",
       "issue": "#517"
+    }
+  },
+  "ships": {
+    "web:places.sections": {
+      "reason": "Web ships project sections with local UI labels rather than reading registry action/prompt IDs yet.",
+      "issue": "#285"
     },
-    "RegistrySignInMethodIds.*": {
-      "reason": "No client renders the sign-in registry yet (SI0); the sign-in screens read it in SI2 and SI4.",
-      "issue": "#636"
+    "web:task.references": {
+      "reason": "Web ships task references with local UI labels rather than reading registry action/surface IDs yet.",
+      "issue": "#390"
+    },
+    "web:task.provenance": {
+      "reason": "Web ships task provenance chips without referencing taskPage.provenance surface ID yet.",
+      "issue": "#285"
+    },
+    "web:task.checklists": {
+      "reason": "Web ships task checklists with local UI labels rather than reading registry action/surface IDs yet.",
+      "issue": "#285"
+    },
+    "web:task.share": {
+      "reason": "Web ships task sharing without referencing the task.share action ID yet.",
+      "issue": "#285"
+    },
+    "web:task.alerts": {
+      "reason": "Web ships task reminders without referencing task.reminder / reminder registry IDs yet.",
+      "issue": "#285"
+    },
+    "web:capture.quick-add": {
+      "reason": "Web ships inline quick-add without referencing the app.quickAdd action ID yet.",
+      "issue": "#285"
+    },
+    "web:find.quick-find": {
+      "reason": "Web ships Quick Find modal without referencing app.quickFind / quickFind registry IDs yet.",
+      "issue": "#285"
+    },
+    "web:task.page": {
+      "reason": "Web ships partial task detail drawer without referencing taskPage surface ID yet.",
+      "issue": "#305"
+    },
+    "web:mac.keyboard": {
+      "reason": "Web ships keyboard shortcuts without referencing app.toggleSidebar / app.keyboardShortcuts action IDs yet.",
+      "issue": "#285"
+    },
+    "web:ai.discuss": {
+      "reason": "Web ships agent discuss threads without referencing conversationReply / discuss registry IDs yet.",
+      "issue": "#285"
     }
   }
 }

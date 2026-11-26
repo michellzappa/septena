@@ -275,6 +275,16 @@ commit on the branch first (or let the cron do it).
 - **The app does not use iCloud.** It syncs with `api.septena.app` through
   `TaskSyncEngine` (ADR 0002). `CKEngine` never starts; it remains only because
   the mutators still take it as a parameter. Do not build on it.
+- **Cross-platform parity — One PR, Three Shells.** Any change that touches
+  `registry/`, `core/`, or user-visible task/list behavior ships across Apple,
+  Android, and Web in the **same PR** by default. If a platform genuinely must
+  wait, file a tracked GitHub issue and add a single explicit entry (never a
+  new `.*` wildcard) to `registry/readers-allowlist.json` pointing to it. Any
+  multi-task rule or list-shaping logic (e.g. series rebasing, date grouping,
+  backup merge, notice selection) belongs in `core/crates/septena-core` with a
+  golden fixture in `registry/conformance/`, never re-implemented per shell.
+  `.github/workflows/parity.yml` gates every PR on `gen-registries.mjs --check`
+  (covering Apple, Android, and Web) and `scripts/lint-design.sh`.
 
 ## The Septask targets
 

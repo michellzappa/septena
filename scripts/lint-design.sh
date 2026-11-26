@@ -135,6 +135,47 @@ scan vocab-task-not-todo error \
   'Say "task", never "to-do", in user-facing copy and prompts (DesignSpec §6.6).' \
   'Microsoft To Do|[Tt]odoist|TODO|newTodos|"todos? [^"]*", "every '
 
+# Enforce the same "task, not to-do" vocabulary across Android and Web shells.
+cross_vocab=$(
+  {
+    grep -rnE '"[^"]*[Tt]o-?[Dd]os?\b[^"]*"' --include="*.kt" android/app/src/main android/ui/src 2>/dev/null
+    grep -rnE '"[^"]*[Tt]o-?[Dd]os?\b[^"]*"' --include="*.ts" --include="*.tsx" web/src 2>/dev/null | grep -v '/generated/'
+  } | grep -v "septena-lint:allow vocab-task-not-todo" \
+    | grep -vE 'Microsoft To Do|[Tt]odoist|TODO|newTodos'
+)
+if [ -n "$cross_vocab" ]; then
+  count=$(printf '%s\n' "$cross_vocab" | wc -l | tr -d ' ')
+  printf '%s✗ %s%s  (%s)\n' "$RED" "vocab-task-not-todo-cross-platform" "$OFF" "$count"
+  errors=$((errors + 1))
+  printf '  %s\n' 'Say "task", never "to-do", in Android and Web user-facing copy and prompts (DesignSpec §6.6).'
+  printf '%s' "$DIM"; printf '%s\n' "$cross_vocab" | head -8 | sed 's/^/    /'
+  [ "$count" -gt 8 ] && printf '    … and %s more\n' "$((count - 8))"
+  printf '%s\n' "$OFF"
+fi
+
+# ── Android top-bar back button (chevron, not text "Back") ──────────────────
+# Every Android TopAppBar leading navigationIcon uses an IconButton with
+# ChevronLeftGlyph (<) or ic_close (×) and a contentDescription — never a
+# TextButton rendering literal "Back" (#694).
+android_text_back=$(python3 -c '
+import glob, re
+for path in sorted(glob.glob("android/app/src/main/kotlin/**/*.kt", recursive=True)):
+    src = open(path, encoding="utf-8").read()
+    for m in re.finditer(r"navigationIcon\s*=\s*\{[^}]{0,400}TextButton", src, re.S):
+        if "septena-lint:allow android-topbar-text-back" in m.group(0):
+            continue
+        line = src[:m.start()].count("\n") + 1
+        print(f"{path}:{line}: TopAppBar navigationIcon uses TextButton instead of IconButton + ChevronLeftGlyph")
+')
+if [ -n "$android_text_back" ]; then
+  count=$(printf '%s\n' "$android_text_back" | wc -l | tr -d ' ')
+  printf '%s✗ %s%s  (%s)\n' "$RED" "android-topbar-text-back" "$OFF" "$count"
+  errors=$((errors + 1))
+  printf '  %s\n' 'Use IconButton + ChevronLeftGlyph (or ic_close) with contentDescription in TopAppBar.navigationIcon, never TextButton.'
+  printf '%s' "$DIM"; printf '%s\n' "$android_text_back" | sed 's/^/    /'
+  printf '%s\n' "$OFF"
+fi
+
 # ── AppKit transient surfaces (docs/SEPTASK_APPKIT_SURFACES.md) ─────────────
 # Every popover, floating panel and filter list in the Septask AppKit shell is
 # built in Septask/SeptaskKitSurface.swift, so material, corner radius, field
