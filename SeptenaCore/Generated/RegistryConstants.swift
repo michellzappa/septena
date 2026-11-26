@@ -2384,7 +2384,7 @@ enum RegistryPlans {
     RegistryPlanCard(id: "free", title: RegistryL10n.t("Free"), icon: "plans.free", detail: RegistryL10n.t("The full task app on one device. You do not need an account."), footnote: nil, highlighted: false),
     RegistryPlanCard(id: "plus", title: RegistryL10n.t("Septena Plus"), icon: "settings.plus", detail: RegistryL10n.t("Your list on every device, updated live."), footnote: RegistryL10n.t("Everything in Free is included."), highlighted: true),
   ] }
-  /// Only for an account that has Pro: no store sells it (ADR 0037, ADR 0045).
+  /// The Pro card, for an account that has Pro. The paywalls offer it in #719 (ADR 0059).
   static var proCard: RegistryPlanCard { RegistryPlanCard(id: "pro", title: RegistryL10n.t("Septena Pro"), icon: "plans.pro", detail: RegistryL10n.t("For people who run many agents on one list."), footnote: RegistryL10n.t("Everything in Plus is included."), highlighted: false) }
   static var outcomes: [RegistryPlanOutcome] { [
     RegistryPlanOutcome(id: "everywhere", icon: "onboarding.devices", title: RegistryL10n.t("Your list everywhere"), detail: RegistryL10n.t("The same tasks on every device, updated as you type."), rows: [
