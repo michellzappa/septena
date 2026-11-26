@@ -187,12 +187,22 @@ internal fun buildTaskListItem(
         ?.takeIf { it != share?.me }
         ?.let { share?.member(it)?.name }
 
+    // "Waiting on Anna · 5 days" (docs/REVIEW_SPEC.md §6): only an open task waits.
+    val isWaiting = isOpen && !isDeleted && snapshot.isWaiting
+    val waitingText = if (isWaiting) {
+        WaitingCopy.label(snapshot.waitingOn.orEmpty().trim(), snapshot.waitingSince, today, languageTag)
+    } else {
+        null
+    }
+
     return TaskListItem(
         id = record.id,
         title = snapshot.title,
         agentName = agent,
         canAssign = share != null,
         assigneeName = assignee,
+        isWaiting = isWaiting,
+        waitingText = waitingText,
         subtitle = subtitle,
         isCompleted = snapshot.status == RegistryEntityEnums.TaskStatus.DONE,
         isOnToday = membership.isOnToday,
@@ -230,6 +240,8 @@ internal fun TaskListItem.withFade(
 ): TaskListItem {
     // Settings ▸ Lists ▸ "Fade inactive tasks" (tasksShowAging) off: rows stay at full strength.
     if (!showAging) return this
+    // A waiting task never fades (docs/REVIEW_SPEC.md §6).
+    if (snapshot.isWaiting) return this
     val isProposal = TaskProvenance.isProposal(snapshot.source, snapshot.acknowledgedAt)
     val fill = runCatching {
         TaskFadeRules.fadeFill(

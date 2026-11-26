@@ -1370,6 +1370,18 @@ final class CloudKitTasksBackend {
     commitAndPush(entity, op: "setDeferredDeadline")
   }
 
+  /// Write the wait exactly (docs/REVIEW_SPEC.md §6). `TaskMutator.setWaiting`
+  /// decides the values; undo replays them through here.
+  @discardableResult
+  func setWaiting(id: String, on name: String?, since: String?) -> Bool {
+    guard let entity = fetch(id: id) else { return false }
+    guard entity.waitingOn != name || entity.waitingSince != since else { return true }
+    entity.waitingOn = name
+    entity.waitingSince = name == nil ? nil : since
+    entity.pendingSync = true
+    return commitAndPush(entity, op: name == nil ? "setWaiting(nil)" : "setWaiting")
+  }
+
   func setReminder(id: String, reminder: TaskReminder?) {
     guard let entity = fetch(id: id) else { return }
     entity.reminder = reminder

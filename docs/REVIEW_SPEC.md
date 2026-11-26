@@ -3,8 +3,7 @@
 **Status:** accepted 2026-11-25 ([ADR 0044](adr/0044-review-is-one-place.md)),
 amended 2026-11-26 ([ADR 0046](adr/0046-agent-work-is-a-review-group.md),
 [ADR 0053](adr/0053-waiting-on-people-is-a-review-group.md): the Waiting
-group). The store rules (§3) are built, except Waiting (§6). §5 says what is
-not.
+group). The store rules (§3) are built. §5 says what is not.
 
 Review is the one list of everything that waits on the user, and of agent
 work in progress. Nothing else in the app is called Review. There is no
@@ -93,11 +92,11 @@ A plain completion of a task in Review is an Accept.
 | Fading projects in the Projects group | #585 |
 | Today rollover (Ask, Clean slate) | #185, #186 |
 | The stuck question after a third deferral. It will be a Question. | #55 |
-| The Waiting group (§6) | #669 |
+| Waiting on a shared-project member (§6, Shared projects) | #672 |
 
 ## 6. Waiting
 
-Work handed to a person (ADR 0053). Not built: #669.
+Work handed to a person (ADR 0053). Built on every platform except Shared projects below (#672).
 
 ### Fields
 
@@ -107,8 +106,8 @@ Work handed to a person (ADR 0053). Not built: #669.
 | `waitingSince` | `YYYY-MM-DD` or null | The store, on the day `waitingOn` goes from null to a value. Cleared with it. |
 
 Both sync. There is no follow-up field: **the task's When date is the day to
-chase.** Waiting On… offers a When date in the same sheet (*default* a week
-out, the user can clear it).
+chase.** The Waiting On… sheet edits the When date: it opens on the task's
+When date, or a week out when it has none, and No date clears it.
 
 On a shared task the two fields are personal, like When *(default)*.
 
@@ -117,7 +116,8 @@ On a shared task the two fields are personal, like When *(default)*.
 - In Review ▸ Waiting, oldest `waitingSince` first.
 - Everywhere else as any task does: on Today when its When date comes, in
   Upcoming before that, in Anytime when it has no date, and in its project or
-  area. The row carries a "Waiting on Anna · 5 days" label.
+  area. The row carries a "Waiting on Anna · 5 days" label ("Waiting on
+  Anna" on the first day).
 - The weekly review shows the Waiting group *(default)*.
 
 ### Actions
@@ -158,5 +158,7 @@ Accept step.
 - MCP: `tasks_set_waiting {id, waiting_on, scheduled?}` (`waiting_on: null`
   from an agent is refused), `tasks_list view=waiting`, and both fields in the
   task shape. REST mirrors them (#90).
-- Core: `reviewGroup` returns `waiting` between `finishedWork` and the agent
-  stages. The badge does not change.
+- Clients: the Review group is `waiting` when the open task has `waitingOn`,
+  after the core's conversation group (Questions, Finished work) and before
+  the core's agent stage. Clients already compose the groups this way (ADR
+  0046), so the core needs no release. The badge does not change.

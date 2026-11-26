@@ -252,6 +252,40 @@ final class TaskMutator {
     cloudBackend.setDeferredDeadline(id: id, day: day)
   }
 
+  /// Waiting On… and Got It Back (docs/REVIEW_SPEC.md §6). A name sets the
+  /// wait, trimmed; `waitingSince` becomes today when the task had no wait
+  /// and stays when the name changes. nil or an empty name clears both.
+  /// `scheduled` is the check-back day: nil leaves When alone, `.some(date)`
+  /// sets it through the When path, and `.some(nil)` clears the When date.
+  /// Undo is recorded at the gesture, not here.
+  @discardableResult
+  func setWaiting(id: String, on name: String?, scheduled: Date?? = nil,
+                  mode: RecurrenceRescheduleMode = .makeException) -> Bool {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] setWaiting called before CK bound — dropping", nil)
+      return false
+    }
+    let name = TaskWaiting.normalizedName(name)
+    let current = LocalCache.task(id: id, in: context)
+    let since: String? = name == nil ? nil
+      : (current?.isWaiting == true ? current?.waitingSince : nil) ?? DayClock.appToday
+    let saved = cloudBackend.setWaiting(id: id, on: name, since: since)
+    if case .some(let day) = scheduled {
+      if let day {
+        apply(.scheduleFor(day), to: id, mode: mode)
+      } else {
+        apply(.clearWhenDate, to: id)
+      }
+    }
+    return saved
+  }
+
+  /// Put back a wait exactly as it was (undo).
+  func restoreWaiting(id: String, on name: String?, since: String?) {
+    guard let cloudBackend else { return }
+    cloudBackend.setWaiting(id: id, on: name, since: since)
+  }
+
   func setReminder(id: String, reminder: TaskReminder?) {
     guard let cloudBackend else {
       SeptenaLog.error("[TaskMutator] setReminder called before CK bound — dropping", nil)

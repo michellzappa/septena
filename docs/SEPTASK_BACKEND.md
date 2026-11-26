@@ -421,6 +421,12 @@ tasks through CloudKit.
   reach the app routes under `/v1` (the public REST API is #90). Keys
   count toward `connectedAgents` (log-only). Writes and claims use the key's
   name.
+- **Waiting (2026-11-26, ADR 0053, #669).** Task fields `waitingOn` (who,
+  ≤80 chars) and `waitingSince` (day). A write that sets `waitingOn` without
+  `waitingSince` gets today (UTC); clearing `waitingOn` clears both. A
+  waiting task never fades (`fadeEnds`, `fadeIsStale`). An agent may set a
+  wait but not clear it, nor complete, cancel or delete a waiting task
+  (`in_review`). MCP `tasks_set_waiting`, `tasks_list view=waiting`.
 - Attachment limits: **25 MB per file, 2 GB per user.** The Worker checks
   both before it mints an upload URL, and the app checks the file size before
   upload so the user sees the error at once.

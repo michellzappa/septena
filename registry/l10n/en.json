@@ -631,6 +631,12 @@
       "settings.pages.advanced.sections.diagnostics.items.0.detail"
     ]
   },
+  "Check back": {
+    "text": "Check back",
+    "paths": [
+      "surfaces.waiting.sheet.checkBack.title"
+    ]
+  },
   "Check for Updates…": {
     "text": "Check for Updates…",
     "paths": [
@@ -1667,6 +1673,12 @@
       "actions.menuBar.go.title"
     ]
   },
+  "Got It Back": {
+    "text": "Got It Back",
+    "paths": [
+      "actions.actions.task.gotItBack.title"
+    ]
+  },
   "Group Today by list": {
     "text": "Group Today by list",
     "paths": [
@@ -2289,6 +2301,12 @@
       "actions.actions.task.move.title"
     ]
   },
+  "Name": {
+    "text": "Name",
+    "paths": [
+      "surfaces.waiting.sheet.placeholder"
+    ]
+  },
   "Name this agent": {
     "text": "Name this agent",
     "paths": [
@@ -2380,6 +2398,12 @@
     "text": "No agent work",
     "paths": [
       "destinations.destinations.agent.emptyState.title"
+    ]
+  },
+  "No date": {
+    "text": "No date",
+    "paths": [
+      "surfaces.waiting.sheet.noCheckBack.title"
     ]
   },
   "No length": {
@@ -3296,6 +3320,7 @@
       "actions.actions.task.detail.save.title",
       "actions.actions.settings.save.title",
       "surfaces.prompts.text.nameAgent.confirmTitle",
+      "surfaces.waiting.sheet.confirmTitle",
       "surfaces.doing.stopNote.confirmTitle"
     ]
   },
@@ -4475,10 +4500,37 @@
       "actions.menuBar.view.title"
     ]
   },
+  "Waiting": {
+    "text": "Waiting",
+    "paths": [
+      "destinations.destinations.review.groups.waiting.title"
+    ]
+  },
+  "Waiting On": {
+    "text": "Waiting On",
+    "paths": [
+      "surfaces.waiting.sheet.title"
+    ]
+  },
+  "Waiting On…": {
+    "text": "Waiting On…",
+    "paths": [
+      "actions.actions.task.waitingOn.title"
+    ]
+  },
   "Waiting for approval.": {
     "text": "Waiting for approval.",
     "paths": [
       "plans.paywall.pending"
+    ]
+  },
+  "Waiting on {name}": {
+    "text": "Waiting on {name}",
+    "placeholders": [
+      "name"
+    ],
+    "paths": [
+      "surfaces.waiting.label.format"
     ]
   },
   "Washi Paper": {
@@ -4758,8 +4810,8 @@
       "surfaces.prompts.items.agentKeyCreated.title"
     ]
   },
-  "Your agent's questions, finished work and tasks in progress show up here. Faded tasks do too.": {
-    "text": "Your agent's questions, finished work and tasks in progress show up here. Faded tasks do too.",
+  "Your agent's questions, finished work and tasks in progress show up here, and so do tasks you are waiting on. Faded tasks do too.": {
+    "text": "Your agent's questions, finished work and tasks in progress show up here, and so do tasks you are waiting on. Faded tasks do too.",
     "paths": [
       "destinations.destinations.review.emptyState.detail"
     ]
@@ -4952,6 +5004,18 @@
     ],
     "paths": [
       "surfaces.accountSwitch.copy.unsentOther.label"
+    ]
+  },
+  "{count} days": {
+    "forms": {
+      "one": "1 day",
+      "other": "{count} days"
+    },
+    "placeholders": [
+      "count"
+    ],
+    "paths": [
+      "surfaces.prompts.countPhrases.waitingDays.label"
     ]
   },
   "{count} files": {

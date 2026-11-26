@@ -106,13 +106,12 @@ internal class AccessSettingsModel(
 
     /** The AI & Agents row status (`statusKey: agentsStatus`): "3 agents", or null until loaded. */
     fun agentsStatus(languageTag: String): String? =
-        access?.let { countPhrase(AGENTS_PHRASE, it.agentCount, languageTag) }
+        access?.let { countPhrase(app.septena.core.generated.RegistryCountPhraseIds.AGENTS, it.agentCount, languageTag) }
 
     companion object {
         const val AGENTS_STATUS_KEY = "agentsStatus"
         const val AGENTS_PAGE = "agents"
         const val DEVICES_PAGE = "devices_access"
-        private const val AGENTS_PHRASE = "agents"
     }
 }
 

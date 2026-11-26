@@ -42,6 +42,7 @@ import {
   type CoreProjection,
 } from "@/lib/core";
 import { agentStageTitle } from "@/lib/destinations";
+import { waitingLabel } from "@/lib/waiting";
 import type {
   AreaRow,
   AttachmentRow,
@@ -132,6 +133,10 @@ export interface TaskRowItemProps {
   onResumeAgent: () => void;
   onLoadHistory: () => Promise<ChangeEntry[]>;
   onKeepFaded?: () => void;
+  /** Waiting On… (REVIEW_SPEC §6): opens the sheet. */
+  onWaitingOn?: () => void;
+  /** Got It Back: only on a waiting task. */
+  onGotItBack?: () => void;
   onDropFaded?: () => void;
   onRestoreDeleted?: () => void;
   onCancelTask: () => void;
@@ -315,6 +320,7 @@ export function TaskDetailEditor({
   const isCancelled = task.status === "cancelled";
   const isToday = membership.isOnToday;
   const taskTagIds = Array.isArray(task.tags) ? task.tags : [];
+  const editorWaitingLabel = waitingLabel(task, props.todayYMD, props.lang);
 
   const commitTitle = () => {
     const trimmed = titleDraft.trim();
@@ -1055,6 +1061,28 @@ export function TaskDetailEditor({
               <Share2 className="h-3.5 w-3.5" />
               Share
             </button>
+            {!isDone && !isCancelled && props.onWaitingOn && (
+              <button
+                type="button"
+                onClick={props.onWaitingOn}
+                title={editorWaitingLabel ?? undefined}
+                className="inline-flex max-w-[16rem] items-center gap-1 rounded-lg px-2 py-1 text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+              >
+                <RegistryIcon token="action.waiting" className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">
+                  {editorWaitingLabel ?? registryText(ACTIONS_CATALOG.actions["task.waitingOn"].title, props.lang)}
+                </span>
+              </button>
+            )}
+            {!isDone && !isCancelled && editorWaitingLabel && props.onGotItBack && (
+              <button
+                type="button"
+                onClick={props.onGotItBack}
+                className="rounded-lg px-2 py-1 text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+              >
+                {registryText(ACTIONS_CATALOG.actions["task.gotItBack"].title, props.lang)}
+              </button>
+            )}
 
             <div className="ml-auto flex items-center gap-1.5">
               {!isCancelled && !isDone && (
@@ -1138,6 +1166,7 @@ export function TaskRowItem(props: TaskRowItemProps) {
   const checkedCount = checklistItems.filter((c) => c.checked).length;
   const todayColor = isColorfulAccent ? "var(--today-gold)" : "var(--accent)";
   const hasActiveReminder = Boolean(task.reminderAt && !task.reminderDismissedAt);
+  const rowWaitingLabel = isDone || isCancelled ? null : waitingLabel(task, props.todayYMD, props.lang);
   const reminderPastDue =
     hasActiveReminder &&
     Number.isFinite(Date.parse(task.reminderSnoozedUntil || task.reminderAt!)) &&
@@ -1305,6 +1334,13 @@ export function TaskRowItem(props: TaskRowItemProps) {
               style={{ color: todayColor }}
             />
             <span>Today</span>
+          </span>
+        )}
+
+        {rowWaitingLabel && !isDeletedView && (
+          <span className="inline-flex min-w-0 items-center gap-1 rounded-full bg-[var(--bg-pill)] px-2 py-0.5 text-[11px] font-medium text-[var(--text-secondary)]">
+            <RegistryIcon token="action.waiting" className="h-[11px] w-[11px] shrink-0" />
+            <span className="truncate">{rowWaitingLabel}</span>
           </span>
         )}
 

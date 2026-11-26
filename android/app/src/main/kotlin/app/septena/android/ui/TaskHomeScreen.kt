@@ -55,6 +55,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -98,6 +99,8 @@ import app.septena.core.RegistryActionResolver
 import app.septena.core.RegistryCatalog
 import app.septena.core.generated.RegistryActionIds
 import app.septena.core.generated.RegistryDestinationIds
+import app.septena.core.generated.RegistryEntityFields
+import app.septena.core.generated.RegistryEntityNames
 import app.septena.core.generated.RegistryNoticeIds
 import app.septena.core.generated.RegistryPlatformIds
 import app.septena.core.generated.RegistryPromptIds
@@ -140,6 +143,8 @@ fun TaskHomeScreen(
     var referenceTaskId by rememberSaveable { mutableStateOf<String?>(null) }
     /** The task whose Assign To dialog is open (row menu). */
     var assignTaskId by rememberSaveable { mutableStateOf<String?>(null) }
+    // The task whose Waiting On… sheet is open.
+    var waitingTaskId by rememberSaveable { mutableStateOf<String?>(null) }
     /** Join a Shared Project: the open dialog, and the token of the link that opened it. */
     var joinOpen by rememberSaveable { mutableStateOf(false) }
     var joinToken by rememberSaveable { mutableStateOf<String?>(null) }
@@ -248,6 +253,8 @@ fun TaskHomeScreen(
             actionId == RegistryActionIds.TASK_ACCEPT_REVIEW -> homeViewModel.complete(id)
             actionId == RegistryActionIds.TASK_SEND_BACK_REVIEW -> openTaskSendBack(id)
             actionId == RegistryActionIds.TASK_KEEP_FADED -> homeViewModel.keepFaded(id)
+            actionId == RegistryActionIds.TASK_WAITING_ON -> waitingTaskId = id
+            actionId == RegistryActionIds.TASK_GOT_IT_BACK -> homeViewModel.gotItBack(id)
             actionId == RegistryActionIds.TASK_LET_GO_FADED -> homeViewModel.letGoFaded(id)
             actionId == RegistryActionIds.TASK_SELECT -> homeViewModel.toggleSelection(id)
         }
@@ -420,6 +427,30 @@ fun TaskHomeScreen(
             onAdd = { draft -> homeViewModel.quickAdd(draft) { homeQuickAddDraft = null } },
             onAddAndDo = addAndDo(graph, homeViewModel) { homeQuickAddDraft = null },
         )
+    }
+
+    waitingTaskId?.let { id ->
+        // The sheet opens on the task's name and When date.
+        val initial by produceState<Pair<String, String?>?>(initialValue = null, id) {
+            value = withContext(Dispatchers.IO) {
+                val fields = graph.taskStore.record(RegistryEntityNames.TASK, id)?.fields
+                fields?.get(RegistryEntityFields.Task.WAITING_ON).stringValue().orEmpty() to
+                    fields?.get(RegistryEntityFields.Task.SCHEDULED).stringValue()
+            }
+        }
+        initial?.let { (name, whenDay) ->
+            WaitingOnDialog(
+                initialName = name,
+                initialWhen = whenDay,
+                today = graph.clock.today(graph.clock.now()),
+                languageTag = languageTag,
+                onDismiss = { waitingTaskId = null },
+                onConfirm = { newName, checkBack ->
+                    homeViewModel.setWaiting(id, newName, checkBack)
+                    waitingTaskId = null
+                },
+            )
+        }
     }
 
     pendingPurgeRequest?.let { req ->
@@ -1832,6 +1863,8 @@ private fun taskRowMenuGroups(
             RegistryActionIds.TASK_ACCEPT_REVIEW,
             RegistryActionIds.TASK_KEEP_FADED,
             RegistryActionIds.TASK_LET_GO_FADED,
+            RegistryActionIds.TASK_WAITING_ON,
+            RegistryActionIds.TASK_GOT_IT_BACK,
             RegistryActionIds.TASK_OPEN,
             RegistryActionIds.TASK_WHEN,
             RegistryActionIds.TASK_MOVE,
@@ -1867,6 +1900,7 @@ private fun taskRowMenuGroups(
                 } else null,
                 needsReview = id == RegistryActionIds.TASK_ACCEPT_REVIEW,
                 needsFaded = id == RegistryActionIds.TASK_KEEP_FADED || id == RegistryActionIds.TASK_LET_GO_FADED,
+                needsWaiting = id == RegistryActionIds.TASK_GOT_IT_BACK,
                 icon = actionMenuIcon(id),
             )
         }.withAssign(menuId, languageTag).takeIf { it.isNotEmpty() }
@@ -1910,6 +1944,8 @@ private fun actionMenuIcon(actionId: String): TaskMenuActionIcon = when (actionI
     RegistryActionIds.TASK_ACCEPT_REVIEW,
     RegistryActionIds.TASK_KEEP_FADED -> TaskMenuActionIcon.Check
     RegistryActionIds.TASK_LET_GO_FADED -> TaskMenuActionIcon.Cancel
+    RegistryActionIds.TASK_WAITING_ON -> TaskMenuActionIcon.Assign
+    RegistryActionIds.TASK_GOT_IT_BACK -> TaskMenuActionIcon.Restore
     else -> TaskMenuActionIcon.None
 }
 

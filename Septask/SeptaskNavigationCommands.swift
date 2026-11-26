@@ -199,6 +199,8 @@ private struct SeptaskTaskMenu: View {
     case .taskClearSchedule: return .clearSchedule
     case .taskRepeat: return .repeatEditor
     case .taskCreateNextCopy: return .createNextCopy
+    case .taskWaitingOn: return .waitingOn
+    case .taskGotItBack: return .gotItBack
     default: return nil
     }
   }

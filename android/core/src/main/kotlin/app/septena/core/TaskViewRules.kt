@@ -36,8 +36,15 @@ data class TaskSnapshot(
     val startTime: String? = null,
     val durationMinutes: Int? = null,
     val timeZone: String? = null,
+    /** Who the user handed the task to (docs/REVIEW_SPEC.md §6), or null. */
+    val waitingOn: String? = null,
+    /** The day the wait started (`YYYY-MM-DD`), or null. */
+    val waitingSince: String? = null,
 ) {
     val isHeading: Boolean get() = kind == RegistryEntityEnums.TaskKind.HEADING
+
+    /** The task waits on a person (docs/REVIEW_SPEC.md §6). */
+    val isWaiting: Boolean get() = !waitingOn.isNullOrBlank()
 
     companion object {
         fun from(record: SyncRecord): TaskSnapshot {
@@ -72,6 +79,8 @@ data class TaskSnapshot(
                     else -> null
                 },
                 timeZone = f[RegistryEntityFields.Task.TIME_ZONE].stringValue(),
+                waitingOn = f[RegistryEntityFields.Task.WAITING_ON].stringValue(),
+                waitingSince = f[RegistryEntityFields.Task.WAITING_SINCE].stringValue(),
             )
         }
     }
@@ -149,13 +158,15 @@ object TaskViewRules {
 
     /**
      * The Review group of a task (docs/REVIEW_SPEC.md §1), or null when it is not in Review:
-     * the first that fits of what waits on the user, agent work in progress, and Faded (ADR 0046).
-     * [conversationGroup] is the core's group for its conversation; [agentStage] is the core's
-     * agent stage, which shows as its own group while the agent works.
+     * the first that fits of what waits on the user, a wait on a person (§6, ADR 0053), agent work
+     * in progress, and Faded (ADR 0046). [conversationGroup] is the core's group for its
+     * conversation; [agentStage] is the core's agent stage, which shows as its own group while the
+     * agent works.
      */
     fun reviewGroup(task: TaskSnapshot, conversationGroup: String?, agentStage: String? = null): String? = when {
         task.status != RegistryEntityEnums.TaskStatus.OPEN || task.isHeading || task.deletedAt != null -> null
         conversationGroup != null -> conversationGroup
+        task.isWaiting -> ReviewGroupIds.WAITING
         agentStage in ReviewGroupIds.AGENT_WORK -> agentStage
         TaskFadeRules.isFaded(task.fadedAt) -> ReviewGroupIds.FADED
         else -> null
@@ -224,6 +235,7 @@ object TaskViewRules {
 object ReviewGroupIds {
     const val QUESTIONS: String = "questions"
     const val FINISHED: String = "finished"
+    const val WAITING: String = "waiting"
     const val WORKING: String = "working"
     const val QUEUED: String = "queued"
     const val STOPPED: String = "stopped"
@@ -232,7 +244,10 @@ object ReviewGroupIds {
     /** Agent work in progress: the core's agent stages that show as Review groups. `done` does not. */
     val AGENT_WORK: Set<String> = setOf(WORKING, QUEUED, STOPPED)
 
-    /** The groups that wait on the user. Only they count in the Review badge. */
+    /** Every group, in the order the Review list draws them. */
+    val ORDER: List<String> = listOf(QUESTIONS, FINISHED, WAITING, WORKING, QUEUED, STOPPED, FADED)
+
+    /** The groups that wait on the user. Only they count in the Review badge; Waiting does not. */
     val BADGE: Set<String> = setOf(QUESTIONS, FINISHED)
 }
 

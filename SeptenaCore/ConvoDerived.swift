@@ -121,7 +121,8 @@ extension TaskConvo {
 /// `registry/destinations.json`, which owns titles and icons. Review holds
 /// everything about your agent and what waits on you (ADR 0046).
 enum ReviewGroup: String, CaseIterable, Sendable {
-  case questions, finished, working, queued, stopped, faded
+  /// `waiting`: the open task waits on a person (`waitingOn`, docs/REVIEW_SPEC.md §6).
+  case questions, finished, waiting, working, queued, stopped, faded
 
   /// Device-local: whether the Faded group is open. It starts closed.
   static let fadedExpandedKey = "septena.tasks.reviewFadedExpanded"
@@ -132,18 +133,20 @@ enum ReviewGroup: String, CaseIterable, Sendable {
   }
 
   /// True for the groups that wait on the user. Only they count in the
-  /// Review badge; agent work in progress and Faded do not.
+  /// Review badge; Waiting, agent work in progress and Faded do not.
   var countsInBadge: Bool { self == .questions || self == .finished }
 }
 
 extension TaskConvo {
   /// The Review group this conversation puts an open task in: a question or
-  /// finished work waits on the user, and agent work in progress shows by
+  /// finished work waits on the user, then a task that waits on a person
+  /// (`waiting`, docs/REVIEW_SPEC.md §6), and agent work in progress shows by
   /// its stage. A claim lease is backend wall-clock time, so this reads the
   /// real clock (as `deriveConvo` does).
-  func reviewGroup(at now: Date = Date()) -> ReviewGroup? {
-    guard let state = coreState(at: now) else { return nil }
+  func reviewGroup(at now: Date = Date(), waiting: Bool = false) -> ReviewGroup? {
+    guard let state = coreState(at: now) else { return waiting ? .waiting : nil }
     if let id = state.reviewGroup, let group = ReviewGroup(rawValue: id) { return group }
+    if waiting { return .waiting }
     return state.agentStage.flatMap(AgentStage.init(rawValue:))?.reviewGroup
   }
 }

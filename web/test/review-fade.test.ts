@@ -9,7 +9,7 @@ const task = (fields: Partial<TaskRow> = {}): TaskRow => ({ id: "t", title: "Tas
 test("Faded and Agent are groups of Review, not sidebar lists", () => {
   assert.deepEqual(
     destinationGroups("review").map((g) => g.id),
-    ["questions", "finished", "working", "queued", "stopped", "faded"],
+    ["questions", "finished", "waiting", "working", "queued", "stopped", "faded"],
   );
   assert.deepEqual([...BADGE_GROUP_IDS], ["questions", "finished"]);
   const ids = SIDEBAR_DESTINATIONS.map((d) => d.id as string);

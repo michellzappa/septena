@@ -69,6 +69,10 @@
     }
   },
   "kotlin": {
+    "RegistryCountPhraseIds.*": {
+      "reason": "Android reads count phrases as their screens ship (agents, waitingDays); Tasks and Projects counts have no Android screen yet.",
+      "issue": "#174"
+    },
     "RegistryTaskPageBlockIds.*": {
       "reason": "Android renders taskPage.blocks by kind (ADR 0029, #305) and reads no block by its ID.",
       "issue": "#305"

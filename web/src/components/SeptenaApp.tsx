@@ -77,6 +77,7 @@ import {
   type RescheduleMode,
   type SyncState,
 } from "@/lib/sync/engine";
+import { compareWaiting, waitingName } from "@/lib/waiting";
 import { UndoStack, type UndoSnapshot } from "@/lib/sync/undo";
 import type {
   ActiveDestination,
@@ -100,6 +101,7 @@ import { RegistryIcon } from "./RegistryIcon";
 import { SettingsModal, type SettingsTab } from "./SettingsModal";
 import { SignInScreen } from "./SignInScreen";
 import { TaskPageDrawer } from "./TaskPageDrawer";
+import { WaitingOnDialog } from "./WaitingOnDialog";
 import {
   TaskRowItem,
   openRepeatSelect,
@@ -168,6 +170,16 @@ function formatDayHeading(ymd: string, todayYMD: string, lang: string): string {
 }
 
 /** Every field that a date action can change: what its undo entry restores. */
+/** The fields Waiting On… and Got It Back can change, for their undo. */
+function waitingFields(task: TaskRow): Record<string, unknown> {
+  return {
+    waitingOn: task.waitingOn ?? null,
+    waitingSince: task.waitingSince ?? null,
+    fadedAt: task.fadedAt ?? null,
+    ...dateFields(task),
+  };
+}
+
 function dateFields(task: TaskRow): Record<string, unknown> {
   return {
     scheduled: task.scheduled ?? null,
@@ -228,6 +240,7 @@ export function SeptenaApp() {
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   /** The tasks of the open keep-or-let-go sheet, fixed when it opens. Null: closed. */
   const [sweepTasks, setSweepTasks] = useState<TaskRow[] | null>(null);
+  const [waitingTaskId, setWaitingTaskId] = useState<string | null>(null);
   const [firstRunOpen, setFirstRunOpen] = useState(false);
   const [infoToast, setInfoToast] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
@@ -717,7 +730,8 @@ export function SeptenaApp() {
       if (task.status !== "open") continue;
 
       if (membership.matchesView.today) counts.today++;
-      // Review holds agent work in progress too (ADR 0046); only what waits on the user is in its badge.
+      // Review holds agent work in progress and Waiting too (ADR 0046, ADR 0053); only what waits on the
+      // user is in its badge. The other groups (Faded aside) keep Review in the sidebar through `agent`.
       const reviewGroup = reviewGroupOf(task, convoState);
       if (reviewGroup && BADGE_GROUP_IDS.has(reviewGroup)) counts.review++;
       else if (reviewGroup && reviewGroup !== "faded") counts.agent++;
@@ -872,7 +886,11 @@ export function SeptenaApp() {
     return destinationGroups("review")
       .map((group) => ({
         ...group,
-        items: listedTasks.filter((i) => reviewGroupOf(i.task, i.convoState) === group.id),
+        items: (() => {
+          const items = listedTasks.filter((i) => reviewGroupOf(i.task, i.convoState) === group.id);
+          // Waiting: oldest wait first (REVIEW_SPEC §6).
+          return group.id === "waiting" ? [...items].sort((a, b) => compareWaiting(a.task, b.task)) : items;
+        })(),
       }))
       .filter((g) => g.items.length > 0);
   }, [destination, listedTasks]);
@@ -1298,6 +1316,52 @@ export function SeptenaApp() {
     [],
   );
 
+  // Waiting On… and Got It Back (REVIEW_SPEC §6), with undo back to the fields before.
+  const setWaiting = useCallback(
+    async (task: TaskRow, name: string, checkBack: string | null) => {
+      const [before] = findTasks([task.id]);
+      const prev = waitingFields(before ?? task);
+      await engine.setTaskWaiting(before ?? task, name, checkBack);
+      undoStack.record({
+        label: `${registryText(ACTIONS_CATALOG.actions["task.waitingOn"].title, prefs.language)} “${task.title}”`,
+        undo: async () => {
+          const [live] = findTasks([task.id]);
+          if (live) await engine.updateTaskFields(live, prev);
+        },
+        redo: async () => {
+          const [live] = findTasks([task.id]);
+          if (live) await engine.setTaskWaiting(live, name, checkBack);
+        },
+      });
+    },
+    [engine, findTasks, prefs.language, undoStack],
+  );
+
+  const gotItBack = useCallback(
+    async (tasks: TaskRow[]) => {
+      const waiting = findTasks(tasks.map((t) => t.id)).filter((t) => waitingName(t));
+      if (waiting.length === 0) return;
+      const before = waiting.map((t) => ({ id: t.id, fields: waitingFields(t) }));
+      for (const t of waiting) await engine.clearTaskWaiting(t);
+      undoStack.record({
+        label:
+          waiting.length === 1
+            ? `${registryText(ACTIONS_CATALOG.actions["task.gotItBack"].title, prefs.language)}: “${waiting[0].title}”`
+            : `${registryText(ACTIONS_CATALOG.actions["task.gotItBack"].title, prefs.language)}: ${waiting.length} tasks`,
+        undo: async () => {
+          for (const b of before) {
+            const [live] = findTasks([b.id]);
+            if (live) await engine.updateTaskFields(live, b.fields);
+          }
+        },
+        redo: async () => {
+          for (const live of findTasks(before.map((b) => b.id))) await engine.clearTaskWaiting(live);
+        },
+      });
+    },
+    [engine, findTasks, prefs.language, undoStack],
+  );
+
   const handleShareTask = useCallback(
     async (task: TaskRow) => {
       const text = task.notes ? `${task.title}\n\n${task.notes}` : task.title;
@@ -1662,6 +1726,9 @@ export function SeptenaApp() {
   ]);
 
   const lang = prefs.language;
+  const waitingTask = waitingTaskId
+    ? (syncState.snapshot.tasks.find((t) => t.id === waitingTaskId && t.status === "open" && !t.deletedAt) ?? null)
+    : null;
   const pickerTask = datePicker
     ? syncState.snapshot.tasks.find((t) => t.id === datePicker.taskIds[0])
     : undefined;
@@ -1996,6 +2063,16 @@ export function SeptenaApp() {
                   { kind: "divider" as const },
                 ]
               : []),
+            ...(waitingName(task)
+              ? [
+                  {
+                    kind: "item" as const,
+                    label: registryText(ACTIONS_CATALOG.actions["task.gotItBack"].title, lang),
+                    onSelect: () => void gotItBack(findTasks(menuTaskIds)),
+                  },
+                  { kind: "divider" as const },
+                ]
+              : []),
             {
               kind: "item",
               label: membership.isOnToday ? "Remove from Today" : "Move to Today",
@@ -2019,6 +2096,11 @@ export function SeptenaApp() {
               label: registryText(ACTIONS_CATALOG.actions["task.deadline"].title, lang),
               shortcut: "⇧⌘D",
               onSelect: () => openDatePicker("deadline", menuTaskIds, menuAnchor),
+            },
+            {
+              kind: "item",
+              label: registryText(ACTIONS_CATALOG.actions["task.waitingOn"].title, lang),
+              onSelect: () => setWaitingTaskId(task.id),
             },
             { kind: "divider" },
             {
@@ -2135,6 +2217,8 @@ export function SeptenaApp() {
       onResumeAgent: () => void engine.resumeAgentOnTask(task.id),
       onLoadHistory: () => api.getChanges("task", task.id),
       onKeepFaded: () => void keepFaded(task),
+      onWaitingOn: () => setWaitingTaskId(task.id),
+      onGotItBack: () => void gotItBack([task]),
       onDropFaded: () => void letGoFaded([task]),
       onRestoreDeleted: () => void engine.restoreDeletedTask(task),
       onCancelTask: async () => {
@@ -3599,6 +3683,17 @@ export function SeptenaApp() {
           setTagFilterId(tid);
         }}
       />
+
+      {waitingTask && (
+        <WaitingOnDialog
+          key={waitingTask.id}
+          task={waitingTask}
+          todayYMD={todayYMD}
+          language={lang}
+          onClose={() => setWaitingTaskId(null)}
+          onSave={(name, checkBack) => setWaiting(waitingTask, name, checkBack)}
+        />
+      )}
 
       {sweepTasks && (
         <FadeSweepModal

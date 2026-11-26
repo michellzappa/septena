@@ -557,6 +557,13 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
 
     fun keepFaded(id: String) = editTask(id) { graph.taskMutator.keepFaded(id) }
 
+    /** Waiting On… (docs/REVIEW_SPEC.md §6): the name, and the When date (null clears it). */
+    fun setWaiting(id: String, name: String, checkBack: String?) =
+        editTask(id) { graph.taskMutator.setWaiting(id, name, checkBack, changesWhen = true) }
+
+    /** Got It Back: the wait ends; the task stays open in its list. */
+    fun gotItBack(id: String) = editTask(id) { graph.taskMutator.setWaiting(id, null) }
+
     fun letGoFaded(id: String) = editTask(id, touches = false) { graph.taskMutator.letGoFaded(id) }
 
     /** One-tap filing from an Inbox suggestion capsule (`edit.filing-suggestion`, #368). */
@@ -837,6 +844,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         var reviewCount = 0
         val agentRequestTimes = mutableListOf<java.time.Instant>()
         var agentCount = 0
+        var waitingCount = 0
         var starredCount = 0
         var fadedCount = 0
         var deletedCount = 0
@@ -872,6 +880,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                     // progress keeps Review in the sidebar without a badge; faded tasks are counted apart.
                     if (reviewGroup in ReviewGroupIds.BADGE) reviewCount += 1
                     if (reviewGroup in ReviewGroupIds.AGENT_WORK) agentCount += 1
+                    if (reviewGroup == ReviewGroupIds.WAITING) waitingCount += 1
                     val requestedAt = when {
                         convoState?.needsHumanReview == true -> conversations[snapshot.id]?.endStateAt
                         convoState?.awaitsHuman == true -> conversations[snapshot.id]?.lastTurnAt
@@ -949,7 +958,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         }
 
         val nonEmptyDestinations = buildSet {
-            if (reviewCount > 0 || agentCount > 0 || fadedCount > 0 ||
+            if (reviewCount > 0 || agentCount > 0 || waitingCount > 0 || fadedCount > 0 ||
                 (selected as? TaskHomeLocation.SmartList)?.destinationId == RegistryDestinationIds.REVIEW
             ) {
                 add(RegistryDestinationIds.REVIEW)
@@ -1173,6 +1182,10 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                         },
                         areaId = snapshot.area,
                         projectId = snapshot.project,
+                        // Review ▸ Waiting lists the oldest wait first.
+                        waitingSince = snapshot.waitingSince.takeIf {
+                            groupHeader != null && groupHeader == reviewGroups[ReviewGroupIds.WAITING]
+                        },
                     )
                     if (inTodayInbox) {
                         inbox += positioned
@@ -1371,6 +1384,9 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                         .thenBy { it.item.title.lowercase() }
                 RegistryDestinationIds.UPCOMING ->
                     compareBy<PositionedTask>({ it.archiveDate ?: "9999-99-99" }, { it.position ?: Double.MAX_VALUE }, { it.item.title.lowercase() })
+                // Only Waiting rows carry waitingSince; sortedByGroup then keeps this order inside each group.
+                RegistryDestinationIds.REVIEW ->
+                    compareBy<PositionedTask>({ it.waitingSince.orEmpty() }, { it.position ?: Double.MAX_VALUE }, { it.item.title.lowercase() })
                 else ->
                     compareBy<PositionedTask>({ it.position ?: Double.MAX_VALUE }, { it.item.title.lowercase() })
             },
@@ -1464,6 +1480,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         val archiveDate: String? = null,
         val areaId: String? = null,
         val projectId: String? = null,
+        val waitingSince: String? = null,
     )
 
     private companion object {

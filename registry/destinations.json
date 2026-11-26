@@ -66,12 +66,13 @@
       "groups": [
         { "id": "questions", "title": "Questions", "icon": "agent.your_turn" },
         { "id": "finished", "title": "Finished work", "icon": "list.review" },
+        { "id": "waiting", "title": "Waiting", "icon": "list.waiting" },
         { "id": "working", "title": "Working", "icon": "agent.working" },
         { "id": "queued", "title": "Queued", "icon": "agent.queued" },
         { "id": "stopped", "title": "Stopped", "icon": "agent.stopped" },
         { "id": "faded", "title": "Faded", "icon": "list.faded" }
       ],
-      "emptyState": { "title": "Nothing to review", "detail": "Your agent's questions, finished work and tasks in progress show up here. Faded tasks do too." }
+      "emptyState": { "title": "Nothing to review", "detail": "Your agent's questions, finished work and tasks in progress show up here, and so do tasks you are waiting on. Faded tasks do too." }
     },
     {
       "id": "agent",

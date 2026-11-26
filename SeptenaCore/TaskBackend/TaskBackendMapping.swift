@@ -172,6 +172,8 @@ enum TaskBackendMapping {
       "timeZone": c.text("timeZone", t.timeZone, max: 64),
       "deadline": c.day("deadline", t.deadline),
       "deferredDeadline": c.day("deferredDeadline", t.deferredDeadline),
+      "waitingOn": c.text("waitingOn", t.waitingOn, max: TaskWaiting.maxNameLength),
+      "waitingSince": c.day("waitingSince", t.waitingSince),
       "today": .bool(t.today),
       "starred": .bool(t.starred),
       "tags": t.tagIDs.isEmpty ? .null : .array(t.tagIDs.map { .string($0) }),

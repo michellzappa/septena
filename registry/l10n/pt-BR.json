@@ -819,5 +819,18 @@
   "€5 a month. You save €24 against paying monthly.": "€5 por mês. Você economiza €24 em relação ao pagamento mensal.",
   "€60 a year": "€60 por ano",
   "€60 a year or €7 a month": "€60 por ano ou €7 por mês",
-  "€7 a month": "€7 por mês"
+  "€7 a month": "€7 por mês",
+  "Check back": "Cobrar em",
+  "Got It Back": "Recebi de volta",
+  "Name": "Nome",
+  "No date": "Sem data",
+  "Waiting": "Aguardando",
+  "Waiting On": "Aguardando",
+  "Waiting On…": "Aguardando…",
+  "Waiting on {name}": "Aguardando {name}",
+  "{count} days": {
+    "one": "1 dia",
+    "other": "{count} dias"
+  },
+  "Your agent's questions, finished work and tasks in progress show up here, and so do tasks you are waiting on. Faded tasks do too.": "Aqui aparecem as perguntas do seu agente, o trabalho concluído e as tarefas em andamento, e também as tarefas que você aguarda de outras pessoas. As tarefas esmaecidas também."
 }

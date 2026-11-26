@@ -493,8 +493,8 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     // first counts in its badge. A claim lease is backend wall-clock time.
     let now = Date()
     var reviewCount = 0, agentCount = 0
-    for task in open where task.conversationJSON != nil {
-      guard let group = task.conversation.reviewGroup(at: now) else { continue }
+    for task in open where task.conversationJSON != nil || task.isWaiting {
+      guard let group = task.conversation.reviewGroup(at: now, waiting: task.isWaiting) else { continue }
       if group.countsInBadge { reviewCount += 1 } else { agentCount += 1 }
     }
     let smartCounts: [TaskFilter: Int] = [
