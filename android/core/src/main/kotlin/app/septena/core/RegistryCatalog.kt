@@ -127,7 +127,7 @@ object RegistryCatalog {
             val fields = raw as? JsonValue.ObjectValue ?: return@mapNotNull null
             val title = fields.stringAt("title") ?: return@mapNotNull null
             val statuses = fields.mapNotNull { (key, value) ->
-                if (key == "title") return@mapNotNull null
+                if (key == "title" || key == "agent") return@mapNotNull null
                 value.stringValue()?.let { key to it }
             }.toMap()
             if (platform !in statuses) return@mapNotNull null

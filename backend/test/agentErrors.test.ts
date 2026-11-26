@@ -216,6 +216,17 @@ describe("AS3 idempotency keys", () => {
     assert.ok(tools.some((t) => t.name === "tasks_create" && "idempotency_key" in (t.inputSchema.properties ?? {})));
   });
 
+  // scripts/lib/mcp-tools.mjs reads the tool names from the source for the
+  // registry checks (capabilities.json `agent`, skills/*/SKILL.md). It must
+  // see exactly the tools that tools/list serves.
+  it("serves the tools that scripts/lib/mcp-tools.mjs reads from the source", async () => {
+    const h = await harness();
+    const r = await h.rpc("tools/list");
+    const served = (r.result as unknown as { tools: { name: string }[] }).tools.map((t) => t.name).sort();
+    const { mcpToolNames } = await import("../../scripts/lib/mcp-tools.mjs");
+    assert.deepEqual(served, mcpToolNames(new URL("../..", import.meta.url).pathname));
+  });
+
   it("expires a key after 24 hours and bounds the table", async () => {
     const { store } = await createTestTaskStore();
     const t0 = 1_000_000_000_000;
