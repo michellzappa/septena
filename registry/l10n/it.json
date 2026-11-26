@@ -284,7 +284,7 @@
   "Invite Someone": "Invita qualcuno",
   "Invite link": "Link di invito",
   "It also removes your tasks from this device and signs you out. You can’t undo this.": "Rimuove anche le tue attività da questo dispositivo e termina la sessione. Non puoi annullare questa operazione.",
-  "It lands in your Inbox until you schedule or file it": "Resta nella posta in arrivo finché non la pianifichi o archivi",
+  "It lands in your Inbox until you schedule or file it": "Resta in Posta in arrivo finché non la pianifichi o archivi",
   "Its tasks stay in the project.": "Le sue attività restano nel progetto.",
   "Jabuticaba": "Jabuticaba",
   "Join": "Partecipa",
@@ -346,7 +346,7 @@
     "one": "Spostata in {destination}",
     "other": "Spostate {count} attività in {destination}"
   },
-  "Moves reminders into your Inbox. Each one you import leaves Reminders.": "Sposta i promemoria nella posta in arrivo. Ogni promemoria importato viene rimosso da Promemoria.",
+  "Moves reminders into your Inbox. Each one you import leaves Reminders.": "Sposta i promemoria in Posta in arrivo. Ogni promemoria importato viene rimosso da Promemoria.",
   "Move…": "Sposta…",
   "Name this agent": "Dai un nome a questo agente",
   "New Area": "Nuova area",
@@ -797,5 +797,9 @@
   "Questions and finished work from your agent show up here. So do tasks that faded.": "Qui appaiono le domande e il lavoro completato dal tuo agente. Anche le attività inattive.",
   "Tasks without activity for 14 days appear here until you keep them or let them go.": "Qui appaiono le attività senza attività da 14 giorni finché non le tieni o le lasci andare.",
   "Tasks fade after 14 days without activity and move to Review. A deadline or a date ahead keeps a task out. Open or edit a task to bring it back. You can turn this off in Settings.": "Dopo 14 giorni senza attività le attività perdono risalto e passano in Revisione. Una scadenza o una data futura lo evita. Apri o modifica un’attività per recuperarla. Puoi disattivarlo in Impostazioni.",
-  "Tasks without activity for 14 days fade out and move to Review. This applies on all your devices.": "Dopo 14 giorni senza attività, le attività perdono risalto e passano in Revisione. Vale su tutti i tuoi dispositivi."
+  "Tasks without activity for 14 days fade out and move to Review. This applies on all your devices.": "Dopo 14 giorni senza attività, le attività perdono risalto e passano in Revisione. Vale su tutti i tuoi dispositivi.",
+  "{count} reminders moved to the Inbox": {
+    "one": "Promemoria spostato in Posta in arrivo",
+    "other": "{count} promemoria spostati in Posta in arrivo"
+  }
 }

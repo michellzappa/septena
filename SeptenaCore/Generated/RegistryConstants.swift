@@ -1861,6 +1861,7 @@ enum RegistryToasts {
   static func deletedSingle(title: String) -> String { title.isEmpty ? RegistryL10n.t("Task deleted") : RegistryL10n.format("“%@” deleted", english: "“%@” deleted", args: [title]) }
   static func deletedBulk(count: Int) -> String { RegistryL10n.plural("%lld tasks deleted", count: count, one: "Task deleted", other: "%lld tasks deleted", args: [count]) }
   static func movedBulk(count: Int, destination: String) -> String { RegistryL10n.plural("Moved %lld tasks to %@", count: count, one: "Moved to %2$@", other: "Moved %lld tasks to %@", args: [count, destination]) }
+  static func importedReminders(count: Int) -> String { RegistryL10n.plural("%lld reminders moved to the Inbox", count: count, one: "Reminder moved to the Inbox", other: "%lld reminders moved to the Inbox", args: [count]) }
 }
 
 /// Canonical task attribute IDs (`registry/surfaces.json` `taskAttributes`).

@@ -4759,6 +4759,18 @@
       "surfaces.prompts.countPhrases.projects.label"
     ]
   },
+  "{count} reminders moved to the Inbox": {
+    "forms": {
+      "one": "Reminder moved to the Inbox",
+      "other": "{count} reminders moved to the Inbox"
+    },
+    "placeholders": [
+      "count"
+    ],
+    "paths": [
+      "surfaces.toasts.templates.importedReminders.format"
+    ]
+  },
   "{count} selected": {
     "text": "{count} selected",
     "placeholders": [

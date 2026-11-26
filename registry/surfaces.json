@@ -278,7 +278,8 @@
       "moved": { "format": "Moved to {destination}", "undoable": true },
       "deletedSingle": { "format": "“{title}” deleted", "emptyTitleFormat": "Task deleted", "undoable": true },
       "deletedBulk": { "format": { "one": "Task deleted", "other": "{count} tasks deleted" }, "undoable": true },
-      "movedBulk": { "format": { "one": "Moved to {destination}", "other": "Moved {count} tasks to {destination}" }, "undoable": true }
+      "movedBulk": { "format": { "one": "Moved to {destination}", "other": "Moved {count} tasks to {destination}" }, "undoable": true },
+      "importedReminders": { "format": { "one": "Reminder moved to the Inbox", "other": "{count} reminders moved to the Inbox" }, "undoable": true }
     }
   },
   "firstRun": {

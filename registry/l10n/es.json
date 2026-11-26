@@ -286,7 +286,7 @@
   "Invite Someone": "Invitar a alguien",
   "Invite link": "Enlace de invitación",
   "It also removes your tasks from this device and signs you out. You can’t undo this.": "También elimina tus tareas de este dispositivo y cierra tu sesión. No puedes deshacerlo.",
-  "It lands in your Inbox until you schedule or file it": "Va a la bandeja de entrada hasta que la programes o la archives",
+  "It lands in your Inbox until you schedule or file it": "Va a la Bandeja de entrada hasta que la programes o la archives",
   "Its tasks stay in the project.": "Sus tareas permanecen en el proyecto.",
   "Jabuticaba": "Jabuticaba",
   "Join": "Unirse",
@@ -804,5 +804,9 @@
   "€5 a month. You save €24 against paying monthly.": "5 € al mes. Ahorras 24 € respecto al pago mensual.",
   "€60 a year": "60 € al año",
   "€60 a year or €7 a month": "60 € al año o 7 € al mes",
-  "€7 a month": "7 € al mes"
+  "€7 a month": "7 € al mes",
+  "{count} reminders moved to the Inbox": {
+    "one": "Recordatorio movido a la Bandeja de entrada",
+    "other": "{count} recordatorios movidos a la Bandeja de entrada"
+  }
 }
