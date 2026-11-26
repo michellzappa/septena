@@ -265,36 +265,12 @@
       "reason": "Android edits recurrence inside Task Detail rather than a standalone menu action.",
       "issue": "#367"
     },
-    "RegistryActionIds.AREA_MOVE_UP": {
-      "reason": "Android reorders areas via drag rather than Move Up menu action.",
-      "issue": "#367"
-    },
-    "RegistryActionIds.AREA_MOVE_DOWN": {
-      "reason": "Android reorders areas via drag rather than Move Down menu action.",
-      "issue": "#367"
-    },
-    "RegistryActionIds.AREA_DELETE": {
-      "reason": "Android area delete does not reference RegistryActionIds.AREA_DELETE constant yet.",
-      "issue": "#367"
-    },
-    "RegistryActionIds.PROJECT_MOVE_UP": {
-      "reason": "Android reorders projects via drag rather than Move Up menu action.",
-      "issue": "#367"
-    },
-    "RegistryActionIds.PROJECT_MOVE_DOWN": {
-      "reason": "Android reorders projects via drag rather than Move Down menu action.",
-      "issue": "#367"
-    },
     "RegistryActionIds.PROJECT_MARK_DONE": {
       "reason": "Android project completion does not reference RegistryActionIds.PROJECT_MARK_DONE constant yet.",
       "issue": "#367"
     },
     "RegistryActionIds.PROJECT_CANCEL": {
       "reason": "Android project cancellation does not reference RegistryActionIds.PROJECT_CANCEL constant yet.",
-      "issue": "#367"
-    },
-    "RegistryActionIds.PROJECT_DELETE": {
-      "reason": "Android project delete does not reference RegistryActionIds.PROJECT_DELETE constant yet.",
       "issue": "#367"
     },
     "RegistryActionIds.LOGGED_CLEAR": {
