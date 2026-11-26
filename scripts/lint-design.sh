@@ -307,6 +307,19 @@ if ! ce_out=$(./scripts/lint-contact-email.sh 2>&1); then
   printf '%s\n' "$OFF"
 fi
 
+# ── Platform names in copy (mz, 2026-11-26) ─────────────────────────────────
+# Every platform gets every feature: registry copy, backend/skill.md,
+# backend/onboard.md and TasksSkill.swift never list platforms. JSON
+# exceptions live in the script's ALLOW list (JSON holds no comments).
+if command -v node >/dev/null 2>&1; then
+  if ! pc_out=$(node scripts/lint-platform-copy.mjs 2>&1); then
+    printf '%s✗ %s%s\n' "$RED" "platform-copy" "$OFF"
+    errors=$((errors + 1))
+    printf '%s' "$DIM"; printf '%s\n' "$pc_out" | sed 's/^/    /'
+    printf '%s\n' "$OFF"
+  fi
+fi
+
 # ── Shared cross-platform registries (ADR 0015) ──────────────────────────────
 # Generated Swift and TypeScript bindings must stay in lockstep with
 # `registry/*.json`. Run `node scripts/gen-registries.mjs` after editing any
