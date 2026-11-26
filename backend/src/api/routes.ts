@@ -8,6 +8,7 @@ import { MAX_ATTACHMENT_BYTES, zId } from "../store/columns.js";
 import { zPushBody, type Op } from "../store/ops.js";
 import type { ChangeEntry } from "../store/TaskStore.js";
 import { USER_ID_RE, accountStoreFor } from "../store/AccountStore.js";
+import { prepareReviewerAccount } from "../shadow/reviewer.js";
 import { AppleIdentityError, userIdForAppleSub, verifyAppleIdentityToken } from "./appleIdentity.js";
 import { HANDOFF_TTL_S, accountAlreadyDeleted, authenticate, issueSession, refreshSession, revokeSession, storeFor, withSession } from "./session.js";
 import { SESSION_HEADER } from "../store/sessions.js";
@@ -961,6 +962,19 @@ api.delete("/admin/grants/:userId/:name", async (c) => {
   const removed = await storeFor(c.env, userId.data).deleteEntitlement(`grant:${name.data}`);
   logEvent("entitlement_grant_revoked", { userId: userId.data, name: name.data, removed });
   return removed ? c.body(null, 204) : c.json({ error: "not_found" }, 404);
+});
+
+// ---- admin: the directory reviewer demo account (ADR 0055) ----
+// Same gate as the grant routes, and 404 unless reviewer mode is on. Returns
+// a short-lived connector token for the demo account only; the seed script
+// (backend/scripts/reviewer-seed.mjs) fills the account with it and revokes it.
+
+api.post("/admin/reviewer/prepare", async (c) => {
+  if (!c.env.ADMIN_TOKEN) return c.notFound();
+  if (!(await adminAllowed(c))) return c.json({ error: "forbidden" }, 403);
+  const tokens = await prepareReviewerAccount(c.env);
+  if (!tokens) return c.json({ error: "reviewer_mode_off" }, 404);
+  return c.json(tokens, 200, { "Cache-Control": "no-store" });
 });
 
 // ---- admin: account move copy (docs/CLOUDFLARE_ACCOUNT_MOVE.md) ----

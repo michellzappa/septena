@@ -59,6 +59,7 @@ a new ADR and set the old one to `superseded by NNNN`.
 | [0052](0052-the-site-shows-pro-as-a-real-plan.md) | The website shows Pro as a real plan (amends 0045) | accepted |
 | [0053](0053-waiting-on-people-is-a-review-group.md) | Work handed to a person is a Waiting group in Review (amends 0046) | accepted |
 | [0054](0054-support-lands-in-starlings.md) | Support goes to Starlings, through a native form (supersedes feedback.md) | accepted |
+| [0055](0055-directory-reviewers-use-a-demo-account.md) | Directory reviewers use a demo account behind a reviewer code | accepted |
 
 ## Template
 

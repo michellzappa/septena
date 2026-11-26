@@ -10,6 +10,7 @@ import { storeFor } from "../api/session.js";
 import { emailSignInEnabled, verifyEmailAccount, zEmailAddress } from "../api/emailSignIn.js";
 import { SIGN_IN } from "../generated/registries.js";
 import { pairApproveUrl, pairQrMatrix, pairQrSvg } from "./pairQr.js";
+import { REVIEWER_MAX_FAILURES, reviewerCodeMatches, reviewerMode } from "./reviewer.js";
 import { AGENT_NAME_MAX, MCP_CLIENT_PREFIX, MCP_GRANT_SCOPE, MCP_SCOPES, issueMcpTokens, redeemMcpRefresh, revokeMcpToken, settleNewAgent } from "./tokens.js";
 
 // OAuth 2.1 for the MCP task connector on api.septena.app (phase 2,
@@ -297,6 +298,48 @@ export async function pairEmail(c: Context<{ Bindings: Env }>) {
   const res = await pairing.approve({ userId: account.userId, timeZone }, "connector");
   if (res.outcome !== "ok") return c.json({ error: "expired_or_unknown" }, 410, noStore);
   logEvent("preview_pair_approve", { ok: true, kind: "connector", via: "email", created: account.created });
+  return c.json({ ok: true }, 200, noStore);
+}
+
+// ---- the page's reviewer path (ADR 0055, septena#85) ----
+
+const zPairReviewerBody = z.object({ code: z.string().trim().min(1).max(200) }).strict();
+
+/// POST /oauth/pair/reviewer: a directory reviewer types the reviewer code on
+/// the authorize page. The pairing cookie proves this browser opened the
+/// pairing; a right code approves it for the demo account and nothing else.
+/// Off (404) unless reviewer mode is on. The code is never logged.
+export async function pairReviewer(c: Context<{ Bindings: Env }>) {
+  const noStore = { "Cache-Control": "no-store" };
+  const mode = reviewerMode(c.env);
+  if (!mode) return c.json({ error: "not_found" }, 404, noStore);
+  if (c.req.header("Origin") !== c.env.API_PUBLIC_URL) return c.json({ error: "origin_not_allowed" }, 403, noStore);
+  const cookie = readCookie(c.req.raw, PAIR_COOKIE) ?? "";
+  const [rawCode, pendingId] = cookie.split(".");
+  const code = rawCode ? normalizePairCode(rawCode) : null;
+  if (!code || !pendingId) return c.json({ error: "expired_or_unknown" }, 410, noStore);
+  let raw: unknown;
+  try { raw = await c.req.json(); } catch { return c.json({ error: "invalid_request" }, 400, noStore); }
+  const body = zPairReviewerBody.safeParse(raw);
+  if (!body.success) return c.json({ error: "invalid_request" }, 400, noStore);
+
+  const ip = c.req.header("CF-Connecting-IP") ?? "unknown";
+  if ((await ipRateCount(c.env, "rl:reviewer", ip)) >= REVIEWER_MAX_FAILURES) {
+    logEvent("reviewer_pair", { ok: false, reason: "ip_limited" });
+    return c.json({ error: "too_many_attempts" }, 429, noStore);
+  }
+  const pairing = pairingFor(c.env, code);
+  if ((await pairing.status(pendingId, "connector")).status !== "pending") {
+    return c.json({ error: "expired_or_unknown" }, 410, noStore);
+  }
+  if (!(await reviewerCodeMatches(c.env, body.data.code))) {
+    await noteIpRateEvent(c.env, "rl:reviewer", ip);
+    logEvent("reviewer_pair", { ok: false, reason: "wrong_code" });
+    return c.json({ error: "invalid_code" }, 401, noStore);
+  }
+  const res = await pairing.approve({ userId: mode.userId }, "connector");
+  if (res.outcome !== "ok") return c.json({ error: "expired_or_unknown" }, 410, noStore);
+  logEvent("reviewer_pair", { ok: true });
   return c.json({ ok: true }, 200, noStore);
 }
 
@@ -692,6 +735,32 @@ const EMAIL_FORM_HTML = `<section class="alt" id="email">
       <p class="small" id="email-note" role="status"></p>
     </section>`;
 
+// The reviewer form (ADR 0055): only while reviewer mode is on. Directory
+// reviewers find the code in the submission notes; nobody else has it.
+const REVIEWER_FORM_HTML = `<section class="alt" id="reviewer">
+      <p><b>Directory reviewer?</b> Use the demo account. Type the reviewer code from the submission notes.</p>
+      <form id="reviewer-form"><input id="reviewer-code" type="password" autocomplete="off" required aria-label="Reviewer code"><button type="submit">Use the demo account</button></form>
+      <p class="small" id="reviewer-note" role="status"></p>
+    </section>`;
+
+const REVIEWER_PAGE_JS = `(() => {
+  const form = document.getElementById("reviewer-form");
+  if (!form) return;
+  const note = document.getElementById("reviewer-note");
+  const say = (t) => { note.textContent = t; note.className = "small err"; };
+  const errors = { invalid_code: "That code is not right.", too_many_attempts: "Too many tries. Wait ten minutes and connect again.", expired_or_unknown: "This sign-in expired. Connect again." };
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault(); const b = form.querySelector("button"); b.disabled = true;
+    try {
+      const r = await fetch("/oauth/pair/reviewer", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code: document.getElementById("reviewer-code").value }) });
+      if (r.ok) { location.href = "/oauth/pair/continue"; return; }
+      const j = await r.json().catch(() => null);
+      say((j && errors[j.error]) || "Something went wrong. Try again.");
+    } catch { say("Something went wrong. Try again."); }
+    b.disabled = false;
+  });
+})();`;
+
 // The page script. Strings arrive as JSON, so registry text never meets the
 // script as code.
 const PAIR_PAGE_TEXT = JSON.stringify({ email: SIGN_IN.email, errors: SIGN_IN.errors }).replace(/</g, "\\u003c");
@@ -779,9 +848,11 @@ function pairPage(
     <p>${client} will be able to read and change your tasks.</p>
     <p class="small">The code works for 10 minutes. This page checks for your approval every few seconds.</p>
     ${emailSignInEnabled(c.env) ? EMAIL_FORM_HTML : ""}
+    ${reviewerMode(c.env) ? REVIEWER_FORM_HTML : ""}
     ${back}
   </main>
   <script>${PAIR_PAGE_JS}</script>
+  ${reviewerMode(c.env) ? `<script>${REVIEWER_PAGE_JS}</script>` : ""}
 </body>
 </html>`;
   const headers: Record<string, string> = {

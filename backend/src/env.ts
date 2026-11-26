@@ -54,6 +54,14 @@ export interface Env {
   /// Cloudflare Email Service send binding (septena.app is onboarded).
   EMAIL?: SendEmail;
 
+  /// Directory reviewer access (ADR 0055, src/shadow/reviewer.ts). The pairing
+  /// page offers the demo account REVIEWER_ACCOUNT_ID to whoever types
+  /// REVIEWER_CODE, until REVIEWER_MODE_UNTIL (optional ISO date). Any one
+  /// unset or malformed turns it off. All three are secrets.
+  REVIEWER_CODE?: string;
+  REVIEWER_ACCOUNT_ID?: string;
+  REVIEWER_MODE_UNTIL?: string;
+
   // KV namespaces
   STATE: KVNamespace;    // short-lived OAuth state (src/shadow/oauth.ts)
   TOKENS: KVNamespace;   // MCP grants: access and refresh tokens (src/shadow/tokens.ts)

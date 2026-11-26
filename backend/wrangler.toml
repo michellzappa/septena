@@ -140,3 +140,7 @@ bucket_name = "septena-attachments"
 # APNS_TEAM_ID    — optional, 10-character Apple Developer Team ID.
 # APNS_BUNDLE_ID  — optional, defaults to "com.septena.tasks".
 # APNS_SANDBOX    — optional, "true" forces sandbox host; unset uses per-token flag.
+# REVIEWER_CODE, REVIEWER_ACCOUNT_ID, REVIEWER_MODE_UNTIL — optional. Directory
+#                   reviewer access (ADR 0055): with the first two set, the
+#                   pairing page offers the demo account for the reviewer code.
+#                   Setup: docs/CONNECTOR_DIRECTORY_SUBMISSION.md section 5.
