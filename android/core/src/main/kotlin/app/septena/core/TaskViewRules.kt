@@ -148,13 +148,17 @@ object TaskViewRules {
     }
 
     /**
-     * The Review group of a task (docs/REVIEW_SPEC.md §1), or null when it is not in Review.
-     * [conversationGroup] is the core's group for its conversation.
+     * The Review group of a task (docs/REVIEW_SPEC.md §1), or null when it is not in Review:
+     * the first that fits of what waits on the user, agent work in progress, and Faded (ADR 0046).
+     * [conversationGroup] is the core's group for its conversation; [agentStage] is the core's
+     * agent stage, which shows as its own group while the agent works.
      */
-    fun reviewGroup(task: TaskSnapshot, conversationGroup: String?): String? = when {
+    fun reviewGroup(task: TaskSnapshot, conversationGroup: String?, agentStage: String? = null): String? = when {
         task.status != RegistryEntityEnums.TaskStatus.OPEN || task.isHeading || task.deletedAt != null -> null
+        conversationGroup != null -> conversationGroup
+        agentStage in ReviewGroupIds.AGENT_WORK -> agentStage
         TaskFadeRules.isFaded(task.fadedAt) -> ReviewGroupIds.FADED
-        else -> conversationGroup
+        else -> null
     }
 
     /**
@@ -220,7 +224,16 @@ object TaskViewRules {
 object ReviewGroupIds {
     const val QUESTIONS: String = "questions"
     const val FINISHED: String = "finished"
+    const val WORKING: String = "working"
+    const val QUEUED: String = "queued"
+    const val STOPPED: String = "stopped"
     const val FADED: String = RegistryDestinationIds.FADED
+
+    /** Agent work in progress: the core's agent stages that show as Review groups. `done` does not. */
+    val AGENT_WORK: Set<String> = setOf(WORKING, QUEUED, STOPPED)
+
+    /** The groups that wait on the user. Only they count in the Review badge. */
+    val BADGE: Set<String> = setOf(QUESTIONS, FINISHED)
 }
 
 /** The task as the shared core reads it. */

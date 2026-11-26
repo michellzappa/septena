@@ -383,8 +383,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     }), collapsedKeys.contains(owner.key) {
       toggleFold(owner)
     }
-    if key == KitSidebarDestination.key(for: .filter(.review))
-        || key == KitSidebarDestination.key(for: .filter(.agent)),
+    if key == KitSidebarDestination.key(for: .filter(.review)),
        row(forKey: key) == nil {
       rebuild(preserving: key)
     }
@@ -489,18 +488,17 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     let today = SeptenaDate.today
     let inboxCount = open.filter { $0.isInTriageBand }.count
     let todayCount = open.filter { $0.isOnToday && !$0.isInTriageBand }.count
-    // One conversation decode per row that carries JSON feeds both the Review
-    // and the Agent counts. A claim lease is backend wall-clock time.
+    // One conversation decode per row that carries JSON. Review shows what
+    // waits on the user and agent work in progress (ADR 0046); only the
+    // first counts in its badge. A claim lease is backend wall-clock time.
     let now = Date()
     var reviewCount = 0, agentCount = 0
     for task in open where task.conversationJSON != nil {
-      let convo = task.conversation
-      if convo.reviewGroup != nil { reviewCount += 1 }
-      if convo.agentStage(at: now) != nil { agentCount += 1 }
+      guard let group = task.conversation.reviewGroup(at: now) else { continue }
+      if group.countsInBadge { reviewCount += 1 } else { agentCount += 1 }
     }
     let smartCounts: [TaskFilter: Int] = [
       .review: reviewCount,
-      .agent: agentCount,
       .upcoming: open.filter(\.isUpcoming).count,
       .repeating: open.filter { $0.recurrenceUnit != nil && $0.recurrence != nil }.count,
       .unscheduled: open.filter {
@@ -546,13 +544,11 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     // Set + order come from `SmartListPreferences.shared` over
     // `registry/destinations.json`, shared across both sidebars and title menus.
     var nonEmptyIDs = Set<RegistryDestinationID>()
-    // Review and Agent also stay while selected, so accepting the last item
-    // does not yank the row away.
-    if reviewCount + fadedCount > 0 || key == KitSidebarDestination.key(for: .filter(.review)) {
+    // Review also stays while selected, so accepting the last item does not
+    // yank the row away.
+    if reviewCount + agentCount + fadedCount > 0
+        || key == KitSidebarDestination.key(for: .filter(.review)) {
       nonEmptyIDs.insert(.review)
-    }
-    if agentCount > 0 || key == KitSidebarDestination.key(for: .filter(.agent)) {
-      nonEmptyIDs.insert(.agent)
     }
     if starredCount > 0 { nonEmptyIDs.insert(.starred) }
     let makeViewNode: (KitSidebarDestination) -> Node = { destination in

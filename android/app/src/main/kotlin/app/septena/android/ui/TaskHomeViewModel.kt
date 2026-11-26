@@ -207,13 +207,17 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         initialValue = TaskHomeUiState(),
     )
 
-    /** Faded is a group of Review (ADR 0044): opening it opens Review with that group unfolded. */
+    /**
+     * Faded (ADR 0044) and agent work (ADR 0046) are groups of Review: opening either opens Review,
+     * Faded with its group unfolded.
+     */
     fun select(location: TaskHomeLocation) {
         selectedIds.value = emptySet()
         starredOnly.value = false
         val opensFaded = location == TaskHomeLocation.SmartList(RegistryDestinationIds.FADED)
+        val opensAgent = location == TaskHomeLocation.SmartList(RegistryDestinationIds.AGENT)
         if (opensFaded) graph.fadeSweepStore.setFadedGroupExpanded(true)
-        this.location.value = if (opensFaded) TaskHomeLocation.SmartList(RegistryDestinationIds.REVIEW) else location
+        this.location.value = if (opensFaded || opensAgent) TaskHomeLocation.SmartList(RegistryDestinationIds.REVIEW) else location
     }
 
     fun toggleFadedGroup() {
@@ -799,7 +803,6 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             }
         }
 
-        val agentGroups = groupHeaders(RegistryDestinationIds.AGENT)
         val reviewGroups = groupHeaders(RegistryDestinationIds.REVIEW)
 
         // Compute core TaskViewMembership ONCE per open non-heading non-deleted task
@@ -833,7 +836,6 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                 continue
             }
             val convoState = convoStates[snapshot.id]
-            if (isOpenVisible(snapshot) && convoState?.agentStage in agentGroups) agentCount += 1
 
             when (snapshot.status) {
                 RegistryEntityEnums.TaskStatus.OPEN -> {
@@ -843,9 +845,11 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                     if (membership.matchesView[RegistryDestinationIds.UPCOMING] == true) upcomingCount += 1
                     if (membership.matchesView[RegistryDestinationIds.ANYTIME] == true) anytimeCount += 1
                     if (TaskViewRules.matchesView(snapshot, membership, RegistryDestinationIds.REPEATING)) repeatingCount += 1
-                    val reviewGroup = TaskViewRules.reviewGroup(snapshot, convoState?.reviewGroup)
-                    // The badge counts what waits on an answer: questions and finished work, not faded tasks.
-                    if (reviewGroup != null && reviewGroup != ReviewGroupIds.FADED) reviewCount += 1
+                    val reviewGroup = TaskViewRules.reviewGroup(snapshot, convoState?.reviewGroup, convoState?.agentStage)
+                    // The badge counts what waits on an answer: questions and finished work. Agent work in
+                    // progress keeps Review in the sidebar without a badge; faded tasks are counted apart.
+                    if (reviewGroup in ReviewGroupIds.BADGE) reviewCount += 1
+                    if (reviewGroup in ReviewGroupIds.AGENT_WORK) agentCount += 1
                     val requestedAt = when {
                         convoState?.needsHumanReview == true -> conversations[snapshot.id]?.endStateAt
                         convoState?.awaitsHuman == true -> conversations[snapshot.id]?.lastTurnAt
@@ -923,11 +927,10 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         }
 
         val nonEmptyDestinations = buildSet {
-            if (reviewCount > 0 || fadedCount > 0 || (selected as? TaskHomeLocation.SmartList)?.destinationId == RegistryDestinationIds.REVIEW) {
+            if (reviewCount > 0 || agentCount > 0 || fadedCount > 0 ||
+                (selected as? TaskHomeLocation.SmartList)?.destinationId == RegistryDestinationIds.REVIEW
+            ) {
                 add(RegistryDestinationIds.REVIEW)
-            }
-            if (agentCount > 0 || (selected as? TaskHomeLocation.SmartList)?.destinationId == RegistryDestinationIds.AGENT) {
-                add(RegistryDestinationIds.AGENT)
             }
             if (starredCount > 0) add(RegistryDestinationIds.STARRED)
             if (deletedCount > 0) add(RegistryDestinationIds.RECENTLY_DELETED)
@@ -939,7 +942,6 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             RegistryDestinationIds.REPEATING -> repeatingCount
             RegistryDestinationIds.ANYTIME -> anytimeCount
             RegistryDestinationIds.REVIEW -> reviewCount.takeIf { it > 0 }
-            RegistryDestinationIds.AGENT -> agentCount.takeIf { it > 0 }
             RegistryDestinationIds.STARRED -> starredCount.takeIf { it > 0 }
             RegistryDestinationIds.LOGBOOK -> doneTodayCount.takeIf { it > 0 }
             RegistryDestinationIds.RECENTLY_DELETED -> deletedCount.takeIf { it > 0 }
@@ -1042,17 +1044,14 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                     }
                     val conversation = conversations[snapshot.id]
                     val convoState = convoStates[snapshot.id]
-                    // The group header of a Review or Agent row; a task with no group there is not in the list.
+                    // The group header of a Review row; a task with no group there is not in the list.
                     val groupHeader = when (resolvedLocation.destinationId) {
                         RegistryDestinationIds.REVIEW ->
-                            reviewGroups[TaskViewRules.reviewGroup(snapshot, convoState?.reviewGroup)]
-                        RegistryDestinationIds.AGENT ->
-                            convoState?.agentStage.takeIf { isOpenVisible(snapshot) }?.let(agentGroups::get)
+                            reviewGroups[TaskViewRules.reviewGroup(snapshot, convoState?.reviewGroup, convoState?.agentStage)]
                         else -> null
                     }
                     val listed = when (resolvedLocation.destinationId) {
-                        RegistryDestinationIds.REVIEW,
-                        RegistryDestinationIds.AGENT -> groupHeader != null
+                        RegistryDestinationIds.REVIEW -> groupHeader != null
                         else -> TaskViewRules.matchesView(snapshot, membership, resolvedLocation.destinationId)
                     }
                     if (!listed) continue
@@ -1233,7 +1232,6 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         } else {
             val items = visible.sortedTaskItems(destinationId)
             when (destinationId) {
-                RegistryDestinationIds.AGENT -> items.sortedByGroup(agentGroups)
                 RegistryDestinationIds.REVIEW -> items.sortedByGroup(reviewGroups)
                 else -> items
             }
@@ -1450,7 +1448,6 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         val SHELL_DESTINATIONS = setOf(
             RegistryDestinationIds.TODAY,
             RegistryDestinationIds.REVIEW,
-            RegistryDestinationIds.AGENT,
             RegistryDestinationIds.UPCOMING,
             RegistryDestinationIds.REPEATING,
             RegistryDestinationIds.STARRED,
