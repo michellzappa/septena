@@ -297,6 +297,16 @@ if [ -n "$reserved_model" ]; then
   printf '%s\n' "$OFF"
 fi
 
+# ── Contact email (ADR 0054) ────────────────────────────────────────────────
+# No email address in copy, code or docs: support is the in-app form and
+# septena.app/support. Scans every tracked file, not only Swift.
+if ! ce_out=$(./scripts/lint-contact-email.sh 2>&1); then
+  printf '%s✗ %s%s\n' "$RED" "contact-email" "$OFF"
+  errors=$((errors + 1))
+  printf '%s' "$DIM"; printf '%s\n' "$ce_out" | sed 's/^/    /'
+  printf '%s\n' "$OFF"
+fi
+
 # ── Shared cross-platform registries (ADR 0015) ──────────────────────────────
 # Generated Swift and TypeScript bindings must stay in lockstep with
 # `registry/*.json`. Run `node scripts/gen-registries.mjs` after editing any

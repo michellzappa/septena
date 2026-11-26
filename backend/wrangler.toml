@@ -51,7 +51,7 @@ APPLE_IAP_ENVIRONMENTS = "Production,Sandbox"
 WEB_ALLOWED_ORIGINS = "https://web.septena.app"
 # The admin page, https://api.septena.app/admin (ADR 0043). 404 until the
 # Access team domain and audience tag are set; only these emails get in.
-ADMIN_EMAILS = "mz@envisioning.com"
+ADMIN_EMAILS = "mz@envisioning.com" # septena-lint:allow contact-email (an access list, not a contact)
 ACCESS_TEAM_DOMAIN = "wispy-tooth-45ec.cloudflareaccess.com"
 ACCESS_AUD = "5154cf50dab7e60f4e49494cd5cafab0e5cd1ebec1f44fdf99fcc0445236a83a"
 # Email sign-in codes (ADR 0016, #169). Off until Terms of Use and the

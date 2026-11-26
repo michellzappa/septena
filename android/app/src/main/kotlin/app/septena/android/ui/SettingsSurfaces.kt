@@ -269,6 +269,7 @@ private const val AI_EXPLAINER = "ai_explainer"
 private const val MCP_SKILLS = "mcp_skills"
 private const val SYNC_DIAGNOSTICS = "sync_diagnostics"
 private const val MAX_ISSUES = 20
-private const val FEEDBACK_EMAIL = "mz@centaur-labs.io"
-private const val FEEDBACK_URL = "mailto:mz@centaur-labs.io?subject=Septena%20feedback"
+// Interim until #676 replaces these with the native Contact Support form.
+private const val FEEDBACK_EMAIL = "mz@centaur-labs.io" // septena-lint:allow contact-email
+private const val FEEDBACK_URL = "mailto:mz@centaur-labs.io?subject=Septena%20feedback" // septena-lint:allow contact-email
 private const val REPO_URL = "https://github.com/michellzappa/septena"

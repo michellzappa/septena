@@ -140,7 +140,7 @@ The apps and the sync server are open source under the MIT License. Septena work
 Native on iPhone, iPad and Mac, with your tasks in sync across all three.
 
 ABOUT THIS BETA
-One person makes Septena: mz. This beta is the iPhone and iPad app. Sign in with Apple and your tasks sync to your other devices through Septena's own server. You can also connect Claude or another agent in Settings, under Connections & AI. Expect rough edges. Send feedback from TestFlight with a screenshot, or write to mz@centaur-labs.io.
+One person makes Septena: mz. This beta is the iPhone and iPad app. Sign in with Apple and your tasks sync to your other devices through Septena's own server. You can also connect Claude or another agent in Settings, under Connections & AI. Expect rough edges. Send feedback from TestFlight with a screenshot, or write to us at septena.app/support.
 
 ### primary_category
 

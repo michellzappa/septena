@@ -945,7 +945,8 @@ private struct SeptaskAboutPane: View {
         label(item)
       }
     case "send_feedback":
-      Link(destination: URL(string: "mailto:mz@centaur-labs.io?subject=Septena%20feedback")!) {
+      // Interim until #676 replaces this with the native Contact Support form.
+      Link(destination: URL(string: "mailto:mz@centaur-labs.io?subject=Septena%20feedback")!) { // septena-lint:allow contact-email
         label(item)
       }
     default:
