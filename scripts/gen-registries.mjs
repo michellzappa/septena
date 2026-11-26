@@ -14,6 +14,7 @@ import { fileURLToPath } from "node:url";
 import * as L10N from "./registry-l10n.mjs";
 import { checkReaders } from "./registry-readers.mjs";
 import { validateCast } from "./registry-cast.mjs";
+import { mcpToolNames } from "./lib/mcp-tools.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(__dirname, "..");
@@ -175,6 +176,44 @@ function validateCapabilities(caps) {
     for (const p of caps.platforms) {
       assert(validStatuses.has(entry[p]), `capabilities.json: ${id}.${p} has invalid status "${entry[p]}"`);
     }
+    // The agent door (ADR 0050, AS7 #628): the MCP tools that reach the
+    // capability, or "none". Every name must be a tool the backend registers.
+    const agent = entry.agent;
+    assert(agent === "none" || (Array.isArray(agent) && agent.length > 0), `capabilities.json: ${id} needs "agent": a list of MCP tool names, or "none"`);
+    if (Array.isArray(agent)) {
+      assert(new Set(agent).size === agent.length, `capabilities.json: ${id}.agent names a tool twice`);
+      for (const tool of agent) assert(MCP_TOOLS.has(tool), `capabilities.json: ${id}.agent names "${tool}", which the backend does not register (scripts/lib/mcp-tools.mjs)`);
+    }
+    const known = new Set(["title", "agent", ...caps.platforms]);
+    for (const key of Object.keys(entry)) assert(known.has(key), `capabilities.json: ${id} has unknown field "${key}"`);
+  }
+}
+
+// skills/<name>/SKILL.md (ADR 0050 §6, AS6 #627): one procedure per skill, the
+// site serves each at septena.app/skills/<name>/SKILL.md. The frontmatter has
+// `name` (the folder) and `description`. Every tool a skill names must be one
+// the backend registers, and backend/skill.md (the full brief) links each one.
+function validateSkills() {
+  const dir = path.join(REPO, "skills");
+  const names = fs.readdirSync(dir, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name).sort();
+  assert(names.length > 0, "skills/: no skills");
+  const brief = fs.readFileSync(path.join(REPO, "backend/skill.md"), "utf8");
+  for (const name of names) {
+    const rel = `skills/${name}/SKILL.md`;
+    assert(/^[a-z0-9]+(-[a-z0-9]+)*$/.test(name), `${rel}: the folder name must be lowercase words joined by hyphens`);
+    assert(fs.existsSync(path.join(REPO, rel)), `${rel}: missing`);
+    const text = fs.readFileSync(path.join(REPO, rel), "utf8");
+    const fm = text.match(/^---\n([\s\S]*?)\n---\n/);
+    assert(fm, `${rel}: needs YAML frontmatter with name and description`);
+    const field = (key) => fm[1].match(new RegExp(`^${key}: (.+)$`, "m"))?.[1]?.trim();
+    assert(field("name") === name, `${rel}: frontmatter name must be "${name}"`);
+    const description = field("description");
+    assert(description && description.length <= 1024, `${rel}: frontmatter needs a description of at most 1024 characters`);
+    assert(!/[\u2013\u2014]/.test(text), `${rel}: no em or en dashes`);
+    for (const [tool] of text.matchAll(/\btasks_[a-z_]+\b/g)) {
+      assert(MCP_TOOLS.has(tool), `${rel}: names "${tool}", which the backend does not register (scripts/lib/mcp-tools.mjs)`);
+    }
+    assert(brief.includes(`https://septena.app/skills/${name}/SKILL.md`), `backend/skill.md: link the skill ${name} (https://septena.app/skills/${name}/SKILL.md)`);
   }
 }
 
@@ -2633,9 +2672,8 @@ function generateKotlinCore(bundle) {
   lines.push("    val statusByFeatureAndPlatform: Map<String, Map<String, String>> = linkedMapOf(");
   for (const [featureId, capability] of Object.entries(caps.capabilities)) {
     lines.push(`        ${kotlinStr(featureId)} to linkedMapOf(`);
-    for (const [platform, status] of Object.entries(capability)) {
-      if (platform === "title") continue;
-      lines.push(`            ${kotlinStr(platform)} to ${kotlinStr(status)},`);
+    for (const platform of caps.platforms) {
+      lines.push(`            ${kotlinStr(platform)} to ${kotlinStr(capability[platform])},`);
     }
     lines.push("        ),");
   }
@@ -2782,6 +2820,7 @@ const rules = readJSON("registry/rules.json");
 const icons = readJSON("registry/icons.json");
 const tokens = readJSON("registry/tokens.json");
 const caps = readJSON("registry/capabilities.json");
+const MCP_TOOLS = new Set(mcpToolNames(REPO));
 const settings = readJSON("registry/settings.json");
 const dests = readJSON("registry/destinations.json");
 const actions = readJSON("registry/actions.json");
@@ -2811,6 +2850,7 @@ validatePlans(plans, icons, caps, importSources);
 validateSignIn(signIn, icons, caps, plans);
 validateConformance();
 validateCodeMap(readJSON("registry/code-map.json"), caps);
+validateSkills();
 // Marketing content only: no generated bindings, no localized strings (ADR 0030).
 validateCast(
   fs.readdirSync(path.join(REPO, "registry/cast")).filter((name) => name.endsWith(".json")).sort()
@@ -2869,9 +2909,11 @@ function generateFeatureMap({ caps }) {
     `|---|${caps.platforms.map(() => "---").join("|")}|`,
     ...caps.statuses.map((st) => `| ${CODES[st] ?? st} | ${caps.platforms.map((p) => rows.filter(([, c]) => c[p] === st).length).join(" | ")} |`),
     "",
-    `| ID | Feature | ${caps.platforms.map((p) => LABELS[p] ?? p).join(" | ")} |`,
-    `|---|---|${caps.platforms.map(() => "---").join("|")}|`,
-    ...rows.map(([id, c]) => `| \`${id}\` | ${cell(c.title)} | ${caps.platforms.map((p) => CODES[c[p]] ?? c[p]).join(" | ")} |`),
+    "**Agent** lists the MCP tools at `api.septena.app/mcp` that reach the feature; **none** means an agent cannot reach it.",
+    "",
+    `| ID | Feature | ${caps.platforms.map((p) => LABELS[p] ?? p).join(" | ")} | Agent |`,
+    `|---|---|${caps.platforms.map(() => "---").join("|")}|---|`,
+    ...rows.map(([id, c]) => `| \`${id}\` | ${cell(c.title)} | ${caps.platforms.map((p) => CODES[c[p]] ?? c[p]).join(" | ")} | ${c.agent === "none" ? "none" : c.agent.map((t) => `\`${t}\``).join(", ")} |`),
     "",
   ];
   return lines.join("\n");

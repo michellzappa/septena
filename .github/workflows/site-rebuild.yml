@@ -1,7 +1,7 @@
 name: Site rebuild
 
-# The website (michellzappa/septena-site) copies registry/, the changelog and
-# the connector's tool list from this repo's main. When one of them changes on
+# The website (michellzappa/septena-site) copies registry/, skills/, the
+# changelog and the connector's tool list from this repo's main. When one of them changes on
 # main, this job asks the site to build and deploy again, so septena.app never
 # shows a stale registry. The site runs its Deploy workflow on the
 # `app-registry-changed` repository_dispatch event.
@@ -15,6 +15,7 @@ on:
     branches: [main]
     paths:
       - "registry/**"
+      - "skills/**"
       - "changelog/**"
       - "tools/changelog.mjs"
       - "backend/src/**"

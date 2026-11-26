@@ -703,7 +703,12 @@ The product is Septena; the code targets keep the working names `Septask` (iOS),
   describe "two servers, edited in lockstep" are history. An MCP tool change
   lands in `backend/` plus the docs and skill briefs in the same change. Keep
   `backend/skill.md` and `Septena/Shell/Tasks/TasksSkill.swift` (the brief in
-  Settings ▸ MCP Skills) in sync with the backend's tools. The agent loop (`tasks_claim`, `tasks_release`,
+  Settings ▸ MCP Skills) in sync with the backend's tools. The skills in `skills/<name>/SKILL.md`
+  (ADR 0050 §6) are single procedures from that brief; the site serves them at
+  `septena.app/skills/<name>/SKILL.md`. A rule change lands in the brief and in
+  every skill that states it. Each capability in `registry/capabilities.json`
+  names the tools that reach it in `agent` (or `"none"`): a new or renamed
+  tool updates it. The agent loop (`tasks_claim`, `tasks_release`,
   `tasks_agent_events`, `tasks_activity`) lives in `src/shadow/agent.ts`: a
   claim needs the Durable Object's single writer, and its rules (leases, the
   human-only stop, pause, run budget) are enforced in `TaskStore`, not in tool

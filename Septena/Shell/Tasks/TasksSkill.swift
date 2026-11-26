@@ -163,6 +163,9 @@ enum TasksSkill {
 
       Every write tool takes an optional `idempotency_key` (a UUID you make per write). Send the same key when you retry: Septena returns the first result and does not write again, so a retried create never makes a second task. Keys live 24 hours; the same key with a different body is refused as `idempotency_conflict`.
 
+      ### Skills
+      Each skill is one procedure from this brief, as a file an agent can load: `https://septena.app/skills/connect-septena/SKILL.md` (connect and check the connection), `https://septena.app/skills/add-a-task-once/SKILL.md` (search, a `from` reference, `existing` and `dismissed`, one `idempotency_key` per create), `https://septena.app/skills/work-a-task/SKILL.md` (claim, notes, turns, hand over to Review) and `https://septena.app/skills/ask-the-person/SKILL.md` (a provider turn with options, then wait for `user_turn`). This brief stays the full set of rules.
+
       ### How the app works (help)
       - When the user asks how to do something in Septena, what a word means, or why something does not work, read `https://septena.app/help.md`. It lists every help page as Markdown, and `https://septena.app/llms-full.txt` has them all in one file. Answer from those pages with the app's own menu names.
       - When the pages do not answer it, say so and point to `https://septena.app/support`. Never guess a menu, a shortcut or a feature.

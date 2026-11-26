@@ -11,8 +11,8 @@
 // Scans:
 //   - every string value in registry/*.json and registry/cast/*.json, minus the
 //     data files and data keys listed below;
-//   - backend/skill.md, backend/onboard.md, Septena/Shell/Tasks/TasksSkill.swift,
-//     line by line.
+//   - backend/skill.md, backend/onboard.md, Septena/Shell/Tasks/TasksSkill.swift
+//     and skills/*/SKILL.md, line by line.
 // It flags iPhone, iPad, Mac, macOS, iOS, iPadOS, Windows, Android, Apple
 // Watch and watchOS. A "web app" in a platform list always sits next to one of
 // these names, so the list is caught by them.
@@ -62,7 +62,9 @@ const ALLOW = [
   { file: "registry/settings.json", path: "copy.access_devices[8].label", category: "device-name", reason: "The kind of a signed-in device in Settings > Account > Devices." },
 ];
 
-const LINE_FILES = ["backend/skill.md", "backend/onboard.md", "Septena/Shell/Tasks/TasksSkill.swift"];
+const SKILL_FILES = readdirSync(path.join(ROOT, "skills"), { withFileTypes: true })
+  .filter((d) => d.isDirectory()).map((d) => `skills/${d.name}/SKILL.md`).sort();
+const LINE_FILES = ["backend/skill.md", "backend/onboard.md", "Septena/Shell/Tasks/TasksSkill.swift", ...SKILL_FILES];
 
 const hits = [];
 const used = new Set();

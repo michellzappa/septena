@@ -7,6 +7,17 @@ description: Use the Septena tasks MCP at api.septena.app to read and write the 
 
 The connector at `https://api.septena.app/mcp` exposes the user's tasks, areas, projects and task conversations, the same data the Septena app shows. Changes reach the app within seconds.
 
+## Skills
+
+Each skill is one procedure from this brief, as a file an agent can load:
+
+- [connect-septena](https://septena.app/skills/connect-septena/SKILL.md): connect to the person's tasks and check the connection.
+- [add-a-task-once](https://septena.app/skills/add-a-task-once/SKILL.md): search, link the source item with role `from`, respect `existing` and `dismissed`, retry with the same `idempotency_key`.
+- [work-a-task](https://septena.app/skills/work-a-task/SKILL.md): claim, read the notes, write each step as a turn, hand over to Review.
+- [ask-the-person](https://septena.app/skills/ask-the-person/SKILL.md): a provider turn with options, then wait for the `user_turn` event.
+
+This brief stays the full set of rules. When a skill and this brief disagree, this brief wins.
+
 ## Connecting or creating an account
 
 - **Browser MCP hosts (Claude, ChatGPT, Cursor):** add `https://api.septena.app/mcp`. On the authorize page the user can approve with an existing Septena app (QR / 8-character code) or create/sign in to an account with email (no app needed first).

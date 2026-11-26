@@ -70,10 +70,18 @@ Each phase is one issue. Phases in one group can run in parallel.
   `add-a-task-once` (search, refs, `existing` and `dismissed`),
   `ask-the-person`. The site serves them, and `llms.txt` and `agents.md`
   link them. Feeds #88.
+  *Shipped.* `scripts/gen-registries.mjs --check` checks each skill: the
+  frontmatter `name` is the folder, a `description` is there, every tool it
+  names is registered, and `backend/skill.md` links it. The site copies
+  `skills/` at build time (`scripts/sync-registry.mjs`).
 - **AS7 (#628) Agent door per capability.** Each entry in
   `registry/capabilities.json` gets an `agent` field: the MCP tools that
   reach it, or `none`. The generator writes it into `docs/FEATURE_MAP.md`.
   The site's parity page and `llms-full.txt` show it as a column.
+  *Shipped.* `scripts/lib/mcp-tools.mjs` reads the tool names from the
+  backend source; `backend/test/agentErrors.test.ts` checks that list against
+  the live `tools/list`. An entry without `agent`, or with a tool the backend
+  does not register, fails `gen-registries.mjs --check`.
 
 ### Group 3: pages that explain (site repo)
 
