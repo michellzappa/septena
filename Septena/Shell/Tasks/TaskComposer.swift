@@ -600,6 +600,13 @@ struct TaskComposerCard: View {
           .foregroundStyle(Theme.inkSecondary)
       }
 
+      // The wait (docs/REVIEW_SPEC.md §6): its label, Got It Back and
+      // Waiting On… on the full page. The row menu offers both everywhere.
+      if presentation == .page || presentation == .drawer, !deferredCreate,
+         let task = editingTask, task.status == .open, task.deletedAt == nil {
+        TaskWaitingStrip(task: task, offersNewWait: pageDepth == .page)
+      }
+
       VStack(alignment: .leading, spacing: inline ? 10 : 14) {
         // Header draws above this column; checklist, attachments and references draw
         // inside the attribute bar. History draws here on the page only (the

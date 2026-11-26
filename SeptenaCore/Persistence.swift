@@ -41,6 +41,11 @@ final class TaskEntity {
   /// The deadline the user planned past (docs/TASK_DATES_SPEC.md I8). Written
   /// by the core's date actions; that deadline does not hold the task on Today.
   var deferredDeadline: String? = nil
+  /// Who the task waits on, 1 to 80 characters, or nil (docs/REVIEW_SPEC.md
+  /// §6). Synced. Default `= nil` for lightweight SwiftData migration.
+  var waitingOn: String? = nil
+  /// The day the wait started (`YYYY-MM-DD`), cleared with `waitingOn`.
+  var waitingSince: String? = nil
   var today: Bool
   /// Simple boolean Important / Star marker (docs/STAR_PRIORITY_SPEC.md, ST0).
   /// Default `= false` required for lightweight SwiftData migration.
@@ -313,6 +318,9 @@ final class TaskEntity {
   /// (`docs/TASK_FADE_SPEC.md` §4). Faded tasks leave every other list, every
   /// count, Next, and the badge.
   var isFaded: Bool { status == .open && fadedAt != nil }
+
+  /// True when the task waits on a person (docs/REVIEW_SPEC.md §6).
+  var isWaiting: Bool { TaskWaiting.isWaiting(waitingOn) }
 
   var isOnToday: Bool { listMembership()?.isOnToday ?? false }
 
@@ -621,6 +629,8 @@ extension SeptenaTask {
       timeZone: e.timeZone,
       deadline: e.deadline,
       deferredDeadline: e.deferredDeadline,
+      waitingOn: e.waitingOn,
+      waitingSince: e.waitingSince,
       today: e.today,
       starred: e.starred,
       tags: e.tagIDs,
@@ -1498,7 +1508,8 @@ enum LocalCache {
       // What waits on the user and agent work in progress
       // (docs/REVIEW_SPEC.md §1), faded rows included.
       // Only rows that carry conversation JSON decode it.
-      guard e.status == .open, !e.isHeading, e.isFaded || e.conversationJSON != nil else { return nil }
+      guard e.status == .open, !e.isHeading,
+            e.isFaded || e.conversationJSON != nil || e.isWaiting else { return nil }
       let task = SeptenaTask(e)
       return task.reviewGroup == nil ? nil : task
     }

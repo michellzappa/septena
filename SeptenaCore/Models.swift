@@ -82,6 +82,11 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
   /// The deadline the user planned past (`TaskEntity.deferredDeadline`).
   /// Populated from the entity, not the wire.
   var deferredDeadline: String? = nil
+  /// Who the task waits on (`TaskEntity.waitingOn`, docs/REVIEW_SPEC.md §6).
+  /// Populated from the entity, not the wire.
+  var waitingOn: String? = nil
+  /// The day the wait started, `YYYY-MM-DD` (`TaskEntity.waitingSince`).
+  var waitingSince: String? = nil
   var today: Bool
   var starred: Bool = false
   /// Canonical `TagEntity.id` values assigned to this task (max 20, flat tags, docs/TAGS_SPEC.md).
@@ -156,10 +161,21 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
   /// count, Next, and the badge.
   var isFaded: Bool { status == .open && fadedAt != nil }
 
-  /// The one Review group an open task shows in, or nil.
+  /// The one Review group an open task shows in, or nil. The conversation's
+  /// group (Questions, Finished work) wins, then Waiting, then the agent
+  /// stage, then Faded (docs/REVIEW_SPEC.md §1, §6).
   var reviewGroup: ReviewGroup? {
     guard status == .open, deletedAt == nil, !isHeading else { return nil }
-    return conversation.reviewGroup() ?? (isFaded ? .faded : nil)
+    return conversation.reviewGroup(waiting: isWaiting) ?? (isFaded ? .faded : nil)
+  }
+
+  /// True when the task waits on a person (`waitingOn` is set).
+  var isWaiting: Bool { TaskWaiting.isWaiting(waitingOn) }
+
+  /// "Waiting on Anna · 5 days" for the row, or nil when the task does not
+  /// wait (docs/REVIEW_SPEC.md §6).
+  func waitingLabel(today: String = SeptenaDate.today) -> String? {
+    TaskWaiting.label(on: waitingOn, since: waitingSince, today: today)
   }
 
   /// True when the task sits in a Review group about agent work (every group
@@ -408,6 +424,8 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     timeZone: String? = nil,
     deadline: String?,
     deferredDeadline: String? = nil,
+    waitingOn: String? = nil,
+    waitingSince: String? = nil,
     today: Bool,
     starred: Bool = false,
     tags: [String] = [],
@@ -448,6 +466,8 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     self.timeZone = timeZone
     self.deadline = deadline
     self.deferredDeadline = deferredDeadline
+    self.waitingOn = waitingOn
+    self.waitingSince = waitingSince
     self.today = today
     self.starred = starred
     self.tags = tags
