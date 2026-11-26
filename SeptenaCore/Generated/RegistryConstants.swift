@@ -2451,7 +2451,7 @@ enum RegistryPlans {
   static func card(_ id: String) -> RegistryPlanCard? { cards.first { $0.id == id } }
   static func upsell(_ id: String) -> RegistryPlanNote? { upsells.first { $0.id == id } }
   /// The paywall's Terms of Use and Privacy Policy links (App Review 3.1.2).
-  static let termsURL = URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!
+  static let termsURL = URL(string: "https://septena.app/terms")!
   static let privacyURL = URL(string: "https://septena.app/privacy")!
 
   enum Action {
