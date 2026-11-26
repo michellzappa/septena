@@ -20,8 +20,8 @@ enum KitContainerNotes {
   static let toggleGap: CGFloat = 4
   static var toggleHeight: CGFloat { ceil(SeptaskKitTheme.meta.boundingRectForFont.height) }
 
-  static var bodyFont: NSFont { .systemFont(ofSize: SeptaskKitTheme.notesFontSize) }
-  private static var headingFont: NSFont { .systemFont(ofSize: SeptaskKitTheme.notesFontSize, weight: .semibold) }
+  static var bodyFont: NSFont { .systemFont(ofSize: SeptaskKitTheme.pageNotesFontSize) }
+  private static var headingFont: NSFont { .systemFont(ofSize: SeptaskKitTheme.pageNotesFontSize, weight: .semibold) }
 
   /// Notes as the page shows them (`ContainerNotes.previewLines`): `#`/`##`
   /// lines as headings, `###` lines (how an agent log entry starts:
@@ -76,7 +76,7 @@ enum KitContainerNotes {
     let style = NSMutableParagraphStyle()
     style.lineBreakMode = .byWordWrapping
     if case .item(let depth, let marker, _) = line {
-      let step = SeptaskKitTheme.notesFontSize
+      let step = SeptaskKitTheme.pageNotesFontSize
       let markerWidth = (marker + " " as NSString).size(withAttributes: [.font: bodyFont]).width
       let lead = CGFloat(depth) * step
       let textStart = lead + max(step, ceil(markerWidth) + 2)

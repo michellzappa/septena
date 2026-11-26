@@ -67,6 +67,12 @@ enum SeptaskKitTheme {
   /// prose matches `TaskMarkdownNotesEditor` (SwiftUI) at the body size.
   static var notesFontSize: CGFloat { SeptenaTypeScale.size(.body) }
 
+  /// Project and area notes on the page, under the title: one step under the
+  /// task titles below them, so the brief reads as context, not as more rows.
+  /// `.callout` keeps the iOS ratio (`.septenaNotes`, subheadline under a
+  /// body title); macOS subheadline is two steps down and reads too small.
+  static var pageNotesFontSize: CGFloat { SeptenaTypeScale.size(.callout) }
+
   /// Single-line row height derived from the body rung so rows grow with the
   /// user's text-size setting instead of clipping. Titles truncate; they do
   /// not wrap and grow the row.
