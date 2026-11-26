@@ -22,8 +22,11 @@ class SyncHttpException(statusCode: Int, responseBody: String) : SyncHttpFailure
 
 class SyncAuthenticationException : IOException("Sign in to sync this device")
 
-/** HTTP 402 from the sync routes: the account has no active sync subscription. */
-class SyncSubscriptionRequiredException : IOException("Sync needs an active Septena subscription")
+/**
+ * HTTP 402 from the sync routes: the server does not sync this device under the account's plan
+ * (`device_not_syncing`). The app shows the registry `second_device` notice, never this message.
+ */
+class SyncSubscriptionRequiredException : IOException("This device is not syncing")
 
 /** HTTP adapter shared by Android and future JVM clients; endpoint payloads stay in `SyncWireCodec`. */
 class UrlConnectionSyncTransport(

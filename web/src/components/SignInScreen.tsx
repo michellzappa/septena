@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { ArrowLeft, RefreshCw, Smartphone } from "lucide-react";
 import { ApiError, SeptenaApiClient } from "@/lib/api/client";
-import { SIGN_IN, registryText } from "@/lib/generated/registries";
+import { SIGN_IN, SURFACES_CATALOG, registryText } from "@/lib/generated/registries";
 import type { DeviceStartResponse, SessionResponse } from "@/lib/types";
 import { QrCode } from "./QrCode";
 import { RegistryIcon } from "./RegistryIcon";
@@ -171,7 +171,7 @@ export function SignInScreen({ api, language, onSignedIn }: SignInScreenProps) {
                 {methodTitle("email", language)}
               </button>
             )}
-            <DeviceApproval api={api} onSignedIn={onSignedIn} />
+            <DeviceApproval api={api} language={language} onSignedIn={onSignedIn} />
           </>
         )}
 
@@ -415,11 +415,19 @@ function attemptsLeft(rawBody: string): number {
 
 // ── Device approval (POST /v1/auth/device/start, /poll) ────────────────────
 
+/** One line of surfaces.json `deviceSignIn.copy`, the same words the other apps show. */
+function deviceSignInCopy(id: string, lang: string): string {
+  const label = SURFACES_CATALOG.deviceSignIn.copy.find((c) => c.id === id)?.label ?? id;
+  return registryText(label, lang);
+}
+
 function DeviceApproval({
   api,
+  language,
   onSignedIn,
 }: {
   api: SeptenaApiClient;
+  language: string;
   onSignedIn: (session: SessionResponse) => void;
 }) {
   const [pairing, setPairing] = useState<DeviceStartResponse | null>(null);
@@ -510,11 +518,7 @@ function DeviceApproval({
   return (
     <>
       <p className="mb-5 text-sm leading-relaxed text-[var(--text-secondary)]">
-        Sign in by approving this browser from a signed-in Septena app. Open{" "}
-        <span className="font-medium text-[var(--text-primary)]">
-          Settings → Account → Approve a device
-        </span>{" "}
-        on your iPhone, iPad, Mac, or Android.
+        {deviceSignInCopy("approve", language)}
       </p>
 
       {status === "starting" && (
@@ -550,7 +554,7 @@ function DeviceApproval({
         <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-sidebar)] p-5 text-center">
           <p className="mb-3 text-sm text-[var(--text-secondary)]">
             {status === "denied" && "Sign-in was denied from the other device."}
-            {status === "expired" && "That code expired."}
+            {status === "expired" && deviceSignInCopy("expired", language)}
             {status === "error" && (errorMessage ?? "Could not start sign-in.")}
           </p>
           <button
@@ -559,7 +563,7 @@ function DeviceApproval({
             className="inline-flex items-center gap-2 rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:opacity-90"
           >
             <RefreshCw className="h-4 w-4" />
-            Get a new code
+            {deviceSignInCopy("retry", language)}
           </button>
         </div>
       )}

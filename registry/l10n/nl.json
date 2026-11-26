@@ -8,7 +8,7 @@
   "365 days": "365 dagen",
   "3rd": "3e",
   "4th": "4e",
-  "A free account allows 500 agent changes a day. Your agent can make changes again tomorrow. Plus has no daily limit.": "Met een gratis account kan een agent 500 wijzigingen per dag doen. Je agent kan morgen weer wijzigingen aanbrengen. Met Plus geldt geen daglimiet.",
+  "Agents on this account made 500 changes today. They can make changes again tomorrow.": "Agents op dit account hebben vandaag 500 wijzigingen gedaan. Morgen kunnen ze weer wijzigingen doen.",
   "A free account shows 30 days of history. Plus shows a full year.": "Een gratis account toont 30 dagen geschiedenis. Plus toont een heel jaar.",
   "A free account syncs one device. Plus syncs all of them. You can also move your free account to this device.": "Een gratis account synchroniseert één apparaat. Plus synchroniseert ze allemaal. Je kunt je gratis account ook naar dit apparaat verplaatsen.",
   "ABCD-EFGH": "ABCD-EFGH",
@@ -397,7 +397,7 @@
   "On this device": "Op dit apparaat",
   "On this device · Sign in to sync": "Op dit apparaat · Meld je aan om te synchroniseren",
   "On your device": "Op je apparaat",
-  "On your iPhone, iPad or Mac, open Septena and go to Settings ▸ Account ▸ Approve a sign-in. Tap Scan Code and point the camera at this screen, or enter this code:": "Open Septena op je iPhone, iPad of Mac en ga naar Instellingen ▸ Account ▸ Aanmelding goedkeuren. Tik op Code scannen en richt de camera op dit scherm, of voer deze code in:",
+  "On another device where you are signed in, open Septena and go to Settings ▸ Account ▸ Approve a sign-in. Tap Scan Code and point the camera at this screen, or enter this code:": "Open Septena op een ander apparaat waarop je bent aangemeld en ga naar Instellingen ▸ Account ▸ Aanmelding goedkeuren. Tik op Code scannen en richt de camera op dit scherm, of voer deze code in:",
   "On-device": "Op het apparaat",
   "On-device only": "Alleen op het apparaat",
   "On-device ↗": "Op het apparaat ↗",
@@ -637,7 +637,7 @@
   "The other members lose this project. You keep it and its tasks.": "De andere leden raken dit project kwijt. Jij houdt het project en de taken.",
   "The project leaves your account. Everyone else keeps it.": "Het project verdwijnt uit je account. De anderen houden het.",
   "The purchase did not go through. Try again in a moment.": "De aankoop is niet gelukt. Probeer het zo meteen opnieuw.",
-  "The same tasks on your phone, tablet and Mac, updated as you type.": "Dezelfde taken op je telefoon, tablet en Mac, direct bijgewerkt terwijl je typt.",
+  "The same tasks on every device, updated as you type.": "Dezelfde taken op elk apparaat, direct bijgewerkt terwijl je typt.",
   "The section is no longer available.": "De sectie is niet meer beschikbaar.",
   "The section is no longer in this project.": "De sectie staat niet meer in dit project.",
   "The selected item is not a section.": "Het geselecteerde item is geen sectie.",
@@ -739,7 +739,7 @@
   "Your plan": "Je abonnement",
   "Your synced settings": "Je gesynchroniseerde instellingen",
   "Your task conversations": "Je taakgesprekken",
-  "Your tasks stay in step on iPhone, iPad and Mac.": "Je taken blijven gelijk op iPhone, iPad en Mac.",
+  "Your tasks stay in step on every device you sign in to.": "Je taken blijven gelijk op elk apparaat waarop je bent aangemeld.",
   "Your tasks, areas and projects": "Je taken, gebieden en projecten",
   "Your tasks, areas, projects, and conversations stay on this device until you sign in. When signed in, they sync through Septena’s private server at api.septena.app, encrypted at rest (not end-to-end, so connected agents can read them when you choose). AI on your device stays on your device. Connect Claude under AI & Agents.": "Je taken, gebieden, projecten en gesprekken blijven op dit apparaat totdat je je aanmeldt. Na aanmelding worden ze gesynchroniseerd via de privéserver van Septena op api.septena.app, versleuteld opgeslagen (niet end-to-end, zodat verbonden agents ze kunnen lezen wanneer jij daarvoor kiest). AI op je apparaat blijft op je apparaat. Verbind Claude onder AI en agents.",
   "Your turn: a question is waiting": "Jij bent aan zet: er wacht een vraag",
@@ -816,5 +816,6 @@
   "New Agent Key": "Nieuwe agentsleutel",
   "Your agent key": "Je agentsleutel",
   "Septena shows this key only once. Paste it into your script or agent. To stop the agent, disconnect it in this list.": "Septena toont deze sleutel maar één keer. Plak hem in je script of agent. Wil je de agent stoppen, ontkoppel hem dan in deze lijst.",
-  "Copy Key": "Sleutel kopiëren"
+  "Copy Key": "Sleutel kopiëren",
+  "Files are still syncing between your devices.": "Bestanden worden nog gesynchroniseerd tussen je apparaten."
 }

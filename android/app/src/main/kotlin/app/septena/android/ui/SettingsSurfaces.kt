@@ -87,7 +87,7 @@ internal fun SettingsCustomSurface(
         "smart_lists_editor" -> SmartListsEditor(env.values, languageTag, env.onValueChange)
         "plus_offer" -> {
             LaunchedEffect(env.signedIn) { env.plans.refresh(env.signedIn) }
-            PlusOffer(env.plans, languageTag)
+            PlusOffer(env.plans, languageTag, env.syncState)
         }
         "calendar_detail" -> CalendarFeedSection(env.graph, env.signedIn, env.values, env.onValueChange, languageTag)
         "sign_in_approval" -> SignInApprovalSection(env.graph, env.signedIn, languageTag)
