@@ -57,6 +57,7 @@ a new ADR and set the old one to `superseded by NNNN`.
 | [0050](0050-septena-publishes-its-agent-contract.md) | Septena publishes its agent contract: Markdown twins, a versioned spec, one error envelope, idempotency, OpenAPI, skills | accepted |
 | [0051](0051-clients-in-other-apps-are-septena-surfaces.md) | A Septena client inside another app (CLI, Raycast) is a Septena surface, not a source integration | accepted |
 | [0052](0052-the-site-shows-pro-as-a-real-plan.md) | The website shows Pro as a real plan, by invitation (amends 0045) | accepted |
+| [0053](0053-waiting-on-people-is-a-review-group.md) | Work handed to a person is a Waiting group in Review (amends 0046) | accepted |
 
 ## Template
 
