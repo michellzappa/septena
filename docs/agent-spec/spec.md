@@ -362,6 +362,11 @@ The table comes from `backend/src/errors.ts`, the one table of codes. A code wit
 | `expired_or_unknown` | no | This request expired, was already claimed, or is unknown. Start a new signup request if the user still wants one. |
 | `too_many_requests` | yes | Rate limit reached. Wait until Retry-After seconds pass before trying again. |
 | `too_many_attempts` | yes | Too many failed attempts. Wait ten minutes before trying again. |
+| `account_exists` | no | This email already has a Septena account. Confirm with the email code and linkToken to add this sign-in method to that account. |
+| `already_linked` | no | This sign-in method already belongs to another Septena account. |
+| `last_method` | no | You cannot remove your only sign-in method. Add another method first. |
+| `provider_off` | no | This sign-in provider is not configured on this server. |
+| `invalid_return_to` | no | The return_to URL is not on the server's allowlist. |
 | `invalid_arguments` | no | Fix the arguments the message names, then call again. |
 | `invalid_request` | no | Fix the request the message describes, then send it again. |
 | `unknown_tool` | no | Call tools/list for the tools this server has. |

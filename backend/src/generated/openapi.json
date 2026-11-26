@@ -42,6 +42,10 @@
       "description": "Devices, connections, agent keys, the plan and the account."
     },
     {
+      "name": "support",
+      "description": "Contact Support: messages to the Septena team and their replies."
+    },
+    {
       "name": "shares",
       "description": "Shared projects."
     },
@@ -2254,6 +2258,782 @@
               "application/json": {
                 "schema": {
                   "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The credential is missing, expired or revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auth/google/native": {
+      "post": {
+        "operationId": "post_auth_google_native",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Sign in with a Google identity token from the device's own account picker.",
+        "security": [],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ErrorFormat"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "idToken": {
+                    "type": "string",
+                    "minLength": 20,
+                    "maxLength": 8000
+                  },
+                  "nonce": {
+                    "type": "string",
+                    "minLength": 16,
+                    "maxLength": 256
+                  }
+                },
+                "required": [
+                  "idToken"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "A session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auth/oidc/redeem": {
+      "post": {
+        "operationId": "post_auth_oidc_redeem",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Swap the one-use code from a web sign-in redirect for a session.",
+        "security": [],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ErrorFormat"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "minLength": 20,
+                    "maxLength": 128
+                  },
+                  "sessionMode": {
+                    "type": "string",
+                    "enum": [
+                      "body",
+                      "cookie"
+                    ]
+                  }
+                },
+                "required": [
+                  "code"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "A session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auth/link/complete": {
+      "post": {
+        "operationId": "post_auth_link_complete",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Finish adding a sign-in method to an existing account with the emailed code.",
+        "security": [],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ErrorFormat"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "linkToken": {
+                    "type": "string",
+                    "minLength": 20,
+                    "maxLength": 4000
+                  },
+                  "code": {
+                    "type": "string",
+                    "pattern": "^\\d{6}$"
+                  },
+                  "sessionMode": {
+                    "type": "string",
+                    "enum": [
+                      "body",
+                      "cookie"
+                    ]
+                  }
+                },
+                "required": [
+                  "linkToken",
+                  "code"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "A session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auth/identities": {
+      "get": {
+        "operationId": "get_auth_identities",
+        "tags": [
+          "auth"
+        ],
+        "summary": "The sign-in methods on the account.",
+        "security": [
+          {
+            "appSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ErrorFormat"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The methods.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The credential is missing, expired or revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auth/identities/{id}": {
+      "delete": {
+        "operationId": "delete_auth_identities_by_id",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Remove a sign-in method.",
+        "security": [
+          {
+            "appSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/ErrorFormat"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Removed."
+          },
+          "400": {
+            "description": "The request is not valid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The credential is missing, expired or revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auth/link/email/start": {
+      "post": {
+        "operationId": "post_auth_link_email_start",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Send a code to add an email sign-in.",
+        "security": [
+          {
+            "appSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ErrorFormat"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "maxLength": 254,
+                    "format": "email"
+                  }
+                },
+                "required": [
+                  "email"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "The code is sent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The credential is missing, expired or revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auth/link/email/verify": {
+      "post": {
+        "operationId": "post_auth_link_email_verify",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Add an email sign-in with the emailed code.",
+        "security": [
+          {
+            "appSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ErrorFormat"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "maxLength": 254,
+                    "format": "email"
+                  },
+                  "code": {
+                    "type": "string",
+                    "pattern": "^\\d{6}$"
+                  }
+                },
+                "required": [
+                  "email",
+                  "code"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Added.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The credential is missing, expired or revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auth/link/apple": {
+      "post": {
+        "operationId": "post_auth_link_apple",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Add Sign in with Apple to the account.",
+        "security": [
+          {
+            "appSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ErrorFormat"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "identityToken": {
+                    "type": "string",
+                    "minLength": 20,
+                    "maxLength": 8000
+                  },
+                  "nonce": {
+                    "type": "string",
+                    "minLength": 16,
+                    "maxLength": 256
+                  }
+                },
+                "required": [
+                  "identityToken",
+                  "nonce"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Added.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The credential is missing, expired or revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auth/link/google/native": {
+      "post": {
+        "operationId": "post_auth_link_google_native",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Add a Google sign-in from the device's own account picker.",
+        "security": [
+          {
+            "appSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ErrorFormat"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "idToken": {
+                    "type": "string",
+                    "minLength": 20,
+                    "maxLength": 8000
+                  },
+                  "nonce": {
+                    "type": "string",
+                    "minLength": 16,
+                    "maxLength": 256
+                  }
+                },
+                "required": [
+                  "idToken"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Added.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The credential is missing, expired or revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auth/link/oidc/start": {
+      "post": {
+        "operationId": "post_auth_link_oidc_start",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Start adding a web sign-in provider. The answer names the address to open.",
+        "security": [
+          {
+            "appSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ErrorFormat"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "provider": {
+                    "type": "string",
+                    "enum": [
+                      "apple",
+                      "google",
+                      "microsoft"
+                    ]
+                  },
+                  "returnTo": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "provider",
+                  "returnTo"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The address to open.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
@@ -6833,6 +7613,264 @@
         }
       }
     },
+    "/v1/support/messages": {
+      "post": {
+        "operationId": "post_support_messages",
+        "tags": [
+          "support"
+        ],
+        "summary": "Send a message to Support. The client makes `message_id`, so a retry sends nothing twice.",
+        "security": [
+          {
+            "appSession": []
+          },
+          {
+            "supportKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ErrorFormat"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "message_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "text": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4000
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "maxLength": 320
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "diagnostics": {
+                    "type": "object",
+                    "properties": {
+                      "platform": {
+                        "type": "string",
+                        "enum": [
+                          "ios",
+                          "ipados",
+                          "macos",
+                          "android",
+                          "web"
+                        ]
+                      },
+                      "osVersion": {
+                        "type": "string",
+                        "maxLength": 40
+                      },
+                      "deviceModel": {
+                        "type": "string",
+                        "maxLength": 60
+                      },
+                      "appVersion": {
+                        "type": "string",
+                        "maxLength": 40
+                      },
+                      "build": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "signedIn": {
+                        "type": "boolean"
+                      },
+                      "plan": {
+                        "type": "string",
+                        "maxLength": 20
+                      },
+                      "lastSyncAt": {
+                        "type": "string",
+                        "maxLength": 40
+                      },
+                      "lastSyncError": {
+                        "type": "string",
+                        "maxLength": 80
+                      },
+                      "lastSyncRequestId": {
+                        "type": "string",
+                        "maxLength": 80
+                      },
+                      "storeFailures": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 1000000
+                      }
+                    },
+                    "required": [
+                      "platform"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "message_id",
+                  "text"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Received.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The credential is missing, expired or revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "get_support_messages",
+        "tags": [
+          "support"
+        ],
+        "summary": "The conversation with Support.",
+        "security": [
+          {
+            "appSession": []
+          },
+          {
+            "supportKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ErrorFormat"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The messages and replies.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The credential is missing, expired or revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/support/read": {
+      "post": {
+        "operationId": "post_support_read",
+        "tags": [
+          "support"
+        ],
+        "summary": "Mark the replies as read.",
+        "security": [
+          {
+            "appSession": []
+          },
+          {
+            "supportKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ErrorFormat"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Marked."
+          },
+          "401": {
+            "description": "The credential is missing, expired or revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/shares": {
       "get": {
         "operationId": "get_shares",
@@ -7735,6 +8773,12 @@
         "type": "http",
         "scheme": "bearer",
         "description": "The one-use upload token from the tasks_attachment_add tool."
+      },
+      "supportKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Septena-Support-Key",
+        "description": "A random key the app makes once per install, for Support before sign-in."
       }
     },
     "parameters": {
@@ -7846,6 +8890,11 @@
               "expired_or_unknown",
               "too_many_requests",
               "too_many_attempts",
+              "account_exists",
+              "already_linked",
+              "last_method",
+              "provider_off",
+              "invalid_return_to",
               "invalid_arguments",
               "invalid_request",
               "unknown_tool",
