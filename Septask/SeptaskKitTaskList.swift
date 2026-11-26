@@ -18,6 +18,9 @@ extension NSPasteboard.PasteboardType {
   /// so smart lists can only reorder within their own top cluster and never mix
   /// with areas or projects below.
   static let septaskSmartListItem = NSPasteboard.PasteboardType("com.septena.septask.smart-list-item")
+  /// Dragged Magic Plus button from the sidebar footer — drops a new Area (at
+  /// area level) or a new Project (inside an area or loose projects zone).
+  static let septaskMagicPlus = NSPasteboard.PasteboardType("com.septena.septask.magic-plus")
 }
 
 /// Shared by the list (reorder/re-file drops) and the sidebar (file/schedule
@@ -511,7 +514,8 @@ final class SeptaskKitTaskListController: NSViewController {
     tableView.delegate = self
     tableView.target = self
     tableView.doubleAction = #selector(beginEditFromDoubleClick)
-    tableView.onToggleComplete = { [weak self] in self?.toggleCompleteSelection() }
+    tableView.onToggleComplete = { [weak self] in self?.toggleCompleteSelection(fromKeyboard: true) }
+    tableView.onCancel = { [weak self] in self?.cancelSelection() }
     tableView.onToggleToday = { [weak self] in self?.toggleTodaySelection() }
     tableView.onDo = { [weak self] in self?.startDo() }
     tableView.onBeginEdit = { [weak self] in self?.beginEditSelectedRow() }
@@ -2204,7 +2208,7 @@ final class SeptaskKitTaskListController: NSViewController {
   /// (ADR 0046). Faded is last, behind its toggle. The AppKit twin of
   /// `TaskListView.reviewGroupRows`.
   private func reviewGroupRows(_ pool: [SeptenaTask]) -> [Row] {
-    let byGroup = Dictionary(grouping: pool) { $0.reviewGroup }
+    let byGroup = ReviewGroup.grouped(pool)
     var result: [Row] = []
     for group in ReviewGroup.allCases where group != .faded {
       guard let tasks = byGroup[group], !tasks.isEmpty else { continue }
@@ -2742,6 +2746,12 @@ final class SeptaskKitTaskListController: NSViewController {
   var hasActionableSelection: Bool { !actionableSelection.isEmpty }
   /// Exactly one task row is selected: the inspector has one subject.
   var hasSingleActionableSelection: Bool { actionableSelection.count == 1 }
+  /// One open task is selected: Waiting On… has a subject.
+  var hasSingleOpenSelection: Bool {
+    actionableSelection.count == 1 && actionableSelection[0].status == .open
+  }
+  /// A selected task waits on someone: Got It Back has a subject.
+  var hasWaitingSelection: Bool { actionableSelection.contains(where: \.isWaiting) }
 
   /// The selected Get started steps. They take Return (open), ⌘K (tick) and
   /// their own context menu; no task command sees them.
@@ -2999,6 +3009,42 @@ final class SeptaskKitTaskListController: NSViewController {
     }
   }
 
+  /// Waiting On… (docs/REVIEW_SPEC.md §6) for the one selected open task,
+  /// anchored to its row (or to `anchor`). `task` names a task the list may
+  /// not have selected (the inspector).
+  func presentWaitingPopover(anchor: KitSurfaceAnchor? = nil, task named: SeptenaTask? = nil) {
+    commitComposerTextIfOpen()
+    guard let task = named ?? (hasSingleOpenSelection ? actionableSelection.first : nil) else {
+      NSSound.beep()
+      return
+    }
+    guard case .rect(let rect, let host)? = anchor ?? selectedRowAnchor else {
+      NSSound.beep()
+      return
+    }
+    SeptaskKitWaitingPopover.present(task: task, relativeTo: rect, of: host) { [weak self] name, checkBack in
+      guard let self else { return }
+      let live = LocalCache.task(id: task.id, in: self.context) ?? task
+      let day = SeptenaDate.format(checkBack)
+      let scheduled: Date?? = day == live.scheduled ? nil : .some(checkBack)
+      TaskUndo.setWaiting(id: task.id, on: name, scheduled: scheduled,
+                          context: self.context, mutator: self.mutator)
+      self.refreshComposerRow(taskId: task.id)
+      self.reload()
+      self.onStoreChanged?()
+    }
+  }
+
+  /// Got It Back (docs/REVIEW_SPEC.md §6) on the selected waiting tasks, or
+  /// on `ids` when given. The tasks stay open where they are.
+  func gotItBackSelection(ids: [String]? = nil) {
+    let targets = ids ?? actionableSelection.map(\.id)
+    TaskUndo.gotItBack(ids: targets, context: context, mutator: mutator)
+    for id in targets { refreshComposerRow(taskId: id) }
+    reload()
+    onStoreChanged?()
+  }
+
   /// Open the type-to-filter/assign/create Tag popover (`⇧⌘T`) for the current
   /// selection (single or multi-select), anchored to the row or composer pill.
   func presentTagPopover(anchor: KitSurfaceAnchor? = nil) {
@@ -3188,10 +3234,38 @@ final class SeptaskKitTaskListController: NSViewController {
 
   // MARK: - Mutations
 
-  func toggleCompleteSelection() {
-    // ⌘K on a focused checklist step ticks the step (composer or inspector).
+  /// Uptime of the last ⌘↩ commit that closed an open row editor (or returned
+  /// focus from the inspector). A rapid second ⌘↩ within the guard window is
+  /// swallowed so finishing an edit cannot accidentally complete the task.
+  private var lastCommandReturnCommitAt: TimeInterval = 0
+  private static let completeGuardAfterCommit: TimeInterval = 0.55
+
+  func suppressCompleteBriefly() {
+    lastCommandReturnCommitAt = ProcessInfo.processInfo.systemUptime
+  }
+
+  /// Commit an open composer or field editor in response to ⌘↩, stamping the
+  /// double-tap guard. Returns false when no row editor is active.
+  @discardableResult
+  func commitOpenEditsForCommandReturn() -> Bool {
+    guard composingTaskId != nil || isTitleEditorActive else { return false }
+    commitComposerEditing()
+    return true
+  }
+
+  func toggleCompleteSelection(fromKeyboard: Bool = false) {
+    if fromKeyboard {
+      if composingTaskId != nil || isTitleEditorActive {
+        commitComposerEditing()
+        return
+      }
+      if ProcessInfo.processInfo.systemUptime - lastCommandReturnCommitAt < Self.completeGuardAfterCommit {
+        return
+      }
+    }
+    // ⌘↩ on a focused checklist step ticks the step (composer or inspector).
     if KitChecklistView.toggleFocusedStep(in: tableView.window) { return }
-    // ⌘K with the row open: save the typed text, close, complete (Things).
+    // Checkbox tap with the row open: save the typed text, close, complete.
     if composingTaskId != nil {
       completeComposingTask()
       return
@@ -3230,6 +3304,7 @@ final class SeptaskKitTaskListController: NSViewController {
   /// rows are left alone; trash has nothing to cancel.
   func cancelSelection() {
     guard !showingRecentlyDeleted else { return }
+    if composingTaskId != nil { collapseComposer(commit: true, animated: false) }
     let open = actionableSelection.filter { $0.status == .open }
     guard !open.isEmpty else { return }
     applyCancel(open)
@@ -4106,6 +4181,7 @@ final class SeptaskKitTaskListController: NSViewController {
   /// all. Descending is `↓` on the title's last line or Tab, both of which
   /// read top-to-bottom instead of as a chord.
   func commitComposerEditing() {
+    suppressCompleteBriefly()
     // ⌘↩ in a bare field editor (⌘R, the "New task" line) finishes it too.
     if composingTaskId == nil, isTitleEditorActive {
       commitFieldEditorNow()
@@ -4652,6 +4728,12 @@ final class SeptaskKitTaskListController: NSViewController {
       case .taskSendBackReview:
         guard let single, single.conversation.needsHumanReview else { return nil }
         return .init { self.presentSendBackForSelectedRow(taskID: single.id) }
+      case .taskWaitingOn:
+        guard let single, single.status == .open else { return nil }
+        return .init { self.presentWaitingPopover() }
+      case .taskGotItBack:
+        guard selection.contains(where: \.isWaiting) else { return nil }
+        return .init { self.gotItBackSelection() }
       case .taskToggleInfo:
         let visible = UserDefaults.standard.bool(forKey: SettingsKey.septaskInspectorVisible)
         return .init(variant: visible ? .active : .base) { self.onToggleInspector?() }
@@ -6204,6 +6286,8 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
   private let statusChip = KitChipView()
   /// Shared projects: who does this task, when that is somebody else.
   private let assigneeChip = KitChipView()
+  /// "Waiting on Anna · 5 days" (docs/REVIEW_SPEC.md §6).
+  private let waitingChip = KitChipView()
   private let suggestionChip = KitSuggestionChipView()
   /// The item the task was created from (its `from` reference).
   private let fromGlyph = NSImageView()
@@ -6394,7 +6478,7 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     let trailingShove = NSView()
     trailingShove.setContentHuggingPriority(.defaultLow, for: .horizontal)
     trailingShove.setContentCompressionResistancePriority(.fittingSizeCompression, for: .horizontal)
-    let trailing = NSStackView(views: [trailingShove, suggestionChip, chip, assigneeChip, statusChip,
+    let trailing = NSStackView(views: [trailingShove, suggestionChip, chip, waitingChip, assigneeChip, statusChip,
                                       tagStack, attachmentGlyph, attachmentLabel,
                                       checklistGlyph, checklistLabel, reminderGlyph, reminderLabel,
                                       scheduleGlyph, detail, repeatGlyph, starGlyph, fromGlyph, notesGlyph, agentGlyph])
@@ -6420,6 +6504,7 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     chip.kitA11yIgnore()
     statusChip.kitA11yIgnore()
     assigneeChip.kitA11yIgnore()
+    waitingChip.kitA11yIgnore()
 
     addSubview(checkbox)
     addSubview(title)
@@ -6519,6 +6604,7 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
       chip.isHidden = true
       statusChip.isHidden = true
       assigneeChip.isHidden = true
+      waitingChip.isHidden = true
       fromGlyph.isHidden = true
       tagStack.isHidden = true
       attachmentGlyph.isHidden = true
@@ -6574,12 +6660,12 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     }
     // The whole row fades, checkbox included: same curve as `CheckableRow`.
     let fade = CGFloat(TaskFade.rowOpacity(checkbox.tenureFill))
-    for view in [checkbox, title, notesGlyph, agentGlyph, fromGlyph, chip, statusChip, suggestionChip,
+    for view in [checkbox, title, notesGlyph, agentGlyph, fromGlyph, chip, statusChip, waitingChip, suggestionChip,
                  tagStack, attachmentGlyph, attachmentLabel, checklistGlyph, checklistLabel,
                  reminderGlyph, reminderLabel, scheduleGlyph, detail, repeatGlyph, starGlyph] as [NSView] {
       view.alphaValue = fade
     }
-    checkbox.cornerDot = !done && !isProposal && task.conversation.hasStarted
+    checkbox.cornerDot = !done && !isProposal && task.conversation.hasStarted && deriveConvo(task.conversation).badge != nil
     checkbox.agentCue = !done && task.showsAgentCue()
 
     var titleAttributes: [NSAttributedString.Key: Any] = [
@@ -6628,6 +6714,13 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
       chip.configure(symbol: chipValue.symbol, title: chipValue.title)
     } else {
       chip.isHidden = true
+    }
+
+    if !done, task.deletedAt == nil, let waiting = task.waitingLabel() {
+      waitingChip.isHidden = false
+      waitingChip.configure(symbol: RegistryIcons.sfSymbol(for: "action.waiting"), title: waiting)
+    } else {
+      waitingChip.isHidden = true
     }
 
     if let name = SharedProjects.assigneeName(of: task, in: LocalStore.shared.container.mainContext) {
@@ -8302,6 +8395,7 @@ final class SeptaskKitTableView: NSTableView {
     return resigned
   }
   var onToggleComplete: (() -> Void)?
+  var onCancel: (() -> Void)?
   var onToggleToday: (() -> Void)?
   /// ⌘J — Do the selected task (docs/DO_SPEC.md §4.1).
   var onDo: (() -> Void)?
@@ -8434,13 +8528,13 @@ final class SeptaskKitTableView: NSTableView {
       let commandShift = flags == [.command, .shift]
       let commandOption = flags == [.command, .option]
       let allowed: Bool
-      if command, ["\r", "\u{3}", "n", ","].contains(key) {
-        allowed = true            // ⌘↩ save + close, ⌘N save then create, ⌘, settings
+      if command, ["\r", "\u{3}", "n", ",", "k"].contains(key) {
+        allowed = true            // ⌘↩ save + close, ⌘K command bar, ⌘N save then create, ⌘, settings
       } else if (commandShift && key == "f") || (commandOption && key == "i") {
-        allowed = true            // Quick Find, inspector: window-level, no row write
-      } else if (command && ["k", "t", "s", "m", "j"].contains(key))
+        allowed = true            // Command bar alias, inspector: window-level, no row write
+      } else if (command && ["t", "s", "m", "j"].contains(key))
                   || (commandShift && ["m", "d", "c"].contains(key))
-                  || (commandOption && ["r", "s"].contains(key)) {
+                  || (commandOption && ["r", "s", "\r", "\u{3}"].contains(key)) {
         allowed = composer        // act on the composing row (text saved first)
       } else {
         allowed = false
@@ -8460,6 +8554,8 @@ final class SeptaskKitTableView: NSTableView {
 
     if flags == [.command, .option] {
       switch key {
+      // ⌥⌘↩ — cancel selected open tasks (registry task.cancel).
+      case "\r", "\u{3}": onCancel?(); return true
       // ⌥⌘I — the platform's inspector toggle.
       case "i": onToggleInspector?(); return true
       // ⌥⌘M — file into the SUGGESTED list, deliberately one modifier from
@@ -8497,16 +8593,16 @@ final class SeptaskKitTableView: NSTableView {
     }
     switch key {
     // ⌘↩ / ⌘keypad-Enter — save and close the open row (composer or field
-    // editor), the platform's "finish this". Caught here rather than in the
-    // composer cell so ONE handler covers the caret being in the title, in
-    // notes, or on a pill. With nothing open it is not ours: pass it on.
+    // editor), or mark the closed selected row(s) complete (with double-tap
+    // guard after closing an editor).
     case "\r", "\u{3}":
-      guard isComposing?() == true || focus == .fieldEditor else {
-        return super.performKeyEquivalent(with: event)
+      if isComposing?() == true || focus == .fieldEditor {
+        onCommitEditing?()
+      } else {
+        onToggleComplete?()
       }
-      onCommitEditing?()
       return true
-    case "k": onToggleComplete?(); return true
+    case "k": onQuickFind?(); return true
     case "t": onToggleToday?(); return true
     case "j": onDo?(); return true
     case "r": onBeginEdit?(); return true

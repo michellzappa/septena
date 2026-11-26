@@ -87,7 +87,7 @@
       "shortTitle": "Complete",
       "icon": "action.complete",
       "role": "default",
-      "shortcut": { "key": "k", "modifiers": ["primary"] },
+      "shortcut": { "key": "return", "modifiers": ["primary"] },
       "availability": { "selection": "any", "excludeDestinations": ["recentlyDeleted"] },
       "featureId": "lists.today"
     },
@@ -96,7 +96,7 @@
       "pluralTitle": "Cancel Tasks",
       "icon": "action.cancel",
       "role": "default",
-      "shortcut": { "key": "k", "modifiers": ["primary", "alt"] },
+      "shortcut": { "key": "return", "modifiers": ["primary", "alt"] },
       "availability": { "selection": "any", "excludeDestinations": ["recentlyDeleted"] },
       "featureId": "lists.today"
     },
@@ -180,6 +180,8 @@
       "availability": { "selection": "any", "excludeDestinations": ["recentlyDeleted"] },
       "featureId": "task.when-deadline"
     },
+    "task.waitingOn": { "title": "Waiting On…", "icon": "action.waiting", "role": "default", "availability": { "selection": "single", "excludeDestinations": ["recentlyDeleted"] }, "featureId": "review.waiting" },
+    "task.gotItBack": { "title": "Got It Back", "icon": "action.got_it_back", "role": "default", "availability": { "selection": "any", "excludeDestinations": ["recentlyDeleted"] }, "featureId": "review.waiting" },
     "task.deadline": {
       "opensAttribute": "deadline",
       "title": "Deadline…",
@@ -389,7 +391,7 @@
       "activeTitle": "Mark as Not Done",
       "icon": "action.complete",
       "role": "default",
-      "shortcut": { "key": "k", "modifiers": ["primary"] },
+      "shortcut": { "key": "return", "modifiers": ["primary"] },
       "availability": { "selection": "any" },
       "featureId": "lists.today"
     },
@@ -428,9 +430,10 @@
     },
     "app.quickFind": {
       "title": "Quick Find…",
+      "desktopTitle": "Command Bar…",
       "icon": "action.search",
       "role": "default",
-      "shortcut": { "key": "f", "modifiers": ["primary", "shift"] },
+      "shortcut": { "key": "k", "modifiers": ["primary"], "alternates": [{ "key": "f", "modifiers": ["primary", "shift"] }] },
       "availability": { "selection": "none" },
       "featureId": "find.quick-find"
     },
@@ -577,6 +580,7 @@
     "task.row": [
       { "kind": "action", "id": "task.acceptReview" },
       { "kind": "action", "id": "task.sendBackReview" },
+      { "kind": "action", "id": "task.gotItBack" },
       { "kind": "slot", "slot": "filingSuggestion" },
       { "kind": "divider" },
       { "kind": "action", "id": "task.do" },
@@ -603,6 +607,7 @@
       },
       { "kind": "action", "id": "task.tags" },
       { "kind": "action", "id": "task.deadline" },
+      { "kind": "action", "id": "task.waitingOn" },
       { "kind": "action", "id": "task.toggleStar" },
       { "kind": "divider" },
       { "kind": "action", "id": "task.open" },
@@ -737,6 +742,8 @@
         { "kind": "action", "id": "task.tags" },
         { "kind": "action", "id": "task.deadline" },
         { "kind": "action", "id": "task.reminder" },
+        { "kind": "action", "id": "task.waitingOn" },
+        { "kind": "action", "id": "task.gotItBack" },
         { "kind": "action", "id": "task.toggleStar" },
         { "kind": "divider" },
         { "kind": "action", "id": "task.editDetails", "titleField": "desktopTitle" },

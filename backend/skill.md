@@ -5,7 +5,17 @@ description: Use the Septena tasks MCP at api.septena.app to read and write the 
 
 # Septena tasks MCP
 
-The connector at `https://api.septena.app/mcp` exposes the user's tasks, areas, projects and task conversations, the same data the Septena app shows. The user pairs it from the Septena app. An agent that cannot sign in (a script, cron, n8n) uses an agent key the user creates in the app: send it as `Authorization: Bearer sk1.…`. Changes reach the app within seconds.
+The connector at `https://api.septena.app/mcp` exposes the user's tasks, areas, projects and task conversations, the same data the Septena app shows. Changes reach the app within seconds.
+
+## Connecting or creating an account
+
+- **Browser MCP hosts (Claude, ChatGPT, Cursor):** add `https://api.septena.app/mcp`. On the authorize page the user can approve with an existing Septena app (QR / 8-character code) or create/sign in to an account with email (no app needed first).
+- **Headless / CLI agents (no browser OAuth):** if the user does not have a key yet, you can create their Septena account or connect to an existing one with their email confirmation:
+  1. `POST https://api.septena.app/v1/agent/signup/start` with `{"email": "<user email>", "agentName": "<your name>", "access": "write", "timeZone": "<IANA tz>"}` (`access` defaults to `"write"`, `"read"` for read-only).
+  2. Tell the user to open the confirmation link Septena emailed them (valid 10 minutes) and approve.
+  3. Poll `POST https://api.septena.app/v1/agent/signup/poll` with `{"requestId": "...", "pollSecret": "..."}` every ~3 seconds (`202` while pending, `410` if declined or expired).
+  4. On `200`, store the returned `key` (`sk1.…`) securely and send it as `Authorization: Bearer sk1.…` to `https://api.septena.app/mcp`. Then run the onboarding flow (`https://api.septena.app/onboard.md`) if `created: true`, and tell the user they can sign in with that email on any of their devices or at `https://web.septena.app`.
+- **Pre-created agent key:** an agent that already has a key from Septena Settings ▸ AI & Agents sends it as `Authorization: Bearer sk1.…`.
 
 ## Conventions
 
@@ -49,6 +59,7 @@ The connector at `https://api.septena.app/mcp` exposes the user's tasks, areas, 
 - Resolve `area`/`project` names → ids via `tasks_list_areas` / `tasks_list_projects` before creating/updating.
 - **`tasks_search(query)`** finds tasks by words in the title or notes, with near matches. Call it before `tasks_create`.
 - **`tasks_defer(id, until)`** moves a task's When to a future day and takes it off Today. **`tasks_move_to_today(id)`** pins it to Today.
+- **`tasks_set_waiting(id, waiting_on, scheduled?)`** marks a task as waiting on a person: the user handed it to someone. Use it when the user says they asked someone ("I asked Anna for the deck"), or when you make a task from a message the user sent, with the thread as a reference. Set `scheduled` to the day to chase (a week out unless the user says). `tasks_list view=waiting` lists the waits, oldest first, with `waitingOn` and `waitingSince`. Only the user ends a wait: clearing it, completing, cancelling or deleting a waiting task is refused as `in_review`. When the thread a waiting task points at has a reply, ask with `tasks_thread_append`: a provider turn "Anna replied. Got it back?" with the options "Got It Back" and "Still Waiting". Never send a chase yourself.
 - **Tags:** pass tag names in `tags` on `tasks_create` / `tasks_update`; a new name makes a new tag. Call **`tasks_list_tags`** first and reuse the user's names. Only the user renames or recolors a tag.
 - **Checklists:** `checklist` on `tasks_create`, then **`tasks_checklist_add(task_id, items)`**, **`tasks_checklist_update(id, …)`** (rename, check, reorder) and **`tasks_checklist_delete(id)`**. `tasks_get` lists the items. Checking every item does not complete the task.
 - **`tasks_history(id)`** shows one task's changes with the values before and after.

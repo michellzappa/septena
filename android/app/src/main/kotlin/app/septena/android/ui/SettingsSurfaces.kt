@@ -53,7 +53,7 @@ internal class SettingsSurfaceEnv(
 internal val SETTINGS_SURFACES = setOf(
     "about_header", "open_source", "open_help", "send_feedback", "privacy_explainer", "ai_explainer",
     "mcp_skills", "sync_diagnostics", "smart_lists_editor", "plus_offer", "calendar_detail",
-    "reset_first_run", DELETE_ACCOUNT,
+    "reset_get_started", "reset_first_run", DELETE_ACCOUNT,
     "sign_in_approval", "claude_connector", "import_export",
 )
 
@@ -78,7 +78,11 @@ internal fun SettingsCustomSurface(
         }
         "privacy_explainer" -> detail?.let { Text(it, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
         "ai_explainer" -> ExpandableRow(label) { AiExplainer(appName(context), languageTag) }
-        // `reset_get_started` is omitted on Android until Android renders the Get Started notice.
+        // Clears synced Get Started dismissal and completed steps (as Apple `SettingsMirror.resetGetStarted`).
+        "reset_get_started" -> ActionRow(label) {
+            env.onValueChange(RegistrySettingKeys.GET_STARTED_DISMISSED, JsonValue.Null)
+            env.onValueChange(RegistrySettingKeys.GET_STARTED_STEPS, JsonValue.Null)
+        }
         // This device only: the synced `onboardedAt` stays, so other devices are not asked again (as on iOS).
         "reset_first_run" -> ActionRow(label) { env.graph.firstRun.showAgain() }
         DELETE_ACCOUNT -> DeleteAccountRow(env.graph, env.signedIn, languageTag)
@@ -87,7 +91,7 @@ internal fun SettingsCustomSurface(
         "smart_lists_editor" -> SmartListsEditor(env.values, languageTag, env.onValueChange)
         "plus_offer" -> {
             LaunchedEffect(env.signedIn) { env.plans.refresh(env.signedIn) }
-            PlusOffer(env.plans, languageTag)
+            PlusOffer(env.plans, languageTag, env.syncState)
         }
         "calendar_detail" -> CalendarFeedSection(env.graph, env.signedIn, env.values, env.onValueChange, languageTag)
         "sign_in_approval" -> SignInApprovalSection(env.graph, env.signedIn, languageTag)
@@ -265,6 +269,7 @@ private const val AI_EXPLAINER = "ai_explainer"
 private const val MCP_SKILLS = "mcp_skills"
 private const val SYNC_DIAGNOSTICS = "sync_diagnostics"
 private const val MAX_ISSUES = 20
-private const val FEEDBACK_EMAIL = "mz@centaur-labs.io"
-private const val FEEDBACK_URL = "mailto:mz@centaur-labs.io?subject=Septena%20feedback"
+// Interim until #676 replaces these with the native Contact Support form.
+private const val FEEDBACK_EMAIL = "mz@centaur-labs.io" // septena-lint:allow contact-email
+private const val FEEDBACK_URL = "mailto:mz@centaur-labs.io?subject=Septena%20feedback" // septena-lint:allow contact-email
 private const val REPO_URL = "https://github.com/michellzappa/septena"

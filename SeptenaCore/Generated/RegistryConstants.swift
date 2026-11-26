@@ -136,6 +136,9 @@ enum RegistryIcons {
     "list.anytime": "rectangle.stack.fill",
     "list.logbook": "checkmark",
     "list.faded": "circle.dashed",
+    "list.waiting": "hourglass",
+    "action.waiting": "hourglass",
+    "action.got_it_back": "arrow.uturn.backward.circle",
     "list.starred": "star.fill",
     "list.recently_deleted": "trash",
     "place.area": "folder",
@@ -722,6 +725,10 @@ enum RegistrySettings {
     "delete_account.failed": RegistryL10n.t("Couldn’t delete your account. Nothing was deleted."),
     "account_profile_card.yourProfile": RegistryL10n.t("Your Profile"),
     "account_profile_card.signInToSync": RegistryL10n.t("On this device · Sign in to sync"),
+    "sync_account_status.accountIdLabel": RegistryL10n.t("Account ID"),
+    "sync_account_status.accountIdFooter": RegistryL10n.t("Share this ID with support if you need help with your account."),
+    "sync_account_status.copy": RegistryL10n.t("Copy"),
+    "sync_account_status.copied": RegistryL10n.t("Copied"),
     "syncStatus.syncing": RegistryL10n.t("Syncing"),
     "syncStatus.synced": RegistryL10n.t("Synced"),
     "syncStatus.offline": RegistryL10n.t("Offline"),
@@ -891,7 +898,7 @@ enum RegistryDestinations {
   static let all: [RegistryDestination] = [
     RegistryDestination(id: .inbox, navigationKey: "triage", serverView: "triage", title: RegistryL10n.t("Inbox"), iconId: "list.inbox", sfSymbol: "tray.full", sidebarSection: "top", visibility: "todayBand", canHide: false, canMoveSection: false, emptyTitle: RegistryL10n.t("Inbox is empty"), emptyDetail: RegistryL10n.t("New tasks wait at the top of Today until you schedule or file them."), featureId: "lists.inbox"),
     RegistryDestination(id: .today, navigationKey: "today", serverView: "today", title: RegistryL10n.t("Today"), iconId: "list.today", sfSymbol: "sun.max.fill", sidebarSection: "top", visibility: "always", canHide: false, canMoveSection: false, emptyTitle: RegistryL10n.t("Nothing on Today"), emptyDetail: RegistryL10n.t("Add a task or move one here when you want to work on it today."), featureId: "lists.today"),
-    RegistryDestination(id: .review, navigationKey: "review", serverView: "all", title: RegistryL10n.t("Review"), iconId: "list.review", sfSymbol: "eye", sidebarSection: "top", visibility: "whenNonEmpty", canHide: true, canMoveSection: false, emptyTitle: RegistryL10n.t("Nothing to review"), emptyDetail: RegistryL10n.t("Your agent's questions, finished work and tasks in progress show up here. Faded tasks do too."), featureId: "lists.review"),
+    RegistryDestination(id: .review, navigationKey: "review", serverView: "all", title: RegistryL10n.t("Review"), iconId: "list.review", sfSymbol: "eye", sidebarSection: "top", visibility: "whenNonEmpty", canHide: true, canMoveSection: false, emptyTitle: RegistryL10n.t("Nothing to review"), emptyDetail: RegistryL10n.t("Your agent's questions, finished work and tasks in progress show up here, and so do tasks you are waiting on. Faded tasks do too."), featureId: "lists.review"),
     RegistryDestination(id: .agent, navigationKey: "agent", serverView: "all", title: RegistryL10n.t("Agent"), iconId: "list.agent", sfSymbol: "person.2.badge.gearshape", sidebarSection: "top", visibility: "reviewGroup", canHide: false, canMoveSection: false, emptyTitle: RegistryL10n.t("No agent work"), emptyDetail: RegistryL10n.t("Tasks you assign to Claude show up in Review, grouped by where the work stands."), featureId: "lists.agent"),
     RegistryDestination(id: .upcoming, navigationKey: "upcoming", serverView: "upcoming", title: RegistryL10n.t("Upcoming"), iconId: "list.upcoming", sfSymbol: "calendar", sidebarSection: "top", visibility: "always", canHide: true, canMoveSection: false, emptyTitle: RegistryL10n.t("Nothing upcoming"), emptyDetail: RegistryL10n.t("Tasks with a future When or Deadline date appear here."), featureId: "lists.upcoming"),
     RegistryDestination(id: .repeating, navigationKey: "repeating", serverView: "all", title: RegistryL10n.t("Repeating"), iconId: "list.repeating", sfSymbol: "arrow.clockwise", sidebarSection: "top", visibility: "always", canHide: true, canMoveSection: false, emptyTitle: RegistryL10n.t("No repeating tasks"), emptyDetail: RegistryL10n.t("Give any task a Repeat rule and it will show up here."), featureId: "lists.repeating"),
@@ -926,6 +933,7 @@ enum RegistryDestinations {
     .review: [
       RegistryDestinationGroup(id: "questions", title: RegistryL10n.t("Questions"), iconId: "agent.your_turn", sfSymbol: "questionmark.bubble"),
       RegistryDestinationGroup(id: "finished", title: RegistryL10n.t("Finished work"), iconId: "list.review", sfSymbol: "eye"),
+      RegistryDestinationGroup(id: "waiting", title: RegistryL10n.t("Waiting"), iconId: "list.waiting", sfSymbol: "hourglass"),
       RegistryDestinationGroup(id: "working", title: RegistryL10n.t("Working"), iconId: "agent.working", sfSymbol: "ellipsis.circle"),
       RegistryDestinationGroup(id: "queued", title: RegistryL10n.t("Queued"), iconId: "agent.queued", sfSymbol: "clock"),
       RegistryDestinationGroup(id: "stopped", title: RegistryL10n.t("Stopped"), iconId: "agent.stopped", sfSymbol: "stop.circle"),
@@ -977,6 +985,8 @@ enum RegistryActionID: String, CaseIterable, Hashable, Sendable {
   case taskToggleChecklistItem = "task.toggleChecklistItem"
   case taskDeleteChecklistItem = "task.deleteChecklistItem"
   case taskWhen = "task.when"
+  case taskWaitingOn = "task.waitingOn"
+  case taskGotItBack = "task.gotItBack"
   case taskDeadline = "task.deadline"
   case taskReminder = "task.reminder"
   case taskMove = "task.move"
@@ -1150,6 +1160,8 @@ enum RegistryActions {
     .taskToggleChecklistItem: RegistryL10n.t("Toggle Checklist Item"),
     .taskDeleteChecklistItem: RegistryL10n.t("Delete Checklist Item"),
     .taskWhen: RegistryL10n.t("When…"),
+    .taskWaitingOn: RegistryL10n.t("Waiting On…"),
+    .taskGotItBack: RegistryL10n.t("Got It Back"),
     .taskDeadline: RegistryL10n.t("Deadline…"),
     .taskReminder: RegistryL10n.t("Reminder…"),
     .taskMove: RegistryL10n.t("Move…"),
@@ -1247,6 +1259,8 @@ enum RegistryActions {
     .taskToggleChecklistItem: "checkmark.circle",
     .taskDeleteChecklistItem: "trash",
     .taskWhen: "calendar",
+    .taskWaitingOn: "hourglass",
+    .taskGotItBack: "arrow.uturn.backward.circle",
     .taskDeadline: "flag",
     .taskReminder: "bell",
     .taskMove: "folder",
@@ -1330,6 +1344,7 @@ enum RegistryActions {
     .taskDelete: ["pluralTitle": RegistryL10n.t("Delete Tasks")],
     .noticeToggleStep: ["activeTitle": RegistryL10n.t("Mark as Not Done")],
     .appQuickAdd: ["addTitle": RegistryL10n.t("Add")],
+    .appQuickFind: ["desktopTitle": RegistryL10n.t("Command Bar…")],
     .appPauseAgents: ["activeTitle": RegistryL10n.t("Resume all agents")],
     .taskConversationStop: ["activeTitle": RegistryL10n.t("Resume")],
     .appToggleSidebar: ["addTitle": RegistryL10n.t("Show Sidebar"), "removeTitle": RegistryL10n.t("Hide Sidebar")],
@@ -1342,8 +1357,8 @@ enum RegistryActions {
     .taskCopy: RegistryShortcut(key: "c", modifiers: ["primary"], keycaps: ["⌘", "C"], excludePlatforms: []),
     .taskDuplicate: RegistryShortcut(key: "d", modifiers: ["primary"], keycaps: ["⌘", "D"], excludePlatforms: []),
     .taskDo: RegistryShortcut(key: "j", modifiers: ["primary"], keycaps: ["⌘", "J"], excludePlatforms: []),
-    .taskToggleComplete: RegistryShortcut(key: "k", modifiers: ["primary"], keycaps: ["⌘", "K"], excludePlatforms: []),
-    .taskCancel: RegistryShortcut(key: "k", modifiers: ["primary", "alt"], keycaps: ["⌥", "⌘", "K"], excludePlatforms: []),
+    .taskToggleComplete: RegistryShortcut(key: "return", modifiers: ["primary"], keycaps: ["⌘", "↩"], excludePlatforms: []),
+    .taskCancel: RegistryShortcut(key: "return", modifiers: ["primary", "alt"], keycaps: ["⌥", "⌘", "↩"], excludePlatforms: []),
     .taskToggleToday: RegistryShortcut(key: "t", modifiers: ["primary"], keycaps: ["⌘", "T"], excludePlatforms: []),
     .taskToggleStar: RegistryShortcut(key: "s", modifiers: ["primary", "alt"], keycaps: ["⌥", "⌘", "S"], excludePlatforms: []),
     .taskTags: RegistryShortcut(key: "t", modifiers: ["primary", "shift"], keycaps: ["⇧", "⌘", "T"], excludePlatforms: []),
@@ -1357,11 +1372,11 @@ enum RegistryActions {
     .taskDelete: RegistryShortcut(key: "delete", modifiers: ["primary"], keycaps: ["⌘", "⌫"], excludePlatforms: []),
     .taskDeletePermanently: RegistryShortcut(key: "delete", modifiers: ["primary"], keycaps: ["⌘", "⌫"], excludePlatforms: []),
     .sectionRename: RegistryShortcut(key: "r", modifiers: ["primary"], keycaps: ["⌘", "R"], excludePlatforms: []),
-    .noticeToggleStep: RegistryShortcut(key: "k", modifiers: ["primary"], keycaps: ["⌘", "K"], excludePlatforms: []),
+    .noticeToggleStep: RegistryShortcut(key: "return", modifiers: ["primary"], keycaps: ["⌘", "↩"], excludePlatforms: []),
     .appNewTask: RegistryShortcut(key: "n", modifiers: ["primary"], keycaps: ["⌘", "N"], excludePlatforms: []),
     .appQuickAdd: RegistryShortcut(key: "i", modifiers: ["primary"], keycaps: ["⌘", "I"], excludePlatforms: []),
     .appQuickEntry: RegistryShortcut(key: "space", modifiers: ["ctrl", "alt"], keycaps: ["⌃", "⌥", "space"], excludePlatforms: []),
-    .appQuickFind: RegistryShortcut(key: "f", modifiers: ["primary", "shift"], keycaps: ["⇧", "⌘", "F"], excludePlatforms: []),
+    .appQuickFind: RegistryShortcut(key: "k", modifiers: ["primary"], keycaps: ["⌘", "K"], excludePlatforms: [], alternates: [RegistryShortcut(key: "f", modifiers: ["primary", "shift"], keycaps: ["⇧", "⌘", "F"], excludePlatforms: [])]),
     .appToggleSidebar: RegistryShortcut(key: "s", modifiers: ["ctrl", "primary"], keycaps: ["⌃", "⌘", "S"], excludePlatforms: ["ios", "ipados"]),
     .appSettings: RegistryShortcut(key: ",", modifiers: ["primary"], keycaps: ["⌘", ","], excludePlatforms: []),
     .appKeyboardShortcuts: RegistryShortcut(key: "/", modifiers: ["primary", "shift"], keycaps: ["⇧", "⌘", "/"], excludePlatforms: []),
@@ -1434,6 +1449,8 @@ enum RegistryActions {
     .taskToggleChecklistItem: RegistryActionAvailability(selection: "single", platforms: ["android"], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "task.checklists"),
     .taskDeleteChecklistItem: RegistryActionAvailability(selection: "single", platforms: ["android"], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "task.checklists"),
     .taskWhen: RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: [.recentlyDeleted], onlyDestinations: [], requiresRecurrence: false, featureId: "task.when-deadline"),
+    .taskWaitingOn: RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: [.recentlyDeleted], onlyDestinations: [], requiresRecurrence: false, featureId: "review.waiting"),
+    .taskGotItBack: RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: [.recentlyDeleted], onlyDestinations: [], requiresRecurrence: false, featureId: "review.waiting"),
     .taskDeadline: RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: [.recentlyDeleted], onlyDestinations: [], requiresRecurrence: false, featureId: "task.when-deadline"),
     .taskReminder: RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: [.recentlyDeleted], onlyDestinations: [], requiresRecurrence: false, featureId: "task.alerts"),
     .taskMove: RegistryActionAvailability(selection: "any", platforms: [], excludeDestinations: [.recentlyDeleted], onlyDestinations: [], requiresRecurrence: false, featureId: "places.projects"),
@@ -1502,24 +1519,26 @@ enum RegistryActions {
     .taskRow: [
       RegistryMenuItem(kind: "action", id: "task.acceptReview", actionId: .taskAcceptReview, title: RegistryL10n.t("Accept"), sfSymbol: "checkmark.seal", items: []),
       RegistryMenuItem(kind: "action", id: "task.sendBackReview", actionId: .taskSendBackReview, title: RegistryL10n.t("Send Back…"), sfSymbol: "arrowshape.turn.up.backward", items: []),
+      RegistryMenuItem(kind: "action", id: "task.gotItBack", actionId: .taskGotItBack, title: RegistryL10n.t("Got It Back"), sfSymbol: "arrow.uturn.backward.circle", items: []),
       RegistryMenuItem(kind: "slot", id: "filingSuggestion", actionId: nil, title: nil, sfSymbol: nil, items: []),
-      RegistryMenuItem(kind: "divider", id: "divider.3", actionId: nil, title: nil, sfSymbol: nil, items: []),
+      RegistryMenuItem(kind: "divider", id: "divider.4", actionId: nil, title: nil, sfSymbol: nil, items: []),
       RegistryMenuItem(kind: "action", id: "task.do", actionId: .taskDo, title: RegistryL10n.t("Do"), sfSymbol: "play.circle", items: []),
       RegistryMenuItem(kind: "action", id: "task.when", actionId: .taskWhen, title: RegistryL10n.t("When…"), sfSymbol: "calendar", items: []),
       RegistryMenuItem(kind: "submenu", id: "move", actionId: nil, title: RegistryL10n.t("Move"), sfSymbol: "folder", items: [RegistryMenuItem(kind: "slot", id: "sectionDestinations", actionId: nil, title: nil, sfSymbol: nil, items: []), RegistryMenuItem(kind: "divider", id: "divider.1", actionId: nil, title: nil, sfSymbol: nil, items: []), RegistryMenuItem(kind: "slot", id: "moveDestinations", actionId: nil, title: nil, sfSymbol: nil, items: []), RegistryMenuItem(kind: "divider", id: "divider.3", actionId: nil, title: nil, sfSymbol: nil, items: []), RegistryMenuItem(kind: "action", id: "task.move", actionId: .taskMove, title: RegistryL10n.t("Move…"), sfSymbol: "folder", items: [])]),
       RegistryMenuItem(kind: "submenu", id: "assign", actionId: nil, title: RegistryL10n.t("Assign To"), sfSymbol: "person", items: [RegistryMenuItem(kind: "slot", id: "assignees", actionId: nil, title: nil, sfSymbol: nil, items: [])]),
       RegistryMenuItem(kind: "action", id: "task.tags", actionId: .taskTags, title: RegistryL10n.t("Tags…"), sfSymbol: "tag", items: []),
       RegistryMenuItem(kind: "action", id: "task.deadline", actionId: .taskDeadline, title: RegistryL10n.t("Deadline…"), sfSymbol: "flag", items: []),
+      RegistryMenuItem(kind: "action", id: "task.waitingOn", actionId: .taskWaitingOn, title: RegistryL10n.t("Waiting On…"), sfSymbol: "hourglass", items: []),
       RegistryMenuItem(kind: "action", id: "task.toggleStar", actionId: .taskToggleStar, title: RegistryL10n.t("Toggle Favorite"), sfSymbol: "star", items: []),
-      RegistryMenuItem(kind: "divider", id: "divider.11", actionId: nil, title: nil, sfSymbol: nil, items: []),
+      RegistryMenuItem(kind: "divider", id: "divider.13", actionId: nil, title: nil, sfSymbol: nil, items: []),
       RegistryMenuItem(kind: "action", id: "task.open", actionId: .taskOpen, title: RegistryL10n.t("Open"), sfSymbol: "arrow.up.left.and.arrow.down.right", items: []),
       RegistryMenuItem(kind: "action", id: "task.addReference", actionId: .taskAddReference, title: RegistryL10n.t("Add Reference…"), sfSymbol: "link.badge.plus", items: []),
       RegistryMenuItem(kind: "action", id: "task.duplicate", actionId: .taskDuplicate, title: RegistryL10n.t("Duplicate"), sfSymbol: "plus.square.on.square", items: []),
       RegistryMenuItem(kind: "action", id: "task.share", actionId: .taskShare, title: RegistryL10n.t("Share…"), sfSymbol: "square.and.arrow.up", items: []),
       RegistryMenuItem(kind: "action", id: "task.select", actionId: .taskSelect, title: RegistryL10n.t("Select"), sfSymbol: "checklist", items: []),
-      RegistryMenuItem(kind: "divider", id: "divider.17", actionId: nil, title: nil, sfSymbol: nil, items: []),
-      RegistryMenuItem(kind: "action", id: "task.toggleComplete", actionId: .taskToggleComplete, title: RegistryL10n.t("Mark as Complete"), sfSymbol: "checkmark.circle", items: []),
       RegistryMenuItem(kind: "divider", id: "divider.19", actionId: nil, title: nil, sfSymbol: nil, items: []),
+      RegistryMenuItem(kind: "action", id: "task.toggleComplete", actionId: .taskToggleComplete, title: RegistryL10n.t("Mark as Complete"), sfSymbol: "checkmark.circle", items: []),
+      RegistryMenuItem(kind: "divider", id: "divider.21", actionId: nil, title: nil, sfSymbol: nil, items: []),
       RegistryMenuItem(kind: "action", id: "task.delete", actionId: .taskDelete, title: RegistryL10n.t("Delete"), sfSymbol: "trash", items: []),
     ],
     .taskReference: [
@@ -1627,16 +1646,18 @@ enum RegistryActions {
       RegistryMenuItem(kind: "action", id: "task.tags", actionId: .taskTags, title: RegistryL10n.t("Tags…"), sfSymbol: "tag", items: []),
       RegistryMenuItem(kind: "action", id: "task.deadline", actionId: .taskDeadline, title: RegistryL10n.t("Deadline…"), sfSymbol: "flag", items: []),
       RegistryMenuItem(kind: "action", id: "task.reminder", actionId: .taskReminder, title: RegistryL10n.t("Reminder…"), sfSymbol: "bell", items: []),
+      RegistryMenuItem(kind: "action", id: "task.waitingOn", actionId: .taskWaitingOn, title: RegistryL10n.t("Waiting On…"), sfSymbol: "hourglass", items: []),
+      RegistryMenuItem(kind: "action", id: "task.gotItBack", actionId: .taskGotItBack, title: RegistryL10n.t("Got It Back"), sfSymbol: "arrow.uturn.backward.circle", items: []),
       RegistryMenuItem(kind: "action", id: "task.toggleStar", actionId: .taskToggleStar, title: RegistryL10n.t("Toggle Favorite"), sfSymbol: "star", items: []),
-      RegistryMenuItem(kind: "divider", id: "divider.16", actionId: nil, title: nil, sfSymbol: nil, items: []),
+      RegistryMenuItem(kind: "divider", id: "divider.18", actionId: nil, title: nil, sfSymbol: nil, items: []),
       RegistryMenuItem(kind: "action", id: "task.editDetails", actionId: .taskEditDetails, title: RegistryL10n.t("Rename"), sfSymbol: "info.circle", items: []),
       RegistryMenuItem(kind: "action", id: "task.duplicate", actionId: .taskDuplicate, title: RegistryL10n.t("Duplicate"), sfSymbol: "plus.square.on.square", items: []),
       RegistryMenuItem(kind: "action", id: "task.addChecklistItem", actionId: .taskAddChecklistItem, title: RegistryL10n.t("Add Checklist Item"), sfSymbol: "checklist", items: []),
       RegistryMenuItem(kind: "action", id: "task.addReference", actionId: .taskAddReference, title: RegistryL10n.t("Add Reference…"), sfSymbol: "link.badge.plus", items: []),
-      RegistryMenuItem(kind: "divider", id: "divider.21", actionId: nil, title: nil, sfSymbol: nil, items: []),
+      RegistryMenuItem(kind: "divider", id: "divider.23", actionId: nil, title: nil, sfSymbol: nil, items: []),
       RegistryMenuItem(kind: "action", id: "task.toggleComplete", actionId: .taskToggleComplete, title: RegistryL10n.t("Mark as Complete"), sfSymbol: "checkmark.circle", items: []),
       RegistryMenuItem(kind: "action", id: "task.cancel", actionId: .taskCancel, title: RegistryL10n.t("Cancel Task"), sfSymbol: "xmark.circle", items: []),
-      RegistryMenuItem(kind: "divider", id: "divider.24", actionId: nil, title: nil, sfSymbol: nil, items: []),
+      RegistryMenuItem(kind: "divider", id: "divider.26", actionId: nil, title: nil, sfSymbol: nil, items: []),
       RegistryMenuItem(kind: "action", id: "task.delete", actionId: .taskDelete, title: RegistryL10n.t("Delete"), sfSymbol: "trash", items: []),
     ]),
     RegistryMenu(id: .help, title: RegistryL10n.t("Help"), system: "help", items: [
@@ -1648,7 +1669,8 @@ enum RegistryActions {
   static let shortcutsGeneral: [RegistryShortcutEntry] = [
     RegistryShortcutEntry(id: "app.newTask", actionId: .appNewTask, label: RegistryL10n.t("New Task"), keycaps: ["⌘", "N"], excludePlatforms: []),
     RegistryShortcutEntry(id: "app.quickAdd", actionId: .appQuickAdd, label: RegistryL10n.t("Quick Add…"), keycaps: ["⌘", "I"], excludePlatforms: []),
-    RegistryShortcutEntry(id: "app.quickFind", actionId: .appQuickFind, label: RegistryL10n.t("Quick Find…"), keycaps: ["⇧", "⌘", "F"], excludePlatforms: []),
+    RegistryShortcutEntry(id: "app.quickFind", actionId: .appQuickFind, label: RegistryL10n.t("Quick Find…"), keycaps: ["⌘", "K"], excludePlatforms: []),
+    RegistryShortcutEntry(id: "app.quickFind.alt0", actionId: .appQuickFind, label: RegistryL10n.t("Quick Find…"), keycaps: ["⇧", "⌘", "F"], excludePlatforms: []),
     RegistryShortcutEntry(id: "app.toggleSidebar", actionId: .appToggleSidebar, label: RegistryL10n.t("Show / Hide Sidebar"), keycaps: ["⌃", "⌘", "S"], excludePlatforms: ["ios", "ipados"]),
     RegistryShortcutEntry(id: "app.settings", actionId: .appSettings, label: RegistryL10n.t("Settings…"), keycaps: ["⌘", ","], excludePlatforms: []),
     RegistryShortcutEntry(id: "app.keyboardShortcuts", actionId: .appKeyboardShortcuts, label: RegistryL10n.t("Keyboard Shortcuts"), keycaps: ["⇧", "⌘", "/"], excludePlatforms: []),
@@ -1659,8 +1681,8 @@ enum RegistryActions {
     RegistryShortcutEntry(id: "task.toggleInfo", actionId: .taskToggleInfo, label: RegistryL10n.t("Show Info"), keycaps: ["⌥", "⌘", "I"], excludePlatforms: []),
     RegistryShortcutEntry(id: "task.copy", actionId: .taskCopy, label: RegistryL10n.t("Copy"), keycaps: ["⌘", "C"], excludePlatforms: []),
     RegistryShortcutEntry(id: "task.duplicate", actionId: .taskDuplicate, label: RegistryL10n.t("Duplicate"), keycaps: ["⌘", "D"], excludePlatforms: []),
-    RegistryShortcutEntry(id: "task.toggleComplete", actionId: .taskToggleComplete, label: RegistryL10n.t("Mark as Complete"), keycaps: ["⌘", "K"], excludePlatforms: []),
-    RegistryShortcutEntry(id: "task.cancel", actionId: .taskCancel, label: RegistryL10n.t("Cancel Task"), keycaps: ["⌥", "⌘", "K"], excludePlatforms: []),
+    RegistryShortcutEntry(id: "task.toggleComplete", actionId: .taskToggleComplete, label: RegistryL10n.t("Mark as Complete"), keycaps: ["⌘", "↩"], excludePlatforms: []),
+    RegistryShortcutEntry(id: "task.cancel", actionId: .taskCancel, label: RegistryL10n.t("Cancel Task"), keycaps: ["⌥", "⌘", "↩"], excludePlatforms: []),
     RegistryShortcutEntry(id: "task.toggleToday", actionId: .taskToggleToday, label: RegistryL10n.t("Toggle Today"), keycaps: ["⌘", "T"], excludePlatforms: []),
     RegistryShortcutEntry(id: "task.toggleStar", actionId: .taskToggleStar, label: RegistryL10n.t("Toggle Favorite"), keycaps: ["⌥", "⌘", "S"], excludePlatforms: []),
     RegistryShortcutEntry(id: "task.tags", actionId: .taskTags, label: RegistryL10n.t("Tags…"), keycaps: ["⇧", "⌘", "T"], excludePlatforms: []),
@@ -1828,6 +1850,7 @@ enum RegistryPrompts {
   static func tasksPhrase(count: Int) -> String { RegistryL10n.plural("%lld tasks", count: count, one: "1 task", other: "%lld tasks", args: [count]) }
   static func projectsPhrase(count: Int) -> String { RegistryL10n.plural("%lld projects", count: count, one: "1 project", other: "%lld projects", args: [count]) }
   static func agentsPhrase(count: Int) -> String { RegistryL10n.plural("%lld agents", count: count, one: "1 agent", other: "%lld agents", args: [count]) }
+  static func waitingDaysPhrase(count: Int) -> String { RegistryL10n.plural("%lld days", count: count, one: "1 day", other: "%lld days", args: [count]) }
   static func deletePermanently(count: Int) -> RegistryPromptCopy {
     RegistryPromptCopy(id: .deletePermanently, title: RegistryL10n.plural("Delete %lld tasks permanently?", count: count, one: "Delete this task permanently?", other: "Delete %lld tasks permanently?", args: [count]), message: RegistryL10n.t("You can’t undo this."), confirmTitle: RegistryL10n.t("Delete Permanently"), options: [])
   }
@@ -1961,11 +1984,10 @@ enum RegistrySurfaces {
   }
   /// The rows under the date board's day strip, in order (`surfaces.json` `taskDateBoard`).
   static let dateBoardRows: [RegistryDateBoardRow] = [
-    RegistryDateBoardRow(id: "dateBoard.tomorrow", kind: .tomorrow, label: RegistryL10n.t("Tomorrow"), attributeLabels: [:], sfSymbol: "sunrise", attributes: [.when, .deadline], featureId: "task.when-deadline"),
-    RegistryDateBoardRow(id: "dateBoard.calendar", kind: .calendar, label: RegistryL10n.t("Pick another date"), attributeLabels: [:], sfSymbol: "calendar", attributes: [.when, .deadline], featureId: "task.when-deadline"),
-    RegistryDateBoardRow(id: "dateBoard.clear", kind: .clear, label: RegistryL10n.t("Clear (Anytime)"), attributeLabels: [.deadline: RegistryL10n.t("No Deadline")], sfSymbol: "xmark.circle", attributes: [.when, .deadline], featureId: "task.when-deadline"),
-    RegistryDateBoardRow(id: "dateBoard.repeatRule", kind: .repeatRule, label: RegistryL10n.t("Repeat…"), attributeLabels: [:], sfSymbol: "arrow.clockwise", attributes: [.when], featureId: "task.repeat"),
-    RegistryDateBoardRow(id: "dateBoard.time", kind: .time, label: RegistryL10n.t("Add time"), attributeLabels: [:], sfSymbol: "clock", attributes: [.when], featureId: "task.when-deadline"),
+    RegistryDateBoardRow(id: "dateBoard.calendar", kind: .calendar, group: .pick, label: RegistryL10n.t("Pick another date"), attributeLabels: [:], sfSymbol: "calendar", attributes: [.when, .deadline], featureId: "task.when-deadline"),
+    RegistryDateBoardRow(id: "dateBoard.time", kind: .time, group: .refine, label: RegistryL10n.t("Add time"), attributeLabels: [:], sfSymbol: "clock", attributes: [.when], featureId: "task.when-deadline"),
+    RegistryDateBoardRow(id: "dateBoard.repeatRule", kind: .repeatRule, group: .refine, label: RegistryL10n.t("Repeat…"), attributeLabels: [:], sfSymbol: "arrow.clockwise", attributes: [.when], featureId: "task.repeat"),
+    RegistryDateBoardRow(id: "dateBoard.clear", kind: .clear, group: .remove, label: RegistryL10n.t("Clear (Anytime)"), attributeLabels: [.deadline: RegistryL10n.t("No Deadline")], sfSymbol: "xmark.circle", attributes: [.when, .deadline], featureId: "task.when-deadline"),
   ]
   static func dateBoardRows(for attribute: RegistryDateBoardAttribute, on platform: String) -> [RegistryDateBoardRow] {
     dateBoardRows.filter { $0.applies(to: attribute, on: platform) }
@@ -1973,7 +1995,7 @@ enum RegistrySurfaces {
   static let taskDateBoardOverdueLabel: String = RegistryL10n.t("Overdue")
   /// The calendar row when the task has a date past the day strip.
   static func dateBoardCalendarLabel(date: String) -> String { RegistryL10n.format("Pick another date (%@)", english: "Pick another date (%@)", args: [date]) }
-  /// The word for the day after today, in the date board and in date labels.
+  /// The word for the day after today, in date labels.
   static let tomorrowLabel: String = RegistryL10n.t("Tomorrow")
   /// Provenance block (`taskPage.provenance`): the name a task you added shows as,
   /// the name for an agent row with no `sourceClient`, and the agent glyph.
@@ -1989,6 +2011,7 @@ enum RegistrySurfaces {
   static let fadeSweepTitle: String = RegistryL10n.t("Faded Tasks")
   /// Quick Find copy (`surfaces.json` `quickFind`).
   static let quickFindPlaceholder: String = RegistryL10n.t("Search tasks, projects, areas…")
+  static let quickFindCommandPlaceholder: String = RegistryL10n.t("Search or run a command…")
   static let quickFindEmptyTitle: String = RegistryL10n.t("Search Tasks")
   static let quickFindEmptyDetail: String = RegistryL10n.t("Find any task, project, or area.")
   static let quickFindCompletedLabel: String = RegistryL10n.t("Completed")
@@ -2007,17 +2030,24 @@ enum RegistryDateBoardAttribute: String, Sendable, Hashable {
 
 /// The closed set of date board rows. Each platform writes one handler per kind.
 enum RegistryDateBoardRowKind: String, Sendable, Hashable {
-  case tomorrow
   case calendar
-  case clear
-  case repeatRule
   case time
+  case repeatRule
+  case clear
+}
+
+/// The date board's row groups, in order. The day strip opens `pick`; a divider separates groups.
+enum RegistryDateBoardGroup: String, Sendable, Hashable {
+  case pick
+  case refine
+  case remove
 }
 
 /// One row under the date board's day strip (`surfaces.json` `taskDateBoard.rows`).
 struct RegistryDateBoardRow: Sendable, Hashable, Identifiable {
   let id: String
   let kind: RegistryDateBoardRowKind
+  let group: RegistryDateBoardGroup
   let label: String
   /// Attribute → label that replaces `label` in that attribute's picker.
   let attributeLabels: [RegistryDateBoardAttribute: String]
@@ -2125,6 +2155,18 @@ enum RegistryDoing {
   static let exitLabels: [String: String] = ["done": RegistryL10n.t("Done"), "stopped": RegistryL10n.t("Stopped for now"), "later": RegistryL10n.t("Moved to later"), "replaced": RegistryL10n.t("Switched to another task"), "closed": RegistryL10n.t("Ended")]
 }
 
+/// Waiting on a person (`registry/surfaces.json` `waiting`, docs/REVIEW_SPEC.md §6).
+enum RegistryWaiting {
+  static func label(name: String) -> String { RegistryL10n.format("Waiting on %@", english: "Waiting on %@", args: [name]) }
+  static let sheetTitle: String = RegistryL10n.t("Waiting On")
+  static let namePlaceholder: String = RegistryL10n.t("Name")
+  static let confirmTitle: String = RegistryL10n.t("Save")
+  static let checkBackTitle: String = RegistryL10n.t("Check back")
+  static let noCheckBackTitle: String = RegistryL10n.t("No date")
+  /// The check-back date Waiting On… offers, in days from today.
+  static let defaultCheckBackDays = 7
+}
+
 /// The notes on a project's or an area's page (`registry/surfaces.json` `placeNotes`).
 enum RegistryPlaceNotes {
   /// Lines of the folded notes.
@@ -2169,7 +2211,7 @@ enum RegistryDeviceSignIn {
   static let title: String = RegistryL10n.t("Sign in to Septena")
   static let intro: String = RegistryL10n.t("Use a device where Septena is already signed in.")
   static let start: String = RegistryL10n.t("Get a sign-in code")
-  static let approve: String = RegistryL10n.t("On your iPhone, iPad or Mac, open Septena and go to Settings ▸ Account ▸ Approve a sign-in. Tap Scan Code and point the camera at this screen, or enter this code:")
+  static let approve: String = RegistryL10n.t("On another device where you are signed in, open Septena and go to Settings ▸ Account ▸ Approve a sign-in. Tap Scan Code and point the camera at this screen, or enter this code:")
   static let lifetime: String = RegistryL10n.t("The code works for 10 minutes. After you approve it, this screen continues by itself.")
   static let expired: String = RegistryL10n.t("The code expired.")
   static let unreachable: String = RegistryL10n.t("Could not reach Septena.")
@@ -2264,7 +2306,7 @@ enum RegistryFirstRun {
   static let setupPrompt: String = RegistryL10n.t("Set up Septena for me using https://septena.app/agents.md")
   static let firstPrompt: String = RegistryL10n.t("Set up my Septena areas, projects, and tasks by following https://api.septena.app/onboard.md")
   static let steps: [RegistryFirstRunStep] = [
-    RegistryFirstRunStep(id: .welcome, kind: "intro", icon: "onboarding.welcome", title: RegistryL10n.t("Welcome to Septena"), body: RegistryL10n.t("Tasks that think with you."), footnote: nil, returningTitle: nil, returningBody: nil, skipWhen: nil, requires: nil, completesGetStartedStep: nil, platforms: [], featureId: nil, points: [RegistryFirstRunPoint(icon: "onboarding.devices", title: RegistryL10n.t("On every device"), detail: RegistryL10n.t("Your tasks stay in step on iPhone, iPad and Mac.")), RegistryFirstRunPoint(icon: "onboarding.agent", title: RegistryL10n.t("Your agents do the work"), detail: RegistryL10n.t("You decide when it’s done.")), RegistryFirstRunPoint(icon: "onboarding.notes", title: RegistryL10n.t("Notes keep the context"), detail: RegistryL10n.t("Each project has notes, so you and Claude know what it’s for."))], choices: [], instructions: [], primary: RegistryFirstRunButton(title: RegistryL10n.t("Continue"), action: .next), secondary: nil, tertiary: nil, afterDone: nil),
+    RegistryFirstRunStep(id: .welcome, kind: "intro", icon: "onboarding.welcome", title: RegistryL10n.t("Welcome to Septena"), body: RegistryL10n.t("Tasks that think with you."), footnote: nil, returningTitle: nil, returningBody: nil, skipWhen: nil, requires: nil, completesGetStartedStep: nil, platforms: [], featureId: nil, points: [RegistryFirstRunPoint(icon: "onboarding.devices", title: RegistryL10n.t("On every device"), detail: RegistryL10n.t("Your tasks stay in step on every device you sign in to.")), RegistryFirstRunPoint(icon: "onboarding.agent", title: RegistryL10n.t("Your agents do the work"), detail: RegistryL10n.t("You decide when it’s done.")), RegistryFirstRunPoint(icon: "onboarding.notes", title: RegistryL10n.t("Notes keep the context"), detail: RegistryL10n.t("Each project has notes, so you and Claude know what it’s for."))], choices: [], instructions: [], primary: RegistryFirstRunButton(title: RegistryL10n.t("Continue"), action: .next), secondary: nil, tertiary: nil, afterDone: nil),
     RegistryFirstRunStep(id: .account, kind: "account", icon: "onboarding.account", title: RegistryL10n.t("Sign in to sync"), body: RegistryL10n.t("Sign in with Apple to keep your tasks on all your devices and to let Claude connect. Septena never sees your Apple password."), footnote: RegistryL10n.t("If you skip this, your tasks stay on this device until you sign in."), returningTitle: nil, returningBody: nil, skipWhen: "signedIn", requires: nil, completesGetStartedStep: nil, platforms: ["ios", "ipados", "macos"], featureId: nil, points: [], choices: [], instructions: [], primary: RegistryFirstRunButton(title: RegistryL10n.t("Sign in with Apple"), action: .signIn), secondary: RegistryFirstRunButton(title: RegistryL10n.t("Not now"), action: .next), tertiary: nil, afterDone: nil),
     RegistryFirstRunStep(id: .accountDevice, kind: "account", icon: "onboarding.account", title: RegistryL10n.t("Sign in to sync"), body: RegistryL10n.t("Use a device where Septena is already signed in. It approves this one with a code, and your tasks sync here."), footnote: nil, returningTitle: nil, returningBody: nil, skipWhen: "signedIn", requires: nil, completesGetStartedStep: nil, platforms: ["android"], featureId: nil, points: [], choices: [], instructions: [], primary: RegistryFirstRunButton(title: RegistryL10n.t("Get a sign-in code"), action: .signIn), secondary: nil, tertiary: nil, afterDone: nil),
     RegistryFirstRunStep(id: .connectClaude, kind: "connectAgent", icon: "settings.claude", title: RegistryL10n.t("Connect Claude"), body: RegistryL10n.t("Claude reads and changes your tasks through your Septena account. You decide which tasks it works on."), footnote: nil, returningTitle: nil, returningBody: nil, skipWhen: nil, requires: "signedIn", completesGetStartedStep: "connectAI", platforms: [], featureId: "agents.connector", points: [], choices: [], instructions: [RegistryL10n.t("Copy the setup prompt and paste it into Claude."), RegistryL10n.t("When Claude shows a code, enter it below."), RegistryL10n.t("Paste the first prompt. Claude sets up your areas and projects with you.")], primary: RegistryFirstRunButton(title: RegistryL10n.t("Copy setup prompt"), action: .copySetupPrompt), secondary: RegistryFirstRunButton(title: RegistryL10n.t("Later"), action: .next), tertiary: RegistryFirstRunButton(title: RegistryL10n.t("Copy first prompt"), action: .copyFirstPrompt), afterDone: RegistryFirstRunButton(title: RegistryL10n.t("Continue"), action: .next)),
@@ -2345,7 +2387,7 @@ enum RegistryPlans {
   /// Only for an account that has Pro: no store sells it (ADR 0037, ADR 0045).
   static var proCard: RegistryPlanCard { RegistryPlanCard(id: "pro", title: RegistryL10n.t("Septena Pro"), icon: "plans.pro", detail: RegistryL10n.t("For people who run many agents on one list."), footnote: RegistryL10n.t("Everything in Plus is included."), highlighted: false) }
   static var outcomes: [RegistryPlanOutcome] { [
-    RegistryPlanOutcome(id: "everywhere", icon: "onboarding.devices", title: RegistryL10n.t("Your list everywhere"), detail: RegistryL10n.t("The same tasks on your phone, tablet and Mac, updated as you type."), rows: [
+    RegistryPlanOutcome(id: "everywhere", icon: "onboarding.devices", title: RegistryL10n.t("Your list everywhere"), detail: RegistryL10n.t("The same tasks on every device, updated as you type."), rows: [
       RegistryPlanRow(id: "devices", label: RegistryL10n.t("Devices"), planned: false, free: .text(RegistryL10n.t("1")), plus: .text(RegistryL10n.t("All your devices")), pro: .text(RegistryL10n.t("All your devices"))),
       RegistryPlanRow(id: "backup", label: RegistryL10n.t("Backup on our server"), planned: false, free: .included, plus: .included, pro: .included),
       RegistryPlanRow(id: "new_device", label: RegistryL10n.t("Move to a new device"), planned: false, free: .included, plus: .included, pro: .included),
@@ -2372,7 +2414,7 @@ enum RegistryPlans {
     RegistryPlanNote(id: "second_device", title: RegistryL10n.t("This device is not syncing"), detail: RegistryL10n.t("A free account syncs one device. Plus syncs all of them. You can also move your free account to this device.")),
     RegistryPlanNote(id: "history_edge", title: RegistryL10n.t("Older changes are hidden"), detail: RegistryL10n.t("A free account shows 30 days of history. Plus shows a full year.")),
     RegistryPlanNote(id: "file_elsewhere", title: RegistryL10n.t("This file is on another device"), detail: RegistryL10n.t("Plus syncs files and images to all your devices.")),
-    RegistryPlanNote(id: "connector_cap", title: RegistryL10n.t("Daily change limit reached"), detail: RegistryL10n.t("A free account allows 500 agent changes a day. Your agent can make changes again tomorrow. Plus has no daily limit.")),
+    RegistryPlanNote(id: "connector_cap", title: RegistryL10n.t("Daily change limit reached"), detail: RegistryL10n.t("Agents on this account made 500 changes today. They can make changes again tomorrow.")),
     RegistryPlanNote(id: "share_create", title: RegistryL10n.t("Sharing a project needs Plus"), detail: RegistryL10n.t("Anyone can join a shared project for free. Plus lets you create one and invite people.")),
     RegistryPlanNote(id: "trial_end", title: RegistryL10n.t("Your 14 days of Plus have ended"), detail: RegistryL10n.t("Your account is now a free account. One device keeps syncing. Your tasks on every device stay where they are.")),
   ] }
@@ -2406,6 +2448,7 @@ enum RegistryPlans {
     static func trialEnds(date: String) -> String { RegistryL10n.format("Plus trial until %@", english: "Plus trial until %@", args: [date]) }
     static func paidThrough(date: String) -> String { RegistryL10n.format("Plus through %@", english: "Plus through %@", args: [date]) }
     static func proThrough(date: String) -> String { RegistryL10n.format("Pro through %@", english: "Pro through %@", args: [date]) }
+    static var filesSyncing: String { RegistryL10n.t("Files are still syncing between your devices.") }
   }
 
   enum Paywall {
@@ -2552,13 +2595,13 @@ enum RegistryImportSources {
 /// Canonical capability parity ledger (`registry/capabilities.json`, ADR 0013 / ADR 0015).
 enum RegistryCapabilities {
   static let byPlatform: [String: [String: String]] = [
-    "ios": ["lists.inbox": "ships", "lists.today": "ships", "lists.review": "ships", "lists.agent": "ships", "lists.upcoming": "ships", "lists.anytime": "ships", "lists.repeating": "ships", "lists.logbook": "ships", "lists.faded": "ships", "lists.starred": "ships", "lists.recently-deleted": "ships", "places.areas": "ships", "places.projects": "ships", "places.sections": "ships", "task.when-deadline": "ships", "task.repeat": "ships", "task.notes": "ships", "task.attachments": "ships", "task.do": "ships", "task.references": "ships", "task.history": "ships", "task.provenance": "ships", "task.aging": "ships", "task.checklists": "ships", "task.tags": "ships", "task.share": "ships", "task.alerts": "ships", "fade.sweep": "ships", "capture.quick-add": "ships", "sharing.projects": "ships", "capture.share-target": "ships", "capture.quick-entry": "not_applicable", "edit.filing-suggestion": "ships", "edit.undo": "ships", "edit.multi-select": "ships", "find.quick-find": "ships", "task.page": "partial", "mac.keyboard": "not_applicable", "mac.updates": "not_applicable", "calendar.events": "ships", "import.reminders": "ships", "import.things": "ships", "ai.discuss": "ships", "ai.reach-dial": "ships", "agents.connector": "ships", "onboarding.first-run": "ships", "agents.stop-pause": "ships", "sync.backend": "ships", "account.delete": "ships", "account.sign-in-apple": "ships", "account.sign-in-google": "planned", "account.sign-in-microsoft": "planned", "account.sign-in-email": "planned", "account.sign-in-device": "ships", "task.times": "ships", "calendar.feed": "ships", "widgets.tasks": "ships", "watch.app": "not_applicable", "data.import-export": "ships", "agents.list": "ships", "settings.display": "ships", "appearance.accents": "ships", "appearance.textures": "ships", "appearance.mode": "ships", "appearance.text-size": "ships"],
-    "ipados": ["lists.inbox": "ships", "lists.today": "ships", "lists.review": "ships", "lists.agent": "ships", "lists.upcoming": "ships", "lists.anytime": "ships", "lists.repeating": "ships", "lists.logbook": "ships", "lists.faded": "ships", "lists.starred": "ships", "lists.recently-deleted": "ships", "places.areas": "ships", "places.projects": "ships", "places.sections": "ships", "task.when-deadline": "ships", "task.repeat": "ships", "task.notes": "ships", "task.attachments": "ships", "task.do": "ships", "task.references": "ships", "task.history": "ships", "task.provenance": "ships", "task.aging": "ships", "task.checklists": "ships", "task.tags": "ships", "task.share": "ships", "task.alerts": "ships", "fade.sweep": "ships", "capture.quick-add": "ships", "sharing.projects": "ships", "capture.share-target": "ships", "capture.quick-entry": "not_applicable", "edit.filing-suggestion": "ships", "edit.undo": "ships", "edit.multi-select": "ships", "find.quick-find": "ships", "task.page": "partial", "mac.keyboard": "ships", "mac.updates": "not_applicable", "calendar.events": "ships", "import.reminders": "ships", "import.things": "ships", "ai.discuss": "ships", "ai.reach-dial": "ships", "agents.connector": "ships", "onboarding.first-run": "ships", "agents.stop-pause": "ships", "sync.backend": "ships", "account.delete": "ships", "account.sign-in-apple": "ships", "account.sign-in-google": "planned", "account.sign-in-microsoft": "planned", "account.sign-in-email": "planned", "account.sign-in-device": "ships", "task.times": "ships", "calendar.feed": "ships", "widgets.tasks": "ships", "watch.app": "not_applicable", "data.import-export": "ships", "agents.list": "ships", "settings.display": "ships", "appearance.accents": "ships", "appearance.textures": "ships", "appearance.mode": "ships", "appearance.text-size": "ships"],
-    "macos": ["lists.inbox": "ships", "lists.today": "ships", "lists.review": "ships", "lists.agent": "ships", "lists.upcoming": "ships", "lists.anytime": "ships", "lists.repeating": "ships", "lists.logbook": "ships", "lists.faded": "ships", "lists.starred": "ships", "lists.recently-deleted": "ships", "places.areas": "ships", "places.projects": "ships", "places.sections": "ships", "task.when-deadline": "ships", "task.repeat": "ships", "task.notes": "ships", "task.attachments": "ships", "task.do": "ships", "task.references": "ships", "task.history": "ships", "task.provenance": "ships", "task.aging": "ships", "task.checklists": "ships", "task.tags": "ships", "task.share": "ships", "task.alerts": "ships", "fade.sweep": "ships", "capture.quick-add": "not_applicable", "sharing.projects": "ships", "capture.share-target": "not_applicable", "capture.quick-entry": "ships", "edit.filing-suggestion": "ships", "edit.undo": "ships", "edit.multi-select": "ships", "find.quick-find": "ships", "task.page": "partial", "mac.keyboard": "ships", "mac.updates": "ships", "calendar.events": "ships", "import.reminders": "ships", "import.things": "ships", "ai.discuss": "ships", "ai.reach-dial": "ships", "agents.connector": "ships", "onboarding.first-run": "ships", "agents.stop-pause": "ships", "sync.backend": "ships", "account.delete": "ships", "account.sign-in-apple": "ships", "account.sign-in-google": "planned", "account.sign-in-microsoft": "planned", "account.sign-in-email": "planned", "account.sign-in-device": "ships", "task.times": "ships", "calendar.feed": "ships", "widgets.tasks": "ships", "watch.app": "not_applicable", "data.import-export": "ships", "agents.list": "ships", "settings.display": "ships", "appearance.accents": "ships", "appearance.textures": "ships", "appearance.mode": "ships", "appearance.text-size": "ships"],
-    "web": ["lists.inbox": "ships", "lists.today": "ships", "lists.review": "ships", "lists.agent": "ships", "lists.upcoming": "ships", "lists.anytime": "ships", "lists.repeating": "ships", "lists.logbook": "ships", "lists.faded": "ships", "lists.starred": "ships", "lists.recently-deleted": "ships", "places.areas": "ships", "places.projects": "ships", "places.sections": "ships", "task.when-deadline": "ships", "task.repeat": "ships", "task.notes": "ships", "task.attachments": "ships", "task.do": "planned", "task.references": "ships", "task.history": "ships", "task.provenance": "ships", "task.aging": "ships", "task.checklists": "ships", "task.tags": "ships", "task.share": "ships", "task.alerts": "ships", "fade.sweep": "ships", "capture.quick-add": "ships", "sharing.projects": "planned", "capture.share-target": "ships", "capture.quick-entry": "not_applicable", "edit.filing-suggestion": "not_applicable", "edit.undo": "ships", "edit.multi-select": "ships", "find.quick-find": "ships", "task.page": "partial", "mac.keyboard": "ships", "mac.updates": "not_applicable", "calendar.events": "planned", "import.reminders": "not_applicable", "import.things": "not_applicable", "ai.discuss": "ships", "ai.reach-dial": "ships", "agents.connector": "ships", "onboarding.first-run": "ships", "agents.stop-pause": "ships", "sync.backend": "ships", "account.delete": "ships", "account.sign-in-apple": "planned", "account.sign-in-google": "planned", "account.sign-in-microsoft": "planned", "account.sign-in-email": "planned", "account.sign-in-device": "ships", "task.times": "ships", "calendar.feed": "ships", "widgets.tasks": "not_applicable", "watch.app": "not_applicable", "data.import-export": "ships", "agents.list": "ships", "settings.display": "ships", "appearance.accents": "ships", "appearance.textures": "ships", "appearance.mode": "ships", "appearance.text-size": "ships"],
-    "android": ["lists.inbox": "ships", "lists.today": "ships", "lists.review": "ships", "lists.agent": "ships", "lists.upcoming": "ships", "lists.anytime": "ships", "lists.repeating": "ships", "lists.logbook": "ships", "lists.faded": "ships", "lists.starred": "ships", "lists.recently-deleted": "ships", "places.areas": "ships", "places.projects": "ships", "places.sections": "ships", "task.when-deadline": "ships", "task.repeat": "ships", "task.notes": "ships", "task.attachments": "ships", "task.do": "ships", "task.references": "ships", "task.history": "ships", "task.provenance": "ships", "task.aging": "ships", "task.checklists": "ships", "task.tags": "ships", "task.share": "ships", "task.alerts": "ships", "fade.sweep": "ships", "capture.quick-add": "ships", "sharing.projects": "ships", "capture.share-target": "ships", "capture.quick-entry": "not_applicable", "edit.filing-suggestion": "ships", "edit.undo": "ships", "edit.multi-select": "ships", "find.quick-find": "ships", "task.page": "partial", "mac.keyboard": "planned", "mac.updates": "not_applicable", "calendar.events": "ships", "import.reminders": "not_applicable", "import.things": "not_applicable", "ai.discuss": "partial", "ai.reach-dial": "ships", "agents.connector": "ships", "onboarding.first-run": "ships", "agents.stop-pause": "ships", "sync.backend": "ships", "account.delete": "ships", "account.sign-in-apple": "planned", "account.sign-in-google": "planned", "account.sign-in-microsoft": "planned", "account.sign-in-email": "planned", "account.sign-in-device": "ships", "task.times": "ships", "calendar.feed": "ships", "widgets.tasks": "ships", "watch.app": "not_applicable", "data.import-export": "ships", "agents.list": "ships", "settings.display": "ships", "appearance.accents": "ships", "appearance.textures": "ships", "appearance.mode": "ships", "appearance.text-size": "ships"],
-    "windows": ["lists.inbox": "planned", "lists.today": "planned", "lists.review": "planned", "lists.agent": "planned", "lists.upcoming": "planned", "lists.anytime": "planned", "lists.repeating": "planned", "lists.logbook": "planned", "lists.faded": "planned", "lists.starred": "planned", "lists.recently-deleted": "planned", "places.areas": "planned", "places.projects": "planned", "places.sections": "planned", "task.when-deadline": "planned", "task.repeat": "planned", "task.notes": "planned", "task.attachments": "planned", "task.do": "planned", "task.references": "planned", "task.history": "planned", "task.provenance": "planned", "task.aging": "planned", "task.checklists": "planned", "task.tags": "planned", "task.share": "planned", "task.alerts": "planned", "fade.sweep": "planned", "capture.quick-add": "not_applicable", "sharing.projects": "planned", "capture.share-target": "planned", "capture.quick-entry": "planned", "edit.filing-suggestion": "planned", "edit.undo": "planned", "edit.multi-select": "planned", "find.quick-find": "planned", "task.page": "planned", "mac.keyboard": "planned", "mac.updates": "planned", "calendar.events": "planned", "import.reminders": "not_applicable", "import.things": "not_applicable", "ai.discuss": "planned", "ai.reach-dial": "planned", "agents.connector": "planned", "onboarding.first-run": "planned", "agents.stop-pause": "planned", "sync.backend": "planned", "account.delete": "planned", "account.sign-in-apple": "planned", "account.sign-in-google": "planned", "account.sign-in-microsoft": "planned", "account.sign-in-email": "planned", "account.sign-in-device": "planned", "task.times": "planned", "calendar.feed": "planned", "widgets.tasks": "planned", "watch.app": "not_applicable", "data.import-export": "planned", "agents.list": "planned", "settings.display": "planned", "appearance.accents": "planned", "appearance.textures": "planned", "appearance.mode": "planned", "appearance.text-size": "planned"],
-    "watchos": ["lists.inbox": "partial", "lists.today": "partial", "lists.review": "not_applicable", "lists.agent": "not_applicable", "lists.upcoming": "not_applicable", "lists.anytime": "not_applicable", "lists.repeating": "not_applicable", "lists.logbook": "not_applicable", "lists.faded": "not_applicable", "lists.starred": "not_applicable", "lists.recently-deleted": "not_applicable", "places.areas": "not_applicable", "places.projects": "not_applicable", "places.sections": "not_applicable", "task.when-deadline": "not_applicable", "task.repeat": "not_applicable", "task.notes": "not_applicable", "task.attachments": "not_applicable", "task.do": "planned", "task.references": "not_applicable", "task.history": "not_applicable", "task.provenance": "not_applicable", "task.aging": "not_applicable", "task.checklists": "not_applicable", "task.tags": "not_applicable", "task.share": "not_applicable", "task.alerts": "not_applicable", "fade.sweep": "not_applicable", "capture.quick-add": "not_applicable", "sharing.projects": "not_applicable", "capture.share-target": "not_applicable", "capture.quick-entry": "not_applicable", "edit.filing-suggestion": "not_applicable", "edit.undo": "not_applicable", "edit.multi-select": "not_applicable", "find.quick-find": "not_applicable", "task.page": "partial", "mac.keyboard": "not_applicable", "mac.updates": "not_applicable", "calendar.events": "not_applicable", "import.reminders": "not_applicable", "import.things": "not_applicable", "ai.discuss": "not_applicable", "ai.reach-dial": "not_applicable", "agents.connector": "not_applicable", "onboarding.first-run": "not_applicable", "agents.stop-pause": "not_applicable", "sync.backend": "planned", "account.delete": "not_applicable", "account.sign-in-apple": "not_applicable", "account.sign-in-google": "not_applicable", "account.sign-in-microsoft": "not_applicable", "account.sign-in-email": "not_applicable", "account.sign-in-device": "not_applicable", "task.times": "not_applicable", "calendar.feed": "not_applicable", "widgets.tasks": "not_applicable", "watch.app": "ships", "data.import-export": "not_applicable", "agents.list": "not_applicable", "settings.display": "not_applicable", "appearance.accents": "not_applicable", "appearance.textures": "not_applicable", "appearance.mode": "not_applicable", "appearance.text-size": "not_applicable"],
+    "ios": ["lists.inbox": "ships", "lists.today": "ships", "lists.review": "ships", "review.waiting": "ships", "lists.agent": "ships", "lists.upcoming": "ships", "lists.anytime": "ships", "lists.repeating": "ships", "lists.logbook": "ships", "lists.faded": "ships", "lists.starred": "ships", "lists.recently-deleted": "ships", "places.areas": "ships", "places.projects": "ships", "places.sections": "ships", "task.when-deadline": "ships", "task.repeat": "ships", "task.notes": "ships", "task.attachments": "ships", "task.do": "ships", "task.references": "ships", "task.history": "ships", "task.provenance": "ships", "task.aging": "ships", "task.checklists": "ships", "task.tags": "ships", "task.share": "ships", "task.alerts": "ships", "fade.sweep": "ships", "capture.quick-add": "ships", "sharing.projects": "ships", "capture.share-target": "ships", "capture.quick-entry": "not_applicable", "edit.filing-suggestion": "ships", "edit.undo": "ships", "edit.multi-select": "ships", "find.quick-find": "ships", "task.page": "partial", "mac.keyboard": "not_applicable", "mac.updates": "not_applicable", "calendar.events": "ships", "import.reminders": "ships", "import.things": "ships", "ai.discuss": "ships", "ai.reach-dial": "ships", "agents.connector": "ships", "onboarding.first-run": "ships", "agents.stop-pause": "ships", "sync.backend": "ships", "account.delete": "ships", "account.sign-in-apple": "ships", "account.sign-in-google": "planned", "account.sign-in-microsoft": "planned", "account.sign-in-email": "planned", "account.sign-in-device": "ships", "task.times": "ships", "calendar.feed": "ships", "widgets.tasks": "ships", "watch.app": "not_applicable", "data.import-export": "ships", "agents.list": "ships", "settings.display": "ships", "appearance.accents": "ships", "appearance.textures": "ships", "appearance.mode": "ships", "appearance.text-size": "ships"],
+    "ipados": ["lists.inbox": "ships", "lists.today": "ships", "lists.review": "ships", "review.waiting": "ships", "lists.agent": "ships", "lists.upcoming": "ships", "lists.anytime": "ships", "lists.repeating": "ships", "lists.logbook": "ships", "lists.faded": "ships", "lists.starred": "ships", "lists.recently-deleted": "ships", "places.areas": "ships", "places.projects": "ships", "places.sections": "ships", "task.when-deadline": "ships", "task.repeat": "ships", "task.notes": "ships", "task.attachments": "ships", "task.do": "ships", "task.references": "ships", "task.history": "ships", "task.provenance": "ships", "task.aging": "ships", "task.checklists": "ships", "task.tags": "ships", "task.share": "ships", "task.alerts": "ships", "fade.sweep": "ships", "capture.quick-add": "ships", "sharing.projects": "ships", "capture.share-target": "ships", "capture.quick-entry": "not_applicable", "edit.filing-suggestion": "ships", "edit.undo": "ships", "edit.multi-select": "ships", "find.quick-find": "ships", "task.page": "partial", "mac.keyboard": "ships", "mac.updates": "not_applicable", "calendar.events": "ships", "import.reminders": "ships", "import.things": "ships", "ai.discuss": "ships", "ai.reach-dial": "ships", "agents.connector": "ships", "onboarding.first-run": "ships", "agents.stop-pause": "ships", "sync.backend": "ships", "account.delete": "ships", "account.sign-in-apple": "ships", "account.sign-in-google": "planned", "account.sign-in-microsoft": "planned", "account.sign-in-email": "planned", "account.sign-in-device": "ships", "task.times": "ships", "calendar.feed": "ships", "widgets.tasks": "ships", "watch.app": "not_applicable", "data.import-export": "ships", "agents.list": "ships", "settings.display": "ships", "appearance.accents": "ships", "appearance.textures": "ships", "appearance.mode": "ships", "appearance.text-size": "ships"],
+    "macos": ["lists.inbox": "ships", "lists.today": "ships", "lists.review": "ships", "review.waiting": "ships", "lists.agent": "ships", "lists.upcoming": "ships", "lists.anytime": "ships", "lists.repeating": "ships", "lists.logbook": "ships", "lists.faded": "ships", "lists.starred": "ships", "lists.recently-deleted": "ships", "places.areas": "ships", "places.projects": "ships", "places.sections": "ships", "task.when-deadline": "ships", "task.repeat": "ships", "task.notes": "ships", "task.attachments": "ships", "task.do": "ships", "task.references": "ships", "task.history": "ships", "task.provenance": "ships", "task.aging": "ships", "task.checklists": "ships", "task.tags": "ships", "task.share": "ships", "task.alerts": "ships", "fade.sweep": "ships", "capture.quick-add": "not_applicable", "sharing.projects": "ships", "capture.share-target": "not_applicable", "capture.quick-entry": "ships", "edit.filing-suggestion": "ships", "edit.undo": "ships", "edit.multi-select": "ships", "find.quick-find": "ships", "task.page": "partial", "mac.keyboard": "ships", "mac.updates": "ships", "calendar.events": "ships", "import.reminders": "ships", "import.things": "ships", "ai.discuss": "ships", "ai.reach-dial": "ships", "agents.connector": "ships", "onboarding.first-run": "ships", "agents.stop-pause": "ships", "sync.backend": "ships", "account.delete": "ships", "account.sign-in-apple": "ships", "account.sign-in-google": "planned", "account.sign-in-microsoft": "planned", "account.sign-in-email": "planned", "account.sign-in-device": "ships", "task.times": "ships", "calendar.feed": "ships", "widgets.tasks": "ships", "watch.app": "not_applicable", "data.import-export": "ships", "agents.list": "ships", "settings.display": "ships", "appearance.accents": "ships", "appearance.textures": "ships", "appearance.mode": "ships", "appearance.text-size": "ships"],
+    "web": ["lists.inbox": "ships", "lists.today": "ships", "lists.review": "ships", "review.waiting": "ships", "lists.agent": "ships", "lists.upcoming": "ships", "lists.anytime": "ships", "lists.repeating": "ships", "lists.logbook": "ships", "lists.faded": "ships", "lists.starred": "ships", "lists.recently-deleted": "ships", "places.areas": "ships", "places.projects": "ships", "places.sections": "ships", "task.when-deadline": "ships", "task.repeat": "ships", "task.notes": "ships", "task.attachments": "ships", "task.do": "planned", "task.references": "ships", "task.history": "ships", "task.provenance": "ships", "task.aging": "ships", "task.checklists": "ships", "task.tags": "ships", "task.share": "ships", "task.alerts": "ships", "fade.sweep": "ships", "capture.quick-add": "ships", "sharing.projects": "planned", "capture.share-target": "ships", "capture.quick-entry": "not_applicable", "edit.filing-suggestion": "not_applicable", "edit.undo": "ships", "edit.multi-select": "ships", "find.quick-find": "ships", "task.page": "partial", "mac.keyboard": "ships", "mac.updates": "not_applicable", "calendar.events": "planned", "import.reminders": "not_applicable", "import.things": "not_applicable", "ai.discuss": "ships", "ai.reach-dial": "ships", "agents.connector": "ships", "onboarding.first-run": "ships", "agents.stop-pause": "ships", "sync.backend": "ships", "account.delete": "ships", "account.sign-in-apple": "planned", "account.sign-in-google": "planned", "account.sign-in-microsoft": "planned", "account.sign-in-email": "planned", "account.sign-in-device": "ships", "task.times": "ships", "calendar.feed": "ships", "widgets.tasks": "not_applicable", "watch.app": "not_applicable", "data.import-export": "ships", "agents.list": "ships", "settings.display": "ships", "appearance.accents": "ships", "appearance.textures": "ships", "appearance.mode": "ships", "appearance.text-size": "ships"],
+    "android": ["lists.inbox": "ships", "lists.today": "ships", "lists.review": "ships", "review.waiting": "ships", "lists.agent": "ships", "lists.upcoming": "ships", "lists.anytime": "ships", "lists.repeating": "ships", "lists.logbook": "ships", "lists.faded": "ships", "lists.starred": "ships", "lists.recently-deleted": "ships", "places.areas": "ships", "places.projects": "ships", "places.sections": "ships", "task.when-deadline": "ships", "task.repeat": "ships", "task.notes": "ships", "task.attachments": "ships", "task.do": "ships", "task.references": "ships", "task.history": "ships", "task.provenance": "ships", "task.aging": "ships", "task.checklists": "ships", "task.tags": "ships", "task.share": "ships", "task.alerts": "ships", "fade.sweep": "ships", "capture.quick-add": "ships", "sharing.projects": "ships", "capture.share-target": "ships", "capture.quick-entry": "not_applicable", "edit.filing-suggestion": "ships", "edit.undo": "ships", "edit.multi-select": "ships", "find.quick-find": "ships", "task.page": "partial", "mac.keyboard": "ships", "mac.updates": "not_applicable", "calendar.events": "ships", "import.reminders": "not_applicable", "import.things": "not_applicable", "ai.discuss": "partial", "ai.reach-dial": "ships", "agents.connector": "ships", "onboarding.first-run": "ships", "agents.stop-pause": "ships", "sync.backend": "ships", "account.delete": "ships", "account.sign-in-apple": "planned", "account.sign-in-google": "planned", "account.sign-in-microsoft": "planned", "account.sign-in-email": "planned", "account.sign-in-device": "ships", "task.times": "ships", "calendar.feed": "ships", "widgets.tasks": "ships", "watch.app": "not_applicable", "data.import-export": "ships", "agents.list": "ships", "settings.display": "ships", "appearance.accents": "ships", "appearance.textures": "ships", "appearance.mode": "ships", "appearance.text-size": "ships"],
+    "windows": ["lists.inbox": "planned", "lists.today": "planned", "lists.review": "planned", "review.waiting": "planned", "lists.agent": "planned", "lists.upcoming": "planned", "lists.anytime": "planned", "lists.repeating": "planned", "lists.logbook": "planned", "lists.faded": "planned", "lists.starred": "planned", "lists.recently-deleted": "planned", "places.areas": "planned", "places.projects": "planned", "places.sections": "planned", "task.when-deadline": "planned", "task.repeat": "planned", "task.notes": "planned", "task.attachments": "planned", "task.do": "planned", "task.references": "planned", "task.history": "planned", "task.provenance": "planned", "task.aging": "planned", "task.checklists": "planned", "task.tags": "planned", "task.share": "planned", "task.alerts": "planned", "fade.sweep": "planned", "capture.quick-add": "not_applicable", "sharing.projects": "planned", "capture.share-target": "planned", "capture.quick-entry": "planned", "edit.filing-suggestion": "planned", "edit.undo": "planned", "edit.multi-select": "planned", "find.quick-find": "planned", "task.page": "planned", "mac.keyboard": "planned", "mac.updates": "planned", "calendar.events": "planned", "import.reminders": "not_applicable", "import.things": "not_applicable", "ai.discuss": "planned", "ai.reach-dial": "planned", "agents.connector": "planned", "onboarding.first-run": "planned", "agents.stop-pause": "planned", "sync.backend": "planned", "account.delete": "planned", "account.sign-in-apple": "planned", "account.sign-in-google": "planned", "account.sign-in-microsoft": "planned", "account.sign-in-email": "planned", "account.sign-in-device": "planned", "task.times": "planned", "calendar.feed": "planned", "widgets.tasks": "planned", "watch.app": "not_applicable", "data.import-export": "planned", "agents.list": "planned", "settings.display": "planned", "appearance.accents": "planned", "appearance.textures": "planned", "appearance.mode": "planned", "appearance.text-size": "planned"],
+    "watchos": ["lists.inbox": "partial", "lists.today": "partial", "lists.review": "not_applicable", "review.waiting": "not_applicable", "lists.agent": "not_applicable", "lists.upcoming": "not_applicable", "lists.anytime": "not_applicable", "lists.repeating": "not_applicable", "lists.logbook": "not_applicable", "lists.faded": "not_applicable", "lists.starred": "not_applicable", "lists.recently-deleted": "not_applicable", "places.areas": "not_applicable", "places.projects": "not_applicable", "places.sections": "not_applicable", "task.when-deadline": "not_applicable", "task.repeat": "not_applicable", "task.notes": "not_applicable", "task.attachments": "not_applicable", "task.do": "planned", "task.references": "not_applicable", "task.history": "not_applicable", "task.provenance": "not_applicable", "task.aging": "not_applicable", "task.checklists": "not_applicable", "task.tags": "not_applicable", "task.share": "not_applicable", "task.alerts": "not_applicable", "fade.sweep": "not_applicable", "capture.quick-add": "not_applicable", "sharing.projects": "not_applicable", "capture.share-target": "not_applicable", "capture.quick-entry": "not_applicable", "edit.filing-suggestion": "not_applicable", "edit.undo": "not_applicable", "edit.multi-select": "not_applicable", "find.quick-find": "not_applicable", "task.page": "partial", "mac.keyboard": "not_applicable", "mac.updates": "not_applicable", "calendar.events": "not_applicable", "import.reminders": "not_applicable", "import.things": "not_applicable", "ai.discuss": "not_applicable", "ai.reach-dial": "not_applicable", "agents.connector": "not_applicable", "onboarding.first-run": "not_applicable", "agents.stop-pause": "not_applicable", "sync.backend": "planned", "account.delete": "not_applicable", "account.sign-in-apple": "not_applicable", "account.sign-in-google": "not_applicable", "account.sign-in-microsoft": "not_applicable", "account.sign-in-email": "not_applicable", "account.sign-in-device": "not_applicable", "task.times": "not_applicable", "calendar.feed": "not_applicable", "widgets.tasks": "not_applicable", "watch.app": "ships", "data.import-export": "not_applicable", "agents.list": "not_applicable", "settings.display": "not_applicable", "appearance.accents": "not_applicable", "appearance.textures": "not_applicable", "appearance.mode": "not_applicable", "appearance.text-size": "not_applicable"],
   ]
 
   /// `ships`, `partial`, `planned` or `not_applicable`; nil for an unknown platform or ID.

@@ -20,6 +20,12 @@ sealed interface SyncState {
     data object Syncing : SyncState
     data class Synced(val at: Instant) : SyncState
     data class Failed(val message: String) : SyncState
+
+    /**
+     * HTTP 402 from sync: the server does not sync this device (a free account's one sync slot is on
+     * another device). Not a failure: Settings shows the `second_device` plan notice, as iOS does.
+     */
+    data object NotSyncing : SyncState
     data object NeedsSignIn : SyncState
 }
 
@@ -121,7 +127,7 @@ class SyncController(
         } catch (error: SyncAuthenticationException) {
             SyncState.NeedsSignIn
         } catch (error: SyncSubscriptionRequiredException) {
-            SyncState.Failed(error.message ?: "Sync needs a subscription")
+            SyncState.NotSyncing
         } catch (error: Exception) {
             SyncState.Failed(error.message ?: error.javaClass.simpleName)
         } finally {

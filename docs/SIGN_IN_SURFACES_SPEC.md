@@ -137,5 +137,5 @@ is `none` in the registry, with the reason in the registry row.
 | Email code or magic link | Code (ADR 0016): works when the mail opens on another device. *(default)* |
 | A provider email matches an existing account | Email code to that address, then link. No silent linking. *(default)* |
 | Microsoft work accounts | Allowed (`common` tenant). *(default)* |
-| Connector page creates accounts | Yes: an agent-first account is a real account. *(default)* |
+| Connector page creates accounts | Yes: an agent-first account is a real account (extended to headless agents in [ADR 0056](adr/0056-agents-create-accounts-with-email-confirmation.md)). *(default)* |
 | Order of methods | Platform provider first, then the others, email, device approval. *(default)* |

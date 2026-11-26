@@ -1,13 +1,22 @@
 import type { Env } from "../env.js";
 import type { JwsRenewalInfo, JwsTransaction, NotificationV2 } from "./appleJws.js";
-import type { EntitlementRow, EntitlementStatus } from "./entitlement.js";
+import type { EntitlementRow, EntitlementStatus, PaidPlanId } from "./entitlement.js";
+import { PLAN_PRODUCT_PLANS } from "../generated/registries.js";
 
 // App Store transaction / notification → entitlement row.
 
-/// Only the sync subscriptions grant sync (spec §4:
-/// com.septena.tasks.sync.monthly / .annual). Any later product on the same
-/// record needs its own decision before it counts.
+/// Only the sync subscriptions grant sync (spec §4). Plus sells as
+/// com.septena.tasks.sync.monthly / .annual, Pro as
+/// com.septena.tasks.sync.pro.monthly / .annual (ADR 0059), all in one
+/// subscription group. Any later product on the same record needs its own
+/// decision before it counts.
 export const SYNC_PRODUCT_PREFIX = "com.septena.tasks.sync.";
+
+/// The plan a store product gives, from registry/plans.json; null for a
+/// product the registry does not list.
+export function planForProduct(productId: string): PaidPlanId | null {
+  return (PLAN_PRODUCT_PLANS as Record<string, PaidPlanId>)[productId] ?? null;
+}
 
 const list = (v: string | undefined) => (v ?? "").split(",").map((s) => s.trim()).filter(Boolean);
 
@@ -15,7 +24,7 @@ const list = (v: string | undefined) => (v ?? "").split(",").map((s) => s.trim()
 export function rejectReason(env: Env, tx: Pick<JwsTransaction, "bundleId" | "environment" | "productId">): string | null {
   if (!list(env.APPLE_IAP_BUNDLE_IDS).includes(tx.bundleId)) return "bundle_not_allowed";
   if (!list(env.APPLE_IAP_ENVIRONMENTS).includes(tx.environment)) return "environment_not_allowed";
-  if (!tx.productId.startsWith(SYNC_PRODUCT_PREFIX)) return "product_not_sync";
+  if (!tx.productId.startsWith(SYNC_PRODUCT_PREFIX) || planForProduct(tx.productId) === null) return "product_not_sync";
   return null;
 }
 
@@ -71,6 +80,8 @@ export function appleRow(
     id: `apple:${tx.originalTransactionId}`,
     source: "apple",
     productId: tx.productId,
+    // Pro products give Pro; Plus rows keep null, which reads as Plus.
+    plan: planForProduct(tx.productId) === "pro" ? "pro" : null,
     expiresAt,
     originalTransactionId: tx.originalTransactionId,
     status,

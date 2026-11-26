@@ -244,7 +244,8 @@
     "countPhrases": [
       { "id": "tasks", "label": { "one": "1 task", "other": "{count} tasks" } },
       { "id": "projects", "label": { "one": "1 project", "other": "{count} projects" } },
-      { "id": "agents", "label": { "one": "1 agent", "other": "{count} agents" } }
+      { "id": "agents", "label": { "one": "1 agent", "other": "{count} agents" } },
+      { "id": "waitingDays", "label": { "one": "1 day", "other": "{count} days" } }
     ],
     "text": [
       { "id": "newSection", "title": "New Section", "placeholder": "Section name", "confirmTitle": "Add", "featureId": "places.sections" },
@@ -310,7 +311,7 @@
         "title": "Welcome to Septena",
         "body": "Tasks that think with you.",
         "points": [
-          { "icon": "onboarding.devices", "title": "On every device", "detail": "Your tasks stay in step on iPhone, iPad and Mac." },
+          { "icon": "onboarding.devices", "title": "On every device", "detail": "Your tasks stay in step on every device you sign in to." },
           {
             "icon": "onboarding.agent",
             "title": "Your agents do the work",
@@ -411,7 +412,7 @@
     "copy": [
       { "id": "intro", "label": "Use a device where Septena is already signed in." },
       { "id": "start", "label": "Get a sign-in code" },
-      { "id": "approve", "label": "On your iPhone, iPad or Mac, open Septena and go to Settings ▸ Account ▸ Approve a sign-in. Tap Scan Code and point the camera at this screen, or enter this code:" },
+      { "id": "approve", "label": "On another device where you are signed in, open Septena and go to Settings ▸ Account ▸ Approve a sign-in. Tap Scan Code and point the camera at this screen, or enter this code:" },
       { "id": "lifetime", "label": "The code works for 10 minutes. After you approve it, this screen continues by itself." },
       { "id": "expired", "label": "The code expired." },
       { "id": "unreachable", "label": "Could not reach Septena." },
@@ -494,6 +495,19 @@
       "failed": { "message": "Couldn’t add the reference." }
     }
   },
+  "waiting": {
+    "id": "waiting",
+    "featureId": "review.waiting",
+    "label": { "format": "Waiting on {name}" },
+    "sheet": {
+      "title": "Waiting On",
+      "placeholder": "Name",
+      "confirmTitle": "Save",
+      "checkBack": { "title": "Check back" },
+      "noCheckBack": { "title": "No date" }
+    },
+    "defaultCheckBackDays": 7
+  },
   "doing": {
     "id": "doing",
     "featureId": "task.do",
@@ -573,20 +587,22 @@
   "taskDateBoard": {
     "id": "taskDateBoard",
     "overdue": { "label": "Overdue" },
+    "tomorrow": { "label": "Tomorrow" },
+    "groups": ["pick", "refine", "remove"],
     "rows": [
-      { "id": "dateBoard.tomorrow", "kind": "tomorrow", "label": "Tomorrow", "icon": "date.tomorrow", "attributes": ["when", "deadline"], "featureId": "task.when-deadline" },
-      { "id": "dateBoard.calendar", "kind": "calendar", "label": "Pick another date", "valueLabel": "Pick another date ({date})", "icon": "action.when", "attributes": ["when", "deadline"], "featureId": "task.when-deadline" },
+      { "id": "dateBoard.calendar", "kind": "calendar", "group": "pick", "label": "Pick another date", "valueLabel": "Pick another date ({date})", "icon": "action.when", "attributes": ["when", "deadline"], "featureId": "task.when-deadline" },
+      { "id": "dateBoard.time", "kind": "time", "group": "refine", "label": "Add time", "icon": "date.time", "attributes": ["when"], "featureId": "task.when-deadline" },
+      { "id": "dateBoard.repeatRule", "kind": "repeatRule", "group": "refine", "action": "task.repeat", "icon": "action.repeat", "attributes": ["when"], "featureId": "task.repeat" },
       {
         "id": "dateBoard.clear",
         "kind": "clear",
+        "group": "remove",
         "label": "Clear (Anytime)",
         "attributeLabels": [{ "attribute": "deadline", "label": "No Deadline" }],
         "icon": "date.clear",
         "attributes": ["when", "deadline"],
         "featureId": "task.when-deadline"
-      },
-      { "id": "dateBoard.repeatRule", "kind": "repeatRule", "action": "task.repeat", "icon": "action.repeat", "attributes": ["when"], "featureId": "task.repeat" },
-      { "id": "dateBoard.time", "kind": "time", "label": "Add time", "icon": "date.time", "attributes": ["when"], "featureId": "task.when-deadline" }
+      }
     ]
   },
   "taskTagsPicker": {
@@ -738,7 +754,7 @@
     ],
     "featureId": "task.notes"
   },
-  "quickFind": {"id":"quickFind","featureId":"find.quick-find","placeholder":"Search tasks, projects, areas…","emptyState":{"title":"Search Tasks","detail":"Find any task, project, or area."},"noResults":{"title":"No matches","detail":"No tasks, projects, or areas match your search."},"completed":{"label":"Completed"},"controls":{"back":"Back"}},
+  "quickFind": {"id":"quickFind","featureId":"find.quick-find","placeholder":"Search tasks, projects, areas…","commandPlaceholder":"Search or run a command…","emptyState":{"title":"Search Tasks","detail":"Find any task, project, or area."},"noResults":{"title":"No matches","detail":"No tasks, projects, or areas match your search."},"completed":{"label":"Completed"},"controls":{"back":"Back"}},
   "fadeSweep": {
     "id": "fadeSweep",
     "featureId": "fade.sweep",

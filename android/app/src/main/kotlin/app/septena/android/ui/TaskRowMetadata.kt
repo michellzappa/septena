@@ -1,6 +1,5 @@
 package app.septena.android.ui
 
-import app.septena.core.DateBoardRowKinds
 import app.septena.core.JsonValue
 import app.septena.core.ProjectShare
 import app.septena.core.RegistryCatalog
@@ -18,7 +17,6 @@ import app.septena.core.generated.RegistryDestinationIds
 import app.septena.core.generated.RegistryEntityEnums
 import app.septena.core.generated.RegistryEntityFields
 import app.septena.core.generated.RegistryEntityNames as EntityNames
-import app.septena.core.generated.RegistryTaskAttributeIds
 import app.septena.core.stringValue
 import app.septena.ui.SeptenaIconKind
 import app.septena.ui.TaskListItem
@@ -97,10 +95,7 @@ internal fun buildTaskListItem(
 
     val todayLabel = RegistryCatalog.destinationTitle(RegistryDestinationIds.TODAY, languageTag)
         ?.takeIf(String::isNotBlank).orEmpty()
-    val tomorrowLabel = RegistryCatalog.dateBoardRows(
-        RegistryTaskAttributeIds.WHEN,
-        languageTag = languageTag,
-    ).firstOrNull { it.kind == DateBoardRowKinds.TOMORROW }?.label?.takeIf(String::isNotBlank).orEmpty()
+    val tomorrowLabel = RegistryCatalog.tomorrowLabel(languageTag)
     val overdueLabel = RegistryCatalog.taskDateBoardOverdueLabel(languageTag)
 
     // Deadline / Scheduled / Completed date — matches iOS `TaskRow.trailingDate`.
@@ -192,12 +187,22 @@ internal fun buildTaskListItem(
         ?.takeIf { it != share?.me }
         ?.let { share?.member(it)?.name }
 
+    // "Waiting on Anna · 5 days" (docs/REVIEW_SPEC.md §6): only an open task waits.
+    val isWaiting = isOpen && !isDeleted && snapshot.isWaiting
+    val waitingText = if (isWaiting) {
+        WaitingCopy.label(snapshot.waitingOn.orEmpty().trim(), snapshot.waitingSince, today, languageTag)
+    } else {
+        null
+    }
+
     return TaskListItem(
         id = record.id,
         title = snapshot.title,
         agentName = agent,
         canAssign = share != null,
         assigneeName = assignee,
+        isWaiting = isWaiting,
+        waitingText = waitingText,
         subtitle = subtitle,
         isCompleted = snapshot.status == RegistryEntityEnums.TaskStatus.DONE,
         isOnToday = membership.isOnToday,
@@ -235,6 +240,8 @@ internal fun TaskListItem.withFade(
 ): TaskListItem {
     // Settings ▸ Lists ▸ "Fade inactive tasks" (tasksShowAging) off: rows stay at full strength.
     if (!showAging) return this
+    // A waiting task never fades (docs/REVIEW_SPEC.md §6).
+    if (snapshot.isWaiting) return this
     val isProposal = TaskProvenance.isProposal(snapshot.source, snapshot.acknowledgedAt)
     val fill = runCatching {
         TaskFadeRules.fadeFill(
@@ -309,8 +316,7 @@ internal fun formatUpcomingDayHeader(
         return RegistryCatalog.destinationTitle(RegistryDestinationIds.TODAY, languageTag).orEmpty()
     }
     if (diff == 1L) {
-        return RegistryCatalog.dateBoardRows(RegistryTaskAttributeIds.WHEN, languageTag = languageTag)
-            .firstOrNull { it.kind == DateBoardRowKinds.TOMORROW }?.label.orEmpty()
+        return RegistryCatalog.tomorrowLabel(languageTag)
     }
     val locale = Locale.forLanguageTag(languageTag)
     val pattern = if (diff in 2L..6L) "EEEE" else if (day.year == today.year) "EEE, MMM d" else "EEE, MMM d, yyyy"

@@ -602,6 +602,20 @@ function validateDoing(surfaces, caps, entities) {
 // References (docs/TASK_REFERENCES_SPEC.md §8): a label and an icon per key
 // kind, the fallback for a kind this build does not know, the labels of the
 // roles that show one, and the copy of Add Reference.
+// Waiting (docs/REVIEW_SPEC.md §6): the row label, the sheet copy and the
+// check-back date the sheet offers.
+function validateWaiting(surfaces, caps) {
+  const w = surfaces.waiting;
+  assert(w && w.featureId in caps.capabilities, "surfaces.json: waiting needs a known featureId");
+  assert(typeof w.label?.format === "string" && w.label.format.includes("{name}"), "surfaces.json: waiting.label.format needs {name}");
+  for (const [f, v] of [["title", w.sheet?.title], ["placeholder", w.sheet?.placeholder], ["confirmTitle", w.sheet?.confirmTitle],
+    ["checkBack.title", w.sheet?.checkBack?.title], ["noCheckBack.title", w.sheet?.noCheckBack?.title]]) {
+    assert(typeof v === "string" && v.length > 0, `surfaces.json: waiting.sheet.${f} is missing`);
+  }
+  assert(Number.isInteger(w.defaultCheckBackDays) && w.defaultCheckBackDays > 0, "surfaces.json: waiting.defaultCheckBackDays is not a positive integer");
+  for (const [p, v] of stringsOf(w, "waiting")) assert(!/[–—]/.test(v), `surfaces.json: ${p} contains an em or en dash`);
+}
+
 function validateTaskReferences(surfaces, icons, caps, entities) {
   const t = surfaces.taskReferences;
   assert(t && t.featureId in caps.capabilities, "surfaces.json: taskReferences needs a known featureId");
@@ -619,9 +633,22 @@ function validateTaskReferences(surfaces, icons, caps, entities) {
 }
 
 // The date board (docs/TASK_ROW_MENU_SPEC.md): the rows under the day strip of
-// the When and Deadline pickers, from a closed set of kinds in one order.
+// the When and Deadline pickers, from a closed set of kinds in one order. Each
+// row names its group; a group is contiguous and the groups keep the order of
+// `groups`. Platforms draw one divider where the group changes, and the day
+// strip opens the first group.
 function checkTaskDateBoard({ surfaces, icons, caps, actions }) {
   const rows = surfaces.taskDateBoard?.rows ?? [];
+  const groups = surfaces.taskDateBoard?.groups ?? [];
+  assert(groups.length === DATE_BOARD_GROUPS.length && groups.every((g, i) => g === DATE_BOARD_GROUPS[i]), `surfaces.json: taskDateBoard.groups must be ${JSON.stringify(DATE_BOARD_GROUPS)}`);
+  assert(typeof surfaces.taskDateBoard?.tomorrow?.label === "string", "surfaces.json: taskDateBoard.tomorrow.label is missing");
+  let lastGroup = 0;
+  for (const r of rows) {
+    const g = groups.indexOf(r.group);
+    assert(g >= 0, `surfaces.json: taskDateBoard row ${r.id} unknown group "${r.group}"`);
+    assert(g >= lastGroup, `surfaces.json: taskDateBoard row ${r.id} breaks the group order (groups are contiguous, in taskDateBoard.groups order)`);
+    lastGroup = g;
+  }
   const attrIds = new Set(surfaces.taskAttributes.map((a) => a.id));
   for (const kind of DATE_BOARD_ROW_KINDS) {
     assert(rows.filter((r) => r.kind === kind).length === 1, `surfaces.json: taskDateBoard needs exactly one "${kind}" row`);
@@ -637,7 +664,8 @@ function checkTaskDateBoard({ surfaces, icons, caps, actions }) {
     }
   }
 }
-const DATE_BOARD_ROW_KINDS = new Set(["tomorrow", "calendar", "clear", "repeatRule", "time"]);
+const DATE_BOARD_ROW_KINDS = new Set(["calendar", "time", "repeatRule", "clear"]);
+const DATE_BOARD_GROUPS = ["pick", "refine", "remove"];
 const DATE_BOARD_ATTRIBUTES = new Set(["when", "deadline"]);
 
 // One picker per attribute (ADR 0029): every popover attribute is opened by
@@ -661,8 +689,9 @@ const TASK_PAGE_BLOCK_KINDS = new Set(["header", "notes", "attributes", "checkli
 const TASK_PAGE_DEPTHS = new Set(["inline", "page", "review"]);
 
 // ---- plans.json (ADR 0010, ADR 0023) ----
-// Pro is planned: the site shows it and no store sells it. The server has it for
-// grants, and the apps name it on an account that has it (ADR 0037, ADR 0045).
+// Pro is a real plan (ADR 0045, ADR 0052): the site shows it,
+// the server applies it, and the apps name it on an account that has it. No
+// store sells it yet.
 const PLAN_LEVELS = ["free", "plus", "pro"];
 const PLAN_LIMIT_PLANS = ["account", "plus", "pro"];
 
@@ -721,11 +750,27 @@ function validatePlans(plans, icons, caps, importSources) {
     assert(pr.label.includes(whole), `plans.json: price ${pr.id} label must state ${whole}`);
   }
   assert(plans.prices.filter((x) => x.highlighted).length === 1, "plans.json: exactly one price must be highlighted");
+  // ADR 0059: Pro sells like Plus, in the same subscription group. Its prices
+  // must state the Pro level's amounts, and its products sit under .sync.pro.
+  const proLevel = plans.levels.find((l) => l.id === "pro");
+  for (const pr of plans.proPrices ?? []) {
+    assert(!priceIds.has(pr.id), `plans.json: duplicate price "${pr.id}"`);
+    priceIds.add(pr.id);
+    assert(/^com\.septena\.tasks\.sync\.pro\.[a-z]+$/.test(pr.productId), `plans.json: pro price ${pr.id} productId must start com.septena.tasks.sync.pro.`);
+    assert(Number.isInteger(pr.amountMinor) && pr.amountMinor > 0, `plans.json: pro price ${pr.id} amountMinor must be a positive integer`);
+    assert(pr.currency === "EUR", `plans.json: pro price ${pr.id} currency must be EUR`);
+    assert(["year", "month"].includes(pr.interval), `plans.json: pro price ${pr.id} unknown interval "${pr.interval}"`);
+    const whole = String(pr.amountMinor / 100);
+    assert(pr.label.includes(whole), `plans.json: pro price ${pr.id} label must state ${whole}`);
+    assert(proLevel.detail.includes(whole), `plans.json: the pro level detail must state ${whole}`);
+  }
+  assert(Array.isArray(plans.proPrices) && plans.proPrices.length > 0, "plans.json: proPrices missing (ADR 0059)");
 
   assert(JSON.stringify(plans.levels.map((l) => l.id)) === JSON.stringify(PLAN_LEVELS), `plans.json: levels must be ${PLAN_LEVELS.join(", ")}`);
   assert(JSON.stringify(plans.cards.map((c) => c.id)) === JSON.stringify(PLAN_LEVELS), `plans.json: cards must be ${PLAN_LEVELS.join(", ")}`);
-  // ADR 0052: Pro is a real plan. No store sells it yet, so accounts get it as a grant.
-  assert(plans.cards.find((c) => c.id === "pro").status === "given", "plans.json: the pro card must be given (no store product yet)");
+  // ADR 0052, ADR 0059: Pro is a real plan. `given` keeps it out of the in-app
+  // purchase list until the app paywalls offer the Pro products.
+  assert(plans.cards.find((c) => c.id === "pro").status === "given", "plans.json: the pro card must be given until the app paywalls sell Pro (ADR 0059)");
   assert(plans.cards.filter((c) => c.highlighted).length === 1, "plans.json: exactly one card must be highlighted");
   for (const k of ["seePlus", "startTrial", "trialStarted", "trialBilling", "success", "pending", "serverRetry", "failed", "ownedApple", "ownedWeb", "ownedGoogle", "ownedGrant", "ownedGrantPro", "ownedOtherAccount", "done"]) {
     assert(typeof plans.paywall?.[k] === "string" && plans.paywall[k].length > 0, `plans.json: paywall.${k} missing`);
@@ -878,7 +923,7 @@ function appleKeycaps(sc) {
   if (sc.modifiers.includes("alt")) caps.push("⌥");
   if (sc.modifiers.includes("shift")) caps.push("⇧");
   if (sc.modifiers.includes("primary")) caps.push("⌘");
-  const keyMap = { delete: "⌫", escape: "esc", return: "return", space: "space", tab: "tab" };
+  const keyMap = { delete: "⌫", escape: "esc", return: "↩", space: "space", tab: "tab" };
   caps.push(keyMap[sc.key] ?? sc.key.toUpperCase());
   return caps;
 }
@@ -1732,7 +1777,7 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
     const action = actions.actions[r.action];
     const label = action ? L(action.title, action, "title") : L(r.label, r, "label");
     const own = (r.attributeLabels ?? []).map((l) => `.${l.attribute}: ${L(l.label, l, "label")}`).join(", ");
-    lines.push(`    RegistryDateBoardRow(id: ${swiftStr(r.id)}, kind: .${r.kind}, label: ${label}, attributeLabels: [${own || ":"}], sfSymbol: ${swiftStr(icons.icons[r.icon].sfSymbol)}, attributes: [${r.attributes.map((a) => "." + a).join(", ")}], featureId: ${swiftStr(r.featureId)}),`);
+    lines.push(`    RegistryDateBoardRow(id: ${swiftStr(r.id)}, kind: .${r.kind}, group: .${r.group}, label: ${label}, attributeLabels: [${own || ":"}], sfSymbol: ${swiftStr(icons.icons[r.icon].sfSymbol)}, attributes: [${r.attributes.map((a) => "." + a).join(", ")}], featureId: ${swiftStr(r.featureId)}),`);
   }
   lines.push("  ]");
   lines.push("  static func dateBoardRows(for attribute: RegistryDateBoardAttribute, on platform: String) -> [RegistryDateBoardRow] {");
@@ -1742,8 +1787,8 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   const cal = surfaces.taskDateBoard.rows.find((r) => r.kind === "calendar");
   lines.push("  /// The calendar row when the task has a date past the day strip.");
   lines.push(tmplFn("dateBoardCalendarLabel", tmplKey(cal.valueLabel, cal, "valueLabel")));
-  const tmrw = surfaces.taskDateBoard.rows.find((r) => r.kind === "tomorrow");
-  lines.push("  /// The word for the day after today, in the date board and in date labels.");
+  const tmrw = surfaces.taskDateBoard.tomorrow;
+  lines.push("  /// The word for the day after today, in date labels.");
   lines.push(`  static let tomorrowLabel: String = ${L(tmrw.label, tmrw, "label")}`);
   const prov = surfaces.taskPage.blocks.find((b) => b.kind === "provenance");
   lines.push("  /// Provenance block (`taskPage.provenance`): the name a task you added shows as,");
@@ -1761,6 +1806,7 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   const qf = surfaces.quickFind;
   lines.push("  /// Quick Find copy (`surfaces.json` `quickFind`).");
   lines.push(`  static let quickFindPlaceholder: String = ${L(qf.placeholder, qf, "placeholder")}`);
+  lines.push(`  static let quickFindCommandPlaceholder: String = ${L(qf.commandPlaceholder, qf, "commandPlaceholder")}`);
   lines.push(`  static let quickFindEmptyTitle: String = ${L(qf.emptyState.title, qf.emptyState, "title")}`);
   lines.push(`  static let quickFindEmptyDetail: String = ${L(qf.emptyState.detail, qf.emptyState, "detail")}`);
   lines.push(`  static let quickFindCompletedLabel: String = ${L(qf.completed.label, qf.completed, "label")}`);
@@ -1781,10 +1827,16 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   for (const k of DATE_BOARD_ROW_KINDS) lines.push(`  case ${k}`);
   lines.push("}");
   lines.push("");
+  lines.push("/// The date board's row groups, in order. The day strip opens `pick`; a divider separates groups.");
+  lines.push("enum RegistryDateBoardGroup: String, Sendable, Hashable {");
+  for (const g of DATE_BOARD_GROUPS) lines.push(`  case ${g}`);
+  lines.push("}");
+  lines.push("");
   lines.push("/// One row under the date board's day strip (`surfaces.json` `taskDateBoard.rows`).");
   lines.push("struct RegistryDateBoardRow: Sendable, Hashable, Identifiable {");
   lines.push("  let id: String");
   lines.push("  let kind: RegistryDateBoardRowKind");
+  lines.push("  let group: RegistryDateBoardGroup");
   lines.push("  let label: String");
   lines.push("  /// Attribute → label that replaces `label` in that attribute's picker.");
   lines.push("  let attributeLabels: [RegistryDateBoardAttribute: String]");
@@ -1879,6 +1931,24 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   }
   lines.push("  /// The label of an exit (`doExit`) in the history.");
   lines.push(`  static let exitLabels: [String: String] = [${Object.entries(doing.exits).map(([id, e]) => `${swiftStr(id)}: ${L(e.label, e, "label")}`).join(", ")}]`);
+  lines.push("}");
+  lines.push("");
+
+  // 8a. Waiting (surfaces.json `waiting`, docs/REVIEW_SPEC.md §6)
+  const waiting = surfaces.waiting;
+  lines.push("/// Waiting on a person (`registry/surfaces.json` `waiting`, docs/REVIEW_SPEC.md §6).");
+  lines.push("enum RegistryWaiting {");
+  {
+    const t = L10N.swiftTemplate(BY_KEY, tmplKey(waiting.label.format, waiting.label, "format"));
+    lines.push(`  static func label(${t.params}) -> String { ${t.body} }`);
+  }
+  for (const [name, node, field] of [
+    ["sheetTitle", waiting.sheet, "title"], ["namePlaceholder", waiting.sheet, "placeholder"],
+    ["confirmTitle", waiting.sheet, "confirmTitle"], ["checkBackTitle", waiting.sheet.checkBack, "title"],
+    ["noCheckBackTitle", waiting.sheet.noCheckBack, "title"],
+  ]) lines.push(`  static let ${name}: String = ${L(node[field], node, field)}`);
+  lines.push("  /// The check-back date Waiting On… offers, in days from today.");
+  lines.push(`  static let defaultCheckBackDays = ${waiting.defaultCheckBackDays}`);
   lines.push("}");
   lines.push("");
 
@@ -2267,7 +2337,7 @@ function generateTS({ entities, rules, icons, tokens, caps, settings, dests, act
   const syncedKeys = Object.entries(settings.keys).filter(([, v]) => v.scope === "synced").map(([k]) => k);
   lines.push(`export const SYNCED_SETTING_KEYS = ${JSON.stringify(syncedKeys)} as const;`);
   lines.push(`export const HELP_URL = ${JSON.stringify(settings.helpURL)};`);
-  lines.push(`export const SETTINGS_REGISTRY = ${JSON.stringify({ version: settings.version, keys: settings.keys, desktopTabs: settings.desktopTabs, rootGroups: settings.rootGroups, pages: settings.pages })} as const;`);
+  lines.push(`export const SETTINGS_REGISTRY = ${JSON.stringify({ version: settings.version, keys: settings.keys, copy: settings.copy, desktopTabs: settings.desktopTabs, rootGroups: settings.rootGroups, pages: settings.pages })} as const;`);
   lines.push(`export const VIEW_ALIASES = ${JSON.stringify(dests.viewAliases)} as const;`);
   lines.push(`export const DESTINATIONS = ${JSON.stringify(dests.destinations)} as const;`);
   lines.push(`export const GENERIC_EMPTY_STATE = ${JSON.stringify(dests.genericEmptyState)} as const;`);
@@ -2275,12 +2345,14 @@ function generateTS({ entities, rules, icons, tokens, caps, settings, dests, act
   lines.push(`export const DESIGN_TOKENS = ${JSON.stringify({ accentPolicy: tokens.accentPolicy, fruitAccents: tokens.fruitAccents ?? [], textures: tokens.textures ?? [], selection: tokens.selection, colors: tokens.colors, multicolorGlyphs: tokens.multicolorGlyphs?.glyphs ?? {}, accentPalette: tokens.accentPalette, radii: tokens.radii, spacing: tokens.spacing, desktopColumn: tokens.desktopColumn, textScale: tokens.textScale })} as const;`);
   lines.push(`export const CAPABILITIES = ${JSON.stringify(caps.capabilities)} as const;`);
   lines.push(`export const ACTIONS_CATALOG = ${JSON.stringify({ actions: actions.actions, contextMenus: actions.contextMenus, menuBar: actions.menuBar, shortcutsSheet: actions.shortcutsSheet })} as const;`);
-  lines.push(`export const SURFACES_CATALOG = ${JSON.stringify({ notices: surfaces.notices, prompts: surfaces.prompts, toasts: surfaces.toasts, taskAttributes: surfaces.taskAttributes, taskDateBoard: surfaces.taskDateBoard, taskPage: surfaces.taskPage, accountSwitch: surfaces.accountSwitch })} as const;`);
+  lines.push(`export const SURFACES_CATALOG = ${JSON.stringify({ notices: surfaces.notices, prompts: surfaces.prompts, toasts: surfaces.toasts, taskAttributes: surfaces.taskAttributes, taskDateBoard: surfaces.taskDateBoard, taskPage: surfaces.taskPage, waiting: surfaces.waiting, accountSwitch: surfaces.accountSwitch, deviceSignIn: surfaces.deviceSignIn, quickFind: surfaces.quickFind })} as const;`);
   lines.push(`export const FIRST_RUN = ${JSON.stringify(surfaces.firstRun)} as const;`);
   lines.push("/** Plan limits (registry/plans.json). The server's plan table: every gate reads these, never a plan name. */");
   lines.push(`export const PLAN_LIMITS = ${JSON.stringify(plans.limits)} as const;`);
   lines.push(`export const PLAN_TRIAL_DAYS = ${plans.trial.days};`);
   lines.push(`export const PLAN_PRODUCTS = ${JSON.stringify(plans.prices.map((p) => p.productId))} as const;`);
+  lines.push("/** The plan each store product gives (ADR 0059). A product not listed gives nothing. */");
+  lines.push(`export const PLAN_PRODUCT_PLANS = ${JSON.stringify(Object.fromEntries([...plans.prices.map((p) => [p.productId, "plus"]), ...plans.proPrices.map((p) => [p.productId, "pro"])]))} as const;`);
   lines.push("/** Upsell copy by moment id (registry/plans.json `upsells`). Server refusals quote it, so the words match the app. */");
   lines.push(`export const PLAN_UPSELLS = ${JSON.stringify(Object.fromEntries(plans.upsells.map((u) => [u.id, { title: u.title, detail: u.detail }])))} as const;`);
   lines.push("/** Sign-in methods, order per platform and screen copy (registry/sign-in.json, ADR 0047). Copy is English; localize with registryText(). GET /v1/auth/methods says which methods are on. */");
@@ -2507,6 +2579,9 @@ function generateKotlinCore(bundle) {
     }
     emitIdObject(objectName, ids);
   }
+  // Count phrase IDs (`prompts.countPhrases`): `countPhrase(id, …)` looks them
+  // up in that list alone, so they need not be unique in the whole document.
+  emitIdObject("RegistryCountPhraseIds", surfaces.prompts.countPhrases.map((p) => p.id));
   if (surfaces.taskDetail) {
     const detail = surfaces.taskDetail;
     assert(idCounts.get(detail.id) === 1, `surfaces.json: id "${detail.id}" must be unique in the document`);
@@ -2696,6 +2771,7 @@ const destIds = validateDestinations(dests, icons, caps);
 validateActions(actions, icons, caps, destIds);
 validateSurfaces(surfaces, icons, caps, plans);
 validateTaskReferences(surfaces, icons, caps, entities);
+validateWaiting(surfaces, caps);
 validatePlaceNotes(surfaces, caps);
 validateDoing(surfaces, caps, entities);
 checkOpensAttribute({ actions, surfaces });

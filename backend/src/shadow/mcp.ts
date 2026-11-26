@@ -149,7 +149,7 @@ const zLimit = (max: number) => z.number().int().min(1).max(max);
 const zArgs = {
   tasks_list: z.object({
     // "triage" and "someday" are retired names, kept as aliases (normalizeView).
-    view: z.enum(["today", "inbox", "review", "anytime", "upcoming", "completed", "faded", "triage", "someday"]).optional(),
+    view: z.enum(["today", "inbox", "review", "waiting", "anytime", "upcoming", "completed", "faded", "triage", "someday"]).optional(),
     limit: zLimit(500).optional(),
     tag: z.union([z.string().min(1), z.array(z.string().min(1))]).optional(),
   }),
@@ -666,6 +666,16 @@ export async function listTasks(
     });
     return { tasks, total, truncated: total > rows.length };
   }
+  if (view === "waiting") {
+    // Review ▸ Waiting (docs/REVIEW_SPEC.md §6): oldest wait first.
+    const { rows } = await store.readTasks("open", 500);
+    const waiting = rows
+      .filter((r) => str(r.waitingOn) && str(r.kind) !== "heading")
+      .map((r) => withChecklist(taskOut(r, tagMap)))
+      .filter((t) => matchesTagFilter(t.tags, requiredTags))
+      .sort((a, b) => (a.waitingSince ?? "").localeCompare(b.waitingSince ?? ""));
+    return { tasks: waiting.slice(0, limit).map(stripDays), total: waiting.length, truncated: waiting.length > limit };
+  }
   // Open rows arrive ordered by scheduled, then position. Today re-sorts by
   // its own manual order: todayPosition, falling back to position.
   const { rows } = await store.readTasks("open", limit);
@@ -771,6 +781,7 @@ export function taskOut(r: Row, tagMap?: Map<string, string>): TaskOut {
     ...(str(r.timeZone) ? { timeZone: str(r.timeZone) } : {}),
     deadline: str(r.deadline),
     ...(str(r.deferredDeadline) ? { deferredDeadline: str(r.deferredDeadline) } : {}),
+    ...(str(r.waitingOn) ? { waitingOn: str(r.waitingOn), ...(str(r.waitingSince) ? { waitingSince: str(r.waitingSince) } : {}) } : {}),
     area: str(r.area),
     project: str(r.project),
     ...(str(r.heading) ? { heading: str(r.heading) } : {}),

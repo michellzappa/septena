@@ -31,7 +31,7 @@ const FIELDS = {
   surfaces: new Set([
     "title", "primaryTitle", "detail", "message", "confirmTitle", "cancelTitle", "dismissTitle", "format",
     "emptyTitleFormat", "singularFormat", "body", "footnote", "returningTitle", "returningBody",
-    "label", "countLabel", "workingLabel", "valueLabel", "instructions", "setup", "first", "placeholder", "untitledName", "selfLabel",
+    "label", "countLabel", "workingLabel", "valueLabel", "instructions", "setup", "first", "placeholder", "commandPlaceholder", "untitledName", "selfLabel",
     "askKicker", "reviewKicker", "reviewFallback", "acceptedLabel",
   ]),
   importSources: new Set(["detail"]),
@@ -47,7 +47,7 @@ const FIELDS = {
     "paidThrough", "proThrough", "subscribe", "restore", "manage", "notNow", "learnMore", "yourPlan", "planned", "included", "notIncluded",
     "seePlus", "startTrial", "trialStarted", "trialBilling", "welcomeBack", "cancelNote", "success", "pending",
     "serverRetry", "failed", "ownedApple", "ownedWeb", "ownedGoogle", "ownedGrant", "ownedGrantPro", "ownedOtherAccount", "done",
-    "syncThisDevice", "syncThisDeviceFailed",
+    "syncThisDevice", "syncThisDeviceFailed", "filesSyncing",
   ]),
 };
 /** Fields skipped even when their name matches (machine data). */

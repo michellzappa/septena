@@ -15,11 +15,16 @@ object ConformanceTestRunner {
             taskViewVectors()
             conversationVectors()
         }
+        ReviewGroupTest().run {
+            registryOrder()
+            waitingOrder()
+        }
         SyncEngineConformanceTest().run {
             pullPageVectors()
             pushResponseVectors()
             rejectionReasonVectors()
         }
+        FixedRepeatRescheduleConformanceTest().runAll()
         // Every fixture once more through the core's own runner, as loaded here
         // (JNA + the release's natives): proves the Kotlin bindings link.
         val failures = File("../../registry/conformance").listFiles { f -> f.extension == "json" }!!

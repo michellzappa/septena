@@ -160,8 +160,12 @@ class TaskMutator(
     }
 
     /** A1 when [enabled], else A3 (Remove from Today): the core decides the fields. */
-    suspend fun setToday(id: String, enabled: Boolean): TaskRecord? =
-        applyDateAction(id, if (enabled) DateAction.PutOnToday(RescheduleMode.MAKE_EXCEPTION) else DateAction.RemoveFromToday)
+    suspend fun setToday(
+        id: String,
+        enabled: Boolean,
+        mode: RescheduleMode = RescheduleMode.MAKE_EXCEPTION,
+    ): TaskRecord? =
+        applyDateAction(id, if (enabled) DateAction.PutOnToday(mode) else DateAction.RemoveFromToday)
 
     suspend fun setStarred(id: String, starred: Boolean): TaskRecord? = updateFields(
         id,
@@ -175,12 +179,20 @@ class TaskMutator(
     )
 
     /** A2 for a day (a day on or before today is A1), A5 for none. */
-    suspend fun schedule(id: String, day: String?): TaskRecord? = setWhen(id, day)
+    suspend fun schedule(
+        id: String,
+        day: String?,
+        mode: RescheduleMode = RescheduleMode.MAKE_EXCEPTION,
+    ): TaskRecord? = setWhen(id, day, mode)
 
     /** The user-visible When value: A2 for a day (today or earlier is A1), A5 for none. */
-    suspend fun setWhen(id: String, day: String?): TaskRecord? = applyDateAction(
+    suspend fun setWhen(
+        id: String,
+        day: String?,
+        mode: RescheduleMode = RescheduleMode.MAKE_EXCEPTION,
+    ): TaskRecord? = applyDateAction(
         id,
-        if (day == null) DateAction.ClearWhenDate else DateAction.ScheduleFor(day, RescheduleMode.MAKE_EXCEPTION),
+        if (day == null) DateAction.ClearWhenDate else DateAction.ScheduleFor(day, mode),
     )
 
     /** A9: set or clear the time slot. A time with no day pins the task to Today. */
@@ -228,7 +240,90 @@ class TaskMutator(
                 else -> error("The core changed an unknown date field: $name")
             }
         }
-        return updateFields(id, changes)
+        val updated = updateFields(id, changes) ?: return null
+        val updatesSeries = when (action) {
+            is DateAction.ScheduleFor -> action.mode == RescheduleMode.UPDATE_RULE
+            is DateAction.PutOnToday -> action.mode == RescheduleMode.UPDATE_RULE
+            else -> false
+        }
+        if (updatesSeries && RegistryEntityFields.Task.RECURRENCE_ANCHOR_DATE in patch.changed) {
+            rebaseFixedSeries(updated)
+        }
+        return updated
+    }
+
+    /**
+     * Rebases sibling open occurrences of a fixed repeating series after "Update Schedule"
+     * moves the anchor slot (#573, mirroring Apple `TasksBackend.rebaseFixedSeries`).
+     */
+    private suspend fun rebaseFixedSeries(source: TaskRecord) {
+        val rule = parseRecurrenceRule(source.fields) ?: return
+        if (rule.afterCompletion) return
+        val newAnchor = source.fields[RegistryEntityFields.Task.RECURRENCE_ANCHOR_DATE].stringValue() ?: return
+        val seriesId = source.fields[RegistryEntityFields.Task.RECURRENCE_SERIES_ID].stringValue() ?: source.id
+        if (source.fields[RegistryEntityFields.Task.RECURRENCE_SERIES_ID].stringValue() != seriesId) {
+            updateFields(source.id, mapOf(RegistryEntityFields.Task.RECURRENCE_SERIES_ID to JsonValue.StringValue(seriesId)))
+        }
+        val openSiblings = store.records(RegistryEntityNames.TASK)
+            .filter { record ->
+                record.id != source.id &&
+                    record.deletedAt == null &&
+                    record.fields[RegistryEntityFields.Task.STATUS].stringValue() ==
+                    app.septena.core.generated.RegistryEntityEnums.TaskStatus.OPEN &&
+                    (record.fields[RegistryEntityFields.Task.RECURRENCE_SERIES_ID].stringValue() ?: record.id) == seriesId
+            }
+            .sortedWith(
+                compareBy<SyncRecord>(
+                    {
+                        it.fields[RegistryEntityFields.Task.RECURRENCE_ANCHOR_DATE].stringValue()
+                            ?: it.fields[RegistryEntityFields.Task.SCHEDULED].stringValue()
+                            ?: "9999-12-31"
+                    },
+                    { it.id },
+                ),
+            )
+        var cursor = newAnchor
+        for (sibling in openSiblings) {
+            val next = RecurrenceRules.nextScheduledDate(
+                completedOn = cursor,
+                scheduled = cursor,
+                logicalScheduled = cursor,
+                rule = rule,
+            ) ?: break
+            cursor = next
+            val siblingChanges = linkedMapOf<String, JsonValue>(
+                RegistryEntityFields.Task.RECURRENCE_SERIES_ID to JsonValue.StringValue(seriesId),
+                RegistryEntityFields.Task.RECURRENCE_ANCHOR_DATE to JsonValue.StringValue(cursor),
+                RegistryEntityFields.Task.SCHEDULED to JsonValue.StringValue(cursor),
+            )
+            val oldScheduled = sibling.fields[RegistryEntityFields.Task.SCHEDULED].stringValue()
+            val reminderAt = sibling.fields[RegistryEntityFields.Task.REMINDER_AT].stringValue()
+            val shiftedReminder = TaskReminderRules.shiftOnReschedule(reminderAt, oldScheduled, cursor)
+            if (shiftedReminder != reminderAt) {
+                siblingChanges[RegistryEntityFields.Task.REMINDER_AT] = JsonValue.stringOrNull(shiftedReminder)
+                siblingChanges[RegistryEntityFields.Task.REMINDER_SNOOZED_UNTIL] = JsonValue.Null
+                siblingChanges[RegistryEntityFields.Task.REMINDER_DISMISSED_AT] = JsonValue.Null
+            }
+            updateFields(sibling.id, siblingChanges)
+        }
+    }
+
+    private fun parseRecurrenceRule(fields: Map<String, JsonValue>): RecurrenceRule? {
+        val unit = fields[RegistryEntityFields.Task.RECURRENCE_UNIT].stringValue() ?: return null
+        val ordinal = fields[RegistryEntityFields.Task.RECURRENCE_ORDINAL_WEEKDAY] as? JsonValue.ObjectValue
+        return RecurrenceRule(
+            unit = unit,
+            interval = fields[RegistryEntityFields.Task.RECURRENCE_INTERVAL].longValue()?.toInt() ?: 1,
+            afterCompletion = fields[RegistryEntityFields.Task.RECURRENCE_AFTER_COMPLETION].booleanValue() ?: true,
+            weekdays = (fields[RegistryEntityFields.Task.RECURRENCE_WEEKDAYS] as? JsonValue.ArrayValue)
+                ?.values?.mapNotNull { it.longValue()?.toInt() },
+            monthDay = fields[RegistryEntityFields.Task.RECURRENCE_MONTH_DAY].longValue()?.toInt(),
+            ordinalWeekday = ordinal?.let {
+                val o = it["ordinal"].longValue()?.toInt()
+                val w = it["weekday"].longValue()?.toInt()
+                if (o != null && w != null) OrdinalWeekday(o, w) else null
+            },
+        )
     }
 
     /**
@@ -498,6 +593,33 @@ class TaskMutator(
     }
 
     /**
+     * Waiting On… and Got It Back (docs/REVIEW_SPEC.md §6, ADR 0053). A name starts or renames the
+     * wait: the name is trimmed, and `waitingSince` becomes today when the task had no wait. A null
+     * or blank name ends the wait and clears both fields. With [changesWhen], [scheduled] is the day to
+     * chase and becomes the When date in the same gesture through the date action: a day schedules
+     * the task, null clears When. Without it, When stays as it is (Got It Back, an agent's rename). Only the gesture layer calls
+     * this, so the caller records the undo step and stamps the fade clock (a wait ends a fade).
+     */
+    suspend fun setWaiting(id: String, on: String?, scheduled: String? = null, changesWhen: Boolean = false): TaskRecord? {
+        val existing = store.record(RegistryEntityNames.TASK, id)?.asTaskRecord() ?: return null
+        if (existing.deletedAt != null) return null
+        val name = on?.trim { it.isWhitespace() }?.takeIf(String::isNotEmpty)
+        val hadWait = !existing.fields[RegistryEntityFields.Task.WAITING_ON].stringValue().isNullOrBlank()
+        val changes = linkedMapOf<String, JsonValue>(
+            RegistryEntityFields.Task.WAITING_ON to JsonValue.stringOrNull(name),
+        )
+        when {
+            name == null -> changes[RegistryEntityFields.Task.WAITING_SINCE] = JsonValue.Null
+            !hadWait -> changes[RegistryEntityFields.Task.WAITING_SINCE] =
+                JsonValue.StringValue(clock.today(clock.now()).toString())
+        }
+        if (name != null) changes[RegistryEntityFields.Task.FADED_AT] = JsonValue.Null
+        val updated = updateFields(id, changes) ?: return null
+        if (name == null || !changesWhen) return updated
+        return setWhen(id, scheduled)
+    }
+
+    /**
      * Faded ▸ Let Go (spec §5, as iOS dropFaded): cancel it with dropReason "faded"; it goes to the Logbook.
      * A task that came back since the row was drawn is left as is.
      */
@@ -530,6 +652,8 @@ class TaskMutator(
             if (record.deletedAt != null) continue
             val task = runCatching { TaskSnapshot.from(record) }.getOrNull() ?: continue
             if (task.status != app.septena.core.generated.RegistryEntityEnums.TaskStatus.OPEN || task.fadedAt != null) continue
+            // A waiting task never fades (docs/REVIEW_SPEC.md §6).
+            if (task.isWaiting) continue
             val convo = conversations[task.id]
             val fades = runCatching {
                 TaskFadeRules.shouldFade(
@@ -600,6 +724,22 @@ class TaskMutator(
     private fun validateTitle(title: String) {
         val maximum = RegistryEntityLimits.TEXT_MAX
         require(title.length.toLong() <= maximum) { "Task title exceeds the registry limit of $maximum characters" }
+    }
+
+    companion object {
+        /** True when [fields] describe a fixed-schedule (not after-completion) repeating task. */
+        fun isFixedRepeating(fields: Map<String, JsonValue>): Boolean =
+            fields[RegistryEntityFields.Task.RECURRENCE_UNIT].stringValue() != null &&
+                fields[RegistryEntityFields.Task.RECURRENCE_AFTER_COMPLETION].booleanValue() != true
+
+        /**
+         * True when scheduling [fields] to [targetDay] triggers the fixed-repeat
+         * "Only This Task / Update Schedule" prompt (TASK_DATES_SPEC §4, #573).
+         */
+        fun needsFixedRepeatReschedulePrompt(fields: Map<String, JsonValue>, targetDay: String?): Boolean =
+            targetDay != null &&
+                isFixedRepeating(fields) &&
+                targetDay != fields[RegistryEntityFields.Task.SCHEDULED].stringValue()
     }
 }
 

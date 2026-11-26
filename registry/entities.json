@@ -125,6 +125,8 @@
         "touchedAt": { "kind": "text", "format": "stamp", "max": 40, "nullable": true },
         "deferCount": { "kind": "int", "min": 0, "default": 0 },
         "fadedAt": { "kind": "text", "format": "stamp", "max": 40, "nullable": true },
+        "waitingOn": { "kind": "text", "max": 80, "nullable": true },
+        "waitingSince": { "kind": "text", "format": "day", "nullable": true },
         "dropReason": { "kind": "text", "max": 16, "nullable": true },
         "effort": { "kind": "text", "max": 16, "nullable": true },
         "assignedTo": { "kind": "text", "max": 64, "nullable": true }

@@ -29,11 +29,13 @@ import {
 } from "lucide-react";
 import { SeptenaApiClient } from "@/lib/api/client";
 import {
+  completedLocalDay,
   ensureCoreReady,
   fadeFill,
   getCoreVersion,
   localTodayYMD,
   localUtcOffsetSeconds,
+  localWallClockTimestamp,
   rowOpacity,
   shouldArmReminder,
   taskViewMembership,
@@ -66,9 +68,17 @@ import {
   registryText,
 } from "@/lib/generated/registries";
 import { hexWithAlpha, type HeaderTextureStyle } from "@/lib/headerWash";
+import { groupTasksByList, orderByPosition } from "@/lib/listOrder";
 import { loadWebPrefs, saveWebPref, type WebDisplayPrefs } from "@/lib/prefs";
 import { AccountSwitchRequiredError, type AccountSwitchSummary } from "@/lib/sync/accountSwitch";
-import { WebSyncEngine, type CompletionReceipt, type SyncState } from "@/lib/sync/engine";
+import {
+  WebSyncEngine,
+  needsFixedRepeatPrompt,
+  type CompletionReceipt,
+  type RescheduleMode,
+  type SyncState,
+} from "@/lib/sync/engine";
+import { compareWaiting, waitingName } from "@/lib/waiting";
 import { UndoStack, type UndoSnapshot } from "@/lib/sync/undo";
 import type {
   ActiveDestination,
@@ -85,13 +95,14 @@ import { DateBoardPopover, anchorOf, type DateBoardAnchor } from "./DateBoard";
 import { FadeSweepModal } from "./FadeSweepModal";
 import { FirstRunModal } from "./FirstRunModal";
 import { HeaderWash } from "./HeaderWash";
-import { KeyboardShortcutsModal } from "./KeyboardShortcutsModal";
+import { KeyboardShortcutsModal, formatShortcutKeycaps } from "./KeyboardShortcutsModal";
 import { QuickAddModal, type QuickAddInitial } from "./QuickAddModal";
-import { QuickFindModal } from "./QuickFindModal";
+import { QuickFindModal, type CommandBarItem } from "./QuickFindModal";
 import { RegistryIcon } from "./RegistryIcon";
 import { SettingsModal, type SettingsTab } from "./SettingsModal";
 import { SignInScreen } from "./SignInScreen";
 import { TaskPageDrawer } from "./TaskPageDrawer";
+import { WaitingOnDialog } from "./WaitingOnDialog";
 import {
   TaskRowItem,
   openRepeatSelect,
@@ -160,6 +171,16 @@ function formatDayHeading(ymd: string, todayYMD: string, lang: string): string {
 }
 
 /** Every field that a date action can change: what its undo entry restores. */
+/** The fields Waiting On… and Got It Back can change, for their undo. */
+function waitingFields(task: TaskRow): Record<string, unknown> {
+  return {
+    waitingOn: task.waitingOn ?? null,
+    waitingSince: task.waitingSince ?? null,
+    fadedAt: task.fadedAt ?? null,
+    ...dateFields(task),
+  };
+}
+
 function dateFields(task: TaskRow): Record<string, unknown> {
   return {
     scheduled: task.scheduled ?? null,
@@ -198,8 +219,15 @@ export function SeptenaApp() {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
+  const lastEditorCloseAtRef = useRef<number>(0);
+  const collapseInlineTask = useCallback(() => {
+    lastEditorCloseAtRef.current = Date.now();
+    setExpandedTaskId(null);
+  }, []);
   const [taskPageId, setTaskPageId] = useState<string | null>(null);
   const [inboxCollapsed, setInboxCollapsed] = useState(false);
+  const [todayLoggedExpanded, setTodayLoggedExpanded] = useState(false);
+  const [scopeLoggedExpandedIds, setScopeLoggedExpandedIds] = useState<Set<string>>(() => new Set());
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [tagFilterId, setTagFilterId] = useState<string | null>(null);
   const [composerTitle, setComposerTitle] = useState("");
@@ -218,6 +246,7 @@ export function SeptenaApp() {
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   /** The tasks of the open keep-or-let-go sheet, fixed when it opens. Null: closed. */
   const [sweepTasks, setSweepTasks] = useState<TaskRow[] | null>(null);
+  const [waitingTaskId, setWaitingTaskId] = useState<string | null>(null);
   const [firstRunOpen, setFirstRunOpen] = useState(false);
   const [infoToast, setInfoToast] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
@@ -229,12 +258,25 @@ export function SeptenaApp() {
 
   // Inline creation & container notes
   const [creatingKind, setCreatingKind] = useState<"area" | "project" | "heading" | null>(null);
+  const [creatingAreaId, setCreatingAreaId] = useState<string | null>(null);
+  const [creatingInsertIndex, setCreatingInsertIndex] = useState<number | null>(null);
   const [newContainerTitle, setNewContainerTitle] = useState("");
   const [showContainerNotes, setShowContainerNotes] = useState(false);
   const [containerNotesDraft, setContainerNotesDraft] = useState("");
 
   // Drag-and-drop state
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
+  const [draggedSidebarItem, setDraggedSidebarItem] = useState<
+    | { kind: "area"; id: string }
+    | { kind: "project"; id: string }
+    | { kind: "magicPlus" }
+    | null
+  >(null);
+  const [magicPlusTarget, setMagicPlusTarget] = useState<
+    | { kind: "area"; index: number; label: string }
+    | { kind: "project"; areaId: string | null; index: number; label: string }
+    | null
+  >(null);
   const [dropTargetTaskId, setDropTargetTaskId] = useState<string | null>(null);
   const [dropTargetSidebar, setDropTargetSidebar] = useState<string | null>(null);
 
@@ -269,10 +311,18 @@ export function SeptenaApp() {
     return () => mq.removeEventListener("change", handler);
   }, []);
 
+  // Keep the address bar on the canonical app root (`/`) so iOS Add to Home
+  // Screen and browser installs always save https://web.septena.app/.
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.location.pathname !== "/") {
+      window.history.replaceState({}, "", `/${window.location.search}`);
+    }
+  }, []);
+
   // Register offline shell Service Worker.
   useEffect(() => {
     if (typeof window !== "undefined" && "serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").catch(() => {});
+      navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(() => {});
     }
   }, []);
 
@@ -298,7 +348,7 @@ export function SeptenaApp() {
       today: false,
     });
     setQuickAddOpen(true);
-    window.history.replaceState({}, "", window.location.pathname);
+    window.history.replaceState({}, "", "/");
   }, [bootPhase]);
 
   // DayClock midnight rollover watcher.
@@ -498,29 +548,40 @@ export function SeptenaApp() {
     areaById,
     projectById,
     projectStats,
+    areaOpenCount,
     checklistsByTask,
     refsByTask,
     attachmentsByTask,
     convoByTask,
     turnsByTask,
   } = useMemo(() => {
-    const areas = syncState.snapshot.areas
-      .filter((a) => !a.deletedAt)
-      .sort((a, b) => (a.position ?? 0) - (b.position ?? 0) || a.title.localeCompare(b.title));
-    const projects = syncState.snapshot.projects
-      .filter((p) => !p.deletedAt && p.status === "active")
-      .sort((a, b) => (a.position ?? 0) - (b.position ?? 0) || a.title.localeCompare(b.title));
-    const tags = syncState.snapshot.tags
-      .filter((t) => !t.deletedAt)
-      .sort((a, b) => (a.position ?? 0) - (b.position ?? 0) || a.name.localeCompare(b.name));
+    const areas = orderByPosition(syncState.snapshot.areas.filter((a) => !a.deletedAt));
+    const projects = orderByPosition(
+      syncState.snapshot.projects.filter((p) => !p.deletedAt && p.status === "active"),
+    );
+    const tags = orderByPosition(syncState.snapshot.tags.filter((t) => !t.deletedAt));
 
+    // Project progress = done / (done + open). Cancelled and faded rows do not
+    // count toward either side, matching iOS SidebarView.aggregate (docs/TASK_FADE_SPEC.md §4).
+    // Area count = direct-in-area open non-faded tasks only (nested projects render separately).
     const pStats = new Map<string, { done: number; total: number }>();
+    const aOpen = new Map<string, number>();
     for (const t of syncState.snapshot.tasks) {
-      if (t.deletedAt || t.kind === "heading" || !t.project) continue;
-      const cur = pStats.get(t.project) ?? { done: 0, total: 0 };
-      cur.total++;
-      if (t.status === "done") cur.done++;
-      pStats.set(t.project, cur);
+      if (t.deletedAt || t.kind === "heading" || t.fadedAt) continue;
+      if (t.project) {
+        if (t.status === "done") {
+          const cur = pStats.get(t.project) ?? { done: 0, total: 0 };
+          cur.done++;
+          cur.total++;
+          pStats.set(t.project, cur);
+        } else if (t.status === "open") {
+          const cur = pStats.get(t.project) ?? { done: 0, total: 0 };
+          cur.total++;
+          pStats.set(t.project, cur);
+        }
+      } else if (t.area && t.status === "open") {
+        aOpen.set(t.area, (aOpen.get(t.area) ?? 0) + 1);
+      }
     }
 
     const cMap = new Map<string, typeof syncState.snapshot.checklistItems>();
@@ -557,6 +618,7 @@ export function SeptenaApp() {
       areaById: new Map(areas.map((a) => [a.id, a])),
       projectById: new Map(projects.map((p) => [p.id, p])),
       projectStats: pStats,
+      areaOpenCount: aOpen,
       checklistsByTask: cMap,
       refsByTask: rMap,
       attachmentsByTask: aMap,
@@ -693,13 +755,14 @@ export function SeptenaApp() {
         continue;
       }
       if (task.status === "done" || task.status === "cancelled") {
-        if (String(task.completedAt ?? "").startsWith(todayYMD)) counts.logbook++;
+        if (completedLocalDay(task.completedAt) === todayYMD) counts.logbook++;
         continue;
       }
       if (task.status !== "open") continue;
 
       if (membership.matchesView.today) counts.today++;
-      // Review holds agent work in progress too (ADR 0046); only what waits on the user is in its badge.
+      // Review holds agent work in progress and Waiting too (ADR 0046, ADR 0053); only what waits on the
+      // user is in its badge. The other groups (Faded aside) keep Review in the sidebar through `agent`.
       const reviewGroup = reviewGroupOf(task, convoState);
       if (reviewGroup && BADGE_GROUP_IDS.has(reviewGroup)) counts.review++;
       else if (reviewGroup && reviewGroup !== "faded") counts.agent++;
@@ -776,13 +839,8 @@ export function SeptenaApp() {
       .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
   }, [destination, syncState.snapshot.tasks]);
 
-  const listedTasks = useMemo(() => {
-    const filtered = evaluatedTasks.filter(({ task, membership, convoState }) => {
-      if (tagFilterId) {
-        const tags = Array.isArray(task.tags) ? task.tags : [];
-        if (!tags.includes(tagFilterId)) return false;
-      }
-
+  const destinationTasks = useMemo(() => {
+    return evaluatedTasks.filter(({ task, membership, convoState }) => {
       if (destination.kind === "smart") {
         if (destination.id === "logbook") {
           if (logbookTab === "deleted") return Boolean(task.deletedAt);
@@ -810,8 +868,29 @@ export function SeptenaApp() {
       }
       return task.project === destination.id;
     });
+  }, [destination, evaluatedTasks, logbookTab, prefs.tasksShowFaded, projectById]);
 
-    return filtered.sort((a, b) => {
+  // Progressive disclosure (matching iOS TaskListView.swift): only surface tags
+  // that actually appear on tasks in the current list; empty → zero chrome.
+  const availableTagsInList = useMemo(() => {
+    const usedIds = new Set<string>();
+    for (const { task } of destinationTasks) {
+      if (Array.isArray(task.tags)) {
+        for (const tid of task.tags) usedIds.add(tid);
+      }
+    }
+    return activeTags.filter((t) => usedIds.has(t.id));
+  }, [activeTags, destinationTasks]);
+
+  const listedTasks = useMemo(() => {
+    const filtered = tagFilterId
+      ? destinationTasks.filter(({ task }) => {
+          const tags = Array.isArray(task.tags) ? task.tags : [];
+          return tags.includes(tagFilterId);
+        })
+      : destinationTasks;
+
+    return [...filtered].sort((a, b) => {
       if (destination.kind === "smart" && destination.id === "logbook") {
         const ka = logbookTab === "deleted" ? String(a.task.deletedAt ?? "") : String(a.task.completedAt ?? "");
         const kb = logbookTab === "deleted" ? String(b.task.deletedAt ?? "") : String(b.task.completedAt ?? "");
@@ -830,7 +909,7 @@ export function SeptenaApp() {
       if (pa !== pb) return pa - pb;
       return String(b.task.createdAt ?? "").localeCompare(String(a.task.createdAt ?? ""));
     });
-  }, [destination, evaluatedTasks, logbookTab, prefs.tasksShowFaded, projectById, tagFilterId]);
+  }, [destination, destinationTasks, logbookTab, tagFilterId]);
 
   // Review grouped by what waits on the user, then agent work in progress (docs/REVIEW_SPEC.md §1), in registry order.
   const reviewGroups = useMemo(() => {
@@ -838,7 +917,11 @@ export function SeptenaApp() {
     return destinationGroups("review")
       .map((group) => ({
         ...group,
-        items: listedTasks.filter((i) => reviewGroupOf(i.task, i.convoState) === group.id),
+        items: (() => {
+          const items = listedTasks.filter((i) => reviewGroupOf(i.task, i.convoState) === group.id);
+          // Waiting: oldest wait first (REVIEW_SPEC §6).
+          return group.id === "waiting" ? [...items].sort((a, b) => compareWaiting(a.task, b.task)) : items;
+        })(),
       }))
       .filter((g) => g.items.length > 0);
   }, [destination, listedTasks]);
@@ -856,19 +939,45 @@ export function SeptenaApp() {
       ? sumRows(reviewGroups.filter((g) => g.id !== "faded"))
       : listedTasks.length;
 
+  // Today's logged block: tasks completed or cancelled TODAY (local calendar
+  // day), newest first — 1:1 with Apple LocalCache.tasksCompleted(onDay: today)
+  // and Mac SeptaskKitTaskList.todayLoggedRows().
   const completedTodayTasks = useMemo(() => {
     if (!(destination.kind === "smart" && destination.id === "today" && prefs.todayShowCompleted)) {
       return [];
     }
     return evaluatedTasks
-      .filter(
-        ({ task }) =>
-          !task.deletedAt &&
-          task.status === "done" &&
-          String(task.completedAt ?? "").startsWith(todayYMD),
-      )
+      .filter(({ task }) => {
+        if (task.deletedAt) return false;
+        if (task.status !== "done" && task.status !== "cancelled") return false;
+        if (completedLocalDay(task.completedAt) !== todayYMD) return false;
+        if (tagFilterId) {
+          const tags = Array.isArray(task.tags) ? task.tags : [];
+          if (!tags.includes(tagFilterId)) return false;
+        }
+        return true;
+      })
       .sort((a, b) => String(b.task.completedAt ?? "").localeCompare(String(a.task.completedAt ?? "")));
-  }, [destination, evaluatedTasks, prefs.todayShowCompleted, todayYMD]);
+  }, [destination, evaluatedTasks, prefs.todayShowCompleted, tagFilterId, todayYMD]);
+
+  // Project / Area logged footer: completed tasks in this scope, newest first
+  // (collapsed by default, matching iOS TaskListView.scopeLoggedSection & Mac).
+  const loggedScopeTasks = useMemo(() => {
+    if (destination.kind !== "area" && destination.kind !== "project") return [];
+    return evaluatedTasks
+      .filter(({ task }) => {
+        if (task.deletedAt || task.status !== "done") return false;
+        if (tagFilterId) {
+          const tags = Array.isArray(task.tags) ? task.tags : [];
+          if (!tags.includes(tagFilterId)) return false;
+        }
+        if (destination.kind === "project") return task.project === destination.id;
+        if (task.area === destination.id) return true;
+        const proj = task.project ? projectById.get(task.project) : null;
+        return proj?.area === destination.id;
+      })
+      .sort((a, b) => String(b.task.completedAt ?? "").localeCompare(String(a.task.completedAt ?? "")));
+  }, [destination, evaluatedTasks, projectById, tagFilterId]);
 
   // On Today: foldable Inbox band at top (matching iOS/Mac, docs/TRIAGE_BAND_SPEC.md).
   const { todayInboxTasks, todayCommittedTasks } = useMemo(() => {
@@ -885,38 +994,29 @@ export function SeptenaApp() {
     return { todayInboxTasks: inboxBand, todayCommittedTasks: committed };
   }, [destination, visibleTasks]);
 
-  // Group committed Today tasks by list when prefs.todayGroupByList is ON (matching iOS/macOS).
+  // Group committed Today tasks by Area & Project in exact sidebar order
+  // (matching iOS TaskListView, Mac SeptaskKitTaskList, Android TaskHomeViewModel).
   const todayListGroups = useMemo(() => {
+    if (!(destination.kind === "smart" && destination.id === "today" && prefs.todayGroupByList)) {
+      return null;
+    }
+    const result = groupTasksByList(todayCommittedTasks, activeAreas, activeProjects);
+    return result.groups.length > 0 ? result : null;
+  }, [activeAreas, activeProjects, destination, prefs.todayGroupByList, todayCommittedTasks]);
+
+  // Anytime & Favorites also group by Area & Project in sidebar order (1:1 with iOS/Mac).
+  const smartListGroups = useMemo(() => {
     if (
-      !(destination.kind === "smart" && destination.id === "today" && prefs.todayGroupByList)
+      !(
+        destination.kind === "smart" &&
+        (destination.id === "anytime" || destination.id === "starred")
+      )
     ) {
       return null;
     }
-    const ungrouped: EvaluatedTask[] = [];
-    const groups = new Map<string, { label: string; items: EvaluatedTask[] }>();
-    for (const item of todayCommittedTasks) {
-      const t = item.task;
-      if (t.project && projectById.has(t.project)) {
-        const key = `p:${t.project}`;
-        const cur = groups.get(key) ?? { label: projectById.get(t.project)!.title, items: [] };
-        cur.items.push(item);
-        groups.set(key, cur);
-      } else if (t.area && areaById.has(t.area)) {
-        const a = areaById.get(t.area)!;
-        const key = `a:${t.area}`;
-        const cur = groups.get(key) ?? {
-          label: `${a.emoji ? `${a.emoji} ` : ""}${a.title}`,
-          items: [],
-        };
-        cur.items.push(item);
-        groups.set(key, cur);
-      } else {
-        ungrouped.push(item);
-      }
-    }
-    if (groups.size === 0) return null;
-    return { ungrouped, groups: Array.from(groups.entries()) };
-  }, [areaById, destination, prefs.todayGroupByList, projectById, todayCommittedTasks]);
+    const result = groupTasksByList(visibleTasks, activeAreas, activeProjects);
+    return result.groups.length > 0 ? result : null;
+  }, [activeAreas, activeProjects, destination, visibleTasks]);
 
   // Upcoming grouped by day via WASM upcomingDay.
   const upcomingGroups = useMemo(() => {
@@ -1083,10 +1183,11 @@ export function SeptenaApp() {
     [engine, undoStack],
   );
 
-  // Sync container notes draft when switching Area / Project.
+  // Sync container notes draft & clear active tag filter when switching lists.
   useEffect(() => {
     setShowContainerNotes(false);
     setSelectedIds(new Set());
+    setTagFilterId(null);
     if (destination.kind === "area") {
       setContainerNotesDraft(areaById.get(destination.id)?.context ?? "");
     } else if (destination.kind === "project") {
@@ -1113,12 +1214,23 @@ export function SeptenaApp() {
     [engine],
   );
 
-  const setTaskDay = useCallback(
-    async (attribute: DateBoardAttribute, taskIds: string[], day: string | null) => {
+  const [pendingReschedule, setPendingReschedule] = useState<
+    | { kind: "when"; taskIds: string[]; day: string }
+    | { kind: "toggleToday"; tasks: TaskRow[]; bulkPutOnToday?: boolean }
+    | null
+  >(null);
+
+  const applyTaskDay = useCallback(
+    async (
+      attribute: DateBoardAttribute,
+      taskIds: string[],
+      day: string | null,
+      mode: RescheduleMode = "makeException",
+    ) => {
       const before = findTasks(taskIds);
       const apply = async () => {
         for (const task of findTasks(taskIds)) {
-          if (attribute === "when") await engine.setTaskScheduled(task, day);
+          if (attribute === "when") await engine.setTaskScheduled(task, day, mode);
           else await engine.setTaskDeadline(task, day);
         }
       };
@@ -1138,6 +1250,69 @@ export function SeptenaApp() {
     [engine, findTasks, prefs.language, undoStack],
   );
 
+  const setTaskDay = useCallback(
+    async (attribute: DateBoardAttribute, taskIds: string[], day: string | null) => {
+      if (
+        attribute === "when" &&
+        day !== null &&
+        findTasks(taskIds).some((task) => needsFixedRepeatPrompt(task, day))
+      ) {
+        setPendingReschedule({ kind: "when", taskIds, day });
+        return;
+      }
+      await applyTaskDay(attribute, taskIds, day, "makeException");
+    },
+    [applyTaskDay, findTasks],
+  );
+
+  const applyToggleToday = useCallback(
+    async (tasks: TaskRow[], mode: RescheduleMode, bulkPutOnToday?: boolean) => {
+      if (tasks.length === 0) return;
+      if (bulkPutOnToday !== undefined) {
+        await engine.bulkToggleToday(tasks, bulkPutOnToday, mode);
+        return;
+      }
+      const task = tasks[0];
+      const prev = {
+        today: Boolean(task.today),
+        todaySetOn: task.todaySetOn ?? null,
+        scheduled: task.scheduled ?? null,
+        deadline: task.deadline ?? null,
+        deferredDeadline: task.deferredDeadline ?? null,
+      };
+      await engine.toggleTaskToday(task, mode);
+      undoStack.record({
+        label: prev.today ? `Removed “${task.title}” from Today` : `Moved “${task.title}” to Today`,
+        undo: () => engine.updateTaskFields(task, prev),
+        redo: () => engine.toggleTaskToday(task, mode),
+      });
+    },
+    [engine, undoStack],
+  );
+
+  const requestToggleToday = useCallback(
+    async (task: TaskRow, isCurrentlyOnToday?: boolean) => {
+      const adding = isCurrentlyOnToday !== undefined ? !isCurrentlyOnToday : !task.today;
+      if (adding && needsFixedRepeatPrompt(task, todayYMD)) {
+        setPendingReschedule({ kind: "toggleToday", tasks: [task] });
+        return;
+      }
+      await applyToggleToday([task], "makeException");
+    },
+    [applyToggleToday, todayYMD],
+  );
+
+  const requestBulkToggleToday = useCallback(
+    async (tasks: TaskRow[], putOnToday: boolean) => {
+      if (putOnToday && tasks.some((t) => needsFixedRepeatPrompt(t, todayYMD))) {
+        setPendingReschedule({ kind: "toggleToday", tasks, bulkPutOnToday: true });
+        return;
+      }
+      await applyToggleToday(tasks, "makeException", putOnToday);
+    },
+    [applyToggleToday, todayYMD],
+  );
+
   const openDatePicker = useCallback(
     (attribute: DateBoardAttribute, taskIds: string[], anchor?: DateBoardAnchor) => {
       if (taskIds.length === 0) return;
@@ -1149,6 +1324,52 @@ export function SeptenaApp() {
       });
     },
     [],
+  );
+
+  // Waiting On… and Got It Back (REVIEW_SPEC §6), with undo back to the fields before.
+  const setWaiting = useCallback(
+    async (task: TaskRow, name: string, checkBack: string | null) => {
+      const [before] = findTasks([task.id]);
+      const prev = waitingFields(before ?? task);
+      await engine.setTaskWaiting(before ?? task, name, checkBack);
+      undoStack.record({
+        label: `${registryText(ACTIONS_CATALOG.actions["task.waitingOn"].title, prefs.language)} “${task.title}”`,
+        undo: async () => {
+          const [live] = findTasks([task.id]);
+          if (live) await engine.updateTaskFields(live, prev);
+        },
+        redo: async () => {
+          const [live] = findTasks([task.id]);
+          if (live) await engine.setTaskWaiting(live, name, checkBack);
+        },
+      });
+    },
+    [engine, findTasks, prefs.language, undoStack],
+  );
+
+  const gotItBack = useCallback(
+    async (tasks: TaskRow[]) => {
+      const waiting = findTasks(tasks.map((t) => t.id)).filter((t) => waitingName(t));
+      if (waiting.length === 0) return;
+      const before = waiting.map((t) => ({ id: t.id, fields: waitingFields(t) }));
+      for (const t of waiting) await engine.clearTaskWaiting(t);
+      undoStack.record({
+        label:
+          waiting.length === 1
+            ? `${registryText(ACTIONS_CATALOG.actions["task.gotItBack"].title, prefs.language)}: “${waiting[0].title}”`
+            : `${registryText(ACTIONS_CATALOG.actions["task.gotItBack"].title, prefs.language)}: ${waiting.length} tasks`,
+        undo: async () => {
+          for (const b of before) {
+            const [live] = findTasks([b.id]);
+            if (live) await engine.updateTaskFields(live, b.fields);
+          }
+        },
+        redo: async () => {
+          for (const live of findTasks(before.map((b) => b.id))) await engine.clearTaskWaiting(live);
+        },
+      });
+    },
+    [engine, findTasks, prefs.language, undoStack],
   );
 
   const handleShareTask = useCallback(
@@ -1225,11 +1446,11 @@ export function SeptenaApp() {
       if (!reg) return;
       switch (reg.dropBehavior) {
         case "setToday":
-          await engine.bulkToggleToday([task], true);
+          await requestBulkToggleToday([task], true);
           showToast(`Moved “${task.title}” to Today`);
           break;
         case "scheduleTomorrow":
-          await engine.setTaskScheduled(task, addDays(todayYMD, 1));
+          await setTaskDay("when", [task.id], addDays(todayYMD, 1));
           showToast(`Scheduled “${task.title}” for tomorrow`);
           break;
         case "clearDates":
@@ -1244,7 +1465,7 @@ export function SeptenaApp() {
           break;
       }
     },
-    [draggedTaskId, engine, showToast, syncState.snapshot.tasks, todayYMD, toggleDone],
+    [draggedTaskId, engine, requestBulkToggleToday, setTaskDay, showToast, syncState.snapshot.tasks, todayYMD, toggleDone],
   );
 
   const handleDropOnSidebarPlace = useCallback(
@@ -1274,8 +1495,11 @@ export function SeptenaApp() {
         target?.tagName === "SELECT" ||
         target?.isContentEditable;
 
-      // Global shortcuts even when browsing
-      if (primary && e.shiftKey && key === "f") {
+      // Global shortcuts even when browsing or typing
+      if (
+        (primary && !e.shiftKey && !e.altKey && key === "k") ||
+        (primary && e.shiftKey && key === "f")
+      ) {
         e.preventDefault();
         setQuickFindOpen((v) => !v);
         return;
@@ -1374,27 +1598,33 @@ export function SeptenaApp() {
       // Row-level shortcuts from registry/actions.json when task(s) are selected
       if (activeSelectedTasks.length > 0) {
         const single = activeSelectedTasks[0];
-        if (primary && !e.shiftKey && !e.altKey && key === "k") {
+        if (primary && !e.shiftKey && !e.altKey && e.key === "Enter") {
           e.preventDefault();
+          if (expandedTaskId !== null) {
+            collapseInlineTask();
+            return;
+          }
+          if (Date.now() - lastEditorCloseAtRef.current < 550) return;
           if (activeSelectedTasks.length === 1) void toggleDone(single);
           else void completeMany(activeSelectedTasks);
           return;
         }
-        if (primary && e.altKey && key === "k") {
+        if (primary && e.altKey && !e.shiftKey && e.key === "Enter") {
           e.preventDefault();
+          if (expandedTaskId !== null) collapseInlineTask();
           void engine.bulkUpdateTasks(activeSelectedTasks, {
             status: "cancelled",
-            completedAt: new Date().toISOString(),
+            completedAt: localWallClockTimestamp(),
             dropReason: "user",
           });
           return;
         }
         if (primary && !e.shiftKey && !e.altKey && key === "t") {
           e.preventDefault();
-          if (activeSelectedTasks.length === 1) void engine.toggleTaskToday(single);
+          if (activeSelectedTasks.length === 1) void requestToggleToday(single);
           else {
             const anyNotToday = activeSelectedTasks.some((t) => !t.today);
-            void engine.bulkToggleToday(activeSelectedTasks, anyNotToday);
+            void requestBulkToggleToday(activeSelectedTasks, anyNotToday);
           }
           return;
         }
@@ -1449,11 +1679,6 @@ export function SeptenaApp() {
           setExpandedTaskId(null);
           return;
         }
-      } else if (primary && !e.shiftKey && !e.altKey && key === "k") {
-        // Fallback: Cmd+K opens Quick Find when no task is selected.
-        e.preventDefault();
-        setQuickFindOpen((v) => !v);
-        return;
       }
 
       if (e.key === "ArrowDown" && visibleTasks.length > 0) {
@@ -1472,12 +1697,12 @@ export function SeptenaApp() {
           setSelectedTaskId(prev.task.id);
           setSelectedIds(new Set([prev.task.id]));
         }
-      } else if (e.key === "Enter" && selectedTaskId) {
+      } else if (!primary && !e.altKey && !e.shiftKey && e.key === "Enter" && selectedTaskId) {
         e.preventDefault();
         const selected = visibleTasks.find((v) => v.task.id === selectedTaskId);
         if (selected) toggleExpanded(selected.task);
       } else if (e.key === "Escape") {
-        setExpandedTaskId(null);
+        collapseInlineTask();
         setSelectedTaskId(null);
         setSelectedIds(new Set());
         setTaskPageId(null);
@@ -1489,9 +1714,11 @@ export function SeptenaApp() {
   }, [
     activeSelectedTasks,
     bootPhase,
+    collapseInlineTask,
     completeMany,
     destination,
     engine,
+    expandedTaskId,
     firstRunOpen,
     handleChangePref,
     handleCopyTasks,
@@ -1515,6 +1742,9 @@ export function SeptenaApp() {
   ]);
 
   const lang = prefs.language;
+  const waitingTask = waitingTaskId
+    ? (syncState.snapshot.tasks.find((t) => t.id === waitingTaskId && t.status === "open" && !t.deletedAt) ?? null)
+    : null;
   const pickerTask = datePicker
     ? syncState.snapshot.tasks.find((t) => t.id === datePicker.taskIds[0])
     : undefined;
@@ -1577,19 +1807,69 @@ export function SeptenaApp() {
     await engine.createTask(opts);
   };
 
+  const activeAreaId = useMemo(() => {
+    if (destination.kind === "area") return destination.id;
+    if (destination.kind === "project") return projectById.get(destination.id)?.area ?? null;
+    return null;
+  }, [destination, projectById]);
+
+  const reorderAreaList = async (ordered: AreaRow[]) => {
+    await Promise.all(ordered.map((a, idx) => engine.updateArea(a, { position: idx })));
+  };
+
+  const reorderProjectList = async (ordered: ProjectRow[]) => {
+    await Promise.all(ordered.map((p, idx) => engine.updateProject(p, { position: idx })));
+  };
+
+  const handleMoveProjectToArea = async (proj: ProjectRow, targetAreaId: string | null, insertBeforeId?: string) => {
+    const oldAreaId = proj.area ?? null;
+    const reparent = oldAreaId !== targetAreaId;
+    const targetSiblings = activeProjects.filter(
+      (p) => (p.area ?? null) === targetAreaId && p.id !== proj.id,
+    );
+    const nextTarget = [...targetSiblings];
+    const insertAt = insertBeforeId ? nextTarget.findIndex((p) => p.id === insertBeforeId) : -1;
+    if (insertAt >= 0) nextTarget.splice(insertAt, 0, proj);
+    else nextTarget.push(proj);
+
+    if (reparent) {
+      await engine.updateProject(proj, { area: targetAreaId });
+    }
+    await reorderProjectList(nextTarget);
+    if (reparent) {
+      const targetName = targetAreaId ? (areaById.get(targetAreaId)?.title ?? "Area") : "No Area";
+      showToast(`Moved “${proj.title}” to ${targetName}`);
+    }
+  };
+
   const handleCreateContainer = async (e: React.FormEvent) => {
     e.preventDefault();
     const title = newContainerTitle.trim();
     if (!title || !creatingKind) return;
     setNewContainerTitle("");
     const kind = creatingKind;
+    const targetAreaId = creatingAreaId;
+    const insertIndex = creatingInsertIndex;
     setCreatingKind(null);
+    setCreatingAreaId(null);
+    setCreatingInsertIndex(null);
     if (kind === "area") {
       const area = await engine.createArea(title);
+      if (insertIndex !== null) {
+        const next = activeAreas.filter((a) => a.id !== area.id);
+        next.splice(Math.max(0, Math.min(insertIndex, next.length)), 0, area);
+        await reorderAreaList(next);
+      }
       setDestination({ kind: "area", id: area.id });
     } else if (kind === "project") {
-      const areaId = destination.kind === "area" ? destination.id : null;
-      const proj = await engine.createProject(title, areaId);
+      const proj = await engine.createProject(title, targetAreaId);
+      if (insertIndex !== null) {
+        const siblings = activeProjects.filter(
+          (p) => (p.area ?? null) === (targetAreaId ?? null) && p.id !== proj.id,
+        );
+        siblings.splice(Math.max(0, Math.min(insertIndex, siblings.length)), 0, proj);
+        await reorderProjectList(siblings);
+      }
       setDestination({ kind: "project", id: proj.id });
     } else if (kind === "heading" && destination.kind === "project") {
       await engine.createTask({ title, kind: "heading", project: destination.id });
@@ -1607,6 +1887,8 @@ export function SeptenaApp() {
           label: "New Project in Area",
           onSelect: () => {
             setDestination({ kind: "area", id: area.id });
+            setCreatingAreaId(area.id);
+            setCreatingInsertIndex(0);
             setCreatingKind("project");
             setNewContainerTitle("");
           },
@@ -1648,6 +1930,23 @@ export function SeptenaApp() {
 
   const openProjectContextMenu = (e: React.MouseEvent, proj: ProjectRow) => {
     e.preventDefault();
+    const currentAreaId = proj.area ?? null;
+    const moveAreaItems: ContextMenuState["items"] = [
+      {
+        kind: "item",
+        label: `${currentAreaId === null ? "✓ " : ""}Move to No Area`,
+        onSelect: () => {
+          if (currentAreaId !== null) void handleMoveProjectToArea(proj, null);
+        },
+      },
+      ...activeAreas.map((area) => ({
+        kind: "item" as const,
+        label: `${currentAreaId === area.id ? "✓ " : ""}Move to ${area.emoji ? `${area.emoji} ` : ""}${area.title}`,
+        onSelect: () => {
+          if (currentAreaId !== area.id) void handleMoveProjectToArea(proj, area.id);
+        },
+      })),
+    ];
     setContextMenu({
       x: e.clientX,
       y: e.clientY,
@@ -1660,6 +1959,8 @@ export function SeptenaApp() {
             if (next && next !== proj.title) void engine.updateProject(proj, { title: next });
           },
         },
+        { kind: "divider" },
+        ...moveAreaItems,
         { kind: "divider" },
         {
           kind: "item",
@@ -1723,6 +2024,8 @@ export function SeptenaApp() {
       destination.kind === "smart" &&
       destination.id === "review" &&
       reviewGroupOf(task, convoState) === "faded";
+    const showsTodayIndicator = !(destination.kind === "smart" && destination.id === "today");
+    const showsFadedIndicator = destination.kind === "area" || destination.kind === "project";
 
     return {
       task,
@@ -1735,6 +2038,8 @@ export function SeptenaApp() {
       expanded: expandedTaskId === task.id,
       isDeletedView,
       isFadedView,
+      showsTodayIndicator,
+      showsFadedIndicator,
       todayYMD,
       lang,
       isColorfulAccent,
@@ -1845,11 +2150,21 @@ export function SeptenaApp() {
                   { kind: "divider" as const },
                 ]
               : []),
+            ...(waitingName(task)
+              ? [
+                  {
+                    kind: "item" as const,
+                    label: registryText(ACTIONS_CATALOG.actions["task.gotItBack"].title, lang),
+                    onSelect: () => void gotItBack(findTasks(menuTaskIds)),
+                  },
+                  { kind: "divider" as const },
+                ]
+              : []),
             {
               kind: "item",
               label: membership.isOnToday ? "Remove from Today" : "Move to Today",
               shortcut: "⌘T",
-              onSelect: () => void engine.toggleTaskToday(task),
+              onSelect: () => void requestToggleToday(task, membership.isOnToday),
             },
             {
               kind: "item",
@@ -1868,6 +2183,11 @@ export function SeptenaApp() {
               label: registryText(ACTIONS_CATALOG.actions["task.deadline"].title, lang),
               shortcut: "⇧⌘D",
               onSelect: () => openDatePicker("deadline", menuTaskIds, menuAnchor),
+            },
+            {
+              kind: "item",
+              label: registryText(ACTIONS_CATALOG.actions["task.waitingOn"].title, lang),
+              onSelect: () => setWaitingTaskId(task.id),
             },
             { kind: "divider" },
             {
@@ -1941,23 +2261,9 @@ export function SeptenaApp() {
         void handleDropOnTask(task.id);
       },
       onOpenTaskPage: () => openTask(task, "page"),
-      onCollapse: () => setExpandedTaskId(null),
+      onCollapse: collapseInlineTask,
       onToggleDone: () => void toggleDone(task),
-      onToggleToday: async () => {
-        const prev = {
-          today: Boolean(task.today),
-          todaySetOn: task.todaySetOn ?? null,
-          scheduled: task.scheduled ?? null,
-          deadline: task.deadline ?? null,
-          deferredDeadline: task.deferredDeadline ?? null,
-        };
-        await engine.toggleTaskToday(task);
-        undoStack.record({
-          label: prev.today ? `Removed “${task.title}” from Today` : `Moved “${task.title}” to Today`,
-          undo: () => engine.updateTaskFields(task, prev),
-          redo: () => engine.toggleTaskToday(task),
-        });
-      },
+      onToggleToday: () => void requestToggleToday(task, membership.isOnToday),
       onToggleStar: () => void engine.toggleTaskStar(task),
       onDuplicate: async () => {
         await engine.duplicateTask(task);
@@ -1998,6 +2304,8 @@ export function SeptenaApp() {
       onResumeAgent: () => void engine.resumeAgentOnTask(task.id),
       onLoadHistory: () => api.getChanges("task", task.id),
       onKeepFaded: () => void keepFaded(task),
+      onWaitingOn: () => setWaitingTaskId(task.id),
+      onGotItBack: () => void gotItBack([task]),
       onDropFaded: () => void letGoFaded([task]),
       onRestoreDeleted: () => void engine.restoreDeletedTask(task),
       onCancelTask: async () => {
@@ -2034,40 +2342,354 @@ export function SeptenaApp() {
     <TaskRowItem key={item.task.id} {...buildTaskRowProps(item, hideContainerLabel)} />
   );
 
+  // iOS TaskCardChrome: 14px continuous rounded card on soft gray canvas with
+  // hairline dividers; translucent frosted glass when a Header Wash is active.
+  const taskCardClass = `overflow-hidden rounded-[14px] border border-[var(--border-subtle)]/75 divide-y divide-[var(--border-hairline)] ${
+    canvasTexture !== "none"
+      ? "bg-[var(--bg-card-glass)] backdrop-blur-md"
+      : "bg-[var(--bg-card)]"
+  }`;
+
+  // Unified iOS group/section header: shares the exact horizontal inset (`px-3`)
+  // and 22px leading icon slot (`w-[22px]` + `gap-2.5`) as every task row
+  // checkbox below it. Sentence case, no bottom underline.
+  const renderSectionHeader = ({
+    leading,
+    title,
+    count,
+    muted = false,
+    collapse,
+    onContextMenu,
+  }: {
+    leading?: React.ReactNode;
+    title: string;
+    count?: number;
+    muted?: boolean;
+    collapse?: { expanded: boolean; onToggle: () => void };
+    onContextMenu?: (e: React.MouseEvent) => void;
+  }) => {
+    const Chevron = collapse?.expanded ? ChevronDown : ChevronRight;
+    const inner = (
+      <>
+        {leading && (
+          <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center">
+            {leading}
+          </span>
+        )}
+        <span
+          className={`truncate text-[15px] font-semibold tracking-[-0.01em] ${
+            muted ? "text-[var(--text-secondary)]" : "text-[var(--text-primary)]"
+          }`}
+        >
+          {title}
+        </span>
+        {typeof count === "number" && (
+          <span className="font-mono-tabular ml-auto text-[13px] font-normal text-[var(--text-muted)]">
+            {count}
+          </span>
+        )}
+        {collapse && <Chevron className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />}
+      </>
+    );
+    const className = "flex w-full items-center gap-2.5 px-3 pb-2 text-left";
+    if (collapse) {
+      return (
+        <button
+          type="button"
+          aria-expanded={collapse.expanded}
+          onClick={collapse.onToggle}
+          onContextMenu={onContextMenu}
+          className={`${className} transition-opacity hover:opacity-80`}
+        >
+          {inner}
+        </button>
+      );
+    }
+    return (
+      <div onContextMenu={onContextMenu} className={className}>
+        {inner}
+      </div>
+    );
+  };
+
   const renderGroupHeader = (
     group: { title: string; icon: string; items: EvaluatedTask[] },
     collapse?: { expanded: boolean; onToggle: () => void },
-  ) => {
-    const Chevron = collapse?.expanded ? ChevronDown : ChevronRight;
-    const content = (
-      <>
-        <RegistryIcon token={group.icon} className="h-3.5 w-3.5 text-[var(--text-muted)]" />
-        <span>{registryText(group.title, lang)}</span>
-        <span className="font-mono-tabular ml-auto font-normal text-[var(--text-muted)]">
-          {group.items.length}
-        </span>
-        {collapse && <Chevron className="h-3.5 w-3.5 text-[var(--text-muted)]" />}
-      </>
-    );
-    const className =
-      "mb-1.5 flex w-full items-center gap-2 border-b border-[var(--border-subtle)] pb-1.5 text-left text-xs font-semibold tracking-wide text-[var(--text-secondary)] uppercase";
-    if (!collapse) return <div className={className}>{content}</div>;
-    return (
-      <button
-        type="button"
-        aria-expanded={collapse.expanded}
-        onClick={collapse.onToggle}
-        className={`${className} hover:text-[var(--text-primary)]`}
-      >
-        {content}
-      </button>
-    );
-  };
+  ) =>
+    renderSectionHeader({
+      leading: <RegistryIcon token={group.icon} className="h-4 w-4 text-[var(--text-muted)]" />,
+      title: registryText(group.title, lang),
+      count: group.items.length,
+      collapse,
+    });
 
   const taskPageItem = useMemo(() => {
     if (!taskPageId) return null;
     return evaluatedTasks.find((e) => e.task.id === taskPageId) ?? null;
   }, [evaluatedTasks, taskPageId]);
+
+  const commandBarItems = useMemo<CommandBarItem[]>(() => {
+    const isMac =
+      typeof navigator !== "undefined" && /Mac|iPhone|iPad/i.test(navigator.platform || navigator.userAgent);
+    const actionsMap = ACTIONS_CATALOG.actions as Record<
+      string,
+      {
+        title: string;
+        desktopTitle?: string;
+        addTitle?: string;
+        removeTitle?: string;
+        activeTitle?: string;
+        icon: string;
+        shortcut?: { key: string; modifiers: readonly string[]; excludePlatforms?: readonly string[] };
+      }
+    >;
+    const makeCmd = (
+      id: string,
+      run: () => void,
+      opts?: { title?: string; keywords?: string[]; contextual?: boolean },
+    ): CommandBarItem => {
+      const def = actionsMap[id];
+      const sc = def?.shortcut && !def.shortcut.excludePlatforms?.includes("web") ? def.shortcut : undefined;
+      return {
+        id,
+        title: opts?.title ?? registryText(def?.desktopTitle ?? def?.title ?? id, lang),
+        icon: def?.icon ?? "action.search",
+        shortcutKeys: sc ? formatShortcutKeycaps(sc, isMac) : undefined,
+        keywords: opts?.keywords,
+        contextual: opts?.contextual,
+        run,
+      };
+    };
+
+    const items: CommandBarItem[] = [];
+
+    if (activeSelectedTasks.length > 0) {
+      const single = activeSelectedTasks[0];
+      const singleOnly = activeSelectedTasks.length === 1;
+      const anyWaiting = activeSelectedTasks.some((t) => waitingName(t));
+
+      items.push(
+        makeCmd(
+          "task.toggleComplete",
+          () => {
+            if (singleOnly) void toggleDone(single);
+            else void completeMany(activeSelectedTasks);
+          },
+          { keywords: ["done", "check", "finish", "tick"], contextual: true },
+        ),
+        makeCmd(
+          "task.toggleToday",
+          () => {
+            if (singleOnly) void requestToggleToday(single);
+            else {
+              const anyNotToday = activeSelectedTasks.some((t) => !t.today);
+              void requestBulkToggleToday(activeSelectedTasks, anyNotToday);
+            }
+          },
+          { keywords: ["today", "schedule"], contextual: true },
+        ),
+        makeCmd(
+          "task.when",
+          () => openDatePicker("when", activeSelectedTasks.map((t) => t.id)),
+          { keywords: ["schedule", "date", "defer", "later"], contextual: true },
+        ),
+        makeCmd(
+          "task.deadline",
+          () => openDatePicker("deadline", activeSelectedTasks.map((t) => t.id)),
+          { keywords: ["due", "date"], contextual: true },
+        ),
+        makeCmd(
+          "task.toggleStar",
+          () => {
+            if (singleOnly) void engine.toggleTaskStar(single);
+            else void engine.bulkUpdateTasks(activeSelectedTasks, { starred: !single.starred });
+          },
+          { keywords: ["star", "favorite", "pin"], contextual: true },
+        ),
+      );
+
+      if (singleOnly && single.status === "open") {
+        items.push(
+          makeCmd("task.waitingOn", () => setWaitingTaskId(single.id), {
+            keywords: ["wait", "delegate", "follow up"],
+            contextual: true,
+          }),
+        );
+      }
+      if (anyWaiting) {
+        items.push(
+          makeCmd("task.gotItBack", () => void gotItBack(activeSelectedTasks), {
+            keywords: ["waiting", "received", "unblock"],
+            contextual: true,
+          }),
+        );
+      }
+
+      if (singleOnly) {
+        items.push(
+          makeCmd("task.editDetails", () => openTask(single), {
+            keywords: ["rename", "edit", "title"],
+            contextual: true,
+          }),
+          makeCmd(
+            "task.toggleInfo",
+            () => {
+              if (taskPageId === single.id) setTaskPageId(null);
+              else openTask(single, "page");
+            },
+            {
+              title: registryText(
+                taskPageId === single.id
+                  ? actionsMap["task.toggleInfo"].activeTitle ?? actionsMap["task.toggleInfo"].title
+                  : actionsMap["task.toggleInfo"].title,
+                lang,
+              ),
+              keywords: ["inspector", "details", "page", "notes"],
+              contextual: true,
+            },
+          ),
+        );
+      }
+
+      items.push(
+        makeCmd(
+          "task.duplicate",
+          () => {
+            void Promise.all(activeSelectedTasks.map((t) => engine.duplicateTask(t)));
+            showToast(singleOnly ? "Duplicated task" : `Duplicated ${activeSelectedTasks.length} tasks`);
+          },
+          { keywords: ["clone", "copy"], contextual: true },
+        ),
+        makeCmd("task.copy", () => void handleCopyTasks(activeSelectedTasks), {
+          keywords: ["clipboard"],
+          contextual: true,
+        }),
+        makeCmd(
+          "task.clearSchedule",
+          () => void Promise.all(activeSelectedTasks.map((t) => engine.clearTaskWhen(t))),
+          { keywords: ["unschedule", "anytime", "clear"], contextual: true },
+        ),
+        makeCmd(
+          "task.cancel",
+          () =>
+            void engine.bulkUpdateTasks(activeSelectedTasks, {
+              status: "cancelled",
+              completedAt: localWallClockTimestamp(),
+              dropReason: "user",
+            }),
+          { keywords: ["drop", "wont do", "cancel"], contextual: true },
+        ),
+        makeCmd(
+          "task.delete",
+          () => {
+            void engine.bulkDeleteTasks(activeSelectedTasks);
+            setSelectedIds(new Set());
+            setSelectedTaskId(null);
+            setExpandedTaskId(null);
+          },
+          { keywords: ["trash", "remove"], contextual: true },
+        ),
+      );
+    }
+
+    // Global commands
+    items.push(
+      makeCmd("app.newTask", () => composerRef.current?.focus(), {
+        keywords: ["add", "create", "task"],
+      }),
+      makeCmd(
+        "app.quickAdd",
+        () => {
+          setQuickAddInitial({
+            today: destination.kind === "smart" && destination.id === "today",
+            area: destination.kind === "area" ? destination.id : null,
+            project: destination.kind === "project" ? destination.id : null,
+          });
+          setQuickAddOpen(true);
+        },
+        { keywords: ["add", "capture", "inbox"] },
+      ),
+      makeCmd(
+        "sidebar.newProject",
+        () => {
+          setCreatingAreaId(destination.kind === "area" ? destination.id : null);
+          setCreatingInsertIndex(null);
+          setNewContainerTitle("");
+          setCreatingKind("project");
+        },
+        { keywords: ["add", "create", "project"] },
+      ),
+      makeCmd(
+        "sidebar.newArea",
+        () => {
+          setCreatingAreaId(null);
+          setCreatingInsertIndex(null);
+          setNewContainerTitle("");
+          setCreatingKind("area");
+        },
+        { keywords: ["add", "create", "area"] },
+      ),
+    );
+
+    if (destination.kind === "project") {
+      items.push(
+        makeCmd(
+          "section.new",
+          () => {
+            setNewContainerTitle("");
+            setCreatingKind("heading");
+          },
+          { keywords: ["add", "create", "heading", "section"] },
+        ),
+      );
+    }
+
+    if (undoSnap.canUndo) {
+      items.push(
+        makeCmd("app.undo", () => void undoStack.undo(), {
+          keywords: ["revert", "undo"],
+        }),
+      );
+    }
+
+    items.push(
+      makeCmd("app.toggleSidebar", () => setSidebarOpen((v) => !v), {
+        title: registryText(
+          sidebarOpen
+            ? actionsMap["app.toggleSidebar"].removeTitle ?? actionsMap["app.toggleSidebar"].title
+            : actionsMap["app.toggleSidebar"].addTitle ?? actionsMap["app.toggleSidebar"].title,
+          lang,
+        ),
+        keywords: ["sidebar", "navigation", "panel"],
+      }),
+      makeCmd("app.settings", () => setSettingsOpen(true), {
+        keywords: ["preferences", "prefs", "account", "theme", "sync"],
+      }),
+      makeCmd("app.keyboardShortcuts", () => setShortcutsOpen(true), {
+        keywords: ["keys", "hotkeys", "help"],
+      }),
+    );
+
+    return items;
+  }, [
+    activeSelectedTasks,
+    completeMany,
+    destination,
+    engine,
+    gotItBack,
+    handleCopyTasks,
+    lang,
+    openDatePicker,
+    openTask,
+    requestBulkToggleToday,
+    requestToggleToday,
+    showToast,
+    sidebarOpen,
+    taskPageId,
+    toggleDone,
+    undoSnap.canUndo,
+    undoStack,
+  ]);
 
   const settingsModal = (
     <SettingsModal
@@ -2194,7 +2816,7 @@ export function SeptenaApp() {
           <button
             type="button"
             onClick={() => setQuickFindOpen(true)}
-            title="Quick Find (⌘⇧F)"
+            title={`${registryText(ACTIONS_CATALOG.actions["app.quickFind"].desktopTitle, lang)} (⌘K)`}
             className="rounded-md p-1.5 text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
           >
             <Search className="h-4 w-4" />
@@ -2227,19 +2849,214 @@ export function SeptenaApp() {
       </div>
 
       <nav className="flex-1 overflow-y-auto px-2 py-2">
-        <div className="space-y-0.5">{sidebarDestinations.top.map(renderSidebarButton)}</div>
+        <div
+          className={`space-y-0.5 rounded-lg transition-colors ${
+            dropTargetSidebar === "no-area" ? "bg-[var(--bg-selected)]" : ""
+          }`}
+          onDragOver={(e) => {
+            if (draggedSidebarItem?.kind === "project") {
+              e.preventDefault();
+              setDropTargetSidebar("no-area");
+            }
+          }}
+          onDragLeave={() => setDropTargetSidebar((p) => (p === "no-area" ? null : p))}
+          onDrop={(e) => {
+            if (draggedSidebarItem?.kind === "project") {
+              e.preventDefault();
+              const proj = projectById.get(draggedSidebarItem.id);
+              setDraggedSidebarItem(null);
+              setDropTargetSidebar(null);
+              if (proj && proj.area) void handleMoveProjectToArea(proj, null);
+            }
+          }}
+        >
+          {sidebarDestinations.top.map(renderSidebarButton)}
+        </div>
 
         <div className="mt-4 border-t border-[var(--border-subtle)] pt-3">
-          {activeAreas.map((area) => {
+          {activeProjects
+            .filter((p) => !p.area || !areaById.has(p.area))
+            .map((proj, looseIdx) => {
+              const projSelected = destination.kind === "project" && destination.id === proj.id;
+              const isProjDrop = dropTargetSidebar === `project:${proj.id}`;
+              const isMagicHere =
+                magicPlusTarget?.kind === "project" &&
+                magicPlusTarget.areaId === null &&
+                magicPlusTarget.index === looseIdx + 1;
+              const stats = projectStats.get(proj.id) ?? { done: 0, total: 0 };
+              return (
+                <div key={proj.id} className="relative">
+                  <button
+                    type="button"
+                    draggable
+                    onDragStart={() => setDraggedSidebarItem({ kind: "project", id: proj.id })}
+                    onDragEnd={() => {
+                      setDraggedSidebarItem(null);
+                      setDropTargetSidebar(null);
+                      setMagicPlusTarget(null);
+                    }}
+                    onContextMenu={(e) => openProjectContextMenu(e, proj)}
+                    onDragOver={(e) => {
+                      if (draggedSidebarItem?.kind === "magicPlus") {
+                        e.preventDefault();
+                        setMagicPlusTarget({
+                          kind: "project",
+                          areaId: null,
+                          index: looseIdx + 1,
+                          label: "New Project",
+                        });
+                        return;
+                      }
+                      if (draggedSidebarItem?.kind === "project" && draggedSidebarItem.id !== proj.id) {
+                        e.preventDefault();
+                        setDropTargetSidebar(`project:${proj.id}`);
+                        return;
+                      }
+                      if (!draggedTaskId) return;
+                      e.preventDefault();
+                      setDropTargetSidebar(`project:${proj.id}`);
+                    }}
+                    onDragLeave={() => {
+                      setDropTargetSidebar((p) => (p === `project:${proj.id}` ? null : p));
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      if (draggedSidebarItem?.kind === "magicPlus") {
+                        setDraggedSidebarItem(null);
+                        setMagicPlusTarget(null);
+                        setCreatingAreaId(null);
+                        setCreatingInsertIndex(looseIdx + 1);
+                        setCreatingKind("project");
+                        setNewContainerTitle("");
+                        return;
+                      }
+                      if (draggedSidebarItem?.kind === "project") {
+                        const moved = projectById.get(draggedSidebarItem.id);
+                        setDraggedSidebarItem(null);
+                        setDropTargetSidebar(null);
+                        if (moved && moved.id !== proj.id) {
+                          void handleMoveProjectToArea(moved, null, proj.id);
+                        }
+                        return;
+                      }
+                      void handleDropOnSidebarPlace({
+                        area: null,
+                        project: proj.id,
+                        label: proj.title,
+                      });
+                    }}
+                    onClick={() => {
+                      setDestination({ kind: "project", id: proj.id });
+                      setExpandedTaskId(null);
+                      setSelectedTaskId(null);
+                      setSelectedIds(new Set());
+                      setMobileMenuOpen(false);
+                    }}
+                    className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm transition-colors ${
+                      isProjDrop
+                        ? "bg-[var(--bg-selected)] text-[var(--text-primary)]"
+                        : projSelected
+                          ? "bg-[var(--bg-selected)] font-medium text-[var(--text-primary)]"
+                          : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+                    }`}
+                  >
+                    <span className="flex h-4 w-4 shrink-0 items-center justify-center">
+                      <ProjectRing done={stats.done} total={stats.total} />
+                    </span>
+                    <span className="flex-1 truncate text-left">{proj.title}</span>
+                    {prefs.sidebarCounts && stats.total - stats.done > 0 && (
+                      <span className="font-mono-tabular text-xs text-[var(--text-muted)]">
+                        {stats.total - stats.done}
+                      </span>
+                    )}
+                  </button>
+                  {isMagicHere && (
+                    <div className="pointer-events-none flex items-center gap-1.5 py-0.5 pl-6 pr-2">
+                      <span className="rounded-full bg-[var(--accent)] px-2 py-0.5 text-[10px] font-semibold text-white shadow">
+                        ○ {magicPlusTarget.label}
+                      </span>
+                      <div className="h-0.5 flex-1 rounded-full bg-[var(--accent)]" />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+          {activeAreas.map((area, areaIdx) => {
             const areaSelected = destination.kind === "area" && destination.id === area.id;
             const areaProjects = activeProjects.filter((p) => p.area === area.id);
             const isAreaDrop = dropTargetSidebar === `area:${area.id}`;
+            const isMagicAreaBefore =
+              magicPlusTarget?.kind === "area" && magicPlusTarget.index === areaIdx;
+            const isMagicFirstProject =
+              magicPlusTarget?.kind === "project" &&
+              magicPlusTarget.areaId === area.id &&
+              magicPlusTarget.index === 0;
             return (
               <div key={area.id} className="mb-2">
+                {draggedSidebarItem?.kind === "magicPlus" && (
+                  <div
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setMagicPlusTarget({ kind: "area", index: areaIdx, label: "New Area" });
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setDraggedSidebarItem(null);
+                      setMagicPlusTarget(null);
+                      setCreatingAreaId(null);
+                      setCreatingInsertIndex(areaIdx);
+                      setCreatingKind("area");
+                      setNewContainerTitle("");
+                    }}
+                    className="flex min-h-[14px] items-center px-1"
+                  >
+                    {isMagicAreaBefore && (
+                      <div className="pointer-events-none flex w-full items-center gap-1.5 py-0.5">
+                        <span className="rounded-full bg-[var(--accent)] px-2 py-0.5 text-[10px] font-semibold text-white shadow">
+                          • New Area
+                        </span>
+                        <div className="h-0.5 flex-1 rounded-full bg-[var(--accent)]" />
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <button
                   type="button"
+                  draggable
+                  onDragStart={() => setDraggedSidebarItem({ kind: "area", id: area.id })}
+                  onDragEnd={() => {
+                    setDraggedSidebarItem(null);
+                    setDropTargetSidebar(null);
+                    setMagicPlusTarget(null);
+                  }}
                   onContextMenu={(e) => openAreaContextMenu(e, area)}
                   onDragOver={(e) => {
+                    if (draggedSidebarItem?.kind === "magicPlus") {
+                      e.preventDefault();
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      const inTopBand = e.clientY - rect.top < rect.height * 0.35;
+                      if (inTopBand) {
+                        setMagicPlusTarget({ kind: "area", index: areaIdx, label: "New Area" });
+                      } else {
+                        setMagicPlusTarget({
+                          kind: "project",
+                          areaId: area.id,
+                          index: 0,
+                          label: `New Project in ${area.title}`,
+                        });
+                      }
+                      return;
+                    }
+                    if (
+                      (draggedSidebarItem?.kind === "area" && draggedSidebarItem.id !== area.id) ||
+                      draggedSidebarItem?.kind === "project"
+                    ) {
+                      e.preventDefault();
+                      setDropTargetSidebar(`area:${area.id}`);
+                      return;
+                    }
                     if (!draggedTaskId) return;
                     e.preventDefault();
                     setDropTargetSidebar(`area:${area.id}`);
@@ -2247,6 +3064,43 @@ export function SeptenaApp() {
                   onDragLeave={() => setDropTargetSidebar((p) => (p === `area:${area.id}` ? null : p))}
                   onDrop={(e) => {
                     e.preventDefault();
+                    if (draggedSidebarItem?.kind === "magicPlus") {
+                      const target = magicPlusTarget;
+                      setDraggedSidebarItem(null);
+                      setMagicPlusTarget(null);
+                      if (target?.kind === "area") {
+                        setCreatingAreaId(null);
+                        setCreatingInsertIndex(target.index);
+                        setCreatingKind("area");
+                      } else {
+                        setCreatingAreaId(area.id);
+                        setCreatingInsertIndex(0);
+                        setCreatingKind("project");
+                      }
+                      setNewContainerTitle("");
+                      return;
+                    }
+                    if (draggedSidebarItem?.kind === "area") {
+                      const moved = areaById.get(draggedSidebarItem.id);
+                      setDraggedSidebarItem(null);
+                      setDropTargetSidebar(null);
+                      if (moved && moved.id !== area.id) {
+                        const next = activeAreas.filter((a) => a.id !== moved.id);
+                        const idx = next.findIndex((a) => a.id === area.id);
+                        next.splice(idx >= 0 ? idx : next.length, 0, moved);
+                        void reorderAreaList(next);
+                      }
+                      return;
+                    }
+                    if (draggedSidebarItem?.kind === "project") {
+                      const moved = projectById.get(draggedSidebarItem.id);
+                      setDraggedSidebarItem(null);
+                      setDropTargetSidebar(null);
+                      if (moved && moved.area !== area.id) {
+                        void handleMoveProjectToArea(moved, area.id);
+                      }
+                      return;
+                    }
                     void handleDropOnSidebarPlace({ area: area.id, project: null, label: area.title });
                   }}
                   onClick={() => {
@@ -2256,72 +3110,143 @@ export function SeptenaApp() {
                     setSelectedIds(new Set());
                     setMobileMenuOpen(false);
                   }}
-                  className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm font-medium transition-colors ${
+                  className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm font-medium transition-colors ${
                     isAreaDrop
-                      ? "ring-2 ring-[var(--accent)] bg-[var(--bg-selected)] text-[var(--text-primary)]"
+                      ? "bg-[var(--bg-selected)] text-[var(--text-primary)]"
                       : areaSelected
                         ? "bg-[var(--bg-selected)] text-[var(--text-primary)]"
                         : "text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
                   }`}
                 >
-                  {area.emoji ? (
-                    <span className="w-4 text-center text-sm leading-none">{area.emoji}</span>
-                  ) : (
-                    <Folder className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
+                  <span className="flex h-4 w-4 shrink-0 items-center justify-center">
+                    {area.emoji ? (
+                      <span className="text-[14px] leading-none">{area.emoji}</span>
+                    ) : (
+                      <Folder className="h-4 w-4 text-[var(--text-muted)]" />
+                    )}
+                  </span>
+                  <span className="flex-1 truncate text-left">{area.title}</span>
+                  {prefs.sidebarCounts && (areaOpenCount.get(area.id) ?? 0) > 0 && (
+                    <span className="font-mono-tabular text-xs font-normal text-[var(--text-muted)]">
+                      {areaOpenCount.get(area.id)}
+                    </span>
                   )}
-                  <span className="truncate">{area.title}</span>
                 </button>
+
+                {isMagicFirstProject && (
+                  <div className="pointer-events-none flex items-center gap-1.5 py-0.5 pl-6 pr-2">
+                    <span className="rounded-full bg-[var(--accent)] px-2 py-0.5 text-[10px] font-semibold text-white shadow">
+                      ○ {magicPlusTarget.label}
+                    </span>
+                    <div className="h-0.5 flex-1 rounded-full bg-[var(--accent)]" />
+                  </div>
+                )}
 
                 {areaProjects.length > 0 && (
                   <div className="mt-0.5 space-y-0.5 pl-4">
-                    {areaProjects.map((proj) => {
+                    {areaProjects.map((proj, projIdx) => {
                       const projSelected = destination.kind === "project" && destination.id === proj.id;
                       const isProjDrop = dropTargetSidebar === `project:${proj.id}`;
+                      const isMagicAfterProj =
+                        magicPlusTarget?.kind === "project" &&
+                        magicPlusTarget.areaId === area.id &&
+                        magicPlusTarget.index === projIdx + 1;
                       const stats = projectStats.get(proj.id) ?? { done: 0, total: 0 };
                       return (
-                        <button
-                          key={proj.id}
-                          type="button"
-                          onContextMenu={(e) => openProjectContextMenu(e, proj)}
-                          onDragOver={(e) => {
-                            if (!draggedTaskId) return;
-                            e.preventDefault();
-                            setDropTargetSidebar(`project:${proj.id}`);
-                          }}
-                          onDragLeave={() =>
-                            setDropTargetSidebar((p) => (p === `project:${proj.id}` ? null : p))
-                          }
-                          onDrop={(e) => {
-                            e.preventDefault();
-                            void handleDropOnSidebarPlace({
-                              area: proj.area ?? null,
-                              project: proj.id,
-                              label: proj.title,
-                            });
-                          }}
-                          onClick={() => {
-                            setDestination({ kind: "project", id: proj.id });
-                            setExpandedTaskId(null);
-                            setSelectedTaskId(null);
-                            setSelectedIds(new Set());
-                            setMobileMenuOpen(false);
-                          }}
-                          className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-1 text-sm transition-colors ${
-                            isProjDrop
-                              ? "ring-2 ring-[var(--accent)] bg-[var(--bg-selected)] text-[var(--text-primary)]"
-                              : projSelected
-                                ? "bg-[var(--bg-selected)] font-medium text-[var(--text-primary)]"
-                                : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
-                          }`}
-                        >
-                          <ProjectRing done={stats.done} total={stats.total} />
-                          <span className="flex-1 truncate text-left">{proj.title}</span>
-                          {prefs.sidebarCounts && stats.total - stats.done > 0 && (
-                            <span className="font-mono-tabular text-xs text-[var(--text-muted)]">
-                              {stats.total - stats.done}
+                        <div key={proj.id}>
+                          <button
+                            type="button"
+                            draggable
+                            onDragStart={() => setDraggedSidebarItem({ kind: "project", id: proj.id })}
+                            onDragEnd={() => {
+                              setDraggedSidebarItem(null);
+                              setDropTargetSidebar(null);
+                              setMagicPlusTarget(null);
+                            }}
+                            onContextMenu={(e) => openProjectContextMenu(e, proj)}
+                            onDragOver={(e) => {
+                              if (draggedSidebarItem?.kind === "magicPlus") {
+                                e.preventDefault();
+                                setMagicPlusTarget({
+                                  kind: "project",
+                                  areaId: area.id,
+                                  index: projIdx + 1,
+                                  label: `New Project in ${area.title}`,
+                                });
+                                return;
+                              }
+                              if (draggedSidebarItem?.kind === "project" && draggedSidebarItem.id !== proj.id) {
+                                e.preventDefault();
+                                setDropTargetSidebar(`project:${proj.id}`);
+                                return;
+                              }
+                              if (!draggedTaskId) return;
+                              e.preventDefault();
+                              setDropTargetSidebar(`project:${proj.id}`);
+                            }}
+                            onDragLeave={() =>
+                              setDropTargetSidebar((p) => (p === `project:${proj.id}` ? null : p))
+                            }
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              if (draggedSidebarItem?.kind === "magicPlus") {
+                                setDraggedSidebarItem(null);
+                                setMagicPlusTarget(null);
+                                setCreatingAreaId(area.id);
+                                setCreatingInsertIndex(projIdx + 1);
+                                setCreatingKind("project");
+                                setNewContainerTitle("");
+                                return;
+                              }
+                              if (draggedSidebarItem?.kind === "project") {
+                                const moved = projectById.get(draggedSidebarItem.id);
+                                setDraggedSidebarItem(null);
+                                setDropTargetSidebar(null);
+                                if (moved && moved.id !== proj.id) {
+                                  void handleMoveProjectToArea(moved, area.id, proj.id);
+                                }
+                                return;
+                              }
+                              void handleDropOnSidebarPlace({
+                                area: proj.area ?? null,
+                                project: proj.id,
+                                label: proj.title,
+                              });
+                            }}
+                            onClick={() => {
+                              setDestination({ kind: "project", id: proj.id });
+                              setExpandedTaskId(null);
+                              setSelectedTaskId(null);
+                              setSelectedIds(new Set());
+                              setMobileMenuOpen(false);
+                            }}
+                            className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1 text-sm transition-colors ${
+                              isProjDrop
+                                ? "bg-[var(--bg-selected)] text-[var(--text-primary)]"
+                                : projSelected
+                                  ? "bg-[var(--bg-selected)] font-medium text-[var(--text-primary)]"
+                                  : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+                            }`}
+                          >
+                            <span className="flex h-4 w-4 shrink-0 items-center justify-center">
+                              <ProjectRing done={stats.done} total={stats.total} />
                             </span>
+                            <span className="flex-1 truncate text-left">{proj.title}</span>
+                            {prefs.sidebarCounts && stats.total - stats.done > 0 && (
+                              <span className="font-mono-tabular text-xs text-[var(--text-muted)]">
+                                {stats.total - stats.done}
+                              </span>
+                            )}
+                          </button>
+                          {isMagicAfterProj && (
+                            <div className="pointer-events-none flex items-center gap-1.5 py-0.5 pl-2 pr-2">
+                              <span className="rounded-full bg-[var(--accent)] px-2 py-0.5 text-[10px] font-semibold text-white shadow">
+                                ○ {magicPlusTarget.label}
+                              </span>
+                              <div className="h-0.5 flex-1 rounded-full bg-[var(--accent)]" />
+                            </div>
                           )}
-                        </button>
+                        </div>
                       );
                     })}
                   </div>
@@ -2330,95 +3255,119 @@ export function SeptenaApp() {
             );
           })}
 
-          {activeProjects
-            .filter((p) => !p.area || !areaById.has(p.area))
-            .map((proj) => {
-              const projSelected = destination.kind === "project" && destination.id === proj.id;
-              const isProjDrop = dropTargetSidebar === `project:${proj.id}`;
-              const stats = projectStats.get(proj.id) ?? { done: 0, total: 0 };
-              return (
-                <button
-                  key={proj.id}
-                  type="button"
-                  onContextMenu={(e) => openProjectContextMenu(e, proj)}
-                  onDragOver={(e) => {
-                    if (!draggedTaskId) return;
-                    e.preventDefault();
-                    setDropTargetSidebar(`project:${proj.id}`);
-                  }}
-                  onDragLeave={() =>
-                    setDropTargetSidebar((p) => (p === `project:${proj.id}` ? null : p))
-                  }
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    void handleDropOnSidebarPlace({
-                      area: null,
-                      project: proj.id,
-                      label: proj.title,
-                    });
-                  }}
-                  onClick={() => {
-                    setDestination({ kind: "project", id: proj.id });
-                    setExpandedTaskId(null);
-                    setSelectedTaskId(null);
-                    setSelectedIds(new Set());
-                    setMobileMenuOpen(false);
-                  }}
-                  className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm transition-colors ${
-                    isProjDrop
-                      ? "ring-2 ring-[var(--accent)] bg-[var(--bg-selected)] text-[var(--text-primary)]"
-                      : projSelected
-                        ? "bg-[var(--bg-selected)] font-medium text-[var(--text-primary)]"
-                        : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
-                  }`}
-                >
-                  <ProjectRing done={stats.done} total={stats.total} />
-                  <span className="flex-1 truncate text-left">{proj.title}</span>
-                  {prefs.sidebarCounts && stats.total - stats.done > 0 && (
-                    <span className="font-mono-tabular text-xs text-[var(--text-muted)]">
-                      {stats.total - stats.done}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
+          {draggedSidebarItem?.kind === "magicPlus" && (
+            <div
+              onDragOver={(e) => {
+                e.preventDefault();
+                setMagicPlusTarget({ kind: "area", index: activeAreas.length, label: "New Area" });
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDraggedSidebarItem(null);
+                setMagicPlusTarget(null);
+                setCreatingAreaId(null);
+                setCreatingInsertIndex(activeAreas.length);
+                setCreatingKind("area");
+                setNewContainerTitle("");
+              }}
+              className="flex min-h-[22px] items-center px-1"
+            >
+              {magicPlusTarget?.kind === "area" && magicPlusTarget.index === activeAreas.length && (
+                <div className="pointer-events-none flex w-full items-center gap-1.5 py-0.5">
+                  <span className="rounded-full bg-[var(--accent)] px-2 py-0.5 text-[10px] font-semibold text-white shadow">
+                    • New Area
+                  </span>
+                  <div className="h-0.5 flex-1 rounded-full bg-[var(--accent)]" />
+                </div>
+              )}
+            </div>
+          )}
 
           {creatingKind && creatingKind !== "heading" ? (
-            <form onSubmit={(e) => void handleCreateContainer(e)} className="mt-2 px-1">
+            <form onSubmit={(e) => void handleCreateContainer(e)} className="mt-2 space-y-1.5 px-1">
               <input
                 type="text"
                 autoFocus
                 value={newContainerTitle}
                 onChange={(e) => setNewContainerTitle(e.target.value)}
-                onBlur={() => {
-                  if (!newContainerTitle.trim()) setCreatingKind(null);
-                }}
                 onKeyDown={(e) => {
                   if (e.key === "Escape") {
                     setCreatingKind(null);
+                    setCreatingAreaId(null);
+                    setCreatingInsertIndex(null);
                     setNewContainerTitle("");
                   }
                 }}
                 placeholder={creatingKind === "area" ? "New area name…" : "New project name…"}
                 className="w-full rounded-lg border border-[var(--accent)] bg-[var(--bg-elevated)] px-2.5 py-1 text-xs text-[var(--text-primary)] outline-none"
               />
+              {creatingKind === "project" && activeAreas.length > 0 && (
+                <select
+                  aria-label="Area"
+                  value={creatingAreaId ?? ""}
+                  onChange={(e) => setCreatingAreaId(e.target.value || null)}
+                  className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-elevated)] px-2 py-1 text-[11px] text-[var(--text-secondary)] outline-none"
+                >
+                  <option value="">No Area</option>
+                  {activeAreas.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.emoji ? `${a.emoji} ` : ""}
+                      {a.title}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <div className="flex items-center justify-end gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCreatingKind(null);
+                    setCreatingAreaId(null);
+                    setCreatingInsertIndex(null);
+                    setNewContainerTitle("");
+                  }}
+                  className="rounded px-2 py-0.5 text-[11px] text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={!newContainerTitle.trim()}
+                  className="rounded bg-[var(--accent)] px-2.5 py-0.5 text-[11px] font-medium text-white disabled:opacity-40"
+                >
+                  Create
+                </button>
+              </div>
             </form>
           ) : (
             <div className="mt-2 flex items-center gap-1 px-1.5 text-[11px] text-[var(--text-muted)]">
               <button
                 type="button"
+                draggable
+                title="Click for New Project (or drag onto an Area or gap for New Area / Project)"
+                onDragStart={() => setDraggedSidebarItem({ kind: "magicPlus" })}
+                onDragEnd={() => {
+                  setDraggedSidebarItem(null);
+                  setMagicPlusTarget(null);
+                }}
                 onClick={() => {
+                  setCreatingAreaId(activeAreaId);
+                  setCreatingInsertIndex(null);
                   setCreatingKind("project");
                   setNewContainerTitle("");
                 }}
-                className="inline-flex items-center gap-1 rounded px-1.5 py-1 hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+                className="inline-flex items-center gap-1.5 rounded-full px-2 py-1 hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
               >
-                <Plus className="h-3 w-3" />
+                <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-[var(--accent)] text-white">
+                  <Plus className="h-3 w-3" />
+                </span>
                 Project
               </button>
               <button
                 type="button"
                 onClick={() => {
+                  setCreatingAreaId(null);
+                  setCreatingInsertIndex(null);
                   setCreatingKind("area");
                   setNewContainerTitle("");
                 }}
@@ -2520,7 +3469,11 @@ export function SeptenaApp() {
           fadeHeight={240}
         />
 
-        <header className="relative z-10 flex flex-wrap items-center gap-3 border-b border-[var(--border-subtle)]/70 px-4 py-3 md:px-10 md:py-5">
+        <header
+          className={`relative z-10 flex flex-wrap items-center gap-3 px-4 py-3 md:px-10 md:py-5 ${
+            canvasTexture === "none" ? "border-b border-[var(--border-subtle)]/70" : ""
+          }`}
+        >
           <button
             type="button"
             onClick={() => setMobileMenuOpen(true)}
@@ -2893,58 +3846,65 @@ export function SeptenaApp() {
               </form>
             )}
 
-            {/* Tag filter strip */}
-            {activeTags.length > 0 && !(destination.kind === "smart" && destination.id === "logbook") && (
-              <div className="mb-3 flex flex-wrap items-center gap-1.5 text-xs">
-                <Tag className="h-3 w-3 text-[var(--text-muted)]" />
-                {tagFilterId && (
-                  <button
-                    type="button"
-                    onClick={() => setTagFilterId(null)}
-                    className="inline-flex items-center gap-1 rounded-full bg-[var(--bg-hover)] px-2 py-0.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                  >
-                    All <X className="h-3 w-3" />
-                  </button>
-                )}
-                {activeTags.map((t) => {
-                  const active = tagFilterId === t.id;
-                  return (
+            {/* Tag filter strip — progressive disclosure (only tags present in this list) */}
+            {availableTagsInList.length > 0 &&
+              !(destination.kind === "smart" && destination.id === "logbook") && (
+                <div className="mb-3 flex flex-wrap items-center gap-1.5 px-1 text-xs">
+                  <Tag className="h-3 w-3 text-[var(--text-muted)]" />
+                  {tagFilterId && (
                     <button
-                      key={t.id}
                       type="button"
-                      onClick={() => setTagFilterId(active ? null : t.id)}
-                      className={`rounded-full px-2.5 py-0.5 transition-colors ${
-                        active
-                          ? "bg-[var(--bg-selected)] font-medium text-[var(--text-primary)]"
-                          : "bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-                      }`}
+                      onClick={() => setTagFilterId(null)}
+                      className="inline-flex items-center gap-1 rounded-full bg-[var(--bg-pill)] px-2.5 py-0.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                     >
-                      {t.name}
+                      All <X className="h-3 w-3" />
                     </button>
-                  );
-                })}
-              </div>
-            )}
+                  )}
+                  {availableTagsInList.map((t) => {
+                    const active = tagFilterId === t.id;
+                    return (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => setTagFilterId(active ? null : t.id)}
+                        className={`rounded-full px-2.5 py-0.5 transition-colors ${
+                          active
+                            ? "bg-[var(--bg-selected)] font-medium text-[var(--text-primary)]"
+                            : "bg-[var(--bg-pill)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                        }`}
+                      >
+                        {t.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
 
-            {/* Inline Quick-Add Composer */}
+            {/* Inline Quick-Add Composer — aligned on the same 22px leading axis as task checkboxes */}
             {pageMeta.supportsInlineCreate && (
               <form
                 onSubmit={(e) => void handleQuickAddInline(e)}
-                className="mb-4 flex items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/95 px-3 py-2 focus-within:border-[var(--accent)]"
+                className={`mb-5 flex items-center gap-2.5 rounded-[14px] border border-[var(--border-subtle)]/75 px-3 py-2.5 focus-within:border-[var(--accent)] ${
+                  canvasTexture !== "none"
+                    ? "bg-[var(--bg-card-glass)] backdrop-blur-md"
+                    : "bg-[var(--bg-card)]"
+                }`}
               >
-                <Plus className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
+                <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center text-[var(--text-muted)]">
+                  <Plus className="h-[17px] w-[17px]" />
+                </span>
                 <input
                   ref={composerRef}
                   type="text"
                   value={composerTitle}
                   onChange={(e) => setComposerTitle(e.target.value)}
                   placeholder={`New task in ${pageMeta.title}… (press N)`}
-                  className="min-w-0 flex-1 bg-transparent text-sm text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)]"
+                  className="min-w-0 flex-1 bg-transparent text-[15px] text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)]"
                 />
                 {composerTitle.trim() && (
                   <button
                     type="submit"
-                    className="rounded-md bg-[var(--accent)] px-2.5 py-1 text-xs font-medium hover:opacity-90"
+                    className="rounded-lg bg-[var(--accent)] px-2.5 py-1 text-xs font-medium hover:opacity-90"
                     style={{ color: "var(--accent-check)" }}
                   >
                     Add
@@ -2953,7 +3913,7 @@ export function SeptenaApp() {
               </form>
             )}
 
-            {/* Task Lists */}
+            {/* Task Lists — iOS grouped rounded cards on soft gray canvas */}
             {listedTasks.length === 0 && projectHeadings.length === 0 && completedTodayTasks.length === 0 ? (
               <div className="py-16 text-center">
                 <p className="text-sm font-medium text-[var(--text-secondary)]">{pageMeta.emptyTitle}</p>
@@ -2963,65 +3923,68 @@ export function SeptenaApp() {
               <div className="space-y-6">
                 {todayInboxTasks.length > 0 && (
                   <section aria-label="Inbox">
-                    <button
-                      type="button"
-                      onClick={() => setInboxCollapsed((v) => !v)}
-                      className="mb-1.5 flex w-full items-center gap-2 border-b border-[var(--border-subtle)] pb-1.5 text-left text-xs font-semibold tracking-wide text-[var(--text-secondary)] uppercase hover:text-[var(--text-primary)]"
-                    >
-                      <Inbox className="h-3.5 w-3.5 text-[var(--accent)]" />
-                      <span>Inbox</span>
-                      <span className="font-mono-tabular font-normal text-[var(--text-muted)]">
-                        {todayInboxTasks.length}
-                      </span>
-                      <span className="ml-auto text-[var(--text-muted)]">
-                        {inboxCollapsed ? (
-                          <ChevronRight className="h-3.5 w-3.5" />
-                        ) : (
-                          <ChevronDown className="h-3.5 w-3.5" />
-                        )}
-                      </span>
-                    </button>
+                    {renderSectionHeader({
+                      leading: <Inbox className="h-4 w-4 text-[var(--accent)]" />,
+                      title: "Inbox",
+                      count: todayInboxTasks.length,
+                      collapse: {
+                        expanded: !inboxCollapsed,
+                        onToggle: () => setInboxCollapsed((v) => !v),
+                      },
+                    })}
                     {!inboxCollapsed && (
-                      <div className="space-y-0.5">{todayInboxTasks.map((i) => renderTaskRow(i))}</div>
+                      <div className={taskCardClass}>
+                        {todayInboxTasks.map((i) => renderTaskRow(i))}
+                      </div>
                     )}
                   </section>
                 )}
 
                 {todayCommittedTasks.length > 0 && (
-                  <section aria-label="Today" className="space-y-4">
+                  <section aria-label="Today" className="space-y-5">
                     {todayInboxTasks.length > 0 && !todayListGroups && (
-                      <div className="mb-1.5 flex items-center gap-2 border-b border-[var(--border-subtle)] pb-1.5 text-xs font-semibold tracking-wide text-[var(--text-secondary)] uppercase">
-                        <Sun className="h-3.5 w-3.5" style={{ color: todayIconColor }} />
-                        <span>Today</span>
-                        <span className="font-mono-tabular font-normal text-[var(--text-muted)]">
-                          {todayCommittedTasks.length}
-                        </span>
-                      </div>
+                      renderSectionHeader({
+                        leading: <Sun className="h-4 w-4" style={{ color: todayIconColor }} />,
+                        title: "Today",
+                        count: todayCommittedTasks.length,
+                      })
                     )}
 
                     {todayListGroups ? (
                       <>
                         {todayListGroups.ungrouped.length > 0 && (
-                          <div className="space-y-0.5">
+                          <div className={taskCardClass}>
                             {todayListGroups.ungrouped.map((i) => renderTaskRow(i, true))}
                           </div>
                         )}
-                        {todayListGroups.groups.map(([key, grp]) => (
-                          <div key={key}>
-                            <div className="mb-1 flex items-center justify-between border-b border-[var(--border-subtle)] pb-1 text-xs font-semibold text-[var(--text-secondary)]">
-                              <span>{grp.label}</span>
-                              <span className="font-mono-tabular font-normal text-[var(--text-muted)]">
-                                {grp.items.length}
-                              </span>
+                        {todayListGroups.groups.map((grp) => {
+                          const leading =
+                            grp.kind === "project" ? (
+                              <ProjectRing
+                                done={projectStats.get(grp.projectId)?.done ?? 0}
+                                total={projectStats.get(grp.projectId)?.total ?? 0}
+                              />
+                            ) : grp.emoji ? (
+                              <span className="text-[16px] leading-none">{grp.emoji}</span>
+                            ) : (
+                              <Folder className="h-4 w-4 text-[var(--text-muted)]" />
+                            );
+                          return (
+                            <div key={grp.key}>
+                              {renderSectionHeader({
+                                leading,
+                                title: grp.title,
+                                count: grp.items.length,
+                              })}
+                              <div className={taskCardClass}>
+                                {grp.items.map((i) => renderTaskRow(i, true))}
+                              </div>
                             </div>
-                            <div className="space-y-0.5">
-                              {grp.items.map((i) => renderTaskRow(i, true))}
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </>
                     ) : (
-                      <div className="space-y-0.5">
+                      <div className={taskCardClass}>
                         {todayCommittedTasks.map((i) => renderTaskRow(i))}
                       </div>
                     )}
@@ -3029,39 +3992,47 @@ export function SeptenaApp() {
                 )}
 
                 {completedTodayTasks.length > 0 && (
-                  <section aria-label="Completed today">
-                    <div className="mb-1.5 flex items-center justify-between border-b border-[var(--border-subtle)] pb-1.5 text-xs font-semibold tracking-wide text-[var(--text-muted)] uppercase">
-                      <span>Completed today</span>
-                      <span className="font-mono-tabular font-normal">{completedTodayTasks.length}</span>
-                    </div>
-                    <div className="space-y-0.5">
-                      {completedTodayTasks.map((i) => renderTaskRow(i))}
-                    </div>
+                  <section aria-label="Logged today" className="pt-2">
+                    <button
+                      type="button"
+                      aria-expanded={todayLoggedExpanded}
+                      onClick={() => setTodayLoggedExpanded((v) => !v)}
+                      className="font-mono-tabular flex w-full items-center px-3 py-2 text-left text-[13px] font-medium text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]"
+                    >
+                      {todayLoggedExpanded
+                        ? `Hide ${completedTodayTasks.length} logged ${completedTodayTasks.length === 1 ? "item" : "items"}`
+                        : `Show ${completedTodayTasks.length} logged ${completedTodayTasks.length === 1 ? "item" : "items"}`}
+                    </button>
+                    {todayLoggedExpanded && (
+                      <div className={taskCardClass}>
+                        {completedTodayTasks.map((i) => renderTaskRow(i))}
+                      </div>
+                    )}
                   </section>
                 )}
               </div>
             ) : destination.kind === "smart" && destination.id === "upcoming" ? (
-              <div className="space-y-5">
+              <div className="space-y-6">
                 {upcomingGroups.map(([day, items]) => (
                   <section key={day}>
-                    <div className="mb-1.5 flex items-center justify-between border-b border-[var(--border-subtle)] pb-1.5 text-xs font-semibold text-[var(--text-secondary)]">
-                      <span>{formatDayHeading(day, todayYMD, lang)}</span>
-                      <span className="font-mono-tabular font-normal text-[var(--text-muted)]">
-                        {items.length}
-                      </span>
-                    </div>
-                    <div className="space-y-0.5">{items.map((i) => renderTaskRow(i))}</div>
+                    {renderSectionHeader({
+                      title: formatDayHeading(day, todayYMD, lang),
+                      count: items.length,
+                    })}
+                    <div className={taskCardClass}>{items.map((i) => renderTaskRow(i))}</div>
                   </section>
                 ))}
               </div>
             ) : destination.kind === "smart" && destination.id === "review" ? (
-              <div className="space-y-5">
+              <div className="space-y-6">
                 {reviewGroups.map((group) => {
                   if (group.id !== "faded") {
                     return (
                       <section key={group.id}>
                         {renderGroupHeader(group)}
-                        <div className="space-y-0.5">{group.items.map((i) => renderTaskRow(i))}</div>
+                        <div className={taskCardClass}>
+                          {group.items.map((i) => renderTaskRow(i))}
+                        </div>
                       </section>
                     );
                   }
@@ -3074,7 +4045,7 @@ export function SeptenaApp() {
                       })}
                       {prefs.reviewFadedExpanded && (
                         <>
-                          <div className="my-2 flex items-center justify-between gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/90 px-4 py-3 text-xs">
+                          <div className="mb-3 flex items-center justify-between gap-3 rounded-[14px] border border-[var(--border-subtle)]/75 bg-[var(--bg-card)] px-4 py-3 text-xs">
                             <div>
                               <p className="font-medium text-[var(--text-primary)]">
                                 {registryText(FADED_PILE_NOTICE.title, lang)}
@@ -3092,7 +4063,9 @@ export function SeptenaApp() {
                               {registryText(FADED_PILE_NOTICE.primaryTitle, lang)}
                             </button>
                           </div>
-                          <div className="space-y-0.5">{group.items.map((i) => renderTaskRow(i))}</div>
+                          <div className={taskCardClass}>
+                            {group.items.map((i) => renderTaskRow(i))}
+                          </div>
                         </>
                       )}
                     </section>
@@ -3100,9 +4073,9 @@ export function SeptenaApp() {
                 })}
               </div>
             ) : destination.kind === "project" && projectHeadings.length > 0 ? (
-              <div className="space-y-5">
+              <div className="space-y-6">
                 {visibleTasks.filter((i) => !i.task.heading).length > 0 && (
-                  <div className="space-y-0.5">
+                  <div className={taskCardClass}>
                     {visibleTasks.filter((i) => !i.task.heading).map((i) => renderTaskRow(i))}
                   </div>
                 )}
@@ -3110,8 +4083,10 @@ export function SeptenaApp() {
                   const under = visibleTasks.filter((i) => i.task.heading === h.id);
                   return (
                     <section key={h.id}>
-                      <div
-                        onContextMenu={(e) => {
+                      {renderSectionHeader({
+                        title: h.title,
+                        count: under.length,
+                        onContextMenu: (e) => {
                           e.preventDefault();
                           setContextMenu({
                             x: e.clientX,
@@ -3138,22 +4113,85 @@ export function SeptenaApp() {
                               },
                             ],
                           });
-                        }}
-                        className="mb-1.5 flex items-center justify-between border-b border-[var(--border-subtle)] pb-1.5 text-xs font-semibold text-[var(--text-secondary)]"
-                      >
-                        <span>{h.title}</span>
-                        <span className="font-mono-tabular font-normal text-[var(--text-muted)]">
-                          {under.length}
-                        </span>
+                        },
+                      })}
+                      {under.length > 0 && (
+                        <div className={taskCardClass}>{under.map((i) => renderTaskRow(i))}</div>
+                      )}
+                    </section>
+                  );
+                })}
+              </div>
+            ) : smartListGroups ? (
+              <div className="space-y-6">
+                {smartListGroups.ungrouped.length > 0 && (
+                  <div className={taskCardClass}>
+                    {smartListGroups.ungrouped.map((i) => renderTaskRow(i, true))}
+                  </div>
+                )}
+                {smartListGroups.groups.map((grp) => {
+                  const leading =
+                    grp.kind === "project" ? (
+                      <ProjectRing
+                        done={projectStats.get(grp.projectId)?.done ?? 0}
+                        total={projectStats.get(grp.projectId)?.total ?? 0}
+                      />
+                    ) : grp.emoji ? (
+                      <span className="text-[16px] leading-none">{grp.emoji}</span>
+                    ) : (
+                      <Folder className="h-4 w-4 text-[var(--text-muted)]" />
+                    );
+                  return (
+                    <section key={grp.key}>
+                      {renderSectionHeader({
+                        leading,
+                        title: grp.title,
+                        count: grp.items.length,
+                      })}
+                      <div className={taskCardClass}>
+                        {grp.items.map((i) => renderTaskRow(i, true))}
                       </div>
-                      <div className="space-y-0.5">{under.map((i) => renderTaskRow(i))}</div>
                     </section>
                   );
                 })}
               </div>
             ) : (
-              <div className="space-y-0.5">{visibleTasks.map((i) => renderTaskRow(i))}</div>
+              <div className={taskCardClass}>{visibleTasks.map((i) => renderTaskRow(i))}</div>
             )}
+
+            {/* Project / Area collapsible logged items footer (1:1 with iOS/Mac) */}
+            {(destination.kind === "area" || destination.kind === "project") &&
+              loggedScopeTasks.length > 0 && (() => {
+                const scopeKey = `${destination.kind}:${destination.id}`;
+                const expanded = scopeLoggedExpandedIds.has(scopeKey);
+                const count = loggedScopeTasks.length;
+                return (
+                  <section aria-label="Logged items" className="pt-5">
+                    <button
+                      type="button"
+                      aria-expanded={expanded}
+                      onClick={() =>
+                        setScopeLoggedExpandedIds((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(scopeKey)) next.delete(scopeKey);
+                          else next.add(scopeKey);
+                          return next;
+                        })
+                      }
+                      className="font-mono-tabular flex w-full items-center px-3 py-2 text-left text-[13px] font-medium text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]"
+                    >
+                      {expanded
+                        ? `Hide ${count} logged ${count === 1 ? "item" : "items"}`
+                        : `Show ${count} logged ${count === 1 ? "item" : "items"}`}
+                    </button>
+                    {expanded && (
+                      <div className={taskCardClass}>
+                        {loggedScopeTasks.map((i) => renderTaskRow(i))}
+                      </div>
+                    )}
+                  </section>
+                );
+              })()}
           </div>
         </div>
 
@@ -3327,6 +4365,7 @@ export function SeptenaApp() {
         areas={activeAreas}
         projects={activeProjects}
         tags={activeTags}
+        commands={commandBarItems}
         language={lang}
         onNavigate={navigateTo}
         onSelectTask={(task) => {
@@ -3349,6 +4388,17 @@ export function SeptenaApp() {
           setTagFilterId(tid);
         }}
       />
+
+      {waitingTask && (
+        <WaitingOnDialog
+          key={waitingTask.id}
+          task={waitingTask}
+          todayYMD={todayYMD}
+          language={lang}
+          onClose={() => setWaitingTaskId(null)}
+          onSave={(name, checkBack) => setWaiting(waitingTask, name, checkBack)}
+        />
+      )}
 
       {sweepTasks && (
         <FadeSweepModal
@@ -3382,6 +4432,73 @@ export function SeptenaApp() {
         }}
         onClose={() => setFirstRunOpen(false)}
       />
+
+      {pendingReschedule && (() => {
+        const prompt = SURFACES_CATALOG.prompts.items.find((p) => p.id === "rescheduleFixedRepeat");
+        const options: ReadonlyArray<{ readonly id: string; readonly title: string }> =
+          prompt && "options" in prompt ? prompt.options : [];
+        const exceptionTitle = registryText(
+          options.find((o) => o.id === "exception")?.title ?? "Only This Task",
+          lang,
+        );
+        const updateRuleTitle = registryText(
+          options.find((o) => o.id === "updateRule")?.title ?? "Update Schedule",
+          lang,
+        );
+        const cancelTitle = registryText(SURFACES_CATALOG.prompts.cancelTitle, lang);
+        const title = registryText(typeof prompt?.title === "string" ? prompt.title : "Reschedule repeating task?", lang);
+        const message = registryText(typeof prompt?.message === "string" ? prompt.message : "", lang);
+        const choose = (mode: RescheduleMode) => {
+          const current = pendingReschedule;
+          setPendingReschedule(null);
+          if (current.kind === "when") {
+            void applyTaskDay("when", current.taskIds, current.day, mode);
+          } else {
+            void applyToggleToday(current.tasks, mode, current.bulkPutOnToday);
+          }
+        };
+        return (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-xs"
+            role="dialog"
+            aria-modal="true"
+            aria-label={title}
+            onClick={() => setPendingReschedule(null)}
+          >
+            <div
+              className="w-full max-w-sm rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)] p-5 shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h2 className="text-sm font-semibold text-[var(--text-primary)]">{title}</h2>
+              {message && <p className="mt-1.5 text-xs text-[var(--text-secondary)]">{message}</p>}
+              <div className="mt-4 flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={() => choose("makeException")}
+                  className="w-full rounded-lg bg-[var(--accent)] px-3 py-2 text-xs font-medium hover:opacity-90"
+                  style={{ color: "var(--accent-check)" }}
+                >
+                  {exceptionTitle}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => choose("updateRule")}
+                  className="w-full rounded-lg border border-[var(--border-subtle)] px-3 py-2 text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
+                >
+                  {updateRuleTitle}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPendingReschedule(null)}
+                  className="w-full rounded-lg px-3 py-2 text-xs text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"
+                >
+                  {cancelTitle}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {settingsModal}
     </div>

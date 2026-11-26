@@ -55,6 +55,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -66,6 +67,13 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
@@ -91,6 +99,8 @@ import app.septena.core.RegistryActionResolver
 import app.septena.core.RegistryCatalog
 import app.septena.core.generated.RegistryActionIds
 import app.septena.core.generated.RegistryDestinationIds
+import app.septena.core.generated.RegistryEntityFields
+import app.septena.core.generated.RegistryEntityNames
 import app.septena.core.generated.RegistryNoticeIds
 import app.septena.core.generated.RegistryPlatformIds
 import app.septena.core.generated.RegistryPromptIds
@@ -133,6 +143,8 @@ fun TaskHomeScreen(
     var referenceTaskId by rememberSaveable { mutableStateOf<String?>(null) }
     /** The task whose Assign To dialog is open (row menu). */
     var assignTaskId by rememberSaveable { mutableStateOf<String?>(null) }
+    // The task whose Waiting On… sheet is open.
+    var waitingTaskId by rememberSaveable { mutableStateOf<String?>(null) }
     /** Join a Shared Project: the open dialog, and the token of the link that opened it. */
     var joinOpen by rememberSaveable { mutableStateOf(false) }
     var joinToken by rememberSaveable { mutableStateOf<String?>(null) }
@@ -241,6 +253,8 @@ fun TaskHomeScreen(
             actionId == RegistryActionIds.TASK_ACCEPT_REVIEW -> homeViewModel.complete(id)
             actionId == RegistryActionIds.TASK_SEND_BACK_REVIEW -> openTaskSendBack(id)
             actionId == RegistryActionIds.TASK_KEEP_FADED -> homeViewModel.keepFaded(id)
+            actionId == RegistryActionIds.TASK_WAITING_ON -> waitingTaskId = id
+            actionId == RegistryActionIds.TASK_GOT_IT_BACK -> homeViewModel.gotItBack(id)
             actionId == RegistryActionIds.TASK_LET_GO_FADED -> homeViewModel.letGoFaded(id)
             actionId == RegistryActionIds.TASK_SELECT -> homeViewModel.toggleSelection(id)
         }
@@ -415,6 +429,30 @@ fun TaskHomeScreen(
         )
     }
 
+    waitingTaskId?.let { id ->
+        // The sheet opens on the task's name and When date.
+        val initial by produceState<Pair<String, String?>?>(initialValue = null, id) {
+            value = withContext(Dispatchers.IO) {
+                val fields = graph.taskStore.record(RegistryEntityNames.TASK, id)?.fields
+                fields?.get(RegistryEntityFields.Task.WAITING_ON).stringValue().orEmpty() to
+                    fields?.get(RegistryEntityFields.Task.SCHEDULED).stringValue()
+            }
+        }
+        initial?.let { (name, whenDay) ->
+            WaitingOnDialog(
+                initialName = name,
+                initialWhen = whenDay,
+                today = graph.clock.today(graph.clock.now()),
+                languageTag = languageTag,
+                onDismiss = { waitingTaskId = null },
+                onConfirm = { newName, checkBack ->
+                    homeViewModel.setWaiting(id, newName, checkBack)
+                    waitingTaskId = null
+                },
+            )
+        }
+    }
+
     pendingPurgeRequest?.let { req ->
         val prompt = remember(req.promptId, req.ids.size, languageTag) {
             purgePromptCopy(req.promptId, req.ids.size, languageTag)
@@ -445,7 +483,74 @@ fun TaskHomeScreen(
         DoStopNoteDialog(graph.doing, doing.justStoppedSessionId.orEmpty(), languageTag)
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    val shortcutScope = rememberCoroutineScope()
+    val smartListNavOrder = remember(state.topSmartLists, state.bottomSmartLists) {
+        (state.topSmartLists + state.bottomSmartLists).map { it.location }
+    }
+    val hardwareShortcutModifier = Modifier.onPreviewKeyEvent { event ->
+        if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+        val primary = event.isCtrlPressed || event.isMetaPressed
+        when {
+            primary && event.key == Key.N -> {
+                settingsOpen = false
+                quickFindOpen = false
+                openedTaskId = null
+                homeQuickAddDraft = defaultQuickAddDraft(state.location)
+                true
+            }
+            primary && event.key == Key.K -> {
+                settingsOpen = false
+                quickFindOpen = !quickFindOpen
+                true
+            }
+            primary && event.key == Key.Comma -> {
+                quickFindOpen = false
+                settingsOpen = !settingsOpen
+                true
+            }
+            primary && event.key == Key.Z && openedTaskId == null && homeQuickAddDraft == null && !quickFindOpen && !settingsOpen -> {
+                shortcutScope.launch {
+                    val undone = runCatching {
+                        withContext(Dispatchers.IO) {
+                            graph.taskUndoHistory.undo(graph.taskMutator, graph.conversationMutator)
+                        }
+                    }.getOrDefault(false)
+                    if (undone) {
+                        graph.sync.noteLocalChange()
+                        graph.sync.requestSync()
+                    }
+                }
+                true
+            }
+            primary && event.key in KEYBOARD_LIST_INDEX -> {
+                val index = KEYBOARD_LIST_INDEX.getValue(event.key)
+                val target = smartListNavOrder.getOrNull(index) ?: return@onPreviewKeyEvent false
+                settingsOpen = false
+                quickFindOpen = false
+                openedTaskId = null
+                selectHomeLocation(target)
+                true
+            }
+            event.key == Key.Escape -> when {
+                quickFindOpen -> { quickFindOpen = false; true }
+                settingsOpen -> { settingsOpen = false; true }
+                openedTaskId != null -> {
+                    openedTaskId = null
+                    openedTaskAttribute = null
+                    openedTaskSendBack = false
+                    true
+                }
+                state.selectedIds.isNotEmpty() -> {
+                    homeViewModel.clearSelection()
+                    true
+                }
+                else -> false
+            }
+            else -> false
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize().then(hardwareShortcutModifier)) {
         val fullDo = doing.current?.takeIf { doing.isFullHere }
         if (fullDo != null) {
             DoScreen(
@@ -470,23 +575,38 @@ fun TaskHomeScreen(
                             MaterialTheme.colorScheme.surfaceContainer
                         },
                     ) {
-                        ListsHomeContent(
+                        TabletSidebarPane(
                             state = state,
                             languageTag = languageTag,
                             settingsTitle = settingsTitle,
+                            quickAddTitle = quickAddTitle,
                             isDark = isDark,
                             hasActiveTexture = appearance.hasActiveTexture,
-                            highlightSelection = true,
-                            showSettingsRow = true,
                             onSelect = selectHomeLocation,
                             onSetAreaEmoji = homeViewModel::setAreaEmoji,
                             onOpenSettings = { settingsOpen = true },
+                            onCreateArea = { title, insertIndex ->
+                                homeViewModel.createArea(title, insertIndex = insertIndex) { created ->
+                                    selectHomeLocation(created)
+                                }
+                            },
+                            onCreateProject = { title, areaId, insertIndex ->
+                                homeViewModel.createProject(title, areaId = areaId, insertIndex = insertIndex) { created ->
+                                    selectHomeLocation(created)
+                                }
+                            },
+                            onMoveProjectToArea = homeViewModel::moveProjectToArea,
+                            onRenameArea = homeViewModel::renameArea,
+                            onRenameProject = homeViewModel::renameProject,
+                            onDeleteArea = homeViewModel::deleteArea,
+                            onDeleteProject = homeViewModel::deleteProject,
+                            onReorderAreas = homeViewModel::reorderAreas,
+                            onReorderProjects = homeViewModel::reorderProjects,
                             onShareProject = { shareProjectId = it },
                             onJoinShared = {
                                 joinToken = null
                                 joinOpen = true
                             },
-                            modifier = Modifier.padding(top = 8.dp),
                         )
                     }
                 }
@@ -578,13 +698,23 @@ fun TaskHomeScreen(
                     onSetAreaEmoji = homeViewModel::setAreaEmoji,
                     onQuickFind = { quickFindOpen = true },
                     onOpenSettings = { settingsOpen = true },
-                    onNewTask = { draft -> homeQuickAddDraft = draft },
-                    onCreateArea = { title ->
-                        homeViewModel.createArea(title) { created -> selectHomeLocation(created) }
+                    onCreateArea = { title, insertIndex ->
+                        homeViewModel.createArea(title, insertIndex = insertIndex) { created ->
+                            selectHomeLocation(created)
+                        }
                     },
-                    onCreateProject = { title ->
-                        homeViewModel.createProject(title) { created -> selectHomeLocation(created) }
+                    onCreateProject = { title, areaId, insertIndex ->
+                        homeViewModel.createProject(title, areaId = areaId, insertIndex = insertIndex) { created ->
+                            selectHomeLocation(created)
+                        }
                     },
+                    onMoveProjectToArea = homeViewModel::moveProjectToArea,
+                    onRenameArea = homeViewModel::renameArea,
+                    onRenameProject = homeViewModel::renameProject,
+                    onDeleteArea = homeViewModel::deleteArea,
+                    onDeleteProject = homeViewModel::deleteProject,
+                    onReorderAreas = homeViewModel::reorderAreas,
+                    onReorderProjects = homeViewModel::reorderProjects,
                     onJoinShared = {
                         joinToken = null
                         joinOpen = true
@@ -966,6 +1096,7 @@ private fun TaskHomeScaffold(
     var quickAddDraft by remember { mutableStateOf<QuickAddDraft?>(null) }
     var newSectionTrigger by remember { mutableIntStateOf(0) }
     var selectionPicker by remember { mutableStateOf<SelectionPicker?>(null) }
+    var pendingFixedReschedule by remember { mutableStateOf<PendingFixedReschedule?>(null) }
     var allOnToday by remember { mutableStateOf(false) }
     var activeSweepItems by remember { mutableStateOf<List<FadeSweepItem>?>(null) }
     val pullScope = rememberCoroutineScope()
@@ -1105,6 +1236,28 @@ private fun TaskHomeScaffold(
             onAddAndDo = addAndDo(graph, homeViewModel) { quickAddDraft = null },
         )
     }
+    pendingFixedReschedule?.let { pending ->
+        RescheduleFixedRepeatDialog(
+            languageTag = languageTag,
+            onPickMode = { mode ->
+                pendingFixedReschedule = null
+                when (pending) {
+                    is PendingFixedReschedule.SelectionWhen -> homeViewModel.setWhenForSelection(pending.day, mode)
+                    PendingFixedReschedule.SelectionToday -> homeViewModel.applyToSelection(
+                        RegistryActionIds.TASK_TOGGLE_TODAY,
+                        todayEnabled = true,
+                        mode = mode,
+                    )
+                    is PendingFixedReschedule.UpcomingDrag -> homeViewModel.rescheduleToDay(
+                        pending.ids,
+                        pending.dayIso,
+                        mode,
+                    )
+                }
+            },
+            onDismiss = { pendingFixedReschedule = null },
+        )
+    }
     when (selectionPicker) {
         SelectionPicker.When -> TaskWhenSheet(
             today = graph.clock.today(graph.clock.now()),
@@ -1112,7 +1265,18 @@ private fun TaskHomeScaffold(
             onDismiss = { selectionPicker = null },
             onPick = { day ->
                 selectionPicker = null
-                homeViewModel.setWhenForSelection(day)
+                if (day == null) {
+                    homeViewModel.setWhenForSelection(null)
+                } else {
+                    val ids = state.selectedIds
+                    pullScope.launch {
+                        if (homeViewModel.anyNeedsFixedRepeatPrompt(ids, day)) {
+                            pendingFixedReschedule = PendingFixedReschedule.SelectionWhen(day)
+                        } else {
+                            homeViewModel.setWhenForSelection(day)
+                        }
+                    }
+                }
             },
         )
         SelectionPicker.List -> TaskListPickerDialog(
@@ -1299,10 +1463,27 @@ private fun TaskHomeScaffold(
                             onCommand = { command ->
                                 when (command) {
                                     is TaskSelectionCommand.Apply -> homeViewModel.applyToSelection(command.actionId)
-                                    is TaskSelectionCommand.SetToday -> homeViewModel.applyToSelection(
-                                        RegistryActionIds.TASK_TOGGLE_TODAY,
-                                        todayEnabled = command.enabled,
-                                    )
+                                    is TaskSelectionCommand.SetToday -> {
+                                        if (!command.enabled) {
+                                            homeViewModel.applyToSelection(
+                                                RegistryActionIds.TASK_TOGGLE_TODAY,
+                                                todayEnabled = false,
+                                            )
+                                        } else {
+                                            val ids = state.selectedIds
+                                            val todayIso = graph.clock.today(graph.clock.now()).toString()
+                                            pullScope.launch {
+                                                if (homeViewModel.anyNeedsFixedRepeatPrompt(ids, todayIso)) {
+                                                    pendingFixedReschedule = PendingFixedReschedule.SelectionToday
+                                                } else {
+                                                    homeViewModel.applyToSelection(
+                                                        RegistryActionIds.TASK_TOGGLE_TODAY,
+                                                        todayEnabled = true,
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
                                     TaskSelectionCommand.PickWhen -> { selectionPicker = SelectionPicker.When }
                                     TaskSelectionCommand.PickList -> { selectionPicker = SelectionPicker.List }
                                     TaskSelectionCommand.Copy -> homeViewModel.copySelection { text ->
@@ -1581,7 +1762,14 @@ private fun TaskHomeScaffold(
                             onReorderGroupHeader = if (canReorderList) {
                                 { ids, targetLocationKey ->
                                     if (isUpcomingList && targetLocationKey.startsWith("day:")) {
-                                        homeViewModel.rescheduleToDay(ids, targetLocationKey.removePrefix("day:"))
+                                        val dayIso = targetLocationKey.removePrefix("day:")
+                                        pullScope.launch {
+                                            if (homeViewModel.anyNeedsFixedRepeatPrompt(ids, dayIso)) {
+                                                pendingFixedReschedule = PendingFixedReschedule.UpcomingDrag(ids, dayIso)
+                                            } else {
+                                                homeViewModel.rescheduleToDay(ids, dayIso)
+                                            }
+                                        }
                                     } else {
                                         val firstInGroupPos = displayedTasks
                                             .firstOrNull { it.group?.targetLocationKey == targetLocationKey }
@@ -1700,6 +1888,8 @@ private fun taskRowMenuGroups(
             RegistryActionIds.TASK_ACCEPT_REVIEW,
             RegistryActionIds.TASK_KEEP_FADED,
             RegistryActionIds.TASK_LET_GO_FADED,
+            RegistryActionIds.TASK_WAITING_ON,
+            RegistryActionIds.TASK_GOT_IT_BACK,
             RegistryActionIds.TASK_OPEN,
             RegistryActionIds.TASK_WHEN,
             RegistryActionIds.TASK_MOVE,
@@ -1735,6 +1925,7 @@ private fun taskRowMenuGroups(
                 } else null,
                 needsReview = id == RegistryActionIds.TASK_ACCEPT_REVIEW,
                 needsFaded = id == RegistryActionIds.TASK_KEEP_FADED || id == RegistryActionIds.TASK_LET_GO_FADED,
+                needsWaiting = id == RegistryActionIds.TASK_GOT_IT_BACK,
                 icon = actionMenuIcon(id),
             )
         }.withAssign(menuId, languageTag).takeIf { it.isNotEmpty() }
@@ -1778,10 +1969,30 @@ private fun actionMenuIcon(actionId: String): TaskMenuActionIcon = when (actionI
     RegistryActionIds.TASK_ACCEPT_REVIEW,
     RegistryActionIds.TASK_KEEP_FADED -> TaskMenuActionIcon.Check
     RegistryActionIds.TASK_LET_GO_FADED -> TaskMenuActionIcon.Cancel
+    RegistryActionIds.TASK_WAITING_ON -> TaskMenuActionIcon.Assign
+    RegistryActionIds.TASK_GOT_IT_BACK -> TaskMenuActionIcon.Restore
     else -> TaskMenuActionIcon.None
 }
 
+private val KEYBOARD_LIST_INDEX: Map<Key, Int> = mapOf(
+    Key.One to 0,
+    Key.Two to 1,
+    Key.Three to 2,
+    Key.Four to 3,
+    Key.Five to 4,
+    Key.Six to 5,
+    Key.Seven to 6,
+    Key.Eight to 7,
+    Key.Nine to 8,
+)
+
 private enum class SelectionPicker { When, List }
+
+private sealed interface PendingFixedReschedule {
+    data class SelectionWhen(val day: String) : PendingFixedReschedule
+    data object SelectionToday : PendingFixedReschedule
+    data class UpcomingDrag(val ids: List<String>, val dayIso: String) : PendingFixedReschedule
+}
 
 private data class PurgeTasksRequest(val ids: List<String>, val promptId: String)
 

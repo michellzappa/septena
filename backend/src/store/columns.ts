@@ -215,6 +215,12 @@ export const ENTITIES = {
       // Shared projects: the member id of the person who does this task
       // (docs/PROJECT_SHARING_SPEC.md §3). Null = nobody in particular.
       assignedTo: text(64),
+      // Waiting on a person (docs/REVIEW_SPEC.md §6, ADR 0053): who, free
+      // text. The task's When date is the day to chase.
+      waitingOn: text(80),
+      // The day `waitingOn` was set. The store stamps it when a write sets a
+      // wait without one, and clears it with the wait.
+      waitingSince: day(),
     },
     requiredOnInsert: ["title", "status"],
   },

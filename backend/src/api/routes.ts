@@ -8,7 +8,7 @@ import { MAX_ATTACHMENT_BYTES, zId } from "../store/columns.js";
 import { zPushBody, type Op } from "../store/ops.js";
 import type { ChangeEntry } from "../store/TaskStore.js";
 import { USER_ID_RE, accountStoreFor } from "../store/AccountStore.js";
-import { prepareReviewerAccount } from "../shadow/reviewer.js";
+import { ensureReviewerAccount, prepareReviewerAccount } from "../shadow/reviewer.js";
 import { AppleIdentityError, userIdForAppleSub, verifyAppleIdentityToken } from "./appleIdentity.js";
 import { HANDOFF_TTL_S, accountAlreadyDeleted, authenticate, issueSession, refreshSession, revokeSession, storeFor, withSession } from "./session.js";
 import { SESSION_HEADER } from "../store/sessions.js";
@@ -36,6 +36,8 @@ import {
   zPairInspectBody,
 } from "../shadow/oauth.js";
 import { MCP_READ_SCOPE, MCP_WRITE_SCOPE, createAgentKey, disconnectFamily, hasScope, isMcpAccessToken, verifyMcpAccess } from "../shadow/tokens.js";
+import { pollAgentSignup, startAgentSignup, zAgentSignupPollBody, zAgentSignupStartBody } from "../shadow/agentSignup.js";
+import { refreshAccounts } from "../admin/accounts.js";
 import { MAX_AGENT_WEBHOOKS, validateWebhookUrl } from "./agentWake.js";
 import {
   TRIAL_ROW_ID,
@@ -277,6 +279,33 @@ api.post("/auth/device/poll", async (c) => {
   return cookieMode
     ? cookieSessionResponse(c.env, session)
     : c.json(session, 200, { "Cache-Control": "no-store" });
+});
+
+// Headless agent account creation & connection (ADR 0056, src/shadow/agentSignup.ts).
+api.post("/agent/signup/start", async (c) => {
+  const body = await parse(c, zAgentSignupStartBody);
+  if (body instanceof Response) return body;
+  const res = await startAgentSignup(c.env, body, c.req.header("CF-Connecting-IP"));
+  if (res.ok) return c.json(res.data, 202, { "Cache-Control": "no-store" });
+  const headers: Record<string, string> = { "Cache-Control": "no-store" };
+  if (res.retryAfterSeconds) headers["Retry-After"] = String(res.retryAfterSeconds);
+  return c.json({ error: res.error, ...(res.retryAfterSeconds ? { retryAfterSeconds: res.retryAfterSeconds } : {}) }, res.status, headers);
+});
+
+api.post("/agent/signup/poll", async (c) => {
+  const body = await parse(c, zAgentSignupPollBody);
+  if (body instanceof Response) return body;
+  const res = await pollAgentSignup(c.env, body, c.req.header("CF-Connecting-IP"));
+  if (res.status === "pending") return c.json({ status: "pending" }, 202, { "Cache-Control": "no-store" });
+  if (res.status === "denied") return c.json({ error: "denied" }, 410, { "Cache-Control": "no-store" });
+  if (res.status === "rate_limited") return c.json({ error: "too_many_attempts" }, 429, { "Cache-Control": "no-store" });
+  if (res.status === "gone") return c.json({ error: "expired_or_unknown" }, 410, { "Cache-Control": "no-store" });
+  try {
+    c.executionCtx.waitUntil(refreshAccounts(c.env, [res.data.userId]));
+  } catch {
+    void refreshAccounts(c.env, [res.data.userId]);
+  }
+  return c.json(res.data, 200, { "Cache-Control": "no-store" });
 });
 
 // ---- everything below needs a bearer access token ----
@@ -975,6 +1004,27 @@ api.post("/admin/reviewer/prepare", async (c) => {
   const tokens = await prepareReviewerAccount(c.env);
   if (!tokens) return c.json({ error: "reviewer_mode_off" }, 404);
   return c.json(tokens, 200, { "Cache-Control": "no-store" });
+});
+
+const zReviewerApproveDeviceBody = z.object({
+  code: z.string().min(1).max(32),
+}).strict();
+
+/// Approves a pending device sign-in code (e.g. web.septena.app) for the demo
+/// account only, so mz can open the demo account in a browser while recording
+/// directory walkthroughs. Admin-only and off (404) unless reviewer mode is on.
+api.post("/admin/reviewer/approve-device", async (c) => {
+  if (!c.env.ADMIN_TOKEN) return c.notFound();
+  if (!(await adminAllowed(c))) return c.json({ error: "forbidden" }, 403);
+  const mode = await ensureReviewerAccount(c.env);
+  if (!mode) return c.json({ error: "reviewer_mode_off" }, 404);
+  const body = await parse(c, zReviewerApproveDeviceBody);
+  if (body instanceof Response) return body;
+  const res = await approvePairing(c.env, mode.userId, { code: body.code, kind: "device" });
+  if (res.ok) logEvent("reviewer_device_approved", { ok: true, client: res.client });
+  return res.ok
+    ? c.json({ ok: true, client: res.client, kind: res.kind }, 200, { "Cache-Control": "no-store" })
+    : c.json({ error: res.error }, res.status, { "Cache-Control": "no-store" });
 });
 
 // ---- admin: account move copy (docs/CLOUDFLARE_ACCOUNT_MOVE.md) ----

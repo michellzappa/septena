@@ -54,13 +54,18 @@ android {
             .find(rootProject.file("../project.yml").readText())!!.groupValues[1]
     }
 
-    // The fixed tester key (scripts/android-tester-keystore.sh). android.yml
-    // passes the keystore path with -PseptenaTesterStoreFile and the password
-    // as ORG_GRADLE_PROJECT_septenaTesterStorePassword, so it never shows on a
-    // command line. Android updates an app only from an APK with the same key;
-    // the runner's own debug key changes on every run. Local builds without
-    // the key keep the machine's debug key.
+    // Signing keys:
+    // - Tester key (scripts/android-tester-keystore.sh): signs everyday CI debug
+    //   and release APKs so tester phones can update in place.
+    // - Centaur Labs release / Play upload keys (scripts/android-release-keystore.sh):
+    //   passed by android-release.yml via -PseptenaReleaseStoreFile,
+    //   -PseptenaReleaseKeyAlias (default "septena-release"), and
+    //   ORG_GRADLE_PROJECT_septenaReleaseStorePassword (never on a command line).
+    //   When present, release builds use this key; otherwise they fall back to
+    //   the tester key (then debug) so android.yml and local builds stay unchanged.
     val testerStoreFile = findProperty("septenaTesterStoreFile") as String?
+    val releaseStoreFile = findProperty("septenaReleaseStoreFile") as String?
+    val releaseKeyAlias = (findProperty("septenaReleaseKeyAlias") as String?) ?: "septena-release"
     signingConfigs {
         if (testerStoreFile != null) {
             create("tester") {
@@ -71,6 +76,16 @@ android {
                 keyPassword = findProperty("septenaTesterStorePassword") as String?
             }
         }
+        if (releaseStoreFile != null) {
+            create("releaseDist") {
+                storeFile = file(releaseStoreFile)
+                storeType = "pkcs12"
+                storePassword = findProperty("septenaReleaseStorePassword") as String?
+                keyAlias = releaseKeyAlias
+                keyPassword = (findProperty("septenaReleaseKeyPassword") as String?)
+                    ?: (findProperty("septenaReleaseStorePassword") as String?)
+            }
+        }
     }
 
     buildTypes {
@@ -79,15 +94,34 @@ android {
         }
         release {
             // R8 shrinking + ART-friendly optimization makes cold boot and Compose
-            // scroll noticeably faster than debug. Signed with the same tester key so
+            // scroll noticeably faster than debug. Uses the Centaur Labs release/upload
+            // key when provided (android-release.yml), otherwise the tester key so
             // adb install -r updates an installed device build in place.
             isMinifyEnabled = true
             isShrinkResources = true
-            signingConfig = signingConfigs.findByName("tester") ?: signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("releaseDist")
+                ?: signingConfigs.findByName("tester")
+                ?: signingConfigs.getByName("debug")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+        }
+    }
+
+    // Store native .so libraries uncompressed and page-aligned in APKs and AABs
+    // (required for Android 15+ 16 KB page-size devices on Google Play).
+    packaging {
+        jniLibs {
+            useLegacyPackaging = false
+        }
+    }
+
+    // Keep all bundled widget/tile/shortcut locale strings in every Play split
+    // so switching language in-app or on-device never drops localized labels.
+    bundle {
+        language {
+            enableSplit = false
         }
     }
 

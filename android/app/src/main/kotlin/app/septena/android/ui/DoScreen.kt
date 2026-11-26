@@ -35,6 +35,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -53,6 +54,8 @@ import androidx.lifecycle.repeatOnLifecycle
 import app.septena.android.AndroidAppGraph
 import app.septena.android.doing.DoController
 import app.septena.android.doing.DoCopy
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import app.septena.android.doing.DoState
 import app.septena.core.RegistryCatalog
 import app.septena.core.generated.RegistryActionIds
@@ -310,13 +313,43 @@ private fun DoExits(languageTag: String, onDone: () -> Unit, onStop: () -> Unit,
 /** Later is the one When picker. Only a saved date ends the Do. */
 @Composable
 private fun DoLaterSheet(graph: AndroidAppGraph, doing: DoState, languageTag: String, onDismiss: () -> Unit) {
+    val scope = rememberCoroutineScope()
+    var pendingDay by remember { mutableStateOf<String?>(null) }
+
+    pendingDay?.let { day ->
+        RescheduleFixedRepeatDialog(
+            languageTag = languageTag,
+            onPickMode = { mode ->
+                pendingDay = null
+                onDismiss()
+                graph.doing.later(doing, day, mode)
+            },
+            onDismiss = { pendingDay = null },
+        )
+    }
+
     TaskWhenSheet(
         today = graph.clock.today(graph.clock.now()),
         languageTag = languageTag,
         onDismiss = onDismiss,
         onPick = { day ->
-            onDismiss()
-            graph.doing.later(doing, day)
+            if (day == null) {
+                onDismiss()
+                graph.doing.later(doing, null)
+            } else {
+                scope.launch {
+                    val needsPrompt = withContext(Dispatchers.IO) {
+                        val record = graph.taskStore.record(app.septena.core.generated.RegistryEntityNames.TASK, doing.taskId)
+                        record != null && app.septena.core.TaskMutator.needsFixedRepeatReschedulePrompt(record.fields, day)
+                    }
+                    if (needsPrompt) {
+                        pendingDay = day
+                    } else {
+                        onDismiss()
+                        graph.doing.later(doing, day)
+                    }
+                }
+            }
         },
     )
 }

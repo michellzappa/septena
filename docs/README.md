@@ -65,6 +65,7 @@ See [ADR 0007](adr/0007-septena-is-the-task-app.md).
 | [SYNC_SUBSCRIPTION_SPEC.md](SYNC_SUBSCRIPTION_SPEC.md) | proposed (launch track) |
 | [SIGN_IN_SURFACES_SPEC.md](SIGN_IN_SURFACES_SPEC.md) | accepted (ADR 0047; #137, SI0 to SI6) |
 | [SUPPORT_SPEC.md](SUPPORT_SPEC.md) | accepted (ADR 0054; SUP1 to SUP5) |
+| [ADMIN_CONSOLE_SPEC.md](ADMIN_CONSOLE_SPEC.md) | building (ADR 0043, 0058; phase 1 shipped) |
 | [IDENTIFIERS.md](IDENTIFIERS.md) | current |
 | [CloudKitSchema.md](CloudKitSchema.md) | current until the iCloud exit, then historical |
 | [PROD_CUTOVER.md](PROD_CUTOVER.md) | CloudKit-era checklist |
@@ -128,7 +129,7 @@ See [ADR 0007](adr/0007-septena-is-the-task-app.md).
 | [ORDERING_AND_HEADINGS_PLAN.md](ORDERING_AND_HEADINGS_PLAN.md), [DRAG_AND_DROP.md](DRAG_AND_DROP.md) | shipped — historical |
 | [RECENTLY_DELETED_SPEC.md](RECENTLY_DELETED_SPEC.md), [TASK_LIST_OBSERVATION_PLAN.md](TASK_LIST_OBSERVATION_PLAN.md) | proposal |
 | [SEPTASK_APPKIT_PARITY.md](SEPTASK_APPKIT_PARITY.md), [SEPTASK_APPKIT_SURFACES.md](SEPTASK_APPKIT_SURFACES.md), [SEPTASK_APPKIT_LOCALIZATION_HANDOFF.md](SEPTASK_APPKIT_LOCALIZATION_HANDOFF.md) | AppKit shell notes |
-| [APPSTORE-SEPTASK.md](APPSTORE-SEPTASK.md), [RELEASING-MAC.md](RELEASING-MAC.md) | current |
+| [APPSTORE-SEPTASK.md](APPSTORE-SEPTASK.md), [RELEASING-MAC.md](RELEASING-MAC.md), [PLAYSTORE.md](PLAYSTORE.md), [RELEASING-ANDROID.md](RELEASING-ANDROID.md) | current |
 | [photo-composite/SKILL.md](photo-composite/SKILL.md), [photo-studio/SKILL.md](photo-studio/SKILL.md), [3d-studio/SKILL.md](3d-studio/SKILL.md) | current: marketing image skills |
 | [NATIVE_SCENES_SPEC.md](NATIVE_SCENES_SPEC.md) | superseded (ADR 0022 rejected): website scenes draw from the registries |
 | [PLATFORM_CHROME.md](PLATFORM_CHROME.md) | draft spec: what each OS draws on a marketing screen (iOS 27, iPadOS 27, macOS 27, Android 17, Windows 11) |

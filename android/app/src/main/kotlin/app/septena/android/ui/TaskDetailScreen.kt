@@ -228,6 +228,7 @@ fun TaskDetailScreen(
     var titleBase by remember(taskId) { mutableStateOf("") }
     var notesBase by remember(taskId) { mutableStateOf("") }
     var textIsDirty by remember(taskId) { mutableStateOf(false) }
+    var pendingRescheduleDay by remember(taskId) { mutableStateOf<String?>(null) }
     var saving by remember(taskId) { mutableStateOf(false) }
     var saveFailed by remember(taskId) { mutableStateOf(false) }
     // The attribute whose picker is folded open in its row on the page. One at a time.
@@ -235,6 +236,7 @@ fun TaskDetailScreen(
     var tagFilterDraft by remember(taskId) { mutableStateOf("") }
     var showAddReferenceDialog by remember(taskId) { mutableStateOf(false) }
     var doTitleEditing by remember(taskId) { mutableStateOf(false) }
+    var waitingSheetOpen by remember(taskId) { mutableStateOf(false) }
 
     LaunchedEffect(graph, taskId, dataVersion) {
         val loaded = withContext(Dispatchers.IO) { loadTaskDetail(graph, taskId) }
@@ -488,8 +490,22 @@ fun TaskDetailScreen(
         write { check(graph.taskMutator.setStarred(taskId, !isStarred) != null) }
     }
 
-    fun setWhen(day: String?) {
-        write { check(graph.taskMutator.setWhen(taskId, day) != null) }
+    fun setWhen(
+        day: String?,
+        mode: app.septena.sharedcore.RescheduleMode = app.septena.sharedcore.RescheduleMode.MAKE_EXCEPTION,
+    ) {
+        write { check(graph.taskMutator.setWhen(taskId, day, mode) != null) }
+    }
+
+    pendingRescheduleDay?.let { day ->
+        RescheduleFixedRepeatDialog(
+            languageTag = languageTag,
+            onPickMode = { mode ->
+                pendingRescheduleDay = null
+                setWhen(day, mode)
+            },
+            onDismiss = { pendingRescheduleDay = null },
+        )
     }
 
     fun setTimeSlot(start: String?, duration: Int?) {
@@ -707,6 +723,20 @@ fun TaskDetailScreen(
     val mutedInk = MaterialTheme.colorScheme.onSurfaceVariant
     val overdueRed = if (isDark) Color(0xFFFF453A) else Color(0xFFFF3B30)
 
+    if (waitingSheetOpen) {
+        WaitingOnDialog(
+            initialName = taskFields[RegistryEntityFields.Task.WAITING_ON].stringValue().orEmpty(),
+            initialWhen = taskFields[RegistryEntityFields.Task.SCHEDULED].stringValue(),
+            today = todayDate,
+            languageTag = languageTag,
+            onDismiss = { waitingSheetOpen = false },
+            onConfirm = { name, checkBack ->
+                waitingSheetOpen = false
+                write { check(graph.taskMutator.setWaiting(taskId, name, checkBack, changesWhen = true) != null) }
+            },
+        )
+    }
+
     Box(modifier = modifier.fillMaxSize().background(canvasBackground)) {
         HeaderWashBackdrop()
         Scaffold(
@@ -882,6 +912,54 @@ fun TaskDetailScreen(
                                                 }
                                             }
 
+                                            // Waiting On… / Got It Back (docs/REVIEW_SPEC.md §6).
+                                            if (isTaskOpen && !isDoPage) {
+                                                val waitingOn = taskFields[RegistryEntityFields.Task.WAITING_ON]
+                                                    .stringValue()?.trim()?.takeIf(String::isNotEmpty)
+                                                FlowRow(
+                                                    verticalArrangement = Arrangement.Center,
+                                                    modifier = Modifier.padding(
+                                                        start = TaskCardMetrics.LeadingColumnWidth + TaskCardMetrics.IconTextGap,
+                                                        top = 4.dp,
+                                                    ),
+                                                ) {
+                                                    if (waitingOn != null) {
+                                                        Text(
+                                                            text = WaitingCopy.label(
+                                                                waitingOn,
+                                                                taskFields[RegistryEntityFields.Task.WAITING_SINCE].stringValue(),
+                                                                todayDate,
+                                                                languageTag,
+                                                            ),
+                                                            fontSize = 13.sp,
+                                                            color = mutedInk,
+                                                            modifier = Modifier.align(Alignment.CenterVertically),
+                                                        )
+                                                    }
+                                                    TextButton(onClick = { waitingSheetOpen = true }, enabled = canEdit) {
+                                                        Text(
+                                                            RegistryCatalog.actionTitle(
+                                                                RegistryActionIds.TASK_WAITING_ON,
+                                                                languageTag = languageTag,
+                                                            ).orEmpty(),
+                                                        )
+                                                    }
+                                                    if (waitingOn != null) {
+                                                        TextButton(
+                                                            onClick = { write { check(graph.taskMutator.setWaiting(taskId, null) != null) } },
+                                                            enabled = canEdit,
+                                                        ) {
+                                                            Text(
+                                                                RegistryCatalog.actionTitle(
+                                                                    RegistryActionIds.TASK_GOT_IT_BACK,
+                                                                    languageTag = languageTag,
+                                                                ).orEmpty(),
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            }
+
                                             if (isReviewDepth) {
                                                 val reviewList = listOfNotNull(selectedArea?.title, selectedProject?.title)
                                                     .joinToString(" › ")
@@ -1007,7 +1085,14 @@ fun TaskDetailScreen(
                                                         today = todayDate,
                                                         languageTag = languageTag,
                                                         enabled = canEdit,
-                                                        onSelect = { day -> openPicker = null; setWhen(day) },
+                                                        onSelect = { day ->
+                                                            openPicker = null
+                                                            if (app.septena.core.TaskMutator.needsFixedRepeatReschedulePrompt(taskFields, day)) {
+                                                                pendingRescheduleDay = day
+                                                            } else {
+                                                                setWhen(day)
+                                                            }
+                                                        },
                                                         onClear = { openPicker = null; setWhen(null) },
                                                         startTime = startTime,
                                                         durationMinutes = durationMinutes,

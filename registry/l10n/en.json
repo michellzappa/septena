@@ -76,12 +76,6 @@
       "plans.outcomes.nothing_lost.rows.files.cells.pro"
     ]
   },
-  "A free account allows 500 agent changes a day. Your agent can make changes again tomorrow. Plus has no daily limit.": {
-    "text": "A free account allows 500 agent changes a day. Your agent can make changes again tomorrow. Plus has no daily limit.",
-    "paths": [
-      "plans.upsells.connector_cap.detail"
-    ]
-  },
   "A free account shows 30 days of history. Plus shows a full year.": {
     "text": "A free account shows 30 days of history. Plus shows a full year.",
     "paths": [
@@ -176,6 +170,12 @@
       "settings.desktopTabs.account.title",
       "settings.rootGroups.account_root.items.0.label",
       "settings.pages.account.title"
+    ]
+  },
+  "Account ID": {
+    "text": "Account ID",
+    "paths": [
+      "settings.copy.sync_account_status.accountIdLabel.label"
     ]
   },
   "Active {time}": {
@@ -301,6 +301,12 @@
       "settings.rootGroups.ai_agents_root.items.1.label",
       "settings.pages.agents.title",
       "plans.outcomes.agents.rows.connected.label"
+    ]
+  },
+  "Agents on this account made 500 changes today. They can make changes again tomorrow.": {
+    "text": "Agents on this account made 500 changes today. They can make changes again tomorrow.",
+    "paths": [
+      "plans.upsells.connector_cap.detail"
     ]
   },
   "All dated tasks": {
@@ -592,7 +598,8 @@
   "Cancel at any time.": {
     "text": "Cancel at any time.",
     "paths": [
-      "plans.prices.monthly.detail"
+      "plans.prices.monthly.detail",
+      "plans.proPrices.pro_monthly.detail"
     ]
   },
   "Capture": {
@@ -623,6 +630,12 @@
     "text": "Changes the server refused appear here, newest first. The server kept its own version of each.",
     "paths": [
       "settings.pages.advanced.sections.diagnostics.items.0.detail"
+    ]
+  },
+  "Check back": {
+    "text": "Check back",
+    "paths": [
+      "surfaces.waiting.sheet.checkBack.title"
     ]
   },
   "Check for Updates…": {
@@ -740,6 +753,12 @@
       "tokens.fruitAccents.colorful.name"
     ]
   },
+  "Command Bar…": {
+    "text": "Command Bar…",
+    "paths": [
+      "actions.actions.app.quickFind.desktopTitle"
+    ]
+  },
   "Complete": {
     "text": "Complete",
     "paths": [
@@ -854,6 +873,7 @@
   "Copied": {
     "text": "Copied",
     "paths": [
+      "settings.copy.sync_account_status.copied.label",
       "settings.copy.claude_connector.copied.label"
     ]
   },
@@ -866,6 +886,7 @@
   "Copy": {
     "text": "Copy",
     "paths": [
+      "settings.copy.sync_account_status.copy.label",
       "settings.copy.claude_connector.copy.label",
       "actions.actions.task.copy.title"
     ]
@@ -1536,6 +1557,12 @@
       "plans.outcomes.nothing_lost.rows.files.label"
     ]
   },
+  "Files are still syncing between your devices.": {
+    "text": "Files are still syncing between your devices.",
+    "paths": [
+      "plans.status.filesSyncing"
+    ]
+  },
   "Find any task, project, or area.": {
     "text": "Find any task, project, or area.",
     "paths": [
@@ -1651,6 +1678,12 @@
     "text": "Go",
     "paths": [
       "actions.menuBar.go.title"
+    ]
+  },
+  "Got It Back": {
+    "text": "Got It Back",
+    "paths": [
+      "actions.actions.task.gotItBack.title"
     ]
   },
   "Group Today by list": {
@@ -2275,6 +2308,12 @@
       "actions.actions.task.move.title"
     ]
   },
+  "Name": {
+    "text": "Name",
+    "paths": [
+      "surfaces.waiting.sheet.placeholder"
+    ]
+  },
   "Name this agent": {
     "text": "Name this agent",
     "paths": [
@@ -2366,6 +2405,12 @@
     "text": "No agent work",
     "paths": [
       "destinations.destinations.agent.emptyState.title"
+    ]
+  },
+  "No date": {
+    "text": "No date",
+    "paths": [
+      "surfaces.waiting.sheet.noCheckBack.title"
     ]
   },
   "No length": {
@@ -2555,6 +2600,12 @@
       "settings.copy.ai_explainer.flowFooter.label"
     ]
   },
+  "On another device where you are signed in, open Septena and go to Settings ▸ Account ▸ Approve a sign-in. Tap Scan Code and point the camera at this screen, or enter this code:": {
+    "text": "On another device where you are signed in, open Septena and go to Settings ▸ Account ▸ Approve a sign-in. Tap Scan Code and point the camera at this screen, or enter this code:",
+    "paths": [
+      "surfaces.deviceSignIn.copy.approve.label"
+    ]
+  },
   "On day": {
     "text": "On day",
     "paths": [
@@ -2583,12 +2634,6 @@
     "text": "On your device",
     "paths": [
       "plans.outcomes.nothing_lost.rows.files.cells.free"
-    ]
-  },
-  "On your iPhone, iPad or Mac, open Septena and go to Settings ▸ Account ▸ Approve a sign-in. Tap Scan Code and point the camera at this screen, or enter this code:": {
-    "text": "On your iPhone, iPad or Mac, open Septena and go to Settings ▸ Account ▸ Approve a sign-in. Tap Scan Code and point the camera at this screen, or enter this code:",
-    "paths": [
-      "surfaces.deviceSignIn.copy.approve.label"
     ]
   },
   "On-device": {
@@ -3282,6 +3327,7 @@
       "actions.actions.task.detail.save.title",
       "actions.actions.settings.save.title",
       "surfaces.prompts.text.nameAgent.confirmTitle",
+      "surfaces.waiting.sheet.confirmTitle",
       "surfaces.doing.stopNote.confirmTitle"
     ]
   },
@@ -3313,6 +3359,12 @@
     "text": "Search Tasks",
     "paths": [
       "surfaces.quickFind.emptyState.title"
+    ]
+  },
+  "Search or run a command…": {
+    "text": "Search or run a command…",
+    "paths": [
+      "surfaces.quickFind.commandPlaceholder"
     ]
   },
   "Search tasks, projects, areas…": {
@@ -3526,6 +3578,12 @@
     "text": "Share Project…",
     "paths": [
       "actions.actions.project.share.title"
+    ]
+  },
+  "Share this ID with support if you need help with your account.": {
+    "text": "Share this ID with support if you need help with your account.",
+    "paths": [
+      "settings.copy.sync_account_status.accountIdFooter.label"
     ]
   },
   "Shared by": {
@@ -4132,8 +4190,8 @@
       "plans.paywall.failed"
     ]
   },
-  "The same tasks on your phone, tablet and Mac, updated as you type.": {
-    "text": "The same tasks on your phone, tablet and Mac, updated as you type.",
+  "The same tasks on every device, updated as you type.": {
+    "text": "The same tasks on every device, updated as you type.",
     "paths": [
       "plans.outcomes.everywhere.detail"
     ]
@@ -4316,7 +4374,7 @@
   "Tomorrow": {
     "text": "Tomorrow",
     "paths": [
-      "surfaces.taskDateBoard.rows.dateBoard.tomorrow.label"
+      "surfaces.taskDateBoard.tomorrow.label"
     ]
   },
   "Too many requests. Try again later.": {
@@ -4455,10 +4513,37 @@
       "actions.menuBar.view.title"
     ]
   },
+  "Waiting": {
+    "text": "Waiting",
+    "paths": [
+      "destinations.destinations.review.groups.waiting.title"
+    ]
+  },
+  "Waiting On": {
+    "text": "Waiting On",
+    "paths": [
+      "surfaces.waiting.sheet.title"
+    ]
+  },
+  "Waiting On…": {
+    "text": "Waiting On…",
+    "paths": [
+      "actions.actions.task.waitingOn.title"
+    ]
+  },
   "Waiting for approval.": {
     "text": "Waiting for approval.",
     "paths": [
       "plans.paywall.pending"
+    ]
+  },
+  "Waiting on {name}": {
+    "text": "Waiting on {name}",
+    "placeholders": [
+      "name"
+    ],
+    "paths": [
+      "surfaces.waiting.label.format"
     ]
   },
   "Washi Paper": {
@@ -4738,8 +4823,8 @@
       "surfaces.prompts.items.agentKeyCreated.title"
     ]
   },
-  "Your agent's questions, finished work and tasks in progress show up here. Faded tasks do too.": {
-    "text": "Your agent's questions, finished work and tasks in progress show up here. Faded tasks do too.",
+  "Your agent's questions, finished work and tasks in progress show up here, and so do tasks you are waiting on. Faded tasks do too.": {
+    "text": "Your agent's questions, finished work and tasks in progress show up here, and so do tasks you are waiting on. Faded tasks do too.",
     "paths": [
       "destinations.destinations.review.emptyState.detail"
     ]
@@ -4829,8 +4914,8 @@
       "settings.copy.delete_account.conversations.label"
     ]
   },
-  "Your tasks stay in step on iPhone, iPad and Mac.": {
-    "text": "Your tasks stay in step on iPhone, iPad and Mac.",
+  "Your tasks stay in step on every device you sign in to.": {
+    "text": "Your tasks stay in step on every device you sign in to.",
     "paths": [
       "surfaces.firstRun.steps.welcome.points.0.detail"
     ]
@@ -4932,6 +5017,18 @@
     ],
     "paths": [
       "surfaces.accountSwitch.copy.unsentOther.label"
+    ]
+  },
+  "{count} days": {
+    "forms": {
+      "one": "1 day",
+      "other": "{count} days"
+    },
+    "placeholders": [
+      "count"
+    ],
+    "paths": [
+      "surfaces.prompts.countPhrases.waitingDays.label"
     ]
   },
   "{count} files": {
@@ -5115,9 +5212,16 @@
       "plans.cards.free.priceLabel"
     ]
   },
+  "€10 a month. You save €48 against paying monthly.": {
+    "text": "€10 a month. You save €48 against paying monthly.",
+    "paths": [
+      "plans.proPrices.pro_annual.detail"
+    ]
+  },
   "€120 a year": {
     "text": "€120 a year",
     "paths": [
+      "plans.proPrices.pro_annual.label",
       "plans.cards.pro.priceLabel"
     ]
   },
@@ -5125,6 +5229,12 @@
     "text": "€120 a year or €14 a month",
     "paths": [
       "plans.levels.pro.detail"
+    ]
+  },
+  "€14 a month": {
+    "text": "€14 a month",
+    "paths": [
+      "plans.proPrices.pro_monthly.label"
     ]
   },
   "€5 a month. You save €24 against paying monthly.": {

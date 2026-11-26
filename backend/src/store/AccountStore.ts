@@ -149,6 +149,15 @@ export class AccountStore extends DurableObject<Env> {
         windowStart INTEGER NOT NULL,
         lockedUntil INTEGER NOT NULL DEFAULT 0
       );
+      CREATE TABLE IF NOT EXISTS agent_signup_limits (
+        email       TEXT PRIMARY KEY,
+        sends       INTEGER NOT NULL DEFAULT 0,
+        windowStart INTEGER NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS metric_days (
+        day  TEXT PRIMARY KEY,
+        data TEXT NOT NULL
+      );
     `);
     this.links.migrate();
   }
@@ -317,6 +326,36 @@ export class AccountStore extends DurableObject<Env> {
     });
   }
 
+  /// Per-address rate limit for headless agent signup emails (ADR 0056).
+  /// Shares the 3-per-10-minute window and respects locks on `email_codes`
+  /// without disturbing any in-flight 6-digit sign-in code.
+  noteAgentSignupSend(email: string, now = Date.now()): IssueEmailCodeResult {
+    const e = normalizeSubject("email", email);
+    return this.ctx.storage.transactionSync(() => {
+      const codeRow = this.sql.exec<{ lockedUntil: number }>(
+        "SELECT lockedUntil FROM email_codes WHERE email = ?", e,
+      ).toArray()[0];
+      if (codeRow && codeRow.lockedUntil > now) {
+        return { ok: false as const, reason: "locked" as const, retryAfterMs: codeRow.lockedUntil - now };
+      }
+      const row = this.sql.exec<{ sends: number; windowStart: number }>(
+        "SELECT sends, windowStart FROM agent_signup_limits WHERE email = ?", e,
+      ).toArray()[0];
+      const inWindow = row && now - row.windowStart < EMAIL_CODE_WINDOW_MS;
+      const sends = inWindow ? row.sends : 0;
+      const windowStart = inWindow ? row.windowStart : now;
+      if (sends >= EMAIL_CODE_MAX_SENDS) {
+        return { ok: false as const, reason: "rate_limited" as const, retryAfterMs: windowStart + EMAIL_CODE_WINDOW_MS - now };
+      }
+      this.sql.exec(
+        `INSERT INTO agent_signup_limits (email, sends, windowStart) VALUES (?, ?, ?)
+         ON CONFLICT(email) DO UPDATE SET sends = excluded.sends, windowStart = excluded.windowStart`,
+        e, sends + 1, windowStart,
+      );
+      return { ok: true as const, expiresAt: now + EMAIL_CODE_TTL_MS };
+    });
+  }
+
   /// All identities currently mapped to `userId`.
   listIdentitiesForUser(userId: string): IdentityRow[] {
     return this.sql.exec(
@@ -417,6 +456,20 @@ export class AccountStore extends DurableObject<Env> {
         plusLinks: links.get(r.userId) ?? [],
       };
     });
+  }
+
+  // ---- daily metrics (ADR 0048, src/admin/metrics.ts) ----
+
+  /// One row per UTC day (`YYYY-MM-DD`), counts only. The hourly cron
+  /// rewrites today's row, so a day keeps its last count.
+  saveMetricDay(day: string, data: Record<string, number>): void {
+    this.sql.exec("INSERT OR REPLACE INTO metric_days (day, data) VALUES (?, ?)", day, JSON.stringify(data));
+  }
+
+  /// The days on and after `since`, oldest first.
+  listMetricDays(since: string): { day: string; data: Record<string, number> }[] {
+    return this.sql.exec<{ day: string; data: string }>("SELECT day, data FROM metric_days WHERE day >= ? ORDER BY day", since)
+      .toArray().map((r) => ({ day: r.day, data: JSON.parse(r.data) as Record<string, number> }));
   }
 
   // ---- Plus links (src/store/plusLinks.ts) ----

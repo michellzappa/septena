@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Plans and pricing for Septena, the task app (ADR 0010, ADR 0023, ADR 0036, ADR 0037). One source for the pricing page, the in-app Septena Plus page and the upsell moments. `limits` holds the machine values per plan; the server plan table reads the same values. `cells` is the copy for each level, and the generator checks that every numeric limit appears in its cell.",
+  "description": "Plans and pricing for Septena, the task app (ADR 0010, ADR 0023, ADR 0036, ADR 0037). One source for the pricing page, the in-app Septena Plus page and the upsell moments. `limits` holds the machine values per plan; the server plan table reads the same values. `cells` is the copy for each level, and the generator checks that every numeric limit appears in its cell. `prices` sell Plus and `proPrices` sell Pro (ADR 0059): both sit in one store subscription group, with Pro the higher level.",
   "featureId": "sync.backend",
   "name": "Septena Plus",
   "shortName": "Plus",
@@ -36,6 +36,28 @@
       "interval": "month",
       "highlighted": false,
       "label": "€7 a month",
+      "detail": "Cancel at any time."
+    }
+  ],
+  "proPrices": [
+    {
+      "id": "pro_annual",
+      "productId": "com.septena.tasks.sync.pro.annual",
+      "amountMinor": 12000,
+      "currency": "EUR",
+      "interval": "year",
+      "highlighted": true,
+      "label": "€120 a year",
+      "detail": "€10 a month. You save €48 against paying monthly."
+    },
+    {
+      "id": "pro_monthly",
+      "productId": "com.septena.tasks.sync.pro.monthly",
+      "amountMinor": 1400,
+      "currency": "EUR",
+      "interval": "month",
+      "highlighted": false,
+      "label": "€14 a month",
       "detail": "Cancel at any time."
     }
   ],
@@ -92,7 +114,7 @@
       "id": "everywhere",
       "icon": "onboarding.devices",
       "title": "Your list everywhere",
-      "detail": "The same tasks on your phone, tablet and Mac, updated as you type.",
+      "detail": "The same tasks on every device, updated as you type.",
       "rows": [
         { "id": "devices", "label": "Devices", "limit": "devices", "featureId": "sync.backend", "cells": { "free": "1", "plus": "All your devices", "pro": "All your devices" } },
         { "id": "backup", "label": "Backup on our server", "featureId": "sync.backend", "cells": { "free": true, "plus": true, "pro": true } },
@@ -168,7 +190,7 @@
     { "id": "second_device", "title": "This device is not syncing", "detail": "A free account syncs one device. Plus syncs all of them. You can also move your free account to this device." },
     { "id": "history_edge", "title": "Older changes are hidden", "detail": "A free account shows 30 days of history. Plus shows a full year." },
     { "id": "file_elsewhere", "title": "This file is on another device", "detail": "Plus syncs files and images to all your devices." },
-    { "id": "connector_cap", "title": "Daily change limit reached", "detail": "A free account allows 500 agent changes a day. Your agent can make changes again tomorrow. Plus has no daily limit." },
+    { "id": "connector_cap", "title": "Daily change limit reached", "detail": "Agents on this account made 500 changes today. They can make changes again tomorrow." },
     { "id": "share_create", "title": "Sharing a project needs Plus", "detail": "Anyone can join a shared project for free. Plus lets you create one and invite people." },
     { "id": "trial_end", "title": "Your 14 days of Plus have ended", "detail": "Your account is now a free account. One device keeps syncing. Your tasks on every device stay where they are." }
   ],
@@ -217,6 +239,7 @@
     "plus": "Plus",
     "trialEnds": "Plus trial until {date}",
     "paidThrough": "Plus through {date}",
-    "proThrough": "Pro through {date}"
+    "proThrough": "Pro through {date}",
+    "filesSyncing": "Files are still syncing between your devices."
   }
 }

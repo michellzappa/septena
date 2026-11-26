@@ -37,7 +37,7 @@ struct SeptaskPlusPane: View {
             SyncThisDeviceButton()
           }
         }
-        if status.plan != nil, !status.isGranted {
+        if status.showsPlanButton {
           Button(sheetButtonTitle) { showingSheet = true }
         }
       }
@@ -128,6 +128,7 @@ struct SeptaskPlusPane: View {
   /// "Manage Subscription" once the account pays, "See Plus" before.
   private var sheetButtonTitle: String {
     if case .plus = status.plan { return RegistryPlans.Action.manage }
+    if status.hasAppleSubscription { return RegistryPlans.Action.manage }
     return RegistryPlans.Paywall.seePlus
   }
 

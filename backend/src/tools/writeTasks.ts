@@ -246,6 +246,16 @@ export const deferTaskJsonSchema = {
   properties: { id: { type: "string" }, until: { type: "string", description: "YYYY-MM-DD" } },
 } as const;
 
+export const setWaitingJsonSchema = {
+  type: "object",
+  required: ["id", "waiting_on"],
+  properties: {
+    id: { type: "string" },
+    waiting_on: { type: ["string", "null"], minLength: 1, maxLength: 80, description: "Who the task waits on, as the user says it (\"Anna\", \"the lawyer\"). null ends the wait: only the user may, an agent is refused (in_review)." },
+    scheduled: { type: ["string", "null"], description: "YYYY-MM-DD: the day to chase, the task's When date. null clears it. Omit to keep the date." },
+  },
+} as const;
+
 export const moveToTodayJsonSchema = {
   type: "object",
   required: ["id"],

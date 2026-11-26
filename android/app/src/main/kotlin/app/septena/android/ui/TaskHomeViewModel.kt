@@ -257,16 +257,43 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         }
     }
 
-    fun createArea(title: String, onCreated: (TaskHomeLocation.Area) -> Unit = {}) {
+    fun createArea(
+        title: String,
+        insertIndex: Int? = null,
+        onCreated: (TaskHomeLocation.Area) -> Unit = {},
+    ) {
         val trimmed = title.trim()
         if (trimmed.isEmpty()) return
         viewModelScope.launch {
             runCatching {
                 withContext(Dispatchers.IO) {
+                    val existingIds = graph.taskStore.records(EntityNames.AREA)
+                        .filter { it.deletedAt == null }
+                        .sortedWith(
+                            compareBy(
+                                { it.fields[RegistryEntityFields.Area.POSITION].numberValue() ?: Double.MAX_VALUE },
+                                { it.fields[RegistryEntityFields.Area.TITLE].stringValue().orEmpty().lowercase() },
+                            ),
+                        )
+                        .map { it.id }
                     val created = graph.registryEntityMutator.create(
                         EntityNames.AREA,
-                        mapOf(RegistryEntityFields.Area.TITLE to JsonValue.StringValue(trimmed)),
+                        mapOf(
+                            RegistryEntityFields.Area.TITLE to JsonValue.StringValue(trimmed),
+                            RegistryEntityFields.Area.POSITION to JsonValue.IntegerValue(existingIds.size.toLong()),
+                        ),
                     )
+                    if (insertIndex != null) {
+                        val ordered = existingIds.filter { it != created.id }.toMutableList()
+                        ordered.add(insertIndex.coerceIn(0, ordered.size), created.id)
+                        ordered.forEachIndexed { idx, id ->
+                            graph.registryEntityMutator.update(
+                                EntityNames.AREA,
+                                id,
+                                mapOf(RegistryEntityFields.Area.POSITION to JsonValue.IntegerValue(idx.toLong())),
+                            )
+                        }
+                    }
                     TaskHomeLocation.Area(created.id, trimmed)
                 }
             }.onSuccess { area ->
@@ -277,24 +304,185 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         }
     }
 
-    fun createProject(title: String, areaId: String? = null, onCreated: (TaskHomeLocation.Project) -> Unit = {}) {
+    fun createProject(
+        title: String,
+        areaId: String? = null,
+        insertIndex: Int? = null,
+        onCreated: (TaskHomeLocation.Project) -> Unit = {},
+    ) {
         val trimmed = title.trim()
         if (trimmed.isEmpty()) return
         viewModelScope.launch {
             runCatching {
                 withContext(Dispatchers.IO) {
+                    val siblingIds = graph.taskStore.records(EntityNames.PROJECT)
+                        .filter {
+                            it.deletedAt == null &&
+                                it.fields[RegistryEntityFields.Project.STATUS].stringValue() == RegistryEntityEnums.ProjectStatus.ACTIVE &&
+                                it.fields[RegistryEntityFields.Project.AREA].stringValue() == areaId
+                        }
+                        .sortedWith(
+                            compareBy(
+                                { it.fields[RegistryEntityFields.Project.POSITION].numberValue() ?: Double.MAX_VALUE },
+                                { it.fields[RegistryEntityFields.Project.TITLE].stringValue().orEmpty().lowercase() },
+                            ),
+                        )
+                        .map { it.id }
                     val fields = buildMap<String, JsonValue> {
                         put(RegistryEntityFields.Project.TITLE, JsonValue.StringValue(trimmed))
                         put(RegistryEntityFields.Project.STATUS, JsonValue.StringValue(RegistryEntityEnums.ProjectStatus.ACTIVE))
+                        put(RegistryEntityFields.Project.POSITION, JsonValue.IntegerValue(siblingIds.size.toLong()))
                         areaId?.let { put(RegistryEntityFields.Project.AREA, JsonValue.StringValue(it)) }
                     }
                     val created = graph.registryEntityMutator.create(EntityNames.PROJECT, fields)
+                    if (insertIndex != null) {
+                        val ordered = siblingIds.filter { it != created.id }.toMutableList()
+                        ordered.add(insertIndex.coerceIn(0, ordered.size), created.id)
+                        ordered.forEachIndexed { idx, id ->
+                            graph.registryEntityMutator.update(
+                                EntityNames.PROJECT,
+                                id,
+                                mapOf(RegistryEntityFields.Project.POSITION to JsonValue.IntegerValue(idx.toLong())),
+                            )
+                        }
+                    }
                     TaskHomeLocation.Project(created.id, trimmed)
                 }
             }.onSuccess { project ->
                 errorMessage.value = null
                 noteLocalChangeAndSync()
                 onCreated(project)
+            }.onFailure { errorMessage.value = it.message }
+        }
+    }
+
+    fun moveProjectToArea(projectId: String, areaId: String?) {
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    graph.registryEntityMutator.update(
+                        EntityNames.PROJECT,
+                        projectId,
+                        mapOf(RegistryEntityFields.Project.AREA to JsonValue.stringOrNull(areaId)),
+                    ) != null
+                }
+            }.onSuccess { changed ->
+                errorMessage.value = null
+                if (changed) noteLocalChangeAndSync()
+            }.onFailure { errorMessage.value = it.message }
+        }
+    }
+
+    fun renameArea(areaId: String, title: String) {
+        val trimmed = title.trim()
+        if (trimmed.isEmpty()) return
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    graph.registryEntityMutator.update(
+                        EntityNames.AREA,
+                        areaId,
+                        mapOf(RegistryEntityFields.Area.TITLE to JsonValue.StringValue(trimmed)),
+                    ) != null
+                }
+            }.onSuccess { changed ->
+                errorMessage.value = null
+                if (changed) noteLocalChangeAndSync()
+            }.onFailure { errorMessage.value = it.message }
+        }
+    }
+
+    fun renameProject(projectId: String, title: String) {
+        val trimmed = title.trim()
+        if (trimmed.isEmpty()) return
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    graph.registryEntityMutator.update(
+                        EntityNames.PROJECT,
+                        projectId,
+                        mapOf(RegistryEntityFields.Project.TITLE to JsonValue.StringValue(trimmed)),
+                    ) != null
+                }
+            }.onSuccess { changed ->
+                errorMessage.value = null
+                if (changed) noteLocalChangeAndSync()
+            }.onFailure { errorMessage.value = it.message }
+        }
+    }
+
+    fun deleteArea(areaId: String) {
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    graph.registryEntityMutator.delete(EntityNames.AREA, areaId) != null
+                }
+            }.onSuccess { changed ->
+                errorMessage.value = null
+                if (changed) {
+                    if ((location.value as? TaskHomeLocation.Area)?.id == areaId) {
+                        select(TaskHomeLocation.SmartList(RegistryDestinationIds.TODAY))
+                    }
+                    noteLocalChangeAndSync()
+                }
+            }.onFailure { errorMessage.value = it.message }
+        }
+    }
+
+    fun deleteProject(projectId: String) {
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    graph.registryEntityMutator.delete(EntityNames.PROJECT, projectId) != null
+                }
+            }.onSuccess { changed ->
+                errorMessage.value = null
+                if (changed) {
+                    if ((location.value as? TaskHomeLocation.Project)?.id == projectId) {
+                        select(TaskHomeLocation.SmartList(RegistryDestinationIds.TODAY))
+                    }
+                    noteLocalChangeAndSync()
+                }
+            }.onFailure { errorMessage.value = it.message }
+        }
+    }
+
+    fun reorderAreas(orderedIds: List<String>) {
+        if (orderedIds.isEmpty()) return
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    orderedIds.forEachIndexed { idx, id ->
+                        graph.registryEntityMutator.update(
+                            EntityNames.AREA,
+                            id,
+                            mapOf(RegistryEntityFields.Area.POSITION to JsonValue.IntegerValue(idx.toLong())),
+                        )
+                    }
+                }
+            }.onSuccess {
+                errorMessage.value = null
+                noteLocalChangeAndSync()
+            }.onFailure { errorMessage.value = it.message }
+        }
+    }
+
+    fun reorderProjects(orderedIds: List<String>) {
+        if (orderedIds.isEmpty()) return
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    orderedIds.forEachIndexed { idx, id ->
+                        graph.registryEntityMutator.update(
+                            EntityNames.PROJECT,
+                            id,
+                            mapOf(RegistryEntityFields.Project.POSITION to JsonValue.IntegerValue(idx.toLong())),
+                        )
+                    }
+                }
+            }.onSuccess {
+                errorMessage.value = null
+                noteLocalChangeAndSync()
             }.onFailure { errorMessage.value = it.message }
         }
     }
@@ -390,7 +578,11 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
     }
 
     /** Complete, Cancel, Delete or Today on the whole selection, as one undo step. */
-    fun applyToSelection(actionId: String, todayEnabled: Boolean = true) {
+    fun applyToSelection(
+        actionId: String,
+        todayEnabled: Boolean = true,
+        mode: app.septena.sharedcore.RescheduleMode = app.septena.sharedcore.RescheduleMode.MAKE_EXCEPTION,
+    ) {
         if (actionId == RegistryActionIds.TASK_TOGGLE_COMPLETE) {
             batchGesture { ids -> graph.completeTasks(ids) }
             return
@@ -399,15 +591,29 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             when (actionId) {
                 RegistryActionIds.TASK_CANCEL -> graph.taskMutator.cancel(id)
                 RegistryActionIds.TASK_DELETE -> graph.taskMutator.delete(id)
-                RegistryActionIds.TASK_TOGGLE_TODAY -> graph.taskMutator.setToday(id, todayEnabled)
+                RegistryActionIds.TASK_TOGGLE_TODAY -> graph.taskMutator.setToday(id, todayEnabled, mode)
                 else -> error("Unsupported batch action: $actionId")
             }
         }
     }
 
+    /** True when rescheduling any of [ids] onto [targetDay] requires the fixed-repeat prompt (#573). */
+    suspend fun anyNeedsFixedRepeatPrompt(ids: Collection<String>, targetDay: String?): Boolean {
+        if (ids.isEmpty() || targetDay == null) return false
+        return withContext(Dispatchers.IO) {
+            ids.any { id ->
+                val record = graph.taskStore.record(EntityNames.TASK, id)
+                record != null && app.septena.core.TaskMutator.needsFixedRepeatReschedulePrompt(record.fields, targetDay)
+            }
+        }
+    }
+
     /** When for the whole selection; null clears it. */
-    fun setWhenForSelection(day: String?) {
-        batch { id -> graph.taskMutator.setWhen(id, day) }
+    fun setWhenForSelection(
+        day: String?,
+        mode: app.septena.sharedcore.RescheduleMode = app.septena.sharedcore.RescheduleMode.MAKE_EXCEPTION,
+    ) {
+        batch { id -> graph.taskMutator.setWhen(id, day, mode) }
     }
 
     /** Move the whole selection to an area, a project, or (both null) the Inbox. */
@@ -539,6 +745,13 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
 
     fun keepFaded(id: String) = editTask(id) { graph.taskMutator.keepFaded(id) }
 
+    /** Waiting On… (docs/REVIEW_SPEC.md §6): the name, and the When date (null clears it). */
+    fun setWaiting(id: String, name: String, checkBack: String?) =
+        editTask(id) { graph.taskMutator.setWaiting(id, name, checkBack, changesWhen = true) }
+
+    /** Got It Back: the wait ends; the task stays open in its list. */
+    fun gotItBack(id: String) = editTask(id) { graph.taskMutator.setWaiting(id, null) }
+
     fun letGoFaded(id: String) = editTask(id, touches = false) { graph.taskMutator.letGoFaded(id) }
 
     /** One-tap filing from an Inbox suggestion capsule (`edit.filing-suggestion`, #368). */
@@ -601,12 +814,16 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
     }
 
     /** Reschedules dragged Upcoming tasks onto [dayIso] (`YYYY-MM-DD`) in one undoable edit. */
-    fun rescheduleToDay(ids: List<String>, dayIso: String) {
+    fun rescheduleToDay(
+        ids: List<String>,
+        dayIso: String,
+        mode: app.septena.sharedcore.RescheduleMode = app.septena.sharedcore.RescheduleMode.MAKE_EXCEPTION,
+    ) {
         if (ids.isEmpty()) return
         viewModelScope.launch {
             runCatching {
                 withContext(Dispatchers.IO) {
-                    graph.captureTaskEdits(ids.toSet()) { id -> graph.taskMutator.setWhen(id, dayIso) }
+                    graph.captureTaskEdits(ids.toSet()) { id -> graph.taskMutator.setWhen(id, dayIso, mode) }
                 }
             }.onSuccess {
                 clearSelection()
@@ -815,6 +1032,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         var reviewCount = 0
         val agentRequestTimes = mutableListOf<java.time.Instant>()
         var agentCount = 0
+        var waitingCount = 0
         var starredCount = 0
         var fadedCount = 0
         var deletedCount = 0
@@ -850,6 +1068,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                     // progress keeps Review in the sidebar without a badge; faded tasks are counted apart.
                     if (reviewGroup in ReviewGroupIds.BADGE) reviewCount += 1
                     if (reviewGroup in ReviewGroupIds.AGENT_WORK) agentCount += 1
+                    if (reviewGroup == ReviewGroupIds.WAITING) waitingCount += 1
                     val requestedAt = when {
                         convoState?.needsHumanReview == true -> conversations[snapshot.id]?.endStateAt
                         convoState?.awaitsHuman == true -> conversations[snapshot.id]?.lastTurnAt
@@ -927,7 +1146,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         }
 
         val nonEmptyDestinations = buildSet {
-            if (reviewCount > 0 || agentCount > 0 || fadedCount > 0 ||
+            if (reviewCount > 0 || agentCount > 0 || waitingCount > 0 || fadedCount > 0 ||
                 (selected as? TaskHomeLocation.SmartList)?.destinationId == RegistryDestinationIds.REVIEW
             ) {
                 add(RegistryDestinationIds.REVIEW)
@@ -1151,6 +1370,10 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                         },
                         areaId = snapshot.area,
                         projectId = snapshot.project,
+                        // Review ▸ Waiting lists the oldest wait first.
+                        waitingSince = snapshot.waitingSince.takeIf {
+                            groupHeader != null && groupHeader == reviewGroups[ReviewGroupIds.WAITING]
+                        },
                     )
                     if (inTodayInbox) {
                         inbox += positioned
@@ -1349,6 +1572,9 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                         .thenBy { it.item.title.lowercase() }
                 RegistryDestinationIds.UPCOMING ->
                     compareBy<PositionedTask>({ it.archiveDate ?: "9999-99-99" }, { it.position ?: Double.MAX_VALUE }, { it.item.title.lowercase() })
+                // Only Waiting rows carry waitingSince; sortedByGroup then keeps this order inside each group.
+                RegistryDestinationIds.REVIEW ->
+                    compareBy<PositionedTask>({ it.waitingSince.orEmpty() }, { it.position ?: Double.MAX_VALUE }, { it.item.title.lowercase() })
                 else ->
                     compareBy<PositionedTask>({ it.position ?: Double.MAX_VALUE }, { it.item.title.lowercase() })
             },
@@ -1442,6 +1668,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         val archiveDate: String? = null,
         val areaId: String? = null,
         val projectId: String? = null,
+        val waitingSince: String? = null,
     )
 
     private companion object {

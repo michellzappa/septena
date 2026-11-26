@@ -36,9 +36,23 @@ struct HeadingDragIDs: Codable, Transferable {
   }
 }
 
+/// Drag payload for reordering Areas and Projects, and moving Projects between
+/// Areas (or out to No Area) in the SwiftUI sidebar (`SidebarView`). Kept
+/// distinct from `TaskDragIDs` so task-filing drops and structure-arrangement
+/// drops never collide.
+enum SidebarStructureDragItem: Codable, Hashable, Transferable {
+  case area(String)
+  case project(String)
+
+  static var transferRepresentation: some TransferRepresentation {
+    CodableRepresentation(contentType: .septenaStructureDragItem)
+  }
+}
+
 extension UTType {
   static let septenaTaskDragIDs = UTType(exportedAs: "com.septena.task-drag-ids")
   static let septenaHeadingDragIDs = UTType(exportedAs: "com.septena.heading-drag-ids")
+  static let septenaStructureDragItem = UTType(exportedAs: "com.septena.structure-drag-item")
 }
 
 /// Row-level reorder target for manually-ordered lists — the in-list
@@ -503,10 +517,11 @@ struct TaskCheckboxModel {
     let isDeleted = task.deletedAt != nil
     isToday = task.isOnToday && showsTodayIndicator && !isDeleted && !task.isFaded
     dashed = TaskRowFlags.languageV2 && isProposal
-    // Accent corner dot for a committed task carrying unread agent context.
-    // Proposals are excluded (they already read as dashed).
+    // Accent corner dot for an open, committed task with an active or finished
+    // conversation (agent work or Discuss). Proposals read as dashed instead,
+    // and completed/cancelled or stopped tasks hide the dot.
     cornerDot = {
-      guard TaskRowFlags.languageV2, !isProposal else { return nil }
+      guard TaskRowFlags.languageV2, task.status == .open, !isProposal else { return nil }
       if task.conversation.hasStarted, deriveConvo(task.conversation).badge != nil { return accent }
       return nil
     }()
@@ -739,6 +754,10 @@ struct TaskRow: View {
     } else if showsTodayIndicator && task.isOnToday && task.status == .open && task.deletedAt == nil && !task.isFaded {
       TaskStatusPill(symbol: "sun.max.fill",
                      title: TaskFilter.today.title)
+    }
+    // "Waiting on Anna · 5 days" (docs/REVIEW_SPEC.md §6).
+    if task.status == .open, task.deletedAt == nil, let waiting = task.waitingLabel(today: clock.today) {
+      TaskStatusPill(symbol: RegistryIcons.sfSymbol(for: "action.waiting"), title: waiting)
     }
     if let name = SharedProjects.assigneeName(of: task, in: LocalStore.shared.container.mainContext) {
       TaskStatusPill(symbol: RegistryIcons.sfSymbol(for: "action.assign"), title: name)
@@ -1114,10 +1133,11 @@ struct WeekStrip: View {
 
 /// THE date board for tasks — one component, every task date surface.
 ///
-/// Shape, in order: a **seven-day strip starting TODAY**, then one list of
-/// rows from the registry (`RegistrySurfaces.dateBoardRows`): Tomorrow, Pick
-/// another date (Apple's month calendar, for anything further out), Clear,
-/// and for When, Repeat and Add time. Every row is a `TaskDateBoardRow`.
+/// Shape, in order: a **seven-day strip starting TODAY**, then the rows from
+/// the registry (`RegistrySurfaces.dateBoardRows`) in three groups: pick (the
+/// strip and Pick another date, Apple's month calendar for anything further
+/// out), refine (Add time, Repeat; When only) and remove (Clear). A hairline
+/// separates the groups. Every row is a `TaskDateBoardRow`.
 /// It is the SwiftUI twin of the AppKit shell's ⌘S / ⌘⇧D popover
 /// (`Septask/SeptaskKitDatePopover.swift`), so When and Deadline ask the
 /// question the same way in both apps.
@@ -1126,8 +1146,8 @@ struct WeekStrip: View {
 /// carry both — a Today row over a strip that started tomorrow — which asked
 /// one question (which day?) with two controls in two vocabularies. One strip
 /// answers it on one axis, and the cell people pick most is the leading one.
-/// Tomorrow has both a cell and a row, because "tomorrow" is an answer people
-/// look for by name (decided 2026-11-24).
+/// Tomorrow is a strip cell only. It was also a row (2026-11-24), but the
+/// duplicate made the board read as an unordered list (mz, 2026-11-26).
 ///
 /// Every control commits on the spot — there is no confirm button.
 ///
@@ -1176,28 +1196,38 @@ struct TaskDateBoard: View {
         if cal.isDate(day, inSameDayAs: anchorDay) { onToday() } else { onPick(day) }
       }
       .padding(.top, 4)
-      .padding(.bottom, 10)
-
-      Hairline(leadingInset: 0)
+      .padding(.bottom, 6)
 
       VStack(spacing: 0) {
-        ForEach(RegistrySurfaces.dateBoardRows(for: attribute, on: RegistryPlatform.current)) { row in
+        ForEach(Array(visibleRows.enumerated()), id: \.element.id) { index, row in
+          // The strip opens the first group, so a divider goes only where
+          // the group changes.
+          let previous = index == 0 ? RegistryDateBoardGroup.pick : visibleRows[index - 1].group
+          if row.group != previous {
+            Hairline(leadingInset: 0)
+              .padding(.vertical, 4)
+          }
           boardRow(row)
         }
       }
-      .padding(.top, 4)
+    }
+  }
+
+  /// The registry rows this board can act on. A group with no rows draws no
+  /// divider, so the filter runs before the dividers are placed.
+  private var visibleRows: [RegistryDateBoardRow] {
+    RegistrySurfaces.dateBoardRows(for: attribute, on: RegistryPlatform.current).filter { row in
+      switch row.kind {
+      case .repeatRule: return repeatLabel != nil && onRepeat != nil
+      case .time: return onAddTime != nil
+      case .calendar, .clear: return true
+      }
     }
   }
 
   @ViewBuilder
   private func boardRow(_ row: RegistryDateBoardRow) -> some View {
     switch row.kind {
-    case .tomorrow:
-      TaskDateBoardRow(symbol: row.sfSymbol, title: row.label(for: attribute)) {
-        guard let tomorrow = cal.date(byAdding: .day, value: 1, to: anchorDay) else { return }
-        Haptics.selection()
-        onPick(tomorrow)
-      }
     case .calendar:
       calendarRow(row)
       if embedding != nil && showingCalendar {

@@ -60,6 +60,10 @@ data class TaskListItem(
     val canAssign: Boolean = false,
     /** Who does the task, when that is another member of its shared project. */
     val assigneeName: String? = null,
+    /** The task waits on a person (docs/REVIEW_SPEC.md §6), so its row menu offers Got It Back. */
+    val isWaiting: Boolean = false,
+    /** "Waiting on Anna · 5 days" (registry copy), or null. */
+    val waitingText: String? = null,
     val subtitle: String? = null,
     val isCompleted: Boolean = false,
     val isOnToday: Boolean = false,
@@ -174,10 +178,13 @@ data class TaskRowMenuAction(
     val needsReview: Boolean = false,
     /** Shows only on a faded task ([TaskListItem.isFaded]). */
     val needsFaded: Boolean = false,
+    /** Shows only on a task that waits on a person ([TaskListItem.isWaiting]). */
+    val needsWaiting: Boolean = false,
     val icon: TaskMenuActionIcon = TaskMenuActionIcon.None,
 ) {
     fun appliesTo(task: TaskListItem): Boolean =
-        (task.canAssign || !needsAssignees) && (task.isInReview || !needsReview) && (task.isFaded || !needsFaded)
+        (task.canAssign || !needsAssignees) && (task.isInReview || !needsReview) && (task.isFaded || !needsFaded) &&
+            (task.isWaiting || !needsWaiting)
 }
 
 /** The last group of a list, which the user folds (Review's Faded). Its rows carry no group header. */

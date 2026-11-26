@@ -56,11 +56,10 @@ export async function reviewerCodeMatches(env: Env, given: string): Promise<bool
   return sameSecret(given.trim(), env.REVIEWER_CODE!.trim());
 }
 
-/// Prepares the demo account for the seed script: an app session (the token
-/// exchange refuses an account without one), a Pro grant (reviewers from two
-/// directories connect two agents), and a short-lived connector token for the
-/// script, which revokes it when it is done. Only ever the demo account.
-export async function prepareReviewerAccount(env: Env): Promise<McpTokenResponse | null> {
+/// Ensures the demo account has an app session (device poll and connector
+/// token exchange both require one) and a Pro grant while reviewer mode is on.
+/// Returns the demo account id, or null when reviewer mode is off.
+export async function ensureReviewerAccount(env: Env): Promise<{ userId: string } | null> {
   const mode = reviewerMode(env);
   if (!mode) return null;
   const store = storeFor(env, mode.userId);
@@ -69,6 +68,16 @@ export async function prepareReviewerAccount(env: Env): Promise<McpTokenResponse
     grantRow("grant:reviewer", "pro", null, "Directory reviewer demo account (ADR 0055)"),
     "admin",
   );
+  return mode;
+}
+
+/// Prepares the demo account for the seed script: an app session (the token
+/// exchange refuses an account without one), a Pro grant (reviewers from two
+/// directories connect two agents), and a short-lived connector token for the
+/// script, which revokes it when it is done. Only ever the demo account.
+export async function prepareReviewerAccount(env: Env): Promise<McpTokenResponse | null> {
+  const mode = await ensureReviewerAccount(env);
+  if (!mode) return null;
   const tokens = await issueMcpTokens(env, {
     userId: mode.userId,
     clientId: REVIEWER_SEED_CLIENT_ID,

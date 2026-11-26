@@ -50,6 +50,11 @@ of the arc. The June 2026 life-OS story below is superseded.
 | Self-hosting | **Planned** (ADR 0011, #119): the server on your own Cloudflare account, unsupported by design. |
 | Private by design | One private store per user at `api.septena.app` (ADR 0002). No ads, no investors. The iCloud-only claim is **gone**; never use it. |
 | Weekends | Saturday is the biggest commit day (401), then Sunday (329) and Friday (328). |
+| Who mz is (personal) | From mz's own michellzappa.com/about (read 2026-11-26): born in Stockholm (1982), moved to São Paulo for school in 1997, moved to Amsterdam in 2005 to work as a designer and developer (TrendWatching), has also lived in London and Milan, lives in Amsterdam. "I'm not a programmer, but since coding agents arrived I build software anyway." |
+| What else mz does | Same source: founded Envisioning (technology research institute) in 2010 and still runs it; writes the weekly Artificial Insights newsletter (since April 2023); founded Starlings and Bipe in 2026, separate companies; THNK faculty since 2012. |
+| The centaur essay | "Field Notes from a Centaur", michellzappa.com/blog/field-notes-from-a-centaur-2026 (15 Dec 2025). /about links to it. |
+| mz's own account (2026-11-26) | mz, in chat: has used every to-do app and runs his digital life on them; loves the craft of Cultured Code, the versatility of Doist and the native integrations of Reminders; practises GTD-lite; tried shapes where his agents felt native for reading, writing and accountability; dogfooded Septena for six months; built it by vibe coding, mostly with Claude Opus 5 and 5.5, Gemini Neon 4 and GPT 6 Sol and Luna; uses it for brain dumps, accountability, prioritizing and sharing ideas; every agent reads the same list. |
+| The name, per mz | "Septena is a made-up word referring to seven, or a week" (mz, 2026-11-26). Overrides "Latin for a group of seven" in Block I. |
 | The numbers are trustworthy | Going open source rewrote hashes (a secrets + history scrub) but preserved author dates, so counts and dates are real. The history from before the rename lives inside this repo; don't double-count. |
 
 ### Block G — the origin line (canonical, 2026-11-21)
@@ -225,56 +230,28 @@ Canonical wording. Reuse verbatim where it fits; adapt length, not meaning.
 > on me; if something's thoughtful, it's probably the part I use every day too.
 > — mz
 
-### Block B — Maker's note (long, for the website /about) — rewritten 2026-11-21
+### Block B — Maker's note (long, for the website /about) — rewritten 2026-11-26
 
-Todo story only. Humanizer pass done 2026-11-21. Facts trace to §1.
+Led by the person, in mz's own words from 2026-11-26 (§1). No tasks from mz's own list: he found that too specific (2026-11-26). The live text is
+`app/about/page.tsx` in septena-site; this is its outline, so the two cannot
+drift word by word. Humanizer pass done.
 
-> **Why Septena**
->
-> The first commit was a task app. On 4 April 2026 I started a Things-style list,
-> and on day two every task got three odd fields: a note from the agent, how sure
-> it was, and whether a human needed to look. I wanted a list my AI could work,
-> and I wanted to see what it had done.
->
-> For a while the same code also ran a much bigger app, one for tracking the rest
-> of my life. That one is Septena Life now, and it's a different story. Septena is
-> the list, the thing I started with.
->
-> **How it's made**
->
-> I build it with AI. Mostly Claude, sometimes Gemini, often several sessions at
-> once. The repo has about two thousand commits, and more than half name Claude as
-> co-author. It also has an AGENTS.md that gives every agent the rules, the traps that earlier
-> sessions fell into, and the things it may not do alone. Much of that file exists
-> because an agent got something wrong first.
->
-> So agents build Septena, and I use Septena to hand work to agents. I write a
-> task and assign it to Claude. The agent claims it, works on it, and asks me in
-> the app when it's stuck, with a couple of buttons to tap. When I say stop, it
-> stops. The stop lives on the server, not in a prompt, and no agent can lift it.
-> Next, a runner on my Mac mini will pick up tasks while I sleep.
->
-> That stop is why I built the app. I think of working with AI as being a
-> centaur. The machine adds reach, and the sense and the direction stay mine. My
-> task list is where I decide what matters this week. It should be the one place
-> where I decide and the agents ask.
->
-> **Why it's open**
->
-> Code is cheap now, so trust is what an app has to earn. If an agent can write to
-> your tasks, you should be able to read the rules it runs under. If one person
-> makes an app, you should be able to keep it running without him. In this case,
-> without me. The apps and the server are open source under MIT. Running the
-> server on your own Cloudflare account is planned.
->
-> No team, no investors. One person, a few agents, and a list that waits for my
-> say.
->
-> Michell
+1. **Hi, I'm Michell** (photo from `MAKER_PHOTOS`): every to-do app under the
+   sun; the craft of Cultured Code, the versatility of Doist, the native
+   integrations of Reminders. Not a programmer. Envisioning (linked), Artificial
+   Insights (linked to envisioning.com/newsletter), Starlings and Bipe. Stockholm, São Paulo, Amsterdam.
+2. **Why I built it:** GTD-lite, wanted more; agents that feel native for
+   reading, writing and accountability; Block G's day-two fields; six months of
+   dogfooding; Block H with a link to the centaur essay.
+3. **How I use it:** brain dumps, accountability, prioritizing, sharing ideas;
+   all agents on one list; the stop; the runner is next.
+4. **How it's made:** vibe coding with the models in §1; AGENTS.md.
+5. **Why it's open:** unchanged; signed with michellzappa.com and envisioning.com.
+6. **The name:** "a made-up word. It refers to seven, as in the days of a week."
+7. A press-kit band to /about/brand, then Get in touch with Block F's line.
 
-The previous Block B (June 2026: "eleven weeks of evenings and weekends", "not
-a night owl", "everything I track", "local-first") is retired. Its claims are
-stale or now banned (§1).
+Naming other apps here is mz's own choice (2026-11-26): it is admiration in his
+voice, never a comparison.
 
 ### Block J — press bio (third person, for the press kit) — 2026-11-23
 
@@ -332,7 +309,7 @@ Where the identity appears, which block, which repo/file, current state.
 | Patronage / Septena+ | cloud · `SettingsPanes.swift` (`SeptenaPlus.reasons` → "Pays the AI bill") | C | **done** (iOS+Mac green 2026-06-21) |
 | Support intro line | cloud · `SupportSettingsPane.swift` (ticket footer + email fallback) | F | **done** (iOS+Mac green 2026-06-21) |
 | Changelog voice | cloud · `Septena/Resources/changelog.json` | E | ongoing, tighten |
-| Website /about | site · `app/about/page.tsx` | B + D | **done** 2026-11-21: Block B, todo story. Same text on michellzappa.com/blog/septena-2026 |
+| Website /about | site · `app/about/page.tsx` | B + D + F | **done** 2026-11-26: Block B, mz's own account, press photo, press-kit band. michellzappa.com/blog/septena-2026 still has the 2026-11-21 text |
 | Website /ownership | site · `app/ownership/page.tsx` | B + D | review vs. this doc |
 | Website /support | site · `app/support/page.tsx` | C + F | reframe |
 | Website /supporters | site · `app/supporters/page.tsx` | C | review |
