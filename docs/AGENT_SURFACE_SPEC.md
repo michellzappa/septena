@@ -1,6 +1,6 @@
 # Agent surface spec
 
-Status: proposal (2026-11-26). Rests on [ADR 0050](adr/0050-septena-publishes-its-agent-contract.md),
+Status: accepted (2026-11-26). Rests on [ADR 0050](adr/0050-septena-publishes-its-agent-contract.md),
 ADR 0008 (agent loop) and ADR 0038 (agents are the integrations).
 
 ## Why

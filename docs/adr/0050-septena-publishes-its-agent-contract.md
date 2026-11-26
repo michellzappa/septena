@@ -1,6 +1,6 @@
 # 0050. Septena publishes its agent contract
 
-- Status: proposed (2026-11-26)
+- Status: accepted (2026-11-26)
 - Date: 2026-11-26
 - Deciders: mz
 - Spec: [AGENT_SURFACE_SPEC.md](../AGENT_SURFACE_SPEC.md)

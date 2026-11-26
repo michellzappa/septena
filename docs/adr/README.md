@@ -54,7 +54,7 @@ a new ADR and set the old one to `superseded by NNNN`.
 | [0047](0047-every-way-in-creates-an-account.md) | Every way into Septena creates an account and offers every sign-in method it can (amends 0016) | accepted |
 | [0048](0048-decisions-and-questions-are-typed-log-entries.md) | Decisions and open questions are typed entries in the notes log | proposed |
 | [0049](0049-templates-are-a-versioned-json-file.md) | A template is a versioned JSON file of structure and briefs, never of private data | proposed |
-| [0050](0050-septena-publishes-its-agent-contract.md) | Septena publishes its agent contract: Markdown twins, a versioned spec, one error envelope, idempotency, OpenAPI, skills | proposed |
+| [0050](0050-septena-publishes-its-agent-contract.md) | Septena publishes its agent contract: Markdown twins, a versioned spec, one error envelope, idempotency, OpenAPI, skills | accepted |
 
 ## Template
 
