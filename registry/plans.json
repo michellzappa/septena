@@ -43,7 +43,7 @@
   "levels": [
     { "id": "free", "title": "Free", "detail": "€0" },
     { "id": "plus", "title": "Plus", "detail": "€60 a year or €7 a month" },
-    { "id": "pro", "title": "Pro", "detail": "Planned: €120 a year or €14 a month" }
+    { "id": "pro", "title": "Pro", "detail": "By invitation. €120 a year or €14 a month once it goes on sale" }
   ],
   "ladderHeadline": "One device free. All devices on Plus. All your agents on Pro.",
   "cardRows": ["devices", "connected", "files", "history"],
@@ -80,7 +80,7 @@
       "id": "pro",
       "title": "Septena Pro",
       "icon": "plans.pro",
-      "status": "planned",
+      "status": "invite",
       "priceLabel": "€120 a year",
       "priceDetail": "Or €14 a month.",
       "detail": "For people who run many agents on one list.",

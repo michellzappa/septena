@@ -724,7 +724,8 @@ function validatePlans(plans, icons, caps, importSources) {
 
   assert(JSON.stringify(plans.levels.map((l) => l.id)) === JSON.stringify(PLAN_LEVELS), `plans.json: levels must be ${PLAN_LEVELS.join(", ")}`);
   assert(JSON.stringify(plans.cards.map((c) => c.id)) === JSON.stringify(PLAN_LEVELS), `plans.json: cards must be ${PLAN_LEVELS.join(", ")}`);
-  assert(plans.cards.find((c) => c.id === "pro").status === "planned", "plans.json: the pro card must be planned");
+  // ADR 0052: Pro is a real plan, given by invitation and not sold yet.
+  assert(plans.cards.find((c) => c.id === "pro").status === "invite", "plans.json: the pro card must be invite (given, not sold)");
   assert(plans.cards.filter((c) => c.highlighted).length === 1, "plans.json: exactly one card must be highlighted");
   for (const k of ["seePlus", "startTrial", "trialStarted", "trialBilling", "success", "pending", "serverRetry", "failed", "ownedApple", "ownedWeb", "ownedGoogle", "ownedGrant", "ownedGrantPro", "ownedOtherAccount", "done"]) {
     assert(typeof plans.paywall?.[k] === "string" && plans.paywall[k].length > 0, `plans.json: paywall.${k} missing`);
@@ -2057,7 +2058,7 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  ] }");
   lines.push("  static var cards: [RegistryPlanCard] { [");
   const cardSwift = (c) => `RegistryPlanCard(id: ${swiftStr(c.id)}, title: ${L(c.title, c, "title")}, icon: ${swiftStr(c.icon)}, detail: ${L(c.detail, c, "detail")}, footnote: ${LOpt(c.footnote, c, "footnote")}, highlighted: ${c.highlighted === true})`;
-  for (const c of P.cards.filter((c) => c.status !== "planned")) lines.push(`    ${cardSwift(c)},`);
+  for (const c of P.cards.filter((c) => c.status === undefined)) lines.push(`    ${cardSwift(c)},`);
   lines.push("  ] }");
   lines.push("  /// Only for an account that has Pro: no store sells it (ADR 0037, ADR 0045).");
   lines.push(`  static var proCard: RegistryPlanCard { ${cardSwift(P.cards.find((c) => c.id === "pro"))} }`);
