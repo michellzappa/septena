@@ -846,6 +846,21 @@ final class SeptaskKitTaskListController: NSViewController {
   private var unfoldedNotes = Set<String>()
   /// The table width the notes row was last measured at.
   private var notesRowMeasuredWidth: CGFloat = 0
+  /// The width the notes cell reported it draws at, when that differs from
+  /// the table's. Cleared when the table width moves.
+  private var notesCellWidth: CGFloat?
+
+  /// The notes cell found its row too short or too tall for its text (long
+  /// notes ran under the task card, 2026-11-26). Measure again at the width
+  /// the cell draws at.
+  private func remeasureNotesRow(id: String, cellWidth: CGFloat) {
+    guard let row = rows.firstIndex(where: {
+      if case .containerNotes(_, id, _) = $0 { return true }
+      return false
+    }), row < tableView.numberOfRows else { return }
+    notesCellWidth = cellWidth
+    tableView.noteHeightOfRows(withIndexesChanged: [row])
+  }
 
   /// The notes row wraps, so its height depends on the width: re-note it when
   /// the width moves. Guarded on a real change, for the same re-entry reason
@@ -854,6 +869,7 @@ final class SeptaskKitTaskListController: NSViewController {
     let width = tableView.bounds.width
     guard abs(width - notesRowMeasuredWidth) > 0.5 else { return }
     notesRowMeasuredWidth = width
+    notesCellWidth = nil
     let indexes = IndexSet(rows.indices.filter { idx in
       guard idx < tableView.numberOfRows else { return false }
       switch rows[idx] {
@@ -5344,7 +5360,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       return KitContainerNotes.height(
         text: text,
         placeholder: isArea ? ContainerNotes.areaPlaceholder : ContainerNotes.projectPlaceholder,
-        rowWidth: tableView.bounds.width,
+        rowWidth: notesCellWidth ?? tableView.bounds.width,
         expanded: unfoldedNotes.contains(id))
     // Reminder rows read as task rows (they become tasks on click); their
     // header sits on the page like every other group header.
@@ -6019,6 +6035,9 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       }
       cell.onHistory = { [weak self] in
         self?.showContainerNotesHistory(isArea: isArea, id: id)
+      }
+      cell.onHeightMismatch = { [weak self] width in
+        self?.remeasureNotesRow(id: id, cellWidth: width)
       }
       return cell
 
