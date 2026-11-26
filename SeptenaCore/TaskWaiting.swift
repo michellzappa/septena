@@ -30,12 +30,13 @@ enum TaskWaiting {
     return max(0, days)
   }
 
-  /// "Waiting on Anna · 5 days", or "Waiting on Anna" when the start day is
-  /// unknown. nil when the task does not wait.
+  /// "Waiting on Anna · 5 days", or "Waiting on Anna" on the first day and
+  /// when the start day is unknown (as on Android and web). nil when the task
+  /// does not wait.
   static func label(on waitingOn: String?, since: String?, today: String) -> String? {
     guard let name = normalizedName(waitingOn) else { return nil }
     let head = RegistryWaiting.label(name: name)
-    guard let days = days(since: since, today: today) else { return head }
+    guard let days = days(since: since, today: today), days > 0 else { return head }
     return [head, RegistryPrompts.waitingDaysPhrase(count: days)].joined(separator: " · ")
   }
 

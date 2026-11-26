@@ -8,9 +8,9 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 
 | Status | iPhone | iPad | Mac | Web | Android | Windows | Watch |
 |---|---|---|---|---|---|---|---|
-| ships | 57 | 58 | 58 | 50 | 53 | 0 | 1 |
+| ships | 58 | 59 | 59 | 51 | 54 | 0 | 1 |
 | partial | 1 | 1 | 1 | 1 | 2 | 0 | 3 |
-| planned | 4 | 4 | 4 | 8 | 6 | 62 | 2 |
+| planned | 3 | 3 | 3 | 7 | 5 | 62 | 2 |
 | - | 4 | 3 | 3 | 7 | 5 | 4 | 60 |
 
 | ID | Feature | iPhone | iPad | Mac | Web | Android | Windows | Watch |
@@ -18,7 +18,7 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 | `lists.inbox` | Inbox band on Today | ships | ships | ships | ships | ships | planned | partial |
 | `lists.today` | Today | ships | ships | ships | ships | ships | planned | partial |
 | `lists.review` | Review (questions, finished work, agent work in progress, faded tasks) | ships | ships | ships | ships | ships | planned | - |
-| `review.waiting` | Waiting: work handed to a person, in Review | planned | planned | planned | planned | planned | planned | - |
+| `review.waiting` | Waiting: work handed to a person, in Review | ships | ships | ships | ships | ships | planned | - |
 | `lists.agent` | Agent work by stage (Working, Queued, Stopped groups in Review) | ships | ships | ships | ships | ships | planned | - |
 | `lists.upcoming` | Upcoming | ships | ships | ships | ships | ships | planned | - |
 | `lists.anytime` | Anytime | ships | ships | ships | ships | ships | planned | - |

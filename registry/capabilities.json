@@ -7,7 +7,7 @@
     "lists.inbox": { "title": "Inbox band on Today", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "ships", "android": "ships", "windows": "planned", "watchos": "partial" },
     "lists.today": { "title": "Today", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "ships", "android": "ships", "windows": "planned", "watchos": "partial" },
     "lists.review": { "title": "Review (questions, finished work, agent work in progress, faded tasks)", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "ships", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
-    "review.waiting": { "title": "Waiting: work handed to a person, in Review", "ios": "planned", "ipados": "planned", "macos": "planned", "web": "planned", "android": "planned", "windows": "planned", "watchos": "not_applicable" },
+    "review.waiting": { "title": "Waiting: work handed to a person, in Review", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "ships", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
     "lists.agent": { "title": "Agent work by stage (Working, Queued, Stopped groups in Review)", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "ships", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
     "lists.upcoming": { "title": "Upcoming", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "ships", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
     "lists.anytime": { "title": "Anytime", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "ships", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
