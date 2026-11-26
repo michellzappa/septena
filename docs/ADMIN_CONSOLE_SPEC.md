@@ -17,7 +17,7 @@ millions of accounts. It never shows what a user wrote (ADR 0043).
 |---|---|---|
 | Growth | Accounts, new accounts (7 d), WAU, MAU, activated, paying, signups, each with the change against 7 days before and a 30-day line. DAU, DAU/MAU, activation %, trial to paid. | Account index + `metric_days` |
 | Funnels | Website: visitors → left an email → clicked a download (30 d). Product: accounts → activated → 2+ devices → agent → trial → paying. | Plausible, account index |
-| Website | Visitors (7 d with change, 30 d), bounce, visit length, visitors and signups per day, CTA goals with conversion, sources, pages, countries, download clicks by platform, list-keeper CTA by placement. Lists site events with no Plausible goal. | Plausible Stats API v2 (Business plan). On Growth: the shared dashboard, embedded. |
+| Website | Visitors (7 d with change, 30 d), bounce, visit length, visitors and signups per day, CTA goals with conversion, sources, pages, countries, download clicks by platform, list-keeper CTA by placement. Lists site events with no Plausible goal. | Plausible Stats API v2 (`PLAUSIBLE_API_KEY`; the site is in the Envisioning Plausible account, ADR 0058). Without a key: a shared dashboard, embedded (`PLAUSIBLE_SHARED_LINK`). |
 | Retention by week | Per start week: size, activated, active this week, 2+ devices, paying. | Account index |
 | Clients and agents | Devices and versions seen in 30 d, agents per client, sign-in providers, Mac downloads per release. | Account index, GitHub releases |
 | Plans and usage | Paid (year/month), granted, Pro, trial, lapsed, tasks, files. | Account index |
@@ -34,8 +34,8 @@ follows the questions in §1, and the most frequent question comes first.
    the day and the value. Under the cards: one row of ratios (DAU/MAU,
    activation %, trial to paid), then the two funnels next to each other.
 2. **Website.** Where the people in the funnel come from: traffic, CTA
-   conversion, sources, pages. With a Stats API key it is native cards and
-   bars. With only a shared link it is the Plausible dashboard embedded.
+   conversion, sources, pages, drawn from the Stats API. Without a key the
+   section embeds a shared Plausible dashboard instead.
 3. **Retention by week.** One row per start week. A healthy product shows the
    "active this week" column holding up in older rows.
 4. **Clients and agents.** What people run Septena on and which versions are
