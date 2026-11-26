@@ -41,11 +41,42 @@ export interface PendingAuth {
 export interface PairApproval {
   userId: string;
   timeZone?: string;
+  /// How this pairing was approved. Email-approved connector pairings (ADR 0047)
+  /// may belong to a brand-new account with no app session yet.
+  approvedVia?: "app" | "email";
+  approvedAt?: number;
   /// Connector codes only: the name the user gave the agent, and the agent
   /// (token family id) it replaces. Both land at the token exchange.
   label?: string;
   replaces?: string;
 }
+
+/// Pending headless agent signup (ADR 0056). Stored under disjoint keys and a
+/// disjoint DO name (`agent-signup:<requestId>`) so it can never cross paths
+/// with app-pairing codes (`pair:<code>`).
+export interface PendingAgentSignup {
+  email: string;
+  agentName: string;
+  access: "read" | "write";
+  timeZone?: string;
+  pollSecret: string;
+  /// SHA-256 base64url of the secret carried in the confirmation link.
+  emailSecretHash: string;
+  expiresAt: number;
+}
+
+export interface AgentSignupApproval {
+  userId: string;
+  created: boolean;
+  approvedAt: number;
+}
+
+export type AgentSignupPeek =
+  | { outcome: "ok"; pending: PendingAgentSignup }
+  | { outcome: "already_decided"; status: "approved" | "denied"; pending: PendingAgentSignup }
+  | { outcome: "not_found" };
+
+export type AgentSignupDecideOutcome = "ok" | "not_found" | "already_used";
 
 export type ApproveOutcome = "ok" | "not_found" | "already_used";
 export type PairStatus = "pending" | "approved" | "denied" | "gone";
@@ -172,6 +203,89 @@ export class PairingStore extends DurableObject<Env> {
     const p = await this.live();
     if (!p || !constantTimeEqual(p.pendingId, pendingId) || (p.purpose ?? "connector") !== purpose) return null;
     const { approved, denied } = await this.isDecided();
+    if (!approved || denied) return null;
+    await this.ctx.storage.deleteAll();
+    await this.ctx.storage.deleteAlarm();
+    return { pending: p, approval: approved };
+  }
+
+  // ---- headless agent signup (ADR 0056) ----
+
+  private async liveAgentSignup(): Promise<PendingAgentSignup | null> {
+    const p = await this.ctx.storage.get<PendingAgentSignup>("agentSignup");
+    if (!p) return null;
+    if (Date.now() > p.expiresAt) {
+      await this.ctx.storage.deleteAll();
+      return null;
+    }
+    return p;
+  }
+
+  private async isAgentSignupDecided(): Promise<{ approved: AgentSignupApproval | undefined; denied: boolean }> {
+    const [approved, denied] = await Promise.all([
+      this.ctx.storage.get<AgentSignupApproval>("agentSignupApproved"),
+      this.ctx.storage.get<boolean>("agentSignupDenied"),
+    ]);
+    return { approved, denied: Boolean(denied) };
+  }
+
+  async createAgentSignup(p: PendingAgentSignup): Promise<boolean> {
+    if (await this.liveAgentSignup()) return false;
+    await this.ctx.storage.deleteAll();
+    await this.ctx.storage.put("agentSignup", p);
+    await this.ctx.storage.setAlarm(p.expiresAt);
+    return true;
+  }
+
+  async peekAgentSignup(emailSecretHash: string): Promise<AgentSignupPeek> {
+    const p = await this.liveAgentSignup();
+    if (!p || !constantTimeEqual(p.emailSecretHash, emailSecretHash)) return { outcome: "not_found" };
+    const { approved, denied } = await this.isAgentSignupDecided();
+    if (approved) return { outcome: "already_decided", status: "approved", pending: p };
+    if (denied) return { outcome: "already_decided", status: "denied", pending: p };
+    return { outcome: "ok", pending: p };
+  }
+
+  async approveAgentSignup(emailSecretHash: string, a: AgentSignupApproval): Promise<AgentSignupDecideOutcome> {
+    const p = await this.liveAgentSignup();
+    if (!p || !constantTimeEqual(p.emailSecretHash, emailSecretHash)) return "not_found";
+    const { approved, denied } = await this.isAgentSignupDecided();
+    if (approved || denied) return "already_used";
+    await this.ctx.storage.put("agentSignupApproved", a);
+    return "ok";
+  }
+
+  async denyAgentSignup(emailSecretHash: string): Promise<AgentSignupDecideOutcome> {
+    const p = await this.liveAgentSignup();
+    if (!p || !constantTimeEqual(p.emailSecretHash, emailSecretHash)) return "not_found";
+    const { approved, denied } = await this.isAgentSignupDecided();
+    if (approved || denied) return "already_used";
+    await this.ctx.storage.put("agentSignupDenied", true);
+    return "ok";
+  }
+
+  async statusAgentSignup(pollSecret: string): Promise<PairStatus> {
+    const p = await this.liveAgentSignup();
+    if (!p || !constantTimeEqual(p.pollSecret, pollSecret)) return "gone";
+    const { approved, denied } = await this.isAgentSignupDecided();
+    if (denied) return "denied";
+    return approved ? "approved" : "pending";
+  }
+
+  async consumeDeniedAgentSignup(pollSecret: string): Promise<boolean> {
+    const p = await this.liveAgentSignup();
+    if (!p || !constantTimeEqual(p.pollSecret, pollSecret)) return false;
+    const { denied } = await this.isAgentSignupDecided();
+    if (!denied) return false;
+    await this.ctx.storage.deleteAll();
+    await this.ctx.storage.deleteAlarm();
+    return true;
+  }
+
+  async takeAgentSignup(pollSecret: string): Promise<{ pending: PendingAgentSignup; approval: AgentSignupApproval } | null> {
+    const p = await this.liveAgentSignup();
+    if (!p || !constantTimeEqual(p.pollSecret, pollSecret)) return null;
+    const { approved, denied } = await this.isAgentSignupDecided();
     if (!approved || denied) return null;
     await this.ctx.storage.deleteAll();
     await this.ctx.storage.deleteAlarm();

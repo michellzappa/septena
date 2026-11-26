@@ -7,6 +7,7 @@ import { isValidTz } from "../tz.js";
 import { registerClient } from "../oauth/register.js";
 import { validateRedirectUri } from "../oauth/redirects.js";
 import { storeFor } from "../api/session.js";
+import { accountStoreFor } from "../store/AccountStore.js";
 import { emailSignInEnabled, verifyEmailAccount, zEmailAddress } from "../api/emailSignIn.js";
 import { SIGN_IN } from "../generated/registries.js";
 import { pairApproveUrl, pairQrMatrix, pairQrSvg } from "./pairQr.js";
@@ -227,6 +228,8 @@ export async function pairContinue(c: Context<{ Bindings: Env }>) {
     JSON.stringify({
       userId: approval.userId,
       timeZone: approval.timeZone,
+      approvedVia: approval.approvedVia,
+      approvedAt: approval.approvedAt,
       label: approval.label,
       replaces: approval.replaces,
       clientId: pending.clientId,
@@ -254,6 +257,8 @@ export async function pairContinue(c: Context<{ Bindings: Env }>) {
 interface StoredCode {
   userId: string;
   timeZone?: string;
+  approvedVia?: "app" | "email";
+  approvedAt?: number;
   /// The agent's name and the agent it replaces, from the approval.
   label?: string;
   replaces?: string;
@@ -295,7 +300,7 @@ export async function pairEmail(c: Context<{ Bindings: Env }>) {
     return c.json({ error: account.error, ...(account.attemptsLeft !== undefined ? { attemptsLeft: account.attemptsLeft } : {}) }, account.status, noStore);
   }
   const timeZone = body.data.timeZone && isValidTz(body.data.timeZone) ? body.data.timeZone : undefined;
-  const res = await pairing.approve({ userId: account.userId, timeZone }, "connector");
+  const res = await pairing.approve({ userId: account.userId, timeZone, approvedVia: "email", approvedAt: Date.now() }, "connector");
   if (res.outcome !== "ok") return c.json({ error: "expired_or_unknown" }, 410, noStore);
   logEvent("preview_pair_approve", { ok: true, kind: "connector", via: "email", created: account.created });
   return c.json({ ok: true }, 200, noStore);
@@ -656,7 +661,21 @@ export async function token(c: Context<{ Bindings: Env }>) {
     return c.json({ error: "invalid_grant" }, 400);
   }
 
-  if (!(await storeFor(c.env, stored.userId).hasAppSession())) {
+  const store = storeFor(c.env, stored.userId);
+  if (stored.approvedVia === "email") {
+    // Email approval on the authorize page can create an agent-first account
+    // with no app session yet (ADR 0047, ADR 0056). Refuse only if the account
+    // was deleted after approval or no longer has an identity.
+    const accounts = accountStoreFor(c.env);
+    const [identities, deletedAt] = await Promise.all([
+      accounts ? accounts.listIdentitiesForUser(stored.userId) : Promise.resolve([{ userId: stored.userId }]),
+      store.deletedAt(),
+    ]);
+    if (identities.length === 0 || (stored.approvedAt !== undefined && deletedAt >= stored.approvedAt)) {
+      logEvent("preview_oauth_token", { ok: false, grantType, clientId, reason: "account_deleted" });
+      return c.json({ error: "invalid_grant" }, 400);
+    }
+  } else if (!(await store.hasAppSession())) {
     logEvent("preview_oauth_token", { ok: false, grantType, clientId, reason: "no_app_session" });
     return c.json({ error: "invalid_grant" }, 400);
   }

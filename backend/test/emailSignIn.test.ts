@@ -12,6 +12,7 @@ const { verifyAccessToken } = await import("../src/api/session.ts");
 const { EMAIL_CODE_MAX_ATTEMPTS, EMAIL_CODE_MAX_SENDS, EMAIL_CODE_TTL_MS } = await import("../src/store/AccountStore.ts");
 const { newEmailCode } = await import("../src/api/emailSignIn.ts");
 const oauth = await import("../src/shadow/oauth.ts");
+const { verifyMcpAccess } = await import("../src/shadow/tokens.ts");
 
 const TEST_SIGNING_KEY = Buffer.alloc(32, 5).toString("base64");
 const EXEC_CTX = { waitUntil() {}, passThroughOnException() {} } as unknown as ExecutionContext;
@@ -86,17 +87,21 @@ async function makeHarness(opts: { enabled?: boolean; failSend?: boolean } = {})
   app.get("/oauth/authorize", oauth.authorize);
   app.get("/oauth/pair/continue", oauth.pairContinue);
   app.post("/oauth/pair/email", oauth.pairEmail);
+  app.post("/oauth/token", oauth.token);
   app.route("/v1", api);
   const clients = (env as unknown as { CLIENTS: ReturnType<typeof makeMemoryKv> }).CLIENTS;
+  // Standard RFC 7636 S256 verifier/challenge pair for token exchange tests.
+  const pkceVerifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
+  const pkceChallenge = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM";
   async function openConnector() {
     await clients.put("v2:client:c1", JSON.stringify({ id: "c1", name: "Claude", redirectUris: ["https://claude.ai/api/mcp/auth_callback"] }));
     const url = new URL("https://api.septena.app/oauth/authorize");
-    for (const [k, v] of Object.entries({ response_type: "code", client_id: "c1", redirect_uri: "https://claude.ai/api/mcp/auth_callback", state: "st", code_challenge: "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM", code_challenge_method: "S256" })) url.searchParams.set(k, v);
+    for (const [k, v] of Object.entries({ response_type: "code", client_id: "c1", redirect_uri: "https://claude.ai/api/mcp/auth_callback", state: "st", code_challenge: pkceChallenge, code_challenge_method: "S256" })) url.searchParams.set(k, v);
     const res = await app.fetch(new Request(url), env, EXEC_CTX);
     return { html: await res.text(), cookie: (res.headers.get("Set-Cookie") ?? "").split(";")[0] };
   }
   const page = (path: string, init: RequestInit = {}) => app.fetch(new Request(`https://api.septena.app${path}`, init), env, EXEC_CTX);
-  return { env, sent, call, lastCode, accountStore, openConnector, page };
+  return { env, sent, call, lastCode, accountStore, ensureTaskStore, openConnector, page, pkceVerifier };
 }
 
 describe("email sign-in", () => {
@@ -206,7 +211,7 @@ describe("email sign-in", () => {
     assert.equal((await h.call("/auth/email/start", { email: "a@example.com" })).status, 503);
   });
 
-  it("connects a connector by email from the authorize page", async () => {
+  it("connects a connector by email from the authorize page through token exchange without an app session", async () => {
     const h = await makeHarness();
     const { html, cookie } = await h.openConnector();
     assert.match(html, /id="email-start"/);
@@ -219,7 +224,60 @@ describe("email sign-in", () => {
     assert.equal(ok.status, 200);
     const done = await h.page("/oauth/pair/continue", { headers: { Cookie: cookie } });
     assert.equal(done.status, 302);
-    assert.match(done.headers.get("Location") ?? "", /^https:\/\/claude\.ai\/api\/mcp\/auth_callback\?code=/);
+    const loc = new URL(done.headers.get("Location") ?? "");
+    assert.equal(`${loc.origin}${loc.pathname}`, "https://claude.ai/api/mcp/auth_callback");
+    const authCode = loc.searchParams.get("code");
+    assert.ok(authCode);
+
+    // Exchange auth code for MCP tokens on the brand-new agent-first account (no app session yet).
+    const form = new URLSearchParams({
+      grant_type: "authorization_code",
+      code: authCode,
+      code_verifier: h.pkceVerifier,
+      redirect_uri: "https://claude.ai/api/mcp/auth_callback",
+      client_id: "c1",
+    });
+    const tokRes = await h.page("/oauth/token", { method: "POST", body: form });
+    assert.equal(tokRes.status, 200);
+    const tokens = await tokRes.json() as { access_token: string; refresh_token: string; scope: string };
+    assert.match(tokens.access_token, /^sm2\./);
+    assert.match(tokens.refresh_token, /^smr2\./);
+    const grant = await verifyMcpAccess(h.env, tokens.access_token);
+    assert.ok(grant);
+    assert.equal(grant.timeZone, "Europe/Amsterdam");
+    const store = await h.ensureTaskStore(grant.userId);
+    assert.equal(store.hasAppSession(), false);
+    const summary = store.accountSummary();
+    assert.ok(summary, "agent-first account appears in admin summary");
+    assert.equal(summary.agents.length, 1);
+  });
+
+  it("refuses token exchange if an email-approved account was deleted before exchange", async () => {
+    const h = await makeHarness();
+    const { cookie } = await h.openConnector();
+    await h.page("/v1/auth/email/start", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: "gone@example.com" }) });
+    await h.page("/oauth/pair/email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: cookie, Origin: "https://api.septena.app" },
+      body: JSON.stringify({ email: "gone@example.com", code: h.lastCode() }),
+    });
+    const done = await h.page("/oauth/pair/continue", { headers: { Cookie: cookie } });
+    const authCode = new URL(done.headers.get("Location") ?? "").searchParams.get("code")!;
+    const identity = await h.accountStore.resolveIdentity("email", "gone@example.com");
+    assert.ok(identity);
+    h.accountStore.deleteIdentitiesForUser(identity.userId);
+    await (await h.ensureTaskStore(identity.userId)).deleteAccount();
+
+    const form = new URLSearchParams({
+      grant_type: "authorization_code",
+      code: authCode,
+      code_verifier: h.pkceVerifier,
+      redirect_uri: "https://claude.ai/api/mcp/auth_callback",
+      client_id: "c1",
+    });
+    const tokRes = await h.page("/oauth/token", { method: "POST", body: form });
+    assert.equal(tokRes.status, 400);
+    assert.deepEqual(await tokRes.json(), { error: "invalid_grant" });
   });
 
   it("hides the email form on the connector page while switched off", async () => {

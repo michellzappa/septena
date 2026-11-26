@@ -2748,9 +2748,15 @@ export class TaskStore extends DurableObject<Env> {
   // account deletion cover it with no code of their own. Only the hash of
   // the key's secret is stored.
 
-  createAgentKey(sid: string, hash: string, name: string, scope: string, now = Date.now()): void {
+  createAgentKey(sid: string, hash: string, name: string, scope: string, now = Date.now(), timeZone?: string): void {
     this.ctx.storage.transactionSync(() => {
-      this.sessions.create(hash, AGENT_KEY_EXPIRES_AT, sid, { clientId: AGENT_KEY_CLIENT, scope }, now);
+      this.sessions.create(
+        hash,
+        AGENT_KEY_EXPIRES_AT,
+        sid,
+        { clientId: AGENT_KEY_CLIENT, scope, ...(timeZone ? { timeZone } : {}) },
+        now,
+      );
       this.recordConnection(sid, AGENT_KEY_CLIENT, AGENT_KEY_CLIENT_NAME, scope, now, name);
     });
   }
@@ -3162,11 +3168,15 @@ export class TaskStore extends DurableObject<Env> {
     const openTasks = count(`${tasks} = 'open'`);
     const closedTasks = count(`${tasks} != 'open'`);
     const signedIn = this.hasAppSession();
-    if (!signedIn && openTasks + closedTasks === 0 && entitlements.length === 0) return null;
+    if (!signedIn && openTasks + closedTasks === 0 && entitlements.length === 0 && agents.length === 0) return null;
     const first = this.sql.exec<{ at: string | null }>("SELECT MIN(at) AS at FROM changes").one().at;
     const last = this.sql.exec<{ at: string }>("SELECT at FROM changes ORDER BY rev DESC LIMIT 1").toArray()[0]?.at ?? null;
-    const starts = [first ? Date.parse(first) : 0, ...devices.map((d) => d.firstSeen), ...entitlements.filter((e) => e.source === "trial").map((e) => e.signedAt)]
-      .filter((t) => t > 0);
+    const starts = [
+      first ? Date.parse(first) : 0,
+      ...devices.map((d) => d.firstSeen),
+      ...agents.map((a) => a.since),
+      ...entitlements.filter((e) => e.source === "trial").map((e) => e.signedAt),
+    ].filter((t) => t > 0);
     return {
       firstSeen: starts.length ? Math.min(...starts) : null,
       lastChangeAt: last ? Date.parse(last) : null,

@@ -114,12 +114,18 @@ export interface CreatedAgentKey {
   scope: string;
 }
 
-export async function createAgentKey(env: Env, userId: string, name: string, scope: string): Promise<CreatedAgentKey> {
+export async function createAgentKey(
+  env: Env,
+  userId: string,
+  name: string,
+  scope: string,
+  timeZone?: string,
+): Promise<CreatedAgentKey> {
   const id = randomId(16);
   const secret = randomId(32);
   const key = `${KEY_PREFIX}${base64url(new TextEncoder().encode(userId))}.${id}.${secret}`;
   const store = storeFor(env, userId);
-  await store.createAgentKey(id, await sha256Base64Url(secret), name, scope, Date.now());
+  await store.createAgentKey(id, await sha256Base64Url(secret), name, scope, Date.now(), timeZone);
   try {
     const count = await store.connectedAgentCount();
     const limit = (await planFor(env, userId)).limits.connectedAgents;

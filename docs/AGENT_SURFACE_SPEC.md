@@ -69,10 +69,11 @@ Each phase is one issue. Phases in one group can run in parallel.
 
 ### Group 3: pages that explain (site repo)
 
-- **AS8 (septena-site#27) Agent sign-up.** The Web, Android and Windows waitlists get
+- **AS8 (septena-site#27) Agent waitlist sign-up.** The Web, Android and Windows waitlists get
   `/waitlist.md`, a JSON Schema and `POST /api/waitlist/agent` (existing D1
   `SIGNUPS`, existing rate limit). The person confirms from an email
-  before the row counts.
+  before the row counts. (Full agent account creation lives on `api.septena.app`
+  per [ADR 0056](adr/0056-agents-create-accounts-with-email-confirmation.md).)
 - **AS9 (septena-site#28) Code map.** `llms.txt` gets a "Code map" section that links each
   claim to the source that keeps it: Stop and Pause (`TaskStore`), the claim
   lease, the MCP server, the shared core, the sync engine. The paths come from
