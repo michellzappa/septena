@@ -533,12 +533,6 @@
       "signIn.copy.terms"
     ]
   },
-  "By invitation. €120 a year or €14 a month once it goes on sale": {
-    "text": "By invitation. €120 a year or €14 a month once it goes on sale",
-    "paths": [
-      "plans.levels.pro.detail"
-    ]
-  },
   "Calendar": {
     "text": "Calendar",
     "paths": [
@@ -5125,6 +5119,12 @@
     "text": "€120 a year",
     "paths": [
       "plans.cards.pro.priceLabel"
+    ]
+  },
+  "€120 a year or €14 a month": {
+    "text": "€120 a year or €14 a month",
+    "paths": [
+      "plans.levels.pro.detail"
     ]
   },
   "€5 a month. You save €24 against paying monthly.": {

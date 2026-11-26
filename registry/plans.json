@@ -43,7 +43,7 @@
   "levels": [
     { "id": "free", "title": "Free", "detail": "€0" },
     { "id": "plus", "title": "Plus", "detail": "€60 a year or €7 a month" },
-    { "id": "pro", "title": "Pro", "detail": "By invitation. €120 a year or €14 a month once it goes on sale" }
+    { "id": "pro", "title": "Pro", "detail": "€120 a year or €14 a month" }
   ],
   "ladderHeadline": "One device free. All devices on Plus. All your agents on Pro.",
   "cardRows": ["devices", "connected", "files", "history"],
@@ -80,7 +80,7 @@
       "id": "pro",
       "title": "Septena Pro",
       "icon": "plans.pro",
-      "status": "invite",
+      "status": "given",
       "priceLabel": "€120 a year",
       "priceDetail": "Or €14 a month.",
       "detail": "For people who run many agents on one list.",
@@ -119,7 +119,7 @@
       "detail": "Connect Claude or another agent to your list. It asks before it acts, and you can stop it at any time.",
       "rows": [
         { "id": "connected", "label": "Agents", "limit": "connectedAgents", "featureId": "agents.connector", "cells": { "free": "1", "plus": "3", "pro": "No limit" } },
-        { "id": "share", "label": "Shared projects", "limit": "createShares", "status": "planned", "cells": { "free": "Join", "plus": "Create and invite", "pro": "Create and invite" } }
+        { "id": "share", "label": "Shared projects", "limit": "createShares", "cells": { "free": "Join", "plus": "Create and invite", "pro": "Create and invite" } }
       ]
     }
   ],
