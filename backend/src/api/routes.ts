@@ -73,6 +73,7 @@ import { notesHistoryRest } from "./notesHistoryRest.js";
 import { shares } from "./shares.js";
 import { projectStoreFor } from "../store/ProjectStore.js";
 import { tasksRest } from "./tasksRest.js";
+import { ERROR_FORMAT_HEADER, envelopeResponse } from "../errors.js";
 
 // Task backend API, mounted at /v1 (docs/SEPTASK_BACKEND.md in the app repo).
 // Phase 0: no app or MCP tool calls this yet. The live connector is unchanged.
@@ -97,6 +98,11 @@ export const api = new Hono<{ Bindings: Env; Variables: Vars }>();
 
 // CORS for browser clients (docs/WEB_CLIENT_SPEC.md §5).
 api.use("*", webCorsMiddleware);
+// The one error envelope, for a caller that asks for it (src/errors.ts).
+api.use("*", async (c, next) => {
+  await next();
+  if (c.req.header(ERROR_FORMAT_HEADER)?.trim().toLowerCase() === "envelope") c.res = await envelopeResponse(c.res);
+});
 
 const zAppleBody = z.object({
   identityToken: z.string().min(20).max(8_000),

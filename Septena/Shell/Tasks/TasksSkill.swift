@@ -18,7 +18,7 @@ enum TasksSkill {
         SectionSkill.Tool("tasks_list",          "List by view. Inbox = unfiled/unratified; today = Today page; review = open tasks awaiting human verification (needs_verify); upcoming = future-scheduled; anytime EXCLUDES inbox-only tasks",
               inputs: "optional: view (today|inbox|review|upcoming|anytime|completed), limit"),
         SectionSkill.Tool("tasks_create",        "New task. Without today/scheduled/deadline it lands in INBOX ONLY — invisible in today/anytime/upcoming. Set a routing field if the user expects to see it",
-              inputs: "required: title · optional: today (boolean — pins to Today), scheduled (YYYY-MM-DD — puts in upcoming), deadline (YYYY-MM-DD — hard date only, does NOT route into views), area (id, not a routing field), project (id, not a routing field), notes (free-text body), recurrence{unit(day|week|month), interval, after_completion}, refs[{key, role, snapshot}] (the email, issue, event or page it is about or comes from; with a role-from key that an active task has, nothing is created and that task returns as placement existing; a suggestion from an item the user turned down returns placement dismissed), allow_duplicate (create it anyway), heading (heading id: files it under that heading, in the heading's project), tags[] (names), checklist[]"),
+              inputs: "required: title · optional: today (boolean — pins to Today), scheduled (YYYY-MM-DD — puts in upcoming), deadline (YYYY-MM-DD — hard date only, does NOT route into views), area (id, not a routing field), project (id, not a routing field), notes (free-text body), recurrence{unit(day|week|month), interval, after_completion}, refs[{key, role, snapshot}] (the email, issue, event or page it is about or comes from; with a role-from key that an active task has, nothing is created and that task returns as placement existing; a suggestion from an item the user turned down returns placement dismissed), allow_duplicate (create it anyway), heading (heading id: files it under that heading, in the heading's project), tags[] (names), checklist[], idempotency_key (same key on a retry: no second task)"),
         SectionSkill.Tool("tasks_update",        "Patch any subset. Pass null to clear scheduled/deadline/area/project/notes",
               inputs: "required: id · optional: title, today, scheduled (YYYY-MM-DD or null), deadline (YYYY-MM-DD or null), area (id or null), project (id or null), heading (heading id, or null to take it out), status (open|cancelled), tags[] (names) or null, notes (free-text body, or null/\"\" to clear), recurrence{unit, interval, after_completion} or null to clear, refs (add or update by key), refs_remove[]"),
         SectionSkill.Tool("tasks_find_by_ref",   "Which tasks point at this email, thread, event, GitHub issue, page or task. Call it before you create a task from an item",
@@ -63,7 +63,7 @@ enum TasksSkill {
               inputs: "required: container, id, brief, why"),
         SectionSkill.Tool("tasks_notes_history", "Every saved version of a note, with who and why",
               inputs: "required: container, id · optional: limit, before, include_body"),
-        SectionSkill.Tool("tasks_claim",         "Claim a task before you work on it. A lease (default 30 min): call again to renew. A refusal names its rule (paused, stopped, your_turn, held, doing, budget): respect it, do not retry. Returns the project and area notes",
+        SectionSkill.Tool("tasks_claim",         "Claim a task before you work on it. A lease (default 30 min): call again to renew. A refusal names its rule (paused, stopped, your_turn, held, doing, budget): respect it. Only held is retryable (after claimUntil). Returns the project and area notes",
               inputs: "required: id, agent · optional: ttlMinutes, why"),
         SectionSkill.Tool("tasks_release",       "End your claim, with one line on what you did",
               inputs: "required: id, agent · optional: why"),
@@ -155,6 +155,11 @@ enum TasksSkill {
       ```
       tasks_list(view: "anytime")
       ```
+
+      ### Refusals and retries
+      A refused call returns `isError` with `{ error: { code, message, hint, retryable } }` (also in `structuredContent`). `code` names the rule (`paused`, `held`, `human_accepts`, `stale`, `idempotency_conflict`, …). Follow the `hint`. Send the same call again only when `retryable` is true (`held`, `rate_limited`, `unavailable`).
+
+      Every write tool takes an optional `idempotency_key` (a UUID you make per write). Send the same key when you retry: Septena returns the first result and does not write again, so a retried create never makes a second task. Keys live 24 hours; the same key with a different body is refused as `idempotency_conflict`.
 
       ### How the app works (help)
       - When the user asks how to do something in Septena, what a word means, or why something does not work, read `https://septena.app/help.md`. It lists every help page as Markdown, and `https://septena.app/llms-full.txt` has them all in one file. Answer from those pages with the app's own menu names.

@@ -76,7 +76,7 @@ A task can point at up to 20 items: an email, a mail thread, a calendar event, a
 
 #### Working a task as an agent
 
-- **`tasks_claim(id, agent)`** before you write to a task you work on. The claim is a lease (default 30 minutes): call it again to renew while you work. A refusal names its rule (`paused`, `stopped`, `your_turn`, `held`, `doing`, `budget`): respect it, do not retry. The claim returns the project and area notes.
+- **`tasks_claim(id, agent)`** before you write to a task you work on. The claim is a lease (default 30 minutes): call it again to renew while you work. A refusal names its rule (`paused`, `stopped`, `your_turn`, `held`, `doing`, `budget`): respect it. Only `held` is `retryable` (claim again after `claimUntil`, or pick another task). The claim returns the project and area notes.
 - **`tasks_release(id, agent, why)`** when you stop, with one line on what you did. A provider turn with options also ends the claim.
 - **`tasks_agent_events(since)`** lists what changed for agents since your cursor (assignments, user answers, stops, pauses). Pass the returned `nextSince` next time. Events are pointers: read the task itself.
 - **`tasks_activity(id?)`** shows who changed what and why, for one task or all of them. Read it before you continue work an earlier run started.
@@ -180,6 +180,25 @@ tasks_list(view: "anytime")
 ```
 
 ## Errors to expect
+
+A refused tool call returns `isError: true`. The first text is the message; the second text (and `structuredContent`) is the envelope:
+
+```
+{ "error": { "code": "paused", "message": "…", "hint": "…", "retryable": false } }
+```
+
+- **`code`** names the rule (`paused`, `stopped`, `your_turn`, `held`, `budget`, `terminal`, `closed`, `not_found`, `human_accepts`, `in_review`, `human_ends`, `note_required`, `human_only:assignee`, `stale`, `brief_is_users`, `rate_limited`, `idempotency_conflict`, …). Codes do not change name.
+- **`hint`** says what to do next. Follow it.
+- **`retryable: true`** means the same call can work later with nothing from the user (`held`, `rate_limited`, `unavailable`, `plan_check_failed`, `idempotency_in_progress`). Wait, then send the same call with the same `idempotency_key`. `retryable: false`: do not send it again as it is.
+- A result that reports a refusal in its own fields (`tasks_claim` with `claimed: false`, `tasks_complete` with `completed: false`, a notes write with `written: false`) keeps those fields and also carries `error`.
+- On `/v1`, send `X-Septena-Errors: envelope` to get the same `error` object; without the header `/v1` keeps its old `{ "error": "<code>" }` body.
+
+### Idempotency keys
+
+- Every write tool takes an optional **`idempotency_key`**: a string you make for one write (a UUID). Send the same key when you retry that call after a lost reply or a host error. Septena returns the first result and does not write again. So a retried create never makes a second task, and you do not need to search before you retry.
+- A key lives 24 hours. The same key with a different body is refused as `idempotency_conflict`: use a new key for a new write.
+- A refused call keeps nothing under its key, so the same call may run again once the rule allows it.
+- On `/v1/tasks` writes, send the key as the `Idempotency-Key` header (or an `idempotency_key` body field). A replay answers with `Idempotent-Replayed: true`.
 
 - 401 → the pairing expired or was revoked; the user re-pairs from Septena.
 - A write tool that says the connection can only read → the pairing predates write access; the user removes and re-adds the connector.

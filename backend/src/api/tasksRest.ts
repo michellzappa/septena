@@ -10,6 +10,8 @@ import { matchesView } from "../tools/taskShared.js";
 import { listTasks, taskOut } from "../shadow/mcp.js";
 import { MAX_REF_INPUT, findByRef, zRefs } from "../shadow/refs.js";
 import { DESIGN_TOKENS, ENTITY_LIMITS } from "../generated/registries.js";
+import { Refusal, envelopeFor } from "../errors.js";
+import { IDEMPOTENCY_KEY_FIELD, withIdempotency, zIdempotencyKey } from "../idempotency.js";
 import { AGENT_FALLBACK_NAME, acceptReview, pushOps, rpcStoreFor, runWriteTool, sendBackReview, zWriteArgs, type StoreRpc, type WriteContext, type WriteToolName } from "../shadow/writes.js";
 
 // A small REST surface over the MCP task tools for thin app clients, first of
@@ -26,6 +28,50 @@ type Vars = { userId: string; actor: string };
 type Ctx = Context<{ Bindings: Env; Variables: Vars }>;
 
 export const tasksRest = new Hono<{ Bindings: Env; Variables: Vars }>();
+
+/// Idempotency keys on every write here (ADR 0050 §4): the
+/// `Idempotency-Key` header or an `idempotency_key` body field. The first
+/// 2xx answer is kept 24 hours; a repeat gets it back with
+/// `Idempotent-Replayed: true` and writes nothing. `/by-ref` only reads.
+tasksRest.use("*", async (c, next) => {
+  if (c.req.method !== "POST" || c.req.path.endsWith("/by-ref")) return next();
+  const text = await c.req.text();
+  let body: unknown = text;
+  let bodyKey: unknown;
+  try {
+    const parsed = text.trim() ? JSON.parse(text) as unknown : {};
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      const { [IDEMPOTENCY_KEY_FIELD]: k, ...rest } = parsed as Record<string, unknown>;
+      bodyKey = k;
+      body = rest;
+    }
+  } catch {
+    // Not JSON: the handler answers invalid_json; the text is the body.
+  }
+  const headerKey = c.req.header("Idempotency-Key");
+  const raw = headerKey ?? bodyKey;
+  if (raw === undefined) return next();
+  const key = zIdempotencyKey.safeParse(raw);
+  if (!key.success || (headerKey !== undefined && bodyKey !== undefined && headerKey !== bodyKey)) {
+    return c.json({ error: "invalid_request", message: "The idempotency key is not valid, or the header and the body name two keys." }, 400);
+  }
+  try {
+    const { value, replayed } = await withIdempotency(rpcStoreFor(c.env, c.get("userId")), key.data, `v1:POST ${c.req.path}`, body, async () => {
+      await next();
+      const ok = c.res.status >= 200 && c.res.status < 300;
+      return { keep: ok, value: { status: c.res.status, body: ok ? await c.res.clone().text() : "" } };
+    });
+    if (replayed) {
+      c.res = new Response(value.body, {
+        status: value.status,
+        headers: { "Content-Type": "application/json", "Idempotent-Replayed": "true" },
+      });
+    }
+  } catch (e) {
+    if (!(e instanceof Refusal)) throw e;
+    return c.json({ error: e.code, message: e.message }, e.code === "idempotency_in_progress" ? 409 : 422);
+  }
+});
 
 /// The wrist's zone decides "today" (it's the device you're wearing), then the
 /// synced `homeTimezone`, then UTC — same fallbacks as the MCP connector.
@@ -604,6 +650,11 @@ async function json<T extends z.ZodTypeAny>(c: Ctx, schema: T): Promise<z.infer<
       return c.json({ error: "invalid_json" }, 400);
     }
   }
+  // Read by the idempotency middleware above, not a field of the verb.
+  if (body && typeof body === "object" && !Array.isArray(body)) {
+    const { [IDEMPOTENCY_KEY_FIELD]: _key, ...rest } = body as Record<string, unknown>;
+    body = rest;
+  }
   const parsed = schema.safeParse(body);
   if (!parsed.success) return c.json({ error: "invalid_request", issues: parsed.error.issues.slice(0, 10) }, 400);
   return parsed.data;
@@ -645,6 +696,7 @@ async function attempt(c: Ctx, name: string, write: () => Promise<object>, okSta
     const message = e instanceof Error ? e.message : String(e);
     logEvent("tasks_rest", { tool: name, ok: false });
     if (/^Task not found/.test(message)) return c.json({ error: "not_found" }, 404);
-    return c.json({ error: "rejected", message }, 422);
+    // `reason`: the refusal's code (src/errors.ts), next to the old fields.
+    return c.json({ error: "rejected", reason: envelopeFor(e).code, message }, 422);
   }
 }

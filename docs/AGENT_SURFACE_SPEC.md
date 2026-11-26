@@ -42,6 +42,14 @@ Each phase is one issue. Phases in one group can run in parallel.
 - **AS3 (#624) Error envelope and idempotency** (ADR 0050 §3, §4). Backend change
   in `backend/src/shadow/`. Both MCP eras. Update `backend/skill.md`,
   `TasksSkill.swift` and the site's `agents.md` in the same change.
+  *Shipped.* The code table is `backend/src/errors.ts`; the keys are in
+  `backend/src/idempotency.ts` and the TaskStore table `idempotency_keys`.
+  MCP: a refusal is `isError` with the old message as the first text and
+  the envelope as the second text and `structuredContent`; bad arguments
+  are a tool error (`invalid_arguments`), not a JSON-RPC error. `/v1`:
+  every app client decodes `error` as a string, so the envelope replaces
+  it only when the request sends `X-Septena-Errors: envelope`. The
+  default flips when no client in `registry/conformance` reads the string.
 - **AS4 (#625) OpenAPI for `/v1`** (ADR 0050 §5). Generated from the Zod
   validators. Served at `api.septena.app/openapi.json`, linked from
   `llms.txt`. CI fails when the generated file is stale. Prepares #90.
