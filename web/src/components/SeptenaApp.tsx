@@ -68,6 +68,7 @@ import {
   registryText,
 } from "@/lib/generated/registries";
 import { hexWithAlpha, type HeaderTextureStyle } from "@/lib/headerWash";
+import { groupTasksByList, orderByPosition } from "@/lib/listOrder";
 import { loadWebPrefs, saveWebPref, type WebDisplayPrefs } from "@/lib/prefs";
 import { AccountSwitchRequiredError, type AccountSwitchSummary } from "@/lib/sync/accountSwitch";
 import {
@@ -548,15 +549,11 @@ export function SeptenaApp() {
     convoByTask,
     turnsByTask,
   } = useMemo(() => {
-    const areas = syncState.snapshot.areas
-      .filter((a) => !a.deletedAt)
-      .sort((a, b) => (a.position ?? 0) - (b.position ?? 0) || a.title.localeCompare(b.title));
-    const projects = syncState.snapshot.projects
-      .filter((p) => !p.deletedAt && p.status === "active")
-      .sort((a, b) => (a.position ?? 0) - (b.position ?? 0) || a.title.localeCompare(b.title));
-    const tags = syncState.snapshot.tags
-      .filter((t) => !t.deletedAt)
-      .sort((a, b) => (a.position ?? 0) - (b.position ?? 0) || a.name.localeCompare(b.name));
+    const areas = orderByPosition(syncState.snapshot.areas.filter((a) => !a.deletedAt));
+    const projects = orderByPosition(
+      syncState.snapshot.projects.filter((p) => !p.deletedAt && p.status === "active"),
+    );
+    const tags = orderByPosition(syncState.snapshot.tags.filter((t) => !t.deletedAt));
 
     const pStats = new Map<string, { done: number; total: number }>();
     for (const t of syncState.snapshot.tasks) {
@@ -976,50 +973,29 @@ export function SeptenaApp() {
     return { todayInboxTasks: inboxBand, todayCommittedTasks: committed };
   }, [destination, visibleTasks]);
 
-  // Group committed Today tasks by list when prefs.todayGroupByList is ON (matching iOS/macOS).
+  // Group committed Today tasks by Area & Project in exact sidebar order
+  // (matching iOS TaskListView, Mac SeptaskKitTaskList, Android TaskHomeViewModel).
   const todayListGroups = useMemo(() => {
+    if (!(destination.kind === "smart" && destination.id === "today" && prefs.todayGroupByList)) {
+      return null;
+    }
+    const result = groupTasksByList(todayCommittedTasks, activeAreas, activeProjects);
+    return result.groups.length > 0 ? result : null;
+  }, [activeAreas, activeProjects, destination, prefs.todayGroupByList, todayCommittedTasks]);
+
+  // Anytime & Favorites also group by Area & Project in sidebar order (1:1 with iOS/Mac).
+  const smartListGroups = useMemo(() => {
     if (
-      !(destination.kind === "smart" && destination.id === "today" && prefs.todayGroupByList)
+      !(
+        destination.kind === "smart" &&
+        (destination.id === "anytime" || destination.id === "starred")
+      )
     ) {
       return null;
     }
-    type TodayGroup =
-      | { kind: "project"; projectId: string; title: string; items: EvaluatedTask[] }
-      | { kind: "area"; areaId: string; emoji: string | null; title: string; items: EvaluatedTask[] };
-    const ungrouped: EvaluatedTask[] = [];
-    const groups = new Map<string, TodayGroup>();
-    for (const item of todayCommittedTasks) {
-      const t = item.task;
-      if (t.project && projectById.has(t.project)) {
-        const p = projectById.get(t.project)!;
-        const key = `p:${t.project}`;
-        const cur = groups.get(key) ?? {
-          kind: "project" as const,
-          projectId: p.id,
-          title: p.title,
-          items: [],
-        };
-        cur.items.push(item);
-        groups.set(key, cur);
-      } else if (t.area && areaById.has(t.area)) {
-        const a = areaById.get(t.area)!;
-        const key = `a:${t.area}`;
-        const cur = groups.get(key) ?? {
-          kind: "area" as const,
-          areaId: a.id,
-          emoji: a.emoji ?? null,
-          title: a.title,
-          items: [],
-        };
-        cur.items.push(item);
-        groups.set(key, cur);
-      } else {
-        ungrouped.push(item);
-      }
-    }
-    if (groups.size === 0) return null;
-    return { ungrouped, groups: Array.from(groups.entries()) };
-  }, [areaById, destination, prefs.todayGroupByList, projectById, todayCommittedTasks]);
+    const result = groupTasksByList(visibleTasks, activeAreas, activeProjects);
+    return result.groups.length > 0 ? result : null;
+  }, [activeAreas, activeProjects, destination, visibleTasks]);
 
   // Upcoming grouped by day via WASM upcomingDay.
   const upcomingGroups = useMemo(() => {
@@ -3686,7 +3662,7 @@ export function SeptenaApp() {
                             {todayListGroups.ungrouped.map((i) => renderTaskRow(i, true))}
                           </div>
                         )}
-                        {todayListGroups.groups.map(([key, grp]) => {
+                        {todayListGroups.groups.map((grp) => {
                           const leading =
                             grp.kind === "project" ? (
                               <ProjectRing
@@ -3699,7 +3675,7 @@ export function SeptenaApp() {
                               <Folder className="h-4 w-4 text-[var(--text-muted)]" />
                             );
                           return (
-                            <div key={key}>
+                            <div key={grp.key}>
                               {renderSectionHeader({
                                 leading,
                                 title: grp.title,
@@ -3847,6 +3823,39 @@ export function SeptenaApp() {
                       {under.length > 0 && (
                         <div className={taskCardClass}>{under.map((i) => renderTaskRow(i))}</div>
                       )}
+                    </section>
+                  );
+                })}
+              </div>
+            ) : smartListGroups ? (
+              <div className="space-y-6">
+                {smartListGroups.ungrouped.length > 0 && (
+                  <div className={taskCardClass}>
+                    {smartListGroups.ungrouped.map((i) => renderTaskRow(i, true))}
+                  </div>
+                )}
+                {smartListGroups.groups.map((grp) => {
+                  const leading =
+                    grp.kind === "project" ? (
+                      <ProjectRing
+                        done={projectStats.get(grp.projectId)?.done ?? 0}
+                        total={projectStats.get(grp.projectId)?.total ?? 0}
+                      />
+                    ) : grp.emoji ? (
+                      <span className="text-[16px] leading-none">{grp.emoji}</span>
+                    ) : (
+                      <Folder className="h-4 w-4 text-[var(--text-muted)]" />
+                    );
+                  return (
+                    <section key={grp.key}>
+                      {renderSectionHeader({
+                        leading,
+                        title: grp.title,
+                        count: grp.items.length,
+                      })}
+                      <div className={taskCardClass}>
+                        {grp.items.map((i) => renderTaskRow(i, true))}
+                      </div>
                     </section>
                   );
                 })}
