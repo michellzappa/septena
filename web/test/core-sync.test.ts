@@ -7,11 +7,14 @@ import {
   applyDateAction,
   checkPullPage,
   checklistOccurrenceId,
+  completedLocalDay,
   conversationState,
   deriveConversation,
   ensureCoreReady,
   fadeFill,
   getCoreVersion,
+  localTodayYMD,
+  localWallClockTimestamp,
   nextScheduledDate,
   occurrenceId,
   parseRef,
@@ -297,5 +300,18 @@ describe("web parity helpers (import preview & header wash seeding)", () => {
     assert.ok(dailyA >= 1 && dailyA < 9999);
     assert.notEqual(dailyA, projectSeed);
     assert.equal(hexWithAlpha("#007AFF", 0.22), "rgba(0, 122, 255, 0.220)");
+  });
+
+  it("writes local wall-clock completedAt and resolves both zoned and unzoned stamps to local day", () => {
+    const localDate = new Date(2026, 10, 26, 0, 15, 5);
+    const stamp = localWallClockTimestamp(localDate);
+    assert.equal(stamp, "2026-11-26T00:15:05");
+    // Unzoned Apple/Backend wall-clock timestamps keep their local date prefix.
+    assert.equal(completedLocalDay("2026-11-26T00:15:05"), "2026-11-26");
+    assert.equal(completedLocalDay("2026-11-25"), "2026-11-25");
+    // Zoned ISO instants convert to the runtime's local calendar day.
+    const iso = localDate.toISOString();
+    assert.equal(completedLocalDay(iso), localTodayYMD(localDate));
+    assert.equal(completedLocalDay(null), null);
   });
 });

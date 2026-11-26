@@ -6,6 +6,7 @@ import {
   ensureCoreReady,
   localTodayYMD,
   localUtcOffsetSeconds,
+  localWallClockTimestamp,
   nextOccurrenceDates,
   nextScheduledDate,
   occurrenceId,
@@ -501,7 +502,7 @@ export class WebSyncEngine {
 
     const fields: Record<string, unknown> = {
       status: "done",
-      completedAt: now,
+      completedAt: localWallClockTimestamp(),
       touchedAt: now,
       ...(isProposal(task) ? { acknowledgedAt: now } : {}),
     };
@@ -572,7 +573,7 @@ export class WebSyncEngine {
     const now = new Date().toISOString();
     await this.patchTask(task, {
       status: "cancelled",
-      completedAt: now,
+      completedAt: localWallClockTimestamp(),
       dropReason: "user",
       touchedAt: now,
     });
@@ -609,8 +610,11 @@ export class WebSyncEngine {
     const dropped = tasks
       .map((t) => this.liveTask(t.id))
       .filter((t): t is TaskRow => t !== null && t.status === "open" && !t.deletedAt && Boolean(t.fadedAt));
-    const now = new Date().toISOString();
-    await this.patchTasks(dropped, { status: "cancelled", completedAt: now, dropReason: "faded" });
+    await this.patchTasks(dropped, {
+      status: "cancelled",
+      completedAt: localWallClockTimestamp(),
+      dropReason: "faded",
+    });
     return dropped;
   }
 
