@@ -15,7 +15,7 @@ This packet holds the copy-pasteable listing fields, authentication walkthrough,
 
 Complete these checks before clicking Submit in either portal:
 
-- [x] **Tool annotations verified in code and tests.** All 37 live tools on `api.septena.app/mcp` carry top-level `title` and explicit MCP `annotations` (`title`, `readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`), verified 1:1 against every handler by `backend/test/annotations.test.mjs`. (`tasks_update` is marked `idempotentHint: false` because `notes_append` appends on repeat calls without `notes_rev`.)
+- [x] **Tool annotations verified in code and tests.** All 40 live tools on `api.septena.app/mcp` carry top-level `title` and explicit MCP `annotations` (`title`, `readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`), verified 1:1 against every handler by `backend/test/annotations.test.mjs`. (`tasks_update` is marked `idempotentHint: false` because `notes_append` appends on repeat calls without `notes_rev`.)
 - [x] **OAuth redirect hosts pinned for both directories.** `backend/src/oauth/redirects.ts` allows `claude.ai`, `claude.com`, `chatgpt.com`, and loopback hosts.
 - [ ] **Deploy latest backend to `api.septena.app`.** Ensure the `tasks_update` `idempotentHint: false` fix and `skill.md` update are live in production before triggering portal rescans.
 - [ ] **Check canonical web URLs.** Confirm that `https://www.septena.app/privacy`, `https://www.septena.app/support`, and `https://www.septena.app/agents` load cleanly (HTTP 200 or clean redirect to `https://septena.app/...`; paste the final canonical URL in the portal forms).
@@ -87,7 +87,7 @@ Complete these checks before clicking Submit in either portal:
 
 ### Data handling and compliance notes (for portal questionnaire)
 
-- **Data accessed**: Only the authenticated user's private Septena store (tasks, checklists, tags, references, areas, projects, notes, task conversations, and change history). No third-party accounts or public web resources are queried by the server (`openWorldHint: false` on all 37 tools).
+- **Data accessed**: Only the authenticated user's private Septena store (tasks, checklists, tags, references, areas, projects, notes, task conversations, and change history). No third-party accounts or public web resources are queried by the server (`openWorldHint: false` on all 40 tools).
 - **Isolation**: Each user has an isolated Cloudflare Durable Object (`TaskStore`). OAuth access tokens (`sm2.`, 1-hour TTL) are signed and checked against the user's Durable Object on every request. Rotating refresh tokens (`smr2.`, 30-day sliding TTL) are stored hashed (`SHA-256`) there; refresh replay revokes the entire token family at once.
 - **No training / no ads**: User task data is never used to train models, sold, or shared with advertisers.
 - **User revocation & deletion**: Users can disconnect any agent in Settings (immediately revoking its token family) or delete their entire account in one step.
@@ -141,10 +141,10 @@ Complete these checks before clicking Submit in either portal:
 
 ### Tool annotations and safety justification (for OpenAI reviewer notes)
 
-- Every one of the 37 tools returned by `tools/list` defines `title`, `readOnlyHint`, `destructiveHint`, `idempotentHint`, and `openWorldHint` directly on the server.
+- Every one of the 40 tools returned by `tools/list` defines `title`, `readOnlyHint`, `destructiveHint`, `idempotentHint`, and `openWorldHint` directly on the server.
 - All 15 read tools are strictly side-effect-free (`readOnlyHint: true`, `destructiveHint: false`, `idempotentHint: true`, `openWorldHint: false`).
-- All 3 tools that can close, overwrite/cancel, or delete user data (`tasks_complete`, `tasks_update`, `tasks_checklist_delete`) declare `destructiveHint: true` so ChatGPT can prompt for confirmation.
-- All 37 tools operate strictly on the authenticated user's private Septena store (`openWorldHint: false`).
+- All 5 tools that can close, overwrite/cancel, or delete user data (`tasks_complete`, `tasks_update`, `tasks_checklist_delete`, `tasks_project_update`, `tasks_area_update`) declare `destructiveHint: true` so ChatGPT can prompt for confirmation.
+- All 40 tools operate strictly on the authenticated user's private Septena store (`openWorldHint: false`).
 - Annotations are paired with server-side enforcement in `TaskStore`: agent writes respect per-task `Stop`, global `Pause all agents`, `human_accepts` (agents cannot close assigned or claimed tasks), `brief_is_users` (agents cannot overwrite an existing project or area brief), and optimistic concurrency (`baseNoteRev` / `notes_rev`).
 
 ---
@@ -208,7 +208,7 @@ Auth flow: OAuth 2.1 (DCR + PKCE S256) with in-app 8-character pairing code appr
 
 Audited directly from `backend/src/shadow/mcp.ts`, `backend/src/tools/taskTools.ts`, `backend/src/shadow/agent.ts`, `backend/src/shadow/notes.ts`, and `backend/test/annotations.test.mjs`.
 
-- **Total tools exposed by `tools/list`:** 37 (15 read-only, 22 write; 3 destructive; 0 open-world).
+- **Total tools exposed by `tools/list`:** 40 (15 read-only, 25 write; 5 destructive; 0 open-world).
 - **Scopes:** Read tools require `tasks:read`; write tools require `tasks:write` (in addition to `tasks:read` at `/mcp`).
 - Every tool sets `openWorldHint: false` and matches top-level `title` to `annotations.title`.
 
@@ -238,7 +238,7 @@ Audited directly from `backend/src/shadow/mcp.ts`, `backend/src/tools/taskTools.
 |---|---|---|---|---|---|---|---|
 | `tasks_create` | Create task | `tasks:write` | `false` | `false` | `false` | `false` | Creates a new task (committed for `origin: "user_request"`, Inbox proposal by default). Creates a new record each call (`idempotentHint: false`). |
 | `tasks_complete` | Complete task | `tasks:write` | `false` | `true` | `true` | `false` | Marks a task done and spawns the next occurrence for recurring tasks. Marked `destructiveHint: true` because it closes a task out of active views; repeat calls return `alreadyComplete: true` (`idempotentHint: true`). Refused with `human_accepts` on agent-assigned or claimed tasks. |
-| `tasks_update` | Update task | `tasks:write` | `false` | `true` | `false` | `false` | Updates any subset of fields on an existing task, including notes, references, tags, dates, or `status: "cancelled"`. Marked `destructiveHint: true` because it can cancel a task, overwrite/clear notes, or remove references, and `idempotentHint: false` because `notes_append` appends on repeated calls without `notes_rev`. |
+| `tasks_update` | Update task | `tasks:write` | `false` | `true` | `false` | `false` | Updates any subset of fields on an existing task, including notes, references, tags, dates, the project heading, or `status: "cancelled"`. Marked `destructiveHint: true` because it can cancel a task, overwrite/clear notes, or remove references, and `idempotentHint: false` because `notes_append` appends on repeated calls without `notes_rev`. |
 | `tasks_defer` | Defer task | `tasks:write` | `false` | `false` | `true` | `false` | Moves a task's When date to a future day (`YYYY-MM-DD`) and clears Today. |
 | `tasks_move_to_today` | Move task to Today | `tasks:write` | `false` | `false` | `true` | `false` | Pins a task to Today and clears a future When date. |
 | `tasks_checklist_add` | Add checklist items | `tasks:write` | `false` | `false` | `false` | `false` | Appends 1-level checklist items to a task. Creates new items each call (`idempotentHint: false`). |
@@ -264,7 +264,7 @@ Audited directly from `backend/src/shadow/mcp.ts`, `backend/src/tools/taskTools.
 | `tasks_claim` | Claim task | `tasks:write` | `false` | `false` | `false` | `false` | Acquires or renews a time-limited lease (default 30 min, max 240 min) and returns project/area notes. Extends lease and counts new runs (`idempotentHint: false`). |
 | `tasks_release` | Release task claim | `tasks:write` | `false` | `false` | `true` | `false` | Ends an agent's lease and records a one-line summary in activity. |
 
-### Write tools: areas, projects, and notes (5)
+### Write tools: areas, projects, headings, and notes (8)
 
 | Tool name | Title | Scope | `readOnly` | `destructive` | `idempotent` | `openWorld` | Purpose and annotation rationale |
 |---|---|---|---|---|---|---|---|
@@ -273,6 +273,9 @@ Audited directly from `backend/src/shadow/mcp.ts`, `backend/src/tools/taskTools.
 | `tasks_notes_propose` | Propose notes brief | `tasks:write` | `false` | `false` | `true` | `false` | Saves one pending brief proposal for the user to accept or reject in the app without changing the live brief. |
 | `tasks_area_create` | Create area | `tasks:write` | `false` | `false` | `false` | `false` | Creates a new top-level area with optional emoji and notes (`idempotentHint: false`). |
 | `tasks_project_create` | Create project | `tasks:write` | `false` | `false` | `false` | `false` | Creates a new project with optional area, notes, and GitHub repo (`idempotentHint: false`). |
+| `tasks_project_update` | Update project | `tasks:write` | `false` | `true` | `true` | `false` | Renames a project, moves it to another area, sets its GitHub repo, or sets its status (active, done, cancelled). Marked `destructiveHint: true` because it overwrites the old values and can end the project. |
+| `tasks_area_update` | Update area | `tasks:write` | `false` | `true` | `true` | `false` | Renames an area or sets its emoji. Marked `destructiveHint: true` because it overwrites the old values. |
+| `tasks_heading_create` | Create heading | `tasks:write` | `false` | `false` | `false` | `false` | Adds a heading (a section divider) at the end of a project. Creates a new heading each call (`idempotentHint: false`). |
 
 ### MCP prompts (1)
 

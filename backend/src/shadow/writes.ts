@@ -67,7 +67,7 @@ type StoreMethod =
   | "readOrderTop" | "readSetting" | "push" | "captureTask" | "claim" | "release" | "agentEvents" | "history" | "head"
   | "readDoing" | "readDoSession" | "readDoSessions"
   | "addUsage" | "connectionName"
-  | "readNote" | "noteRevisions" | "readContainer" | "readContainerTasks";
+  | "readNote" | "noteRevisions" | "readContainer" | "readContainerTasks" | "readHeadings";
 export type StoreRpc = {
   [K in StoreMethod]: (...a: Parameters<TaskStore[K]>) => Promise<ReturnType<TaskStore[K]>>;
 };
@@ -112,6 +112,7 @@ export const zWriteArgs = {
     due: zDay.optional(),
     area: z.string().optional(),
     project: z.string().optional(),
+    heading: zId.optional(),
     notes: z.string().optional(),
     recurrence: zRecurrence.optional(),
     reminder_at: z.string().nullable().optional(),
@@ -141,6 +142,7 @@ export const zWriteArgs = {
     due: zDayOrClear.optional(),
     area: z.string().nullable().optional(),
     project: z.string().nullable().optional(),
+    heading: z.union([zId, z.literal("")]).nullable().optional(),
     status: z.enum(["open", "cancelled"]).optional(),
     notes: z.string().nullable().optional(),
     notes_append: z.string().min(1).optional(),
@@ -378,6 +380,16 @@ async function assertKnownContainer(store: StoreRpc, kind: "area" | "project", i
 /// Resolve human tag names case-insensitively against the store's live tags,
 /// producing `tag` upsert ops for any missing tags (unless `allowCreate` is
 /// false). Deduplicates case-insensitively and caps at `MAX_TAGS_PER_TASK`.
+/// The project of a live heading row, checked against the project the call
+/// names. Throws when the id is not a heading or the projects differ.
+async function headingProject(store: StoreRpc, id: string, project: string | undefined): Promise<string> {
+  const row = (await store.readTask(id))?.task;
+  const home = row && str(row.kind) === "heading" ? str(row.project) : undefined;
+  if (!home) throw new Error(`Heading not found: ${id}. tasks_project_get lists a project's headings.`);
+  if (project && project !== home) throw new Error(`Heading ${id} is in project ${home}, not ${project}.`);
+  return home;
+}
+
 async function resolveTagNames(
   store: StoreRpc,
   rawNames: string[],
@@ -547,6 +559,9 @@ function recurrenceColumns(rule: RecurrenceRuleInput | null): Record<string, unk
 
 async function createTask(ctx: WriteContext, input: CreateTaskInput) {
   const { store } = ctx;
+  // A heading names its project: the task goes there, under it.
+  if (input.heading && input.area) throw new Error("A heading is in a project: pass heading or area, not both.");
+  if (input.heading) input = { ...input, project: await headingProject(store, input.heading, input.project), area: undefined };
   await assertKnownContainer(store, "area", input.area);
   await assertKnownContainer(store, "project", input.project);
   // Validate the rule and the references BEFORE creating anything.
@@ -583,6 +598,7 @@ async function createTask(ctx: WriteContext, input: CreateTaskInput) {
   // A project implies its area: the app stores one or the other.
   if (input.project) fields.project = input.project;
   else if (input.area) fields.area = input.area;
+  if (input.heading) fields.heading = input.heading;
   if (input.notes) fields.notes = input.notes;
   if (plan.rule) {
     Object.assign(fields, recurrenceColumns(plan.rule));
@@ -678,8 +694,18 @@ async function updateTask(ctx: WriteContext, input: UpdateTaskInput) {
   if (!current) throw new Error(`Task not found: ${input.id}`);
   const old = current.task;
   input = resolveNotesEdit(input, str(old.notes));
+  // A heading names its project. The task moves there only when it is not
+  // in that project yet, so a task already in it keeps its place.
+  const heading = input.heading === "" ? null : input.heading;
+  if (heading !== undefined && str(old.kind) === "heading") throw new Error(`${input.id} is a heading: a heading cannot go under another heading.`);
+  if (heading && input.area) throw new Error("A heading is in a project: pass heading or area, not both.");
+  if (heading) {
+    const project = await headingProject(store, heading, input.project ?? undefined);
+    if (input.project === undefined && str(old.project) !== project) input = { ...input, project };
+  }
   const storedScheduled = updateNeedsStoredSchedule(input) ? (str(old.scheduled) ?? null) : undefined;
   const { fields: p, updated } = planUpdate(input, storedScheduled);
+  if (heading !== undefined) updated.push("heading");
   const hasTagChange = input.tags !== undefined;
   const refOps = await planRefs(store, input);
   if (updated.length === 0 && !hasTagChange) {
@@ -705,6 +731,7 @@ async function updateTask(ctx: WriteContext, input: UpdateTaskInput) {
   if (p.area !== undefined) fields.area = clear(p.area);
   if (p.project !== undefined) fields.project = clear(p.project);
   if (p.heading !== undefined) fields.heading = null;
+  if (heading !== undefined) fields.heading = heading;
   if (p.status !== undefined) fields.status = p.status;
   if (p.notes !== undefined) fields.notes = clear(p.notes);
   if (p.recurrence !== undefined) {
