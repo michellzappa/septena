@@ -85,6 +85,138 @@
         }
       }
     },
+    "%lld reminders moved to the Inbox" : {
+      "comment" : "Generated from registry surfaces.toasts.templates.importedReminders.format. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Erinnerung in den Eingang verschoben"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Erinnerungen in den Eingang verschoben"
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Reminder moved to the Inbox"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld reminders moved to the Inbox"
+                }
+              }
+            }
+          }
+        },
+        "es" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Recordatorio movido a la Bandeja de entrada"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld recordatorios movidos a la Bandeja de entrada"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Rappel déplacé dans la Boîte de réception"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld rappels déplacés dans la Boîte de réception"
+                }
+              }
+            }
+          }
+        },
+        "it" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Promemoria spostato in Posta in arrivo"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld promemoria spostati in Posta in arrivo"
+                }
+              }
+            }
+          }
+        },
+        "nl" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Herinnering naar Postvak IN verplaatst"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld herinneringen naar Postvak IN verplaatst"
+                }
+              }
+            }
+          }
+        },
+        "pt-BR" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Lembrete movido para a Caixa de entrada"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld lembretes movidos para a Caixa de entrada"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld non-task records will be skipped." : {
       "comment" : "Generated from registry settings.copy.import_export.importSkipped.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -19186,7 +19318,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Va a la bandeja de entrada hasta que la programes o la archives"
+            "value" : "Va a la Bandeja de entrada hasta que la programes o la archives"
           }
         },
         "fr" : {
@@ -19198,7 +19330,7 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Resta nella posta in arrivo finché non la pianifichi o archivi"
+            "value" : "Resta in Posta in arrivo finché non la pianifichi o archivi"
           }
         },
         "nl" : {
@@ -22486,7 +22618,7 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sposta i promemoria nella posta in arrivo. Ogni promemoria importato viene rimosso da Promemoria."
+            "value" : "Sposta i promemoria in Posta in arrivo. Ogni promemoria importato viene rimosso da Promemoria."
           }
         },
         "nl" : {

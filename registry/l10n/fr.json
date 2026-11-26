@@ -804,5 +804,9 @@
   "€5 a month. You save €24 against paying monthly.": "5 € par mois. Vous économisez 24 € par rapport au paiement mensuel.",
   "€60 a year": "60 € par an",
   "€60 a year or €7 a month": "60 € par an ou 7 € par mois",
-  "€7 a month": "7 € par mois"
+  "€7 a month": "7 € par mois",
+  "{count} reminders moved to the Inbox": {
+    "one": "Rappel déplacé dans la Boîte de réception",
+    "other": "{count} rappels déplacés dans la Boîte de réception"
+  }
 }

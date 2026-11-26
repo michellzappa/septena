@@ -1908,6 +1908,7 @@ final class SeptaskKitTaskListController: NSViewController {
                         deadline: pair.view.dueDate,
                         notes: pair.view.notes).id]
       })
+    showRemindersImported(ids: [created.id])
     reload()
   }
 
@@ -1937,7 +1938,19 @@ final class SeptaskKitTaskListController: NSViewController {
                          notes: pair.view.notes).id
         }
       })
+    showRemindersImported(ids: createdIDs)
     reload()
+  }
+
+  /// One done line after a Reminders import, with Undo. Same words and the
+  /// same ticket pattern as the SwiftUI Inbox (`RemindersInboxSection`).
+  private func showRemindersImported(ids: [String]) {
+    guard !ids.isEmpty else { return }
+    let ticket = TaskUndoTicket()
+    showToast(RegistryToasts.importedReminders(count: ids.count)) { [weak self, mutator] in
+      ticket.undo { for id in ids { mutator.delete(id: id) } }
+      self?.reload()
+    }
   }
 
   /// The Inbox — every unratified row, whatever its source: pending Apple

@@ -801,5 +801,9 @@
   "€5 a month. You save €24 against paying monthly.": "€5 per maand. Je bespaart €24 ten opzichte van maandelijks betalen.",
   "€60 a year": "€60 per jaar",
   "€60 a year or €7 a month": "€60 per jaar of €7 per maand",
-  "€7 a month": "€7 per maand"
+  "€7 a month": "€7 per maand",
+  "{count} reminders moved to the Inbox": {
+    "one": "Herinnering naar Postvak IN verplaatst",
+    "other": "{count} herinneringen naar Postvak IN verplaatst"
+  }
 }
