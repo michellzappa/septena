@@ -8,7 +8,7 @@ import { MAX_ATTACHMENT_BYTES, zId } from "../store/columns.js";
 import { zPushBody, type Op } from "../store/ops.js";
 import type { ChangeEntry } from "../store/TaskStore.js";
 import { USER_ID_RE, accountStoreFor } from "../store/AccountStore.js";
-import { prepareReviewerAccount } from "../shadow/reviewer.js";
+import { ensureReviewerAccount, prepareReviewerAccount } from "../shadow/reviewer.js";
 import { AppleIdentityError, userIdForAppleSub, verifyAppleIdentityToken } from "./appleIdentity.js";
 import { HANDOFF_TTL_S, accountAlreadyDeleted, authenticate, issueSession, refreshSession, revokeSession, storeFor, withSession } from "./session.js";
 import { SESSION_HEADER } from "../store/sessions.js";
@@ -975,6 +975,27 @@ api.post("/admin/reviewer/prepare", async (c) => {
   const tokens = await prepareReviewerAccount(c.env);
   if (!tokens) return c.json({ error: "reviewer_mode_off" }, 404);
   return c.json(tokens, 200, { "Cache-Control": "no-store" });
+});
+
+const zReviewerApproveDeviceBody = z.object({
+  code: z.string().min(1).max(32),
+}).strict();
+
+/// Approves a pending device sign-in code (e.g. web.septena.app) for the demo
+/// account only, so mz can open the demo account in a browser while recording
+/// directory walkthroughs. Admin-only and off (404) unless reviewer mode is on.
+api.post("/admin/reviewer/approve-device", async (c) => {
+  if (!c.env.ADMIN_TOKEN) return c.notFound();
+  if (!(await adminAllowed(c))) return c.json({ error: "forbidden" }, 403);
+  const mode = await ensureReviewerAccount(c.env);
+  if (!mode) return c.json({ error: "reviewer_mode_off" }, 404);
+  const body = await parse(c, zReviewerApproveDeviceBody);
+  if (body instanceof Response) return body;
+  const res = await approvePairing(c.env, mode.userId, { code: body.code, kind: "device" });
+  if (res.ok) logEvent("reviewer_device_approved", { ok: true, client: res.client });
+  return res.ok
+    ? c.json({ ok: true, client: res.client, kind: res.kind }, 200, { "Cache-Control": "no-store" })
+    : c.json({ error: res.error }, res.status, { "Cache-Control": "no-store" });
 });
 
 // ---- admin: account move copy (docs/CLOUDFLARE_ACCOUNT_MOVE.md) ----
