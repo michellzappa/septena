@@ -128,7 +128,8 @@ object PairCode {
 /**
  * Devices and agents that can reach the account (docs/SEPTASK_BACKEND.md §10).
  * Routes: `GET /v1/access`, `DELETE /v1/access/devices/:sid`,
- * `DELETE /v1/access/connections/:id`, `PATCH /v1/access/connections/:id`.
+ * `DELETE /v1/access/connections/:id`, `PATCH /v1/access/connections/:id`,
+ * `POST /v1/access/keys`.
  * Same bearer and refresh-on-401 rule as [UrlConnectionSyncTransport].
  */
 class SeptenaAccessClient(
@@ -184,6 +185,22 @@ class SeptenaAccessClient(
         val trimmed = name?.trim()?.take(MAX_AGENT_NAME)?.takeIf(String::isNotEmpty)
         val body = JsonValue.ObjectValue(mapOf("name" to JsonValue.stringOrNull(trimmed))).canonicalJson()
         request("/v1/access/connections/${connectionId.pathSegment()}", "PATCH", body)
+    }
+
+    /**
+     * Creates an agent key with read and write access (`POST /v1/access/keys`, #86).
+     * Returns the key, which the server sends in this reply only.
+     */
+    suspend fun createAgentKey(name: String): String {
+        val trimmed = name.trim().take(MAX_AGENT_NAME)
+        require(trimmed.isNotEmpty()) { "An agent key needs a name" }
+        val body = JsonValue.ObjectValue(
+            mapOf("name" to JsonValue.StringValue(trimmed), "access" to JsonValue.StringValue("write")),
+        ).canonicalJson()
+        val json = JsonValue.parse(request("/v1/access/keys", "POST", body)) as? JsonValue.ObjectValue
+            ?: error("Expected a JSON object")
+        return json.fields["key"].stringValue()?.takeIf { it.startsWith("sk1.") }
+            ?: error("The server sent no agent key")
     }
 
     /** What a sign-in code asks for. Throws [AccessHttpException] with `invalid_code` and the like. */

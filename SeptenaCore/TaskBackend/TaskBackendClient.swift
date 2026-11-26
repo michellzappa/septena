@@ -437,6 +437,26 @@ actor TaskBackendClient {
     guard status == 204 else { throw Self.httpError(status, data) }
   }
 
+  /// A new agent key (`POST /v1/access/keys`, #86). The server returns the
+  /// key in this reply only.
+  struct CreatedAgentKey: Decodable, Sendable, Hashable {
+    let id: String
+    let key: String
+    let name: String
+    let scope: String
+  }
+
+  /// Creates an agent key with read and write access. The key's row in the
+  /// Agents list is `id`: rename and disconnect it like any agent.
+  func createAgentKey(name: String) async throws -> CreatedAgentKey {
+    let clean = String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(Self.agentNameMax))
+    guard !clean.isEmpty else { throw TaskBackendError.badResponse("agent name") }
+    let body = try JSONEncoder().encode(["name": clean, "access": "write"])
+    let (data, status) = try await authed(path: "/v1/access/keys", method: "POST", body: body)
+    guard status == 201 else { throw Self.httpError(status, data) }
+    return try decode(CreatedAgentKey.self, from: data, what: "agent key")
+  }
+
   // MARK: - Shared projects (docs/PROJECT_SHARING_SPEC.md)
 
   func createShare(projectID: String, name: String) async throws -> ProjectShare {

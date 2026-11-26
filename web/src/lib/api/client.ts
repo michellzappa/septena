@@ -1,5 +1,6 @@
 import {
   zAccessSummary,
+  zCreatedAgentKey,
   zChangesResponse,
   zDeviceStartResponse,
   zIcalFeedSettings,
@@ -275,6 +276,21 @@ export class SeptenaApiClient {
       const err = parseErr(raw);
       throw new ApiError(res.status, err.error ?? "disconnect_agent_failed", err.message, raw);
     }
+  }
+
+  // A new agent key (#86). The key is in this reply only.
+  async createAgentKey(name: string): Promise<{ id: string; key: string; name: string; scope: string }> {
+    const res = await this.authedFetch("/v1/access/keys", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, access: "write" }),
+    });
+    if (!res.ok) {
+      const raw = await res.text().catch(() => "");
+      const err = parseErr(raw);
+      throw new ApiError(res.status, err.error ?? "create_agent_key_failed", err.message, raw);
+    }
+    return zCreatedAgentKey.parse(await res.json());
   }
 
   async renameAgent(id: string, name: string | null): Promise<void> {

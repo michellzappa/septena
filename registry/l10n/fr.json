@@ -816,5 +816,9 @@
   "1 change was not sent yet and will be lost.": "1 modification n’a pas encore été envoyée et sera perdue.",
   "{count} changes were not sent yet and will be lost.": "{count} modifications n’ont pas encore été envoyées et seront perdues.",
   "Export a Backup First": "Exporter d’abord une sauvegarde",
-  "Replace": "Remplacer"
+  "Replace": "Remplacer",
+  "New Agent Key": "Nouvelle clé d’agent",
+  "Your agent key": "Ta clé d’agent",
+  "Septena shows this key only once. Paste it into your script or agent. To stop the agent, disconnect it in this list.": "Septena n’affiche cette clé qu’une seule fois. Colle-la dans ton script ou ton agent. Pour arrêter l’agent, déconnecte-le dans cette liste.",
+  "Copy Key": "Copier la clé"
 }

@@ -84,6 +84,14 @@ export const zAccessSummary = z.object({
 });
 export type AccessSummary = z.infer<typeof zAccessSummary>;
 
+// POST /v1/access/keys (#86): the key appears in this reply only.
+export const zCreatedAgentKey = z.object({
+  id: z.string(),
+  key: z.string().startsWith("sk1."),
+  name: z.string(),
+  scope: z.string(),
+});
+
 export const zChangeEntry = z.object({
   rev: z.number(),
   entity: z.string(),
