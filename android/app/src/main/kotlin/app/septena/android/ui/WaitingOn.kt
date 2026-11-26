@@ -23,7 +23,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import app.septena.core.DateBoardRowKinds
 import app.septena.core.JsonValue
 import app.septena.core.RegistryCatalog
 import app.septena.core.generated.RegistryCountPhraseIds
@@ -32,7 +31,6 @@ import app.septena.core.generated.RegistryEntities
 import app.septena.core.generated.RegistryEntityFields
 import app.septena.core.generated.RegistryEntityNames
 import app.septena.core.generated.RegistrySurfaceIds
-import app.septena.core.generated.RegistryTaskAttributeIds
 import app.septena.core.longValue
 import app.septena.core.stringValue
 import java.time.Instant
@@ -103,10 +101,7 @@ internal fun WaitingOnDialog(
     val todayLabel = remember(languageTag) {
         RegistryCatalog.destinationTitle(RegistryDestinationIds.TODAY, languageTag).orEmpty()
     }
-    val tomorrowLabel = remember(languageTag) {
-        RegistryCatalog.dateBoardRows(RegistryTaskAttributeIds.WHEN, languageTag = languageTag)
-            .firstOrNull { it.kind == DateBoardRowKinds.TOMORROW }?.label.orEmpty()
-    }
+    val tomorrowLabel = remember(languageTag) { RegistryCatalog.tomorrowLabel(languageTag) }
     var name by remember(initialName) { mutableStateOf(initialName) }
     var checkBack by remember(today, initialWhen) {
         mutableStateOf<LocalDate?>(
