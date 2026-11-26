@@ -6,6 +6,7 @@ import { joinLanding } from "./api/shares.js";
 import { admin } from "./admin/routes.js";
 import { sweepAccounts } from "./admin/accounts.js";
 import * as oauth from "./shadow/oauth.js";
+import * as agentSignup from "./shadow/agentSignup.js";
 import { previewMcpHandler } from "./shadow/mcp.js";
 import { ONBOARD_MARKDOWN } from "./shadow/prompts.js";
 import SKILL_MARKDOWN from "../skill.md";
@@ -80,6 +81,9 @@ app.post("/oauth/pair/email", oauth.pairEmail);
 app.post("/oauth/pair/reviewer", oauth.pairReviewer);
 // Where a sign-in QR lands when a system camera opens it (src/shadow/pairQr.ts).
 app.get("/pair/:code", oauth.pairLanding);
+// Where a human confirms a headless agent account creation/connection (ADR 0056).
+app.get("/agent/confirm/:token", agentSignup.confirmPage);
+app.post("/agent/confirm/:token", agentSignup.confirmSubmit);
 // Where an invite to a shared project opens (src/api/shares.ts).
 app.get("/join/:token", joinLanding);
 // Where a Plus link opens (src/api/plusLinks.ts).

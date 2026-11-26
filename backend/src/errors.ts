@@ -107,6 +107,36 @@ export const REFUSALS = {
   unavailable: { retryable: true, hint: "Septena could not finish the call. Try again; with an idempotency_key a retry is safe." },
   maintenance: { retryable: true, hint: "Septena is in maintenance. Try again in a few minutes." },
 
+  // ---- agent signup & email auth (ADR 0016, ADR 0056) ----
+  email_signin_off: {
+    retryable: false,
+    hint: "Email sign-in is turned off on this server. Connect through an existing Septena app instead.",
+  },
+  email_send_failed: {
+    retryable: true,
+    hint: "Septena could not send the confirmation email. Try again in a minute.",
+  },
+  signup_unavailable: {
+    retryable: true,
+    hint: "Septena could not start the signup right now. Try again in a moment.",
+  },
+  denied: {
+    retryable: false,
+    hint: "The user declined the request. Do not retry unless they ask you to.",
+  },
+  expired_or_unknown: {
+    retryable: false,
+    hint: "This request expired, was already claimed, or is unknown. Start a new signup request if the user still wants one.",
+  },
+  too_many_requests: {
+    retryable: true,
+    hint: "Rate limit reached. Wait until Retry-After seconds pass before trying again.",
+  },
+  too_many_attempts: {
+    retryable: true,
+    hint: "Too many failed attempts. Wait ten minutes before trying again.",
+  },
+
   // ---- the request itself ----
   invalid_arguments: { retryable: false, hint: "Fix the arguments the message names, then call again." },
   invalid_request: { retryable: false, hint: "Fix the request the message describes, then send it again." },

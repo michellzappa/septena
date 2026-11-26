@@ -139,6 +139,30 @@ export async function verifyEmailSignIn(
   return { ok: true, session: await issueSession(env, res.userId), created: res.created };
 }
 
+/// Resolves or creates the account for a verified email address, starting the
+/// 14-day Plus trial once per address (spec §6.4 finding 4). Callers must have
+/// already proved control of `email` (6-digit code or signed confirmation link).
+export async function resolveOrCreateEmailAccount(
+  env: Env,
+  email: string,
+): Promise<{ userId: string; created: boolean }> {
+  const accounts = accountStoreFor(env);
+  if (!accounts) throw new Error("ACCOUNT_STORE binding missing");
+  const normalized = email.trim().toLowerCase();
+  const { userId, created } = await accounts.resolveOrCreateIdentity("email", normalized);
+  if (created) {
+    // A new account starts with the trial, once per address: deleting the
+    // account and signing up again with the same address does not give a
+    // second one (spec §6.4 finding 4).
+    const marker = `e_${await sha256Base64Url(`email:${normalized}`)}`;
+    if (!(await hasUsedTrial(env, marker))) {
+      if (await startTrialOnce(env, userId)) logEvent("trial_started", { userId });
+      await markTrialUsed(env, marker);
+    }
+  }
+  return { userId, created };
+}
+
 /// Checks the code and returns the account, created on first use. The app
 /// routes turn it into a session; the connector page approves its pairing
 /// with it (src/shadow/oauth.ts).
@@ -165,17 +189,7 @@ export async function verifyEmailAccount(
     if (checked.status === "locked") return { ok: false, status: 429, error: "too_many_attempts" };
     return { ok: false, status: 410, error: "expired_or_unknown" };
   }
-  const { userId, created } = await accounts.resolveOrCreateIdentity("email", body.email);
-  if (created) {
-    // A new account starts with the trial, once per address: deleting the
-    // account and signing up again with the same address does not give a
-    // second one (spec §6.4 finding 4).
-    const marker = `e_${await sha256Base64Url(`email:${body.email}`)}`;
-    if (!(await hasUsedTrial(env, marker))) {
-      if (await startTrialOnce(env, userId)) logEvent("trial_started", { userId });
-      await markTrialUsed(env, marker);
-    }
-  }
+  const { userId, created } = await resolveOrCreateEmailAccount(env, body.email);
   logEvent("email_signin_verify", { ok: true, created });
   return { ok: true, userId, created };
 }

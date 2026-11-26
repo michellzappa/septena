@@ -5,7 +5,17 @@ description: Use the Septena tasks MCP at api.septena.app to read and write the 
 
 # Septena tasks MCP
 
-The connector at `https://api.septena.app/mcp` exposes the user's tasks, areas, projects and task conversations, the same data the Septena app shows. The user pairs it from the Septena app. An agent that cannot sign in (a script, cron, n8n) uses an agent key the user creates in the app: send it as `Authorization: Bearer sk1.…`. Changes reach the app within seconds.
+The connector at `https://api.septena.app/mcp` exposes the user's tasks, areas, projects and task conversations, the same data the Septena app shows. Changes reach the app within seconds.
+
+## Connecting or creating an account
+
+- **Browser MCP hosts (Claude, ChatGPT, Cursor):** add `https://api.septena.app/mcp`. On the authorize page the user can approve with an existing Septena app (QR / 8-character code) or create/sign in to an account with email (no app needed first).
+- **Headless / CLI agents (no browser OAuth):** if the user does not have a key yet, you can create their Septena account or connect to an existing one with their email confirmation:
+  1. `POST https://api.septena.app/v1/agent/signup/start` with `{"email": "<user email>", "agentName": "<your name>", "access": "write", "timeZone": "<IANA tz>"}` (`access` defaults to `"write"`, `"read"` for read-only).
+  2. Tell the user to open the confirmation link Septena emailed them (valid 10 minutes) and approve.
+  3. Poll `POST https://api.septena.app/v1/agent/signup/poll` with `{"requestId": "...", "pollSecret": "..."}` every ~3 seconds (`202` while pending, `410` if declined or expired).
+  4. On `200`, store the returned `key` (`sk1.…`) securely and send it as `Authorization: Bearer sk1.…` to `https://api.septena.app/mcp`. Then run the onboarding flow (`https://api.septena.app/onboard.md`) if `created: true`, and remind the user they can sign in with that email on iOS, macOS, Android, or `https://web.septena.app` anytime.
+- **Pre-created agent key:** an agent that already has a key from Septena Settings ▸ AI & Agents sends it as `Authorization: Bearer sk1.…`.
 
 ## Conventions
 

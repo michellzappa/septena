@@ -6,9 +6,11 @@ Cloudflare Worker for the Septask task backend, at `api.septena.app`:
   in the app repo).
 - `/mcp` — the Septena tasks MCP connector (`src/shadow/`). Claude reads and
   writes the user's tasks in their `TaskStore` Durable Object. The user pairs
-  it from the Septask app (`/oauth/*`, `/.well-known/*`).
-  An agent that cannot sign in uses an agent key (`sk1.`, #86,
-  `POST /v1/access/keys`).
+  it from the Septask app or signs in by email on `/oauth/authorize`
+  (`/oauth/*`, `/.well-known/*`). An agent that cannot run browser OAuth
+  uses an agent key (`sk1.`, #86, `POST /v1/access/keys`) or creates/connects
+  an account with human email confirmation (`POST /v1/agent/signup/start`,
+  `/agent/confirm/:token`, `POST /v1/agent/signup/poll`, ADR 0056).
 - `/skill.md` — the agent brief for the task tools.
 
 **2026-11-20: the CloudKit connector on `mcp.septena.app` is decommissioned.**

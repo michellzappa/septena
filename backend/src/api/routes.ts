@@ -36,6 +36,8 @@ import {
   zPairInspectBody,
 } from "../shadow/oauth.js";
 import { MCP_READ_SCOPE, MCP_WRITE_SCOPE, createAgentKey, disconnectFamily, hasScope, isMcpAccessToken, verifyMcpAccess } from "../shadow/tokens.js";
+import { pollAgentSignup, startAgentSignup, zAgentSignupPollBody, zAgentSignupStartBody } from "../shadow/agentSignup.js";
+import { refreshAccounts } from "../admin/accounts.js";
 import { MAX_AGENT_WEBHOOKS, validateWebhookUrl } from "./agentWake.js";
 import {
   TRIAL_ROW_ID,
@@ -277,6 +279,33 @@ api.post("/auth/device/poll", async (c) => {
   return cookieMode
     ? cookieSessionResponse(c.env, session)
     : c.json(session, 200, { "Cache-Control": "no-store" });
+});
+
+// Headless agent account creation & connection (ADR 0056, src/shadow/agentSignup.ts).
+api.post("/agent/signup/start", async (c) => {
+  const body = await parse(c, zAgentSignupStartBody);
+  if (body instanceof Response) return body;
+  const res = await startAgentSignup(c.env, body, c.req.header("CF-Connecting-IP"));
+  if (res.ok) return c.json(res.data, 202, { "Cache-Control": "no-store" });
+  const headers: Record<string, string> = { "Cache-Control": "no-store" };
+  if (res.retryAfterSeconds) headers["Retry-After"] = String(res.retryAfterSeconds);
+  return c.json({ error: res.error, ...(res.retryAfterSeconds ? { retryAfterSeconds: res.retryAfterSeconds } : {}) }, res.status, headers);
+});
+
+api.post("/agent/signup/poll", async (c) => {
+  const body = await parse(c, zAgentSignupPollBody);
+  if (body instanceof Response) return body;
+  const res = await pollAgentSignup(c.env, body, c.req.header("CF-Connecting-IP"));
+  if (res.status === "pending") return c.json({ status: "pending" }, 202, { "Cache-Control": "no-store" });
+  if (res.status === "denied") return c.json({ error: "denied" }, 410, { "Cache-Control": "no-store" });
+  if (res.status === "rate_limited") return c.json({ error: "too_many_attempts" }, 429, { "Cache-Control": "no-store" });
+  if (res.status === "gone") return c.json({ error: "expired_or_unknown" }, 410, { "Cache-Control": "no-store" });
+  try {
+    c.executionCtx.waitUntil(refreshAccounts(c.env, [res.data.userId]));
+  } catch {
+    void refreshAccounts(c.env, [res.data.userId]);
+  }
+  return c.json(res.data, 200, { "Cache-Control": "no-store" });
 });
 
 // ---- everything below needs a bearer access token ----

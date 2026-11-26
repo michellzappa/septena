@@ -60,6 +60,7 @@ a new ADR and set the old one to `superseded by NNNN`.
 | [0053](0053-waiting-on-people-is-a-review-group.md) | Work handed to a person is a Waiting group in Review (amends 0046) | accepted |
 | [0054](0054-support-lands-in-starlings.md) | Support goes to Starlings, through a native form (supersedes feedback.md) | accepted |
 | [0055](0055-directory-reviewers-use-a-demo-account.md) | Directory reviewers use a demo account behind a reviewer code | accepted |
+| [0056](0056-agents-create-accounts-with-email-confirmation.md) | Agents can create and connect Septena accounts with human email confirmation | accepted |
 
 ## Template
 
