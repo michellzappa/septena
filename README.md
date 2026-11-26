@@ -2,6 +2,16 @@
 
 Septena is a private, local-first task app for you and your agents, on iPhone, iPad, Mac, Apple Watch and Android. Tasks live in a local store and sync through Septena's own backend. Agents reach the same tasks over MCP.
 
+## Connect an agent
+
+In Claude Code, install the Septena plugin. It adds the tasks connector and the agent loop skill:
+
+```
+/plugin install septena --marketplace michellzappa/septena
+```
+
+Then type `/mcp`, pick septena and sign in. Other agents: [septena.app/agents](https://septena.app/agents).
+
 The app was once a life operating system. That product moved to its own repository on 2026-11-21 ([ADR 0017](docs/adr/0017-move-septena-life-out-of-repo.md)); its history is under the tag `septena-life-archive`.
 
 ## Stack

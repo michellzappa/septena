@@ -1,7 +1,7 @@
 {
   "name": "septena",
-  "version": "0.1.0",
-  "description": "Connect Claude Code to Septena tasks over MCP and follow the Septena agent loop.",
+  "version": "0.2.0",
+  "description": "Connects Claude Code to your Septena tasks and teaches it the agent loop.",
   "author": {
     "name": "Michell Zappa",
     "url": "https://septena.app"
@@ -9,5 +9,10 @@
   "homepage": "https://septena.app/agents",
   "repository": "https://github.com/michellzappa/septena",
   "license": "MIT",
-  "keywords": ["septena", "tasks", "mcp", "agent-loop"]
+  "keywords": [
+    "septena",
+    "tasks",
+    "mcp",
+    "agent-loop"
+  ]
 }

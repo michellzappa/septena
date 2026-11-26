@@ -15,7 +15,7 @@ const GENERATED_BANNER =
 
 const CLAUDE_SKILL_FRONTMATTER = `---
 name: septena
-description: Work and manage tasks in Septena over MCP following the Septena agent loop rules (claim, read, append turns, ask with options, hand back artifacts/handoffs, release).
+description: Read and change the person's Septena tasks, areas and projects over the Septena MCP connector, and work a task as an agent (claim, ask with options, hand over for review). Use when the person asks about their tasks, today, their inbox or Septena.
 ---
 
 `;

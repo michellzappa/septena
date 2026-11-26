@@ -1,0 +1,14 @@
+{
+  "name": "septena",
+  "description": "Septena for Claude Code: the tasks connector and the agent loop skill.",
+  "owner": { "name": "Michell Zappa", "url": "https://septena.app" },
+  "plugins": [
+    {
+      "name": "septena",
+      "source": "./tools/agent-packages/claude-plugin",
+      "description": "Connects Claude Code to your Septena tasks and teaches it the agent loop.",
+      "homepage": "https://septena.app/agents",
+      "category": "productivity"
+    }
+  ]
+}
