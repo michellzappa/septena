@@ -945,7 +945,7 @@ private struct SeptaskAboutPane: View {
         label(item)
       }
     case "send_feedback":
-      Link(destination: URL(string: "mailto:mz@envisioning.com?subject=Septena%20feedback")!) {
+      Link(destination: URL(string: "mailto:mz@centaur-labs.io?subject=Septena%20feedback")!) {
         label(item)
       }
     default:
