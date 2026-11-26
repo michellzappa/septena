@@ -22,6 +22,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -33,6 +34,8 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import app.septena.core.RegistryCatalog
 import app.septena.core.SystemDayClock
+import app.septena.core.TaskRecord
+import app.septena.core.asTaskRecord
 import app.septena.core.generated.RegistryActionIds
 import app.septena.core.generated.RegistryDestinationIds
 import app.septena.core.generated.RegistryPlacesScreenIds
@@ -87,12 +90,14 @@ private fun DesktopTasks(workspace: SpikeWorkspace, transport: FixtureTransport,
     var destination by remember { mutableStateOf<DesktopLocation>(today) }
     var lists by remember { mutableStateOf(DesktopTaskLists()) }
     var editor by remember { mutableStateOf<NameEditor?>(null) }
+    var editingTask by remember { mutableStateOf<TaskRecord?>(null) }
     var movingTask by remember { mutableStateOf<String?>(null) }
     var status by remember { mutableStateOf("Loading fixture") }
     var error by remember { mutableStateOf<String?>(null) }
     var online by remember { mutableStateOf(true) }
     var busy by remember { mutableStateOf(false) }
     var loaded by remember { mutableStateOf(false) }
+    val undo by workspace.undoState.collectAsState()
 
     fun <T> work(action: suspend () -> T, onSuccess: (T) -> Unit = {}) {
         if (busy) return
@@ -221,8 +226,13 @@ private fun DesktopTasks(workspace: SpikeWorkspace, transport: FixtureTransport,
                     status = if (online) "Fixture online" else "Fixture offline"
                 }) { Text(if (online) "Go offline" else "Go online") }
                 TextButton(enabled = !busy, onClick = {
-                    work({ workspace.sync() }) { status = "Task writes sent: ${it.pushedOperations}" }
+                    work({ workspace.sync() }) { status = "Writes sent: ${it.pushedOperations}" }
                 }) { Text("Sync") }
+                TextButton(enabled = !busy && undo.canUndo, onClick = {
+                    work({ workspace.undo() }) { changed ->
+                        if (changed) status = "Undo saved to the outbox"
+                    }
+                }) { Text(actionTitle(RegistryActionIds.APP_UNDO, languageTag)) }
             }
             Text(status, style = MaterialTheme.typography.bodySmall)
             TaskHomeContent(
@@ -249,19 +259,12 @@ private fun DesktopTasks(workspace: SpikeWorkspace, transport: FixtureTransport,
                     }) { status = "Task saved to the outbox" }
                 },
                 onOpenTask = { id ->
-                    if (!busy) {
-                        val row = (rows + inbox).firstOrNull { it.id == id }
-                        if (row != null) openEditor(
-                            NameEditor(
-                                localized("Task Details", languageTag),
-                                localized("Title", languageTag),
-                                localized("Save", languageTag),
-                                row.title,
-                            ) { title ->
-                                checkNotNull(workspace.rename(row.id, title)) { localized("Task is no longer available.", languageTag) }
-                                null
-                            },
-                        )
+                    work({
+                        checkNotNull(workspace.task(id)?.takeIf { it.deletedAt == null }) {
+                            localized("Task is no longer available.", languageTag)
+                        }.asTaskRecord()
+                    }) { selected ->
+                        editingTask = selected
                     }
                 },
                 onTaskAction = { id, action ->
@@ -281,6 +284,22 @@ private fun DesktopTasks(workspace: SpikeWorkspace, transport: FixtureTransport,
                 if (next != null) destination = next
                 editor = null
                 status = "Saved to the outbox"
+            }
+        }
+    }
+    editingTask?.let { task ->
+        DesktopTaskEditor(task, workspace.today(), languageTag, busy, error, onDismiss = { editingTask = null }) { change, done ->
+            work({
+                when (change) {
+                    is DesktopTaskEdit.Text -> workspace.saveText(task, change.title, change.notes)
+                    is DesktopTaskEdit.When -> workspace.setWhen(task.id, change.day, change.mode)
+                    is DesktopTaskEdit.Deadline -> workspace.setDeadline(task.id, change.day)
+                    is DesktopTaskEdit.Repeat -> workspace.setRepeat(task.id, change.rule, change.paused)
+                }
+            }) { updated ->
+                editingTask = updated
+                status = "Task saved to the outbox"
+                done()
             }
         }
     }

@@ -1,10 +1,7 @@
-package app.septena.android
+package app.septena.core
 
-import app.septena.core.ConversationMutator
-import app.septena.core.JsonValue
-import app.septena.core.SyncRecord
-import app.septena.core.TaskMutator
 import app.septena.core.generated.RegistryEntities
+import app.septena.core.generated.RegistryEntityFields
 import app.septena.core.generated.RegistryEntityNames
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -17,7 +14,7 @@ data class TaskUndoState(
     val latestEditId: Long = 0,
 )
 
-/** One process-wide undo stack for task edits made from any Android surface. */
+/** One undo stack for task edits across the current workspace's surfaces. */
 class TaskUndoHistory {
     private sealed interface UndoOperation {
         data class RestoreFields(val fields: Map<String, JsonValue>) : UndoOperation
@@ -91,12 +88,9 @@ class TaskUndoHistory {
             before.deletedAt != null && after.deletedAt == null -> UndoOperation.DeleteRestored
             before.deletedAt != null || after.deletedAt != null -> return null
             else -> {
-                val changedFields = (before.fields.keys + after.fields.keys)
-                    .filter { before.fields[it] != after.fields[it] }
-                if (changedFields.isEmpty()) return null
-                UndoOperation.RestoreFields(
-                    changedFields.associateWith { field -> before.fields[field] ?: JsonValue.Null },
-                )
+                val fields = restorationFields(RegistryEntityNames.TASK, before.fields, after.fields)
+                if (fields.isEmpty()) return null
+                UndoOperation.RestoreFields(fields)
             }
         }
         return Step(taskId = before.id, operation = operation)
@@ -104,19 +98,30 @@ class TaskUndoHistory {
 
     private fun convoStep(taskId: String, before: SyncRecord?, after: SyncRecord?): Step? {
         if (after == null || after.entity != RegistryEntityNames.CONVO) return null
-        val beforeFields = before?.fields.orEmpty()
-        val afterFields = after.fields
-        // A pull between the two reads can bring in server-owned fields; a client may not write those back.
-        val columns = RegistryEntities.all.getValue(RegistryEntityNames.CONVO).columns
-        val changedFields = (beforeFields.keys + afterFields.keys)
-            .filter { beforeFields[it] != afterFields[it] && columns[it]?.serverOwned == false }
-        if (changedFields.isEmpty()) return null
-        return Step(
-            taskId = taskId,
-            operation = UndoOperation.RestoreConvoFields(
-                changedFields.associateWith { field -> beforeFields[field] ?: JsonValue.Null },
-            ),
-        )
+        val fields = restorationFields(RegistryEntityNames.CONVO, before?.fields.orEmpty(), after.fields)
+        if (fields.isEmpty()) return null
+        return Step(taskId, UndoOperation.RestoreConvoFields(fields))
+    }
+
+    private fun restorationFields(
+        entity: String,
+        before: Map<String, JsonValue>,
+        after: Map<String, JsonValue>,
+    ): Map<String, JsonValue> {
+        val spec = RegistryEntities.all.getValue(entity)
+        return buildMap {
+            for (field in before.keys + after.keys) {
+                if (before[field] == after[field]) continue
+                val column = spec.columns[field] ?: continue
+                if (column.serverOwned || spec.updatable?.contains(field) == false) continue
+                val repeatMode = if (entity == RegistryEntityNames.TASK && field == RegistryEntityFields.Task.RECURRENCE_AFTER_COMPLETION) {
+                    RecurrenceRules.fromFields(before)?.let { JsonValue.BooleanValue(it.afterCompletion) }
+                } else null
+                val missingValue = if (column.nullable == true) JsonValue.Null else null
+                val value = before[field] ?: repeatMode ?: column.defaultFieldValue() ?: missingValue
+                if (value != null) put(field, value)
+            }
+        }
     }
 
     /** Drops every entry: the tasks they restore are gone (account deletion). */

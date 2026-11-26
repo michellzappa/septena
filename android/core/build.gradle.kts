@@ -34,6 +34,7 @@ val fetchCoreJvmNatives = tasks.register("fetchCoreJvmNatives") {
 }
 
 dependencies {
+    implementation(libs.kotlinx.coroutines.core)
     testRuntimeOnly(files(coreJvmNatives).builtBy(fetchCoreJvmNatives))
     // The shared core (ADR 0025, C1 #247). The bindings in
     // src/main/kotlin/app/septena/sharedcore are generated (scripts/core-pin.sh).

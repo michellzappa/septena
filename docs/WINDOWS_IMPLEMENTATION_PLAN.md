@@ -24,7 +24,9 @@ The first fixture slice uses the shared task rows for Today with its Inbox band,
 
 The second fixture slice adds areas, projects and project sections (`places.areas`, `places.projects`, `places.sections`). The desktop sidebar shows the hierarchy, including empty sections. A project displays unsectioned tasks and groups the rest by section. Create and rename locations, create tasks directly inside them, and file an existing task with its **Move** action. The fixture check covers offline creation and filing, rejects a section that belongs to another project, and confirms that a second database sees the hierarchy after reconnect. Win365 acceptance covers navigation, the move picker, and keyboard and screen-reader behavior.
 
-Next add When, Deadline, Repeat, notes and undo using the existing task edits and date rules. Add Quick Find against SQLite, then conversations and agent actions. These slices can use fixture workspaces until live W1 is ready. A feature's fixture and CI evidence stays separate from its Win365 result.
+The third fixture slice adds the task editor for title, notes, When, Deadline and the basic Repeat controls. When and Deadline use the released date rules through the shared mutator. Repeat supports day, week, month and year with a fixed schedule or after completion, pause and removal. Rescheduling a fixed occurrence offers the existing one-task and series choices. Editor Undo uses the same Kotlin history as Android. The fixture check covers separate dates, repeat changes, undo, offline reopen and a peer pull.
+
+Next add Quick Find against SQLite, then conversations and agent actions. Advanced repeat-pattern editing, broader undo coverage for task actions and keyboard behavior stay in the parity backlog. These slices can use fixture workspaces until live W1 is ready. A feature's fixture and CI evidence stays separate from its Win365 result.
 
 ## Checkpoint 2 — live W1 on Win365
 

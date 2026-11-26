@@ -1,9 +1,16 @@
 package app.septena.windows
 
 import app.septena.core.DayClock
+import app.septena.core.RecurrenceRule
+import app.septena.core.RecurrenceRules
 import app.septena.core.TaskStatus
 import app.septena.core.asTaskRecord
 import app.septena.core.generated.RegistryDestinationIds
+import app.septena.core.generated.RegistryEntityEnums
+import app.septena.core.generated.RegistryEntityFields.Task
+import app.septena.core.booleanValue
+import app.septena.core.stringValue
+import app.septena.sharedcore.RescheduleMode
 import kotlinx.coroutines.runBlocking
 import java.io.IOException
 import java.nio.file.Files
@@ -63,10 +70,78 @@ fun main() = runBlocking {
             check(peer.lists("en").rows(RegistryDestinationIds.ANYTIME).none { it.id == id })
         }
         checkPlaceParity(directory.toPath(), clock)
+        checkTaskEditor(directory.toPath(), clock)
     } finally {
         check(directory.deleteRecursively()) { "SQLite files remained locked after close" }
     }
-    println("Windows spike smoke passed: list membership, offline persistence, edit, completion, places, sections, filing, peer pull, cleanup")
+    println("Windows spike smoke passed: list membership, offline persistence, task edits, places, filing, editor undo, peer pull, cleanup")
+}
+
+private suspend fun checkTaskEditor(directory: Path, clock: DayClock) {
+    val fixture = FixtureTransport(clock)
+    val path = directory.resolve("editor.db")
+    val id = "seedtask0001"
+    val scheduled = clock.today().plusDays(1)
+    val deadline = clock.today().plusDays(4)
+    val weekly = RecurrenceRule(RegistryEntityEnums.RecurrenceUnit.WEEK, interval = 2, afterCompletion = false)
+    SpikeWorkspace(path, fixture, clock).use { workspace ->
+        workspace.sync()
+        val original = checkNotNull(workspace.task(id)).asTaskRecord()
+        val edited = workspace.saveText(original, "Plan the delivery", "Check the installer.\nRecord the result.")
+        check(edited.title == "Plan the delivery")
+        check(edited.fields[Task.NOTES].stringValue() == "Check the installer.\nRecord the result.")
+        check(workspace.undo())
+        val restored = checkNotNull(workspace.task(id)).asTaskRecord()
+        check(restored.title == original.title && restored.fields[Task.NOTES].stringValue() == null)
+        check(!workspace.undoState.value.canUndo)
+
+        fixture.online = false
+        workspace.saveText(restored, "Plan the delivery", "Keep the Win365 checklist.")
+        workspace.setWhen(id, scheduled, RescheduleMode.MAKE_EXCEPTION)
+        workspace.setDeadline(id, deadline)
+        check(workspace.undo())
+        val dateUndo = checkNotNull(workspace.task(id))
+        check(dateUndo.fields[Task.SCHEDULED].stringValue() == scheduled.toString())
+        check(dateUndo.fields[Task.DEADLINE].stringValue() == null)
+        workspace.setDeadline(id, deadline)
+        workspace.setRepeat(id, weekly, false)
+        check(workspace.undo())
+        check(RecurrenceRules.fromFields(checkNotNull(workspace.task(id)).fields) == null)
+        val repeated = workspace.setRepeat(id, weekly, false)
+        check(repeated.fields[Task.RECURRENCE_ANCHOR_DATE].stringValue() == scheduled.toString())
+        workspace.setRepeat(id, weekly, true)
+        check(workspace.undo())
+        check(checkNotNull(workspace.task(id)).fields[Task.RECURRENCE_PAUSED].booleanValue() == false)
+
+        val newDay = scheduled.plusDays(2)
+        val exception = workspace.setWhen(id, newDay, RescheduleMode.MAKE_EXCEPTION)
+        check(exception.fields[Task.SCHEDULED].stringValue() == newDay.toString())
+        check(exception.fields[Task.RECURRENCE_ANCHOR_DATE].stringValue() == scheduled.toString())
+        check(workspace.undo())
+        val movedSeries = workspace.setWhen(id, newDay, RescheduleMode.UPDATE_RULE)
+        check(movedSeries.fields[Task.RECURRENCE_ANCHOR_DATE].stringValue() == newDay.toString())
+        check(workspace.undo())
+        val ruleUndo = checkNotNull(workspace.task(id))
+        check(ruleUndo.fields[Task.RECURRENCE_ANCHOR_DATE].stringValue() == scheduled.toString())
+        check(ruleUndo.fields[Task.SCHEDULED].stringValue() == scheduled.toString())
+        check(ruleUndo.fields[Task.DEADLINE].stringValue() == deadline.toString())
+    }
+    SpikeWorkspace(path, fixture, clock).use { workspace ->
+        check(checkNotNull(workspace.task(id)).fields[Task.NOTES].stringValue() == "Keep the Win365 checklist.")
+        fixture.online = true
+        check(workspace.sync().pushedOperations > 0)
+        check(workspace.rejected().isEmpty())
+    }
+    SpikeWorkspace(directory.resolve("editor-peer.db"), fixture, clock).use { peer ->
+        peer.sync()
+        val task = checkNotNull(peer.task(id)).asTaskRecord()
+        check(task.title == "Plan the delivery")
+        check(task.fields[Task.NOTES].stringValue() == "Keep the Win365 checklist.")
+        check(task.fields[Task.SCHEDULED].stringValue() == scheduled.toString())
+        check(task.fields[Task.DEADLINE].stringValue() == deadline.toString())
+        check(RecurrenceRules.fromFields(task.fields) == weekly)
+        check(task.fields[Task.RECURRENCE_PAUSED].booleanValue() == false)
+    }
 }
 
 private suspend fun checkPlaceParity(directory: Path, clock: DayClock) {

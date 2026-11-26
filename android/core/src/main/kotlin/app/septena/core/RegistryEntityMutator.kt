@@ -1,6 +1,7 @@
 package app.septena.core
 
 import app.septena.core.generated.RegistryEntities
+import app.septena.core.generated.RegistryColumnSpec
 import app.septena.core.generated.RegistryEntityNames
 import app.septena.core.generated.RegistryRules
 import java.time.Duration
@@ -70,16 +71,16 @@ class RegistryEntityMutator(
 
     private fun defaultFields(entity: String): Map<String, JsonValue> =
         RegistryEntities.all.getValue(entity).columns.mapNotNull { (name, column) ->
-            val raw = column.defaultJson ?: return@mapNotNull null
-            val value = if (column.kind == "bool") {
-                when (raw) {
-                    "1", "true" -> JsonValue.BooleanValue(true)
-                    "0", "false" -> JsonValue.BooleanValue(false)
-                    else -> error("Registry boolean default for $entity.$name is not boolean-like")
-                }
-            } else {
-                JsonValue.parse(raw)
-            }
-            name to value
+            column.defaultFieldValue()?.let { name to it }
         }.toMap()
+}
+
+internal fun RegistryColumnSpec.defaultFieldValue(): JsonValue? {
+    val raw = defaultJson ?: return null
+    if (kind != "bool") return JsonValue.parse(raw)
+    return when (raw) {
+        "1", "true" -> JsonValue.BooleanValue(true)
+        "0", "false" -> JsonValue.BooleanValue(false)
+        else -> error("Registry boolean default is not boolean-like")
+    }
 }

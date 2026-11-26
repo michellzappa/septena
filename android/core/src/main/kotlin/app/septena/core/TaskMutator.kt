@@ -1,6 +1,7 @@
 package app.septena.core
 
 import app.septena.core.generated.RegistryEntityFields
+import app.septena.core.generated.RegistryEntityEnums
 import app.septena.core.generated.RegistryEntityLimits
 import app.septena.core.generated.RegistryEntityNames
 import app.septena.sharedcore.DateAction
@@ -202,6 +203,46 @@ class TaskMutator(
     /** A7 / A8: set or clear the deadline. */
     suspend fun setDeadline(id: String, day: String?): TaskRecord? = applyDateAction(id, DateAction.SetDeadline(day))
 
+    /** Saves one repeat-rule edit, including any compatible custom pattern and the paused state. */
+    suspend fun setRepeat(id: String, rule: RecurrenceRule?, paused: Boolean? = null): TaskRecord? {
+        val existing = store.record(RegistryEntityNames.TASK, id)?.asTaskRecord() ?: return null
+        if (existing.deletedAt != null) return null
+        val f = existing.fields
+        val unit = rule?.unit
+        val fixed = rule?.afterCompletion == false
+        val weekdays = rule?.weekdays?.takeIf { fixed && unit == RegistryEntityEnums.RecurrenceUnit.WEEK }
+        val useMonthRule = fixed && (unit == RegistryEntityEnums.RecurrenceUnit.MONTH || unit == RegistryEntityEnums.RecurrenceUnit.YEAR)
+        val ordinal = rule?.ordinalWeekday?.takeIf { useMonthRule }
+        val changes = linkedMapOf(
+            RegistryEntityFields.Task.RECURRENCE_UNIT to JsonValue.stringOrNull(unit),
+            RegistryEntityFields.Task.RECURRENCE_INTERVAL to JsonValue.integerOrNull(rule?.interval?.coerceIn(1, 99)?.toLong()),
+            RegistryEntityFields.Task.RECURRENCE_AFTER_COMPLETION to JsonValue.BooleanValue(rule?.afterCompletion == true),
+            RegistryEntityFields.Task.RECURRENCE_PAUSED to JsonValue.BooleanValue(
+                rule != null && (paused ?: f[RegistryEntityFields.Task.RECURRENCE_PAUSED].booleanValue() ?: false),
+            ),
+            RegistryEntityFields.Task.RECURRENCE_SERIES_ID to JsonValue.stringOrNull(
+                if (rule == null) null else f[RegistryEntityFields.Task.RECURRENCE_SERIES_ID].stringValue() ?: id,
+            ),
+            RegistryEntityFields.Task.RECURRENCE_ANCHOR_DATE to JsonValue.stringOrNull(
+                if (fixed) f[RegistryEntityFields.Task.RECURRENCE_ANCHOR_DATE].stringValue()
+                    ?: f[RegistryEntityFields.Task.SCHEDULED].stringValue() else null,
+            ),
+            RegistryEntityFields.Task.RECURRENCE_WEEKDAYS to (weekdays?.takeIf { it.isNotEmpty() }?.let { days ->
+                JsonValue.ArrayValue(days.sorted().map { JsonValue.IntegerValue(it.toLong()) })
+            } ?: JsonValue.Null),
+            RegistryEntityFields.Task.RECURRENCE_MONTH_DAY to JsonValue.integerOrNull(
+                rule?.monthDay?.takeIf { useMonthRule }?.toLong(),
+            ),
+            RegistryEntityFields.Task.RECURRENCE_ORDINAL_WEEKDAY to (ordinal?.let {
+                JsonValue.ObjectValue(mapOf(
+                    "ordinal" to JsonValue.IntegerValue(it.ordinal.toLong()),
+                    "weekday" to JsonValue.IntegerValue(it.weekday.toLong()),
+                ))
+            } ?: JsonValue.Null),
+        ).filter { (field, value) -> value != (f[field] ?: JsonValue.Null) }
+        return if (changes.isEmpty()) existing else updateFields(id, changes)
+    }
+
     /**
      * One date action of docs/TASK_DATES_SPEC.md §4 (D5, #292). The shared core
      * decides every date field (When, deadline, Today pin and its stamp, time
@@ -257,7 +298,7 @@ class TaskMutator(
      * moves the anchor slot (#573, mirroring Apple `TasksBackend.rebaseFixedSeries`).
      */
     private suspend fun rebaseFixedSeries(source: TaskRecord) {
-        val rule = parseRecurrenceRule(source.fields) ?: return
+        val rule = RecurrenceRules.fromFields(source.fields) ?: return
         if (rule.afterCompletion) return
         val newAnchor = source.fields[RegistryEntityFields.Task.RECURRENCE_ANCHOR_DATE].stringValue() ?: return
         val seriesId = source.fields[RegistryEntityFields.Task.RECURRENCE_SERIES_ID].stringValue() ?: source.id
@@ -306,24 +347,6 @@ class TaskMutator(
             }
             updateFields(sibling.id, siblingChanges)
         }
-    }
-
-    private fun parseRecurrenceRule(fields: Map<String, JsonValue>): RecurrenceRule? {
-        val unit = fields[RegistryEntityFields.Task.RECURRENCE_UNIT].stringValue() ?: return null
-        val ordinal = fields[RegistryEntityFields.Task.RECURRENCE_ORDINAL_WEEKDAY] as? JsonValue.ObjectValue
-        return RecurrenceRule(
-            unit = unit,
-            interval = fields[RegistryEntityFields.Task.RECURRENCE_INTERVAL].longValue()?.toInt() ?: 1,
-            afterCompletion = fields[RegistryEntityFields.Task.RECURRENCE_AFTER_COMPLETION].booleanValue() ?: true,
-            weekdays = (fields[RegistryEntityFields.Task.RECURRENCE_WEEKDAYS] as? JsonValue.ArrayValue)
-                ?.values?.mapNotNull { it.longValue()?.toInt() },
-            monthDay = fields[RegistryEntityFields.Task.RECURRENCE_MONTH_DAY].longValue()?.toInt(),
-            ordinalWeekday = ordinal?.let {
-                val o = it["ordinal"].longValue()?.toInt()
-                val w = it["weekday"].longValue()?.toInt()
-                if (o != null && w != null) OrdinalWeekday(o, w) else null
-            },
-        )
     }
 
     /**
@@ -476,22 +499,8 @@ class TaskMutator(
      */
     private suspend fun spawnNextOccurrence(source: TaskRecord) {
         val f = source.fields
-        val unit = f[RegistryEntityFields.Task.RECURRENCE_UNIT].stringValue() ?: return
         if (f[RegistryEntityFields.Task.RECURRENCE_PAUSED].booleanValue() == true) return
-        val ordinal = f[RegistryEntityFields.Task.RECURRENCE_ORDINAL_WEEKDAY] as? JsonValue.ObjectValue
-        val rule = RecurrenceRule(
-            unit = unit,
-            interval = f[RegistryEntityFields.Task.RECURRENCE_INTERVAL].longValue()?.toInt() ?: 1,
-            afterCompletion = f[RegistryEntityFields.Task.RECURRENCE_AFTER_COMPLETION].booleanValue() ?: true,
-            weekdays = (f[RegistryEntityFields.Task.RECURRENCE_WEEKDAYS] as? JsonValue.ArrayValue)
-                ?.values?.mapNotNull { it.longValue()?.toInt() },
-            monthDay = f[RegistryEntityFields.Task.RECURRENCE_MONTH_DAY].longValue()?.toInt(),
-            ordinalWeekday = ordinal?.let {
-                val o = it["ordinal"].longValue()?.toInt()
-                val w = it["weekday"].longValue()?.toInt()
-                if (o != null && w != null) OrdinalWeekday(o, w) else null
-            },
-        )
+        val rule = RecurrenceRules.fromFields(f) ?: return
         val now = clock.now()
         val today = clock.today(now).toString()
         val next = RecurrenceRules.nextScheduledDate(

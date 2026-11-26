@@ -55,6 +55,8 @@ internal fun desktopTaskLists(
             title = task.title,
             isOnToday = membership.isOnToday,
             isStarred = task.starred,
+            isRepeating = task.recurrenceUnit != null,
+            hasNotes = !record.fields[RegistryEntityFields.Task.NOTES].stringValue().isNullOrBlank(),
             position = record.fields[RegistryEntityFields.Task.POSITION].numberValue(),
         )
 

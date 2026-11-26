@@ -1,5 +1,6 @@
 package app.septena.core
 
+import app.septena.core.generated.RegistryEntityFields.Task
 import app.septena.sharedcore.OrdinalWeekday as CoreOrdinalWeekday
 import app.septena.sharedcore.RecurrenceRule as CoreRecurrenceRule
 import app.septena.sharedcore.checklistOccurrenceId as coreChecklistOccurrenceId
@@ -23,6 +24,23 @@ data class RecurrenceRule(
  * completion on any device converges on one next row.
  */
 object RecurrenceRules {
+    fun fromFields(fields: Map<String, JsonValue>): RecurrenceRule? {
+        val unit = fields[Task.RECURRENCE_UNIT].stringValue() ?: return null
+        val ordinal = fields[Task.RECURRENCE_ORDINAL_WEEKDAY] as? JsonValue.ObjectValue
+        return RecurrenceRule(
+            unit = unit,
+            interval = fields[Task.RECURRENCE_INTERVAL].longValue()?.toInt() ?: 1,
+            afterCompletion = fields[Task.RECURRENCE_AFTER_COMPLETION].booleanValue() ?: true,
+            weekdays = (fields[Task.RECURRENCE_WEEKDAYS] as? JsonValue.ArrayValue)?.values?.mapNotNull { it.longValue()?.toInt() },
+            monthDay = fields[Task.RECURRENCE_MONTH_DAY].longValue()?.toInt(),
+            ordinalWeekday = ordinal?.let {
+                val o = it["ordinal"].longValue()?.toInt()
+                val w = it["weekday"].longValue()?.toInt()
+                if (o != null && w != null) OrdinalWeekday(o, w) else null
+            },
+        )
+    }
+
     fun nextScheduledDate(
         completedOn: String,
         scheduled: String?,

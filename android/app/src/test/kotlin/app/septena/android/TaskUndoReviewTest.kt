@@ -12,6 +12,7 @@ import app.septena.core.SyncRecord
 import app.septena.core.SyncTurn
 import app.septena.core.TaskIdGenerator
 import app.septena.core.TaskMutator
+import app.septena.core.TaskUndoHistory
 import app.septena.core.TaskStore
 import app.septena.core.generated.RegistryEntityEnums
 import app.septena.core.generated.RegistryEntityFields

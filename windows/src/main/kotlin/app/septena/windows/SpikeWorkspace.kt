@@ -3,6 +3,8 @@ package app.septena.windows
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
 import app.septena.core.DayClock
 import app.septena.core.JsonValue
+import app.septena.core.NotesBase
+import app.septena.core.RecurrenceRule
 import app.septena.core.RegistryEntityMutator
 import app.septena.core.SyncChange
 import app.septena.core.SyncOperation
@@ -17,9 +19,11 @@ import app.septena.core.TaskMutator
 import app.septena.core.TaskRecord
 import app.septena.core.TaskSnapshot
 import app.septena.core.TaskSyncEngine
+import app.septena.core.TaskUndoHistory
 import app.septena.core.UuidTaskIdGenerator
 import app.septena.core.WireTimestamp
 import app.septena.core.asSyncRecord
+import app.septena.core.asTaskRecord
 import app.septena.core.generated.RegistryDestinationIds
 import app.septena.core.generated.RegistryEntityEnums
 import app.septena.core.generated.RegistryEntityFields
@@ -27,9 +31,11 @@ import app.septena.core.generated.RegistryEntityNames
 import app.septena.core.stringValue
 import app.septena.store.SqlDelightTaskStore
 import app.septena.store.db.SeptenaDatabase
+import app.septena.sharedcore.RescheduleMode
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
+import java.time.LocalDate
 
 internal class SpikeWorkspace(
     path: Path,
@@ -42,6 +48,8 @@ internal class SpikeWorkspace(
     private val mutator = TaskMutator(store, clock, ids, sourceClient = "Septena Windows")
     private val entityMutator = RegistryEntityMutator(store, clock, ids)
     private val syncEngine = TaskSyncEngine(store, transport, clock)
+    private val undoHistory = TaskUndoHistory()
+    val undoState = undoHistory.state
 
     suspend fun lists(languageTag: String): DesktopTaskLists {
         val records = store.activeTasks()
@@ -52,6 +60,50 @@ internal class SpikeWorkspace(
         desktopPlaces(store.records(RegistryEntityNames.AREA), store.records(RegistryEntityNames.PROJECT), tasks ?: store.activeTasks())
 
     suspend fun task(id: String) = store.record(RegistryEntityNames.TASK, id)
+
+    fun today(): LocalDate = clock.today(clock.now())
+
+    suspend fun saveText(original: TaskRecord, title: String, notes: String): TaskRecord {
+        val cleanTitle = title.trim()
+        require(cleanTitle.isNotEmpty())
+        val originalNotes = original.fields[RegistryEntityFields.Task.NOTES].stringValue()
+        val changes = buildMap {
+            if (cleanTitle != original.title) put(RegistryEntityFields.Task.TITLE, JsonValue.StringValue(cleanTitle))
+            if (notes != originalNotes.orEmpty()) put(RegistryEntityFields.Task.NOTES, JsonValue.stringOrNull(notes.ifEmpty { null }))
+        }
+        return editTask(original.id) {
+            if (changes.isEmpty()) task(original.id)?.asTaskRecord()
+            else mutator.updateFields(original.id, changes, notesBase = NotesBase(originalNotes))
+        }
+    }
+
+    suspend fun setWhen(id: String, day: LocalDate?, mode: RescheduleMode): TaskRecord {
+        val current = checkNotNull(task(id))
+        val series = current.fields[RegistryEntityFields.Task.RECURRENCE_SERIES_ID].stringValue() ?: id
+        val before = if (mode == RescheduleMode.UPDATE_RULE) {
+            (store.activeTasks().filter { row ->
+                row.deletedAt == null && row.fields[RegistryEntityFields.Task.RECURRENCE_SERIES_ID].stringValue() == series
+            } + current).distinctBy(SyncRecord::id)
+        } else listOf(current)
+        val updated = checkNotNull(mutator.setWhen(id, day?.toString(), mode))
+        undoHistory.recordEdits(before.map { it to task(it.id) })
+        return updated
+    }
+
+    suspend fun setDeadline(id: String, day: LocalDate?): TaskRecord =
+        editTask(id) { mutator.setDeadline(id, day?.toString()) }
+
+    suspend fun setRepeat(id: String, rule: RecurrenceRule?, paused: Boolean): TaskRecord =
+        editTask(id) { mutator.setRepeat(id, rule, paused) }
+
+    suspend fun undo(): Boolean = undoHistory.undo(mutator)
+
+    private suspend fun editTask(id: String, write: suspend () -> TaskRecord?): TaskRecord {
+        val before = checkNotNull(task(id))
+        val after = checkNotNull(write())
+        undoHistory.recordEdits(listOf(before to after.asSyncRecord()))
+        return after
+    }
 
     suspend fun add(title: String, location: DesktopLocation = DesktopLocation.Smart(RegistryDestinationIds.INBOX)): TaskRecord {
         requirePlace(location)
