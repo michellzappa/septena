@@ -88,7 +88,7 @@ See [ADR 0007](adr/0007-septena-is-the-task-app.md).
 | [DO_SPEC.md](DO_SPEC.md) | building (ADR 0041): Do one task, full on one device, a notice on the others, the orb takes over |
 | [REVIEW_SPEC.md](REVIEW_SPEC.md) | accepted (ADR 0044, 0046; store rules built) |
 | [DAILY_REVIEW_SPEC.md](DAILY_REVIEW_SPEC.md) | proposal (#618): a short end-of-day review in Review |
-| [DECISIONS_SPEC.md](DECISIONS_SPEC.md) | proposal (#620, ADR 0050): decisions and open questions as typed log entries |
+| [DECISIONS_SPEC.md](DECISIONS_SPEC.md) | proposal (#620, ADR 0048): decisions and open questions as typed log entries |
 | [TASK_FADE_SPEC.md](TASK_FADE_SPEC.md) | accepted (§6 amended by ADR 0014, proposals by ADR 0039) |
 | [INBOX_ZERO_MOTION_SPEC.md](INBOX_ZERO_MOTION_SPEC.md) | shipped — historical (#298) |
 | [PROJECT_NOTES_SPEC.md](PROJECT_NOTES_SPEC.md) | accepted (ADR 0012) |
