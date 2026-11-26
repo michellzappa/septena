@@ -465,8 +465,16 @@ struct SeptaskCommandMenus: Commands {
       Divider()
 
       Button(RegistryActions.title(.appQuickFind)) { showQuickFind() }
-        .keyboardShortcut("f", modifiers: [.command, .shift])
+        .keyboardShortcut(RegistryActions.shortcut(for: .appQuickFind)?.keyboardShortcut
+                          ?? KeyboardShortcut("k", modifiers: .command))
         .disabled(!canNavigate)
+
+      ForEach(Array((RegistryActions.shortcut(for: .appQuickFind)?.alternates ?? []).enumerated()), id: \.offset) { _, alternate in
+        Button(RegistryActions.title(.appQuickFind)) { showQuickFind() }
+          .keyboardShortcut(alternate.keyboardShortcut)
+          .disabled(!canNavigate)
+          .hidden()
+      }
 
       #if os(macOS)
       Divider()

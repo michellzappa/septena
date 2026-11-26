@@ -95,9 +95,9 @@ import { DateBoardPopover, anchorOf, type DateBoardAnchor } from "./DateBoard";
 import { FadeSweepModal } from "./FadeSweepModal";
 import { FirstRunModal } from "./FirstRunModal";
 import { HeaderWash } from "./HeaderWash";
-import { KeyboardShortcutsModal } from "./KeyboardShortcutsModal";
+import { KeyboardShortcutsModal, formatShortcutKeycaps } from "./KeyboardShortcutsModal";
 import { QuickAddModal, type QuickAddInitial } from "./QuickAddModal";
-import { QuickFindModal } from "./QuickFindModal";
+import { QuickFindModal, type CommandBarItem } from "./QuickFindModal";
 import { RegistryIcon } from "./RegistryIcon";
 import { SettingsModal, type SettingsTab } from "./SettingsModal";
 import { SignInScreen } from "./SignInScreen";
@@ -219,6 +219,11 @@ export function SeptenaApp() {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
+  const lastEditorCloseAtRef = useRef<number>(0);
+  const collapseInlineTask = useCallback(() => {
+    lastEditorCloseAtRef.current = Date.now();
+    setExpandedTaskId(null);
+  }, []);
   const [taskPageId, setTaskPageId] = useState<string | null>(null);
   const [inboxCollapsed, setInboxCollapsed] = useState(false);
   const [todayLoggedExpanded, setTodayLoggedExpanded] = useState(false);
@@ -1490,8 +1495,11 @@ export function SeptenaApp() {
         target?.tagName === "SELECT" ||
         target?.isContentEditable;
 
-      // Global shortcuts even when browsing
-      if (primary && e.shiftKey && key === "f") {
+      // Global shortcuts even when browsing or typing
+      if (
+        (primary && !e.shiftKey && !e.altKey && key === "k") ||
+        (primary && e.shiftKey && key === "f")
+      ) {
         e.preventDefault();
         setQuickFindOpen((v) => !v);
         return;
@@ -1590,14 +1598,20 @@ export function SeptenaApp() {
       // Row-level shortcuts from registry/actions.json when task(s) are selected
       if (activeSelectedTasks.length > 0) {
         const single = activeSelectedTasks[0];
-        if (primary && !e.shiftKey && !e.altKey && key === "k") {
+        if (primary && !e.shiftKey && !e.altKey && e.key === "Enter") {
           e.preventDefault();
+          if (expandedTaskId !== null) {
+            collapseInlineTask();
+            return;
+          }
+          if (Date.now() - lastEditorCloseAtRef.current < 550) return;
           if (activeSelectedTasks.length === 1) void toggleDone(single);
           else void completeMany(activeSelectedTasks);
           return;
         }
-        if (primary && e.altKey && key === "k") {
+        if (primary && e.altKey && !e.shiftKey && e.key === "Enter") {
           e.preventDefault();
+          if (expandedTaskId !== null) collapseInlineTask();
           void engine.bulkUpdateTasks(activeSelectedTasks, {
             status: "cancelled",
             completedAt: localWallClockTimestamp(),
@@ -1665,11 +1679,6 @@ export function SeptenaApp() {
           setExpandedTaskId(null);
           return;
         }
-      } else if (primary && !e.shiftKey && !e.altKey && key === "k") {
-        // Fallback: Cmd+K opens Quick Find when no task is selected.
-        e.preventDefault();
-        setQuickFindOpen((v) => !v);
-        return;
       }
 
       if (e.key === "ArrowDown" && visibleTasks.length > 0) {
@@ -1688,12 +1697,12 @@ export function SeptenaApp() {
           setSelectedTaskId(prev.task.id);
           setSelectedIds(new Set([prev.task.id]));
         }
-      } else if (e.key === "Enter" && selectedTaskId) {
+      } else if (!primary && !e.altKey && !e.shiftKey && e.key === "Enter" && selectedTaskId) {
         e.preventDefault();
         const selected = visibleTasks.find((v) => v.task.id === selectedTaskId);
         if (selected) toggleExpanded(selected.task);
       } else if (e.key === "Escape") {
-        setExpandedTaskId(null);
+        collapseInlineTask();
         setSelectedTaskId(null);
         setSelectedIds(new Set());
         setTaskPageId(null);
@@ -1705,9 +1714,11 @@ export function SeptenaApp() {
   }, [
     activeSelectedTasks,
     bootPhase,
+    collapseInlineTask,
     completeMany,
     destination,
     engine,
+    expandedTaskId,
     firstRunOpen,
     handleChangePref,
     handleCopyTasks,
@@ -2250,7 +2261,7 @@ export function SeptenaApp() {
         void handleDropOnTask(task.id);
       },
       onOpenTaskPage: () => openTask(task, "page"),
-      onCollapse: () => setExpandedTaskId(null),
+      onCollapse: collapseInlineTask,
       onToggleDone: () => void toggleDone(task),
       onToggleToday: () => void requestToggleToday(task, membership.isOnToday),
       onToggleStar: () => void engine.toggleTaskStar(task),
@@ -2417,6 +2428,269 @@ export function SeptenaApp() {
     return evaluatedTasks.find((e) => e.task.id === taskPageId) ?? null;
   }, [evaluatedTasks, taskPageId]);
 
+  const commandBarItems = useMemo<CommandBarItem[]>(() => {
+    const isMac =
+      typeof navigator !== "undefined" && /Mac|iPhone|iPad/i.test(navigator.platform || navigator.userAgent);
+    const actionsMap = ACTIONS_CATALOG.actions as Record<
+      string,
+      {
+        title: string;
+        desktopTitle?: string;
+        addTitle?: string;
+        removeTitle?: string;
+        activeTitle?: string;
+        icon: string;
+        shortcut?: { key: string; modifiers: readonly string[]; excludePlatforms?: readonly string[] };
+      }
+    >;
+    const makeCmd = (
+      id: string,
+      run: () => void,
+      opts?: { title?: string; keywords?: string[]; contextual?: boolean },
+    ): CommandBarItem => {
+      const def = actionsMap[id];
+      const sc = def?.shortcut && !def.shortcut.excludePlatforms?.includes("web") ? def.shortcut : undefined;
+      return {
+        id,
+        title: opts?.title ?? registryText(def?.desktopTitle ?? def?.title ?? id, lang),
+        icon: def?.icon ?? "action.search",
+        shortcutKeys: sc ? formatShortcutKeycaps(sc, isMac) : undefined,
+        keywords: opts?.keywords,
+        contextual: opts?.contextual,
+        run,
+      };
+    };
+
+    const items: CommandBarItem[] = [];
+
+    if (activeSelectedTasks.length > 0) {
+      const single = activeSelectedTasks[0];
+      const singleOnly = activeSelectedTasks.length === 1;
+      const anyWaiting = activeSelectedTasks.some((t) => waitingName(t));
+
+      items.push(
+        makeCmd(
+          "task.toggleComplete",
+          () => {
+            if (singleOnly) void toggleDone(single);
+            else void completeMany(activeSelectedTasks);
+          },
+          { keywords: ["done", "check", "finish", "tick"], contextual: true },
+        ),
+        makeCmd(
+          "task.toggleToday",
+          () => {
+            if (singleOnly) void requestToggleToday(single);
+            else {
+              const anyNotToday = activeSelectedTasks.some((t) => !t.today);
+              void requestBulkToggleToday(activeSelectedTasks, anyNotToday);
+            }
+          },
+          { keywords: ["today", "schedule"], contextual: true },
+        ),
+        makeCmd(
+          "task.when",
+          () => openDatePicker("when", activeSelectedTasks.map((t) => t.id)),
+          { keywords: ["schedule", "date", "defer", "later"], contextual: true },
+        ),
+        makeCmd(
+          "task.deadline",
+          () => openDatePicker("deadline", activeSelectedTasks.map((t) => t.id)),
+          { keywords: ["due", "date"], contextual: true },
+        ),
+        makeCmd(
+          "task.toggleStar",
+          () => {
+            if (singleOnly) void engine.toggleTaskStar(single);
+            else void engine.bulkUpdateTasks(activeSelectedTasks, { starred: !single.starred });
+          },
+          { keywords: ["star", "favorite", "pin"], contextual: true },
+        ),
+      );
+
+      if (singleOnly && single.status === "open") {
+        items.push(
+          makeCmd("task.waitingOn", () => setWaitingTaskId(single.id), {
+            keywords: ["wait", "delegate", "follow up"],
+            contextual: true,
+          }),
+        );
+      }
+      if (anyWaiting) {
+        items.push(
+          makeCmd("task.gotItBack", () => void gotItBack(activeSelectedTasks), {
+            keywords: ["waiting", "received", "unblock"],
+            contextual: true,
+          }),
+        );
+      }
+
+      if (singleOnly) {
+        items.push(
+          makeCmd("task.editDetails", () => openTask(single), {
+            keywords: ["rename", "edit", "title"],
+            contextual: true,
+          }),
+          makeCmd(
+            "task.toggleInfo",
+            () => {
+              if (taskPageId === single.id) setTaskPageId(null);
+              else openTask(single, "page");
+            },
+            {
+              title: registryText(
+                taskPageId === single.id
+                  ? actionsMap["task.toggleInfo"].activeTitle ?? actionsMap["task.toggleInfo"].title
+                  : actionsMap["task.toggleInfo"].title,
+                lang,
+              ),
+              keywords: ["inspector", "details", "page", "notes"],
+              contextual: true,
+            },
+          ),
+        );
+      }
+
+      items.push(
+        makeCmd(
+          "task.duplicate",
+          () => {
+            void Promise.all(activeSelectedTasks.map((t) => engine.duplicateTask(t)));
+            showToast(singleOnly ? "Duplicated task" : `Duplicated ${activeSelectedTasks.length} tasks`);
+          },
+          { keywords: ["clone", "copy"], contextual: true },
+        ),
+        makeCmd("task.copy", () => void handleCopyTasks(activeSelectedTasks), {
+          keywords: ["clipboard"],
+          contextual: true,
+        }),
+        makeCmd(
+          "task.clearSchedule",
+          () => void Promise.all(activeSelectedTasks.map((t) => engine.clearTaskWhen(t))),
+          { keywords: ["unschedule", "anytime", "clear"], contextual: true },
+        ),
+        makeCmd(
+          "task.cancel",
+          () =>
+            void engine.bulkUpdateTasks(activeSelectedTasks, {
+              status: "cancelled",
+              completedAt: localWallClockTimestamp(),
+              dropReason: "user",
+            }),
+          { keywords: ["drop", "wont do", "cancel"], contextual: true },
+        ),
+        makeCmd(
+          "task.delete",
+          () => {
+            void engine.bulkDeleteTasks(activeSelectedTasks);
+            setSelectedIds(new Set());
+            setSelectedTaskId(null);
+            setExpandedTaskId(null);
+          },
+          { keywords: ["trash", "remove"], contextual: true },
+        ),
+      );
+    }
+
+    // Global commands
+    items.push(
+      makeCmd("app.newTask", () => composerRef.current?.focus(), {
+        keywords: ["add", "create", "task"],
+      }),
+      makeCmd(
+        "app.quickAdd",
+        () => {
+          setQuickAddInitial({
+            today: destination.kind === "smart" && destination.id === "today",
+            area: destination.kind === "area" ? destination.id : null,
+            project: destination.kind === "project" ? destination.id : null,
+          });
+          setQuickAddOpen(true);
+        },
+        { keywords: ["add", "capture", "inbox"] },
+      ),
+      makeCmd(
+        "sidebar.newProject",
+        () => {
+          setCreatingAreaId(destination.kind === "area" ? destination.id : null);
+          setCreatingInsertIndex(null);
+          setNewContainerTitle("");
+          setCreatingKind("project");
+        },
+        { keywords: ["add", "create", "project"] },
+      ),
+      makeCmd(
+        "sidebar.newArea",
+        () => {
+          setCreatingAreaId(null);
+          setCreatingInsertIndex(null);
+          setNewContainerTitle("");
+          setCreatingKind("area");
+        },
+        { keywords: ["add", "create", "area"] },
+      ),
+    );
+
+    if (destination.kind === "project") {
+      items.push(
+        makeCmd(
+          "section.new",
+          () => {
+            setNewContainerTitle("");
+            setCreatingKind("heading");
+          },
+          { keywords: ["add", "create", "heading", "section"] },
+        ),
+      );
+    }
+
+    if (undoSnap.canUndo) {
+      items.push(
+        makeCmd("app.undo", () => void undoStack.undo(), {
+          keywords: ["revert", "undo"],
+        }),
+      );
+    }
+
+    items.push(
+      makeCmd("app.toggleSidebar", () => setSidebarOpen((v) => !v), {
+        title: registryText(
+          sidebarOpen
+            ? actionsMap["app.toggleSidebar"].removeTitle ?? actionsMap["app.toggleSidebar"].title
+            : actionsMap["app.toggleSidebar"].addTitle ?? actionsMap["app.toggleSidebar"].title,
+          lang,
+        ),
+        keywords: ["sidebar", "navigation", "panel"],
+      }),
+      makeCmd("app.settings", () => setSettingsOpen(true), {
+        keywords: ["preferences", "prefs", "account", "theme", "sync"],
+      }),
+      makeCmd("app.keyboardShortcuts", () => setShortcutsOpen(true), {
+        keywords: ["keys", "hotkeys", "help"],
+      }),
+    );
+
+    return items;
+  }, [
+    activeSelectedTasks,
+    completeMany,
+    destination,
+    engine,
+    gotItBack,
+    handleCopyTasks,
+    lang,
+    openDatePicker,
+    openTask,
+    requestBulkToggleToday,
+    requestToggleToday,
+    showToast,
+    sidebarOpen,
+    taskPageId,
+    toggleDone,
+    undoSnap.canUndo,
+    undoStack,
+  ]);
+
   const settingsModal = (
     <SettingsModal
       open={settingsOpen}
@@ -2542,7 +2816,7 @@ export function SeptenaApp() {
           <button
             type="button"
             onClick={() => setQuickFindOpen(true)}
-            title="Quick Find (⌘⇧F)"
+            title={`${registryText(ACTIONS_CATALOG.actions["app.quickFind"].desktopTitle, lang)} (⌘K)`}
             className="rounded-md p-1.5 text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
           >
             <Search className="h-4 w-4" />
@@ -4091,6 +4365,7 @@ export function SeptenaApp() {
         areas={activeAreas}
         projects={activeProjects}
         tags={activeTags}
+        commands={commandBarItems}
         language={lang}
         onNavigate={navigateTo}
         onSelectTask={(task) => {

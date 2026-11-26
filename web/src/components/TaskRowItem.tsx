@@ -410,8 +410,16 @@ export function TaskDetailEditor({
               onChange={(e) => setTitleDraft(e.target.value)}
               onBlur={commitTitle}
               onKeyDown={(e) => {
-                if (e.key === "Enter") e.currentTarget.blur();
-                else if (e.key === "Escape" && props.onCollapse) props.onCollapse();
+                if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                  e.preventDefault();
+                  commitTitle();
+                  e.currentTarget.blur();
+                  props.onCollapse?.();
+                } else if (e.key === "Enter") {
+                  e.currentTarget.blur();
+                } else if (e.key === "Escape" && props.onCollapse) {
+                  props.onCollapse();
+                }
               }}
               className="min-w-0 flex-1 bg-transparent text-[15px] font-medium text-[var(--text-primary)] outline-none"
               placeholder="Task title"
@@ -444,6 +452,17 @@ export function TaskDetailEditor({
             value={notesDraft}
             onChange={(e) => setNotesDraft(e.target.value)}
             onBlur={commitNotes}
+            onKeyDown={(e) => {
+              if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                e.preventDefault();
+                commitNotes();
+                e.currentTarget.blur();
+                props.onCollapse?.();
+              } else if (e.key === "Escape" && props.onCollapse) {
+                commitNotes();
+                props.onCollapse();
+              }
+            }}
             rows={isPageMode ? 4 : 3}
             placeholder="Notes"
             className="w-full resize-y bg-transparent text-sm leading-relaxed text-[var(--text-secondary)] outline-none placeholder:text-[var(--text-muted)]"

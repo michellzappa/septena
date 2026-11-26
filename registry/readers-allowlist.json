@@ -451,10 +451,6 @@
     }
   },
   "ships": {
-    "web:places.sections": {
-      "reason": "Web ships project sections with local UI labels rather than reading registry action/prompt IDs yet.",
-      "issue": "#285"
-    },
     "web:task.references": {
       "reason": "Web ships task references with local UI labels rather than reading registry action/surface IDs yet.",
       "issue": "#390"
@@ -473,22 +469,6 @@
     },
     "web:task.alerts": {
       "reason": "Web ships task reminders without referencing task.reminder / reminder registry IDs yet.",
-      "issue": "#285"
-    },
-    "web:capture.quick-add": {
-      "reason": "Web ships inline quick-add without referencing the app.quickAdd action ID yet.",
-      "issue": "#285"
-    },
-    "web:find.quick-find": {
-      "reason": "Web ships Quick Find modal without referencing app.quickFind / quickFind registry IDs yet.",
-      "issue": "#285"
-    },
-    "web:task.page": {
-      "reason": "Web ships partial task detail drawer without referencing taskPage surface ID yet.",
-      "issue": "#305"
-    },
-    "web:mac.keyboard": {
-      "reason": "Web ships keyboard shortcuts without referencing app.toggleSidebar / app.keyboardShortcuts action IDs yet.",
       "issue": "#285"
     },
     "web:ai.discuss": {

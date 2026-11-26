@@ -752,6 +752,12 @@
       "tokens.fruitAccents.colorful.name"
     ]
   },
+  "Command Bar…": {
+    "text": "Command Bar…",
+    "paths": [
+      "actions.actions.app.quickFind.desktopTitle"
+    ]
+  },
   "Complete": {
     "text": "Complete",
     "paths": [
@@ -3352,6 +3358,12 @@
     "text": "Search Tasks",
     "paths": [
       "surfaces.quickFind.emptyState.title"
+    ]
+  },
+  "Search or run a command…": {
+    "text": "Search or run a command…",
+    "paths": [
+      "surfaces.quickFind.commandPlaceholder"
     ]
   },
   "Search tasks, projects, areas…": {

@@ -343,6 +343,11 @@ struct TaskListView: View {
   // `.inline` presentation, so the form is literally the same component the
   // create-drawer uses. Folding the row autosaves (see `collapseEdit`).
   @State private var expandedEditId: String?
+  /// Uptime of the last inline-editor close: guards against a rapid second ⌘↩
+  /// accidentally completing the task right after closing its editor.
+  @State private var lastInlineEditClosedAt: TimeInterval = 0
+  private static let completeGuardAfterEdit: TimeInterval = 0.55
+  @State private var commandBridgeOwner = UUID()
   /// The row whose inline editor is folding shut right now (`collapseEdit`).
   /// While it is set, the editor and the closed row swap with NO transition,
   /// so only the card's frame animates: the card shrinks in step with the
@@ -760,7 +765,15 @@ struct TaskListView: View {
     // confirmation with an Undo, and a lost write is neither confirmable nor
     // undoable — a notice the user can miss would just reproduce the original
     // "it silently didn't save" complaint.
-    let withSnackbar = content.storeHealthAlert().septenaToastOverlay(store: toastStore)
+    let withSnackbar = content
+      .storeHealthAlert()
+      .septenaToastOverlay(store: toastStore)
+      .onAppear {
+        ActiveTaskCommandBridge.register(owner: commandBridgeOwner) { currentTaskActions }
+      }
+      .onDisappear {
+        ActiveTaskCommandBridge.unregister(owner: commandBridgeOwner)
+      }
     // Publish row actions to the menu bar via FocusedValues — macOS ONLY.
     // The "Task" CommandMenu in App.swift reads these and owns the keyboard
     // shortcuts (⌘N, ⌘T, ⌘S, ⌘⇧D, ⌘⌫, ⌘.). On iPadOS, publishing a focused
@@ -771,27 +784,7 @@ struct TaskListView: View {
     // trace). The iPad keyboard-HUD menu entries aren't worth a launch crash;
     // gestures and the `+` button are unaffected. macOS keeps the full menu.
     #if os(macOS)
-    return withSnackbar.focusedSceneValue(\.taskActions, TaskActions(
-      newTask: { openContextualQuickAdd() },
-      toggleToday: !hasTaskSelection ? nil : toggleTodayForSelected,
-      openWhen: !hasTaskSelection ? nil : openWhenForSelected,
-      openDeadline: !hasTaskSelection ? nil : openDeadlineForSelected,
-      openMove: !hasTaskSelection ? nil : openMoveForSelected,
-      toggleComplete: selection.isEmpty && FocusedChecklistStep.shared.toggle == nil ? nil : toggleSelected,
-      cancel: !hasTaskSelection ? nil : cancelSelected,
-      delete: !hasTaskSelection ? nil : deleteSelected,
-      clearSchedule: !hasTaskSelection ? nil : clearScheduleForSelected,
-      editDetails: editDetailsSelectedAction,
-      doTask: doSelectedAction,
-      duplicate: duplicateSelectedAction,
-      copy: copySelectedAction,
-      toggleStar: !hasTaskSelection ? nil : toggleStarForSelected,
-      openTags: !hasTaskSelection ? nil : openTagsForSelected,
-      openReminder: singleSelectedTask == nil ? nil : openReminderForSelected,
-      moveSuggested: moveSuggestedSelectedAction,
-      openWaiting: singleSelectedTask?.status == .open ? openWaitingForSelected : nil,
-      gotItBack: gotItBackSelectedAction
-    ))
+    return withSnackbar.focusedSceneValue(\.taskActions, currentTaskActions)
     #else
     // `focusedSceneValue` spins the iPad focus arbiter (see comment above).
     // Modifier shortcuts still register from a zero-size button in the
@@ -803,7 +796,7 @@ struct TaskListView: View {
           // `TaskActions` serves) so this list can't drift from the macOS
           // menu. The titles are real, which is what the hold-⌘ HUD labels
           // each row with.
-          let actions = iPadRowCommandActions
+          let actions = currentTaskActions
           ForEach(TaskActions.rowCommandIds, id: \.self) { id in
             let action = actions.handler(for: id)
             let title = RegistryActions.title(id)
@@ -825,11 +818,9 @@ struct TaskListView: View {
     #endif
   }
 
-  #if !os(macOS)
-  /// The same handler set macOS publishes through `focusedSceneValue`, built
-  /// here for the iPad hidden-button path (which exists because publishing a
-  /// focused scene value from a split-view detail SIGKILLs iPad — see above).
-  private var iPadRowCommandActions: TaskActions {
+  /// The live row-command handler set shared by macOS's `focusedSceneValue`,
+  /// iPad's hidden shortcut buttons, and the ⌘K Command Bar.
+  private var currentTaskActions: TaskActions {
     TaskActions(
       newTask: { openContextualQuickAdd() },
       toggleToday: !hasTaskSelection ? nil : toggleTodayForSelected,
@@ -852,7 +843,6 @@ struct TaskListView: View {
       gotItBack: gotItBackSelectedAction
     )
   }
-  #endif
 
   private var showsEmbeddedNewTaskToolbar: Bool {
     #if os(iOS)
@@ -1506,7 +1496,10 @@ struct TaskListView: View {
   /// reference (`onDismiss: collapseEdit`).
   private func collapseEdit(animated: Bool) {
     let closingId = expandedEditId
-    if let closingId { clearQuickAddCaptureSlot(for: closingId) }
+    if let closingId {
+      lastInlineEditClosedAt = ProcessInfo.processInfo.systemUptime
+      clearQuickAddCaptureSlot(for: closingId)
+    }
     if animated, let closingId {
       foldingEditId = closingId
       a11yAnimate(Theme.Motion.inlineEdit) { expandedEditId = nil }
@@ -3679,12 +3672,21 @@ struct TaskListView: View {
   }
 
   private func toggleSelected() {
-    // ⌘K on a focused checklist step ticks the step, not the task.
+    // ⌘↩ while an inline row editor is open commits & closes instead of
+    // completing, and a rapid second ⌘↩ within the guard window is ignored.
+    if expandedEditId != nil {
+      collapseEdit()
+      return
+    }
+    if ProcessInfo.processInfo.systemUptime - lastInlineEditClosedAt < Self.completeGuardAfterEdit {
+      return
+    }
+    // ⌘↩ on a focused checklist step ticks the step, not the task.
     if let toggleStep = FocusedChecklistStep.shared.toggle {
       toggleStep()
       return
     }
-    // ⌘K on Get started steps ticks them (or unticks them, when every
+    // ⌘↩ on Get started steps ticks them (or unticks them, when every
     // selected step is already done), like completing tasks.
     let steps = selectedNoticeSteps
     if !steps.isEmpty {
