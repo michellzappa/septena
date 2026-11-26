@@ -689,9 +689,9 @@ const TASK_PAGE_BLOCK_KINDS = new Set(["header", "notes", "attributes", "checkli
 const TASK_PAGE_DEPTHS = new Set(["inline", "page", "review"]);
 
 // ---- plans.json (ADR 0010, ADR 0023) ----
-// Pro is a real plan (ADR 0045, ADR 0052): the site shows it,
-// the server applies it, and the apps name it on an account that has it. No
-// store sells it yet.
+// Pro is a real plan (ADR 0045, ADR 0052) that sells like Plus (ADR 0059):
+// the site shows it, the server applies it from a grant or a Pro product, and
+// the apps name it on an account that has it. The app paywalls offer it in #719.
 const PLAN_LEVELS = ["free", "plus", "pro"];
 const PLAN_LIMIT_PLANS = ["account", "plus", "pro"];
 
@@ -2130,7 +2130,7 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   const cardSwift = (c) => `RegistryPlanCard(id: ${swiftStr(c.id)}, title: ${L(c.title, c, "title")}, icon: ${swiftStr(c.icon)}, detail: ${L(c.detail, c, "detail")}, footnote: ${LOpt(c.footnote, c, "footnote")}, highlighted: ${c.highlighted === true})`;
   for (const c of P.cards.filter((c) => c.status === undefined)) lines.push(`    ${cardSwift(c)},`);
   lines.push("  ] }");
-  lines.push("  /// Only for an account that has Pro: no store sells it (ADR 0037, ADR 0045).");
+  lines.push("  /// The Pro card, for an account that has Pro. The paywalls offer it in #719 (ADR 0059).");
   lines.push(`  static var proCard: RegistryPlanCard { ${cardSwift(P.cards.find((c) => c.id === "pro"))} }`);
   lines.push("  static var outcomes: [RegistryPlanOutcome] { [");
   for (const o of P.outcomes) {

@@ -277,7 +277,7 @@ internal fun planUpsell(id: String, languageTag: String): Pair<String, String>? 
     RegistryCatalog.document("plans").objects("upsells").firstOrNull { it.fields["id"].stringValue() == id }
         ?.let { registryText(it.fields["title"].stringValue(), languageTag) to registryText(it.fields["detail"].stringValue(), languageTag) }
 
-/** A field of a plan card (plans.json `cards`). Pro has one, but no store sells it (ADR 0045). */
+/** A field of a plan card (plans.json `cards`). Pro has one; the paywalls offer it in #719 (ADR 0059). */
 private fun planCard(id: String, field: String, languageTag: String): String =
     RegistryCatalog.document("plans").objects("cards").firstOrNull { it.fields["id"].stringValue() == id }
         ?.let { registryText(it.fields[field].stringValue(), languageTag) }.orEmpty()

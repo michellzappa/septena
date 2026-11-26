@@ -58,7 +58,8 @@ with limits, paid lifts the limits.**
 ## 3. Free and paid
 
 Three levels: Free, Plus and Pro (ADR 0010, ADR 0023, ADR 0036, ADR 0045,
-ADR 0052). Pro is a real plan; no store sells it yet. An account
+ADR 0052, ADR 0059). Pro sells like Plus, one level above it in the same
+subscription group (ADR 0059). An account
 adds the server; Plus adds more than one. The earlier rule "the server is paid" is
 replaced. The public rule: **free on one device, Plus on all of them.** The
 paid plan is named **Septena Plus** on every surface.
@@ -197,7 +198,8 @@ party. No per-user tracking, no SDKs.
   middleware on `/v1` routes, and the same check in the gateway before it
   reaches the DO. The plan is `plus` when any entitlement row is active,
   else `free`. `trial` (the reverse trial) resolves to the Plus limits, and an
-  active `pro` row to `pro` (ADR 0045).
+  active `pro` row to `pro` (a Pro grant, ADR 0045, or a Pro store product,
+  ADR 0059).
 - **Plan table (ADR 0010).** One table in `backend/` maps each plan to its
   limits: device count, sync mode (live / poll), connected agents, change-log
   window, Recently Deleted window, R2 attachments on/off and quota, connector
@@ -206,7 +208,7 @@ party. No per-user tracking, no SDKs.
   gate read this table. Apps fetch their limits from the server and never
   hardcode them.
 - **Gates read limits, never the plan name.** No code checks `plan == "paid"`.
-  Pro (ADR 0045) is such a row. A later tier (Supporter, Family; see the
+  Pro (ADR 0045, ADR 0059) is such a row. A later tier (Supporter, Family; see the
   Starlings doc *Free and paid plans*) is then a new row in the plan table and a new product in the same
   subscription group, with no code change at the gates.
 - **Fail closed** on a missing or invalid row, with one exception: grace
@@ -220,7 +222,8 @@ row per source of access: `id` (`apple:<originalTransactionId>` or
 `grant:<name>`), `source`, `productId`, `expiresAt` (ms; null = no expiry),
 `originalTransactionId`, `status` (`active` / `grace` / `billing_retry` /
 `expired` / `revoked`), `environment`, `note`, `signedAt`, `updatedAt`. The
-user is on Pro when any active row has `plan` = `pro` (grants only, ADR 0045),
+user is on Pro when any active row has `plan` = `pro` (a Pro grant, ADR 0045,
+or an App Store row for a Pro product, ADR 0059),
 else on Plus when any row is active. An older Apple payload (`signedDate`)
 never overwrites a newer one. KV `TOKENS` maps `ent-otx:<originalTransactionId>`
 and `ent-aat:<appAccountToken>` to the user, so a webhook finds its user.

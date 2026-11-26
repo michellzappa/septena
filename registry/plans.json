@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Plans and pricing for Septena, the task app (ADR 0010, ADR 0023, ADR 0036, ADR 0037). One source for the pricing page, the in-app Septena Plus page and the upsell moments. `limits` holds the machine values per plan; the server plan table reads the same values. `cells` is the copy for each level, and the generator checks that every numeric limit appears in its cell. `prices` sell Plus and `proPrices` sell Pro (ADR 0059): both sit in one store subscription group, with Pro the higher level.",
+  "description": "Plans and pricing for Septena, the task app (ADR 0010, ADR 0023, ADR 0036, ADR 0037, ADR 0045, ADR 0052, ADR 0059). One source for the pricing page, the in-app Septena Plus page and the upsell moments. `limits` holds the machine values per plan; the server plan table reads the same values. `cells` is the copy for each level, and the generator checks that every numeric limit appears in its cell. `prices` sell Plus and `proPrices` sell Pro (ADR 0059): both sit in one store subscription group, with Pro the higher level.",
   "featureId": "sync.backend",
   "name": "Septena Plus",
   "shortName": "Plus",
