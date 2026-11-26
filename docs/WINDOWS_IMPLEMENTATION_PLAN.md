@@ -1,5 +1,7 @@
 # Septena for Windows
 
+Status: building (ADR 0013, #136)
+
 ## What carries over from Bipe
 
 Bipe separated the work into a standalone JVM proof, a real account runtime, a Compose desktop shell, then distribution. Its Windows CI proved the native libraries and SQLite path with synthetic sessions. Its Windows 365 checks recorded separate evidence for account restore, keyboard behavior and packaging. That sequence fits Septena. Bipe's Matrix SDK, MAS registration and encrypted Matrix store are specific to its messaging stack.
