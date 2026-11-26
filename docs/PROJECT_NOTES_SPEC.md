@@ -117,13 +117,16 @@ fake a date or a name.
 
 | Tool | Does |
 |---|---|
-| `tasks_project_get` | One project: notes, `noteRev`, area, open tasks (titles, ids, status), the last 10 activity entries. |
+| `tasks_project_get` | One project: notes, `noteRev`, area, headings, open tasks (titles, ids, status, heading), the last 10 activity entries. |
 | `tasks_notes_log` | Append one log entry to a project's or an area's notes. Takes `container`, `id`, `baseRev`, `text`, `why`. |
 | `tasks_notes_write` | Replace the whole body. Allowed for an agent only while the brief is empty (§4). Takes `baseRev`, `body`, `why`. |
 | `tasks_notes_propose` | Propose a new brief. Stores it on the container as `notesProposal { body, agent, at, why }`. One open proposal per note; a new one replaces the old. The user accepts or rejects it in the app. |
 | `tasks_notes_history` | A note's revisions, newest first: `rev`, `actor`, `at`, `reason`, and the body when `include_body` is true. |
 | `tasks_area_create` | Create an area with optional notes. |
 | `tasks_project_create` | Create a project in an area with optional notes and `githubRepo`. |
+| `tasks_project_update` | Rename a project, move it to another area, set `githubRepo`, or set its status. |
+| `tasks_area_update` | Rename an area or set its emoji. |
+| `tasks_heading_create` | Add a heading at the end of a project. `tasks_create` and `tasks_update` take `heading` to file a task under it. |
 
 Refusals use the existing shape (`reason`, `rule`), with the new reasons
 `stale` and `brief_is_users`.

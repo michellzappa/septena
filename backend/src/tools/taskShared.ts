@@ -28,6 +28,8 @@ export interface TaskOut {
   deferredDeadline?: string;
   area?: string;
   project?: string;
+  // The id of the project heading the task is filed under (a heading row).
+  heading?: string;
   completedAt?: string;
   notes?: string;
   // Day stamps (YYYY-MM-DD) that date a task's arrival on Today — the inputs

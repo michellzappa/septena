@@ -2494,6 +2494,14 @@ export class TaskStore extends DurableObject<Env> {
     return raw ? (decodeRow(spec, raw as Record<string, unknown>) as Row) : null;
   }
 
+  /// A project's live headings (section dividers), in list order.
+  readHeadings(projectId: string): Row[] {
+    const raws = this.sql.exec(
+      "SELECT * FROM tasks WHERE project = ? AND deletedAt IS NULL AND kind = 'heading' ORDER BY position, id", projectId,
+    ).toArray();
+    return raws.map((r) => decodeRow(ENTITIES.task, r as Record<string, unknown>) as Row);
+  }
+
   /// Open tasks filed directly in a project or an area (headings excluded),
   /// in list order.
   readContainerTasks(container: NoteContainer, id: string, limit: number): Row[] {

@@ -684,6 +684,7 @@ export function taskOut(r: Row, tagMap?: Map<string, string>): TaskOut {
     ...(str(r.deferredDeadline) ? { deferredDeadline: str(r.deferredDeadline) } : {}),
     area: str(r.area),
     project: str(r.project),
+    ...(str(r.heading) ? { heading: str(r.heading) } : {}),
     completedAt: str(r.completedAt),
     notes: str(r.notes),
     created: str(r.created),
