@@ -45,7 +45,7 @@ import { evaluateConversation, groupTurnsByTask } from "@/lib/conversation";
 import { addDays, attributeLabel, todayLabel, tomorrowLabel, type DateBoardAttribute } from "@/lib/dateBoard";
 import {
   SIDEBAR_DESTINATIONS,
-  agentGroupOf,
+  BADGE_GROUP_IDS,
   destinationGroups,
   destinationInfo,
   reviewGroupOf,
@@ -633,9 +633,10 @@ export function SeptenaApp() {
       if (task.status !== "open") continue;
 
       if (membership.matchesView.today) counts.today++;
+      // Review holds agent work in progress too (ADR 0046); only what waits on the user is in its badge.
       const reviewGroup = reviewGroupOf(task, convoState);
-      if (reviewGroup && reviewGroup !== "faded") counts.review++;
-      if (agentGroupOf(task, convoState)) counts.agent++;
+      if (reviewGroup && BADGE_GROUP_IDS.has(reviewGroup)) counts.review++;
+      else if (reviewGroup && reviewGroup !== "faded") counts.agent++;
       if (membership.matchesView.upcoming) counts.upcoming++;
       if (task.recurrenceUnit) counts.repeating++;
       if (membership.matchesView.anytime) counts.anytime++;
@@ -663,8 +664,10 @@ export function SeptenaApp() {
 
     const destById = new Map(SIDEBAR_DESTINATIONS.map((d) => [d.id, d]));
     const isEmpty = (id: SmartDestination) =>
-      // The Faded group keeps Review in the sidebar, but it is not in the badge.
-      (id === "review" ? smartCounts.counts.review + smartCounts.counts.faded : smartCounts.counts[id]) === 0;
+      // Agent work in progress and the Faded group keep Review in the sidebar, but they are not in the badge.
+      (id === "review"
+        ? smartCounts.counts.review + smartCounts.counts.agent + smartCounts.counts.faded
+        : smartCounts.counts[id]) === 0;
 
     const orderedIds: SmartDestination[] = [
       ...rawOrder.filter((id): id is SmartDestination => destById.has(id as SmartDestination)),
@@ -723,7 +726,7 @@ export function SeptenaApp() {
         switch (destination.id) {
           case "today": return membership.matchesView.today;
           case "review": return reviewGroupOf(task, convoState) !== null;
-          case "agent": return agentGroupOf(task, convoState) !== null;
+          case "agent": return false; // a group of Review: navigateTo opens Review
           case "upcoming": return membership.matchesView.upcoming;
           case "repeating": return Boolean(task.recurrenceUnit);
           case "anytime": return membership.matchesView.anytime;
@@ -763,7 +766,7 @@ export function SeptenaApp() {
     });
   }, [destination, evaluatedTasks, logbookTab, prefs.tasksShowFaded, projectById, tagFilterId]);
 
-  // Review grouped by what waits on the user (docs/REVIEW_SPEC.md §1), in registry order.
+  // Review grouped by what waits on the user, then agent work in progress (docs/REVIEW_SPEC.md §1), in registry order.
   const reviewGroups = useMemo(() => {
     if (!(destination.kind === "smart" && destination.id === "review")) return [];
     return destinationGroups("review")
@@ -862,17 +865,6 @@ export function SeptenaApp() {
     return Array.from(byDay.entries()).sort((a, b) => a[0].localeCompare(b[0]));
   }, [destination, visibleTasks]);
 
-  // Agent grouped by the registry's stages.
-  const agentGroups = useMemo(() => {
-    if (!(destination.kind === "smart" && destination.id === "agent")) return [];
-    return destinationGroups("agent")
-      .map((group) => ({
-        ...group,
-        items: listedTasks.filter((i) => agentGroupOf(i.task, i.convoState) === group.id),
-      }))
-      .filter((g) => g.items.length > 0);
-  }, [destination, listedTasks]);
-
   // Every faded task (the Faded group's sheet), and those of this week's sweep (the prompt on Today).
   const fadedTasks = useMemo(
     () =>
@@ -887,11 +879,13 @@ export function SeptenaApp() {
   );
   const sweepDue = isSweepDue(new Date(), fade, fadedTasks.map((t) => t.fadedAt));
 
-  // Go to a place and clear the selection. Faded is a group of Review: going to it opens the group.
+  // Go to a place and clear the selection. Faded and Agent are groups of Review: going to one opens Review.
   const navigateTo = useCallback(
     (dest: ActiveDestination) => {
       if (dest.kind === "smart" && dest.id === "faded") {
         handleChangePref("reviewFadedExpanded", true);
+        setDestination({ kind: "smart", id: "review" });
+      } else if (dest.kind === "smart" && dest.id === "agent") {
         setDestination({ kind: "smart", id: "review" });
       } else {
         setDestination(dest);
@@ -2547,7 +2541,7 @@ export function SeptenaApp() {
               </button>
             )}
 
-            {destination.kind === "smart" && destination.id === "agent" && (
+            {destination.kind === "smart" && destination.id === "review" && (
               <button
                 type="button"
                 onClick={() => void engine.setSetting("agentsPaused", !agentsPaused)}
@@ -2695,7 +2689,7 @@ export function SeptenaApp() {
 
             {agentsPaused &&
               destination.kind === "smart" &&
-              (destination.id === "agent" || destination.id === "review") && (
+              destination.id === "review" && (
                 <div className="mb-4 flex items-center justify-between rounded-lg border border-amber-500/30 bg-amber-500/10 px-3.5 py-2 text-xs text-amber-700 dark:text-amber-300">
                   <span>All agents are paused. Connected agents cannot claim or edit tasks.</span>
                   <button
@@ -2946,15 +2940,6 @@ export function SeptenaApp() {
                       </span>
                     </div>
                     <div className="space-y-0.5">{items.map((i) => renderTaskRow(i))}</div>
-                  </section>
-                ))}
-              </div>
-            ) : destination.kind === "smart" && destination.id === "agent" ? (
-              <div className="space-y-5">
-                {agentGroups.map((group) => (
-                  <section key={group.id}>
-                    {renderGroupHeader(group)}
-                    <div className="space-y-0.5">{group.items.map((i) => renderTaskRow(i))}</div>
                   </section>
                 ))}
               </div>

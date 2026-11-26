@@ -1,36 +1,43 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { agentGroupOf, destinationGroups, reviewGroupOf, SIDEBAR_DESTINATIONS } from "../src/lib/destinations.ts";
+import { BADGE_GROUP_IDS, destinationGroups, reviewGroupOf, SIDEBAR_DESTINATIONS } from "../src/lib/destinations.ts";
 import { fadeInput, fadeSettings, isProposal, isSweepDue, sweepAnchorDay } from "../src/lib/fade.ts";
 import type { TaskRow } from "../src/lib/types.ts";
 
 const task = (fields: Partial<TaskRow> = {}): TaskRow => ({ id: "t", title: "Task", status: "open", ...fields });
 
-test("Faded is a group of Review, not a sidebar list", () => {
-  assert.deepEqual(destinationGroups("review").map((g) => g.id), ["questions", "finished", "faded"]);
+test("Faded and Agent are groups of Review, not sidebar lists", () => {
+  assert.deepEqual(
+    destinationGroups("review").map((g) => g.id),
+    ["questions", "finished", "working", "queued", "stopped", "faded"],
+  );
+  assert.deepEqual([...BADGE_GROUP_IDS], ["questions", "finished"]);
   const ids = SIDEBAR_DESTINATIONS.map((d) => d.id as string);
   assert.ok(ids.includes("review"));
-  for (const nested of ["faded", "inbox", "recentlyDeleted"]) assert.ok(!ids.includes(nested), nested);
+  for (const nested of ["faded", "agent", "inbox", "recentlyDeleted"]) assert.ok(!ids.includes(nested), nested);
 });
 
 test("a task is in one Review group", () => {
-  assert.equal(reviewGroupOf(task(), { reviewGroup: "questions" }), "questions");
-  assert.equal(reviewGroupOf(task(), { reviewGroup: "finished" }), "finished");
+  assert.equal(reviewGroupOf(task(), { reviewGroup: "questions", agentStage: null }), "questions");
+  assert.equal(reviewGroupOf(task(), { reviewGroup: "finished", agentStage: null }), "finished");
   assert.equal(reviewGroupOf(task({ fadedAt: "2026-11-20T10:00:00Z" }), null), "faded");
-  assert.equal(reviewGroupOf(task({ fadedAt: "2026-11-20T10:00:00Z" }), { reviewGroup: "questions" }), "faded");
+  // The first group that fits wins (docs/REVIEW_SPEC.md §1): a question beats Faded.
+  assert.equal(reviewGroupOf(task({ fadedAt: "2026-11-20T10:00:00Z" }), { reviewGroup: "questions", agentStage: null }), "questions");
   assert.equal(reviewGroupOf(task(), null), null);
   for (const out of [{ status: "done" }, { deletedAt: "2026-11-20T10:00:00Z" }, { kind: "heading" }] as Partial<TaskRow>[]) {
-    assert.equal(reviewGroupOf(task({ ...out, fadedAt: "2026-11-20T10:00:00Z" }), { reviewGroup: "finished" }), null);
+    assert.equal(reviewGroupOf(task({ ...out, fadedAt: "2026-11-20T10:00:00Z" }), { reviewGroup: "finished", agentStage: null }), null);
   }
 });
 
-test("Agent shows work in progress only", () => {
-  for (const stage of ["working", "queued", "stopped", "done"] as const) {
-    assert.equal(agentGroupOf(task(), { agentStage: stage }), stage);
+test("Review shows agent work in progress by its stage", () => {
+  for (const stage of ["working", "queued", "stopped"] as const) {
+    assert.equal(reviewGroupOf(task(), { reviewGroup: null, agentStage: stage }), stage);
   }
-  for (const stage of ["yourTurn", "review", null] as const) assert.equal(agentGroupOf(task(), { agentStage: stage }), null);
-  assert.equal(agentGroupOf(task(), null), null);
-  assert.equal(agentGroupOf(task({ fadedAt: "2026-11-20T10:00:00Z" }), { agentStage: "queued" }), null);
+  for (const stage of ["done", "yourTurn", "review", null] as const) {
+    assert.equal(reviewGroupOf(task(), { reviewGroup: null, agentStage: stage }), null);
+  }
+  assert.equal(reviewGroupOf(task(), { reviewGroup: "questions", agentStage: "yourTurn" }), "questions");
+  assert.equal(reviewGroupOf(task({ fadedAt: "2026-11-20T10:00:00Z" }), { reviewGroup: null, agentStage: "queued" }), "queued");
 });
 
 test("the fade input marks an unaccepted proposal", () => {

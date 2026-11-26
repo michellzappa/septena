@@ -1188,7 +1188,6 @@
     "paths": [
       "settings.copy.ai_explainer.turnDone.label",
       "settings.copy.sign_in_approval.done.label",
-      "destinations.destinations.agent.groups.done.title",
       "actions.actions.task.select.activeTitle",
       "actions.actions.do.done.title",
       "surfaces.doing.exits.done.label",
@@ -2867,16 +2866,10 @@
       "destinations.destinations.review.groups.questions.title"
     ]
   },
-  "Questions and finished work from your agent show up here. So do tasks that faded.": {
-    "text": "Questions and finished work from your agent show up here. So do tasks that faded.",
-    "paths": [
-      "destinations.destinations.review.emptyState.detail"
-    ]
-  },
   "Queued": {
     "text": "Queued",
     "paths": [
-      "destinations.destinations.agent.groups.queued.title"
+      "destinations.destinations.review.groups.queued.title"
     ]
   },
   "Quick Add…": {
@@ -3697,7 +3690,7 @@
   "Stopped": {
     "text": "Stopped",
     "paths": [
-      "destinations.destinations.agent.groups.stopped.title"
+      "destinations.destinations.review.groups.stopped.title"
     ]
   },
   "Stopped for now": {
@@ -3894,8 +3887,8 @@
       "settings.rootGroups.lists_root.items.3.detail"
     ]
   },
-  "Tasks you assign to Claude appear here, grouped by where the work stands.": {
-    "text": "Tasks you assign to Claude appear here, grouped by where the work stands.",
+  "Tasks you assign to Claude show up in Review, grouped by where the work stands.": {
+    "text": "Tasks you assign to Claude show up in Review, grouped by where the work stands.",
     "paths": [
       "destinations.destinations.agent.emptyState.detail"
     ]
@@ -4409,7 +4402,7 @@
   "Working": {
     "text": "Working",
     "paths": [
-      "destinations.destinations.agent.groups.working.title"
+      "destinations.destinations.review.groups.working.title"
     ]
   },
   "Working lists shown at the top of the sidebar.": {
@@ -4528,6 +4521,12 @@
     "text": "Your agent asks",
     "paths": [
       "surfaces.taskPage.blocks.taskPage.conversation.askKicker"
+    ]
+  },
+  "Your agent's questions, finished work and tasks in progress show up here. Faded tasks do too.": {
+    "text": "Your agent's questions, finished work and tasks in progress show up here. Faded tasks do too.",
+    "paths": [
+      "destinations.destinations.review.emptyState.detail"
     ]
   },
   "Your agents do the work": {

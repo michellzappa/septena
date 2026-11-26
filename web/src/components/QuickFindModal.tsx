@@ -169,7 +169,7 @@ export function QuickFindModal({
                     ? "text-[var(--today-gold)]"
                     : item.id === "starred"
                       ? "text-amber-500"
-                      : item.id === "review" || item.id === "agent"
+                      : item.id === "review"
                         ? "text-[var(--accent)]"
                         : "text-[var(--text-muted)]";
                 icon = <RegistryIcon token={item.icon} className={`h-3.5 w-3.5 ${tint}`} />;

@@ -1331,7 +1331,7 @@ enum LocalCache {
           e.deletedAt == nil && !e.pendingDeletion && e.area == areaId
         }
       ))
-    case .today, .triage, .review, .agent, .upcoming, .repeating, .unscheduled, .starred, .faded:
+    case .today, .triage, .review, .upcoming, .repeating, .unscheduled, .starred, .faded:
       return StoreHealth.fetch(context, FetchDescriptor<TaskEntity>(
         predicate: #Predicate { e in
           e.deletedAt == nil && !e.pendingDeletion && e.statusRaw == "open"
@@ -1495,7 +1495,8 @@ enum LocalCache {
       return e.isFaded ? SeptenaTask(e) : nil
     }
     if filter == .review {
-      // What waits on the user (docs/REVIEW_SPEC.md §1), faded rows included.
+      // What waits on the user and agent work in progress
+      // (docs/REVIEW_SPEC.md §1), faded rows included.
       // Only rows that carry conversation JSON decode it.
       guard e.status == .open, !e.isHeading, e.isFaded || e.conversationJSON != nil else { return nil }
       let task = SeptenaTask(e)
@@ -1514,14 +1515,6 @@ enum LocalCache {
       return e.isInTriageBand ? SeptenaTask(e) : nil
     case .review:
       return nil // handled above, before the faded rows leave
-    case .agent:
-      // Agent work by stage (docs/TASK_FACTORY_SPEC.md §3). Only rows that
-      // carry conversation JSON decode it. A claim lease is backend wall-clock
-      // time, not the app's day, so this reads the real clock (as
-      // `deriveConvo` does).
-      guard e.status == .open, e.conversationJSON != nil,
-            e.conversation.agentStage(at: Date()) != nil else { return nil }
-      return SeptenaTask(e)
     case .upcoming:
       return e.isUpcoming ? SeptenaTask(e) : nil
     case .repeating:

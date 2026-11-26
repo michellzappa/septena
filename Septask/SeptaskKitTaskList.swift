@@ -1233,8 +1233,6 @@ final class SeptaskKitTaskListController: NSViewController {
       newRows = titleRows + upcomingBuckets(pool)
     case .review:
       newRows = titleRows + reviewGroupRows(pool)
-    case .agent:
-      newRows = titleRows + agentStageRows(pool)
     case .unscheduled, .starred:
       newRows = titleRows + groupedByList(pool)
     case .project, .area:
@@ -2186,7 +2184,8 @@ final class SeptaskKitTaskListController: NSViewController {
   }
 
   /// Review (docs/REVIEW_SPEC.md §1): one header per non-empty `ReviewGroup`,
-  /// in registry order. Faded is last, behind its toggle. The AppKit twin of
+  /// in registry order: what waits on the user, then agent work in progress
+  /// (ADR 0046). Faded is last, behind its toggle. The AppKit twin of
   /// `TaskListView.reviewGroupRows`.
   private func reviewGroupRows(_ pool: [SeptenaTask]) -> [Row] {
     let byGroup = Dictionary(grouping: pool) { $0.reviewGroup }
@@ -2209,27 +2208,6 @@ final class SeptaskKitTaskListController: NSViewController {
   /// A Finished work row of Review: it draws Accept and Send back.
   private func isReviewRow(_ task: SeptenaTask) -> Bool {
     filter == .review && !task.isHeading && task.conversation.needsHumanReview
-  }
-
-  /// Agent smart list (docs/TASK_FACTORY_SPEC.md §3): one header per
-  /// non-empty `AgentStage`, in registry order, then that stage's tasks. The
-  /// AppKit twin of `TaskListView.agentStageRows`.
-  private func agentStageRows(_ pool: [SeptenaTask]) -> [Row] {
-    // A claim lease is backend wall-clock time, not the app's day.
-    let now = Date()
-    let byStage = Dictionary(grouping: pool.filter { !$0.isHeading }) {
-      $0.conversation.agentStage(at: now) ?? .queued
-    }
-    var result: [Row] = []
-    for stage in AgentStage.allCases {
-      guard let tasks = byStage[stage], !tasks.isEmpty else { continue }
-      result.append(.header(id: "agent-\(stage.rawValue)",
-                            title: stage.group?.title ?? stage.rawValue,
-                            icon: .symbol(stage.group?.sfSymbol ?? "circle"),
-                            count: tasks.count))
-      result += tasks.map(chipped)
-    }
-    return result
   }
 
   /// The grouped open list — reference implementation is TaskListView's
@@ -2269,9 +2247,6 @@ final class SeptaskKitTaskListController: NSViewController {
     case .review:
       return .screenTitle(title: TaskFilter.review.title,
                           icon: .symbol("eye"))
-    case .agent:
-      return .screenTitle(title: TaskFilter.agent.title,
-                          icon: .symbol(Route.filter(.agent).icon))
     case .upcoming:
       return .screenTitle(title: TaskFilter.upcoming.title,
                           icon: .symbol("calendar"))
@@ -3968,7 +3943,7 @@ final class SeptaskKitTaskListController: NSViewController {
     // Repeating lists the templates that already carry a recurrence rule;
     // a plain new task can't join it, so ⌘N stays off there — same as the
     // two read-only lists.
-    case .review, .agent, .repeating, .logbook, .faded, .recentlyDeleted: return nil
+    case .review, .repeating, .logbook, .faded, .recentlyDeleted: return nil
     }
     return (area, project, today, scheduled)
   }
@@ -5483,7 +5458,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
   /// don't reorder.
   private var allowsReorder: Bool {
     switch filter {
-    case .review, .agent, .logbook, .faded, .recentlyDeleted: return false
+    case .review, .logbook, .faded, .recentlyDeleted: return false
     default: return true
     }
   }

@@ -60,15 +60,17 @@ machine.
 | **Review** | `endState = needs_verify`. In Review ▸ Finished work. |
 | **Done** | Terminal `endState`. The task `status` stays mz's: it closes when mz accepts or finishes the handoff. |
 
-The **Agent** list shows work in progress: Working, Queued, Stopped and Done.
-Your turn and Review are groups of **Review** (§3.1). The Today list shows only **Your turn** and **Review** items, as
+Every stage except Done is a group of **Review** (§3.1, ADR 0046): Your turn
+is Questions, Review is Finished work, and Working, Queued and Stopped keep
+their names. There is no separate Agent list. Done is in the Logbook. The Today list shows only **Your turn** and **Review** items, as
 today's ball-in-court dot already does.
 
 ### 3.1 Review
 
-Review is one list for everything that waits on the user. Its contract, the
+Review is one list for everything that waits on the user and for agent work
+in progress. Its contract, the
 store rules for agents, Accept and Send back are in
-[`docs/REVIEW_SPEC.md`](REVIEW_SPEC.md) (ADR 0044).
+[`docs/REVIEW_SPEC.md`](REVIEW_SPEC.md) (ADR 0044, ADR 0046).
 
 ## 4. Runner
 

@@ -1,10 +1,12 @@
 # Review — spec
 
-**Status:** accepted 2026-11-25 ([ADR 0044](adr/0044-review-is-one-place.md)).
+**Status:** accepted 2026-11-25 ([ADR 0044](adr/0044-review-is-one-place.md)),
+amended 2026-11-26 ([ADR 0046](adr/0046-agent-work-is-a-review-group.md)).
 The store rules (§3) are built. §5 says what is not.
 
-Review is the one list of everything that waits on the user. Nothing else in
-the app is called Review.
+Review is the one list of everything that waits on the user, and of agent
+work in progress. Nothing else in the app is called Review. There is no
+separate Agent list (ADR 0046).
 
 ## 1. The groups
 
@@ -12,6 +14,9 @@ the app is called Review.
 |---|---|---|---|
 | **Questions** | The last turn is a provider turn with options, on an open task that is not stopped. | The user answers, stops the agent, or closes the task. | It stays. It does not fade. |
 | **Finished work** | `endState = needs_verify` on an open task. | The user accepts, sends back, or closes the task. | It stays. It does not fade. |
+| **Working** | An agent holds a live claim on the open task. | The claim ends, the agent asks or hands over, or the user takes the task back. | It stays. It does not fade. |
+| **Queued** | Agent work (§3) with no live claim, not stopped and not terminal. | An agent claims it, or the user takes the task back or closes it. | It stays. |
+| **Stopped** | The user stopped the agent on this task. | The user resumes the agent, takes the task back or closes it. | It stays. |
 | **Faded** | The fade pass set `fadedAt` (`TASK_FADE_SPEC.md` §4), or a proposal expired (ADR 0039). | The user keeps, opens or edits it, or lets it go. A hand-off, a question or a user's deadline also ends the fade. | It stays. A timer never drops a task. |
 | **Projects** | The project faded (`TASK_FADE_SPEC.md` §4.2, #585). | Keep, Done or Let go. | It stays, dimmed in the sidebar. |
 
@@ -25,10 +30,11 @@ Today), overdue tasks, and the Today rollover (§6 of the fade spec).
 
 - Sidebar: right below Today, while it has an item. Go ▸ Review and Quick Find
   always open it.
-- Badge: Questions plus Finished work. Faded and Projects do not count.
+- Badge: Questions plus Finished work. Working, Queued, Stopped, Faded and
+  Projects do not count.
 - Faded starts collapsed. Its notice opens the keep-or-let-go sheet on any day.
 - The weekly prompt on Today opens the same sheet.
-- The Agent list shows work in progress: Working, Queued, Stopped, Done.
+- Agent work that is done has no group: it is in the Logbook.
 
 ## 3. Rules the store enforces
 
