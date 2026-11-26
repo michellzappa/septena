@@ -55,6 +55,7 @@ a new ADR and set the old one to `superseded by NNNN`.
 | [0048](0048-decisions-and-questions-are-typed-log-entries.md) | Decisions and open questions are typed entries in the notes log | proposed |
 | [0049](0049-templates-are-a-versioned-json-file.md) | A template is a versioned JSON file of structure and briefs, never of private data | proposed |
 | [0050](0050-septena-publishes-its-agent-contract.md) | Septena publishes its agent contract: Markdown twins, a versioned spec, one error envelope, idempotency, OpenAPI, skills | accepted |
+| [0051](0051-clients-in-other-apps-are-septena-surfaces.md) | A Septena client inside another app (CLI, Raycast) is a Septena surface, not a source integration | accepted |
 
 ## Template
 
