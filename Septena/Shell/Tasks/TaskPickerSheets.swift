@@ -895,7 +895,7 @@ struct MovePickerSheet: View {
   }
 
   private var rows: some View {
-        LazyVStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 4) {
           // Inbox first — drop both area and project.
           if !hidesInboxTarget && matches(TaskFilter.triage.title) {
             row(.inbox, title: TaskFilter.triage.title,

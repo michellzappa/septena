@@ -86,7 +86,7 @@ struct NotesProposalCard: View {
         .padding(.vertical, 4)
     } else {
       ScrollView {
-        LazyVStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 2) {
           ForEach(lines) { line in
             diffRow(line)
           }

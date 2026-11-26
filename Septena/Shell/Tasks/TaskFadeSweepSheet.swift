@@ -63,7 +63,7 @@ struct TaskFadeSweepSheet: View {
 
   private var taskList: some View {
     ScrollView {
-      LazyVStack(alignment: .leading, spacing: 0) {
+      VStack(alignment: .leading, spacing: 0) {
         Text(String(localized: "Choose Keep for anything you still need. The rest move to your Logbook as let go, never deleted.",
                     comment: "Sweep sheet intro"))
           .font(.septenaMeta)
