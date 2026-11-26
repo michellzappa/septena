@@ -314,9 +314,10 @@ The task factory (`docs/TASK_FACTORY_SPEC.md`) uses the project's
 
 ## 11. Open questions for mz
 
-| Question | Default in this spec |
+| Question | Decision |
 |---|---|
-| One link per project, or several remote scopes merged into one project? | One. |
-| Do local tasks in a linked project push to the remote automatically? | No; explicit "Send to…". |
-| On unlink, keep the rows as local tasks or remove them? | Keep. |
-| Privacy text: third-party tokens stored on the backend. | Add to the backend privacy text (backend spec §10). |
+| One link per project, or several remote scopes merged into one project? | One. Decided (default, 2026-11-26). |
+| Do local tasks in a linked project push to the remote automatically? | No; explicit "Send to…". Decided (default, 2026-11-26). |
+| On unlink, keep the rows as local tasks or remove them? | Keep. Decided (default, 2026-11-26). |
+| Privacy text: third-party tokens stored on the backend. | Add to the backend privacy text (backend spec §10). Decided (default, 2026-11-26). |
+| Build Starlings linked projects, or let the agent read Starlings too (ADR 0038)? | Open (asked 2026-11-25, #24). Default: do not start #12 to #14 until mz answers. |
