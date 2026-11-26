@@ -21,7 +21,7 @@ dependencies {
     runtimeOnly(files(coreNatives).builtBy(":core:fetchCoreJvmNatives"))
 }
 
-val smokeTest by tasks.registering(JavaExec::class) {
+tasks.register<JavaExec>("smokeTest") {
     dependsOn(tasks.named("testClasses"))
     classpath = sourceSets["test"].runtimeClasspath
     mainClass.set("app.septena.windows.SpikeSmokeKt")
@@ -32,6 +32,6 @@ compose.desktop.application {
     nativeDistributions {
         packageName = "SeptenaSpike"
         packageVersion = "0.1.0"
-        modules("java.sql", "jdk.unsupported")
+        includeAllModules = true
     }
 }

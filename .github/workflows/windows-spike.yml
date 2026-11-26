@@ -10,6 +10,8 @@ on:
       - "android/gradle/**"
       - "android/gradlew*"
       - "core/release/release.json"
+      - "registry/conformance/**"
+      - "docs/WINDOWS_IMPLEMENTATION_PLAN.md"
       - ".github/workflows/windows-spike.yml"
   workflow_dispatch:
 
@@ -54,4 +56,5 @@ jobs:
           name: septena-windows-spike-x64
           path: windows/build/compose/binaries/main/app/SeptenaSpike
           if-no-files-found: error
+          include-hidden-files: true
           retention-days: 14
