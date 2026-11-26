@@ -13,12 +13,14 @@ on:
       - "backend/**"
       - "registry/**"
       - "scripts/gen-registries.mjs"
+      - "docs/agent-spec/**"
       - ".github/workflows/backend.yml"
   pull_request:
     paths:
       - "backend/**"
       - "registry/**"
       - "scripts/gen-registries.mjs"
+      - "docs/agent-spec/**"
       - ".github/workflows/backend.yml"
   workflow_dispatch:
 
@@ -58,6 +60,12 @@ jobs:
 
       - name: Tests
         run: pnpm test
+
+      # ADR 0050: openapi.json, the agent spec and its JSON Schema are
+      # generated. A change to a route validator, registry/entities.json,
+      # the refusal table or spec.src.md must regenerate them.
+      - name: Generated contract files are current
+        run: pnpm run gen:contract --check
 
   # F2 (#343): a backend change on main goes live from CI, then /health
   # must answer. Without the CLOUDFLARE_API_TOKEN secret the job skips

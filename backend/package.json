@@ -9,6 +9,7 @@
     "deploy": "wrangler deploy",
     "tail": "wrangler tail",
     "typecheck": "tsc --noEmit",
+    "gen:contract": "node scripts/gen-contract.ts",
     "test": "node --test test/*.test.mjs test/*.test.ts"
   },
   "dependencies": {

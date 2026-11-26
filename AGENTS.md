@@ -708,6 +708,17 @@ The product is Septena; the code targets keep the working names `Septask` (iOS),
   claim needs the Durable Object's single writer, and its rules (leases, the
   human-only stop, pause, run budget) are enforced in `TaskStore`, not in tool
   code. See ADR 0008.
+- **The agent contract is generated (ADR 0050).** `api.septena.app/openapi.json`
+  comes from the /v1 Zod validators listed in `backend/src/api/openapi.ts`;
+  `docs/agent-spec/spec.md` and `schema.json` come from
+  `docs/agent-spec/spec.src.md`, `registry/entities.json` and the refusal
+  table in `backend/src/errors.ts`. After a change to a /v1 route, a
+  validator, an entity column, a refusal code or the spec source, run
+  `pnpm run gen:contract` in `backend/` and commit the output. Backend CI
+  runs it with `--check`, and a test fails when a new /v1 route is not in
+  `ROUTES` or `INTERNAL_ROUTES`. The site copies the spec, the schema,
+  `registry/conformance/*.json` and `docs/agent-spec/conformance/run.mjs`
+  at build time. Never edit the generated files by hand.
 - **The MCP server is DUAL-ERA and must stay that way.** MCP revision
   `2026-07-28` made the protocol stateless (no `initialize`, no
   `Mcp-Session-Id`, no GET stream; version + client identity ride in

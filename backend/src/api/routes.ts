@@ -133,11 +133,11 @@ api.use("*", async (c, next) => {
   if (c.req.header(ERROR_FORMAT_HEADER)?.trim().toLowerCase() === "envelope") c.res = await envelopeResponse(c.res);
 });
 
-const zAppleBody = z.object({
+export const zAppleBody = z.object({
   identityToken: z.string().min(20).max(8_000),
   nonce: z.string().min(16).max(256),
 }).strict();
-const zRefreshBody = z.object({ refreshToken: z.string().min(20).max(400) }).strict();
+export const zRefreshBody = z.object({ refreshToken: z.string().min(20).max(400) }).strict();
 const zClientName = z.string().regex(/^[\w .()-]{1,40}$/);
 
 /// The app version behind a call, for the device list on the admin page.
@@ -594,8 +594,7 @@ api.post("/sync/push", async (c) => {
   return c.json(result);
 });
 
-api.get("/sync/pull", async (c) => {
-  const q = z.object({
+export const zSyncPullQuery = z.object({
     since: z.coerce.number().int().min(0).default(0),
     limit: z.coerce.number().int().min(1).max(1_000).default(500),
     // `settings=1`: the client syncs the `setting` entity (TaskStore.pull).
@@ -608,7 +607,10 @@ api.get("/sync/pull", async (c) => {
     refs: z.enum(["0", "1"]).default("0"),
     // `doSessions=1`: the client syncs the `doSession` entity (TaskStore.pull).
     doSessions: z.enum(["0", "1"]).default("0"),
-  }).safeParse(c.req.query());
+  });
+
+api.get("/sync/pull", async (c) => {
+  const q = zSyncPullQuery.safeParse(c.req.query());
   if (!q.success) return c.json({ error: "invalid_request" }, 400);
   return c.json(await storeFor(c.env, c.get("userId")).pull(
     q.data.since,
@@ -645,13 +647,15 @@ api.get("/sync/ws", liveSocket);
 
 // ---- change history (who changed what, with before/after values) ----
 
+export const zChangesQuery = z.object({
+  entity: z.enum(["task", "area", "project", "attachment", "checklistItem", "taskRef", "doSession", "tag", "convo", "setting", "turn"]).optional(),
+  id: zId.optional(),
+  before: z.coerce.number().int().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(500).default(100),
+});
+
 api.get("/changes", async (c) => {
-  const q = z.object({
-    entity: z.enum(["task", "area", "project", "attachment", "checklistItem", "taskRef", "doSession", "tag", "convo", "setting", "turn"]).optional(),
-    id: zId.optional(),
-    before: z.coerce.number().int().min(1).optional(),
-    limit: z.coerce.number().int().min(1).max(500).default(100),
-  }).safeParse(c.req.query());
+  const q = zChangesQuery.safeParse(c.req.query());
   if (!q.success) return c.json({ error: "invalid_request" }, 400);
   const plan = c.get("plan");
   const store = storeFor(c.env, c.get("userId"));
@@ -836,13 +840,13 @@ api.post("/auth/link/oidc/start", async (c) => {
 // ---- APNs device push tokens (F1b #213, docs/TASK_FACTORY_SPEC.md §8) ----
 
 const zPushToken = z.string().regex(/^[0-9a-fA-F]{32,256}$/);
-const zPushTokenRegisterBody = z.object({
+export const zPushTokenRegisterBody = z.object({
   token: zPushToken,
   platform: z.enum(["ios", "watchos"]).default("ios"),
   sandbox: z.boolean().default(false),
   deviceId: z.string().trim().min(1).max(128).optional(),
 }).strict();
-const zPushTokenDeleteBody = z.object({
+export const zPushTokenDeleteBody = z.object({
   token: zPushToken,
 }).strict();
 
@@ -901,8 +905,8 @@ api.post("/pair/deny", async (c) => {
 // Every place the account is signed in: app sessions (one per install) and
 // MCP connections (Claude, ChatGPT and other connector clients).
 
-const zSid = z.string().uuid();
-const zFamilyId = z.string().regex(/^[A-Za-z0-9_-]{8,64}$/);
+export const zSid = z.string().uuid();
+export const zFamilyId = z.string().regex(/^[A-Za-z0-9_-]{8,64}$/);
 
 api.get("/access", async (c) => {
   const userId = c.get("userId");
@@ -946,7 +950,7 @@ api.delete("/access/connections/:id", async (c) => {
 /// session reaches this route, so an agent cannot mint keys. The key is in
 /// this reply only. The key's row in the Agents list is `id`: rename and
 /// revoke use the connection routes above and below.
-const zCreateKeyBody = z.object({
+export const zCreateKeyBody = z.object({
   name: zAgentName,
   access: z.enum(["read", "write"]).default("write"),
 }).strict();
@@ -962,7 +966,7 @@ api.post("/access/keys", async (c) => {
 });
 
 /// Renames an agent. `name: null` goes back to the client's registered name.
-const zRenameConnectionBody = z.object({ name: zAgentName.nullable() }).strict();
+export const zRenameConnectionBody = z.object({ name: zAgentName.nullable() }).strict();
 
 api.patch("/access/connections/:id", async (c) => {
   const id = zFamilyId.safeParse(c.req.param("id"));
@@ -978,6 +982,7 @@ api.patch("/access/connections/:id", async (c) => {
 // ---- sync entitlement (docs/SYNC_SUBSCRIPTION_SPEC.md §5–§6) ----
 
 const zJws = z.string().min(20).max(20_000);
+export const zEntitlementAppleBody = z.object({ signedTransaction: zJws, signedRenewalInfo: zJws.optional() }).strict();
 
 /// The caller's entitlement, and the appAccountToken the app must pass to
 /// `Product.purchase(options: [.appAccountToken(_)])`.
@@ -1050,7 +1055,7 @@ api.post("/entitlement/device", async (c) => {
 /// A StoreKit 2 transaction the app holds (after purchase, and for every item
 /// of Transaction.currentEntitlements on restore).
 api.post("/entitlement/apple", async (c) => {
-  const body = await parse(c, z.object({ signedTransaction: zJws, signedRenewalInfo: zJws.optional() }).strict());
+  const body = await parse(c, zEntitlementAppleBody);
   if (body instanceof Response) return body;
   const userId = c.get("userId");
   let tx: JwsTransaction;
@@ -1285,7 +1290,7 @@ api.post("/admin/copy/:userId/import/end", async (c) => {
 // itself authenticates by an unguessable 32-byte base64url URL token.
 
 const zIcalScope = z.enum(["all", "timed"]);
-const zIcalUpdateBody = z.object({
+export const zIcalUpdateBody = z.object({
   enabled: z.boolean().optional(),
   scope: zIcalScope.optional(),
   rotate: z.boolean().optional(),
@@ -1411,17 +1416,23 @@ api.get("/ical/:tokenFile", async (c) => {
 //   - POST /v1/agent/webhooks       — register a signed outbound HTTPS webhook.
 //   - DELETE /v1/agent/webhooks/:id — remove a webhook.
 
+/// The event cursor: `?since=` or the `Last-Event-ID` header. Empty means
+/// from now.
+export const zEventCursor = z.union([
+  z.literal(""),
+  z.string().regex(/^\d+$/).refine((s) => Number.isSafeInteger(Number(s)), "cursor too large"),
+]);
+export const zAgentEventsQuery = z.object({ since: zEventCursor.optional() });
+
 api.get("/agent/events/stream", async (c) => {
   const rawCursor = c.req.query("since") ?? c.req.header("Last-Event-ID");
-  if (rawCursor !== undefined && rawCursor !== "") {
-    if (!/^\d+$/.test(rawCursor) || !Number.isSafeInteger(Number(rawCursor))) {
-      return c.json({ error: "invalid_request" }, 400);
-    }
+  if (rawCursor !== undefined && !zEventCursor.safeParse(rawCursor).success) {
+    return c.json({ error: "invalid_request" }, 400);
   }
   return storeFor(c.env, c.get("userId")).fetch(withSession(c.req.raw, c.get("session"), SESSION_HEADER));
 });
 
-const zCreateWebhookBody = z.object({
+export const zCreateWebhookBody = z.object({
   url: z.string().min(1).max(2048),
   secret: z.string().min(16).max(256).optional(),
   enabled: z.boolean().optional(),

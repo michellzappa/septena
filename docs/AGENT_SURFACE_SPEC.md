@@ -53,10 +53,18 @@ Each phase is one issue. Phases in one group can run in parallel.
 - **AS4 (#625) OpenAPI for `/v1`** (ADR 0050 §5). Generated from the Zod
   validators. Served at `api.septena.app/openapi.json`, linked from
   `llms.txt`. CI fails when the generated file is stale. Prepares #90.
+  *Shipped.* `backend/src/api/openapi.ts` lists the routes with their own
+  validators; `backend/scripts/gen-contract.ts` writes
+  `backend/src/generated/openapi.json`. A test fails when a /v1 route is
+  neither documented nor listed in `INTERNAL_ROUTES`.
 - **AS5 (#626) The agent spec** (ADR 0050 §2). `docs/agent-spec/` holds the spec
   source. The schema is generated from `registry/entities.json`. The site
   publishes `/spec.md`, `/spec/schema.json`, `/spec/conformance/*.json` and
   `/spec/conformance/run.mjs`.
+  *Shipped.* Source `docs/agent-spec/spec.src.md`; the same generator
+  writes `spec.md` (tables from `registry/entities.json`,
+  `registry/rules.json` and `REFUSALS`) and `schema.json`. The runner is
+  `docs/agent-spec/conformance/run.mjs`. The site copies them at build time.
 - **AS6 (#627) Skills** (ADR 0050 §6). Source in `skills/<name>/SKILL.md` in this
   repo. First set *(default)*: `connect-septena`, `work-a-task`,
   `add-a-task-once` (search, refs, `existing` and `dismissed`),

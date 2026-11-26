@@ -12,6 +12,7 @@ import * as agentSignup from "./shadow/agentSignup.js";
 import { previewMcpHandler } from "./shadow/mcp.js";
 import { ONBOARD_MARKDOWN } from "./shadow/prompts.js";
 import SKILL_MARKDOWN from "../skill.md";
+import OPENAPI from "./generated/openapi.json";
 import coreWasm from "./core/wasm/septena_core_wasm_bg.wasm";
 import { initCore } from "./core/index.js";
 
@@ -56,6 +57,15 @@ app.get("/skill.md", (c) =>
   c.text(SKILL_MARKDOWN, 200, {
     "Content-Type": "text/markdown; charset=utf-8",
     "Cache-Control": "public, max-age=300",
+  }),
+);
+
+// The OpenAPI 3.1 document for /v1 (ADR 0050 §5). Generated from the route
+// validators by scripts/gen-contract.ts; CI fails when it is stale.
+app.get("/openapi.json", (c) =>
+  c.json(OPENAPI, 200, {
+    "Cache-Control": "public, max-age=300",
+    "Access-Control-Allow-Origin": "*",
   }),
 );
 
