@@ -2359,7 +2359,7 @@ enum RegistryPlans {
     ]),
     RegistryPlanOutcome(id: "agents", icon: "onboarding.agent", title: RegistryL10n.t("Help that keeps working"), detail: RegistryL10n.t("Connect Claude or another agent to your list. It asks before it acts, and you can stop it at any time."), rows: [
       RegistryPlanRow(id: "connected", label: RegistryL10n.t("Agents"), planned: false, free: .text(RegistryL10n.t("1")), plus: .text(RegistryL10n.t("3")), pro: .text(RegistryL10n.t("No limit"))),
-      RegistryPlanRow(id: "share", label: RegistryL10n.t("Shared projects"), planned: true, free: .text(RegistryL10n.t("Join")), plus: .text(RegistryL10n.t("Create and invite")), pro: .text(RegistryL10n.t("Create and invite"))),
+      RegistryPlanRow(id: "share", label: RegistryL10n.t("Shared projects"), planned: false, free: .text(RegistryL10n.t("Join")), plus: .text(RegistryL10n.t("Create and invite")), pro: .text(RegistryL10n.t("Create and invite"))),
     ]),
   ] }
   static var promises: [RegistryPlanNote] { [
