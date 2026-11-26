@@ -1,8 +1,10 @@
 package app.septena.transport
 
 import app.septena.core.JsonValue
+import app.septena.core.booleanValue
 import app.septena.core.stringValue
 import java.io.IOException
+import java.net.URLEncoder
 
 /** An app session from the backend (`issueSession` in backend/src/api/session.ts). */
 data class SessionTokens(
@@ -63,6 +65,25 @@ sealed interface EmailStartResult {
     data class Unavailable(val error: String) : EmailStartResult
 }
 
+/** One entry from `GET /v1/auth/methods` (ADR 0047). */
+data class AuthMethodEntry(
+    val id: String,
+    val web: Boolean = false,
+    val native: Boolean = false,
+)
+
+/** POST /v1/auth/oidc/redeem when signing in (ADR 0047, #637). */
+sealed interface OidcRedeemResult {
+    data class SignedIn(val tokens: SessionTokens) : OidcRedeemResult
+    data class AccountExists(
+        val email: String,
+        val provider: String,
+        val linkToken: String?,
+        val codeSent: Boolean,
+    ) : OidcRedeemResult
+    data object Expired : OidcRedeemResult
+}
+
 /** POST /v1/auth/email/verify: what the server answered (#169). */
 sealed interface EmailVerifyResult {
     /** The same session JSON as a device approval. A new address created an account. */
@@ -88,21 +109,78 @@ class SeptenaAuthClient(
     private val clientVersion: String,
     private val baseUrl: String = JsonHttp.DEFAULT_BASE_URL,
 ) {
-    /**
-     * The sign-in method ids this server has turned on (ADR 0047). Throws on any answer that is not a
-     * well-formed list: the caller then offers device approval only.
-     */
-    suspend fun signInMethods(): Set<String> {
+    /** The sign-in methods this server has turned on, with web/native capability flags (ADR 0047). */
+    suspend fun signInMethodEntries(): List<AuthMethodEntry> {
         val response = JsonHttp.send(baseUrl, "/v1/auth/methods", "GET", null, clientVersion)
         if (response.statusCode != 200) throw AuthHttpException(response.statusCode, response.body)
         val methods = parseObject(response.body)["methods"] as? JsonValue.ArrayValue
             ?: error("Methods response is missing methods")
-        return methods.values.map { entry ->
-            val id = (entry as? JsonValue.ObjectValue)?.get("id").stringValue()
-                ?: error("Methods response has a method without an id")
+        return methods.values.map { raw ->
+            val entry = raw as? JsonValue.ObjectValue ?: error("Methods response has a non-object entry")
+            val id = entry["id"].stringValue() ?: error("Methods response has a method without an id")
             require(METHOD_ID.matches(id)) { "Methods response has a bad method id" }
-            id
-        }.toSet()
+            AuthMethodEntry(
+                id = id,
+                web = entry["web"].booleanValue() ?: false,
+                native = entry["native"].booleanValue() ?: false,
+            )
+        }
+    }
+
+    /**
+     * The sign-in method ids this server has turned on (ADR 0047). Throws on any answer that is not a
+     * well-formed list: the caller then offers device approval only.
+     */
+    suspend fun signInMethods(): Set<String> = signInMethodEntries().map { it.id }.toSet()
+
+    /** Browser redirect URL for OIDC sign-in with Apple, Google or Microsoft (ADR 0047, #637). */
+    fun oidcStartUrl(provider: String, returnTo: String): String {
+        val encoded = URLEncoder.encode(returnTo, Charsets.UTF_8.name())
+        return "${baseUrl.trimEnd('/')}/v1/auth/oidc/$provider/start?return_to=$encoded"
+    }
+
+    /** Trades a one-time OIDC callback code (`POST /v1/auth/oidc/redeem`) for a session or collision step. */
+    suspend fun redeemOidcSignIn(code: String): OidcRedeemResult {
+        val response = post("/v1/auth/oidc/redeem", obj("code" to JsonValue.StringValue(code)))
+        return when (response.statusCode) {
+            200 -> OidcRedeemResult.SignedIn(parseSession(response.body))
+            409 -> {
+                val err = errorBody(response.body) ?: throw AuthHttpException(409, response.body)
+                if (err["error"].stringValue() == "account_exists") {
+                    OidcRedeemResult.AccountExists(
+                        email = err["email"].stringValue().orEmpty(),
+                        provider = err["provider"].stringValue().orEmpty(),
+                        linkToken = err["linkToken"].stringValue(),
+                        codeSent = err["codeSent"].booleanValue() ?: false,
+                    )
+                } else {
+                    throw AuthHttpException(409, response.body)
+                }
+            }
+            410 -> OidcRedeemResult.Expired
+            else -> throw AuthHttpException(response.statusCode, response.body)
+        }
+    }
+
+    /** Finishes a no-silent-linking collision step with the emailed 6-digit code (`POST /v1/auth/link/complete`). */
+    suspend fun completeCollisionLink(linkToken: String, code: String): EmailVerifyResult {
+        val body = obj(
+            "linkToken" to JsonValue.StringValue(linkToken),
+            "code" to JsonValue.StringValue(code),
+        )
+        val response = post("/v1/auth/link/complete", body)
+        return when (response.statusCode) {
+            200 -> EmailVerifyResult.SignedIn(parseSession(response.body))
+            401 -> {
+                val failure = errorBody(response.body) ?: throw AuthHttpException(401, response.body)
+                if (failure["error"].stringValue() != "invalid_code") throw AuthHttpException(401, response.body)
+                val left = failure["attemptsLeft"].longValue()?.toInt() ?: 0
+                EmailVerifyResult.WrongCode(left.coerceAtLeast(0))
+            }
+            410 -> EmailVerifyResult.Expired
+            429 -> EmailVerifyResult.TooManyAttempts
+            else -> throw AuthHttpException(response.statusCode, response.body)
+        }
     }
 
     suspend fun startEmail(email: String): EmailStartResult {

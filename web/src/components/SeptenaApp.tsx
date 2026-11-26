@@ -502,6 +502,27 @@ export function SeptenaApp() {
     [beginSession],
   );
 
+  // Finish an OIDC provider-link redirect returning to `/?oidc_link=1&oidc_code=...`
+  // while signed in (Settings ▸ Account ▸ Sign-in methods, #643).
+  useEffect(() => {
+    if (bootPhase !== "signed_in" || typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("oidc_link") !== "1") return;
+    const code = params.get("oidc_code");
+    window.history.replaceState({}, "", window.location.pathname);
+    if (!code) return;
+    void (async () => {
+      try {
+        await api.redeemOidcLink(code);
+      } catch {
+        // Settings Account tab shows the current linked methods on open.
+      } finally {
+        setSettingsInitialTab("account");
+        setSettingsOpen(true);
+      }
+    })();
+  }, [api, bootPhase]);
+
   // The answer to the account-switch question. Every path ends in a phase:
   // Replace starts the new account; Cancel and Export sign the new session out
   // and keep this device's tasks (never `signOutAndWipe`).

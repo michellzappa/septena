@@ -54,6 +54,7 @@ class MainActivity : ComponentActivity() {
             // A recreated activity still holds the link it opened with.
             ?.takeUnless { it is WidgetLaunchAction.JoinShare && savedInstanceState != null }
             ?.let { pendingWidgetAction.value = it }
+        if (savedInstanceState == null) captureOidcCallback(intent)
         followDoFloat()
         setContent {
             SeptenaAndroidTheme(graph.appearance) {
@@ -124,6 +125,17 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         SeptenaWidgetIntents.parseLaunchAction(intent)?.let { pendingWidgetAction.value = it }
+        captureOidcCallback(intent)
+    }
+
+    private fun captureOidcCallback(intent: Intent?) {
+        val data = intent?.data ?: return
+        if (data.scheme != "septask" || data.host != "auth" || data.path != "/callback") return
+        val code = data.getQueryParameter("oidc_code")
+        val error = data.getQueryParameter("oidc_error")
+        if (code != null || error != null) {
+            graph.pendingOidcCallback.value = AndroidAppGraph.OidcCallback(code, error)
+        }
     }
 
     /** Opens live WebSocket nudges + foreground fallback polling and pulls immediately. */

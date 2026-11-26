@@ -1,6 +1,7 @@
 package app.septena.android.ui
 
 import app.septena.core.generated.RegistrySignInMethodIds
+import app.septena.transport.AuthMethodEntry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -38,6 +39,27 @@ class SignInMethodsTest {
     fun failedOrEmptyMethodsShowDeviceApprovalOnly() {
         assertEquals(listOf(RegistrySignInMethodIds.DEVICE), visibleSignInMethods(order, null))
         assertEquals(listOf(RegistrySignInMethodIds.DEVICE), visibleSignInMethods(order, emptySet()))
+        assertEquals(listOf(RegistrySignInMethodIds.DEVICE), visibleSignInMethodsFromEntries(order, null))
+    }
+
+    @Test
+    fun oidcProvidersAppearOnlyWhenWebFlowEnabledOnServer() {
+        val entries = listOf(
+            AuthMethodEntry(RegistrySignInMethodIds.APPLE, web = false),
+            AuthMethodEntry(RegistrySignInMethodIds.GOOGLE, web = true),
+            AuthMethodEntry(RegistrySignInMethodIds.MICROSOFT, web = true),
+            AuthMethodEntry(RegistrySignInMethodIds.EMAIL),
+            AuthMethodEntry(RegistrySignInMethodIds.DEVICE),
+        )
+        assertEquals(
+            listOf(
+                RegistrySignInMethodIds.GOOGLE,
+                RegistrySignInMethodIds.MICROSOFT,
+                RegistrySignInMethodIds.EMAIL,
+                RegistrySignInMethodIds.DEVICE,
+            ),
+            visibleSignInMethodsFromEntries(order, entries),
+        )
     }
 
     @Test

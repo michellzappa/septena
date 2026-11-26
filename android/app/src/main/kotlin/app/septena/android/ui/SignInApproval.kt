@@ -59,6 +59,7 @@ import kotlinx.coroutines.launch
 @Composable
 internal fun SignInApprovalSection(graph: AndroidAppGraph, signedIn: Boolean, languageTag: String) {
     if (!signedIn) return
+    SignInMethodsSettingsSection(graph = graph, signedIn = signedIn, languageTag = languageTag)
     var open by remember { mutableStateOf(false) }
     ListItem(
         headlineContent = { Text(approvalCopy("title", languageTag), color = MaterialTheme.colorScheme.primary) },

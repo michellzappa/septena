@@ -98,15 +98,111 @@ actor TaskBackendClient {
     return (raw, hashed)
   }
 
-  /// Returns the backend user id of the new session.
+  /// Returns the backend user id of the new session. Throws
+  /// `BackendAccountExistsError` on 409 `account_exists` (ADR 0047 decision 5).
   @discardableResult
   func signIn(identityToken: String, rawNonce: String) async throws -> String {
     let body = try JSONEncoder().encode(["identityToken": identityToken, "nonce": rawNonce])
     let (data, status) = try await perform(path: "/v1/auth/apple", method: "POST", body: body, auth: nil)
+    if status == 409, let collision = Self.accountExistsError(from: data) { throw collision }
     guard status == 200 else { throw Self.httpError(status, data) }
     let session = try decode(BackendSession.self, from: data, what: "session")
     try adopt(session)
     return session.userId
+  }
+
+  /// Top-level OIDC redirect URL for Google, Microsoft, or Web Sign in with Apple.
+  nonisolated static func oidcStartURL(provider: String, returnTo: String) -> URL? {
+    var comps = URLComponents(url: baseURL.appendingPathComponent("v1/auth/oidc/\(provider)/start"), resolvingAgainstBaseURL: false)
+    comps?.queryItems = [URLQueryItem(name: "return_to", value: returnTo)]
+    return comps?.url
+  }
+
+  /// Trades a one-time OIDC callback code (`POST /v1/auth/oidc/redeem`) for a session.
+  @discardableResult
+  func redeemOidcSignIn(code: String) async throws -> String {
+    let body = try JSONEncoder().encode(["code": code])
+    let (data, status) = try await perform(path: "/v1/auth/oidc/redeem", method: "POST", body: body, auth: nil)
+    if status == 409, let collision = Self.accountExistsError(from: data) { throw collision }
+    guard status == 200 else { throw Self.httpError(status, data) }
+    let session = try decode(BackendSession.self, from: data, what: "session")
+    try adopt(session)
+    return session.userId
+  }
+
+  /// Completes a no-silent-linking email collision step (`POST /v1/auth/link/complete`).
+  @discardableResult
+  func completeCollisionLink(linkToken: String, code: String) async throws -> String {
+    let body = try JSONEncoder().encode(["linkToken": linkToken, "code": code])
+    let (data, status) = try await perform(path: "/v1/auth/link/complete", method: "POST", body: body, auth: nil)
+    guard status == 200 else { throw Self.emailError(status, data) }
+    let session = try decode(BackendSession.self, from: data, what: "session")
+    try adopt(session)
+    return session.userId
+  }
+
+  /// Lists linked sign-in methods on the signed-in account (`GET /v1/auth/identities`, #643).
+  func listIdentities() async throws -> BackendLinkedIdentities {
+    let (data, status) = try await authed(path: "/v1/auth/identities", method: "GET", body: nil)
+    guard status == 200 else { throw Self.httpError(status, data) }
+    return try decode(BackendLinkedIdentities.self, from: data, what: "sign-in methods")
+  }
+
+  /// Unlinks one sign-in method (`DELETE /v1/auth/identities/:id`); refuses the last one.
+  func unlinkIdentity(id: String) async throws -> BackendLinkedIdentities {
+    let encoded = id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? id
+    let (data, status) = try await authed(path: "/v1/auth/identities/\(encoded)", method: "DELETE", body: nil)
+    if status == 409 { throw BackendAuthLinkError.lastMethod }
+    if status == 404 { throw BackendAuthLinkError.notFound }
+    guard status == 200 else { throw Self.httpError(status, data) }
+    return try decode(BackendLinkedIdentities.self, from: data, what: "sign-in methods")
+  }
+
+  /// Sends a 6-digit code to add an email address to the signed-in account.
+  func startLinkEmail(email: String) async throws -> BackendEmailCodeSent {
+    let body = try JSONEncoder().encode(["email": email])
+    let (data, status) = try await authed(path: "/v1/auth/link/email/start", method: "POST", body: body)
+    guard status == 202 else { throw Self.emailError(status, data) }
+    return try decode(BackendEmailCodeSent.self, from: data, what: "email code")
+  }
+
+  /// Verifies the emailed code and attaches the email to the signed-in account.
+  func verifyLinkEmail(email: String, code: String) async throws -> BackendLinkedIdentities {
+    let body = try JSONEncoder().encode(["email": email, "code": code])
+    let (data, status) = try await authed(path: "/v1/auth/link/email/verify", method: "POST", body: body)
+    if status == 409 { throw BackendAuthLinkError.alreadyLinked }
+    guard status == 200 else { throw Self.emailError(status, data) }
+    return try decode(BackendLinkedIdentities.self, from: data, what: "sign-in methods")
+  }
+
+  /// Links native Sign in with Apple to the signed-in account (`POST /v1/auth/link/apple`).
+  func linkApple(identityToken: String, rawNonce: String) async throws -> BackendLinkedIdentities {
+    let body = try JSONEncoder().encode(["identityToken": identityToken, "nonce": rawNonce])
+    let (data, status) = try await authed(path: "/v1/auth/link/apple", method: "POST", body: body)
+    if status == 409 { throw BackendAuthLinkError.alreadyLinked }
+    guard status == 200 else { throw Self.httpError(status, data) }
+    return try decode(BackendLinkedIdentities.self, from: data, what: "sign-in methods")
+  }
+
+  /// Starts a web OIDC redirect URL to link Apple, Google, or Microsoft to this account.
+  func startLinkOidc(provider: String, returnTo: String) async throws -> URL {
+    let body = try JSONEncoder().encode(["provider": provider, "returnTo": returnTo])
+    let (data, status) = try await authed(path: "/v1/auth/link/oidc/start", method: "POST", body: body)
+    if status == 503 { throw BackendAuthLinkError.providerOff }
+    guard status == 200 else { throw Self.httpError(status, data) }
+    struct Reply: Decodable { let url: String }
+    let reply = try decode(Reply.self, from: data, what: "link url")
+    guard let url = URL(string: reply.url) else { throw TaskBackendError.badResponse("link url") }
+    return url
+  }
+
+  /// Completes a signed-in OIDC link callback (`POST /v1/auth/oidc/redeem` with Bearer).
+  func redeemOidcLink(code: String) async throws -> BackendLinkedIdentities {
+    let body = try JSONEncoder().encode(["code": code])
+    let (data, status) = try await authed(path: "/v1/auth/oidc/redeem", method: "POST", body: body)
+    if status == 409 { throw BackendAuthLinkError.alreadyLinked }
+    guard status == 200 else { throw Self.httpError(status, data) }
+    return try decode(BackendLinkedIdentities.self, from: data, what: "sign-in methods")
   }
 
   /// Starts sign-in by device approval (`POST /v1/auth/device/start`,
@@ -131,11 +227,16 @@ actor TaskBackendClient {
     }
   }
 
-  /// The sign-in methods this server has on (`GET /v1/auth/methods`).
-  func signInMethods() async throws -> [String] {
+  /// The sign-in methods this server has on (`GET /v1/auth/methods`), with capability flags.
+  func signInMethodEntries() async throws -> [BackendAuthMethods.Method] {
     let (data, status) = try await perform(path: "/v1/auth/methods", method: "GET", body: nil, auth: nil)
     guard status == 200 else { throw Self.httpError(status, data) }
-    return try decode(BackendAuthMethods.self, from: data, what: "sign-in methods").methods.map(\.id)
+    return try decode(BackendAuthMethods.self, from: data, what: "sign-in methods").methods
+  }
+
+  /// The sign-in methods this server has on (`GET /v1/auth/methods`).
+  func signInMethods() async throws -> [String] {
+    try await signInMethodEntries().map(\.id)
   }
 
   /// Mails a sign-in code to `email` (`POST /v1/auth/email/start`). Throws
@@ -717,6 +818,21 @@ actor TaskBackendClient {
 
   private func decode<T: Decodable>(_ type: T.Type, from data: Data, what: String) throws -> T {
     do { return try JSONDecoder().decode(type, from: data) } catch { throw TaskBackendError.badResponse(what) }
+  }
+
+  private static func accountExistsError(from data: Data) -> BackendAccountExistsError? {
+    guard let body = try? JSONDecoder().decode(BackendAccountExistsBody.self, from: data),
+          body.error == "account_exists",
+          let email = body.email,
+          let provider = body.provider else {
+      return nil
+    }
+    return BackendAccountExistsError(
+      email: email,
+      provider: provider,
+      linkToken: body.linkToken,
+      codeSent: body.codeSent ?? false,
+    )
   }
 
   private static func httpError(_ status: Int, _ data: Data) -> TaskBackendError {

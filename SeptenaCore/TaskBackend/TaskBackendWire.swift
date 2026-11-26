@@ -209,10 +209,51 @@ enum BackendDevicePoll: Sendable {
 /// (docs/SIGN_IN_SURFACES_SPEC.md §3). Ids this build does not know are kept
 /// as strings; the screen shows only the ones it implements.
 struct BackendAuthMethods: Decodable, Sendable {
-  struct Method: Decodable, Sendable {
+  struct Method: Decodable, Sendable, Equatable {
     let id: String
+    let web: Bool?
+    let native: Bool?
   }
   let methods: [Method]
+}
+
+/// One linked sign-in method on the signed-in account (`GET /v1/auth/identities`, #643).
+struct BackendLinkedIdentity: Decodable, Sendable, Equatable, Identifiable {
+  let id: String
+  let provider: String
+  let label: String
+  let createdAt: Double
+}
+
+struct BackendLinkedIdentities: Decodable, Sendable, Equatable {
+  let identities: [BackendLinkedIdentity]
+  let canRemove: Bool
+}
+
+/// 409 `account_exists` (ADR 0047 decision 5): a new provider sign-in whose
+/// verified email already belongs to an existing account.
+struct BackendAccountExistsError: Error, Sendable, Equatable, Identifiable {
+  let email: String
+  let provider: String
+  let linkToken: String?
+  let codeSent: Bool
+
+  var id: String { "\(provider):\(email):\(linkToken ?? "")" }
+}
+
+struct BackendAccountExistsBody: Decodable, Sendable {
+  let error: String
+  let email: String?
+  let provider: String?
+  let linkToken: String?
+  let codeSent: Bool?
+}
+
+enum BackendAuthLinkError: Error, Equatable, Sendable {
+  case alreadyLinked
+  case lastMethod
+  case notFound
+  case providerOff
 }
 
 /// `POST /v1/auth/email/start` answered 202: a code went to the address.

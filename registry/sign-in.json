@@ -93,6 +93,23 @@
   "existingAccount": {
     "title": "This email already has a Septena account",
     "detail": "We'll send a code to {email}. Enter it to sign in, and we'll add {provider} to that account.",
-    "button": "Email me a code"
+    "button": "Email me a code",
+    "manualDetail": "Sign in with {email}, then add {provider} in Settings."
+  },
+  "manage": {
+    "heading": "Sign-in methods",
+    "footer": "Add another sign-in method to open this same account on any device. You cannot remove your last method.",
+    "remove": "Remove",
+    "cancel": "Cancel",
+    "addProvider": "Add {provider}",
+    "addEmail": "Add email",
+    "addAppleDetail": "Link your Apple ID to sign in to this same Septena account.",
+    "alreadyLinked": "That sign-in method already belongs to another Septena account.",
+    "lastMethod": "Add another sign-in method before removing your last one.",
+    "added": "Sign-in method added.",
+    "removed": "Sign-in method removed.",
+    "loadFailed": "Could not load sign-in methods.",
+    "addFailed": "Could not add sign-in method.",
+    "removeFailed": "Could not remove sign-in method."
   }
 }

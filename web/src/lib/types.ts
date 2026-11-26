@@ -22,10 +22,36 @@ export const zSessionResponse = z.object({
 export type SessionResponse = z.infer<typeof zSessionResponse>;
 
 // Sign-in methods this server has turned on (GET /v1/auth/methods, ADR 0047).
+export const zAuthMethodEntry = z.object({
+  id: z.string(),
+  web: z.boolean().optional(),
+  native: z.boolean().optional(),
+});
+export type AuthMethodEntry = z.infer<typeof zAuthMethodEntry>;
+
 export const zAuthMethodsResponse = z.object({
-  methods: z.array(z.object({ id: z.string() })),
+  methods: z.array(zAuthMethodEntry),
 });
 export type AuthMethodsResponse = z.infer<typeof zAuthMethodsResponse>;
+
+// Linked sign-in methods on the signed-in account (GET /v1/auth/identities, #643).
+export const zLinkedIdentity = z.object({
+  id: z.string(),
+  provider: z.string(),
+  label: z.string(),
+  createdAt: z.number(),
+});
+export type LinkedIdentity = z.infer<typeof zLinkedIdentity>;
+
+export const zLinkedIdentitiesResponse = z.object({
+  identities: z.array(zLinkedIdentity),
+  canRemove: z.boolean(),
+});
+export type LinkedIdentitiesResponse = z.infer<typeof zLinkedIdentitiesResponse>;
+
+export type OidcRedeemSignInResult =
+  | { status: "signed_in"; session: SessionResponse }
+  | { status: "account_exists"; email: string; provider: string; linkToken?: string; codeSent?: boolean };
 
 // POST /v1/auth/email/start (202).
 export const zEmailStartResponse = z.object({

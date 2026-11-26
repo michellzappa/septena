@@ -4560,6 +4560,10 @@
         }
       }
     },
+    "Add %@" : {
+      "comment" : "Generated from registry signIn.manage.addProvider. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Add %@ as a reference" : {
       "comment" : "Generated from registry surfaces.taskReferences.add.suggestions.format. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -4830,6 +4834,14 @@
         }
       }
     },
+    "Add another sign-in method before removing your last one." : {
+      "comment" : "Generated from registry signIn.manage.lastMethod. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Add another sign-in method to open this same account on any device. You cannot remove your last method." : {
+      "comment" : "Generated from registry signIn.manage.footer. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Add Checklist Item" : {
       "comment" : "Generated from registry actions.actions.task.addChecklistItem.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -4871,6 +4883,10 @@
           }
         }
       }
+    },
+    "Add email" : {
+      "comment" : "Generated from registry signIn.manage.addEmail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Add Reference" : {
       "comment" : "Generated from registry actions.actions.task.addReference.shortTitle. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -11315,6 +11331,14 @@
         }
       }
     },
+    "Could not add sign-in method." : {
+      "comment" : "Generated from registry signIn.manage.addFailed. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Could not load sign-in methods." : {
+      "comment" : "Generated from registry signIn.manage.loadFailed. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Could not reach Septena." : {
       "comment" : "Generated from registry surfaces.sharing.copy.failed.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -11356,6 +11380,10 @@
           }
         }
       }
+    },
+    "Could not remove sign-in method." : {
+      "comment" : "Generated from registry signIn.manage.removeFailed. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Couldn’t add the reference." : {
       "comment" : "Generated from registry surfaces.taskReferences.add.failed.message. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -20938,6 +20966,10 @@
           }
         }
       }
+    },
+    "Link your Apple ID to sign in to this same Septena account." : {
+      "comment" : "Generated from registry signIn.manage.addAppleDetail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Links in this task" : {
       "comment" : "Generated from registry surfaces.taskReferences.add.offers.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -35237,6 +35269,10 @@
         }
       }
     },
+    "Sign in with %@, then add %@ in Settings." : {
+      "comment" : "Generated from registry signIn.existingAccount.manualDetail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Sign in with Apple" : {
       "localizations" : {
         "de" : {
@@ -35444,6 +35480,18 @@
           }
         }
       }
+    },
+    "Sign-in method added." : {
+      "comment" : "Generated from registry signIn.manage.added. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Sign-in method removed." : {
+      "comment" : "Generated from registry signIn.manage.removed. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Sign-in methods" : {
+      "comment" : "Generated from registry signIn.manage.heading. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Skip" : {
       "localizations" : {
@@ -38255,6 +38303,10 @@
           }
         }
       }
+    },
+    "That sign-in method already belongs to another Septena account." : {
+      "comment" : "Generated from registry signIn.manage.alreadyLinked. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "The brief did not load. Check your connection and open this page again." : {
       "comment" : "Generated from registry settings.copy.mcp_skills.loadFailed.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
