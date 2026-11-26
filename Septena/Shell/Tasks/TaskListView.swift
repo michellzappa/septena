@@ -2103,19 +2103,16 @@ struct TaskListView: View {
     if filter == .today {
       let allInbox = renderedTodayInboxRows
       if showsQuickAddInInbox || !allInbox.isEmpty || inboxZeroPhase == .checkmark || inboxZeroAnimating {
-        Section {
-          if !inboxCollapsed {
-            cardedRows(allInbox,
-                       quickMenu: { model.filingSuggestions[$0.id] != nil },
-                       appendQuickAdd: showsQuickAddInInbox,
-                       quickAddShowsEditor: quickAddInInboxShowsEditor,
-                       moveDropTarget: .inbox,
-                       magicContext: "Inbox")
-          }
-        } header: {
-          // Type-erased: a deep header type overflowed the launch stack
-          // (see cardedRows).
-          AnyView(inboxHeader(count: allInbox.count))
+        // Type-erased: a deep header type overflowed the launch stack
+        // (see cardedRows).
+        AnyView(inboxHeader(count: allInbox.count))
+        if !inboxCollapsed {
+          cardedRows(allInbox,
+                     quickMenu: { model.filingSuggestions[$0.id] != nil },
+                     appendQuickAdd: showsQuickAddInInbox,
+                     quickAddShowsEditor: quickAddInInboxShowsEditor,
+                     moveDropTarget: .inbox,
+                     magicContext: "Inbox")
         }
       }
     }
@@ -2851,15 +2848,12 @@ struct TaskListView: View {
             cardedRows(tasks)
           }
         } else {
-          Section {
-            if group == .finished {
-              reviewRows(tasks)
-            } else {
-              cardedRows(tasks)
-            }
-          } header: {
-            groupHeader(icon: group.group?.sfSymbol ?? "circle",
-                        title: group.group?.title ?? group.rawValue)
+          groupHeader(icon: group.group?.sfSymbol ?? "circle",
+                      title: group.group?.title ?? group.rawValue)
+          if group == .finished {
+            reviewRows(tasks)
+          } else {
+            cardedRows(tasks)
           }
         }
       }
@@ -5011,8 +5005,49 @@ struct TaskListView: View {
     cardedRows(classified)
   }
 
-  /// Renders `items` clustered by their project (preferred) or area, using
-  /// real SwiftUI sections so group titles are headers, not selectable rows.
+  private struct OpenTaskGroup: Identifiable {
+    enum Kind {
+      case area(Area)
+      case project(Project)
+    }
+    let kind: Kind
+    let tasks: [SeptenaTask]
+
+    var id: String {
+      switch kind {
+      case .area(let area): return "area:\(area.id)"
+      case .project(let project): return "project:\(project.id)"
+      }
+    }
+  }
+
+  /// Precomputes the non-empty area and project clusters in sidebar order so
+  /// `groupedOpenItems` emits a single flat `ForEach` without nested
+  /// `ForEach` / `Section` / empty `if` branches (which hurt both type depth
+  /// and `LazyVStack` height estimation on very large lists).
+  private func openTaskGroups(byArea: [String: [SeptenaTask]],
+                              byProject: [String: [SeptenaTask]]) -> [OpenTaskGroup] {
+    var groups: [OpenTaskGroup] = []
+    for area in areas {
+      if let areaTasks = byArea[area.id], !areaTasks.isEmpty {
+        groups.append(OpenTaskGroup(kind: .area(area), tasks: areaTasks))
+      }
+      for project in projects where project.area == area.id {
+        if let tasks = byProject[project.id], !tasks.isEmpty {
+          groups.append(OpenTaskGroup(kind: .project(project), tasks: tasks))
+        }
+      }
+    }
+    for project in projects where project.area == nil {
+      if let tasks = byProject[project.id], !tasks.isEmpty {
+        groups.append(OpenTaskGroup(kind: .project(project), tasks: tasks))
+      }
+    }
+    return groups
+  }
+
+  /// Renders `items` clustered by their project (preferred) or area as flat
+  /// header + card runs directly inside the scroll stack.
   @ViewBuilder
   private var groupedOpenItems: some View {
     let base = chipFiltered(items)
@@ -5025,6 +5060,7 @@ struct TaskListView: View {
     let byArea = Dictionary(grouping: pool.filter { $0.project == nil && $0.area != nil },
                             by: { $0.area! })
     let loose = excludingQuickAddCapture(pool.filter(\.isUnfiled))
+    let groups = openTaskGroups(byArea: byArea, byProject: byProject)
 
     // Loose tasks on Today are merged into the Inbox section above (triageSection).
     // For other filters (Unscheduled, Area, etc.) show them headerless as before.
@@ -5032,92 +5068,52 @@ struct TaskListView: View {
       cardedRows(loose)
     }
 
-    // Areas in sidebar order: direct-area tasks, then each project's tasks.
-    ForEach(areas) { area in
-      let areaDropTarget: TodayDropTarget? = filter == .today ? .area(area.id) : nil
-      let areaCustomDrop: (([String]) -> Bool)? = filter == .today
-        ? nil : { ids in handleGroupedListMoveDrop(ids: ids, areaId: area.id, projectId: nil) }
-      let areaTasks = byArea[area.id] ?? []
-      if !areaTasks.isEmpty {
-        Section {
-          cardedRows(areaTasks,
-                     appendQuickAdd: showsQuickAddInArea(area.id),
-                     quickAddShowsEditor: true,
-                     moveDropTarget: areaDropTarget,
-                     onDropIDs: areaCustomDrop,
-                     magicContext: area.title)
-        } header: {
-          groupHeader(icon: "square.stack.3d.up.fill",
-                      title: area.title,
-                      areaEmoji: area.emoji,
-                      onTap: {
-                        if closeActiveEditIfNeeded() { return }
-                        nav.go(to: .area(id: area.id))
-                      },
-                      onAdd: showsGroupedHeaderQuickAdd
-                        ? { startCreate(areaId: area.id) } : nil,
-                      moveDropTarget: areaDropTarget,
-                      onDropIDs: areaCustomDrop,
-                      magicDropId: "mp-area-\(area.id)")
-        }
-      }
-      ForEach(projects.filter { $0.area == area.id }) { project in
+    ForEach(groups) { group in
+      switch group.kind {
+      case .area(let area):
+        let areaDropTarget: TodayDropTarget? = filter == .today ? .area(area.id) : nil
+        let areaCustomDrop: (([String]) -> Bool)? = filter == .today
+          ? nil : { ids in handleGroupedListMoveDrop(ids: ids, areaId: area.id, projectId: nil) }
+        groupHeader(icon: "square.stack.3d.up.fill",
+                    title: area.title,
+                    areaEmoji: area.emoji,
+                    onTap: {
+                      if closeActiveEditIfNeeded() { return }
+                      nav.go(to: .area(id: area.id))
+                    },
+                    onAdd: showsGroupedHeaderQuickAdd
+                      ? { startCreate(areaId: area.id) } : nil,
+                    moveDropTarget: areaDropTarget,
+                    onDropIDs: areaCustomDrop,
+                    magicDropId: "mp-area-\(area.id)")
+        cardedRows(group.tasks,
+                   appendQuickAdd: showsQuickAddInArea(area.id),
+                   quickAddShowsEditor: true,
+                   moveDropTarget: areaDropTarget,
+                   onDropIDs: areaCustomDrop,
+                   magicContext: area.title)
+      case .project(let project):
         let projectDropTarget: TodayDropTarget? = filter == .today ? .project(project.id) : nil
         let projectCustomDrop: (([String]) -> Bool)? = filter == .today
           ? nil : { ids in handleGroupedListMoveDrop(ids: ids, areaId: nil, projectId: project.id) }
-        if let tasks = byProject[project.id], !tasks.isEmpty {
-          Section {
-            cardedRows(tasks,
-                       appendQuickAdd: showsQuickAddInProject(project.id),
-                       quickAddShowsEditor: true,
-                       moveDropTarget: projectDropTarget,
-                       onDropIDs: projectCustomDrop,
-                       magicContext: project.title)
-          } header: {
-            groupHeader(icon: nil,
-                        title: project.title,
-                        projectProgress: model.progressByProject[project.id],
-                        onTap: {
-                          if closeActiveEditIfNeeded() { return }
-                          nav.go(to: .project(id: project.id))
-                        },
-                        onAdd: showsGroupedHeaderQuickAdd
-                          ? { startCreate(projectId: project.id) } : nil,
-                        moveDropTarget: projectDropTarget,
-                        onDropIDs: projectCustomDrop,
-                        magicDropId: "mp-proj-\(project.id)")
-          }
-        }
-      }
-    }
-
-    // Top-level projects (no area).
-    ForEach(projects.filter { $0.area == nil }) { project in
-      let projectDropTarget: TodayDropTarget? = filter == .today ? .project(project.id) : nil
-      let projectCustomDrop: (([String]) -> Bool)? = filter == .today
-        ? nil : { ids in handleGroupedListMoveDrop(ids: ids, areaId: nil, projectId: project.id) }
-      if let tasks = byProject[project.id], !tasks.isEmpty {
-        Section {
-          cardedRows(tasks,
-                     appendQuickAdd: showsQuickAddInProject(project.id),
-                     quickAddShowsEditor: true,
-                     moveDropTarget: projectDropTarget,
-                     onDropIDs: projectCustomDrop,
-                     magicContext: project.title)
-        } header: {
-          groupHeader(icon: nil,
-                      title: project.title,
-                      projectProgress: model.progressByProject[project.id],
-                      onTap: {
-                        if closeActiveEditIfNeeded() { return }
-                        nav.go(to: .project(id: project.id))
-                      },
-                      onAdd: showsGroupedHeaderQuickAdd
-                        ? { startCreate(projectId: project.id) } : nil,
-                      moveDropTarget: projectDropTarget,
-                      onDropIDs: projectCustomDrop,
-                      magicDropId: "mp-proj-\(project.id)")
-        }
+        groupHeader(icon: nil,
+                    title: project.title,
+                    projectProgress: model.progressByProject[project.id],
+                    onTap: {
+                      if closeActiveEditIfNeeded() { return }
+                      nav.go(to: .project(id: project.id))
+                    },
+                    onAdd: showsGroupedHeaderQuickAdd
+                      ? { startCreate(projectId: project.id) } : nil,
+                    moveDropTarget: projectDropTarget,
+                    onDropIDs: projectCustomDrop,
+                    magicDropId: "mp-proj-\(project.id)")
+        cardedRows(group.tasks,
+                   appendQuickAdd: showsQuickAddInProject(project.id),
+                   quickAddShowsEditor: true,
+                   moveDropTarget: projectDropTarget,
+                   onDropIDs: projectCustomDrop,
+                   magicContext: project.title)
       }
     }
   }
@@ -5454,19 +5450,16 @@ struct TaskListView: View {
       let dropOnDay: ([String]) -> Bool = { ids in
         handleUpcomingDateDrop(ids: ids, dateKey: bucket.key)
       }
-      Section {
-        // The day's calendar events frame it first (the agenda), then the tasks
-        // scheduled for that day — matching Today, where the agenda sits on top.
-        if !bucket.events.isEmpty {
-          calendarEventsBlock(bucket.events)
-            .taskCardChrome(.solo)
-            .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
-        }
-        cardedRows(bucket.tasks, onDropIDs: dropOnDay, magicContext: bucket.label)
-      } header: {
-        groupHeader(icon: "calendar", title: bucket.label,
-                    onDropIDs: dropOnDay, magicDropId: "mp-upcoming-\(bucket.key)")
+      groupHeader(icon: "calendar", title: bucket.label,
+                  onDropIDs: dropOnDay, magicDropId: "mp-upcoming-\(bucket.key)")
+      // The day's calendar events frame it first (the agenda), then the tasks
+      // scheduled for that day — matching Today, where the agenda sits on top.
+      if !bucket.events.isEmpty {
+        calendarEventsBlock(bucket.events)
+          .taskCardChrome(.solo)
+          .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
       }
+      cardedRows(bucket.tasks, onDropIDs: dropOnDay, magicContext: bucket.label)
     }
   }
 

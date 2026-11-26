@@ -110,7 +110,7 @@ struct QuickFindView: View {
     } else {
       ScrollViewReader { proxy in
         ScrollView {
-          LazyVStack(alignment: .leading, spacing: 0) {
+          VStack(alignment: .leading, spacing: 0) {
             ForEach(Array(rows.enumerated()), id: \.element.id) { idx, hit in
               QuickFindRow(hit: hit, selected: idx == selection)
                 .id(idx)
