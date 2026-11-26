@@ -310,7 +310,7 @@
         "title": "Welcome to Septena",
         "body": "Tasks that think with you.",
         "points": [
-          { "icon": "onboarding.devices", "title": "On every device", "detail": "Your tasks stay in step on iPhone, iPad and Mac." },
+          { "icon": "onboarding.devices", "title": "On every device", "detail": "Your tasks stay in step on every device you sign in to." },
           {
             "icon": "onboarding.agent",
             "title": "Your agents do the work",
@@ -411,7 +411,7 @@
     "copy": [
       { "id": "intro", "label": "Use a device where Septena is already signed in." },
       { "id": "start", "label": "Get a sign-in code" },
-      { "id": "approve", "label": "On your iPhone, iPad or Mac, open Septena and go to Settings ▸ Account ▸ Approve a sign-in. Tap Scan Code and point the camera at this screen, or enter this code:" },
+      { "id": "approve", "label": "On another device where you are signed in, open Septena and go to Settings ▸ Account ▸ Approve a sign-in. Tap Scan Code and point the camera at this screen, or enter this code:" },
       { "id": "lifetime", "label": "The code works for 10 minutes. After you approve it, this screen continues by itself." },
       { "id": "expired", "label": "The code expired." },
       { "id": "unreachable", "label": "Could not reach Septena." },

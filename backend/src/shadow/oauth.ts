@@ -772,9 +772,9 @@ function pairPage(
 <body>
   <main class="card">
     <h1>Connect ${client} to your Septena tasks</h1>
-    <p>On your iPhone or iPad, open ${appPath}${appPathNote}, tap Scan Code and point the camera at this QR code:</p>
+    <p>On a device where you are signed in, open ${appPath}${appPathNote}, tap Scan Code and point the camera at this QR code:</p>
     <div class="qr">${pairQrSvg(pairApproveUrl(c.env.API_PUBLIC_URL, opts.code), `Sign-in code ${shown}`)}</div>
-    <p>Or enter the code by hand (on Mac: Settings &#9656; AI &amp; Agents):</p>
+    <p>Or enter this code there by hand:</p>
     <div class="code">${escapeHtml(shown)}</div>
     <p>${client} will be able to read and change your tasks.</p>
     <p class="small">The code works for 10 minutes. This page checks for your approval every few seconds.</p>

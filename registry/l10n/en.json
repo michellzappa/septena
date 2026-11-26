@@ -76,12 +76,6 @@
       "plans.outcomes.nothing_lost.rows.files.cells.pro"
     ]
   },
-  "A free account allows 500 agent changes a day. Your agent can make changes again tomorrow. Plus has no daily limit.": {
-    "text": "A free account allows 500 agent changes a day. Your agent can make changes again tomorrow. Plus has no daily limit.",
-    "paths": [
-      "plans.upsells.connector_cap.detail"
-    ]
-  },
   "A free account shows 30 days of history. Plus shows a full year.": {
     "text": "A free account shows 30 days of history. Plus shows a full year.",
     "paths": [
@@ -301,6 +295,12 @@
       "settings.rootGroups.ai_agents_root.items.1.label",
       "settings.pages.agents.title",
       "plans.outcomes.agents.rows.connected.label"
+    ]
+  },
+  "Agents on this account made 500 changes today. They can make changes again tomorrow.": {
+    "text": "Agents on this account made 500 changes today. They can make changes again tomorrow.",
+    "paths": [
+      "plans.upsells.connector_cap.detail"
     ]
   },
   "All dated tasks": {
@@ -1536,6 +1536,12 @@
       "plans.outcomes.nothing_lost.rows.files.label"
     ]
   },
+  "Files are still syncing between your devices.": {
+    "text": "Files are still syncing between your devices.",
+    "paths": [
+      "plans.status.filesSyncing"
+    ]
+  },
   "Find any task, project, or area.": {
     "text": "Find any task, project, or area.",
     "paths": [
@@ -2555,6 +2561,12 @@
       "settings.copy.ai_explainer.flowFooter.label"
     ]
   },
+  "On another device where you are signed in, open Septena and go to Settings ▸ Account ▸ Approve a sign-in. Tap Scan Code and point the camera at this screen, or enter this code:": {
+    "text": "On another device where you are signed in, open Septena and go to Settings ▸ Account ▸ Approve a sign-in. Tap Scan Code and point the camera at this screen, or enter this code:",
+    "paths": [
+      "surfaces.deviceSignIn.copy.approve.label"
+    ]
+  },
   "On day": {
     "text": "On day",
     "paths": [
@@ -2583,12 +2595,6 @@
     "text": "On your device",
     "paths": [
       "plans.outcomes.nothing_lost.rows.files.cells.free"
-    ]
-  },
-  "On your iPhone, iPad or Mac, open Septena and go to Settings ▸ Account ▸ Approve a sign-in. Tap Scan Code and point the camera at this screen, or enter this code:": {
-    "text": "On your iPhone, iPad or Mac, open Septena and go to Settings ▸ Account ▸ Approve a sign-in. Tap Scan Code and point the camera at this screen, or enter this code:",
-    "paths": [
-      "surfaces.deviceSignIn.copy.approve.label"
     ]
   },
   "On-device": {
@@ -4132,8 +4138,8 @@
       "plans.paywall.failed"
     ]
   },
-  "The same tasks on your phone, tablet and Mac, updated as you type.": {
-    "text": "The same tasks on your phone, tablet and Mac, updated as you type.",
+  "The same tasks on every device, updated as you type.": {
+    "text": "The same tasks on every device, updated as you type.",
     "paths": [
       "plans.outcomes.everywhere.detail"
     ]
@@ -4829,8 +4835,8 @@
       "settings.copy.delete_account.conversations.label"
     ]
   },
-  "Your tasks stay in step on iPhone, iPad and Mac.": {
-    "text": "Your tasks stay in step on iPhone, iPad and Mac.",
+  "Your tasks stay in step on every device you sign in to.": {
+    "text": "Your tasks stay in step on every device you sign in to.",
     "paths": [
       "surfaces.firstRun.steps.welcome.points.0.detail"
     ]

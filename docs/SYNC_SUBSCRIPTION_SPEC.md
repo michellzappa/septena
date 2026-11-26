@@ -1,6 +1,8 @@
 # Sync subscription — spec
 
-**Status:** proposed 2026-11-19. Defaults marked *(default)* stand until mz
+**Status:** built (proposed 2026-11-19; updated 2026-11-26). §10 says what
+ships. The server still runs its limits in log-only mode
+(`ENTITLEMENT_ENFORCE=false`). Defaults marked *(default)* stand until mz
 overrules them in §11.
 **Decisions:** [ADR 0007](adr/0007-septena-is-the-task-app.md),
 [ADR 0002](adr/0002-own-backend-replaces-icloud.md),
@@ -53,7 +55,8 @@ with limits, paid lifts the limits.**
 
 ## 3. Free and paid
 
-Three levels at launch, Pro later (ADR 0010, ADR 0023, ADR 0036). An account
+Three levels: Free, Plus and Pro (ADR 0010, ADR 0023, ADR 0036, ADR 0045,
+ADR 0052). Pro is given by invitation. An account
 adds the server; Plus adds more than one. The earlier rule "the server is paid" is
 replaced. The public rule: **free on one device, Plus on all of them.** The
 paid plan is named **Septena Plus** on every surface.
@@ -114,10 +117,10 @@ it names what the user gets. All copy goes through the humanizer skill.
 |---|---|
 | Second device signs in | The device works locally; one line says Plus syncs every device. Moving the slot to this device is offered too. |
 | History reaches the window edge | A count of older changes, with one tap to Plus. |
-| A task with a file opens on another device | "1 file on your iPhone." Plus syncs files to all devices. |
-| An agent past the count pairs | Replace an agent, or Plus *(not built: ADR 0036, the count only logs)*. |
+| A task with a file opens on another device | On a plan without file sync: "This file is on another device." Plus syncs files to all devices. On Plus or Pro, while the file is on its way: "Files are still syncing between your devices.", with no upsell. |
+| An agent past the count pairs | Replace an agent, or Plus. The server counts agents and only logs for now (ADR 0036, #445). |
 | A free member shares a project | Joining is free; creating a share is the upsell. |
-| Connector write over the abuse cap (500 a day) | The tool returns one line. No nagging inside a conversation. |
+| Connector write over the abuse cap (500 a day) | The tool returns one neutral line: the agent can make changes again tomorrow. No Plus sell: the cap is an abuse cap, not a plan feature (ADR 0036). |
 | Reverse trial ends | One notice listing what changes. No countdown screens. |
 
 Banned: timed nags, badges on paid features, blocked export, modals on
@@ -189,8 +192,8 @@ party. No per-user tracking, no SDKs.
 - Every server path checks the user's **plan** in one place: a Hono
   middleware on `/v1` routes, and the same check in the gateway before it
   reaches the DO. The plan is `plus` when any entitlement row is active,
-  else `free`. `trial` (the reverse trial) is not built yet; it will resolve
-  to the Plus limits.
+  else `free`. `trial` (the reverse trial) resolves to the Plus limits, and an
+  active `pro` row to `pro` (ADR 0045).
 - **Plan table (ADR 0010).** One table in `backend/` maps each plan to its
   limits: device count, sync mode (live / poll), connected agents, change-log
   window, Recently Deleted window, R2 attachments on/off and quota, connector
@@ -199,8 +202,8 @@ party. No per-user tracking, no SDKs.
   gate read this table. Apps fetch their limits from the server and never
   hardcode them.
 - **Gates read limits, never the plan name.** No code checks `plan == "paid"`.
-  A later tier (Pro, Supporter, Family; see the Starlings doc *Free and paid
-  plans*) is then a new row in the plan table and a new product in the same
+  Pro (ADR 0045) is such a row. A later tier (Supporter, Family; see the
+  Starlings doc *Free and paid plans*) is then a new row in the plan table and a new product in the same
   subscription group, with no code change at the gates.
 - **Fail closed** on a missing or invalid row, with one exception: grace
   period and billing retry count as active (Apple's own rule).
@@ -513,7 +516,10 @@ app. It opens only from a tap, never on launch and never on a timer.
 
 - "See Plus" on an upsell moment (§3.2). The sheet then shows that moment's
   title as its first line, so the user sees why it opened.
-- "Subscribe" on Settings ▸ Septena Plus (`SeptaskPlusPane`).
+- "See Plus" on Settings ▸ Septena Plus (`SeptaskPlusPane`). An account on
+  a bought plan sees "Manage Subscription" there instead. An account with a
+  grant and an active App Store subscription (Pro on top of a paid Plus)
+  keeps "Manage Subscription", because the subscription still renews.
 - "See Plus" on the trial-end notice.
 
 **Each upsell moment shows once per account.** The "shown" mark syncs with
@@ -648,10 +654,12 @@ task's history (`/v1/changes` sends `upsell: "history_edge"` only on the
 free plan with hidden rows). The sheet adds "Sync This Device" for
 `second_device` (`POST /v1/entitlement/device`), and Settings ▸ Septena
 Plus keeps that line after the notice is gone. "Once per account" is the
-synced setting `upsellsSeen`. Not built: `file_elsewhere` (the app drops
-`uploadedAt` on attachments, so it cannot tell bytes elsewhere from bytes
-not yet downloaded), the agent count and `connector_cap` (#269),
-`share_create` (no sharing yet). The App Store Connect products do
+synced setting `upsellsSeen`. `file_elsewhere` shows in a task's
+attachments on a plan without file sync; on Plus or Pro the same row shows a
+neutral syncing line. `share_create` is the 402 line when a free account
+creates a shared project. `connector_cap` is the MCP tool's neutral line at
+the abuse cap. The connected-agent count only logs on the server for now (#445).
+The App Store Connect products do
 not exist yet; `checkout.open` stays false until they do. The Mac sells
 once its release moves to the Mac App Store (ADR 0026).
 

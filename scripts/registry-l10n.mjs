@@ -47,7 +47,7 @@ const FIELDS = {
     "paidThrough", "proThrough", "subscribe", "restore", "manage", "notNow", "learnMore", "yourPlan", "planned", "included", "notIncluded",
     "seePlus", "startTrial", "trialStarted", "trialBilling", "welcomeBack", "cancelNote", "success", "pending",
     "serverRetry", "failed", "ownedApple", "ownedWeb", "ownedGoogle", "ownedGrant", "ownedGrantPro", "ownedOtherAccount", "done",
-    "syncThisDevice", "syncThisDeviceFailed",
+    "syncThisDevice", "syncThisDeviceFailed", "filesSyncing",
   ]),
 };
 /** Fields skipped even when their name matches (machine data). */

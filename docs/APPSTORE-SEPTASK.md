@@ -31,8 +31,8 @@ it acts, built for the agents people already use, and open source. Sources:
 Starlings `/strategy/positioning-septena-the-task-app` and the feature map
 `/product/feature-map-septena-task-app` (use the app's words: Anytime, not
 Someday; sections, not headings; When for the start date). Claim only what
-ships; web, Android, Windows and self-hosting stay out of store copy until they
-ship. The screenshots must prove **a focused task UI**, **today is your call**
+the App Store build does. Apple's rules keep other platforms and self-hosting
+out of App Store copy. The screenshots must prove **a focused task UI**, **today is your call**
 (the Inbox waits above Today), and **your own agent can work a task**. Screens come from the website's scene builder
 (`../septena-site/lib/task-ui/model.ts`), not from the simulator. See
 `## Screenshots`.

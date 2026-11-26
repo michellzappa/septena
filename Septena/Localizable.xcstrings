@@ -3517,13 +3517,6 @@
         }
       }
     },
-    "€5 a month" : {
-      "comment" : "Generated from registry plans.prices.monthly.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
-      "extractionState" : "manual",
-      "localizations" : {
-
-      }
-    },
     "1st" : {
       "comment" : "Generated from registry surfaces.taskDetail.ordinals.0.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -3921,48 +3914,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "365 dias"
-          }
-        }
-      }
-    },
-    "A free account allows 500 agent changes a day. Your agent can make changes again tomorrow. Plus has no daily limit." : {
-      "comment" : "Generated from registry plans.upsells.connector_cap.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ein kostenloses Konto erlaubt 500 Änderungen durch Agenten pro Tag. Ab morgen kann dein Agent wieder Änderungen vornehmen. Plus hat kein Tageslimit."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Una cuenta gratuita permite 500 cambios de agentes al día. Tu agente podrá volver a hacer cambios mañana. Plus no tiene límite diario."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Un compte gratuit autorise 500 modifications par jour pour les agents. Votre agent pourra de nouveau apporter des modifications demain. Plus n’impose aucune limite quotidienne."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Un account gratuito consente 500 modifiche al giorno da parte degli agenti. Domani il tuo agente potrà apportarne altre. Plus non ha limiti giornalieri."
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Met een gratis account kan een agent 500 wijzigingen per dag doen. Je agent kan morgen weer wijzigingen aanbrengen. Met Plus geldt geen daglimiet."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Uma conta gratuita permite 500 alterações por dia feitas por agentes. Seu agente poderá voltar a fazer alterações amanhã. O Plus não tem limite diário."
           }
         }
       }
@@ -5558,6 +5509,48 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Agentes"
+          }
+        }
+      }
+    },
+    "Agents on this account made 500 changes today. They can make changes again tomorrow." : {
+      "comment" : "Generated from registry plans.upsells.connector_cap.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agenten haben in diesem Konto heute 500 Änderungen vorgenommen. Ab morgen können sie wieder Änderungen vornehmen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los agentes de esta cuenta hicieron 500 cambios hoy. Mañana podrán volver a hacer cambios."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les agents de ce compte ont fait 500 modifications aujourd’hui. Ils pourront de nouveau en faire demain."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gli agenti di questo account hanno fatto 500 modifiche oggi. Domani potranno farne di nuovo."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agents op dit account hebben vandaag 500 wijzigingen gedaan. Morgen kunnen ze weer wijzigingen doen."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Os agentes desta conta fizeram 500 alterações hoje. Amanhã eles poderão fazer alterações de novo."
           }
         }
       }
@@ -8167,10 +8160,6 @@
     },
     "By continuing, you agree to the %@ and the %@." : {
       "comment" : "Generated from registry signIn.copy.terms. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
-      "extractionState" : "manual"
-    },
-    "By invitation. €120 a year or €14 a month once it goes on sale" : {
-      "comment" : "Generated from registry plans.levels.pro.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
     "Calendar" : {
@@ -14034,18 +14023,6 @@
         }
       }
     },
-    "Each project has notes, so you and Claude know what it's for." : {
-      "comment" : "Generated from registry surfaces.firstRun.steps.welcome.points.2.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cada projeto tem notas, para você e o Claude saberem para que ele serve."
-          }
-        }
-      }
-    },
     "Each project has notes, so you and Claude know what it’s for." : {
       "comment" : "Generated from registry surfaces.firstRun.steps.welcome.points.2.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -14826,13 +14803,6 @@
             "value" : "Todos os recursos de tarefas são gratuitos no dispositivo que você usa. Uma conta gratuita inclui um backup e permite conectar um agente. O Plus cobre todos os seus dispositivos, três agentes, arquivos sincronizados e um histórico mais longo."
           }
         }
-      }
-    },
-    "Every task feature is free on the device you use. Plus syncs your list to all your devices and keeps its full history and files. It also lets your agents work without a daily cap." : {
-      "comment" : "Generated from registry plans.subhead. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
-      "extractionState" : "manual",
-      "localizations" : {
-
       }
     },
     "Everything in Free is included." : {
@@ -16091,6 +16061,48 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Arquivos"
+          }
+        }
+      }
+    },
+    "Files are still syncing between your devices." : {
+      "comment" : "Generated from registry plans.status.filesSyncing. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dateien werden noch zwischen deinen Geräten synchronisiert."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los archivos aún se están sincronizando entre tus dispositivos."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les fichiers sont encore en cours de synchronisation entre vos appareils."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I file sono ancora in sincronizzazione tra i tuoi dispositivi."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bestanden worden nog gesynchroniseerd tussen je apparaten."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Os arquivos ainda estão sincronizando entre seus dispositivos."
           }
         }
       }
@@ -18725,42 +18737,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Importar de outros apps de tarefas"
-          }
-        }
-      }
-    },
-    "Import from Things" : {
-      "comment" : "Generated from registry settings.pages.import_export.sections.move_in.items.0.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Importeren uit Things"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Importar do Things"
-          }
-        }
-      }
-    },
-    "Import from Things and Apple Reminders" : {
-      "comment" : "Generated from registry plans.fullApp.points.4. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Importeren uit Things en Apple Herinneringen"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Importar do Things e do Lembretes da Apple"
           }
         }
       }
@@ -25417,6 +25393,48 @@
         }
       }
     },
+    "On another device where you are signed in, open Septena and go to Settings ▸ Account ▸ Approve a sign-in. Tap Scan Code and point the camera at this screen, or enter this code:" : {
+      "comment" : "Generated from registry surfaces.deviceSignIn.copy.approve.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Öffne Septena auf einem anderen Gerät, auf dem du angemeldet bist, und gehe zu Einstellungen ▸ Konto ▸ Anmeldung bestätigen. Tippe auf Code scannen und richte die Kamera auf diesen Bildschirm, oder gib diesen Code ein:"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En otro dispositivo donde hayas iniciado sesión, abre Septena y ve a Ajustes ▸ Cuenta ▸ Aprobar inicio de sesión. Pulsa Escanear código y apunta la cámara a esta pantalla, o introduce este código:"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sur un autre appareil où vous êtes connecté, ouvrez Septena et accédez à Réglages ▸ Compte ▸ Approuver une connexion. Touchez Scanner le code et dirigez l’appareil photo vers cet écran, ou saisissez ce code :"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Su un altro dispositivo in cui hai effettuato l’accesso, apri Septena e vai in Impostazioni ▸ Account ▸ Approva un accesso. Tocca Scansiona codice e inquadra questa schermata, oppure inserisci questo codice:"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Septena op een ander apparaat waarop je bent aangemeld en ga naar Instellingen ▸ Account ▸ Aanmelding goedkeuren. Tik op Code scannen en richt de camera op dit scherm, of voer deze code in:"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Em outro dispositivo em que você já entrou, abra o Septena e acesse Ajustes ▸ Conta ▸ Aprovar acesso. Toque em Ler código e aponte a câmera para esta tela, ou digite este código:"
+          }
+        }
+      }
+    },
     "On Automatic, every step runs on your device first — it leaves only for the steps on-device can't do (↗), never wholesale." : {
       "localizations" : {
         "nl" : {
@@ -25823,48 +25841,6 @@
         }
       }
     },
-    "On your iPhone, iPad or Mac, open Septena and go to Settings ▸ Account ▸ Approve a sign-in. Tap Scan Code and point the camera at this screen, or enter this code:" : {
-      "comment" : "Generated from registry surfaces.deviceSignIn.copy.approve.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Öffne Septena auf deinem iPhone, iPad oder Mac und gehe zu Einstellungen ▸ Konto ▸ Anmeldung bestätigen. Tippe auf Code scannen und richte die Kamera auf diesen Bildschirm, oder gib diesen Code ein:"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "En tu iPhone, iPad o Mac, abre Septena y ve a Ajustes ▸ Cuenta ▸ Aprobar inicio de sesión. Pulsa Escanear código y apunta la cámara a esta pantalla, o introduce este código:"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sur votre iPhone, iPad ou Mac, ouvrez Septena et accédez à Réglages ▸ Compte ▸ Approuver une connexion. Touchez Scanner le code et dirigez l’appareil photo vers cet écran, ou saisissez ce code :"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Su iPhone, iPad o Mac, apri Septena e vai in Impostazioni ▸ Account ▸ Approva un accesso. Tocca Scansiona codice e inquadra questa schermata, oppure inserisci questo codice:"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Open Septena op je iPhone, iPad of Mac en ga naar Instellingen ▸ Account ▸ Aanmelding goedkeuren. Tik op Code scannen en richt de camera op dit scherm, of voer deze code in:"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No iPhone, iPad ou Mac, abra o Septena e acesse Ajustes ▸ Conta ▸ Aprovar acesso. Toque em Ler código e aponte a câmera para esta tela, ou digite este código:"
-          }
-        }
-      }
-    },
     "On-device" : {
       "comment" : "Generated from registry settings.copy.ai_explainer.runsOnDevice.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -25945,48 +25921,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "No dispositivo ↗"
-          }
-        }
-      }
-    },
-    "On-device first, escalating to Apple’s Private Cloud Compute or your own Claude only when a step needs a larger model. Recommended." : {
-      "comment" : "Generated from registry settings.copy.aiMode.auto.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Primeiro, no dispositivo; só recorre ao Private Cloud Compute da Apple ou ao seu Claude quando uma etapa precisa de um modelo maior. Recomendado."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "D’abord sur l’appareil. Apple Private Cloud Compute ou votre propre Claude ne sont utilisés que si une étape nécessite un modèle plus puissant. Recommandé."
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Zuerst auf dem Gerät; nur wenn ein Schritt ein größeres Modell benötigt, geht es weiter zu Apples Private Cloud Compute oder deinem eigenen Claude. Empfohlen."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Primero en el dispositivo; solo se recurre a Private Cloud Compute de Apple o a tu propio Claude si un paso necesita un modelo más grande. Recomendado."
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Eerst op het apparaat; alleen als een stap een groter model nodig heeft, schakelt het over op Apple Private Cloud Compute of je eigen Claude. Aanbevolen."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Prima sul dispositivo; si ricorre a Private Cloud Compute di Apple o al tuo Claude solo quando un passaggio richiede un modello più potente. Consigliato."
           }
         }
       }
@@ -26347,13 +26281,6 @@
             "value" : "Abra uma tarefa ou escolha Manter para trazê-la de volta. Revise a lista e descarte as demais."
           }
         }
-      }
-    },
-    "Open a task or choose Keep to bring it back, or sweep the list to let the rest go." : {
-      "comment" : "Generated from registry surfaces.notices.items.fadedPile.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
-      "extractionState" : "manual",
-      "localizations" : {
-
       }
     },
     "Open in Calendar" : {
@@ -27418,48 +27345,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Planejado"
-          }
-        }
-      }
-    },
-    "Planned: €120 a year or €14 a month" : {
-      "comment" : "Generated from registry plans.levels.pro.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Geplant: 120 € pro Jahr oder 14 € pro Monat"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Previsto: 120 € al año o 14 € al mes"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Prévu : 120 € par an ou 14 € par mois"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Previsto: 120 € all’anno o 14 € al mese"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Gepland: €120 per jaar of €14 per maand"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Planejado: €120 por ano ou €14 por mês"
           }
         }
       }
@@ -28717,48 +28602,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Perguntas"
-          }
-        }
-      }
-    },
-    "Questions and finished work from your agent show up here. So do tasks that faded." : {
-      "comment" : "Generated from registry destinations.destinations.review.emptyState.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hier erscheinen Fragen und fertige Arbeit deines Agenten. Verblasste Aufgaben ebenfalls."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aquí aparecen las preguntas y el trabajo terminado de tu agente. También las tareas atenuadas."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Les questions et le travail terminé de votre agent apparaissent ici. Les tâches estompées aussi."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Qui appaiono le domande e il lavoro completato dal tuo agente. Anche le attività inattive."
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vragen en afgerond werk van je agent verschijnen hier. Vervaagde taken ook."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "As perguntas e o trabalho concluído do seu agente aparecem aqui. As tarefas inativas também."
           }
         }
       }
@@ -32384,24 +32227,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "O app Septena não consegue usar a câmera."
-          }
-        }
-      }
-    },
-    "Septena copies your areas, projects and tasks. The other app is not changed, and you can undo an import." : {
-      "comment" : "Generated from registry settings.pages.import_export.sections.move_in.footer. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Septena kopieert je gebieden, projecten en taken. De andere app wordt niet gewijzigd en je kunt een import ongedaan maken."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "O Septena copia suas áreas, projetos e tarefas. O outro app não é alterado, e você pode desfazer uma importação."
           }
         }
       }
@@ -37079,48 +36904,6 @@
         }
       }
     },
-    "Tasks without activity for 14 days fade out and move to Faded." : {
-      "comment" : "Generated from registry settings.rootGroups.lists_root.items.3.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aufgaben ohne Aktivität verblassen nach 14 Tagen und werden ausgeblendet."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Las tareas sin actividad durante 14 días se atenúan y pasan a Tareas atenuadas."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Les tâches sans activité depuis 14 jours s’estompent et passent dans Estompées."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dopo 14 giorni senza attività, le attività perdono risalto e vengono spostate in Inattive."
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Taken zonder activiteit gedurende 14 dagen vervagen en worden verplaatst naar Vervaagd."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Depois de 14 dias sem atividade, as tarefas perdem destaque e vão para Inativas."
-          }
-        }
-      }
-    },
     "Tasks without activity for 14 days fade out and move to Review. This applies on all your devices." : {
       "comment" : "Generated from registry settings.rootGroups.lists_root.items.3.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -37162,52 +36945,6 @@
           }
         }
       }
-    },
-    "Tasks you assign to Claude appear here, grouped by where the work stands." : {
-      "comment" : "Generated from registry destinations.destinations.agent.emptyState.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aufgaben, die du Claude zuweist, erscheinen hier, gruppiert nach Arbeitsstand."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aquí aparecen las tareas que asignas a Claude, agrupadas según su estado."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Les tâches confiées à Claude apparaissent ici, regroupées selon leur avancement."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Qui appaiono le attività assegnate a Claude, raggruppate in base allo stato del lavoro."
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Taken die je aan Claude toewijst, verschijnen hier, gegroepeerd op de voortgang."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "As tarefas que você atribuir ao Claude aparecem aqui, agrupadas pelo andamento do trabalho."
-          }
-        }
-      }
-    },
-    "Tasks you assign to Claude appear in Review, grouped by where the work stands." : {
-      "comment" : "Generated from registry destinations.destinations.agent.emptyState.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
-      "extractionState" : "manual"
     },
     "Tasks you assign to Claude show up in Review, grouped by where the work stands." : {
       "comment" : "Generated from registry destinations.destinations.agent.emptyState.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -37813,24 +37550,6 @@
         }
       }
     },
-    "The full task app on one iPhone, iPad or Mac. You do not need an account." : {
-      "comment" : "Generated from registry plans.cards.free.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "De volledige takenapp op één iPhone, iPad of Mac. Je hebt geen account nodig."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "O app completo de tarefas em um iPhone, iPad ou Mac. Você não precisa de uma conta."
-          }
-        }
-      }
-    },
     "The other members lose this project. You keep it and its tasks." : {
       "comment" : "Generated from registry surfaces.sharing.copy.stopDetail.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -37957,44 +37676,44 @@
         }
       }
     },
-    "The same tasks on your phone, tablet and Mac, updated as you type." : {
+    "The same tasks on every device, updated as you type." : {
       "comment" : "Generated from registry plans.outcomes.everywhere.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dieselben Aufgaben auf deinem Smartphone, Tablet und Mac, sofort aktualisiert."
+            "value" : "Dieselben Aufgaben auf jedem Gerät, sofort aktualisiert."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Las mismas tareas en tu teléfono, tableta y Mac, actualizadas al escribir."
+            "value" : "Las mismas tareas en todos tus dispositivos, actualizadas al escribir."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Les mêmes tâches sur votre téléphone, tablette et Mac, mises à jour à mesure que vous tapez."
+            "value" : "Les mêmes tâches sur tous vos appareils, mises à jour à mesure que vous tapez."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Le stesse attività su telefono, tablet e Mac, aggiornate mentre scrivi."
+            "value" : "Le stesse attività su ogni dispositivo, aggiornate mentre scrivi."
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dezelfde taken op je telefoon, tablet en Mac, direct bijgewerkt terwijl je typt."
+            "value" : "Dezelfde taken op elk apparaat, direct bijgewerkt terwijl je typt."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "As mesmas tarefas no celular, tablet e Mac, atualizadas enquanto você digita."
+            "value" : "As mesmas tarefas em todos os dispositivos, atualizadas enquanto você digita."
           }
         }
       }
@@ -39129,24 +38848,6 @@
         }
       }
     },
-    "Today with its Inbox, Upcoming, Anytime, Faded and Logbook" : {
-      "comment" : "Generated from registry plans.fullApp.points.0. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vandaag met Postvak IN, Binnenkort, Op elk moment, Vervaagd en Logboek"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hoje, com Caixa de entrada, Próximas, A qualquer momento, Inativas e Registro"
-          }
-        }
-      }
-    },
     "Toggle Checklist Item" : {
       "comment" : "Generated from registry actions.actions.task.toggleChecklistItem.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -39762,90 +39463,6 @@
         }
       }
     },
-    "Undated tasks fade after 14 days without activity and move to Faded. Open or edit a task to bring it back. You can turn this off in Settings." : {
-      "comment" : "Generated from registry surfaces.notices.items.fadeIntro.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aufgaben ohne Datum verblassen nach 14 Tagen ohne Aktivität und werden ausgeblendet. Öffne oder bearbeite eine Aufgabe, um sie zurückzuholen. Du kannst dies in den Einstellungen ausschalten."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Las tareas sin fecha se atenúan después de 14 días sin actividad y pasan a Tareas atenuadas. Ábrelas o edítalas para recuperarlas. Puedes desactivar esta opción en Ajustes."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Les tâches sans date s’estompent après 14 jours d’inactivité et passent dans Estompées. Ouvrez ou modifiez une tâche pour la rétablir. Vous pouvez désactiver cette option dans Réglages."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le attività senza data e inattive da 14 giorni vengono spostate in Inattive. Aprine una o modificala per farla tornare visibile. Puoi disattivare questa opzione in Impostazioni."
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Taken zonder datum vervagen na 14 dagen zonder activiteit en worden verplaatst naar Vervaagd. Open of bewerk een taak om die terug te zetten. Je kunt dit uitschakelen in Instellingen."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "As tarefas sem data que ficarem inativas por 14 dias vão para Inativas. Abra ou edite uma delas para trazê-la de volta. Você pode desativar isso em Ajustes."
-          }
-        }
-      }
-    },
-    "Undated tasks without activity for 14 days appear here until you keep them or let them go." : {
-      "comment" : "Generated from registry destinations.destinations.faded.emptyState.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aufgaben ohne Datum, die 14 Tage inaktiv waren, erscheinen hier, bis du sie behältst oder freigibst."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Las tareas sin fecha y sin actividad durante 14 días aparecen aquí hasta que las conserves o las dejes ir."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Les tâches sans date et inactives depuis 14 jours apparaissent ici jusqu’à ce que vous les conserviez ou les supprimiez."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le attività senza data e inattive da 14 giorni compaiono qui, dove puoi decidere se tenerle o scartarle."
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Taken zonder datum die 14 dagen inactief zijn, verschijnen hier totdat je ze behoudt of loslaat."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "As tarefas sem data e sem atividade há 14 dias aparecem aqui até você decidir se quer mantê-las ou descartá-las."
-          }
-        }
-      }
-    },
     "Undo" : {
       "comment" : "Generated from registry actions.actions.app.undo.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -40171,42 +39788,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Superior"
-          }
-        }
-      }
-    },
-    "Usage data" : {
-      "comment" : "Generated from registry settings.pages.privacy.sections.telemetry.items.0.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Gebruiksgegevens"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dados de uso"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nutzungsdaten"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Données d’utilisation"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Datos de uso"
           }
         }
       }
@@ -41568,48 +41149,6 @@
         }
       }
     },
-    "Work an agent finished appears here so you can check and accept it." : {
-      "comment" : "Generated from registry destinations.destinations.review.emptyState.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Abgeschlossene Agentenarbeit erscheint hier, damit du sie prüfen und annehmen kannst."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aquí aparece el trabajo terminado por un agente para que puedas revisarlo y aceptarlo."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le travail terminé par un agent apparaît ici pour que vous puissiez le vérifier et l’accepter."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Qui appare il lavoro completato da un agente, così puoi controllarlo e accettarlo."
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Werk dat een agent heeft afgerond, verschijnt hier zodat je het kunt controleren en goedkeuren."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "O trabalho concluído por um agente aparece aqui para você conferir e aceitar."
-          }
-        }
-      }
-    },
     "Working" : {
       "comment" : "Generated from registry destinations.destinations.review.groups.working.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -41914,13 +41453,6 @@
             "value" : "Você pode cancelar quando quiser em Ajustes."
           }
         }
-      }
-    },
-    "You can undo an import in Past imports." : {
-      "comment" : "Generated from registry settings.pages.import_export.sections.move_in.footer. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
-      "extractionState" : "manual",
-      "localizations" : {
-
       }
     },
     "You can undo an import." : {
@@ -42354,10 +41886,6 @@
         }
       }
     },
-    "You signed in with a different account. The tasks on this device belong to the account you used before. They are removed from this device, and this account’s tasks take their place. The other account keeps what it already has on the server." : {
-      "comment" : "Generated from registry surfaces.accountSwitch.copy.body.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
-      "extractionState" : "manual"
-    },
     "You’re all set" : {
       "comment" : "Generated from registry surfaces.firstRun.steps.done.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -42655,10 +42183,6 @@
           }
         }
       }
-    },
-    "Your agent's questions, finished work and work in progress show up here. So do tasks that faded." : {
-      "comment" : "Generated from registry destinations.destinations.review.emptyState.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
-      "extractionState" : "manual"
     },
     "Your agents do the work" : {
       "comment" : "Generated from registry surfaces.firstRun.steps.welcome.points.1.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -43332,80 +42856,44 @@
         }
       }
     },
-    "Your task text and titles are never sent through analytics. This setting syncs across your devices." : {
-      "comment" : "Generated from registry settings.pages.privacy.sections.telemetry.footer. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Je taakteksten en titels worden nooit via analytics verzonden. Deze instelling wordt op al je apparaten gesynchroniseerd."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "O texto e os títulos das suas tarefas nunca são enviados pelas análises. Este ajuste sincroniza entre seus dispositivos."
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aufgabentexte und -titel werden niemals über Analysen übertragen. Diese Einstellung wird auf deinen Geräten synchronisiert."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le texte et les titres de vos tâches ne sont jamais transmis par les outils d’analyse. Ce réglage se synchronise entre vos appareils."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "El texto y los títulos de tus tareas nunca se envían mediante análisis. Este ajuste se sincroniza entre tus dispositivos."
-          }
-        }
-      }
-    },
-    "Your tasks stay in step on iPhone, iPad and Mac." : {
+    "Your tasks stay in step on every device you sign in to." : {
       "comment" : "Generated from registry surfaces.firstRun.steps.welcome.points.0.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Deine Aufgaben bleiben auf iPhone, iPad und Mac synchron."
+            "value" : "Deine Aufgaben bleiben auf jedem Gerät synchron, auf dem du angemeldet bist."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tus tareas están sincronizadas en iPhone, iPad y Mac."
+            "value" : "Tus tareas están sincronizadas en todos los dispositivos donde inicias sesión."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Vos tâches restent synchronisées sur iPhone, iPad et Mac."
+            "value" : "Vos tâches restent synchronisées sur tous les appareils où vous êtes connecté."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Le tue attività restano sincronizzate su iPhone, iPad e Mac."
+            "value" : "Le tue attività restano sincronizzate su ogni dispositivo in cui accedi."
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Je taken blijven gelijk op iPhone, iPad en Mac."
+            "value" : "Je taken blijven gelijk op elk apparaat waarop je bent aangemeld."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Suas tarefas ficam sempre atualizadas no iPhone, iPad e Mac."
+            "value" : "Suas tarefas ficam sempre atualizadas em todos os dispositivos em que você entrar."
           }
         }
       }
@@ -43490,18 +42978,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Suas tarefas, áreas, projetos e conversas ficam neste dispositivo até você entrar. Depois de entrar, elas sincronizam pelo servidor privado do Septena em api.septena.app, criptografadas em repouso (não de ponta a ponta, então agentes conectados podem lê-las quando você escolher). A IA no seu dispositivo fica no seu dispositivo. Conecte o Claude em IA e agentes."
-          }
-        }
-      }
-    },
-    "Your tasks, areas, projects, and conversations stay on this device until you sign in. When signed in, they sync through Septena's private server at api.septena.app, encrypted at rest (not end-to-end, so connected agents can read them when you choose). Apple's on-device intelligence runs locally; you can connect Claude under AI & Agents." : {
-      "comment" : "Generated from registry settings.pages.privacy.sections.data_locality.items.0.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Suas tarefas, áreas, projetos e conversas ficam neste dispositivo até você entrar. Depois de entrar, elas sincronizam pelo servidor privado do Septena em api.septena.app, criptografadas em repouso (não de ponta a ponta, então agentes conectados podem lê-las quando você escolher). A inteligência no dispositivo da Apple roda localmente; você pode conectar o Claude em IA e agentes."
           }
         }
       }

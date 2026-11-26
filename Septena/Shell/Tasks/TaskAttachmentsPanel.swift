@@ -19,6 +19,8 @@ struct TaskAttachmentsPanel: View {
   @State private var limitUpsell: RegistryPlanNote?
   @State private var upsellSeen = false
   @State private var showingPlus = false
+  /// Opening a file found it on another device, and the plan syncs files.
+  @State private var fileStillSyncing = false
 
   private var store: TaskAttachmentStore { SeptenaServices.shared.taskAttachmentStore }
 
@@ -30,10 +32,18 @@ struct TaskAttachmentsPanel: View {
     rows.contains { TaskSyncEngine.shared.isAttachmentElsewhere($0) }
   }
 
+  /// The Plus upsell only for an account whose plan has no file sync. A
+  /// Plus or Pro account whose file has not arrived yet sees the syncing line.
   private var activeUpsell: RegistryPlanNote? {
     if let limitUpsell { return limitUpsell }
+    guard PlanStatus.shared.showsFileSyncUpsell else { return nil }
     if hasElsewhereRows || hasLocalOnlyRows { return RegistryPlans.upsell("file_elsewhere") }
     return nil
+  }
+
+  /// Files are on their way between devices and the plan syncs them.
+  private var showsSyncingLine: Bool {
+    activeUpsell == nil && (hasElsewhereRows || hasLocalOnlyRows || fileStillSyncing)
   }
 
   var body: some View {
@@ -70,6 +80,11 @@ struct TaskAttachmentsPanel: View {
 
       if let moment = activeUpsell {
         upsellLine(moment)
+      } else if showsSyncingLine {
+        Text(RegistryPlans.Status.filesSyncing)
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .padding(.top, 2)
       }
 
       Button { importing = true } label: {
@@ -145,7 +160,10 @@ struct TaskAttachmentsPanel: View {
     Task { @MainActor in
       do {
         guard let url = try await store.localFile(for: attachment) else {
-          if TaskSyncEngine.shared.isAttachmentElsewhere(attachment),
+          if TaskSyncEngine.shared.isAttachmentElsewhere(attachment), !PlanStatus.shared.showsFileSyncUpsell {
+            fileStillSyncing = true
+            errorMessage = nil
+          } else if TaskSyncEngine.shared.isAttachmentElsewhere(attachment),
              let moment = RegistryPlans.upsell("file_elsewhere") {
             limitUpsell = moment
             upsellSeen = SettingsMirror.upsellsSeen(context: modelContext).contains(moment.id)
@@ -167,7 +185,11 @@ struct TaskAttachmentsPanel: View {
         }
         errorMessage = nil
       } catch TaskBackendError.http(let status, _) where status == 404 {
-        if !PlanStatus.shared.attachmentsAllowed || TaskSyncEngine.shared.isAttachmentElsewhere(attachment),
+        if PlanStatus.shared.attachmentsAllowed, !PlanStatus.shared.showsFileSyncUpsell,
+           TaskSyncEngine.shared.isAttachmentElsewhere(attachment) {
+          fileStillSyncing = true
+          errorMessage = nil
+        } else if !PlanStatus.shared.attachmentsAllowed || TaskSyncEngine.shared.isAttachmentElsewhere(attachment),
            let moment = RegistryPlans.upsell("file_elsewhere") {
           limitUpsell = moment
           upsellSeen = SettingsMirror.upsellsSeen(context: modelContext).contains(moment.id)
