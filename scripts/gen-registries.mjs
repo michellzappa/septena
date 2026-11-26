@@ -875,6 +875,26 @@ function validateSignIn(signIn, icons, caps, plans) {
   assert(plans.legal?.terms && plans.legal?.privacy, "sign-in.json: the Terms and Privacy URLs come from plans.json legal");
 }
 
+// The code map (ADR 0050, AS9): public claims and the file that keeps each.
+// No bindings: septena.app renders it. Every path must exist in this repo, so
+// a rename here fails before the site's own check does.
+function validateCodeMap(map, caps) {
+  assert(map.repo === "michellzappa/septena" && map.branch === "main", "code-map.json: repo must be michellzappa/septena on main");
+  assert(Array.isArray(map.entries) && map.entries.length > 0, "code-map.json: entries must be a non-empty array");
+  const ids = new Set();
+  for (const e of map.entries) {
+    assert(typeof e.id === "string" && /^[a-z0-9-]+$/.test(e.id), `code-map.json: bad id ${JSON.stringify(e.id)}`);
+    assert(!ids.has(e.id), `code-map.json: duplicate id ${e.id}`);
+    ids.add(e.id);
+    assert(typeof e.label === "string" && e.label.trim() && !/[\u2013\u2014]/.test(e.label), `code-map.json: ${e.id} needs a label without en or em dashes`);
+    assert(typeof e.path === "string" && !e.path.startsWith("/") && !e.path.includes(".."), `code-map.json: ${e.id} path must be relative to the repo`);
+    const full = path.join(REPO, e.path);
+    assert(fs.existsSync(full), `code-map.json: ${e.id} path ${e.path} does not exist`);
+    assert(fs.statSync(full).isDirectory() === e.path.endsWith("/"), `code-map.json: ${e.id} path ${e.path}: a folder ends in /, a file does not`);
+    if (e.feature !== undefined) assert(caps.capabilities[e.feature], `code-map.json: ${e.id} feature ${e.feature} is not in capabilities.json`);
+  }
+}
+
 function validateConformance() {
   const dir = path.join(REPO, "registry/conformance");
   const files = fs.readdirSync(dir).filter((f) => f.endsWith(".json")).sort();
@@ -2781,6 +2801,7 @@ validateImportSources(importSources, caps);
 validatePlans(plans, icons, caps, importSources);
 validateSignIn(signIn, icons, caps, plans);
 validateConformance();
+validateCodeMap(readJSON("registry/code-map.json"), caps);
 // Marketing content only: no generated bindings, no localized strings (ADR 0030).
 validateCast(
   fs.readdirSync(path.join(REPO, "registry/cast")).filter((name) => name.endsWith(".json")).sort()

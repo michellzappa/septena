@@ -78,6 +78,8 @@ Each phase is one issue. Phases in one group can run in parallel.
   claim to the source that keeps it: Stop and Pause (`TaskStore`), the claim
   lease, the MCP server, the shared core, the sync engine. The paths come from
   one list in this repo, and the site build checks that each one exists.
+  *Shipped.* The list is `registry/code-map.json`; `gen-registries --check`
+  checks each path here, and the site build checks it against `main`.
 - **AS10 (septena-site#29) How Septena works.** Pages for people and agents:
   architecture (apps, the Worker, the Durable Object store, the core),
   domains (`septena.app`, `api.septena.app`, what each serves) and the
