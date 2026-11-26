@@ -2,15 +2,20 @@
 
 :root,
 :root[data-theme="light"] {
-  --bg-canvas: #ffffff;
-  --bg-sidebar: #f7f7f5;
+  --bg-canvas: #f2f2f7;
+  --bg-sidebar: #ececef;
+  --bg-card: #ffffff;
+  --bg-card-glass: rgba(255, 255, 255, 0.80);
   --bg-elevated: #ffffff;
-  --bg-hover: rgba(0, 0, 0, 0.038);
+  --bg-pill: rgba(120, 120, 128, 0.12);
+  --bg-hover: rgba(0, 0, 0, 0.032);
   --bg-selected: rgba(0, 122, 255, 0.14);
-  --border-subtle: rgba(0, 0, 0, 0.08);
-  --text-primary: #18181b;
-  --text-secondary: #52525b;
-  --text-muted: #71717a;
+  --border-subtle: rgba(60, 60, 67, 0.12);
+  --border-hairline: rgba(60, 60, 67, 0.11);
+  --checkbox-stroke: rgba(60, 60, 67, 0.50);
+  --text-primary: #1c1c1e;
+  --text-secondary: #636366;
+  --text-muted: #8e8e93;
   --accent: #007aff;
   --accent-check: #ffffff;
   --today-gold: #f5c721;
@@ -25,13 +30,18 @@
   :root:not([data-theme="light"]) {
     --bg-canvas: #141416;
     --bg-sidebar: #1b1b1e;
-    --bg-elevated: #1f1f23;
-    --bg-hover: rgba(255, 255, 255, 0.055);
+    --bg-card: #1e1e22;
+    --bg-card-glass: rgba(30, 30, 34, 0.78);
+    --bg-elevated: #222226;
+    --bg-pill: rgba(255, 255, 255, 0.09);
+    --bg-hover: rgba(255, 255, 255, 0.045);
     --bg-selected: rgba(10, 132, 255, 0.24);
     --border-subtle: rgba(255, 255, 255, 0.09);
+    --border-hairline: rgba(255, 255, 255, 0.08);
+    --checkbox-stroke: rgba(235, 235, 245, 0.48);
     --text-primary: #f4f4f5;
     --text-secondary: #a1a1aa;
-    --text-muted: #71717a;
+    --text-muted: #7c7c84;
     --accent: #0a84ff;
     --accent-check: #ffffff;
     --today-gold: #f5c721;
@@ -46,13 +56,18 @@
 :root[data-theme="dark"] {
   --bg-canvas: #141416;
   --bg-sidebar: #1b1b1e;
-  --bg-elevated: #1f1f23;
-  --bg-hover: rgba(255, 255, 255, 0.055);
+  --bg-card: #1e1e22;
+  --bg-card-glass: rgba(30, 30, 34, 0.78);
+  --bg-elevated: #222226;
+  --bg-pill: rgba(255, 255, 255, 0.09);
+  --bg-hover: rgba(255, 255, 255, 0.045);
   --bg-selected: rgba(10, 132, 255, 0.24);
   --border-subtle: rgba(255, 255, 255, 0.09);
+  --border-hairline: rgba(255, 255, 255, 0.08);
+  --checkbox-stroke: rgba(235, 235, 245, 0.48);
   --text-primary: #f4f4f5;
   --text-secondary: #a1a1aa;
-  --text-muted: #71717a;
+  --text-muted: #7c7c84;
   --accent: #0a84ff;
   --accent-check: #ffffff;
   --today-gold: #f5c721;
