@@ -390,7 +390,11 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
     }
 
     /** Complete, Cancel, Delete or Today on the whole selection, as one undo step. */
-    fun applyToSelection(actionId: String, todayEnabled: Boolean = true) {
+    fun applyToSelection(
+        actionId: String,
+        todayEnabled: Boolean = true,
+        mode: app.septena.sharedcore.RescheduleMode = app.septena.sharedcore.RescheduleMode.MAKE_EXCEPTION,
+    ) {
         if (actionId == RegistryActionIds.TASK_TOGGLE_COMPLETE) {
             batchGesture { ids -> graph.completeTasks(ids) }
             return
@@ -399,15 +403,29 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             when (actionId) {
                 RegistryActionIds.TASK_CANCEL -> graph.taskMutator.cancel(id)
                 RegistryActionIds.TASK_DELETE -> graph.taskMutator.delete(id)
-                RegistryActionIds.TASK_TOGGLE_TODAY -> graph.taskMutator.setToday(id, todayEnabled)
+                RegistryActionIds.TASK_TOGGLE_TODAY -> graph.taskMutator.setToday(id, todayEnabled, mode)
                 else -> error("Unsupported batch action: $actionId")
             }
         }
     }
 
+    /** True when rescheduling any of [ids] onto [targetDay] requires the fixed-repeat prompt (#573). */
+    suspend fun anyNeedsFixedRepeatPrompt(ids: Collection<String>, targetDay: String?): Boolean {
+        if (ids.isEmpty() || targetDay == null) return false
+        return withContext(Dispatchers.IO) {
+            ids.any { id ->
+                val record = graph.taskStore.record(EntityNames.TASK, id)
+                record != null && app.septena.core.TaskMutator.needsFixedRepeatReschedulePrompt(record.fields, targetDay)
+            }
+        }
+    }
+
     /** When for the whole selection; null clears it. */
-    fun setWhenForSelection(day: String?) {
-        batch { id -> graph.taskMutator.setWhen(id, day) }
+    fun setWhenForSelection(
+        day: String?,
+        mode: app.septena.sharedcore.RescheduleMode = app.septena.sharedcore.RescheduleMode.MAKE_EXCEPTION,
+    ) {
+        batch { id -> graph.taskMutator.setWhen(id, day, mode) }
     }
 
     /** Move the whole selection to an area, a project, or (both null) the Inbox. */
@@ -601,12 +619,16 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
     }
 
     /** Reschedules dragged Upcoming tasks onto [dayIso] (`YYYY-MM-DD`) in one undoable edit. */
-    fun rescheduleToDay(ids: List<String>, dayIso: String) {
+    fun rescheduleToDay(
+        ids: List<String>,
+        dayIso: String,
+        mode: app.septena.sharedcore.RescheduleMode = app.septena.sharedcore.RescheduleMode.MAKE_EXCEPTION,
+    ) {
         if (ids.isEmpty()) return
         viewModelScope.launch {
             runCatching {
                 withContext(Dispatchers.IO) {
-                    graph.captureTaskEdits(ids.toSet()) { id -> graph.taskMutator.setWhen(id, dayIso) }
+                    graph.captureTaskEdits(ids.toSet()) { id -> graph.taskMutator.setWhen(id, dayIso, mode) }
                 }
             }.onSuccess {
                 clearSelection()

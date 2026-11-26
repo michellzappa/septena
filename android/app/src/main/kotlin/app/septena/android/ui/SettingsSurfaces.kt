@@ -53,7 +53,7 @@ internal class SettingsSurfaceEnv(
 internal val SETTINGS_SURFACES = setOf(
     "about_header", "open_source", "open_help", "send_feedback", "privacy_explainer", "ai_explainer",
     "mcp_skills", "sync_diagnostics", "smart_lists_editor", "plus_offer", "calendar_detail",
-    "reset_first_run", DELETE_ACCOUNT,
+    "reset_get_started", "reset_first_run", DELETE_ACCOUNT,
     "sign_in_approval", "claude_connector", "import_export",
 )
 
@@ -78,7 +78,11 @@ internal fun SettingsCustomSurface(
         }
         "privacy_explainer" -> detail?.let { Text(it, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
         "ai_explainer" -> ExpandableRow(label) { AiExplainer(appName(context), languageTag) }
-        // `reset_get_started` is omitted on Android until Android renders the Get Started notice.
+        // Clears synced Get Started dismissal and completed steps (as Apple `SettingsMirror.resetGetStarted`).
+        "reset_get_started" -> ActionRow(label) {
+            env.onValueChange(RegistrySettingKeys.GET_STARTED_DISMISSED, JsonValue.Null)
+            env.onValueChange(RegistrySettingKeys.GET_STARTED_STEPS, JsonValue.Null)
+        }
         // This device only: the synced `onboardedAt` stays, so other devices are not asked again (as on iOS).
         "reset_first_run" -> ActionRow(label) { env.graph.firstRun.showAgain() }
         DELETE_ACCOUNT -> DeleteAccountRow(env.graph, env.signedIn, languageTag)

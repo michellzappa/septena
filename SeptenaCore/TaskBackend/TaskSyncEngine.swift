@@ -1626,6 +1626,9 @@ final class TaskSyncEngine {
     #endif
   }
 
+  /// Backend user id of the active session on this device, for Settings ▸ Account (#565).
+  var accountID: String? { signedIn ? lastUserID : nil }
+
   /// Backend user id of the last sign-in on this device.
   private var lastUserID: String? {
     get { UserDefaults.standard.string(forKey: Self.lastUserKey) }

@@ -29,6 +29,10 @@ class AppCredentials(
     private val _signedIn = MutableStateFlow(store.load() != null)
     val signedIn: StateFlow<Boolean> = _signedIn.asStateFlow()
 
+    /** Signed-in backend user id for Settings ▸ Account (#565), or null when signed out. */
+    private val _userId = MutableStateFlow(store.load()?.userId)
+    val userId: StateFlow<String?> = _userId.asStateFlow()
+
     suspend fun adopt(tokens: SessionTokens) {
         beforeAdopt()
         mutex.withLock { remember(tokens) }
@@ -49,6 +53,7 @@ class AppCredentials(
             access = null
             accessExpiresAtMs = 0L
             _signedIn.value = false
+            _userId.value = null
             saved
         }
         saved?.let { runCatching { auth.signOut(it.refreshToken) } }
@@ -63,6 +68,7 @@ class AppCredentials(
         access = null
         accessExpiresAtMs = 0L
         _signedIn.value = false
+        _userId.value = null
     }
 
     private suspend fun refresh(stale: String?): String? = mutex.withLock {
@@ -70,6 +76,7 @@ class AppCredentials(
         if (current != null && current != stale && nowMs() < accessExpiresAtMs - EXPIRY_MARGIN_MS) return current
         val saved = store.load() ?: run {
             _signedIn.value = false
+            _userId.value = null
             return null
         }
         val tokens = auth.refresh(saved.refreshToken)
@@ -77,6 +84,7 @@ class AppCredentials(
             store.clear()
             access = null
             _signedIn.value = false
+            _userId.value = null
             return null
         }
         remember(tokens)
@@ -88,6 +96,7 @@ class AppCredentials(
         access = tokens.accessToken
         accessExpiresAtMs = nowMs() + tokens.expiresInSeconds * 1000L
         _signedIn.value = true
+        _userId.value = tokens.userId
     }
 
     private companion object {

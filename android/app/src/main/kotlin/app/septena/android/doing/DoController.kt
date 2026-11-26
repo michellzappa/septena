@@ -178,9 +178,13 @@ class DoController(
     }
 
     /** Only a saved date ends the Do. Clear changes the task and the Do goes on. */
-    fun later(doing: DoState, day: String?) = gesture {
+    fun later(
+        doing: DoState,
+        day: String?,
+        mode: app.septena.sharedcore.RescheduleMode = app.septena.sharedcore.RescheduleMode.MAKE_EXCEPTION,
+    ) = gesture {
         var saved = false
-        captureTaskEdit(doing.taskId) { saved = tasks.setWhen(doing.taskId, day) != null }
+        captureTaskEdit(doing.taskId) { saved = tasks.setWhen(doing.taskId, day, mode) != null }
         if (!saved || day == null) return@gesture
         sessions.end(doing.sessionId, RegistryEntityEnums.DoExit.LATER)
         _ui.update { it.copy(endedSince = doing.startedAt) }

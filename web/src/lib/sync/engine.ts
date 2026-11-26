@@ -19,6 +19,11 @@ import {
 } from "../core";
 import { evaluateConversation, groupTurnsByTask } from "../conversation";
 import { fadeInput, fadeSettings, isProposal, type FadeClock } from "../fade";
+import {
+  needsFixedRepeatPrompt,
+  planFixedSeriesRebase,
+  type RescheduleMode,
+} from "../fixedRepeat";
 import { LocalStore, pendingFieldsFor, turnSyntheticId, type LocalMutation } from "../store/db";
 import type { ParsedBackupPreview } from "../export";
 import type {
@@ -44,6 +49,8 @@ import type {
 // - Every task rule (dates, recurrence spawning, reminder shifting, reference normalization)
 //   and every sync decision (checkPullPage, planPullRow, planPushResponse) runs through the
 //   shared Rust WASM core — zero duplicated logic in TypeScript.
+
+export { needsFixedRepeatPrompt, type RescheduleMode };
 
 export interface SyncState {
   snapshot: StoreSnapshot;
@@ -604,17 +611,25 @@ export class WebSyncEngine {
     }
   }
 
-  async toggleTaskToday(task: TaskRow): Promise<void> {
+  async toggleTaskToday(task: TaskRow, mode: RescheduleMode = "makeException"): Promise<void> {
     await ensureCoreReady();
     const now = new Date().toISOString();
     const todayYMD = localTodayYMD();
-    const datePatch = applyDateAction(task, { type: "toggleToday" }, todayYMD, now);
+    const datePatch = applyDateAction(task, { type: "toggleToday", mode }, todayYMD, now);
     if (Object.keys(datePatch).length === 0) return;
     await this.patchTask(task, {
       ...datePatch,
       touchedAt: now,
       ...(isProposal(task) ? { acknowledgedAt: now } : {}),
     });
+    if (
+      mode === "updateRule" &&
+      typeof datePatch.recurrenceAnchorDate === "string" &&
+      task.recurrenceUnit &&
+      !task.recurrenceAfterCompletion
+    ) {
+      await this.rebaseFixedSeries(task, datePatch.recurrenceAnchorDate);
+    }
   }
 
   async toggleTaskStar(task: TaskRow): Promise<void> {
@@ -623,12 +638,16 @@ export class WebSyncEngine {
     await this.patchTask(task, { starred: !task.starred, touchedAt: now });
   }
 
-  async setTaskScheduled(task: TaskRow, day: string | null): Promise<void> {
+  async setTaskScheduled(
+    task: TaskRow,
+    day: string | null,
+    mode: RescheduleMode = "makeException",
+  ): Promise<void> {
     await ensureCoreReady();
     const now = new Date().toISOString();
     const todayYMD = localTodayYMD();
     const datePatch = day
-      ? applyDateAction(task, { type: "scheduleFor", day }, todayYMD, now)
+      ? applyDateAction(task, { type: "scheduleFor", day, mode }, todayYMD, now)
       : applyDateAction(task, { type: "clearWhenDate" }, todayYMD, now);
     if (Object.keys(datePatch).length === 0) return;
 
@@ -644,6 +663,48 @@ export class WebSyncEngine {
       touchedAt: now,
       ...(isProposal(task) ? { acknowledgedAt: now } : {}),
     });
+    if (
+      mode === "updateRule" &&
+      typeof datePatch.recurrenceAnchorDate === "string" &&
+      task.recurrenceUnit &&
+      !task.recurrenceAfterCompletion
+    ) {
+      await this.rebaseFixedSeries(task, datePatch.recurrenceAnchorDate);
+    }
+  }
+
+  /**
+   * Rebase sibling open occurrences of a fixed repeating series after "Update Schedule"
+   * moves the anchor slot (#573, matching Apple `TasksBackend.rebaseFixedSeries`).
+   */
+  private async rebaseFixedSeries(source: TaskRow, newAnchor: string): Promise<void> {
+    if (!source.recurrenceUnit || source.recurrenceAfterCompletion) return;
+    const seriesID = source.recurrenceSeriesID ?? source.id;
+    const liveSource = this.liveTask(source.id) ?? source;
+    if (liveSource.recurrenceSeriesID !== seriesID) {
+      await this.patchTask(liveSource, { recurrenceSeriesID: seriesID });
+    }
+    const updates = planFixedSeriesRebase(
+      source,
+      this.state.snapshot.tasks,
+      newAnchor,
+      nextScheduledDate,
+    );
+    for (const { task: sibling, nextDay } of updates) {
+      const shiftedReminder = shiftReminderOnReschedule({
+        reminderAt: sibling.reminderAt ?? null,
+        oldScheduled: sibling.scheduled ?? null,
+        newScheduled: nextDay,
+      });
+      await this.patchTask(sibling, {
+        recurrenceSeriesID: seriesID,
+        recurrenceAnchorDate: nextDay,
+        scheduled: nextDay,
+        ...(sibling.reminderAt && shiftedReminder !== sibling.reminderAt
+          ? { reminderAt: shiftedReminder, reminderSnoozedUntil: null, reminderDismissedAt: null }
+          : {}),
+      });
+    }
   }
 
   async setTaskDeadline(task: TaskRow, day: string | null): Promise<void> {
@@ -1142,7 +1203,11 @@ export class WebSyncEngine {
     await this.patchTasks(tasks, { ...fields, touchedAt: new Date().toISOString() });
   }
 
-  async bulkToggleToday(tasks: TaskRow[], putOnToday: boolean): Promise<void> {
+  async bulkToggleToday(
+    tasks: TaskRow[],
+    putOnToday: boolean,
+    mode: RescheduleMode = "makeException",
+  ): Promise<void> {
     if (tasks.length === 0) return;
     await ensureCoreReady();
     const now = new Date().toISOString();
@@ -1150,10 +1215,11 @@ export class WebSyncEngine {
     const queuedAt = Date.now();
     const mutations: LocalMutation[] = [];
     const ops: OutboxOp[] = [];
+    const toRebase: Array<{ task: TaskRow; newAnchor: string }> = [];
     tasks.forEach((task, idx) => {
       const datePatch = applyDateAction(
         task,
-        putOnToday ? { type: "putOnToday" } : { type: "removeFromToday" },
+        putOnToday ? { type: "putOnToday", mode } : { type: "removeFromToday" },
         todayYMD,
         now,
       );
@@ -1168,8 +1234,20 @@ export class WebSyncEngine {
         fields: patch,
         queuedAt: queuedAt + idx,
       });
+      if (
+        putOnToday &&
+        mode === "updateRule" &&
+        typeof datePatch.recurrenceAnchorDate === "string" &&
+        task.recurrenceUnit &&
+        !task.recurrenceAfterCompletion
+      ) {
+        toRebase.push({ task, newAnchor: datePatch.recurrenceAnchorDate });
+      }
     });
     if (mutations.length > 0) await this.commit(mutations, ops);
+    for (const item of toRebase) {
+      await this.rebaseFixedSeries(item.task, item.newAnchor);
+    }
   }
 
   async bulkDeleteTasks(tasks: TaskRow[]): Promise<void> {

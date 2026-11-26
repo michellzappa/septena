@@ -8,9 +8,9 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 
 | Status | iPhone | iPad | Mac | Web | Android | Windows | Watch |
 |---|---|---|---|---|---|---|---|
-| ships | 55 | 56 | 56 | 49 | 52 | 0 | 1 |
+| ships | 55 | 56 | 56 | 49 | 53 | 0 | 1 |
 | partial | 1 | 1 | 1 | 1 | 2 | 0 | 3 |
-| planned | 0 | 0 | 0 | 3 | 1 | 56 | 2 |
+| planned | 0 | 0 | 0 | 3 | 0 | 56 | 2 |
 | - | 4 | 3 | 3 | 7 | 5 | 4 | 54 |
 
 | ID | Feature | iPhone | iPad | Mac | Web | Android | Windows | Watch |
@@ -52,7 +52,7 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 | `edit.multi-select` | Select multiple tasks | ships | ships | ships | ships | ships | planned | - |
 | `find.quick-find` | Quick Find | ships | ships | ships | ships | ships | planned | - |
 | `task.page` | Task page (ADR 0029) | partial | partial | partial | partial | partial | planned | partial |
-| `mac.keyboard` | Keyboard-first shortcuts | - | ships | ships | ships | planned | planned | - |
+| `mac.keyboard` | Keyboard-first shortcuts | - | ships | ships | ships | ships | planned | - |
 | `mac.updates` | In-app updates (Sparkle) | - | - | ships | - | - | planned | - |
 | `calendar.events` | Calendar events in Today and Upcoming | ships | ships | ships | planned | ships | planned | - |
 | `import.reminders` | Apple Reminders into Inbox | ships | ships | ships | - | - | - | - |
