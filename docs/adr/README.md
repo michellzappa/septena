@@ -61,6 +61,7 @@ a new ADR and set the old one to `superseded by NNNN`.
 | [0054](0054-support-lands-in-starlings.md) | Support goes to Starlings, through a native form (supersedes feedback.md) | accepted |
 | [0055](0055-directory-reviewers-use-a-demo-account.md) | Directory reviewers use a demo account behind a reviewer code | accepted |
 | [0056](0056-agents-create-accounts-with-email-confirmation.md) | Agents can create and connect Septena accounts with human email confirmation | accepted |
+| [0057](0057-agent-responses-stay-typed-data-not-generative-ui.md) | Agent responses and hooks stay typed data, not generative UI (A2UI review) | proposed |
 
 ## Template
 
