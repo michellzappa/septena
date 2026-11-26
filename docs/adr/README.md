@@ -31,7 +31,7 @@ a new ADR and set the old one to `superseded by NNNN`.
 | [0023](0023-sync-across-devices-is-plus.md) | Make sync across devices the paid line (amends 0010) | accepted, amended by 0036 (agents) |
 | [0024](0024-no-iphone-tab-bar.md) | No tab bar on iPhone: the list is the root of one navigation stack | accepted |
 | [0025](0025-shared-rust-core.md) | Put task rules and sync decisions in one shared Rust core | accepted (amends 0013 W0, 0015) |
-| [0026](0026-plus-on-any-store-stripe-for-web.md) | Sell Plus on any store, one account entitlement, Stripe for web | accepted |
+| [0026](0026-plus-on-any-store-stripe-for-web.md) | Sell Plus on any store, one account entitlement, Stripe for web | accepted, amended by 0060 |
 | [0027](0027-task-date-rules-are-core-actions.md) | Task date rules are actions in the shared core | accepted |
 | [0028](0028-registry-owns-vocabulary-platforms-own-interaction.md) | The registry owns vocabulary; each platform owns layout and interaction | accepted |
 | [0029](0029-one-task-page-two-depths.md) | One task page with two depths; one picker per attribute | accepted |
@@ -64,6 +64,7 @@ a new ADR and set the old one to `superseded by NNNN`.
 | [0057](0057-agent-responses-stay-typed-data-not-generative-ui.md) | Agent responses and hooks stay typed data, not generative UI (A2UI review) | proposed |
 | [0058](0058-admin-growth-from-daily-snapshots-then-an-event-stream.md) | Admin growth comes from daily snapshots now, and from an event stream at scale (amends 0043) | accepted |
 | [0059](0059-pro-sells-like-plus.md) | Pro sells like Plus, one subscription group (amends 0045, 0052) | accepted |
+| [0060](0060-revenuecat-subscriptions-and-pinned-currencies.md) | Standardize on RevenueCat across stores and pin EUR, USD and GBP currencies (amends 0026) | accepted |
 
 ## Template
 
