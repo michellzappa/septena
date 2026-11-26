@@ -148,9 +148,6 @@ export function DateBoardPopover(props: DateBoardPopoverProps) {
 
   const activate = (row: (typeof rows)[number]) => {
     switch (row.kind) {
-      case "tomorrow":
-        pick(addDays(today, 1));
-        break;
       case "calendar":
         setCalendarDay((open) => (open ? null : (value ?? today)));
         break;
@@ -272,23 +269,26 @@ export function DateBoardPopover(props: DateBoardPopoverProps) {
           })}
         </div>
 
-        <div className="mt-2 mb-1 border-t border-[var(--border-subtle)]" />
-
-        {rows.map((row) => {
+        {rows.map((row, i) => {
+          // The strip opens the first group; a divider goes where the group changes.
+          const divider = row.group !== (i === 0 ? "pick" : rows[i - 1].group);
+          const rule = divider && <div className="my-1.5 border-t border-[var(--border-subtle)]" />;
           if (row.kind === "time" && timeOpen) {
             return (
-              <TimeControls
-                key={row.id}
-                lang={lang}
-                lucide={row.lucide}
-                startTime={props.startTime ?? DEFAULT_START_TIME}
-                durationMinutes={props.durationMinutes ?? null}
-                onChange={(start, duration) => onTimeSlotChange?.(start, duration)}
-                onClear={() => {
-                  setTimeOpen(false);
-                  onTimeSlotChange?.(null, null);
-                }}
-              />
+              <div key={row.id}>
+                {rule}
+                <TimeControls
+                  lang={lang}
+                  lucide={row.lucide}
+                  startTime={props.startTime ?? DEFAULT_START_TIME}
+                  durationMinutes={props.durationMinutes ?? null}
+                  onChange={(start, duration) => onTimeSlotChange?.(start, duration)}
+                  onClear={() => {
+                    setTimeOpen(false);
+                    onTimeSlotChange?.(null, null);
+                  }}
+                />
+              </div>
             );
           }
           const index = days.length + focusRows.indexOf(row);
@@ -298,6 +298,7 @@ export function DateBoardPopover(props: DateBoardPopoverProps) {
           else if (row.kind === "repeatRule") label = props.repeatTitle ?? row.label;
           return (
             <div key={row.id}>
+              {rule}
               <button
                 type="button"
                 tabIndex={-1}

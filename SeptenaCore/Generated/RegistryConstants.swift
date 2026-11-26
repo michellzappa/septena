@@ -1961,11 +1961,10 @@ enum RegistrySurfaces {
   }
   /// The rows under the date board's day strip, in order (`surfaces.json` `taskDateBoard`).
   static let dateBoardRows: [RegistryDateBoardRow] = [
-    RegistryDateBoardRow(id: "dateBoard.tomorrow", kind: .tomorrow, label: RegistryL10n.t("Tomorrow"), attributeLabels: [:], sfSymbol: "sunrise", attributes: [.when, .deadline], featureId: "task.when-deadline"),
-    RegistryDateBoardRow(id: "dateBoard.calendar", kind: .calendar, label: RegistryL10n.t("Pick another date"), attributeLabels: [:], sfSymbol: "calendar", attributes: [.when, .deadline], featureId: "task.when-deadline"),
-    RegistryDateBoardRow(id: "dateBoard.clear", kind: .clear, label: RegistryL10n.t("Clear (Anytime)"), attributeLabels: [.deadline: RegistryL10n.t("No Deadline")], sfSymbol: "xmark.circle", attributes: [.when, .deadline], featureId: "task.when-deadline"),
-    RegistryDateBoardRow(id: "dateBoard.repeatRule", kind: .repeatRule, label: RegistryL10n.t("Repeat…"), attributeLabels: [:], sfSymbol: "arrow.clockwise", attributes: [.when], featureId: "task.repeat"),
-    RegistryDateBoardRow(id: "dateBoard.time", kind: .time, label: RegistryL10n.t("Add time"), attributeLabels: [:], sfSymbol: "clock", attributes: [.when], featureId: "task.when-deadline"),
+    RegistryDateBoardRow(id: "dateBoard.calendar", kind: .calendar, group: .pick, label: RegistryL10n.t("Pick another date"), attributeLabels: [:], sfSymbol: "calendar", attributes: [.when, .deadline], featureId: "task.when-deadline"),
+    RegistryDateBoardRow(id: "dateBoard.time", kind: .time, group: .refine, label: RegistryL10n.t("Add time"), attributeLabels: [:], sfSymbol: "clock", attributes: [.when], featureId: "task.when-deadline"),
+    RegistryDateBoardRow(id: "dateBoard.repeatRule", kind: .repeatRule, group: .refine, label: RegistryL10n.t("Repeat…"), attributeLabels: [:], sfSymbol: "arrow.clockwise", attributes: [.when], featureId: "task.repeat"),
+    RegistryDateBoardRow(id: "dateBoard.clear", kind: .clear, group: .remove, label: RegistryL10n.t("Clear (Anytime)"), attributeLabels: [.deadline: RegistryL10n.t("No Deadline")], sfSymbol: "xmark.circle", attributes: [.when, .deadline], featureId: "task.when-deadline"),
   ]
   static func dateBoardRows(for attribute: RegistryDateBoardAttribute, on platform: String) -> [RegistryDateBoardRow] {
     dateBoardRows.filter { $0.applies(to: attribute, on: platform) }
@@ -1973,7 +1972,7 @@ enum RegistrySurfaces {
   static let taskDateBoardOverdueLabel: String = RegistryL10n.t("Overdue")
   /// The calendar row when the task has a date past the day strip.
   static func dateBoardCalendarLabel(date: String) -> String { RegistryL10n.format("Pick another date (%@)", english: "Pick another date (%@)", args: [date]) }
-  /// The word for the day after today, in the date board and in date labels.
+  /// The word for the day after today, in date labels.
   static let tomorrowLabel: String = RegistryL10n.t("Tomorrow")
   /// Provenance block (`taskPage.provenance`): the name a task you added shows as,
   /// the name for an agent row with no `sourceClient`, and the agent glyph.
@@ -2007,17 +2006,24 @@ enum RegistryDateBoardAttribute: String, Sendable, Hashable {
 
 /// The closed set of date board rows. Each platform writes one handler per kind.
 enum RegistryDateBoardRowKind: String, Sendable, Hashable {
-  case tomorrow
   case calendar
-  case clear
-  case repeatRule
   case time
+  case repeatRule
+  case clear
+}
+
+/// The date board's row groups, in order. The day strip opens `pick`; a divider separates groups.
+enum RegistryDateBoardGroup: String, Sendable, Hashable {
+  case pick
+  case refine
+  case remove
 }
 
 /// One row under the date board's day strip (`surfaces.json` `taskDateBoard.rows`).
 struct RegistryDateBoardRow: Sendable, Hashable, Identifiable {
   let id: String
   let kind: RegistryDateBoardRowKind
+  let group: RegistryDateBoardGroup
   let label: String
   /// Attribute → label that replaces `label` in that attribute's picker.
   let attributeLabels: [RegistryDateBoardAttribute: String]

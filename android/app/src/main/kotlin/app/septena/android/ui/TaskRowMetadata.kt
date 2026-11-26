@@ -1,6 +1,5 @@
 package app.septena.android.ui
 
-import app.septena.core.DateBoardRowKinds
 import app.septena.core.JsonValue
 import app.septena.core.ProjectShare
 import app.septena.core.RegistryCatalog
@@ -18,7 +17,6 @@ import app.septena.core.generated.RegistryDestinationIds
 import app.septena.core.generated.RegistryEntityEnums
 import app.septena.core.generated.RegistryEntityFields
 import app.septena.core.generated.RegistryEntityNames as EntityNames
-import app.septena.core.generated.RegistryTaskAttributeIds
 import app.septena.core.stringValue
 import app.septena.ui.SeptenaIconKind
 import app.septena.ui.TaskListItem
@@ -97,10 +95,7 @@ internal fun buildTaskListItem(
 
     val todayLabel = RegistryCatalog.destinationTitle(RegistryDestinationIds.TODAY, languageTag)
         ?.takeIf(String::isNotBlank).orEmpty()
-    val tomorrowLabel = RegistryCatalog.dateBoardRows(
-        RegistryTaskAttributeIds.WHEN,
-        languageTag = languageTag,
-    ).firstOrNull { it.kind == DateBoardRowKinds.TOMORROW }?.label?.takeIf(String::isNotBlank).orEmpty()
+    val tomorrowLabel = RegistryCatalog.tomorrowLabel(languageTag)
     val overdueLabel = RegistryCatalog.taskDateBoardOverdueLabel(languageTag)
 
     // Deadline / Scheduled / Completed date — matches iOS `TaskRow.trailingDate`.
@@ -309,8 +304,7 @@ internal fun formatUpcomingDayHeader(
         return RegistryCatalog.destinationTitle(RegistryDestinationIds.TODAY, languageTag).orEmpty()
     }
     if (diff == 1L) {
-        return RegistryCatalog.dateBoardRows(RegistryTaskAttributeIds.WHEN, languageTag = languageTag)
-            .firstOrNull { it.kind == DateBoardRowKinds.TOMORROW }?.label.orEmpty()
+        return RegistryCatalog.tomorrowLabel(languageTag)
     }
     val locale = Locale.forLanguageTag(languageTag)
     val pattern = if (diff in 2L..6L) "EEEE" else if (day.year == today.year) "EEE, MMM d" else "EEE, MMM d, yyyy"
