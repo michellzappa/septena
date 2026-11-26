@@ -28,11 +28,17 @@ object TaskPageBlockKinds {
 
 /** The closed set of date board row kinds (surfaces.json `taskDateBoard.rows[].kind`). */
 object DateBoardRowKinds {
-    const val TOMORROW: String = "tomorrow"
     const val CALENDAR: String = "calendar"
-    const val CLEAR: String = "clear"
-    const val REPEAT_RULE: String = "repeatRule"
     const val TIME: String = "time"
+    const val REPEAT_RULE: String = "repeatRule"
+    const val CLEAR: String = "clear"
+}
+
+/** The date board's row groups (surfaces.json `taskDateBoard.groups`). The day strip opens PICK. */
+object DateBoardGroups {
+    const val PICK: String = "pick"
+    const val REFINE: String = "refine"
+    const val REMOVE: String = "remove"
 }
 
 /** The depths of the task page (ADR 0029). REVIEW is the page of a task waiting for the user to accept it. */
@@ -58,6 +64,7 @@ data class TaskPageBlock(
 data class DateBoardRow(
     val id: String,
     val kind: String,
+    val group: String,
     val label: String,
 )
 
@@ -222,6 +229,12 @@ object RegistryCatalog {
             "Missing task date board overdue label"
         }.let { localizedString(it, languageTag) ?: it }
 
+    /** The word for the day after today, in date labels (`taskDateBoard.tomorrow`). */
+    fun tomorrowLabel(languageTag: String = "en"): String =
+        requireNotNull(surface(TASK_DATE_BOARD_KEY)?.objectAt("tomorrow")?.stringAt("label")) {
+            "Missing task date board tomorrow label"
+        }.let { localizedString(it, languageTag) ?: it }
+
     /**
      * The task attributes in registry order, with localized labels. The task page
      * `attributes` block renders these; it holds no list of its own (ADR 0029).
@@ -251,6 +264,7 @@ object RegistryCatalog {
         dateBoardRowObjects().mapNotNull { fields ->
             val id = fields.stringAt("id") ?: return@mapNotNull null
             val kind = fields.stringAt("kind") ?: return@mapNotNull null
+            val group = fields.stringAt("group") ?: return@mapNotNull null
             val featureId = fields.stringAt("featureId") ?: return@mapNotNull null
             if (fields.arrayAt("attributes").orEmpty().none { it.stringValue() == attribute }) return@mapNotNull null
             if (capabilityStatus(featureId, platform) == CAPABILITY_NOT_APPLICABLE) return@mapNotNull null
@@ -262,6 +276,7 @@ object RegistryCatalog {
             DateBoardRow(
                 id = id,
                 kind = kind,
+                group = group,
                 label = label?.let { localizedString(it, languageTag) ?: it }
                     ?: fields.stringAt("action")?.let { actionTitle(it, languageTag = languageTag) }.orEmpty(),
             )
@@ -294,6 +309,7 @@ object RegistryCatalog {
             val fields = raw as? JsonValue.ObjectValue ?: return@mapNotNull null
             val id = fields.stringAt("id") ?: return@mapNotNull null
             val kind = fields.stringAt("kind") ?: return@mapNotNull null
+            val group = fields.stringAt("group") ?: return@mapNotNull null
             val featureId = fields.stringAt("featureId") ?: return@mapNotNull null
             val depths = fields.arrayAt("depths").orEmpty().mapNotNull { it.stringValue() }
             if (depth !in depths) return@mapNotNull null

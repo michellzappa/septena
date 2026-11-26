@@ -633,9 +633,22 @@ function validateTaskReferences(surfaces, icons, caps, entities) {
 }
 
 // The date board (docs/TASK_ROW_MENU_SPEC.md): the rows under the day strip of
-// the When and Deadline pickers, from a closed set of kinds in one order.
+// the When and Deadline pickers, from a closed set of kinds in one order. Each
+// row names its group; a group is contiguous and the groups keep the order of
+// `groups`. Platforms draw one divider where the group changes, and the day
+// strip opens the first group.
 function checkTaskDateBoard({ surfaces, icons, caps, actions }) {
   const rows = surfaces.taskDateBoard?.rows ?? [];
+  const groups = surfaces.taskDateBoard?.groups ?? [];
+  assert(groups.length === DATE_BOARD_GROUPS.length && groups.every((g, i) => g === DATE_BOARD_GROUPS[i]), `surfaces.json: taskDateBoard.groups must be ${JSON.stringify(DATE_BOARD_GROUPS)}`);
+  assert(typeof surfaces.taskDateBoard?.tomorrow?.label === "string", "surfaces.json: taskDateBoard.tomorrow.label is missing");
+  let lastGroup = 0;
+  for (const r of rows) {
+    const g = groups.indexOf(r.group);
+    assert(g >= 0, `surfaces.json: taskDateBoard row ${r.id} unknown group "${r.group}"`);
+    assert(g >= lastGroup, `surfaces.json: taskDateBoard row ${r.id} breaks the group order (groups are contiguous, in taskDateBoard.groups order)`);
+    lastGroup = g;
+  }
   const attrIds = new Set(surfaces.taskAttributes.map((a) => a.id));
   for (const kind of DATE_BOARD_ROW_KINDS) {
     assert(rows.filter((r) => r.kind === kind).length === 1, `surfaces.json: taskDateBoard needs exactly one "${kind}" row`);
@@ -651,7 +664,8 @@ function checkTaskDateBoard({ surfaces, icons, caps, actions }) {
     }
   }
 }
-const DATE_BOARD_ROW_KINDS = new Set(["tomorrow", "calendar", "clear", "repeatRule", "time"]);
+const DATE_BOARD_ROW_KINDS = new Set(["calendar", "time", "repeatRule", "clear"]);
+const DATE_BOARD_GROUPS = ["pick", "refine", "remove"];
 const DATE_BOARD_ATTRIBUTES = new Set(["when", "deadline"]);
 
 // One picker per attribute (ADR 0029): every popover attribute is opened by
@@ -1747,7 +1761,7 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
     const action = actions.actions[r.action];
     const label = action ? L(action.title, action, "title") : L(r.label, r, "label");
     const own = (r.attributeLabels ?? []).map((l) => `.${l.attribute}: ${L(l.label, l, "label")}`).join(", ");
-    lines.push(`    RegistryDateBoardRow(id: ${swiftStr(r.id)}, kind: .${r.kind}, label: ${label}, attributeLabels: [${own || ":"}], sfSymbol: ${swiftStr(icons.icons[r.icon].sfSymbol)}, attributes: [${r.attributes.map((a) => "." + a).join(", ")}], featureId: ${swiftStr(r.featureId)}),`);
+    lines.push(`    RegistryDateBoardRow(id: ${swiftStr(r.id)}, kind: .${r.kind}, group: .${r.group}, label: ${label}, attributeLabels: [${own || ":"}], sfSymbol: ${swiftStr(icons.icons[r.icon].sfSymbol)}, attributes: [${r.attributes.map((a) => "." + a).join(", ")}], featureId: ${swiftStr(r.featureId)}),`);
   }
   lines.push("  ]");
   lines.push("  static func dateBoardRows(for attribute: RegistryDateBoardAttribute, on platform: String) -> [RegistryDateBoardRow] {");
@@ -1757,8 +1771,8 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   const cal = surfaces.taskDateBoard.rows.find((r) => r.kind === "calendar");
   lines.push("  /// The calendar row when the task has a date past the day strip.");
   lines.push(tmplFn("dateBoardCalendarLabel", tmplKey(cal.valueLabel, cal, "valueLabel")));
-  const tmrw = surfaces.taskDateBoard.rows.find((r) => r.kind === "tomorrow");
-  lines.push("  /// The word for the day after today, in the date board and in date labels.");
+  const tmrw = surfaces.taskDateBoard.tomorrow;
+  lines.push("  /// The word for the day after today, in date labels.");
   lines.push(`  static let tomorrowLabel: String = ${L(tmrw.label, tmrw, "label")}`);
   const prov = surfaces.taskPage.blocks.find((b) => b.kind === "provenance");
   lines.push("  /// Provenance block (`taskPage.provenance`): the name a task you added shows as,");
@@ -1796,10 +1810,16 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   for (const k of DATE_BOARD_ROW_KINDS) lines.push(`  case ${k}`);
   lines.push("}");
   lines.push("");
+  lines.push("/// The date board's row groups, in order. The day strip opens `pick`; a divider separates groups.");
+  lines.push("enum RegistryDateBoardGroup: String, Sendable, Hashable {");
+  for (const g of DATE_BOARD_GROUPS) lines.push(`  case ${g}`);
+  lines.push("}");
+  lines.push("");
   lines.push("/// One row under the date board's day strip (`surfaces.json` `taskDateBoard.rows`).");
   lines.push("struct RegistryDateBoardRow: Sendable, Hashable, Identifiable {");
   lines.push("  let id: String");
   lines.push("  let kind: RegistryDateBoardRowKind");
+  lines.push("  let group: RegistryDateBoardGroup");
   lines.push("  let label: String");
   lines.push("  /// Attribute → label that replaces `label` in that attribute's picker.");
   lines.push("  let attributeLabels: [RegistryDateBoardAttribute: String]");

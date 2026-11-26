@@ -8,12 +8,13 @@ import SwiftUI
 // each is a popover anchored to that row — no sheet, no modal window. The
 // Repeat editor below is the third member of that family.
 //
-// Layout is a ONE-WEEK day strip starting at TODAY, then one list of rows
-// (Tomorrow, Pick another date, Clear, Repeat, Add time). The rows, their order
-// and their words come from the registry (`RegistrySurfaces.dateBoardRows`),
-// and every row is the same `KitDateCell`. Tomorrow is also the strip's second
-// cell; its row stays because "tomorrow" is an answer people look for by name
-// (decided 2026-11-24). Scheduling answers "which of the next few days", so the
+// Layout, in three groups with a divider between them (mz, 2026-11-26):
+// pick (the typed-date line, a ONE-WEEK day strip starting at TODAY, Pick
+// another date), refine (Add time, Repeat) and remove (Clear). The rows, their
+// groups, their order and their words come from the registry
+// (`RegistrySurfaces.dateBoardRows`), and every row is the same `KitDateCell`.
+// Tomorrow is the strip's second cell only; the Tomorrow row duplicated it.
+// Scheduling answers "which of the next few days", so the
 // popover shows seven labeled cells (weekday over day number) instead of a
 // month grid.
 // Today is the strip's FIRST CELL, and its weekday line reads "Today". There
@@ -1523,45 +1524,61 @@ private final class KitDateBoard: NSView {
       }
     } ?? false
 
-    // The typed-entry line is a peer of the rows below: same body size, same
-    // 10 pt text inset, so it reads as an option, not a footnote.
+    // The typed-entry line is the first row of the pick group: the rows'
+    // body size, icon column and 10 pt inset, so it reads as an option, not
+    // a footnote.
     typedLabel.font = .monospacedDigitSystemFont(ofSize: SeptenaTypeScale.size(.body), weight: .regular)
     typedLabel.textColor = SeptaskKitTheme.inkSecondary
     typedLabel.lineBreakMode = .byTruncatingTail
-    typedLabel.translatesAutoresizingMaskIntoConstraints = false
     updateTypedLabel()
-    let typedRow = NSView()
-    typedRow.translatesAutoresizingMaskIntoConstraints = false
-    typedRow.addSubview(typedLabel)
-    NSLayoutConstraint.activate([
-      typedLabel.leadingAnchor.constraint(equalTo: typedRow.leadingAnchor, constant: 10),
-      typedLabel.trailingAnchor.constraint(equalTo: typedRow.trailingAnchor, constant: -10),
-      typedLabel.topAnchor.constraint(equalTo: typedRow.topAnchor, constant: 4),
-      typedLabel.bottomAnchor.constraint(equalTo: typedRow.bottomAnchor, constant: -2),
-    ])
+    let typedIcon = NSImageView()
+    typedIcon.image = NSImage(systemSymbolName: "keyboard", accessibilityDescription: nil)
+    typedIcon.symbolConfiguration = NSImage.SymbolConfiguration(
+      pointSize: SeptenaTypeScale.size(.body), weight: .regular)
+    typedIcon.contentTintColor = SeptaskKitTheme.inkSecondary
+    typedIcon.widthAnchor.constraint(equalToConstant: SeptenaTypeScale.size(.body) + 6).isActive = true
+    let typedRow = NSStackView(views: [typedIcon, typedLabel])
+    typedRow.orientation = .horizontal
+    typedRow.spacing = 8
+    typedRow.alignment = .centerY
+    typedRow.edgeInsets = NSEdgeInsets(top: 4, left: 10, bottom: 2, right: 10)
+    typedLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
-    let separator = NSBox()
-    separator.boxType = .separator
-
-    let stack = NSStackView(views: [typedRow, strip, separator])
+    let stack = NSStackView(views: [typedRow, strip])
     stack.orientation = .vertical
     stack.alignment = .leading
     stack.spacing = Self.rowSpacing
     stack.detachesHiddenViews = true
     stack.setCustomSpacing(8, after: typedRow)
-    stack.setCustomSpacing(8, after: strip)
-    stack.setCustomSpacing(4, after: separator)
+    stack.setCustomSpacing(6, after: strip)
 
+    // The rows this board can act on, before the dividers are placed, so a
+    // group with no rows draws no divider.
+    let rows = RegistrySurfaces.dateBoardRows(for: kind, on: RegistryPlatform.current).filter { row in
+      switch row.kind {
+      case .repeatRule: return repeatTitle != nil && onRepeat != nil
+      case .time: return onTimeSlotChange != nil
+      case .calendar, .clear: return true
+      }
+    }
+    // The strip opens the first group; a divider goes where the group changes.
+    var previousGroup = RegistryDateBoardGroup.pick
     var calendarCell: KitDateCell?
-    for row in RegistrySurfaces.dateBoardRows(for: kind, on: RegistryPlatform.current) {
+    for row in rows {
+      if row.group != previousGroup {
+        let divider = NSBox()
+        divider.boxType = .separator
+        stack.addArrangedSubview(divider)
+        divider.widthAnchor.constraint(equalToConstant: Self.boardWidth).isActive = true
+        if let before = stack.arrangedSubviews.dropLast().last {
+          stack.setCustomSpacing(6, after: before)
+        }
+        stack.setCustomSpacing(6, after: divider)
+        previousGroup = row.group
+      }
       var title = row.label(for: kind)
       let action: () -> Void
       switch row.kind {
-      case .tomorrow:
-        action = { [weak self] in
-          guard let tomorrow = KitDayFormat.day(offset: 1) else { return }
-          self?.pick(tomorrow)
-        }
       case .calendar:
         if beyondStrip, let initial {
           title = RegistrySurfaces.dateBoardCalendarLabel(
@@ -1647,7 +1664,12 @@ private final class KitDateBoard: NSView {
 
       timeControlsContainer.addArrangedSubview(topRow)
       timeControlsContainer.addArrangedSubview(durRow)
-      stack.addArrangedSubview(timeControlsContainer)
+      // Directly under the Add time row it replaces, inside the refine group.
+      if let index = stack.arrangedSubviews.firstIndex(of: timeCell) {
+        stack.insertArrangedSubview(timeControlsContainer, at: index + 1)
+      } else {
+        stack.addArrangedSubview(timeControlsContainer)
+      }
       timeControlsContainer.widthAnchor.constraint(equalTo: strip.widthAnchor).isActive = true
 
       let hasTime = startTime != nil
@@ -1656,9 +1678,7 @@ private final class KitDateBoard: NSView {
     }
 
     // The strip sets the width; everything else matches it.
-    for view in [typedRow, separator] as [NSView] {
-      view.widthAnchor.constraint(equalTo: strip.widthAnchor).isActive = true
-    }
+    typedRow.widthAnchor.constraint(equalTo: strip.widthAnchor).isActive = true
 
     refreshCells()
     for cell in dayCells + rowCells {
