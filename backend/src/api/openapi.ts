@@ -23,6 +23,9 @@ import {
 } from "../shadow/oauth.js";
 import { zAgentSignupPollBody, zAgentSignupStartBody } from "../shadow/agentSignup.js";
 import { zEmailStartBody, zEmailVerifyBody } from "./emailSignIn.js";
+import { zLinkCompleteBody, zLinkEmailVerifyBody } from "./authLink.js";
+import { zGoogleNativeBody, zOidcLinkStartBody, zOidcRedeemBody } from "./oidc.js";
+import { zSupportMessageBody } from "../support/routes.js";
 import {
   zAgentEventsQuery,
   zAppleBody,
@@ -133,9 +136,27 @@ export const ROUTES: RouteDoc[] = [
   { method: "POST", path: "/auth/device", tag: "auth", auth: "app", summary: "Make a separate session for a companion device.", ok: { 200: "A session." } },
   { method: "POST", path: "/auth/refresh", tag: "auth", auth: "none", summary: "Swap a refresh token (body or web cookie) for a new session.", body: zRefreshBody.optional(), ok: { 200: "A session." } },
   { method: "POST", path: "/auth/signout", tag: "auth", auth: "none", summary: "Revoke a refresh token (body or web cookie).", body: zRefreshBody.optional(), ok: { 204: "Signed out." } },
+  { method: "POST", path: "/auth/google/native", tag: "auth", auth: "none", summary: "Sign in with a Google identity token from the native Android or iOS sign-in.", body: zGoogleNativeBody, ok: { 200: "A session." } },
+  { method: "GET", path: "/auth/oidc/:provider/start", tag: "auth", auth: "none", summary: "Start a web sign-in with a provider (Google, Microsoft, Apple on the web).", params: { provider: z.string() }, ok: { 302: "A redirect to the provider." } },
+  { method: "GET", path: "/auth/oidc/:provider/callback", tag: "auth", auth: "none", summary: "The provider's redirect back after a web sign-in.", params: { provider: z.string() }, ok: { 302: "A redirect to the app." } },
+  { method: "POST", path: "/auth/oidc/:provider/callback", tag: "auth", auth: "none", summary: "The provider's form post back after a web sign-in (Apple).", params: { provider: z.string() }, ok: { 302: "A redirect to the app." } },
+  { method: "POST", path: "/auth/oidc/redeem", tag: "auth", auth: "none", summary: "Swap the one-time code from a web sign-in for a session.", body: zOidcRedeemBody, ok: { 200: "A session." } },
+  { method: "POST", path: "/auth/link/complete", tag: "auth", auth: "none", summary: "Finish adding a sign-in method to the account that already holds its email.", body: zLinkCompleteBody, ok: { 200: "A session." } },
+  { method: "GET", path: "/auth/identities", tag: "auth", auth: "app", summary: "The sign-in methods on the account.", ok: { 200: "The methods." } },
+  { method: "DELETE", path: "/auth/identities/:id", tag: "auth", auth: "app", summary: "Remove a sign-in method. The last one cannot be removed.", params: { id: z.string() }, ok: { 204: "Removed." } },
+  { method: "POST", path: "/auth/link/email/start", tag: "auth", auth: "app", summary: "Send a code to add an email sign-in to the account.", body: zEmailStartBody, ok: { 202: "The code is sent." } },
+  { method: "POST", path: "/auth/link/email/verify", tag: "auth", auth: "app", summary: "Add the email sign-in with the emailed code.", body: zLinkEmailVerifyBody, ok: { 200: "Added." } },
+  { method: "POST", path: "/auth/link/apple", tag: "auth", auth: "app", summary: "Add Sign in with Apple to the account.", body: zAppleBody, ok: { 200: "Added." } },
+  { method: "POST", path: "/auth/link/google/native", tag: "auth", auth: "app", summary: "Add Google sign-in to the account with a native identity token.", body: zGoogleNativeBody, ok: { 200: "Added." } },
+  { method: "POST", path: "/auth/link/oidc/start", tag: "auth", auth: "app", summary: "Start adding a provider's web sign-in to the account.", body: zOidcLinkStartBody, ok: { 200: "The address to open." } },
   { method: "POST", path: "/pair/inspect", tag: "auth", auth: "app", summary: "Read what a sign-in code is for (a device or an agent connector) before approving it.", body: zPairInspectBody, ok: { 200: "The kind and the client." } },
   { method: "POST", path: "/pair/approve", tag: "auth", auth: "app", summary: "Approve a sign-in code.", body: zPairApproveBody, ok: { 200: "Approved." } },
   { method: "POST", path: "/pair/deny", tag: "auth", auth: "app", summary: "Turn down a sign-in code.", body: zPairDenyBody, ok: { 200: "Turned down." } },
+
+  // ---- support (ADR 0054) ----
+  { method: "POST", path: "/support/messages", tag: "account", auth: "none", summary: "Send a Contact Support message. Signed in: the app session. Signed out: the header X-Septena-Support-Key and an email.", body: zSupportMessageBody, ok: { 202: "The stored message." } },
+  { method: "GET", path: "/support/messages", tag: "account", auth: "none", summary: "The support conversation and its unread count, for the session or the X-Septena-Support-Key.", ok: { 200: "The conversation." } },
+  { method: "POST", path: "/support/read", tag: "account", auth: "none", summary: "Mark the support replies read.", ok: { 204: "Read." } },
 
   // ---- sync ----
   { method: "POST", path: "/sync/push", tag: "sync", auth: "app", summary: "Push a batch of operations. Each op carries a client op id, so a retry applies nothing twice.", body: zPushBody, ok: { 200: "A result per op." } },
@@ -181,6 +202,7 @@ export const ROUTES: RouteDoc[] = [
 /// /v1 routes that are not part of the contract, and why.
 export const INTERNAL_ROUTES: Array<{ method: Method; path: string; why: string }> = [
   { method: "POST", path: "/webhooks/apple", why: "Called by the App Store only." },
+  { method: "POST", path: "/support/replies", why: "Called by Starlings only, signed with APP_INTAKE_KEY (ADR 0054)." },
   { method: "POST", path: "/admin/grants", why: "Operator only (X-Admin-Token)." },
   { method: "DELETE", path: "/admin/grants/:userId/:name", why: "Operator only." },
   { method: "POST", path: "/admin/reviewer/prepare", why: "Operator only." },
