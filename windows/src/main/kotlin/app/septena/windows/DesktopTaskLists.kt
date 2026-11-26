@@ -60,13 +60,10 @@ internal fun desktopTaskLists(
 
         val projectId = task.project
         val headingId = record.fields[RegistryEntityFields.Task.HEADING].stringValue()
-        val location = when {
-            projectId != null && headingId != null &&
-                DesktopLocation.Section(projectId, headingId) in headings -> DesktopLocation.Section(projectId, headingId)
-            projectId != null -> DesktopLocation.Project(projectId)
-            task.area != null -> DesktopLocation.Area(task.area)
-            else -> null
-        }
+        val section = if (projectId != null && headingId != null) DesktopLocation.Section(projectId, headingId) else null
+        val location = section?.takeIf { it in headings }
+            ?: projectId?.let(DesktopLocation::Project)
+            ?: task.area?.let(DesktopLocation::Area)
         if (location != null) placeTasks.getOrPut(location) { mutableListOf() } += row
 
         for ((destination, rows) in lists) {
