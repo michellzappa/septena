@@ -205,6 +205,58 @@ enum BackendDevicePoll: Sendable {
   case approved(BackendSession)
 }
 
+/// `GET /v1/auth/methods`: the sign-in methods this server has on
+/// (docs/SIGN_IN_SURFACES_SPEC.md §3). Ids this build does not know are kept
+/// as strings; the screen shows only the ones it implements.
+struct BackendAuthMethods: Decodable, Sendable {
+  struct Method: Decodable, Sendable {
+    let id: String
+  }
+  let methods: [Method]
+}
+
+/// `POST /v1/auth/email/start` answered 202: a code went to the address.
+struct BackendEmailCodeSent: Decodable, Sendable, Equatable {
+  let status: String
+  let expiresInSeconds: Int
+  let codeLength: Int
+
+  init(from decoder: Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    status = try c.decode(String.self, forKey: .status)
+    expiresInSeconds = try c.decode(Int.self, forKey: .expiresInSeconds)
+    codeLength = try c.decode(Int.self, forKey: .codeLength)
+    guard status == "sent", expiresInSeconds > 0, (4...12).contains(codeLength) else {
+      throw DecodingError.dataCorruptedError(forKey: .status, in: c, debugDescription: "unexpected email start reply")
+    }
+  }
+
+  private enum CodingKeys: String, CodingKey { case status, expiresInSeconds, codeLength }
+}
+
+/// The refusals of `/v1/auth/email/start` and `/verify`, from their error
+/// bodies (`{ error, attemptsLeft?, retryAfterSeconds? }`).
+enum BackendEmailSignInError: Error, Equatable, Sendable {
+  /// 400: the server did not accept the address or the code shape.
+  case invalidRequest
+  /// 401 `invalid_code`.
+  case wrongCode(attemptsLeft: Int)
+  /// 410 `expired_or_unknown`: no live code for this address.
+  case expired
+  /// 429 `too_many_attempts` on verify: the code is spent.
+  case tooManyAttempts
+  /// 429 `too_many_requests` on start.
+  case rateLimited(retryAfterSeconds: Int?)
+  /// 503 `email_signin_off` or `email_send_failed`.
+  case unavailable
+}
+
+struct BackendEmailErrorBody: Decodable, Sendable {
+  let error: String
+  let attemptsLeft: Int?
+  let retryAfterSeconds: Int?
+}
+
 // MARK: - iCal Feed (IC1)
 
 enum BackendIcalScope: String, Codable, CaseIterable, Identifiable, Sendable {

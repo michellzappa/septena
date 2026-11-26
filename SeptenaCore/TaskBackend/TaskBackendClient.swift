@@ -131,6 +131,35 @@ actor TaskBackendClient {
     }
   }
 
+  /// The sign-in methods this server has on (`GET /v1/auth/methods`).
+  func signInMethods() async throws -> [String] {
+    let (data, status) = try await perform(path: "/v1/auth/methods", method: "GET", body: nil, auth: nil)
+    guard status == 200 else { throw Self.httpError(status, data) }
+    return try decode(BackendAuthMethods.self, from: data, what: "sign-in methods").methods.map(\.id)
+  }
+
+  /// Mails a sign-in code to `email` (`POST /v1/auth/email/start`). Throws
+  /// `BackendEmailSignInError` for the server's refusals.
+  func startEmailSignIn(email: String) async throws -> BackendEmailCodeSent {
+    let body = try JSONEncoder().encode(["email": email])
+    let (data, status) = try await perform(path: "/v1/auth/email/start", method: "POST", body: body, auth: nil)
+    guard status == 202 else { throw Self.emailError(status, data) }
+    return try decode(BackendEmailCodeSent.self, from: data, what: "email code")
+  }
+
+  /// Trades the mailed code for a session (`POST /v1/auth/email/verify`) and
+  /// stores it like an Apple sign-in. A new address creates an account.
+  /// Returns the backend user id.
+  @discardableResult
+  func verifyEmailSignIn(email: String, code: String) async throws -> String {
+    let body = try JSONEncoder().encode(["email": email, "code": code])
+    let (data, status) = try await perform(path: "/v1/auth/email/verify", method: "POST", body: body, auth: nil)
+    guard status == 200 else { throw Self.emailError(status, data) }
+    let session = try decode(BackendSession.self, from: data, what: "session")
+    try adopt(session)
+    return session.userId
+  }
+
   /// Adopts the session of an approved device sign-in. Returns its user id.
   @discardableResult
   func adoptDeviceSession(_ session: BackendSession) throws -> String {
@@ -655,6 +684,21 @@ actor TaskBackendClient {
     }
     let code = (try? JSONDecoder().decode(BackendErrorBody.self, from: data))?.error ?? "no detail"
     return .http(status: status, code: code)
+  }
+
+  /// Maps an email sign-in refusal. A status or code this build does not
+  /// know stays an ordinary `TaskBackendError`.
+  private static func emailError(_ status: Int, _ data: Data) -> Error {
+    let body = try? JSONDecoder().decode(BackendEmailErrorBody.self, from: data)
+    switch (status, body?.error) {
+    case (400, _): return BackendEmailSignInError.invalidRequest
+    case (401, "invalid_code"): return BackendEmailSignInError.wrongCode(attemptsLeft: max(body?.attemptsLeft ?? 0, 0))
+    case (410, _): return BackendEmailSignInError.expired
+    case (429, "too_many_attempts"): return BackendEmailSignInError.tooManyAttempts
+    case (429, _): return BackendEmailSignInError.rateLimited(retryAfterSeconds: body?.retryAfterSeconds)
+    case (503, _): return BackendEmailSignInError.unavailable
+    default: return httpError(status, data)
+    }
   }
 }
 

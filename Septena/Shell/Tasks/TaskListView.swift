@@ -2717,7 +2717,7 @@ struct TaskListView: View {
       .buttonStyle(.bordered)
       .controlSize(.small)
     }
-    if notice.id == .signIn { SeptaskSignInButton(compact: true) }
+    if notice.id == .signIn { SeptaskSignInButton(compact: true, title: notice.primaryTitle) }
     if let upsell = notice.upsellID {
       Button(notice.primaryTitle ?? RegistryPlans.Paywall.seePlus) {
         // Opening the sheet from the notice marks the moment seen.

@@ -1669,7 +1669,7 @@ final class SeptaskKitTaskListController: NSViewController {
   /// Return on the selected notice both run this.
   private func noticePrimaryAction(_ id: TaskNotice.ID) -> (() -> Void)? {
     switch id {
-    case .signIn: return { SeptaskAppKitSignIn.shared.start() }
+    case .signIn: return { SeptaskSignInWindow.present() }
     case .weeklySweep: return { [weak self] in self?.presentWeeklySweepSheet() }
     case .trialEnd, .secondDevice:
       guard let upsell = RegistryNotices.byId[id.registryID]?.upsellId else { return nil }

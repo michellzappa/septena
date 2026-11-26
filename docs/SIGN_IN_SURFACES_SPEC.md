@@ -18,15 +18,18 @@ Android Custom Tabs, a top-level redirect on the web).
 
 | Surface | Apple | Google | Microsoft | Email code | Device approval | Today |
 |---|---|---|---|---|---|---|
-| iPhone, iPad (App Store) | native | web | web | yes | yes | Apple, device |
-| Mac (App Store) | native | web | web | yes | yes | Apple, device |
-| Mac (Developer ID) | web | web | web | yes | yes | device only (#551) |
+| iPhone, iPad (App Store) | native | web | web | yes | yes | Apple, email, device |
+| Mac (App Store) | native | web | web | yes | yes | Apple, email, device |
+| Mac (Developer ID) | web | web | web | yes | yes | email, device |
 | Android | web | native (Credential Manager) | web | yes | yes | device only |
 | Web app | web | web | web | yes | yes | device only |
 | Claude connector authorize page | web | web | web | yes | yes (today's code) | device only |
 | Windows | web | web | web | yes | yes | not built (#136) |
 | Apple Watch | through the phone | | | | | through the phone |
 | Website | no sign-in; links to the web app and downloads | | | | | |
+
+"email" in the Today column shows only while the server's email switch is
+on (`GET /v1/auth/methods`).
 
 Device approval never creates an account: it needs a signed-in device. Every
 other method creates one on first use.
