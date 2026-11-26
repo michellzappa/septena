@@ -575,23 +575,38 @@ fun TaskHomeScreen(
                             MaterialTheme.colorScheme.surfaceContainer
                         },
                     ) {
-                        ListsHomeContent(
+                        TabletSidebarPane(
                             state = state,
                             languageTag = languageTag,
                             settingsTitle = settingsTitle,
+                            quickAddTitle = quickAddTitle,
                             isDark = isDark,
                             hasActiveTexture = appearance.hasActiveTexture,
-                            highlightSelection = true,
-                            showSettingsRow = true,
                             onSelect = selectHomeLocation,
                             onSetAreaEmoji = homeViewModel::setAreaEmoji,
                             onOpenSettings = { settingsOpen = true },
+                            onCreateArea = { title, insertIndex ->
+                                homeViewModel.createArea(title, insertIndex = insertIndex) { created ->
+                                    selectHomeLocation(created)
+                                }
+                            },
+                            onCreateProject = { title, areaId, insertIndex ->
+                                homeViewModel.createProject(title, areaId = areaId, insertIndex = insertIndex) { created ->
+                                    selectHomeLocation(created)
+                                }
+                            },
+                            onMoveProjectToArea = homeViewModel::moveProjectToArea,
+                            onRenameArea = homeViewModel::renameArea,
+                            onRenameProject = homeViewModel::renameProject,
+                            onDeleteArea = homeViewModel::deleteArea,
+                            onDeleteProject = homeViewModel::deleteProject,
+                            onReorderAreas = homeViewModel::reorderAreas,
+                            onReorderProjects = homeViewModel::reorderProjects,
                             onShareProject = { shareProjectId = it },
                             onJoinShared = {
                                 joinToken = null
                                 joinOpen = true
                             },
-                            modifier = Modifier.padding(top = 8.dp),
                         )
                     }
                 }
@@ -683,13 +698,23 @@ fun TaskHomeScreen(
                     onSetAreaEmoji = homeViewModel::setAreaEmoji,
                     onQuickFind = { quickFindOpen = true },
                     onOpenSettings = { settingsOpen = true },
-                    onNewTask = { draft -> homeQuickAddDraft = draft },
-                    onCreateArea = { title ->
-                        homeViewModel.createArea(title) { created -> selectHomeLocation(created) }
+                    onCreateArea = { title, insertIndex ->
+                        homeViewModel.createArea(title, insertIndex = insertIndex) { created ->
+                            selectHomeLocation(created)
+                        }
                     },
-                    onCreateProject = { title ->
-                        homeViewModel.createProject(title) { created -> selectHomeLocation(created) }
+                    onCreateProject = { title, areaId, insertIndex ->
+                        homeViewModel.createProject(title, areaId = areaId, insertIndex = insertIndex) { created ->
+                            selectHomeLocation(created)
+                        }
                     },
+                    onMoveProjectToArea = homeViewModel::moveProjectToArea,
+                    onRenameArea = homeViewModel::renameArea,
+                    onRenameProject = homeViewModel::renameProject,
+                    onDeleteArea = homeViewModel::deleteArea,
+                    onDeleteProject = homeViewModel::deleteProject,
+                    onReorderAreas = homeViewModel::reorderAreas,
+                    onReorderProjects = homeViewModel::reorderProjects,
                     onJoinShared = {
                         joinToken = null
                         joinOpen = true

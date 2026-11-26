@@ -252,12 +252,25 @@ export function SeptenaApp() {
 
   // Inline creation & container notes
   const [creatingKind, setCreatingKind] = useState<"area" | "project" | "heading" | null>(null);
+  const [creatingAreaId, setCreatingAreaId] = useState<string | null>(null);
+  const [creatingInsertIndex, setCreatingInsertIndex] = useState<number | null>(null);
   const [newContainerTitle, setNewContainerTitle] = useState("");
   const [showContainerNotes, setShowContainerNotes] = useState(false);
   const [containerNotesDraft, setContainerNotesDraft] = useState("");
 
   // Drag-and-drop state
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
+  const [draggedSidebarItem, setDraggedSidebarItem] = useState<
+    | { kind: "area"; id: string }
+    | { kind: "project"; id: string }
+    | { kind: "magicPlus" }
+    | null
+  >(null);
+  const [magicPlusTarget, setMagicPlusTarget] = useState<
+    | { kind: "area"; index: number; label: string }
+    | { kind: "project"; areaId: string | null; index: number; label: string }
+    | null
+  >(null);
   const [dropTargetTaskId, setDropTargetTaskId] = useState<string | null>(null);
   const [dropTargetSidebar, setDropTargetSidebar] = useState<string | null>(null);
 
@@ -1791,19 +1804,69 @@ export function SeptenaApp() {
     await engine.createTask(opts);
   };
 
+  const activeAreaId = useMemo(() => {
+    if (destination.kind === "area") return destination.id;
+    if (destination.kind === "project") return projectById.get(destination.id)?.area ?? null;
+    return null;
+  }, [destination, projectById]);
+
+  const reorderAreaList = async (ordered: AreaRow[]) => {
+    await Promise.all(ordered.map((a, idx) => engine.updateArea(a, { position: idx })));
+  };
+
+  const reorderProjectList = async (ordered: ProjectRow[]) => {
+    await Promise.all(ordered.map((p, idx) => engine.updateProject(p, { position: idx })));
+  };
+
+  const handleMoveProjectToArea = async (proj: ProjectRow, targetAreaId: string | null, insertBeforeId?: string) => {
+    const oldAreaId = proj.area ?? null;
+    const reparent = oldAreaId !== targetAreaId;
+    const targetSiblings = activeProjects.filter(
+      (p) => (p.area ?? null) === targetAreaId && p.id !== proj.id,
+    );
+    const nextTarget = [...targetSiblings];
+    const insertAt = insertBeforeId ? nextTarget.findIndex((p) => p.id === insertBeforeId) : -1;
+    if (insertAt >= 0) nextTarget.splice(insertAt, 0, proj);
+    else nextTarget.push(proj);
+
+    if (reparent) {
+      await engine.updateProject(proj, { area: targetAreaId });
+    }
+    await reorderProjectList(nextTarget);
+    if (reparent) {
+      const targetName = targetAreaId ? (areaById.get(targetAreaId)?.title ?? "Area") : "No Area";
+      showToast(`Moved “${proj.title}” to ${targetName}`);
+    }
+  };
+
   const handleCreateContainer = async (e: React.FormEvent) => {
     e.preventDefault();
     const title = newContainerTitle.trim();
     if (!title || !creatingKind) return;
     setNewContainerTitle("");
     const kind = creatingKind;
+    const targetAreaId = creatingAreaId;
+    const insertIndex = creatingInsertIndex;
     setCreatingKind(null);
+    setCreatingAreaId(null);
+    setCreatingInsertIndex(null);
     if (kind === "area") {
       const area = await engine.createArea(title);
+      if (insertIndex !== null) {
+        const next = activeAreas.filter((a) => a.id !== area.id);
+        next.splice(Math.max(0, Math.min(insertIndex, next.length)), 0, area);
+        await reorderAreaList(next);
+      }
       setDestination({ kind: "area", id: area.id });
     } else if (kind === "project") {
-      const areaId = destination.kind === "area" ? destination.id : null;
-      const proj = await engine.createProject(title, areaId);
+      const proj = await engine.createProject(title, targetAreaId);
+      if (insertIndex !== null) {
+        const siblings = activeProjects.filter(
+          (p) => (p.area ?? null) === (targetAreaId ?? null) && p.id !== proj.id,
+        );
+        siblings.splice(Math.max(0, Math.min(insertIndex, siblings.length)), 0, proj);
+        await reorderProjectList(siblings);
+      }
       setDestination({ kind: "project", id: proj.id });
     } else if (kind === "heading" && destination.kind === "project") {
       await engine.createTask({ title, kind: "heading", project: destination.id });
@@ -1821,6 +1884,8 @@ export function SeptenaApp() {
           label: "New Project in Area",
           onSelect: () => {
             setDestination({ kind: "area", id: area.id });
+            setCreatingAreaId(area.id);
+            setCreatingInsertIndex(0);
             setCreatingKind("project");
             setNewContainerTitle("");
           },
@@ -1862,6 +1927,23 @@ export function SeptenaApp() {
 
   const openProjectContextMenu = (e: React.MouseEvent, proj: ProjectRow) => {
     e.preventDefault();
+    const currentAreaId = proj.area ?? null;
+    const moveAreaItems: ContextMenuState["items"] = [
+      {
+        kind: "item",
+        label: `${currentAreaId === null ? "✓ " : ""}Move to No Area`,
+        onSelect: () => {
+          if (currentAreaId !== null) void handleMoveProjectToArea(proj, null);
+        },
+      },
+      ...activeAreas.map((area) => ({
+        kind: "item" as const,
+        label: `${currentAreaId === area.id ? "✓ " : ""}Move to ${area.emoji ? `${area.emoji} ` : ""}${area.title}`,
+        onSelect: () => {
+          if (currentAreaId !== area.id) void handleMoveProjectToArea(proj, area.id);
+        },
+      })),
+    ];
     setContextMenu({
       x: e.clientX,
       y: e.clientY,
@@ -1874,6 +1956,8 @@ export function SeptenaApp() {
             if (next && next !== proj.title) void engine.updateProject(proj, { title: next });
           },
         },
+        { kind: "divider" },
+        ...moveAreaItems,
         { kind: "divider" },
         {
           kind: "item",
@@ -2499,19 +2583,214 @@ export function SeptenaApp() {
       </div>
 
       <nav className="flex-1 overflow-y-auto px-2 py-2">
-        <div className="space-y-0.5">{sidebarDestinations.top.map(renderSidebarButton)}</div>
+        <div
+          className={`space-y-0.5 rounded-lg transition-colors ${
+            dropTargetSidebar === "no-area" ? "bg-[var(--bg-selected)]" : ""
+          }`}
+          onDragOver={(e) => {
+            if (draggedSidebarItem?.kind === "project") {
+              e.preventDefault();
+              setDropTargetSidebar("no-area");
+            }
+          }}
+          onDragLeave={() => setDropTargetSidebar((p) => (p === "no-area" ? null : p))}
+          onDrop={(e) => {
+            if (draggedSidebarItem?.kind === "project") {
+              e.preventDefault();
+              const proj = projectById.get(draggedSidebarItem.id);
+              setDraggedSidebarItem(null);
+              setDropTargetSidebar(null);
+              if (proj && proj.area) void handleMoveProjectToArea(proj, null);
+            }
+          }}
+        >
+          {sidebarDestinations.top.map(renderSidebarButton)}
+        </div>
 
         <div className="mt-4 border-t border-[var(--border-subtle)] pt-3">
-          {activeAreas.map((area) => {
+          {activeProjects
+            .filter((p) => !p.area || !areaById.has(p.area))
+            .map((proj, looseIdx) => {
+              const projSelected = destination.kind === "project" && destination.id === proj.id;
+              const isProjDrop = dropTargetSidebar === `project:${proj.id}`;
+              const isMagicHere =
+                magicPlusTarget?.kind === "project" &&
+                magicPlusTarget.areaId === null &&
+                magicPlusTarget.index === looseIdx + 1;
+              const stats = projectStats.get(proj.id) ?? { done: 0, total: 0 };
+              return (
+                <div key={proj.id} className="relative">
+                  <button
+                    type="button"
+                    draggable
+                    onDragStart={() => setDraggedSidebarItem({ kind: "project", id: proj.id })}
+                    onDragEnd={() => {
+                      setDraggedSidebarItem(null);
+                      setDropTargetSidebar(null);
+                      setMagicPlusTarget(null);
+                    }}
+                    onContextMenu={(e) => openProjectContextMenu(e, proj)}
+                    onDragOver={(e) => {
+                      if (draggedSidebarItem?.kind === "magicPlus") {
+                        e.preventDefault();
+                        setMagicPlusTarget({
+                          kind: "project",
+                          areaId: null,
+                          index: looseIdx + 1,
+                          label: "New Project",
+                        });
+                        return;
+                      }
+                      if (draggedSidebarItem?.kind === "project" && draggedSidebarItem.id !== proj.id) {
+                        e.preventDefault();
+                        setDropTargetSidebar(`project:${proj.id}`);
+                        return;
+                      }
+                      if (!draggedTaskId) return;
+                      e.preventDefault();
+                      setDropTargetSidebar(`project:${proj.id}`);
+                    }}
+                    onDragLeave={() => {
+                      setDropTargetSidebar((p) => (p === `project:${proj.id}` ? null : p));
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      if (draggedSidebarItem?.kind === "magicPlus") {
+                        setDraggedSidebarItem(null);
+                        setMagicPlusTarget(null);
+                        setCreatingAreaId(null);
+                        setCreatingInsertIndex(looseIdx + 1);
+                        setCreatingKind("project");
+                        setNewContainerTitle("");
+                        return;
+                      }
+                      if (draggedSidebarItem?.kind === "project") {
+                        const moved = projectById.get(draggedSidebarItem.id);
+                        setDraggedSidebarItem(null);
+                        setDropTargetSidebar(null);
+                        if (moved && moved.id !== proj.id) {
+                          void handleMoveProjectToArea(moved, null, proj.id);
+                        }
+                        return;
+                      }
+                      void handleDropOnSidebarPlace({
+                        area: null,
+                        project: proj.id,
+                        label: proj.title,
+                      });
+                    }}
+                    onClick={() => {
+                      setDestination({ kind: "project", id: proj.id });
+                      setExpandedTaskId(null);
+                      setSelectedTaskId(null);
+                      setSelectedIds(new Set());
+                      setMobileMenuOpen(false);
+                    }}
+                    className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm transition-colors ${
+                      isProjDrop
+                        ? "bg-[var(--bg-selected)] text-[var(--text-primary)]"
+                        : projSelected
+                          ? "bg-[var(--bg-selected)] font-medium text-[var(--text-primary)]"
+                          : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+                    }`}
+                  >
+                    <span className="flex h-4 w-4 shrink-0 items-center justify-center">
+                      <ProjectRing done={stats.done} total={stats.total} />
+                    </span>
+                    <span className="flex-1 truncate text-left">{proj.title}</span>
+                    {prefs.sidebarCounts && stats.total - stats.done > 0 && (
+                      <span className="font-mono-tabular text-xs text-[var(--text-muted)]">
+                        {stats.total - stats.done}
+                      </span>
+                    )}
+                  </button>
+                  {isMagicHere && (
+                    <div className="pointer-events-none flex items-center gap-1.5 py-0.5 pl-6 pr-2">
+                      <span className="rounded-full bg-[var(--accent)] px-2 py-0.5 text-[10px] font-semibold text-white shadow">
+                        ○ {magicPlusTarget.label}
+                      </span>
+                      <div className="h-0.5 flex-1 rounded-full bg-[var(--accent)]" />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+          {activeAreas.map((area, areaIdx) => {
             const areaSelected = destination.kind === "area" && destination.id === area.id;
             const areaProjects = activeProjects.filter((p) => p.area === area.id);
             const isAreaDrop = dropTargetSidebar === `area:${area.id}`;
+            const isMagicAreaBefore =
+              magicPlusTarget?.kind === "area" && magicPlusTarget.index === areaIdx;
+            const isMagicFirstProject =
+              magicPlusTarget?.kind === "project" &&
+              magicPlusTarget.areaId === area.id &&
+              magicPlusTarget.index === 0;
             return (
               <div key={area.id} className="mb-2">
+                {draggedSidebarItem?.kind === "magicPlus" && (
+                  <div
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setMagicPlusTarget({ kind: "area", index: areaIdx, label: "New Area" });
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setDraggedSidebarItem(null);
+                      setMagicPlusTarget(null);
+                      setCreatingAreaId(null);
+                      setCreatingInsertIndex(areaIdx);
+                      setCreatingKind("area");
+                      setNewContainerTitle("");
+                    }}
+                    className="flex min-h-[14px] items-center px-1"
+                  >
+                    {isMagicAreaBefore && (
+                      <div className="pointer-events-none flex w-full items-center gap-1.5 py-0.5">
+                        <span className="rounded-full bg-[var(--accent)] px-2 py-0.5 text-[10px] font-semibold text-white shadow">
+                          • New Area
+                        </span>
+                        <div className="h-0.5 flex-1 rounded-full bg-[var(--accent)]" />
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <button
                   type="button"
+                  draggable
+                  onDragStart={() => setDraggedSidebarItem({ kind: "area", id: area.id })}
+                  onDragEnd={() => {
+                    setDraggedSidebarItem(null);
+                    setDropTargetSidebar(null);
+                    setMagicPlusTarget(null);
+                  }}
                   onContextMenu={(e) => openAreaContextMenu(e, area)}
                   onDragOver={(e) => {
+                    if (draggedSidebarItem?.kind === "magicPlus") {
+                      e.preventDefault();
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      const inTopBand = e.clientY - rect.top < rect.height * 0.35;
+                      if (inTopBand) {
+                        setMagicPlusTarget({ kind: "area", index: areaIdx, label: "New Area" });
+                      } else {
+                        setMagicPlusTarget({
+                          kind: "project",
+                          areaId: area.id,
+                          index: 0,
+                          label: `New Project in ${area.title}`,
+                        });
+                      }
+                      return;
+                    }
+                    if (
+                      (draggedSidebarItem?.kind === "area" && draggedSidebarItem.id !== area.id) ||
+                      draggedSidebarItem?.kind === "project"
+                    ) {
+                      e.preventDefault();
+                      setDropTargetSidebar(`area:${area.id}`);
+                      return;
+                    }
                     if (!draggedTaskId) return;
                     e.preventDefault();
                     setDropTargetSidebar(`area:${area.id}`);
@@ -2519,6 +2798,43 @@ export function SeptenaApp() {
                   onDragLeave={() => setDropTargetSidebar((p) => (p === `area:${area.id}` ? null : p))}
                   onDrop={(e) => {
                     e.preventDefault();
+                    if (draggedSidebarItem?.kind === "magicPlus") {
+                      const target = magicPlusTarget;
+                      setDraggedSidebarItem(null);
+                      setMagicPlusTarget(null);
+                      if (target?.kind === "area") {
+                        setCreatingAreaId(null);
+                        setCreatingInsertIndex(target.index);
+                        setCreatingKind("area");
+                      } else {
+                        setCreatingAreaId(area.id);
+                        setCreatingInsertIndex(0);
+                        setCreatingKind("project");
+                      }
+                      setNewContainerTitle("");
+                      return;
+                    }
+                    if (draggedSidebarItem?.kind === "area") {
+                      const moved = areaById.get(draggedSidebarItem.id);
+                      setDraggedSidebarItem(null);
+                      setDropTargetSidebar(null);
+                      if (moved && moved.id !== area.id) {
+                        const next = activeAreas.filter((a) => a.id !== moved.id);
+                        const idx = next.findIndex((a) => a.id === area.id);
+                        next.splice(idx >= 0 ? idx : next.length, 0, moved);
+                        void reorderAreaList(next);
+                      }
+                      return;
+                    }
+                    if (draggedSidebarItem?.kind === "project") {
+                      const moved = projectById.get(draggedSidebarItem.id);
+                      setDraggedSidebarItem(null);
+                      setDropTargetSidebar(null);
+                      if (moved && moved.area !== area.id) {
+                        void handleMoveProjectToArea(moved, area.id);
+                      }
+                      return;
+                    }
                     void handleDropOnSidebarPlace({ area: area.id, project: null, label: area.title });
                   }}
                   onClick={() => {
@@ -2530,7 +2846,7 @@ export function SeptenaApp() {
                   }}
                   className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm font-medium transition-colors ${
                     isAreaDrop
-                      ? "ring-2 ring-[var(--accent)] bg-[var(--bg-selected)] text-[var(--text-primary)]"
+                      ? "bg-[var(--bg-selected)] text-[var(--text-primary)]"
                       : areaSelected
                         ? "bg-[var(--bg-selected)] text-[var(--text-primary)]"
                         : "text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
@@ -2546,58 +2862,120 @@ export function SeptenaApp() {
                   <span className="truncate">{area.title}</span>
                 </button>
 
+                {isMagicFirstProject && (
+                  <div className="pointer-events-none flex items-center gap-1.5 py-0.5 pl-6 pr-2">
+                    <span className="rounded-full bg-[var(--accent)] px-2 py-0.5 text-[10px] font-semibold text-white shadow">
+                      ○ {magicPlusTarget.label}
+                    </span>
+                    <div className="h-0.5 flex-1 rounded-full bg-[var(--accent)]" />
+                  </div>
+                )}
+
                 {areaProjects.length > 0 && (
                   <div className="mt-0.5 space-y-0.5 pl-4">
-                    {areaProjects.map((proj) => {
+                    {areaProjects.map((proj, projIdx) => {
                       const projSelected = destination.kind === "project" && destination.id === proj.id;
                       const isProjDrop = dropTargetSidebar === `project:${proj.id}`;
+                      const isMagicAfterProj =
+                        magicPlusTarget?.kind === "project" &&
+                        magicPlusTarget.areaId === area.id &&
+                        magicPlusTarget.index === projIdx + 1;
                       const stats = projectStats.get(proj.id) ?? { done: 0, total: 0 };
                       return (
-                        <button
-                          key={proj.id}
-                          type="button"
-                          onContextMenu={(e) => openProjectContextMenu(e, proj)}
-                          onDragOver={(e) => {
-                            if (!draggedTaskId) return;
-                            e.preventDefault();
-                            setDropTargetSidebar(`project:${proj.id}`);
-                          }}
-                          onDragLeave={() =>
-                            setDropTargetSidebar((p) => (p === `project:${proj.id}` ? null : p))
-                          }
-                          onDrop={(e) => {
-                            e.preventDefault();
-                            void handleDropOnSidebarPlace({
-                              area: proj.area ?? null,
-                              project: proj.id,
-                              label: proj.title,
-                            });
-                          }}
-                          onClick={() => {
-                            setDestination({ kind: "project", id: proj.id });
-                            setExpandedTaskId(null);
-                            setSelectedTaskId(null);
-                            setSelectedIds(new Set());
-                            setMobileMenuOpen(false);
-                          }}
-                          className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1 text-sm transition-colors ${
-                            isProjDrop
-                              ? "ring-2 ring-[var(--accent)] bg-[var(--bg-selected)] text-[var(--text-primary)]"
-                              : projSelected
-                                ? "bg-[var(--bg-selected)] font-medium text-[var(--text-primary)]"
-                                : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
-                          }`}
-                        >
-                          <span className="flex h-4 w-4 shrink-0 items-center justify-center">
-                            <ProjectRing done={stats.done} total={stats.total} />
-                          </span>
-                          <span className="flex-1 truncate text-left">{proj.title}</span>
-                          {prefs.sidebarCounts && stats.total - stats.done > 0 && (
-                            <span className="font-mono-tabular text-xs text-[var(--text-muted)]">
-                              {stats.total - stats.done}
+                        <div key={proj.id}>
+                          <button
+                            type="button"
+                            draggable
+                            onDragStart={() => setDraggedSidebarItem({ kind: "project", id: proj.id })}
+                            onDragEnd={() => {
+                              setDraggedSidebarItem(null);
+                              setDropTargetSidebar(null);
+                              setMagicPlusTarget(null);
+                            }}
+                            onContextMenu={(e) => openProjectContextMenu(e, proj)}
+                            onDragOver={(e) => {
+                              if (draggedSidebarItem?.kind === "magicPlus") {
+                                e.preventDefault();
+                                setMagicPlusTarget({
+                                  kind: "project",
+                                  areaId: area.id,
+                                  index: projIdx + 1,
+                                  label: `New Project in ${area.title}`,
+                                });
+                                return;
+                              }
+                              if (draggedSidebarItem?.kind === "project" && draggedSidebarItem.id !== proj.id) {
+                                e.preventDefault();
+                                setDropTargetSidebar(`project:${proj.id}`);
+                                return;
+                              }
+                              if (!draggedTaskId) return;
+                              e.preventDefault();
+                              setDropTargetSidebar(`project:${proj.id}`);
+                            }}
+                            onDragLeave={() =>
+                              setDropTargetSidebar((p) => (p === `project:${proj.id}` ? null : p))
+                            }
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              if (draggedSidebarItem?.kind === "magicPlus") {
+                                setDraggedSidebarItem(null);
+                                setMagicPlusTarget(null);
+                                setCreatingAreaId(area.id);
+                                setCreatingInsertIndex(projIdx + 1);
+                                setCreatingKind("project");
+                                setNewContainerTitle("");
+                                return;
+                              }
+                              if (draggedSidebarItem?.kind === "project") {
+                                const moved = projectById.get(draggedSidebarItem.id);
+                                setDraggedSidebarItem(null);
+                                setDropTargetSidebar(null);
+                                if (moved && moved.id !== proj.id) {
+                                  void handleMoveProjectToArea(moved, area.id, proj.id);
+                                }
+                                return;
+                              }
+                              void handleDropOnSidebarPlace({
+                                area: proj.area ?? null,
+                                project: proj.id,
+                                label: proj.title,
+                              });
+                            }}
+                            onClick={() => {
+                              setDestination({ kind: "project", id: proj.id });
+                              setExpandedTaskId(null);
+                              setSelectedTaskId(null);
+                              setSelectedIds(new Set());
+                              setMobileMenuOpen(false);
+                            }}
+                            className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1 text-sm transition-colors ${
+                              isProjDrop
+                                ? "bg-[var(--bg-selected)] text-[var(--text-primary)]"
+                                : projSelected
+                                  ? "bg-[var(--bg-selected)] font-medium text-[var(--text-primary)]"
+                                  : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+                            }`}
+                          >
+                            <span className="flex h-4 w-4 shrink-0 items-center justify-center">
+                              <ProjectRing done={stats.done} total={stats.total} />
                             </span>
+                            <span className="flex-1 truncate text-left">{proj.title}</span>
+                            {prefs.sidebarCounts && stats.total - stats.done > 0 && (
+                              <span className="font-mono-tabular text-xs text-[var(--text-muted)]">
+                                {stats.total - stats.done}
+                              </span>
+                            )}
+                          </button>
+                          {isMagicAfterProj && (
+                            <div className="pointer-events-none flex items-center gap-1.5 py-0.5 pl-2 pr-2">
+                              <span className="rounded-full bg-[var(--accent)] px-2 py-0.5 text-[10px] font-semibold text-white shadow">
+                                ○ {magicPlusTarget.label}
+                              </span>
+                              <div className="h-0.5 flex-1 rounded-full bg-[var(--accent)]" />
+                            </div>
                           )}
-                        </button>
+                        </div>
                       );
                     })}
                   </div>
@@ -2606,97 +2984,119 @@ export function SeptenaApp() {
             );
           })}
 
-          {activeProjects
-            .filter((p) => !p.area || !areaById.has(p.area))
-            .map((proj) => {
-              const projSelected = destination.kind === "project" && destination.id === proj.id;
-              const isProjDrop = dropTargetSidebar === `project:${proj.id}`;
-              const stats = projectStats.get(proj.id) ?? { done: 0, total: 0 };
-              return (
-                <button
-                  key={proj.id}
-                  type="button"
-                  onContextMenu={(e) => openProjectContextMenu(e, proj)}
-                  onDragOver={(e) => {
-                    if (!draggedTaskId) return;
-                    e.preventDefault();
-                    setDropTargetSidebar(`project:${proj.id}`);
-                  }}
-                  onDragLeave={() =>
-                    setDropTargetSidebar((p) => (p === `project:${proj.id}` ? null : p))
-                  }
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    void handleDropOnSidebarPlace({
-                      area: null,
-                      project: proj.id,
-                      label: proj.title,
-                    });
-                  }}
-                  onClick={() => {
-                    setDestination({ kind: "project", id: proj.id });
-                    setExpandedTaskId(null);
-                    setSelectedTaskId(null);
-                    setSelectedIds(new Set());
-                    setMobileMenuOpen(false);
-                  }}
-                  className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm transition-colors ${
-                    isProjDrop
-                      ? "ring-2 ring-[var(--accent)] bg-[var(--bg-selected)] text-[var(--text-primary)]"
-                      : projSelected
-                        ? "bg-[var(--bg-selected)] font-medium text-[var(--text-primary)]"
-                        : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
-                  }`}
-                >
-                  <span className="flex h-4 w-4 shrink-0 items-center justify-center">
-                    <ProjectRing done={stats.done} total={stats.total} />
+          {draggedSidebarItem?.kind === "magicPlus" && (
+            <div
+              onDragOver={(e) => {
+                e.preventDefault();
+                setMagicPlusTarget({ kind: "area", index: activeAreas.length, label: "New Area" });
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDraggedSidebarItem(null);
+                setMagicPlusTarget(null);
+                setCreatingAreaId(null);
+                setCreatingInsertIndex(activeAreas.length);
+                setCreatingKind("area");
+                setNewContainerTitle("");
+              }}
+              className="flex min-h-[22px] items-center px-1"
+            >
+              {magicPlusTarget?.kind === "area" && magicPlusTarget.index === activeAreas.length && (
+                <div className="pointer-events-none flex w-full items-center gap-1.5 py-0.5">
+                  <span className="rounded-full bg-[var(--accent)] px-2 py-0.5 text-[10px] font-semibold text-white shadow">
+                    • New Area
                   </span>
-                  <span className="flex-1 truncate text-left">{proj.title}</span>
-                  {prefs.sidebarCounts && stats.total - stats.done > 0 && (
-                    <span className="font-mono-tabular text-xs text-[var(--text-muted)]">
-                      {stats.total - stats.done}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
+                  <div className="h-0.5 flex-1 rounded-full bg-[var(--accent)]" />
+                </div>
+              )}
+            </div>
+          )}
 
           {creatingKind && creatingKind !== "heading" ? (
-            <form onSubmit={(e) => void handleCreateContainer(e)} className="mt-2 px-1">
+            <form onSubmit={(e) => void handleCreateContainer(e)} className="mt-2 space-y-1.5 px-1">
               <input
                 type="text"
                 autoFocus
                 value={newContainerTitle}
                 onChange={(e) => setNewContainerTitle(e.target.value)}
-                onBlur={() => {
-                  if (!newContainerTitle.trim()) setCreatingKind(null);
-                }}
                 onKeyDown={(e) => {
                   if (e.key === "Escape") {
                     setCreatingKind(null);
+                    setCreatingAreaId(null);
+                    setCreatingInsertIndex(null);
                     setNewContainerTitle("");
                   }
                 }}
                 placeholder={creatingKind === "area" ? "New area name…" : "New project name…"}
                 className="w-full rounded-lg border border-[var(--accent)] bg-[var(--bg-elevated)] px-2.5 py-1 text-xs text-[var(--text-primary)] outline-none"
               />
+              {creatingKind === "project" && activeAreas.length > 0 && (
+                <select
+                  aria-label="Area"
+                  value={creatingAreaId ?? ""}
+                  onChange={(e) => setCreatingAreaId(e.target.value || null)}
+                  className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-elevated)] px-2 py-1 text-[11px] text-[var(--text-secondary)] outline-none"
+                >
+                  <option value="">No Area</option>
+                  {activeAreas.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.emoji ? `${a.emoji} ` : ""}
+                      {a.title}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <div className="flex items-center justify-end gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCreatingKind(null);
+                    setCreatingAreaId(null);
+                    setCreatingInsertIndex(null);
+                    setNewContainerTitle("");
+                  }}
+                  className="rounded px-2 py-0.5 text-[11px] text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={!newContainerTitle.trim()}
+                  className="rounded bg-[var(--accent)] px-2.5 py-0.5 text-[11px] font-medium text-white disabled:opacity-40"
+                >
+                  Create
+                </button>
+              </div>
             </form>
           ) : (
             <div className="mt-2 flex items-center gap-1 px-1.5 text-[11px] text-[var(--text-muted)]">
               <button
                 type="button"
+                draggable
+                title="Click for New Project (or drag onto an Area or gap for New Area / Project)"
+                onDragStart={() => setDraggedSidebarItem({ kind: "magicPlus" })}
+                onDragEnd={() => {
+                  setDraggedSidebarItem(null);
+                  setMagicPlusTarget(null);
+                }}
                 onClick={() => {
+                  setCreatingAreaId(activeAreaId);
+                  setCreatingInsertIndex(null);
                   setCreatingKind("project");
                   setNewContainerTitle("");
                 }}
-                className="inline-flex items-center gap-1 rounded px-1.5 py-1 hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+                className="inline-flex items-center gap-1.5 rounded-full px-2 py-1 hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
               >
-                <Plus className="h-3 w-3" />
+                <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-[var(--accent)] text-white">
+                  <Plus className="h-3 w-3" />
+                </span>
                 Project
               </button>
               <button
                 type="button"
                 onClick={() => {
+                  setCreatingAreaId(null);
+                  setCreatingInsertIndex(null);
                   setCreatingKind("area");
                   setNewContainerTitle("");
                 }}

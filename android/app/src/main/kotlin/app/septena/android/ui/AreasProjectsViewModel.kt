@@ -57,12 +57,20 @@ data class PlaceTaskRow(
 )
 data class PlaceSectionRow(val id: String, val title: String, val tasks: List<PlaceTaskRow>)
 
+data class PlaceAreaOption(
+    val id: String,
+    val title: String,
+    val emoji: String? = null,
+)
+
 data class AreasProjectsUiState(
     val destination: AreasProjectsDestination? = null,
     val isLoading: Boolean = true,
     val title: String = "",
     val emoji: String? = null,
     val notes: String = "",
+    val currentAreaId: String? = null,
+    val availableAreas: List<PlaceAreaOption> = emptyList(),
     val projects: List<PlaceProjectRow> = emptyList(),
     val areaTasks: List<PlaceTaskRow> = emptyList(),
     val unsectionedTasks: List<PlaceTaskRow> = emptyList(),
@@ -150,6 +158,17 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                 RegistryEntityNames.AREA,
                 selected.id,
                 mapOf(RegistryEntityFields.Area.EMOJI to JsonValue.stringOrNull(emoji?.takeIf(String::isNotBlank))),
+            ) != null
+        }
+    }
+
+    fun moveProjectToArea(areaId: String?) {
+        val selected = destination.value as? AreasProjectsDestination.Project ?: return
+        mutate {
+            graph.registryEntityMutator.update(
+                RegistryEntityNames.PROJECT,
+                selected.id,
+                mapOf(RegistryEntityFields.Project.AREA to JsonValue.stringOrNull(areaId)),
             ) != null
         }
     }
@@ -436,11 +455,29 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                             .map(ProjectTask::row),
                     )
                 }
+                val availableAreas = graph.taskStore.records(RegistryEntityNames.AREA)
+                    .asSequence()
+                    .filter { it.deletedAt == null }
+                    .mapNotNull { record ->
+                        record.fields[RegistryEntityFields.Area.TITLE].stringValue()?.let { areaTitle ->
+                            record to PlaceAreaOption(
+                                id = record.id,
+                                title = areaTitle,
+                                emoji = record.fields[RegistryEntityFields.Area.EMOJI].stringValue()?.takeIf(String::isNotBlank),
+                            )
+                        }
+                    }
+                    .sortedWith(compareBy({ it.first.fields[RegistryEntityFields.Area.POSITION].numberValue() ?: Double.MAX_VALUE }, { it.second.title.lowercase() }))
+                    .map { it.second }
+                    .toList()
+                val currentAreaId = container.fields[RegistryEntityFields.Project.AREA].stringValue()?.takeIf(String::isNotBlank)
                 AreasProjectsUiState(
                     destination = selected,
                     isLoading = false,
                     title = title,
                     notes = notes,
+                    currentAreaId = currentAreaId,
+                    availableAreas = availableAreas,
                     unsectionedTasks = unsectioned,
                     sections = sections,
                 )
