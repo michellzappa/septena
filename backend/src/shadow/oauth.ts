@@ -752,9 +752,14 @@ function pairPage(
   opts: { code: string; clientName: string; redirectHost: string; setCookie?: string },
 ) {
   const shown = `${opts.code.slice(0, 4)}-${opts.code.slice(4)}`;
+  const client = escapeHtml(opts.clientName);
   const back = opts.redirectHost
-    ? `<p class="small">After you approve, this page sends you back to <b>${escapeHtml(opts.redirectHost)}</b>. If you did not start this from Claude, close this page.</p>`
-    : `<p class="small">If you did not start this from Claude, close this page.</p>`;
+    ? `<p class="small">After you approve, this page sends you back to <b>${escapeHtml(opts.redirectHost)}</b>. If you did not start this from ${client}, close this page.</p>`
+    : `<p class="small">If you did not start this from ${client}, close this page.</p>`;
+  // The app's row is labelled "Connect Claude" (registry/settings.json
+  // claude_pairing), but it pairs every MCP client. Say so to other clients.
+  const appPath = "Septena &#9656; Settings &#9656; AI &amp; Agents &#9656; Connect Claude";
+  const appPathNote = /^claude\b/i.test(opts.clientName) ? "" : " (it connects every agent)";
   const html = `<!doctype html>
 <html lang="en">
 <head>
@@ -766,12 +771,12 @@ function pairPage(
 </head>
 <body>
   <main class="card">
-    <h1>Connect ${escapeHtml(opts.clientName)} to your Septena tasks</h1>
-    <p>On your iPhone or iPad, open Septena &#9656; Settings &#9656; Connect Claude, tap Scan Code and point the camera at this QR code:</p>
+    <h1>Connect ${client} to your Septena tasks</h1>
+    <p>On your iPhone or iPad, open ${appPath}${appPathNote}, tap Scan Code and point the camera at this QR code:</p>
     <div class="qr">${pairQrSvg(pairApproveUrl(c.env.API_PUBLIC_URL, opts.code), `Sign-in code ${shown}`)}</div>
     <p>Or enter the code by hand (on Mac: Settings &#9656; AI &amp; Agents):</p>
     <div class="code">${escapeHtml(shown)}</div>
-    <p>${escapeHtml(opts.clientName)} will be able to read and change your tasks.</p>
+    <p>${client} will be able to read and change your tasks.</p>
     <p class="small">The code works for 10 minutes. This page checks for your approval every few seconds.</p>
     ${emailSignInEnabled(c.env) ? EMAIL_FORM_HTML : ""}
     ${back}

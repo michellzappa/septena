@@ -17,10 +17,10 @@ Complete these checks before clicking Submit in either portal:
 
 - [x] **Tool annotations verified in code and tests.** All 40 live tools on `api.septena.app/mcp` carry top-level `title` and explicit MCP `annotations` (`title`, `readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`), verified 1:1 against every handler by `backend/test/annotations.test.mjs`. (`tasks_update` is marked `idempotentHint: false` because `notes_append` appends on repeat calls without `notes_rev`.)
 - [x] **OAuth redirect hosts pinned for both directories.** `backend/src/oauth/redirects.ts` allows `claude.ai`, `claude.com`, `chatgpt.com`, and loopback hosts.
-- [ ] **Deploy latest backend to `api.septena.app`.** Ensure the `tasks_update` `idempotentHint: false` fix and `skill.md` update are live in production before triggering portal rescans.
-- [ ] **Check canonical web URLs.** Confirm that `https://www.septena.app/privacy`, `https://www.septena.app/support`, and `https://www.septena.app/agents` load cleanly (HTTP 200 or clean redirect to `https://septena.app/...`; paste the final canonical URL in the portal forms).
+- [x] **Deploy latest backend to `api.septena.app`.** CI (`backend.yml`) deploys every push to `main`; the 2026-11-26 deploy carries these fixes. Ensure the `tasks_update` `idempotentHint: false` fix and `skill.md` update are live in production before triggering portal rescans.
+- [x] **Check canonical web URLs.** Checked 2026-11-26: `https://www.septena.app/privacy`, `/support` and `/agents` answer 301 to `https://septena.app/...`. The fields below use the `https://septena.app` URLs.
 - [ ] **Prepare reviewer test access (see Section 5).** Both Anthropic and OpenAI reviewers need a frictionless way to authenticate without getting blocked by MFA or an unavailable second device. Because Septena pairs via an 8-character code approved in the signed-in app, fill in Section 5 before submitting.
-- [ ] **ChatGPT pairing page wording (small polish before OpenAI submission).** `backend/src/shadow/oauth.ts` currently renders "If you did not start this from Claude, close this page" and "Settings ▸ Connect Claude" on the pairing HTML page even when `clientName` is ChatGPT. Worth generalizing to `opts.clientName` before submitting to OpenAI so reviewers do not see another vendor's name during OAuth.
+- [x] **ChatGPT pairing page wording.** Fixed 2026-11-26: the pairing page in `backend/src/shadow/oauth.ts` names the connecting client (`opts.clientName`) in "If you did not start this from …", and gives the full app path (Settings ▸ AI & Agents ▸ Connect Claude). For a client that is not Claude, it adds that the same screen connects every agent.
 - [ ] **OpenAI domain verification.** After creating the draft in `platform.openai.com/apps-manage`, serve the portal's verification token at `https://api.septena.app/.well-known/openai-apps-challenge`.
 - [ ] **Optional tool-surface decision.** `tasks_list_tags` and `tasks_checklist_*` are currently live in `tools/list` and included in Section 6 below. If you hide them before the app UI renders tags and checklists, update Section 6 and trigger a portal rescan.
 
@@ -75,12 +75,12 @@ Complete these checks before clicking Submit in either portal:
 
 ### Links and company details
 
-- **Website URL**: `https://www.septena.app`
-- **Documentation URL**: `https://www.septena.app/agents`
+- **Website URL**: `https://septena.app`
+- **Documentation URL**: `https://septena.app/agents`
 - **Machine-readable Agent Guide**: `https://api.septena.app/skill.md`
 - **Onboarding Guide**: `https://api.septena.app/onboard.md` (also exposed as MCP prompt `onboard_septena`)
-- **Privacy Policy URL**: `https://www.septena.app/privacy`
-- **Support URL**: `https://www.septena.app/support`
+- **Privacy Policy URL**: `https://septena.app/privacy`
+- **Support URL**: `https://septena.app/support`
 - **Support Contact**: `[mz: fill in support email, e.g. support@septena.app]`
 - **Developer / Publisher Name**: `Michell Zappa` (or `Septena`)
 - **Open-Source Repository (MIT)**: `https://github.com/michellzappa/septena`
@@ -135,9 +135,9 @@ Complete these checks before clicking Submit in either portal:
   ```
 - **OAuth Redirect URI Allowed**: `https://chatgpt.com/connector_platform_oauth_redirect` (already pinned in `backend/src/oauth/redirects.ts`).
 - **Domain Verification**: Serve OpenAI's challenge token at `https://api.septena.app/.well-known/openai-apps-challenge` once generated in the portal.
-- **Privacy Policy URL**: `https://www.septena.app/privacy`
-- **Support URL**: `https://www.septena.app/support`
-- **Documentation URL**: `https://www.septena.app/agents`
+- **Privacy Policy URL**: `https://septena.app/privacy`
+- **Support URL**: `https://septena.app/support`
+- **Documentation URL**: `https://septena.app/agents`
 
 ### Tool annotations and safety justification (for OpenAI reviewer notes)
 
