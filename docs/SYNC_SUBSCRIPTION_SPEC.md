@@ -9,7 +9,9 @@ overrules them in §11.
 [ADR 0010](adr/0010-free-server-tier-with-limits.md) (free account with
 limits; changes §1, §3, §6, §7 on 2026-11-20),
 [ADR 0023](adr/0023-sync-across-devices-is-plus.md) (free account syncs one
-device; changes §1, §3, §3.2, §4 on 2026-11-22).
+device; changes §1, §3, §3.2, §4 on 2026-11-22),
+[ADR 0059](adr/0059-pro-sells-like-plus.md) (Pro sells like Plus on 2026-11-26),
+[ADR 0060](adr/0060-revenuecat-subscriptions-and-pinned-currencies.md) (RevenueCat across stores and pinned EUR/USD/GBP currencies on 2026-11-26).
 **Builds on:** the backend (`docs/SEPTASK_BACKEND.md`, auth in §7), the
 existing tip jar (`Septena/Shell/Settings/SupportStore.swift`,
 `SeptenaPlus.swift`, `Config/Septena.storekit`).
@@ -614,21 +616,35 @@ Keep the cosmetic supporter finish only if a subscriber gets it. The
 Connect, so nothing breaks. Septena Life may keep the tip jar until it moves
 to the backend.
 
-## 9. Other platforms
+## 9. Other platforms, RevenueCat and currencies
 
-Decided in ADR 0026 (2026-11-22). One account, one Plus, bought on any
-store, valid on every device.
+Decided in ADR 0026 (2026-11-22) and amended in ADR 0060 (2026-11-26). One
+account, one subscription (Plus or Pro, ADR 0059), bought on any store, valid
+on every device.
 
-- **Web and Windows:** Stripe Checkout in subscription mode, the Stripe
-  customer portal to manage it, Stripe webhooks to write the `stripe` row.
-  Stripe Tax calculates VAT; Envisioning Technology files EU VAT through the
-  One Stop Shop. Windows ships outside the Microsoft Store first and opens
-  the checkout in the browser.
-- **Android:** Google Play Billing in the Play Store build, a new `google`
-  source, verified through the Play Developer API and real-time developer
-  notifications.
-- **No double payment:** an account on Plus from any source sees no buy
-  button anywhere, only where to manage it.
+- **Subscription backend (ADR 0060):** Standardize on **RevenueCat** (free up
+  to $2,500 USD MTR, 1% above) across Apple App Store, Google Play and
+  Web/Windows (Stripe / RevenueCat Web Billing). Every purchase maps to the
+  Septena backend user id (`u_…`) as `app_user_id`. RevenueCat webhooks sync
+  entitlement rows into the user's Durable Object `entitlements` table so the
+  plan table and every server gate stay unchanged; the P0 direct Apple JWS
+  verifier (`backend/src/entitlement/appleJws.ts`) is superseded once
+  RevenueCat integration ships. Task data and sync traffic never touch
+  RevenueCat.
+- **Currencies (ADR 0060):** EUR is the baseline. Top markets are pinned to
+  clean `.00` prices on App Store Connect, Google Play and Web/Windows
+  checkout; all other store storefronts auto-equalize from the EUR base:
+  - **Plus:** `€7 / €60` (incl. VAT), `$7 / $60` (+ applicable tax), `£6 / £50` (incl. VAT)
+  - **Pro:** `€14 / €120` (incl. VAT), `$14 / $120` (+ applicable tax), `£12 / £100` (incl. VAT)
+  - **Web & Windows:** Fixed EUR, USD and GBP prices matching the pinned store
+    numbers (no dynamic FX conversion on subscriptions). Stripe Tax calculates
+    VAT; Envisioning Technology files EU VAT through the One Stop Shop.
+  - **Pricing page (`/pricing`):** Geo-defaults to EUR, USD or GBP with a small
+    currency switcher and currency-aware tax footnotes.
+  - **Annual price lock:** Locked in purchase currency within the same store;
+    protects Septena's subscription price tier, excluding statutory tax changes.
+- **No double payment:** an account on Plus or Pro from any source sees no buy
+  button for the same tier anywhere, only where to manage it.
 - **No checkout link out of a store app** at launch, on iOS or Android.
 
 ## 10. Phases
@@ -672,8 +688,8 @@ before any public release that uses the backend.
 
 | Question | Default |
 |---|---|
-| Monthly and annual price | Decided 2026-11-19: €5 / €40. Raised 2026-11-22 to €7 / €60 |
-| Web payment provider | Decided 2026-11-22: Stripe, not a merchant of record (ADR 0026) |
+| Monthly and annual price | Decided 2026-11-19: €5 / €40. Raised 2026-11-22 to €7 / €60. Pro added 2026-11-26 at €14 / €120 (ADR 0059). Currencies pinned 2026-11-26: EUR €7/€60, USD $7/$60, GBP £6/£50 (Pro 2×), rest auto-equalized from EUR (ADR 0060) |
+| Web payment provider & subscription backend | Decided 2026-11-22: Stripe, not a merchant of record (ADR 0026). Amended 2026-11-26: standardize on RevenueCat across Apple, Google Play and Web/Stripe, with fixed EUR/USD/GBP on web (ADR 0060) |
 | Subscribing during the trial | Default 2026-11-22: billing starts on the day of purchase; the sheet says so (§7.1) |
 | Terms of Use | Default: Apple's standard EULA, linked from the paywall and the App Store listing |
 | Trial length | Decided 2026-11-19: 14 days |
