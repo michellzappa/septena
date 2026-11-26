@@ -405,6 +405,22 @@ tasks through CloudKit.
   named in `replaces` on the approval, so one agent stays one row.
   `GET /v1/access` returns `agents: {count, limit}`; the plan limit
   `connectedAgents` only logs (`agent_limit_over`), it never blocks.
+- **Agent keys (2026-11-26, #86).** For agents that cannot hold an OAuth
+  sign-in (scripts, cron, n8n, a CLI). `POST /v1/access/keys
+  {name, access: "read"|"write"}` (an app session only; default `write`)
+  returns `{id, key, name, scope}` once. The key is
+  `sk1.<user id, base64url>.<id>.<secret>`; the store keeps only the hash
+  of the secret, as an agent session with client `septena-agent-key` and
+  a connection row named `name` (client name "Agent key"). So the key is
+  one row in the Agents list, and rename, disconnect
+  (`DELETE /v1/access/connections/:id`), Stop, Pause all agents and
+  account deletion cover it. It is accepted wherever an `sm2.` token is:
+  `Authorization: Bearer sk1.…` on `/mcp` and
+  `/v1/agent/events/stream`. A key never expires and stays in the list
+  while unused. `POST /oauth/revoke` with the key ends it. It does not
+  reach the app routes under `/v1` (the public REST API is #90). Keys
+  count toward `connectedAgents` (log-only). Writes and claims use the key's
+  name.
 - Attachment limits: **25 MB per file, 2 GB per user.** The Worker checks
   both before it mints an upload URL, and the app checks the file size before
   upload so the user sees the error at once.

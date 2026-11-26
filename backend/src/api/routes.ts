@@ -33,7 +33,7 @@ import {
   zPairDenyBody,
   zPairInspectBody,
 } from "../shadow/oauth.js";
-import { MCP_READ_SCOPE, disconnectFamily, hasScope, isMcpAccessToken, verifyMcpAccess } from "../shadow/tokens.js";
+import { MCP_READ_SCOPE, MCP_WRITE_SCOPE, createAgentKey, disconnectFamily, hasScope, isMcpAccessToken, verifyMcpAccess } from "../shadow/tokens.js";
 import { MAX_AGENT_WEBHOOKS, validateWebhookUrl } from "./agentWake.js";
 import {
   TRIAL_ROW_ID,
@@ -673,6 +673,25 @@ api.delete("/access/connections/:id", async (c) => {
   if (!had) return c.json({ error: "not_found" }, 404);
   logEvent("access_connection_revoked", { userId, by: c.get("actor") });
   return c.body(null, 204);
+});
+
+/// Creates an agent key (#86) for an agent that cannot sign in. Only an app
+/// session reaches this route, so an agent cannot mint keys. The key is in
+/// this reply only. The key's row in the Agents list is `id`: rename and
+/// revoke use the connection routes above and below.
+const zCreateKeyBody = z.object({
+  name: zAgentName,
+  access: z.enum(["read", "write"]).default("write"),
+}).strict();
+
+api.post("/access/keys", async (c) => {
+  const body = zCreateKeyBody.safeParse(await c.req.json().catch(() => null));
+  if (!body.success) return c.json({ error: "invalid_request" }, 400);
+  const userId = c.get("userId");
+  const scope = body.data.access === "write" ? `${MCP_READ_SCOPE} ${MCP_WRITE_SCOPE}` : MCP_READ_SCOPE;
+  const created = await createAgentKey(c.env, userId, body.data.name, scope);
+  logEvent("access_key_created", { userId, by: c.get("actor"), access: body.data.access });
+  return c.json(created, 201, { "Cache-Control": "no-store" });
 });
 
 /// Renames an agent. `name: null` goes back to the client's registered name.

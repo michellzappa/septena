@@ -56,7 +56,7 @@ import {
   type SharedEntity,
 } from "./shares.js";
 import { mergeNotes } from "./mergeText.js";
-import { SESSION_HEADER, SessionBook, type RenewResult, type SessionGrant } from "./sessions.js";
+import { AGENT_KEY_CLIENT, AGENT_KEY_CLIENT_NAME, AGENT_KEY_EXPIRES_AT, SESSION_HEADER, SessionBook, type RenewResult, type SessionGrant } from "./sessions.js";
 
 /// Task fields only the app writes (docs/TASK_FADE_SPEC.md §3): the fade
 /// clock and its outcome. An agent cannot keep a task alive by touching it.
@@ -267,6 +267,8 @@ const TOMBSTONE_TTL_MS = DOMAIN_RULES.tombstoneTtlDays * DAY_MS;
 const CLIENT_OP_TTL_MS = DOMAIN_RULES.clientOpTtlDays * DAY_MS;
 /// A connection unused this long has an expired refresh token (src/shadow/tokens.ts).
 const CONNECTION_TTL_MS = MCP_REFRESH_TTL_S * 1000;
+/// How often a key in use moves its "last used".
+const AGENT_KEY_TOUCH_MS = 60 * 60 * 1000;
 /// How long the store remembers an item whose proposal the user turned down (#497).
 const DISMISSED_REF_TTL_MS = 365 * DAY_MS;
 const CHANGE_LOG_TTL_MS = DOMAIN_RULES.changeLogTtlDays * DAY_MS;
@@ -2655,6 +2657,33 @@ export class TaskStore extends DurableObject<Env> {
     return true;
   }
 
+  // ---- agent keys (#86) ----
+  // A key is an agent session: the same row in `sessions` and `connections`
+  // as an OAuth agent, so the Agents list, disconnect, Stop, Pause and
+  // account deletion cover it with no code of their own. Only the hash of
+  // the key's secret is stored.
+
+  createAgentKey(sid: string, hash: string, name: string, scope: string, now = Date.now()): void {
+    this.ctx.storage.transactionSync(() => {
+      this.sessions.create(hash, AGENT_KEY_EXPIRES_AT, sid, { clientId: AGENT_KEY_CLIENT, scope }, now);
+      this.recordConnection(sid, AGENT_KEY_CLIENT, AGENT_KEY_CLIENT_NAME, scope, now, name);
+    });
+  }
+
+  /// The grant behind a key, or null. Moves the key's "last used" at most
+  /// once an hour, so a busy key does not write on every call.
+  authorizeAgentKey(sid: string, hash: string, now = Date.now()): SessionGrant | null {
+    return this.ctx.storage.transactionSync(() => {
+      const res = this.sessions.authorize(sid, hash, now);
+      if (res?.grant?.clientId !== AGENT_KEY_CLIENT) return null;
+      this.sql.exec(
+        "UPDATE connections SET lastUsed = ? WHERE familyId = ? AND lastUsed < ?",
+        now, sid, now - AGENT_KEY_TOUCH_MS,
+      );
+      return res.grant;
+    });
+  }
+
   /// `recordConnection` for an agent whose session is here. A disconnect that
   /// lands in the middle of a renewal wins.
   noteAgent(familyId: string, clientId: string, clientName: string, scope: string, now = Date.now(), label: string | null = null): void {
@@ -2835,9 +2864,10 @@ export class TaskStore extends DurableObject<Env> {
     ).toArray().map((r) => r.familyId);
   }
 
-  /// The agent count: connections used within their refresh lifetime.
+  /// The agent count: connections used within their refresh lifetime, and
+  /// every agent key.
   connectedAgentCount(now = Date.now()): number {
-    return this.sql.exec<{ n: number }>("SELECT COUNT(*) AS n FROM connections WHERE lastUsed > ?", now - CONNECTION_TTL_MS).one().n;
+    return this.sql.exec<{ n: number }>("SELECT COUNT(*) AS n FROM connections WHERE lastUsed > ? OR clientId = ?", now - CONNECTION_TTL_MS, AGENT_KEY_CLIENT).one().n;
   }
 
   /// Every place this account is signed in: app sessions (devices) and MCP
@@ -2847,7 +2877,7 @@ export class TaskStore extends DurableObject<Env> {
     const devices = this.deviceSummary(cap, now);
     const firstSeen = new Map(this.sql.exec<{ sid: string; firstSeen: number }>("SELECT sid, firstSeen FROM devices").toArray().map((r) => [r.sid, r.firstSeen]));
     const connections = this.sql.exec<{ familyId: string; name: string; clientName: string; scope: string; createdAt: number; lastUsed: number }>(
-      "SELECT familyId, COALESCE(label, clientName) AS name, clientName, scope, createdAt, lastUsed FROM connections WHERE lastUsed > ? ORDER BY lastUsed DESC", now - CONNECTION_TTL_MS,
+      "SELECT familyId, COALESCE(label, clientName) AS name, clientName, scope, createdAt, lastUsed FROM connections WHERE lastUsed > ? OR clientId = ? ORDER BY lastUsed DESC", now - CONNECTION_TTL_MS, AGENT_KEY_CLIENT,
     ).toArray();
     return {
       devices: devices.map((d) => ({
@@ -3038,7 +3068,7 @@ export class TaskStore extends DurableObject<Env> {
       "SELECT client, version, firstSeen, lastSeen FROM devices d WHERE EXISTS (SELECT 1 FROM sessions s WHERE s.sid = d.sid) ORDER BY lastSeen DESC",
     ).toArray().map((r) => ({ ...r }));
     const agents = this.sql.exec<{ client: string; since: number; lastUsed: number }>(
-      "SELECT clientName AS client, createdAt AS since, lastUsed FROM connections WHERE lastUsed > ? ORDER BY lastUsed DESC", now - CONNECTION_TTL_MS,
+      "SELECT clientName AS client, createdAt AS since, lastUsed FROM connections WHERE lastUsed > ? OR clientId = ? ORDER BY lastUsed DESC", now - CONNECTION_TTL_MS, AGENT_KEY_CLIENT,
     ).toArray().map((r) => ({ ...r }));
     const entitlements = this.entitlements().map((r) => ({
       id: r.id, source: r.source, productId: r.productId, expiresAt: r.expiresAt, status: r.status,
@@ -3594,7 +3624,8 @@ export class TaskStore extends DurableObject<Env> {
       this.sql.exec("DELETE FROM changes WHERE at < ?", new Date(now - CHANGE_LOG_TTL_MS).toISOString());
       this.sessions.purge(now);
       this.sql.exec("DELETE FROM devices WHERE sid NOT IN (SELECT sid FROM sessions WHERE sid IS NOT NULL)");
-      this.sql.exec("DELETE FROM connections WHERE lastUsed < ?", now - CONNECTION_TTL_MS);
+      // A key never expires: its row stays until the user revokes it.
+      this.sql.exec("DELETE FROM connections WHERE lastUsed < ? AND clientId != ?", now - CONNECTION_TTL_MS, AGENT_KEY_CLIENT);
       // Day and month counters: two months covers the current month.
       this.sql.exec("DELETE FROM usage WHERE updatedAt < ?", now - 62 * DAY_MS);
     });
