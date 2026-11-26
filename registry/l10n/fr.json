@@ -808,5 +808,13 @@
   "{count} reminders moved to the Inbox": {
     "one": "Rappel déplacé dans la Boîte de réception",
     "other": "{count} rappels déplacés dans la Boîte de réception"
-  }
+  },
+  "Replace the tasks on this device?": "Remplacer les tâches de cet appareil ?",
+  "You signed in with a different account. The tasks on this device belong to the account you used before. They are removed from this device, and this account’s tasks take their place.": "Vous vous êtes connecté avec un autre compte. Les tâches de cet appareil appartiennent au compte que vous utilisiez avant. Elles sont retirées de cet appareil et les tâches de ce compte prennent leur place.",
+  "1 task is on this device.": "1 tâche est sur cet appareil.",
+  "{count} tasks are on this device.": "{count} tâches sont sur cet appareil.",
+  "1 change was not sent yet and will be lost.": "1 modification n’a pas encore été envoyée et sera perdue.",
+  "{count} changes were not sent yet and will be lost.": "{count} modifications n’ont pas encore été envoyées et seront perdues.",
+  "Export a Backup First": "Exporter d’abord une sauvegarde",
+  "Replace": "Remplacer"
 }

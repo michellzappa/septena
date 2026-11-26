@@ -85,6 +85,174 @@
         }
       }
     },
+    "%lld changes were not sent yet and will be lost." : {
+      "comment" : "Generated from registry surfaces.accountSwitch.copy.unsentOther.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld Änderungen wurden noch nicht gesendet und gehen verloren."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld cambios aún no se enviaron y se perderán."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld modifications n’ont pas encore été envoyées et seront perdues."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld modifiche non sono ancora state inviate e andranno perse."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld wijzigingen zijn nog niet verstuurd en gaan verloren."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld alterações ainda não foram enviadas e serão perdidas."
+          }
+        }
+      }
+    },
+    "%lld tasks are on this device." : {
+      "comment" : "Generated from registry surfaces.accountSwitch.copy.tasksOther.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld Aufgaben sind auf diesem Gerät."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hay %lld tareas en este dispositivo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld tâches sont sur cet appareil."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ci sono %lld attività su questo dispositivo."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Er staan %lld taken op dit apparaat."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Há %lld tarefas neste dispositivo."
+          }
+        }
+      }
+    },
+    "1 change was not sent yet and will be lost." : {
+      "comment" : "Generated from registry surfaces.accountSwitch.copy.unsentOne.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 Änderung wurde noch nicht gesendet und geht verloren."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 cambio aún no se envió y se perderá."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 modification n’a pas encore été envoyée et sera perdue."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 modifica non è ancora stata inviata e andrà persa."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 wijziging is nog niet verstuurd en gaat verloren."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 alteração ainda não foi enviada e será perdida."
+          }
+        }
+      }
+    },
+    "1 task is on this device." : {
+      "comment" : "Generated from registry surfaces.accountSwitch.copy.tasksOne.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 Aufgabe ist auf diesem Gerät."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hay 1 tarea en este dispositivo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 tâche est sur cet appareil."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "C’è 1 attività su questo dispositivo."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Er staat 1 taak op dit apparaat."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Há 1 tarefa neste dispositivo."
+          }
+        }
+      }
+    },
     "%lld reminders moved to the Inbox" : {
       "comment" : "Generated from registry surfaces.toasts.templates.importedReminders.format. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -14895,6 +15063,48 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Esporta"
+          }
+        }
+      }
+    },
+    "Export a Backup First" : {
+      "comment" : "Generated from registry surfaces.accountSwitch.copy.export.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zuerst ein Backup exportieren"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exportar una copia primero"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exporter d’abord une sauvegarde"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esporta prima un backup"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eerst een back-up exporteren"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exportar um backup primeiro"
           }
         }
       }
@@ -29866,6 +30076,90 @@
         }
       }
     },
+    "Replace" : {
+      "comment" : "Generated from registry surfaces.accountSwitch.copy.replace.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ersetzen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reemplazar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remplacer"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sostituisci"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vervangen"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Substituir"
+          }
+        }
+      }
+    },
+    "Replace the tasks on this device?" : {
+      "comment" : "Generated from registry surfaces.accountSwitch.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aufgaben auf diesem Gerät ersetzen?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Reemplazar las tareas de este dispositivo?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remplacer les tâches de cet appareil ?"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sostituire le attività su questo dispositivo?"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Taken op dit apparaat vervangen?"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Substituir as tarefas deste dispositivo?"
+          }
+        }
+      }
+    },
     "Replaces" : {
       "comment" : "Generated from registry surfaces.prompts.items.agentReplaces.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -41771,6 +42065,52 @@
           }
         }
       }
+    },
+    "You signed in with a different account. The tasks on this device belong to the account you used before. They are removed from this device, and this account’s tasks take their place." : {
+      "comment" : "Generated from registry surfaces.accountSwitch.copy.body.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Du hast dich mit einem anderen Konto angemeldet. Die Aufgaben auf diesem Gerät gehören zu dem Konto, das du vorher benutzt hast. Sie werden von diesem Gerät entfernt, und die Aufgaben dieses Kontos treten an ihre Stelle."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Iniciaste sesión con otra cuenta. Las tareas de este dispositivo pertenecen a la cuenta que usabas antes. Se eliminan de este dispositivo y las tareas de esta cuenta ocupan su lugar."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vous vous êtes connecté avec un autre compte. Les tâches de cet appareil appartiennent au compte que vous utilisiez avant. Elles sont retirées de cet appareil et les tâches de ce compte prennent leur place."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hai effettuato l’accesso con un altro account. Le attività su questo dispositivo appartengono all’account che usavi prima. Vengono rimosse da questo dispositivo e le attività di questo account prendono il loro posto."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Je bent ingelogd met een ander account. De taken op dit apparaat horen bij het account dat je eerder gebruikte. Ze worden van dit apparaat verwijderd en de taken van dit account komen ervoor in de plaats."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Você entrou com outra conta. As tarefas deste dispositivo pertencem à conta que você usava antes. Elas são removidas deste dispositivo, e as tarefas desta conta ficam no lugar."
+          }
+        }
+      }
+    },
+    "You signed in with a different account. The tasks on this device belong to the account you used before. They are removed from this device, and this account’s tasks take their place. The other account keeps what it already has on the server." : {
+      "comment" : "Generated from registry surfaces.accountSwitch.copy.body.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "You’re all set" : {
       "comment" : "Generated from registry surfaces.firstRun.steps.done.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",

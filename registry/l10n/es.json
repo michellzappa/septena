@@ -808,5 +808,13 @@
   "{count} reminders moved to the Inbox": {
     "one": "Recordatorio movido a la Bandeja de entrada",
     "other": "{count} recordatorios movidos a la Bandeja de entrada"
-  }
+  },
+  "Replace the tasks on this device?": "¿Reemplazar las tareas de este dispositivo?",
+  "You signed in with a different account. The tasks on this device belong to the account you used before. They are removed from this device, and this account’s tasks take their place.": "Iniciaste sesión con otra cuenta. Las tareas de este dispositivo pertenecen a la cuenta que usabas antes. Se eliminan de este dispositivo y las tareas de esta cuenta ocupan su lugar.",
+  "1 task is on this device.": "Hay 1 tarea en este dispositivo.",
+  "{count} tasks are on this device.": "Hay {count} tareas en este dispositivo.",
+  "1 change was not sent yet and will be lost.": "1 cambio aún no se envió y se perderá.",
+  "{count} changes were not sent yet and will be lost.": "{count} cambios aún no se enviaron y se perderán.",
+  "Export a Backup First": "Exportar una copia primero",
+  "Replace": "Reemplazar"
 }

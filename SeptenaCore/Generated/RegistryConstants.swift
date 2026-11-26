@@ -1343,7 +1343,7 @@ enum RegistryActions {
     .taskToggleToday: RegistryShortcut(key: "t", modifiers: ["primary"], keycaps: ["⌘", "T"], excludePlatforms: []),
     .taskToggleStar: RegistryShortcut(key: "s", modifiers: ["primary", "alt"], keycaps: ["⌥", "⌘", "S"], excludePlatforms: []),
     .taskTags: RegistryShortcut(key: "t", modifiers: ["primary", "shift"], keycaps: ["⇧", "⌘", "T"], excludePlatforms: []),
-    .taskAddChecklistItem: RegistryShortcut(key: "c", modifiers: ["primary", "shift"], keycaps: ["⇧", "⌘", "C"], excludePlatforms: []),
+    .taskAddChecklistItem: RegistryShortcut(key: "c", modifiers: ["primary", "shift"], keycaps: ["⇧", "⌘", "C"], excludePlatforms: ["ios", "ipados"]),
     .taskWhen: RegistryShortcut(key: "s", modifiers: ["primary"], keycaps: ["⌘", "S"], excludePlatforms: []),
     .taskDeadline: RegistryShortcut(key: "d", modifiers: ["primary", "shift"], keycaps: ["⇧", "⌘", "D"], excludePlatforms: []),
     .taskReminder: RegistryShortcut(key: "r", modifiers: ["primary", "alt"], keycaps: ["⌥", "⌘", "R"], excludePlatforms: []),
@@ -1660,7 +1660,7 @@ enum RegistryActions {
     RegistryShortcutEntry(id: "task.toggleToday", actionId: .taskToggleToday, label: RegistryL10n.t("Toggle Today"), keycaps: ["⌘", "T"], excludePlatforms: []),
     RegistryShortcutEntry(id: "task.toggleStar", actionId: .taskToggleStar, label: RegistryL10n.t("Toggle Favorite"), keycaps: ["⌥", "⌘", "S"], excludePlatforms: []),
     RegistryShortcutEntry(id: "task.tags", actionId: .taskTags, label: RegistryL10n.t("Tags…"), keycaps: ["⇧", "⌘", "T"], excludePlatforms: []),
-    RegistryShortcutEntry(id: "task.addChecklistItem", actionId: .taskAddChecklistItem, label: RegistryL10n.t("Add Checklist Item"), keycaps: ["⇧", "⌘", "C"], excludePlatforms: []),
+    RegistryShortcutEntry(id: "task.addChecklistItem", actionId: .taskAddChecklistItem, label: RegistryL10n.t("Add Checklist Item"), keycaps: ["⇧", "⌘", "C"], excludePlatforms: ["ios", "ipados"]),
     RegistryShortcutEntry(id: "task.when", actionId: .taskWhen, label: RegistryL10n.t("When…"), keycaps: ["⌘", "S"], excludePlatforms: []),
     RegistryShortcutEntry(id: "task.deadline", actionId: .taskDeadline, label: RegistryL10n.t("Deadline…"), keycaps: ["⇧", "⌘", "D"], excludePlatforms: []),
     RegistryShortcutEntry(id: "task.reminder", actionId: .taskReminder, label: RegistryL10n.t("Reminder…"), keycaps: ["⌥", "⌘", "R"], excludePlatforms: []),
@@ -2166,6 +2166,19 @@ enum RegistryDeviceSignIn {
   static let expired: String = RegistryL10n.t("The code expired.")
   static let unreachable: String = RegistryL10n.t("Could not reach Septena.")
   static let retry: String = RegistryL10n.t("Get a new code")
+}
+
+/// The question before a sign-in replaces another account's tasks (`registry/surfaces.json` `accountSwitch`).
+enum RegistryAccountSwitch {
+  static let title: String = RegistryL10n.t("Replace the tasks on this device?")
+  static let body: String = RegistryL10n.t("You signed in with a different account. The tasks on this device belong to the account you used before. They are removed from this device, and this account’s tasks take their place.")
+  static let tasksOne: String = RegistryL10n.t("1 task is on this device.")
+  static let tasksOther: String = RegistryL10n.t("{count} tasks are on this device.")
+  static let unsentOne: String = RegistryL10n.t("1 change was not sent yet and will be lost.")
+  static let unsentOther: String = RegistryL10n.t("{count} changes were not sent yet and will be lost.")
+  static let export: String = RegistryL10n.t("Export a Backup First")
+  static let replace: String = RegistryL10n.t("Replace")
+  static let cancel: String = RegistryL10n.t("Cancel")
 }
 
 /// Canonical first-run step IDs (`registry/surfaces.json` `firstRun.steps`).

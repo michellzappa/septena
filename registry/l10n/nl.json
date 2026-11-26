@@ -805,5 +805,13 @@
   "{count} reminders moved to the Inbox": {
     "one": "Herinnering naar Postvak IN verplaatst",
     "other": "{count} herinneringen naar Postvak IN verplaatst"
-  }
+  },
+  "Replace the tasks on this device?": "Taken op dit apparaat vervangen?",
+  "You signed in with a different account. The tasks on this device belong to the account you used before. They are removed from this device, and this account’s tasks take their place.": "Je bent ingelogd met een ander account. De taken op dit apparaat horen bij het account dat je eerder gebruikte. Ze worden van dit apparaat verwijderd en de taken van dit account komen ervoor in de plaats.",
+  "1 task is on this device.": "Er staat 1 taak op dit apparaat.",
+  "{count} tasks are on this device.": "Er staan {count} taken op dit apparaat.",
+  "1 change was not sent yet and will be lost.": "1 wijziging is nog niet verstuurd en gaat verloren.",
+  "{count} changes were not sent yet and will be lost.": "{count} wijzigingen zijn nog niet verstuurd en gaan verloren.",
+  "Export a Backup First": "Eerst een back-up exporteren",
+  "Replace": "Vervangen"
 }

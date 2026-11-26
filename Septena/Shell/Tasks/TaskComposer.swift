@@ -1255,11 +1255,14 @@ struct TaskComposerCard: View {
     #endif
   }
 
-  /// Apply any quick-entry tokens the user didn't tap. The `isUnset` guard
-  /// means an earlier token (e.g. `!today`) wins over a later conflicting one
-  /// (a detected date) instead of being clobbered.
+  /// Apply the explicit tokens the user typed and didn't tap: `#project`,
+  /// `@area` and `!today` are syntax, so saving takes them. A date phrase the
+  /// detector found in ordinary words ("Plan Friday dinner") applies only when
+  /// its chip is tapped: words stay in the title unless the user asks (#578,
+  /// docs/INLINE_CAPTURE_PARSING_SPEC.md: never strip words silently). The
+  /// `isUnset` guard means an earlier token wins over a later conflicting one.
   private func applyPendingTokens() {
-    for token in detectedTokens where isUnset(token) { applyToken(token) }
+    for token in detectedTokens where token.isExplicit && isUnset(token) { applyToken(token) }
   }
 
   /// Writes the draft through the mutator. The scaffold's Save runs this then

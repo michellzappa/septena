@@ -12,6 +12,18 @@
       "plans.outcomes.agents.rows.connected.cells.plus"
     ]
   },
+  "1 change was not sent yet and will be lost.": {
+    "text": "1 change was not sent yet and will be lost.",
+    "paths": [
+      "surfaces.accountSwitch.copy.unsentOne.label"
+    ]
+  },
+  "1 task is on this device.": {
+    "text": "1 task is on this device.",
+    "paths": [
+      "surfaces.accountSwitch.copy.tasksOne.label"
+    ]
+  },
   "10 GB synced": {
     "text": "10 GB synced",
     "paths": [
@@ -532,7 +544,8 @@
   "Cancel": {
     "text": "Cancel",
     "paths": [
-      "surfaces.prompts.cancelTitle"
+      "surfaces.prompts.cancelTitle",
+      "surfaces.accountSwitch.copy.cancel.label"
     ]
   },
   "Cancel Project": {
@@ -1349,6 +1362,12 @@
     "text": "Export Markdown",
     "paths": [
       "settings.copy.import_export.exportMarkdownTitle.label"
+    ]
+  },
+  "Export a Backup First": {
+    "text": "Export a Backup First",
+    "paths": [
+      "surfaces.accountSwitch.copy.export.label"
     ]
   },
   "Export as JSON": {
@@ -3031,6 +3050,18 @@
       "actions.actions.task.repeat.title"
     ]
   },
+  "Replace": {
+    "text": "Replace",
+    "paths": [
+      "surfaces.accountSwitch.copy.replace.label"
+    ]
+  },
+  "Replace the tasks on this device?": {
+    "text": "Replace the tasks on this device?",
+    "paths": [
+      "surfaces.accountSwitch.title"
+    ]
+  },
   "Replaces": {
     "text": "Replaces",
     "paths": [
@@ -4487,6 +4518,12 @@
       "plans.promises.own_ai.title"
     ]
   },
+  "You signed in with a different account. The tasks on this device belong to the account you used before. They are removed from this device, and this account’s tasks take their place.": {
+    "text": "You signed in with a different account. The tasks on this device belong to the account you used before. They are removed from this device, and this account’s tasks take their place.",
+    "paths": [
+      "surfaces.accountSwitch.copy.body.label"
+    ]
+  },
   "Your 14 days of Plus have ended": {
     "text": "Your 14 days of Plus have ended",
     "paths": [
@@ -4704,6 +4741,15 @@
       "surfaces.prompts.countPhrases.agents.label"
     ]
   },
+  "{count} changes were not sent yet and will be lost.": {
+    "text": "{count} changes were not sent yet and will be lost.",
+    "placeholders": [
+      "count"
+    ],
+    "paths": [
+      "surfaces.accountSwitch.copy.unsentOther.label"
+    ]
+  },
   "{count} files": {
     "forms": {
       "one": "{count} file",
@@ -4801,6 +4847,15 @@
     ],
     "paths": [
       "surfaces.prompts.countPhrases.tasks.label"
+    ]
+  },
+  "{count} tasks are on this device.": {
+    "text": "{count} tasks are on this device.",
+    "placeholders": [
+      "count"
+    ],
+    "paths": [
+      "surfaces.accountSwitch.copy.tasksOther.label"
     ]
   },
   "{count} tasks deleted": {

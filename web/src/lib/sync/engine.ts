@@ -19,6 +19,11 @@ import {
 } from "../core";
 import { evaluateConversation, groupTurnsByTask } from "../conversation";
 import { fadeInput, fadeSettings, isProposal, type FadeClock } from "../fade";
+import {
+  AccountSwitchRequiredError,
+  decideAccountSwitch,
+  type AccountSwitchSummary,
+} from "./accountSwitch";
 import { LocalStore, pendingFieldsFor, turnSyntheticId, type LocalMutation } from "../store/db";
 import type { ParsedBackupPreview } from "../export";
 import type {
@@ -160,11 +165,31 @@ export class WebSyncEngine {
     return snapshot;
   }
 
-  async start(userId: string): Promise<void> {
+  /**
+   * What a session for `userId` would remove from this device, or null when
+   * `start` may go on without asking (same account, no stored account, or
+   * nothing local to lose). Call it before `start`; on a summary, ask the user
+   * and pass `replaceOtherAccount` only when they chose Replace (#575).
+   */
+  async accountSwitchSummary(userId: string): Promise<AccountSwitchSummary | null> {
+    await ensureCoreReady();
+    const existing = await this.store.loadSnapshot();
+    this.emit({ snapshot: existing });
+    const decision = decideAccountSwitch(existing, userId);
+    return decision.kind === "ask" ? decision.summary : null;
+  }
+
+  async start(userId: string, options: { replaceOtherAccount?: boolean } = {}): Promise<void> {
     this.stopped = false;
     await ensureCoreReady();
     const existing = await this.store.loadSnapshot();
-    if (existing.userId && existing.userId !== userId) {
+    const decision = decideAccountSwitch(existing, userId);
+    if (decision.kind === "ask" && !options.replaceOtherAccount) {
+      // Fails closed: another account's tasks stay until the user confirms.
+      this.stopped = true;
+      throw new AccountSwitchRequiredError(decision.summary);
+    }
+    if (decision.kind !== "keep") {
       await this.store.clearAll();
     }
     await this.store.setUserId(userId);

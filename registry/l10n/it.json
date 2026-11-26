@@ -801,5 +801,13 @@
   "{count} reminders moved to the Inbox": {
     "one": "Promemoria spostato in Posta in arrivo",
     "other": "{count} promemoria spostati in Posta in arrivo"
-  }
+  },
+  "Replace the tasks on this device?": "Sostituire le attività su questo dispositivo?",
+  "You signed in with a different account. The tasks on this device belong to the account you used before. They are removed from this device, and this account’s tasks take their place.": "Hai effettuato l’accesso con un altro account. Le attività su questo dispositivo appartengono all’account che usavi prima. Vengono rimosse da questo dispositivo e le attività di questo account prendono il loro posto.",
+  "1 task is on this device.": "C’è 1 attività su questo dispositivo.",
+  "{count} tasks are on this device.": "Ci sono {count} attività su questo dispositivo.",
+  "1 change was not sent yet and will be lost.": "1 modifica non è ancora stata inviata e andrà persa.",
+  "{count} changes were not sent yet and will be lost.": "{count} modifiche non sono ancora state inviate e andranno perse.",
+  "Export a Backup First": "Esporta prima un backup",
+  "Replace": "Sostituisci"
 }

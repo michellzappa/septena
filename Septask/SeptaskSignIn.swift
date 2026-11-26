@@ -54,6 +54,9 @@ enum SeptaskSignIn {
         try await TaskSyncEngine.shared.signIn(identityToken: token, rawNonce: rawNonce)
         TaskNotices.clearSignInDismissal()
         return nil
+      } catch is TaskSyncEngine.AccountSwitchDeclined {
+        // The user kept this device's tasks; nothing went wrong.
+        return nil
       } catch {
         return (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
       }
