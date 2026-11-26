@@ -2,11 +2,15 @@
 // Caches the static shell and WASM core so the app opens and queues writes
 // while offline. Never caches or intercepts api.septena.app traffic.
 
-const CACHE_NAME = "septena-web-shell-v1";
+const CACHE_NAME = "septena-web-shell-v2";
 const SHELL_URLS = [
   "/",
   "/manifest.webmanifest",
   "/icon.svg",
+  "/icon-192.png",
+  "/icon-512.png",
+  "/icon-maskable-512.png",
+  "/apple-touch-icon.png",
 ];
 
 self.addEventListener("install", (event) => {
