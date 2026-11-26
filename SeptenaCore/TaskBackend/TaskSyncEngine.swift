@@ -1607,6 +1607,12 @@ final class TaskSyncEngine {
     try await signIn { try await $0.adoptDeviceSession(session) }
   }
 
+  /// The same, with the code mailed to `email` (ADR 0047). A new address
+  /// creates an account.
+  func signIn(email: String, code: String) async throws {
+    try await signIn { try await $0.verifyEmailSignIn(email: email, code: code) }
+  }
+
   private func signIn(_ authenticate: (TaskBackendClient) async throws -> String) async throws {
     let wasRunning = await pauseSync()
     defer { if wasRunning { start() } }

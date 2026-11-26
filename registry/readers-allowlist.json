@@ -60,10 +60,6 @@
     "RegistryRules.doLapseHours": {
       "reason": "The shared core applies it (resolve_do_sessions).",
       "issue": "#517"
-    },
-    "RegistrySignIn.method": {
-      "reason": "No client renders the sign-in registry yet (SI0); the sign-in screens read it in SI2 and SI4.",
-      "issue": "#636"
     }
   },
   "ts": {
