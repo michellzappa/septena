@@ -227,7 +227,7 @@ class SyncLiveCoordinator(
             when (sync.state.value) {
                 is SyncState.Synced -> pollBackoffMs = 0L
                 SyncState.NeedsSignIn -> break
-                is SyncState.Failed -> {
+                is SyncState.Failed, SyncState.NotSyncing -> {
                     pollBackoffMs = if (pollBackoffMs == 0L) {
                         pollWhileSocketDownMs
                     } else {

@@ -113,4 +113,49 @@ describe("notes tools", () => {
     assert.equal(c2.project, null);
     assert.equal(c2.area.id, "a2");
   });
+
+  it("updates a project and an area, and files tasks under a heading", async () => {
+    const { store, run } = await setup();
+    const { runWriteTool } = await import("../src/shadow/writes.ts");
+    const write = (name: Parameters<typeof runWriteTool>[1], args: Record<string, unknown>) =>
+      runWriteTool({ store: store as never, timeZone: "UTC", actor: "mcp:claude" }, name, args) as Promise<Record<string, any>>;
+    const area = await run("tasks_area_create", { title: "Work" });
+    const other = await run("tasks_area_create", { title: "Home" });
+    const project = await run("tasks_project_create", { title: "Launch", area: area.id });
+
+    await run("tasks_area_update", { id: area.id, title: "Client work", emoji: "💼" });
+    assert.equal(store.readContainer("area", area.id)?.emoji, "💼");
+    await run("tasks_project_update", { id: project.id, title: "Launch v2", area: other.id, status: "done" });
+    let row = store.readContainer("project", project.id)!;
+    assert.equal(row.title, "Launch v2");
+    assert.equal(row.area, other.id);
+    assert.equal(row.status, "done");
+    assert.ok(row.completedAt);
+    await run("tasks_project_update", { id: project.id, status: "active", area: null });
+    row = store.readContainer("project", project.id)!;
+    assert.equal(row.completedAt ?? null, null);
+    assert.equal(row.area ?? null, null);
+    await assert.rejects(run("tasks_project_update", { id: project.id }), /Nothing to update/);
+    await assert.rejects(run("tasks_area_update", { id: "nope", title: "X" }), /Area not found/);
+
+    const heading = await run("tasks_heading_create", { project: project.id, title: "Copy" });
+    const made = await write("tasks_create", { title: "Write hero", heading: heading.id, origin: "user_request" });
+    let task = store.readTask(made.id)!.task;
+    assert.equal(task.project, project.id);
+    assert.equal(task.heading, heading.id);
+    const loose = await write("tasks_create", { title: "Loose", area: area.id, origin: "user_request" });
+    await write("tasks_update", { id: loose.id, heading: heading.id });
+    task = store.readTask(loose.id)!.task;
+    assert.equal(task.project, project.id);
+    assert.equal(task.area ?? null, null);
+    assert.equal(task.heading, heading.id);
+    await write("tasks_update", { id: loose.id, heading: null });
+    assert.equal(store.readTask(loose.id)!.task.heading ?? null, null);
+    await assert.rejects(write("tasks_update", { id: loose.id, heading: made.id }), /Heading not found/);
+    await assert.rejects(write("tasks_update", { id: loose.id, heading: heading.id, area: area.id }), /not both/);
+
+    const got = await run("tasks_project_get", { id: project.id });
+    assert.deepEqual(got.headings, [{ id: heading.id, title: "Copy" }]);
+    assert.equal(got.openTasks.find((t: { id: string }) => t.id === made.id).heading, heading.id);
+  });
 });

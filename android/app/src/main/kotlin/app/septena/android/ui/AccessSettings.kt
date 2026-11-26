@@ -2,9 +2,11 @@ package app.septena.android.ui
 
 import android.text.format.DateUtils
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ListItem
@@ -18,6 +20,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import app.septena.android.AndroidAppGraph
 import app.septena.core.JsonValue
@@ -74,6 +78,16 @@ internal class AccessSettingsModel(
     /** An empty name gives the agent its client's name back. */
     fun rename(agent: AgentConnection, name: String) = perform {
         graph.access.renameAgent(agent.id, name.trim().ifEmpty { null })
+    }
+
+    /** The new agent key (#86), shown once; null when none is waiting. */
+    var createdKey by mutableStateOf<String?>(null)
+        private set
+
+    fun createKey(name: String) = perform { createdKey = graph.access.createAgentKey(name) }
+
+    fun dismissCreatedKey() {
+        createdKey = null
     }
 
     private fun perform(action: suspend () -> Unit) {
@@ -150,7 +164,10 @@ internal fun AccessDevicesList(model: AccessSettingsModel, signedIn: Boolean, la
     }
 }
 
-/** Surface `access_agents`: the count row, then every connected agent with rename and disconnect. */
+/**
+ * Surface `access_agents`: the count row, then every connected agent with rename and
+ * disconnect, then New Agent Key for an agent that cannot sign in (#86).
+ */
 @Composable
 internal fun AccessAgentsList(model: AccessSettingsModel, signedIn: Boolean, languageTag: String) {
     if (!signedIn) return
@@ -158,6 +175,11 @@ internal fun AccessAgentsList(model: AccessSettingsModel, signedIn: Boolean, lan
     var draftName by remember { mutableStateOf("") }
     var pendingDisconnect by remember { mutableStateOf<AgentConnection?>(null) }
     val renamePrompt = remember(languageTag) { registryPrompt(RegistryPromptIds.RENAME_AGENT, languageTag) }
+    val newKeyPrompt = remember(languageTag) { registryPrompt(RegistryPromptIds.NEW_AGENT_KEY, languageTag) }
+    val keyCreatedPrompt = remember(languageTag) { registryPrompt(RegistryPromptIds.AGENT_KEY_CREATED, languageTag) }
+    var namingKey by remember { mutableStateOf(false) }
+    var keyName by remember { mutableStateOf("") }
+    val context = LocalContext.current
     val disconnectTitle = registryPrompt(RegistryPromptIds.DISCONNECT_AGENT, languageTag).confirmTitle
     val access = model.access
 
@@ -192,7 +214,61 @@ internal fun AccessAgentsList(model: AccessSettingsModel, signedIn: Boolean, lan
             modifier = Modifier.fillMaxWidth(),
         )
     }
+    ListItem(
+        headlineContent = {
+            TextButton(onClick = {
+                keyName = ""
+                namingKey = true
+            }) { Text(newKeyPrompt.title) }
+        },
+        modifier = Modifier.fillMaxWidth(),
+    )
     AccessError(model)
+
+    if (namingKey) {
+        AlertDialog(
+            onDismissRequest = { namingKey = false },
+            title = { Text(newKeyPrompt.title) },
+            text = {
+                OutlinedTextField(
+                    value = keyName,
+                    onValueChange = { keyName = it.take(MAX_AGENT_NAME) },
+                    label = { Text(newKeyPrompt.placeholder) },
+                    singleLine = true,
+                )
+            },
+            confirmButton = {
+                TextButton(enabled = keyName.isNotBlank(), onClick = {
+                    namingKey = false
+                    model.createKey(keyName)
+                }) { Text(newKeyPrompt.confirmTitle) }
+            },
+            dismissButton = {
+                TextButton(onClick = { namingKey = false }) { Text(promptChrome("cancelTitle", languageTag)) }
+            },
+        )
+    }
+    model.createdKey?.let { key ->
+        // One button: the key is gone once this closes, so it closes by copying.
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text(keyCreatedPrompt.title) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(keyCreatedPrompt.message)
+                    SelectionContainer {
+                        Text(key, fontFamily = FontFamily.Monospace)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    copyToClipboard(context, keyCreatedPrompt.title, key)
+                    model.dismissCreatedKey()
+                }) { Text(keyCreatedPrompt.confirmTitle) }
+            },
+        )
+    }
 
     renaming?.let { agent ->
         AlertDialog(
@@ -314,6 +390,14 @@ internal fun countPhrase(id: String, count: Int, languageTag: String): String {
     val phrase = phrases.firstOrNull { (it as? JsonValue.ObjectValue)?.fields?.get("id").stringValue() == id }
         as? JsonValue.ObjectValue
     val label = phrase?.fields?.get("label") as? JsonValue.ObjectValue ?: return count.toString()
+    return registryPlural(label, count, languageTag)
+}
+
+/**
+ * A registry plural (`{one, other}`), localized, with `{count}` filled. The localization entry for the
+ * `other` form holds the plural forms per language.
+ */
+internal fun registryPlural(label: JsonValue.ObjectValue, count: Int, languageTag: String): String {
     val other = label.fields["other"].stringValue().orEmpty()
     val forms = localizedPluralForms(other, languageTag) ?: label
     val form = (if (count == 1) forms.fields["one"].stringValue() else null)

@@ -55,6 +55,7 @@
         "artifact": "Launch brief",
         "bodies": ["The website draft is ready for review. Check the download links before sharing the launch update with Maya.", "Website draft: ready. Next: check the download links, review the copy, then share the launch update with Maya."],
         "otherBody": "Website draft ready; check download links before sharing with Maya. Your direction: {answer}",
+        "otherAnswer": "Three lines and the open questions",
         "handoff": "Read the brief", "acceptance": "You have a brief ready to use."
       },
       "discuss": {
@@ -63,6 +64,7 @@
         "artifact": "Launch update draft",
         "bodies": ["Hi Maya, the website draft is ready for review. I’m checking the download links before we share it.", "Hi Maya, the website draft is ready. The download links still need a final check before we share it."],
         "otherBody": "Hi Maya, the website draft is ready; download links still need a check. For this update: {answer}",
+        "otherAnswer": "When we can share it",
         "draftHandoff": "Review the draft", "handoff": "Your next step: review and send", "acceptance": "Maya has your launch update.",
         "with": ["brief", "photos", "reply", "dentist"]
       },

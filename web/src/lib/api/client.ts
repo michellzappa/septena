@@ -1,5 +1,8 @@
 import {
   zAccessSummary,
+  zAuthMethodsResponse,
+  zCreatedAgentKey,
+  zEmailStartResponse,
   zChangesResponse,
   zDeviceStartResponse,
   zIcalFeedSettings,
@@ -10,6 +13,7 @@ import {
   type AccessSummary,
   type ChangeEntry,
   type DeviceStartResponse,
+  type EmailStartResponse,
   type IcalFeedSettings,
   type OutboxOp,
   type PullResponse,
@@ -102,7 +106,7 @@ export class SeptenaApiClient {
     }
   }
 
-  async startDeviceSignIn(clientName: string): Promise<DeviceStartResponse> {
+  async startDeviceSignIn(clientName: string, signal?: AbortSignal): Promise<DeviceStartResponse> {
     const res = await fetch(`${this.apiBase}/v1/auth/device/start`, {
       method: "POST",
       headers: {
@@ -110,6 +114,7 @@ export class SeptenaApiClient {
         "X-Septena-Client": CLIENT_HEADER,
       },
       body: JSON.stringify({ clientName }),
+      signal,
     });
     if (!res.ok) {
       const raw = await res.text().catch(() => "");
@@ -145,6 +150,60 @@ export class SeptenaApiClient {
     const session = zSessionResponse.parse(await res.json());
     this.setSession(session);
     return { status: "approved", session };
+  }
+
+  /** The sign-in method ids this server has turned on. Throws on any failure: the caller fails closed. */
+  async authMethods(signal?: AbortSignal): Promise<string[]> {
+    const res = await fetch(`${this.apiBase}/v1/auth/methods`, {
+      headers: { "X-Septena-Client": CLIENT_HEADER },
+      signal,
+    });
+    if (!res.ok) throw new ApiError(res.status, "auth_methods_failed");
+    return zAuthMethodsResponse.parse(await res.json()).methods.map((m) => m.id);
+  }
+
+  /** Sends a sign-in code to `email` (POST /v1/auth/email/start). */
+  async startEmailSignIn(email: string, signal?: AbortSignal): Promise<EmailStartResponse> {
+    const res = await fetch(`${this.apiBase}/v1/auth/email/start`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Septena-Client": CLIENT_HEADER,
+      },
+      body: JSON.stringify({ email }),
+      signal,
+    });
+    if (!res.ok) {
+      const raw = await res.text().catch(() => "");
+      const err = parseErr(raw);
+      throw new ApiError(res.status, err.error ?? "email_start_failed", err.message, raw);
+    }
+    return zEmailStartResponse.parse(await res.json());
+  }
+
+  /**
+   * Trades the emailed code for a session (POST /v1/auth/email/verify). The
+   * refresh token arrives in the HttpOnly cookie, as for device approval.
+   */
+  async verifyEmailSignIn(email: string, code: string, signal?: AbortSignal): Promise<SessionResponse> {
+    const res = await fetch(`${this.apiBase}/v1/auth/email/verify`, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Septena-Client": CLIENT_HEADER,
+      },
+      body: JSON.stringify({ email, code, sessionMode: "cookie" }),
+      signal,
+    });
+    if (!res.ok) {
+      const raw = await res.text().catch(() => "");
+      const err = parseErr(raw);
+      throw new ApiError(res.status, err.error ?? "email_verify_failed", err.message, raw);
+    }
+    const session = zSessionResponse.parse(await res.json());
+    this.setSession(session);
+    return session;
   }
 
   async signOut(): Promise<void> {
@@ -275,6 +334,21 @@ export class SeptenaApiClient {
       const err = parseErr(raw);
       throw new ApiError(res.status, err.error ?? "disconnect_agent_failed", err.message, raw);
     }
+  }
+
+  // A new agent key (#86). The key is in this reply only.
+  async createAgentKey(name: string): Promise<{ id: string; key: string; name: string; scope: string }> {
+    const res = await this.authedFetch("/v1/access/keys", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, access: "write" }),
+    });
+    if (!res.ok) {
+      const raw = await res.text().catch(() => "");
+      const err = parseErr(raw);
+      throw new ApiError(res.status, err.error ?? "create_agent_key_failed", err.message, raw);
+    }
+    return zCreatedAgentKey.parse(await res.json());
   }
 
   async renameAgent(id: string, name: string | null): Promise<void> {

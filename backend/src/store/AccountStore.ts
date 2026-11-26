@@ -65,6 +65,22 @@ export type LinkIdentityResult =
   | { ok: true; created: boolean; row: IdentityRow }
   | { ok: false; reason: "already_linked" };
 
+/// Email sign-in codes (ADR 0016 decision 2, issue #169).
+export const EMAIL_CODE_TTL_MS = 10 * 60 * 1000;
+export const EMAIL_CODE_WINDOW_MS = 10 * 60 * 1000;
+export const EMAIL_CODE_MAX_SENDS = 3;
+export const EMAIL_CODE_MAX_ATTEMPTS = 5;
+
+export type IssueEmailCodeResult =
+  | { ok: true; expiresAt: number }
+  | { ok: false; reason: "locked" | "rate_limited"; retryAfterMs: number };
+
+export type CheckEmailCodeResult =
+  | { status: "ok" }
+  | { status: "invalid"; attemptsLeft: number }
+  | { status: "expired" }
+  | { status: "locked" };
+
 /// Mints a random `u_` user id for a new account from a non-Apple provider.
 /// 32 random bytes base64url-encoded = 43 chars, matching `USER_ID_RE`.
 export function newUserId(): string {
@@ -124,6 +140,15 @@ export class AccountStore extends DurableObject<Env> {
         summary     TEXT
       );
       CREATE TABLE IF NOT EXISTS store_meta (key TEXT PRIMARY KEY, value INTEGER NOT NULL);
+      CREATE TABLE IF NOT EXISTS email_codes (
+        email       TEXT PRIMARY KEY,
+        codeHash    TEXT NOT NULL,
+        expiresAt   INTEGER NOT NULL,
+        attempts    INTEGER NOT NULL DEFAULT 0,
+        sends       INTEGER NOT NULL DEFAULT 0,
+        windowStart INTEGER NOT NULL,
+        lockedUntil INTEGER NOT NULL DEFAULT 0
+      );
     `);
     this.links.migrate();
   }
@@ -236,6 +261,62 @@ export class AccountStore extends DurableObject<Env> {
     });
   }
 
+  /// Stores a new sign-in code for `email` (ADR 0016, issue #169), replacing
+  /// any earlier one. Refuses while the address is locked after too many wrong
+  /// codes, or when it has had `EMAIL_CODE_MAX_SENDS` codes in this window.
+  issueEmailCode(email: string, codeHash: string, now = Date.now()): IssueEmailCodeResult {
+    const e = normalizeSubject("email", email);
+    return this.ctx.storage.transactionSync(() => {
+      const row = this.sql.exec<{ sends: number; windowStart: number; lockedUntil: number }>(
+        "SELECT sends, windowStart, lockedUntil FROM email_codes WHERE email = ?", e,
+      ).toArray()[0];
+      if (row && row.lockedUntil > now) {
+        return { ok: false as const, reason: "locked" as const, retryAfterMs: row.lockedUntil - now };
+      }
+      const inWindow = row && now - row.windowStart < EMAIL_CODE_WINDOW_MS;
+      const sends = inWindow ? row.sends : 0;
+      const windowStart = inWindow ? row.windowStart : now;
+      if (sends >= EMAIL_CODE_MAX_SENDS) {
+        return { ok: false as const, reason: "rate_limited" as const, retryAfterMs: windowStart + EMAIL_CODE_WINDOW_MS - now };
+      }
+      this.sql.exec(
+        `INSERT INTO email_codes (email, codeHash, expiresAt, attempts, sends, windowStart, lockedUntil)
+         VALUES (?, ?, ?, 0, ?, ?, 0)
+         ON CONFLICT(email) DO UPDATE SET codeHash = excluded.codeHash, expiresAt = excluded.expiresAt,
+           attempts = 0, sends = excluded.sends, windowStart = excluded.windowStart, lockedUntil = 0`,
+        e, codeHash, now + EMAIL_CODE_TTL_MS, sends + 1, windowStart,
+      );
+      return { ok: true as const, expiresAt: now + EMAIL_CODE_TTL_MS };
+    });
+  }
+
+  /// Checks a code. A right code is spent at once. Five wrong codes lock the
+  /// address until the send window ends, and a new code does not unlock it.
+  checkEmailCode(email: string, codeHash: string, now = Date.now()): CheckEmailCodeResult {
+    const e = normalizeSubject("email", email);
+    return this.ctx.storage.transactionSync(() => {
+      const row = this.sql.exec<{ codeHash: string; expiresAt: number; attempts: number; windowStart: number; lockedUntil: number }>(
+        "SELECT codeHash, expiresAt, attempts, windowStart, lockedUntil FROM email_codes WHERE email = ?", e,
+      ).toArray()[0];
+      if (!row) return { status: "expired" as const };
+      if (row.lockedUntil > now) return { status: "locked" as const };
+      if (row.expiresAt <= now || row.codeHash === "") return { status: "expired" as const };
+      if (row.codeHash === codeHash) {
+        // Keep the row for its send count; blank the code so it cannot be used twice.
+        this.sql.exec("UPDATE email_codes SET codeHash = '', attempts = 0 WHERE email = ?", e);
+        return { status: "ok" as const };
+      }
+      const attempts = row.attempts + 1;
+      if (attempts >= EMAIL_CODE_MAX_ATTEMPTS) {
+        const lockedUntil = Math.max(row.windowStart + EMAIL_CODE_WINDOW_MS, now + EMAIL_CODE_TTL_MS);
+        this.sql.exec("UPDATE email_codes SET codeHash = '', attempts = ?, lockedUntil = ? WHERE email = ?", attempts, lockedUntil, e);
+        return { status: "locked" as const };
+      }
+      this.sql.exec("UPDATE email_codes SET attempts = ? WHERE email = ?", attempts, e);
+      return { status: "invalid" as const, attemptsLeft: EMAIL_CODE_MAX_ATTEMPTS - attempts };
+    });
+  }
+
   /// All identities currently mapped to `userId`.
   listIdentitiesForUser(userId: string): IdentityRow[] {
     return this.sql.exec(
@@ -257,6 +338,10 @@ export class AccountStore extends DurableObject<Env> {
     return this.ctx.storage.transactionSync(() => {
       this.sql.exec("DELETE FROM account_index WHERE userId = ?", userId);
       this.links.forgetUser(userId);
+      this.sql.exec(
+        "DELETE FROM email_codes WHERE email IN (SELECT subject FROM identities WHERE userId = ? AND provider = 'email')",
+        userId,
+      );
       return this.sql.exec("DELETE FROM identities WHERE userId = ?", userId).rowsWritten;
     });
   }

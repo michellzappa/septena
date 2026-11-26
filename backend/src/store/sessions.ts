@@ -26,6 +26,14 @@ const MAX_UNUSED_CHILDREN = 8;
 /// that opened it, so ending the session closes it.
 export const SESSION_HEADER = "X-Septena-Session";
 
+/// The client id of an agent key (#86). A key is an agent session with one
+/// refresh row that never renews and never expires; the user revokes it.
+export const AGENT_KEY_CLIENT = "septena-agent-key";
+/// What the Agents list shows as the client of a key.
+export const AGENT_KEY_CLIENT_NAME = "Agent key";
+/// Far past any real date: purge never drops a key's row.
+export const AGENT_KEY_EXPIRES_AT = 8_640_000_000_000_000;
+
 export interface SessionGrant {
   clientId: string;
   scope: string;

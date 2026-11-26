@@ -4,17 +4,22 @@ import android.os.Build
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -22,13 +27,18 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import app.septena.android.AndroidAppGraph
+import app.septena.android.auth.AccountSwitchChoice
+import app.septena.android.auth.AccountSwitchSummary
+import app.septena.android.signIn
 import app.septena.core.JsonValue
 import app.septena.core.RegistryCatalog
 import app.septena.core.stringValue
 import app.septena.transport.DeviceCode
 import app.septena.transport.DevicePollResult
+import app.septena.transport.SessionTokens
 import app.septena.transport.SignInQr
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -38,15 +48,23 @@ private sealed interface SignInStep {
     data object Requesting : SignInStep
     data class ShowCode(val device: DeviceCode) : SignInStep
     data class Failed(val message: String) : SignInStep
+
+    /** The user kept this device's tasks and asked for a backup: the export, then the start button again. */
+    data object Exporting : SignInStep
 }
+
+/**
+ * The open account-switch question (#575). It lives outside [SignInStep]: the sign-in coroutine waits on
+ * [answer], and a step change would restart the effect that runs it.
+ */
+internal class AccountSwitchQuestion(
+    val summary: AccountSwitchSummary,
+    val answer: CompletableDeferred<AccountSwitchChoice> = CompletableDeferred(),
+)
 
 /** surfaces.json `deviceSignIn`: the block that holds the sign-in-by-code copy. */
 private val deviceSignIn: JsonValue.ObjectValue?
     get() = RegistryCatalog.document("surfaces").fields["deviceSignIn"] as? JsonValue.ObjectValue
-
-/** The sign-in screen's title (surfaces.json `deviceSignIn.title`), localized. */
-internal fun deviceSignInTitle(languageTag: String): String =
-    registryText(deviceSignIn?.fields?.get("title").stringValue(), languageTag)
 
 /** One line of surfaces.json `deviceSignIn.copy` by id, localized. */
 internal fun deviceSignInCopy(id: String, languageTag: String): String {
@@ -56,19 +74,75 @@ internal fun deviceSignInCopy(id: String, languageTag: String): String {
     return registryText(entry?.fields?.get("label").stringValue(), languageTag)
 }
 
+/** surfaces.json `accountSwitch`: the question before another account replaces this device's tasks. */
+private val accountSwitch: JsonValue.ObjectValue?
+    get() = RegistryCatalog.document("surfaces").fields["accountSwitch"] as? JsonValue.ObjectValue
+
+/** The ids of surfaces.json `accountSwitch.copy`. */
+@Suppress("EnumEntryName")
+internal enum class AccountSwitchCopy { body, tasksOne, tasksOther, unsentOne, unsentOther, export, replace, cancel }
+
+/** The account-switch question's title (surfaces.json `accountSwitch.title`), localized. */
+internal fun accountSwitchTitle(languageTag: String): String =
+    registryText(accountSwitch?.fields?.get("title").stringValue(), languageTag)
+
+/** One line of surfaces.json `accountSwitch.copy`, localized. */
+internal fun accountSwitchCopy(id: AccountSwitchCopy, languageTag: String): String {
+    val entries = (accountSwitch?.fields?.get("copy") as? JsonValue.ArrayValue)?.values.orEmpty()
+    val entry = entries.firstOrNull { (it as? JsonValue.ObjectValue)?.fields?.get("id").stringValue() == id.name }
+        as? JsonValue.ObjectValue
+    return registryText(entry?.fields?.get("label").stringValue(), languageTag)
+}
+
+/** The question's message: what goes, then how much of it. Same lines as Apple `SeptaskAccountSwitchPrompt`. */
+internal fun accountSwitchMessage(summary: AccountSwitchSummary, languageTag: String): String {
+    fun count(one: AccountSwitchCopy, other: AccountSwitchCopy, n: Int) =
+        if (n == 1) accountSwitchCopy(one, languageTag) else accountSwitchCopy(other, languageTag).replace("{count}", n.toString())
+    val lines = mutableListOf(accountSwitchCopy(AccountSwitchCopy.body, languageTag))
+    lines += count(AccountSwitchCopy.tasksOne, AccountSwitchCopy.tasksOther, summary.tasks)
+    if (summary.unsent > 0) lines += count(AccountSwitchCopy.unsentOne, AccountSwitchCopy.unsentOther, summary.unsent)
+    return lines.joinToString("\n\n")
+}
+
+/**
+ * Stores a new session from any sign-in method, as device approval always did. Another account's session
+ * waits for the user's answer to the account-switch question (#575), which [ask] shows (null hides it).
+ * Returns the user's declining answer, or null when the device is signed in (and a sync is asked for).
+ */
+internal suspend fun completeSignIn(
+    graph: AndroidAppGraph,
+    tokens: SessionTokens,
+    ask: (AccountSwitchQuestion?) -> Unit,
+): AccountSwitchChoice? = withContext(Dispatchers.IO) {
+    val declined = graph.signIn(tokens) { summary ->
+        val asked = AccountSwitchQuestion(summary)
+        ask(asked)
+        try {
+            asked.answer.await()
+        } finally {
+            ask(null)
+        }
+    }
+    // In here: signing in removes the sign-in screen, which cancels what follows.
+    if (declined == null) graph.sync.requestSync()
+    declined
+}
+
 /**
  * Sign-in by device approval (ADR 0016): this device shows a code and the user enters it in Septena on a
  * signed-in iPhone, iPad or Mac (Settings ▸ Account ▸ Approve a sign-in), which shows this device's name before
- * the user approves. Used by the sign-in screen and by the first run's account step. [startTitle] labels the
- * first button. Callers watch `credentials.signedIn` for the result.
+ * the user approves. Shown by [SignInMethodsPanel]. [startTitle] labels the first button; [secondary] draws it
+ * outlined. Callers watch `credentials.signedIn` for the result.
  */
 @Composable
 internal fun DeviceSignInPanel(
     graph: AndroidAppGraph,
     languageTag: String,
     startTitle: String = deviceSignInCopy("start", languageTag),
+    secondary: Boolean = false,
 ) {
     var step by remember { mutableStateOf<SignInStep>(SignInStep.Start) }
+    var question by remember { mutableStateOf<AccountSwitchQuestion?>(null) }
     val unreachable = deviceSignInCopy("unreachable", languageTag)
     val expired = deviceSignInCopy("expired", languageTag)
 
@@ -86,10 +160,13 @@ internal fun DeviceSignInPanel(
                         DevicePollResult.Expired -> break
                         is DevicePollResult.Approved -> {
                             runCatching {
-                                withContext(Dispatchers.IO) {
-                                    graph.credentials.adopt(result.tokens)
-                                    // In here: signing in removes this panel, which cancels what follows.
-                                    graph.sync.requestSync()
+                                completeSignIn(graph, result.tokens) { question = it }
+                            }.onSuccess { declined ->
+                                // Not signed in: the device keeps its tasks and the panel starts over.
+                                when (declined) {
+                                    null -> Unit
+                                    AccountSwitchChoice.ExportFirst -> step = SignInStep.Exporting
+                                    else -> step = SignInStep.Start
                                 }
                             }.onFailure {
                                 if (it is CancellationException) throw it
@@ -107,7 +184,12 @@ internal fun DeviceSignInPanel(
 
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         when (val current = step) {
-            SignInStep.Start -> Button(onClick = { step = SignInStep.Requesting }) { Text(startTitle) }
+            // Below the email form the device way in is the second choice: an outlined button.
+            SignInStep.Start -> if (secondary) {
+                OutlinedButton(onClick = { step = SignInStep.Requesting }) { Text(startTitle) }
+            } else {
+                Button(onClick = { step = SignInStep.Requesting }) { Text(startTitle) }
+            }
             SignInStep.Requesting -> CircularProgressIndicator()
             is SignInStep.ShowCode -> {
                 Text(deviceSignInCopy("approve", languageTag))
@@ -124,8 +206,45 @@ internal fun DeviceSignInPanel(
                 Text(current.message)
                 Button(onClick = { step = SignInStep.Requesting }) { Text(deviceSignInCopy("retry", languageTag)) }
             }
+            // Settings is out of reach while signed out, so the export renders here (Apple opens Import & Export).
+            SignInStep.Exporting -> {
+                DataTransferSection(graph, languageTag)
+                Button(onClick = { step = SignInStep.Requesting }) { Text(startTitle) }
+            }
         }
     }
+
+    question?.let { asked -> AccountSwitchDialog(asked, languageTag) }
+}
+
+/**
+ * The account-switch question as a Material alert. Three answers do not fit one button row, so they stack,
+ * in Apple's order: Export a Backup First, Replace (destructive), Cancel. Dismissing the dialog is Cancel,
+ * which keeps this device's tasks.
+ */
+@Composable
+internal fun AccountSwitchDialog(asked: AccountSwitchQuestion, languageTag: String) {
+    fun answer(choice: AccountSwitchChoice) {
+        asked.answer.complete(choice)
+    }
+    AlertDialog(
+        onDismissRequest = { answer(AccountSwitchChoice.Cancel) },
+        title = { Text(accountSwitchTitle(languageTag)) },
+        text = { Text(accountSwitchMessage(asked.summary, languageTag)) },
+        confirmButton = {
+            Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End) {
+                TextButton(onClick = { answer(AccountSwitchChoice.ExportFirst) }) {
+                    Text(accountSwitchCopy(AccountSwitchCopy.export, languageTag))
+                }
+                TextButton(onClick = { answer(AccountSwitchChoice.Replace) }) {
+                    Text(accountSwitchCopy(AccountSwitchCopy.replace, languageTag), color = MaterialTheme.colorScheme.error)
+                }
+                TextButton(onClick = { answer(AccountSwitchChoice.Cancel) }) {
+                    Text(accountSwitchCopy(AccountSwitchCopy.cancel, languageTag))
+                }
+            }
+        },
+    )
 }
 
 /**

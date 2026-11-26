@@ -8,10 +8,10 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 
 | Status | iPhone | iPad | Mac | Web | Android | Windows | Watch |
 |---|---|---|---|---|---|---|---|
-| ships | 55 | 56 | 56 | 49 | 53 | 0 | 1 |
+| ships | 57 | 58 | 58 | 50 | 54 | 0 | 1 |
 | partial | 1 | 1 | 1 | 1 | 2 | 0 | 3 |
-| planned | 0 | 0 | 0 | 3 | 0 | 56 | 2 |
-| - | 4 | 3 | 3 | 7 | 5 | 4 | 54 |
+| planned | 3 | 3 | 3 | 7 | 4 | 61 | 2 |
+| - | 4 | 3 | 3 | 7 | 5 | 4 | 59 |
 
 | ID | Feature | iPhone | iPad | Mac | Web | Android | Windows | Watch |
 |---|---|---|---|---|---|---|---|---|
@@ -64,6 +64,11 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 | `agents.stop-pause` | Stop one task, pause all agents | ships | ships | ships | ships | ships | planned | - |
 | `sync.backend` | Sync through api.septena.app | ships | ships | ships | ships | ships | planned | planned |
 | `account.delete` | Delete account | ships | ships | ships | ships | ships | planned | - |
+| `account.sign-in-apple` | Sign in with Apple (creates an account) | ships | ships | ships | planned | planned | planned | - |
+| `account.sign-in-google` | Sign in with Google (creates an account) | planned | planned | planned | planned | planned | planned | - |
+| `account.sign-in-microsoft` | Sign in with Microsoft (creates an account) | planned | planned | planned | planned | planned | planned | - |
+| `account.sign-in-email` | Sign in with an email code (creates an account) | planned | planned | planned | planned | planned | planned | - |
+| `account.sign-in-device` | Sign in by approval from another signed-in device | ships | ships | ships | ships | ships | planned | - |
 | `task.times` | Start time and duration on a task | ships | ships | ships | ships | ships | planned | - |
 | `calendar.feed` | Private read-only calendar feed (.ics) | ships | ships | ships | ships | ships | planned | - |
 | `widgets.tasks` | Today and Upcoming widgets | ships | ships | ships | - | ships | planned | - |

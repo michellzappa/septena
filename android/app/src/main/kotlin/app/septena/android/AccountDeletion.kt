@@ -57,6 +57,7 @@ suspend fun AndroidAppGraph.deleteAccount() {
         throw error
     }
     accountWipe.markPending()
+    credentials.forgetLastAccount()
     // The task screens still collect the data version, so they drop the old rows before they leave.
     runCatching { finishPendingWipe() }
     credentials.forgetSession()

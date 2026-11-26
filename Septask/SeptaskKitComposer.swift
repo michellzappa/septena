@@ -2019,17 +2019,28 @@ final class KitAttachmentsView: NSView {
     items.contains { TaskSyncEngine.shared.isAttachmentElsewhere($0) }
   }
 
+  /// The Plus upsell only for an account whose plan has no file sync. A
+  /// Plus or Pro account whose file has not arrived yet sees the syncing line.
   private var activeUpsell: RegistryPlanNote? {
     if let explicitUpsell { return explicitUpsell }
+    guard PlanStatus.shared.showsFileSyncUpsell else { return nil }
     if hasElsewhereItems || hasLocalOnlyItems { return RegistryPlans.upsell("file_elsewhere") }
     return nil
+  }
+
+  /// Opening a file found it on another device, and the plan syncs files.
+  private var fileStillSyncing = false
+
+  /// Files are on their way between devices and the plan syncs them.
+  private var showsSyncingLine: Bool {
+    activeUpsell == nil && (hasElsewhereItems || hasLocalOnlyItems || fileStillSyncing)
   }
 
   var preferredHeight: CGFloat {
     guard !items.isEmpty else { return 0 }
     var h = CGFloat(items.count) * Self.chipHeight
       + CGFloat(max(0, items.count - 1)) * Self.rowSpacing
-    if activeUpsell != nil {
+    if activeUpsell != nil || showsSyncingLine {
       h += Self.rowSpacing + Self.upsellHeight
     }
     return h
@@ -2057,7 +2068,7 @@ final class KitAttachmentsView: NSView {
   required init?(coder: NSCoder) { fatalError("KitAttachmentsView is code-only") }
 
   func configure(taskID: String) {
-    if self.taskID != taskID { explicitUpsell = nil }
+    if self.taskID != taskID { explicitUpsell = nil; fileStillSyncing = false }
     self.taskID = taskID
     reload()
   }
@@ -2123,6 +2134,15 @@ final class KitAttachmentsView: NSView {
       stack.addArrangedSubview(row)
       row.widthAnchor.constraint(lessThanOrEqualTo: stack.widthAnchor).isActive = true
       row.heightAnchor.constraint(equalToConstant: Self.upsellHeight).isActive = true
+    } else if showsSyncingLine {
+      let label = NSTextField(labelWithString: RegistryPlans.Status.filesSyncing)
+      label.font = SeptaskKitTheme.meta
+      label.textColor = SeptaskKitTheme.inkSecondary
+      label.lineBreakMode = .byTruncatingTail
+      label.maximumNumberOfLines = 1
+      stack.addArrangedSubview(label)
+      label.widthAnchor.constraint(lessThanOrEqualTo: stack.widthAnchor).isActive = true
+      label.heightAnchor.constraint(equalToConstant: Self.upsellHeight).isActive = true
     }
   }
 
@@ -2171,6 +2191,10 @@ final class KitAttachmentsView: NSView {
         if let downloaded = try await self.store.localFile(for: target) {
           self.reload()
           KitQuickLookCoordinator.shared.preview(urls: [downloaded], startingAt: 0)
+        } else if TaskSyncEngine.shared.isAttachmentElsewhere(target), !PlanStatus.shared.showsFileSyncUpsell {
+          self.fileStillSyncing = true
+          self.rebuild()
+          self.onChanged?()
         } else if TaskSyncEngine.shared.isAttachmentElsewhere(target),
                   let moment = RegistryPlans.upsell("file_elsewhere") {
           self.explicitUpsell = moment
@@ -2183,7 +2207,12 @@ final class KitAttachmentsView: NSView {
         self.rebuild()
         self.onChanged?()
       } catch TaskBackendError.http(let status, _) where status == 404 {
-        if !PlanStatus.shared.attachmentsAllowed || TaskSyncEngine.shared.isAttachmentElsewhere(target),
+        if PlanStatus.shared.attachmentsAllowed, !PlanStatus.shared.showsFileSyncUpsell,
+           TaskSyncEngine.shared.isAttachmentElsewhere(target) {
+          self.fileStillSyncing = true
+          self.rebuild()
+          self.onChanged?()
+        } else if !PlanStatus.shared.attachmentsAllowed || TaskSyncEngine.shared.isAttachmentElsewhere(target),
            let moment = RegistryPlans.upsell("file_elsewhere") {
           self.explicitUpsell = moment
           self.rebuild()

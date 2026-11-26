@@ -5,7 +5,7 @@ description: Use the Septena tasks MCP at api.septena.app to read and write the 
 
 # Septena tasks MCP
 
-The connector at `https://api.septena.app/mcp` exposes the user's tasks, areas, projects and task conversations, the same data the Septena app shows. The user pairs it from the Septena app. Changes reach the app within seconds.
+The connector at `https://api.septena.app/mcp` exposes the user's tasks, areas, projects and task conversations, the same data the Septena app shows. The user pairs it from the Septena app. An agent that cannot sign in (a script, cron, n8n) uses an agent key the user creates in the app: send it as `Authorization: Bearer sk1.…`. Changes reach the app within seconds.
 
 ## Conventions
 
@@ -13,6 +13,9 @@ The connector at `https://api.septena.app/mcp` exposes the user's tasks, areas, 
 - **IDs** are short, opaque strings. Always echo back the `id` from a create call before referencing it in an update.
 
 ## Guidance
+
+### Start here
+- **`tasks_orientation`** returns the server's guide, every tool by family, and which areas have a brief. Call it once when you are new to the account.
 
 ### First-time setup (onboarding)
 - When helping a user populate a new or sparse Septena account, follow the onboarding guide at `https://api.septena.app/onboard.md` (also exposed as the MCP prompt `onboard_septena`). Draw from what you already know about their ongoing work, projects, and responsibilities — or interview them briefly if starting fresh — to propose real Areas (with context + emoji), Projects (with context briefs), and at least a few concrete Tasks, and confirm before writing.
@@ -30,18 +33,25 @@ The connector at `https://api.septena.app/mcp` exposes the user's tasks, areas, 
 - You may write a whole brief with `tasks_notes_write` only while it is empty (setting up a project with the user). Once it has text, suggest changes with **`tasks_notes_propose`**; the user accepts or rejects them in the app. A `brief_is_users` refusal means exactly this.
 - Never invent a brief. Write the user's own words; leave a brief empty when the user said nothing about the project.
 - `tasks_project_create` / `tasks_area_create` make containers, with optional notes. Ask first, and list existing ones first so you do not duplicate.
+- **`tasks_project_update(id, …)`** renames a project, moves it to another area (`null` for none), sets `githubRepo`, or sets `status` (`active`, `done`, `cancelled`). Done or cancelled moves it to the Logbook; its open tasks stay open. Change the status only when the user asked. **`tasks_area_update(id, …)`** renames an area or sets its emoji. Only the user deletes a project or an area.
+- **Headings** split a project into sections. `tasks_project_get` lists `headings` and the `heading` of each open task. **`tasks_heading_create(project, title)`** adds one at the end of the project. Pass `heading` to `tasks_create` or `tasks_update` to file a task under it (the task moves into the heading's project); `heading: null` takes it out. Rename a heading with `tasks_update` on its id.
 - `tasks_notes_history` lists every saved version of a note, with who and why.
 
 ### Tasks
 - Views: `today`, `inbox`, `review`, `upcoming`, `anytime`, `completed`, `faded`. `review` lists open tasks waiting for the user to check and accept (`endState = needs_verify`). `faded` is the Faded pile: open tasks nobody touched for the fade window. No other view shows them, and an agent edit does not bring one back; the user keeps or drops them in the app. `today` is the whole Today page: the **Inbox** section first, then the filed tasks on Today. `inbox` is that Inbox section alone. `anytime` = open tasks with no date that are not on Today, the app's Anytime list (it absorbed the former `someday` bucket). No view returns "all open tasks"; use `tasks_get` to locate a known id.
 - **One Inbox.** The app shows a single Inbox at the top of Today. It holds unfiled tasks (no area, no project) and your proposals the user has not accepted. Never describe these as two piles ("triage" vs "unorganized"). `triage` is a retired view name and returns the Inbox.
-- Row flags: `inbox: true` = the row sits in the Inbox. `daysOnToday: N` = the row has carried over on Today undone for N days; the app darkens its checkbox one seventh per day. Mention rows at 7+ as stuck when you summarize Today.
+- Row flags: `inbox: true` = the row sits in the Inbox. `daysOnToday: N` = the row has carried over on Today undone for N days. Mention rows at 7+ as stuck when you summarize Today.
 - `tasks_list` returns `{tasks, total, truncated}` — **`truncated: true` means more rows exist beyond `limit`**, so don't conclude a task is missing/deleted from a capped page; raise `limit` or use `tasks_get`.
 - **`tasks_get(id)`** — one call for "where is this task, what's its state?": title, status, area, project, scheduled, deadline, today, completedAt, source, notes, plus a compact convo summary. Works regardless of view or status; use this instead of scanning lists to locate a known id.
 - **`notes`** — the task's free-text body. Readable on `tasks_get`/`tasks_list` and writable on `tasks_create`/`tasks_update` (pass `notes`; on update, `null`/`""` clears it). This is the plain note field, distinct from the structured `TaskConvo` (artifact/handoff/thread) below.
 - **`recurrence`** — the repeat rule, readable on `tasks_get`/`tasks_list` and writable on `tasks_create`/`tasks_update` as `{unit: "day"|"week"|"month", interval: N, after_completion: bool}` (on update, `null` clears it). `after_completion: true` (the default) counts the interval from the day the task is ticked off — use it for "every 3 days" phrasing with no anchor day. `after_completion: false` counts from the previous scheduled date, which is what keeps a named weekday on its weekday ("every Monday"); it REQUIRES the task to have a `scheduled` date and errors without one. Getting this backwards silently converts a fixed weekly task into one that drifts every time the user is late.
 - `tasks_complete` on a **recurring** task also creates its next occurrence and returns it as `nextOccurrence` — say when the task comes back, don't send the user to the app. If the result carries a `recurrenceWarning`, the task was still completed but the series didn't advance; relay that rather than claiming the next one is scheduled.
 - Resolve `area`/`project` names → ids via `tasks_list_areas` / `tasks_list_projects` before creating/updating.
+- **`tasks_search(query)`** finds tasks by words in the title or notes, with near matches. Call it before `tasks_create`.
+- **`tasks_defer(id, until)`** moves a task's When to a future day and takes it off Today. **`tasks_move_to_today(id)`** pins it to Today.
+- **Tags:** pass tag names in `tags` on `tasks_create` / `tasks_update`; a new name makes a new tag. Call **`tasks_list_tags`** first and reuse the user's names. Only the user renames or recolors a tag.
+- **Checklists:** `checklist` on `tasks_create`, then **`tasks_checklist_add(task_id, items)`**, **`tasks_checklist_update(id, …)`** (rename, check, reorder) and **`tasks_checklist_delete(id)`**. `tasks_get` lists the items. Checking every item does not complete the task.
+- **`tasks_history(id)`** shows one task's changes with the values before and after.
 
 #### References: what a task points at
 
@@ -63,6 +73,13 @@ A task can point at up to 20 items: an email, a mail thread, a calendar event, a
 - `tasks_get` lists `attachments` (filename, contentType, byteCount). You cannot read a file's bytes. `uploaded: false` means the bytes are only on the device that added the file.
 - **`tasks_attachment_add(task_id, filename, content_type)`** adds a file of up to 10 MB. Pass `text` for text you wrote, or `base64` for a tiny binary. For a file on disk, pass neither and run the returned `command` (one-time token, 15 minutes). The file is attached when that upload answers `attached: true`.
 - For a web page or an email, add a reference instead. Only the user can remove a file.
+
+#### Working a task as an agent
+
+- **`tasks_claim(id, agent)`** before you write to a task you work on. The claim is a lease (default 30 minutes): call it again to renew while you work. A refusal names its rule (`paused`, `stopped`, `your_turn`, `held`, `doing`, `budget`): respect it. Only `held` is `retryable` (claim again after `claimUntil`, or pick another task). The claim returns the project and area notes.
+- **`tasks_release(id, agent, why)`** when you stop, with one line on what you did. A provider turn with options also ends the claim.
+- **`tasks_agent_events(since)`** lists what changed for agents since your cursor (assignments, user answers, stops, pauses). Pass the returned `nextSince` next time. Events are pointers: read the task itself.
+- **`tasks_activity(id?)`** shows who changed what and why, for one task or all of them. Read it before you continue work an earlier run started.
 
 #### Task Conversations (agent-driven resolution)
 
@@ -163,6 +180,25 @@ tasks_list(view: "anytime")
 ```
 
 ## Errors to expect
+
+A refused tool call returns `isError: true`. The first text is the message; the second text (and `structuredContent`) is the envelope:
+
+```
+{ "error": { "code": "paused", "message": "…", "hint": "…", "retryable": false } }
+```
+
+- **`code`** names the rule (`paused`, `stopped`, `your_turn`, `held`, `budget`, `terminal`, `closed`, `not_found`, `human_accepts`, `in_review`, `human_ends`, `note_required`, `human_only:assignee`, `stale`, `brief_is_users`, `rate_limited`, `idempotency_conflict`, …). Codes do not change name.
+- **`hint`** says what to do next. Follow it.
+- **`retryable: true`** means the same call can work later with nothing from the user (`held`, `rate_limited`, `unavailable`, `plan_check_failed`, `idempotency_in_progress`). Wait, then send the same call with the same `idempotency_key`. `retryable: false`: do not send it again as it is.
+- A result that reports a refusal in its own fields (`tasks_claim` with `claimed: false`, `tasks_complete` with `completed: false`, a notes write with `written: false`) keeps those fields and also carries `error`.
+- On `/v1`, send `X-Septena-Errors: envelope` to get the same `error` object; without the header `/v1` keeps its old `{ "error": "<code>" }` body.
+
+### Idempotency keys
+
+- Every write tool takes an optional **`idempotency_key`**: a string you make for one write (a UUID). Send the same key when you retry that call after a lost reply or a host error. Septena returns the first result and does not write again. So a retried create never makes a second task, and you do not need to search before you retry.
+- A key lives 24 hours. The same key with a different body is refused as `idempotency_conflict`: use a new key for a new write.
+- A refused call keeps nothing under its key, so the same call may run again once the rule allows it.
+- On `/v1/tasks` writes, send the key as the `Idempotency-Key` header (or an `idempotency_key` body field). A replay answers with `Idempotent-Replayed: true`.
 
 - 401 → the pairing expired or was revoked; the user re-pairs from Septena.
 - A write tool that says the connection can only read → the pairing predates write access; the user removes and re-adds the connector.

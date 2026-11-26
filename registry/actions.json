@@ -134,7 +134,7 @@
       "title": "Add Checklist Item",
       "icon": "action.checklist",
       "role": "default",
-      "shortcut": { "key": "c", "modifiers": ["primary", "shift"] },
+      "shortcut": { "key": "c", "modifiers": ["primary", "shift"], "excludePlatforms": ["ios", "ipados"] },
       "availability": { "selection": "single", "excludeDestinations": ["recentlyDeleted"] },
       "featureId": "task.checklists"
     },

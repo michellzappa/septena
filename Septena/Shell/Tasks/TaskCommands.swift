@@ -26,6 +26,14 @@ struct TaskActions {
   var doTask: (() -> Void)?
   var duplicate: (() -> Void)?
   var copy: (() -> Void)?
+  /// Favorite / unfavorite the selected row(s) — ⌥⌘S.
+  var toggleStar: (() -> Void)? = nil
+  /// Open the tag picker for the selected row(s) — ⇧⌘T.
+  var openTags: (() -> Void)? = nil
+  /// Open the reminder picker for one selected row — ⌥⌘R.
+  var openReminder: (() -> Void)? = nil
+  /// File one selected row into its suggested project or area — ⌥⌘M.
+  var moveSuggested: (() -> Void)? = nil
 
   /// The registry actions this type can serve, in shortcuts-sheet order. The
   /// iPad hidden shortcut buttons render these.
@@ -62,6 +70,10 @@ struct TaskActions {
     case .taskDeadline: return \.openDeadline
     case .taskMove: return \.openMove
     case .taskClearSchedule: return \.clearSchedule
+    case .taskToggleStar: return \.toggleStar
+    case .taskTags: return \.openTags
+    case .taskReminder: return \.openReminder
+    case .taskMoveSuggested: return \.moveSuggested
     case .taskDelete: return \.delete
     default: return nil
     }

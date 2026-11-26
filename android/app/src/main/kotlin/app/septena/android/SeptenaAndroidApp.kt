@@ -3,6 +3,7 @@ package app.septena.android
 import android.app.Application
 import app.cash.sqldelight.driver.android.AndroidSqliteDriver
 import app.septena.android.auth.AppCredentials
+import app.septena.android.auth.LastAccountStore
 import app.septena.android.auth.SessionStore
 import app.septena.android.doing.DoController
 import app.septena.android.reminders.TaskReminderScheduler
@@ -95,7 +96,12 @@ class AndroidAppGraph(application: Application) {
     val fadeSweepStore = app.septena.android.ui.FadeSweepStore(application, syncedSettings, syncedSettingsMutator)
 
     val auth = SeptenaAuthClient(clientVersion)
-    val credentials = AppCredentials(SessionStore(application), auth, beforeAdopt = ::finishPendingWipe)
+    val credentials = AppCredentials(
+        SessionStore(application),
+        auth,
+        LastAccountStore(application),
+        beforeAdopt = ::finishPendingWipe,
+    )
     private val transport = UrlConnectionSyncTransport(credentials, clientVersion)
     val access = SeptenaAccessClient(credentials, clientVersion)
     val shares = SeptenaShareClient(access)
@@ -231,12 +237,15 @@ class AndroidAppGraph(application: Application) {
         // Another account must not inherit this one's fade pass day or sweep state.
         appScope.launch {
             credentials.signedIn.collect { signedIn ->
-                if (!signedIn) {
-                    lastFadePassDay = null
-                    fadeSweepStore.forgetAccount()
-                }
+                if (!signedIn) forgetAccountScopedState()
             }
         }
+    }
+
+    /** Drops the state that belongs to one account: on sign-out, and when another account replaces this one. */
+    fun forgetAccountScopedState() {
+        lastFadePassDay = null
+        fadeSweepStore.forgetAccount()
     }
 
     /**

@@ -23,6 +23,7 @@ import type { IcalTask } from "../ical.js";
 import { DOMAIN_RULES, ENTITY_LIMITS, TURN_FIELDS } from "../generated/registries.js";
 import { MCP_REFRESH_TTL_S } from "../shadow/tokens.js";
 import { logEvent, randomId } from "../util.js";
+import { REFUSALS, type RefusalCode } from "../errors.js";
 import {
   sendAgentPushes,
   type AgentPush,
@@ -56,7 +57,7 @@ import {
   type SharedEntity,
 } from "./shares.js";
 import { mergeNotes } from "./mergeText.js";
-import { SESSION_HEADER, SessionBook, type RenewResult, type SessionGrant } from "./sessions.js";
+import { AGENT_KEY_CLIENT, AGENT_KEY_CLIENT_NAME, AGENT_KEY_EXPIRES_AT, SESSION_HEADER, SessionBook, type RenewResult, type SessionGrant } from "./sessions.js";
 
 /// Task fields only the app writes (docs/TASK_FADE_SPEC.md §3): the fade
 /// clock and its outcome. An agent cannot keep a task alive by touching it.
@@ -163,26 +164,16 @@ export interface AgentWebhookCreated extends AgentWebhookPublic {
 export const isAgentActor = (actor: string) => actor.startsWith("mcp:");
 
 /// Guidance attached to agent write refusals, so any connector or runner knows
-/// the rule instead of retrying (ADR 0008).
-export const AGENT_WRITE_RULES: Record<string, string> = {
-  stopped: "The user stopped agent work on this task. Do not write to it; only the user can resume it.",
-  stale:
-    "The notes changed since you read them. Read `current`, then write again on top of it with its noteRev as baseNoteRev.",
-  brief_is_users:
-    "The text above `## Log` is the user's brief. Append a dated entry under `## Log`, or propose a new brief for the user to accept.",
-  paused: "The user paused all agents. Do not write; only the user can unpause.",
-  "retired:context": "Project context is retired (ADR 0012). Write the project's notes instead.",
-  human_only_do: "Only the user starts, changes or ends a Do.",
-  human_accepts:
-    "Only the user ends an agent-worked task: not done, not cancelled, not deleted by you. Call tasks_set_endstate with endState \"needs_verify\" and a note describing what to check, or why you suggest to cancel it.",
-  human_ends:
-    "You may set \"needs_verify\" (hand over to Review) or \"decomposed\" (the work goes on as an issue or smaller tasks). Every other end state follows from what the user does.",
-  in_review:
-    "This task is in the user's Review. You may hand it over again with \"needs_verify\" and a new note. Only the user takes it out of Review.",
-  note_required: "A hand-off needs a note that says what to check. Send it in the same call.",
-  closed: "The user closed this task, so there is nothing to hand over.",
-  "human_only:assignee": "Only the user takes a task back from you. Ask in the conversation, or hand it over with \"needs_verify\".",
-};
+/// the rule instead of retrying (ADR 0008). The text is the hint of the one
+/// refusal table (src/errors.ts).
+const AGENT_WRITE_CODES = [
+  "stopped", "stale", "brief_is_users", "paused", "retired:context", "human_only_do", "human_accepts",
+  "human_ends", "in_review", "note_required", "closed", "human_only:assignee",
+  "human_only:stoppedAt", "human_only:agentsPaused",
+] as const satisfies readonly RefusalCode[];
+export const AGENT_WRITE_RULES: Record<string, string> = Object.fromEntries(
+  AGENT_WRITE_CODES.map((code) => [code, REFUSALS[code].hint]),
+);
 
 /// Lease bounds for a claim. An agent that stops writing loses the task when
 /// the lease ends; the maximum keeps a crashed run from holding it for long.
@@ -265,8 +256,25 @@ export const DEVICE_SLOT_INACTIVE_MS = 14 * DAY_MS;
 export const DEVICE_SLOT_MOVE_COOLDOWN_MS = DAY_MS;
 const TOMBSTONE_TTL_MS = DOMAIN_RULES.tombstoneTtlDays * DAY_MS;
 const CLIENT_OP_TTL_MS = DOMAIN_RULES.clientOpTtlDays * DAY_MS;
+/// Idempotency keys (ADR 0050 §4): a key and its first result live 24 hours
+/// per account. A key whose call has not finished (no result) is taken over
+/// after IDEMPOTENCY_PENDING_MS, so a crashed call does not block its retry.
+/// At most IDEMPOTENCY_MAX_KEYS rows; the oldest go first.
+export const IDEMPOTENCY_TTL_MS = DAY_MS;
+export const IDEMPOTENCY_PENDING_MS = 2 * 60_000;
+export const IDEMPOTENCY_MAX_KEYS = 5_000;
+/// A result larger than this is not kept: a repeat runs the call again.
+export const IDEMPOTENCY_MAX_RESULT_BYTES = 512 * 1024;
+
+export type IdempotencyStart =
+  | { state: "new" }
+  | { state: "replay"; result: string }
+  | { state: "conflict" }
+  | { state: "in_progress" };
 /// A connection unused this long has an expired refresh token (src/shadow/tokens.ts).
 const CONNECTION_TTL_MS = MCP_REFRESH_TTL_S * 1000;
+/// How often a key in use moves its "last used".
+const AGENT_KEY_TOUCH_MS = 60 * 60 * 1000;
 /// How long the store remembers an item whose proposal the user turned down (#497).
 const DISMISSED_REF_TTL_MS = 365 * DAY_MS;
 const CHANGE_LOG_TTL_MS = DOMAIN_RULES.changeLogTtlDays * DAY_MS;
@@ -593,6 +601,10 @@ export class TaskStore extends DurableObject<Env> {
       CREATE TABLE IF NOT EXISTS client_ops (
         clientOpId TEXT PRIMARY KEY, result TEXT NOT NULL, at INTEGER NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS idempotency_keys (
+        key TEXT PRIMARY KEY, hash TEXT NOT NULL, result TEXT, at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idempotency_keys_at ON idempotency_keys(at);
       CREATE TABLE IF NOT EXISTS sessions (
         hash TEXT PRIMARY KEY, createdAt INTEGER NOT NULL, expiresAt INTEGER NOT NULL
       );
@@ -2048,6 +2060,45 @@ export class TaskStore extends DurableObject<Env> {
   }
 
   /// The newest rev: the cursor for an agent that starts listening now.
+  /// Reserve an idempotency key for one call (ADR 0050 §4). `hash` is the
+  /// call's body. A finished key with the same body replays its result; a
+  /// different body is a conflict; a key whose call still runs is
+  /// in_progress. One object per account, so two calls never both get "new".
+  idempotencyBegin(key: string, hash: string, now = Date.now()): IdempotencyStart {
+    const row = this.sql.exec<{ hash: string; result: string | null; at: number }>(
+      "SELECT hash, result, at FROM idempotency_keys WHERE key = ?", key,
+    ).toArray()[0];
+    if (row && row.at >= now - IDEMPOTENCY_TTL_MS) {
+      if (row.hash !== hash) return { state: "conflict" };
+      if (row.result !== null) return { state: "replay", result: row.result };
+      if (row.at >= now - IDEMPOTENCY_PENDING_MS) return { state: "in_progress" };
+    }
+    this.sql.exec(
+      "INSERT INTO idempotency_keys (key, hash, result, at) VALUES (?, ?, NULL, ?) " +
+        "ON CONFLICT(key) DO UPDATE SET hash = excluded.hash, result = NULL, at = excluded.at",
+      key, hash, now,
+    );
+    this.sql.exec("DELETE FROM idempotency_keys WHERE at < ?", now - IDEMPOTENCY_TTL_MS);
+    this.sql.exec(
+      "DELETE FROM idempotency_keys WHERE key IN (SELECT key FROM idempotency_keys ORDER BY at DESC LIMIT -1 OFFSET ?)",
+      IDEMPOTENCY_MAX_KEYS,
+    );
+    return { state: "new" };
+  }
+
+  /// Keep the result of the call that holds `key`. Too large a result is
+  /// not kept: the key is let go, so a repeat runs again.
+  idempotencyFinish(key: string, hash: string, result: string): void {
+    if (result.length > IDEMPOTENCY_MAX_RESULT_BYTES) return this.idempotencyAbandon(key, hash);
+    this.sql.exec("UPDATE idempotency_keys SET result = ? WHERE key = ? AND hash = ? AND result IS NULL", result, key, hash);
+  }
+
+  /// Let go of a key whose call was refused or failed: nothing was kept, so
+  /// the same call may run again.
+  idempotencyAbandon(key: string, hash: string): void {
+    this.sql.exec("DELETE FROM idempotency_keys WHERE key = ? AND hash = ? AND result IS NULL", key, hash);
+  }
+
   head(): number {
     return this.meta("rev");
   }
@@ -2494,6 +2545,14 @@ export class TaskStore extends DurableObject<Env> {
     return raw ? (decodeRow(spec, raw as Record<string, unknown>) as Row) : null;
   }
 
+  /// A project's live headings (section dividers), in list order.
+  readHeadings(projectId: string): Row[] {
+    const raws = this.sql.exec(
+      "SELECT * FROM tasks WHERE project = ? AND deletedAt IS NULL AND kind = 'heading' ORDER BY position, id", projectId,
+    ).toArray();
+    return raws.map((r) => decodeRow(ENTITIES.task, r as Record<string, unknown>) as Row);
+  }
+
   /// Open tasks filed directly in a project or an area (headings excluded),
   /// in list order.
   readContainerTasks(container: NoteContainer, id: string, limit: number): Row[] {
@@ -2645,6 +2704,33 @@ export class TaskStore extends DurableObject<Env> {
     if (!this.ownsAgent(familyId)) return false;
     this.endSession(familyId);
     return true;
+  }
+
+  // ---- agent keys (#86) ----
+  // A key is an agent session: the same row in `sessions` and `connections`
+  // as an OAuth agent, so the Agents list, disconnect, Stop, Pause and
+  // account deletion cover it with no code of their own. Only the hash of
+  // the key's secret is stored.
+
+  createAgentKey(sid: string, hash: string, name: string, scope: string, now = Date.now()): void {
+    this.ctx.storage.transactionSync(() => {
+      this.sessions.create(hash, AGENT_KEY_EXPIRES_AT, sid, { clientId: AGENT_KEY_CLIENT, scope }, now);
+      this.recordConnection(sid, AGENT_KEY_CLIENT, AGENT_KEY_CLIENT_NAME, scope, now, name);
+    });
+  }
+
+  /// The grant behind a key, or null. Moves the key's "last used" at most
+  /// once an hour, so a busy key does not write on every call.
+  authorizeAgentKey(sid: string, hash: string, now = Date.now()): SessionGrant | null {
+    return this.ctx.storage.transactionSync(() => {
+      const res = this.sessions.authorize(sid, hash, now);
+      if (res?.grant?.clientId !== AGENT_KEY_CLIENT) return null;
+      this.sql.exec(
+        "UPDATE connections SET lastUsed = ? WHERE familyId = ? AND lastUsed < ?",
+        now, sid, now - AGENT_KEY_TOUCH_MS,
+      );
+      return res.grant;
+    });
   }
 
   /// `recordConnection` for an agent whose session is here. A disconnect that
@@ -2827,9 +2913,10 @@ export class TaskStore extends DurableObject<Env> {
     ).toArray().map((r) => r.familyId);
   }
 
-  /// The agent count: connections used within their refresh lifetime.
+  /// The agent count: connections used within their refresh lifetime, and
+  /// every agent key.
   connectedAgentCount(now = Date.now()): number {
-    return this.sql.exec<{ n: number }>("SELECT COUNT(*) AS n FROM connections WHERE lastUsed > ?", now - CONNECTION_TTL_MS).one().n;
+    return this.sql.exec<{ n: number }>("SELECT COUNT(*) AS n FROM connections WHERE lastUsed > ? OR clientId = ?", now - CONNECTION_TTL_MS, AGENT_KEY_CLIENT).one().n;
   }
 
   /// Every place this account is signed in: app sessions (devices) and MCP
@@ -2839,7 +2926,7 @@ export class TaskStore extends DurableObject<Env> {
     const devices = this.deviceSummary(cap, now);
     const firstSeen = new Map(this.sql.exec<{ sid: string; firstSeen: number }>("SELECT sid, firstSeen FROM devices").toArray().map((r) => [r.sid, r.firstSeen]));
     const connections = this.sql.exec<{ familyId: string; name: string; clientName: string; scope: string; createdAt: number; lastUsed: number }>(
-      "SELECT familyId, COALESCE(label, clientName) AS name, clientName, scope, createdAt, lastUsed FROM connections WHERE lastUsed > ? ORDER BY lastUsed DESC", now - CONNECTION_TTL_MS,
+      "SELECT familyId, COALESCE(label, clientName) AS name, clientName, scope, createdAt, lastUsed FROM connections WHERE lastUsed > ? OR clientId = ? ORDER BY lastUsed DESC", now - CONNECTION_TTL_MS, AGENT_KEY_CLIENT,
     ).toArray();
     return {
       devices: devices.map((d) => ({
@@ -3030,7 +3117,7 @@ export class TaskStore extends DurableObject<Env> {
       "SELECT client, version, firstSeen, lastSeen FROM devices d WHERE EXISTS (SELECT 1 FROM sessions s WHERE s.sid = d.sid) ORDER BY lastSeen DESC",
     ).toArray().map((r) => ({ ...r }));
     const agents = this.sql.exec<{ client: string; since: number; lastUsed: number }>(
-      "SELECT clientName AS client, createdAt AS since, lastUsed FROM connections WHERE lastUsed > ? ORDER BY lastUsed DESC", now - CONNECTION_TTL_MS,
+      "SELECT clientName AS client, createdAt AS since, lastUsed FROM connections WHERE lastUsed > ? OR clientId = ? ORDER BY lastUsed DESC", now - CONNECTION_TTL_MS, AGENT_KEY_CLIENT,
     ).toArray().map((r) => ({ ...r }));
     const entitlements = this.entitlements().map((r) => ({
       id: r.id, source: r.source, productId: r.productId, expiresAt: r.expiresAt, status: r.status,
@@ -3583,10 +3670,12 @@ export class TaskStore extends DurableObject<Env> {
       this.setMeta("purgedThrough", purged);
       this.sql.exec("DELETE FROM dismissed_refs WHERE at < ?", new Date(now - DISMISSED_REF_TTL_MS).toISOString());
       this.sql.exec("DELETE FROM client_ops WHERE at < ?", now - CLIENT_OP_TTL_MS);
+      this.sql.exec("DELETE FROM idempotency_keys WHERE at < ?", now - IDEMPOTENCY_TTL_MS);
       this.sql.exec("DELETE FROM changes WHERE at < ?", new Date(now - CHANGE_LOG_TTL_MS).toISOString());
       this.sessions.purge(now);
       this.sql.exec("DELETE FROM devices WHERE sid NOT IN (SELECT sid FROM sessions WHERE sid IS NOT NULL)");
-      this.sql.exec("DELETE FROM connections WHERE lastUsed < ?", now - CONNECTION_TTL_MS);
+      // A key never expires: its row stays until the user revokes it.
+      this.sql.exec("DELETE FROM connections WHERE lastUsed < ? AND clientId != ?", now - CONNECTION_TTL_MS, AGENT_KEY_CLIENT);
       // Day and month counters: two months covers the current month.
       this.sql.exec("DELETE FROM usage WHERE updatedAt < ?", now - 62 * DAY_MS);
     });

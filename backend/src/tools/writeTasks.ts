@@ -135,6 +135,7 @@ export const createTaskJsonSchema = {
     deadline: { type: "string", description: "YYYY-MM-DD (hard deadline)" },
     area: { type: "string", description: "Area id (e.g. 'envisioning')" },
     project: { type: "string", description: "Project id (e.g. 'septena')" },
+    heading: { type: "string", description: "Heading id in a project (from tasks_project_get `headings`). Files the task under that heading, in the heading's project." },
     notes: { type: "string", description: "Free-text note body for the task." },
     recurrence: recurrenceJsonSchema,
     reminder_at: {
@@ -199,6 +200,7 @@ export const updateTaskJsonSchema = {
     deadline: { type: ["string", "null"], description: "YYYY-MM-DD, or null to clear" },
     area: { type: ["string", "null"] },
     project: { type: ["string", "null"] },
+    heading: { type: ["string", "null"], description: "Heading id in a project (from tasks_project_get `headings`): files the task under it, in the heading's project. null or \"\" takes it out of its heading. A move to another project or an area without a heading clears it." },
     status: { type: "string", enum: ["open", "cancelled"] },
     notes: { type: ["string", "null"], description: 'Replace the whole note body, or null/"" to clear. To add or change one part, use notes_append or notes_section instead, so you never overwrite edits made since your read.' },
     notes_append: { type: "string", minLength: 1, description: "Add this text on a new line at the end of the notes. Cannot be combined with notes or notes_section." },
@@ -266,6 +268,8 @@ export interface CreateTaskInput {
   due?: string;
   area?: string;
   project?: string;
+  /** A heading row's id; the task goes into that heading's project. */
+  heading?: string;
   notes?: string;
   recurrence?: RecurrenceInput | null;
   reminder_at?: string | null;
@@ -302,6 +306,8 @@ export interface UpdateTaskInput {
   due?: string | null;
   area?: string | null;
   project?: string | null;
+  /** A heading row's id, or null / "" to take the task out of its heading. */
+  heading?: string | null;
   status?: "open" | "cancelled";
   notes?: string | null;
   notes_append?: string;

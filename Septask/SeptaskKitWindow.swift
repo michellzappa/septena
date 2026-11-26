@@ -135,11 +135,9 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     // otherwise has no use for. An accessory reaches the same strip of chrome
     // and stays out of that decision. `SyncIndicator` draws nothing when idle,
     // so the accessory collapses to zero width between syncs; it only takes
-    // space while a fetch/send is in flight, or during the first-run download
-    // where it also carries the running item count.
+    // space while a sync with the task backend runs.
     let syncHost = NSHostingView(
       rootView: SyncIndicator()
-        .environment(SeptenaServices.shared.ckEngine)
         .padding(.trailing, 12)
     )
     syncHost.frame.size = syncHost.fittingSize

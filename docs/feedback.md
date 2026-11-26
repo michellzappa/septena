@@ -1,3 +1,7 @@
+> **Superseded** by [ADR 0054](adr/0054-support-lands-in-starlings.md) and
+> [SUPPORT_SPEC.md](SUPPORT_SPEC.md) (2026-11-26). This iCloud-era design is
+> history: support goes to Starlings, and App Attest is not used.
+
 # Feedback & Feature Board — Design
 
 Status: **designed, not built** · Last updated: 2026-06-04

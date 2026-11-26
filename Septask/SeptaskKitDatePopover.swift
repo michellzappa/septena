@@ -1523,20 +1523,32 @@ private final class KitDateBoard: NSView {
       }
     } ?? false
 
-    typedLabel.font = SeptaskKitTheme.meta
-    typedLabel.textColor = SeptaskKitTheme.iconMuted
+    // The typed-entry line is a peer of the rows below: same body size, same
+    // 10 pt text inset, so it reads as an option, not a footnote.
+    typedLabel.font = .monospacedDigitSystemFont(ofSize: SeptenaTypeScale.size(.body), weight: .regular)
+    typedLabel.textColor = SeptaskKitTheme.inkSecondary
     typedLabel.lineBreakMode = .byTruncatingTail
+    typedLabel.translatesAutoresizingMaskIntoConstraints = false
     updateTypedLabel()
+    let typedRow = NSView()
+    typedRow.translatesAutoresizingMaskIntoConstraints = false
+    typedRow.addSubview(typedLabel)
+    NSLayoutConstraint.activate([
+      typedLabel.leadingAnchor.constraint(equalTo: typedRow.leadingAnchor, constant: 10),
+      typedLabel.trailingAnchor.constraint(equalTo: typedRow.trailingAnchor, constant: -10),
+      typedLabel.topAnchor.constraint(equalTo: typedRow.topAnchor, constant: 4),
+      typedLabel.bottomAnchor.constraint(equalTo: typedRow.bottomAnchor, constant: -2),
+    ])
 
     let separator = NSBox()
     separator.boxType = .separator
 
-    let stack = NSStackView(views: [typedLabel, strip, separator])
+    let stack = NSStackView(views: [typedRow, strip, separator])
     stack.orientation = .vertical
     stack.alignment = .leading
     stack.spacing = Self.rowSpacing
     stack.detachesHiddenViews = true
-    stack.setCustomSpacing(8, after: typedLabel)
+    stack.setCustomSpacing(8, after: typedRow)
     stack.setCustomSpacing(8, after: strip)
     stack.setCustomSpacing(4, after: separator)
 
@@ -1644,7 +1656,7 @@ private final class KitDateBoard: NSView {
     }
 
     // The strip sets the width; everything else matches it.
-    for view in [typedLabel, separator] as [NSView] {
+    for view in [typedRow, separator] as [NSView] {
       view.widthAnchor.constraint(equalTo: strip.widthAnchor).isActive = true
     }
 
@@ -1947,7 +1959,7 @@ private final class KitDateBoard: NSView {
   /// text and the date it means.
   private func updateTypedLabel() {
     if typed.isEmpty {
-      typedLabel.textColor = SeptaskKitTheme.iconMuted
+      typedLabel.textColor = SeptaskKitTheme.inkSecondary
       typedLabel.stringValue = String(localized: "Type a date: tomorrow, fri, +3, dec 4",
                                       comment: "SeptaskKit: date popover typed-entry hint")
       return

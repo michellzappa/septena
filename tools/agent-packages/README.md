@@ -1,8 +1,14 @@
-# Septena Agent Packages (Draft — Issue #88)
+# Septena Agent Packages (Issue #88)
 
 Draft installable packages for AI coding/CLI agents pointing at the Septena tasks MCP connector (`https://api.septena.app/mcp`), plus the draft `llms.txt` for `septena.app`.
 
-Nothing here is published yet and no GitHub org repositories have been created.
+The Claude Code plugin is published. This repo is its marketplace (`.claude-plugin/marketplace.json` at the repo root):
+
+```
+/plugin install septena --marketplace michellzappa/septena
+```
+
+The Gemini CLI extension and `llms.txt` are still drafts.
 
 ## Single source of truth
 
@@ -34,5 +40,5 @@ node tools/agent-packages/sync.mjs --check
 
 - **OpenClaw / ClawHub skill & Hermes Agent skill** — wait on **agent keys (#86)** because those clients cannot hold an interactive OAuth sign-in and need `Authorization: Bearer <key>` on `/mcp`.
 - **Headless / CI / cron runs of Gemini CLI or Claude Code** — interactive local sessions can complete the OAuth PKCE + pairing-code flow on loopback today; non-interactive/headless runners without a browser wait on **agent keys (#86)**.
-- **Standalone distribution repos under `github.com/septena`** (Claude Code marketplace repo + Gemini CLI extension repo) — intentionally not created here; each package directory (`claude-plugin/`, `gemini-extension/`) is self-contained and ready to be extracted once the org/repos are set up.
+- **Gemini CLI extension repo** — not created. `gemini extensions install` wants the extension at a repo root, so it needs its own repo. The Claude Code plugin needs none: this repo is its marketplace.
 - **"Add to Cursor" deep link on `/agents` and serving `llms.txt` on `septena.app`** — live in the private `septena-site` repository.

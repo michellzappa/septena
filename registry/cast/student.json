@@ -41,6 +41,7 @@
       "artifact": "Reference check",
       "bodies": ["Eleven of 94 references don’t match. Six miss a page range, four use the old journal style, and one is listed twice.", "Eleven of 94 references don’t match. Each one has a suggested line below. Two page ranges are missing from your notes, so I left a gap."],
       "otherBody": "Eleven of 94 references don’t match the guide. Your direction: {answer}",
+      "otherAnswer": "Fix them, then show me",
       "handoff": "Read the list", "acceptance": "Every reference follows the guide."
     },
     "discuss": {
@@ -49,6 +50,7 @@
       "artifact": "Message to Ottilie",
       "bodies": ["Hi Ottilie, yes to the van and yes to both weeks. I can bring the corer if you bring the waders.", "Hi Ottilie, yes to the van. I can promise the first week now, and I will know about the second once chapter 3 is back from the committee."],
       "otherBody": "Hi Ottilie, about the van and the second week: {answer}",
+      "otherAnswer": "Fairly sure, I’ll know by {weekday+2}",
       "draftHandoff": "Read the message", "handoff": "Your next step: send it", "acceptance": "Ottilie can book the van.",
       "with": ["cut", "wen-comments", "marking", "alto"]
     },

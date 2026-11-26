@@ -207,6 +207,15 @@
         "featureId": "agents.connector"
       },
       {
+        "id": "agentKeyCreated",
+        "kind": "fork",
+        "title": "Your agent key",
+        "message": "Septena shows this key only once. Paste it into your script or agent. To stop the agent, disconnect it in this list.",
+        "confirmTitle": "Copy Key",
+        "options": [],
+        "featureId": "agents.connector"
+      },
+      {
         "id": "agentReplaces",
         "kind": "fork",
         "title": "Replaces",
@@ -246,6 +255,7 @@
       { "id": "renameProject", "title": "Rename Project", "placeholder": "Project name", "confirmTitle": "Rename", "featureId": "places.projects" },
       { "id": "renameAgent", "title": "Rename Agent", "placeholder": "Agent name", "confirmTitle": "Rename", "featureId": "agents.connector" },
       { "id": "nameAgent", "title": "Name this agent", "placeholder": "Agent name", "confirmTitle": "Save", "featureId": "agents.connector" },
+      { "id": "newAgentKey", "title": "New Agent Key", "placeholder": "Agent name", "confirmTitle": "Create", "featureId": "agents.connector" },
       { "id": "conversationOther", "title": "Other…", "placeholder": "Type your answer", "confirmTitle": "Send", "featureId": "ai.discuss" },
       { "id": "conversationReply", "title": "Reply…", "placeholder": "Reply to thread", "confirmTitle": "Send", "featureId": "ai.discuss" },
       { "id": "sendBackReview", "title": "Send back for another pass", "placeholder": "What needs another pass?", "confirmTitle": "Send back", "featureId": "lists.review" }
@@ -300,7 +310,7 @@
         "title": "Welcome to Septena",
         "body": "Tasks that think with you.",
         "points": [
-          { "icon": "onboarding.devices", "title": "On every device", "detail": "Your tasks stay in step on iPhone, iPad and Mac." },
+          { "icon": "onboarding.devices", "title": "On every device", "detail": "Your tasks stay in step on every device you sign in to." },
           {
             "icon": "onboarding.agent",
             "title": "Your agents do the work",
@@ -401,11 +411,25 @@
     "copy": [
       { "id": "intro", "label": "Use a device where Septena is already signed in." },
       { "id": "start", "label": "Get a sign-in code" },
-      { "id": "approve", "label": "On your iPhone, iPad or Mac, open Septena and go to Settings ▸ Account ▸ Approve a sign-in. Tap Scan Code and point the camera at this screen, or enter this code:" },
+      { "id": "approve", "label": "On another device where you are signed in, open Septena and go to Settings ▸ Account ▸ Approve a sign-in. Tap Scan Code and point the camera at this screen, or enter this code:" },
       { "id": "lifetime", "label": "The code works for 10 minutes. After you approve it, this screen continues by itself." },
       { "id": "expired", "label": "The code expired." },
       { "id": "unreachable", "label": "Could not reach Septena." },
       { "id": "retry", "label": "Get a new code" }
+    ]
+  },
+  "accountSwitch": {
+    "featureId": "sync.backend",
+    "title": "Replace the tasks on this device?",
+    "copy": [
+      { "id": "body", "label": "You signed in with a different account. The tasks on this device belong to the account you used before. They are removed from this device, and this account’s tasks take their place." },
+      { "id": "tasksOne", "label": "1 task is on this device." },
+      { "id": "tasksOther", "label": "{count} tasks are on this device." },
+      { "id": "unsentOne", "label": "1 change was not sent yet and will be lost." },
+      { "id": "unsentOther", "label": "{count} changes were not sent yet and will be lost." },
+      { "id": "export", "label": "Export a Backup First" },
+      { "id": "replace", "label": "Replace" },
+      { "id": "cancel", "label": "Cancel" }
     ]
   },
   "taskAttributes": [

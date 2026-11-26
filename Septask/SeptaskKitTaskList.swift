@@ -1669,7 +1669,7 @@ final class SeptaskKitTaskListController: NSViewController {
   /// Return on the selected notice both run this.
   private func noticePrimaryAction(_ id: TaskNotice.ID) -> (() -> Void)? {
     switch id {
-    case .signIn: return { SeptaskAppKitSignIn.shared.start() }
+    case .signIn: return { SeptaskSignInWindow.present() }
     case .weeklySweep: return { [weak self] in self?.presentWeeklySweepSheet() }
     case .trialEnd, .secondDevice:
       guard let upsell = RegistryNotices.byId[id.registryID]?.upsellId else { return nil }
@@ -4083,9 +4083,10 @@ final class SeptaskKitTaskListController: NSViewController {
       beginEditingRow(row)
       return
     }
-    // A Review row opens the task page (the inspector), same as iPhone. It
-    // never expands inline: the review cell is not a task row.
-    if isReviewRow(task) {
+    // A Review row about agent work (question, finished work, work in
+    // progress) opens the task page (the inspector), where its conversation
+    // is, same as iPhone. Only Faded rows expand inline.
+    if filter == .review, task.opensConversationInReview {
       onOpenInspector?()
       return
     }

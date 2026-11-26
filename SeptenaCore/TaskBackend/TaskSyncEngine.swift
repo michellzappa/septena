@@ -136,6 +136,34 @@ final class TaskSyncEngine {
   static var onSignInHook: (@MainActor () -> Void)?
   static var beforeSignOutHook: (@MainActor () async -> Void)?
 
+  /// What a sign-in with another account would remove from this device (#575).
+  struct AccountSwitchSummary: Sendable {
+    /// Tasks on this device, finished and deleted ones included.
+    let tasks: Int
+    /// Changes in the outbox that the previous account never received.
+    let unsent: Int
+  }
+
+  /// The user's answer to `confirmAccountSwitch`.
+  enum AccountSwitchChoice: Sendable {
+    /// Remove this device's tasks and take the new account's.
+    case replace
+    /// Keep this device's tasks and sign out of the new account.
+    case cancel
+    /// As `cancel`, then open Import & Export so the user can save a backup
+    /// and sign in again.
+    case exportFirst
+  }
+
+  /// Thrown by `signIn` when the user kept the other account's tasks. Not an
+  /// error to show: the sign-in did what the user chose.
+  struct AccountSwitchDeclined: Error {}
+
+  /// Asks the user before a sign-in with another account replaces the tasks on
+  /// this device. The app sets it (`SeptaskAccountSwitchPrompt`). When it is
+  /// nil the sign-in keeps the tasks and signs out: it fails closed.
+  static var confirmAccountSwitch: (@MainActor (AccountSwitchSummary) async -> AccountSwitchChoice)?
+
   private init() {}
 
   var main: ModelContext { LocalStore.shared.container.mainContext }
@@ -1579,6 +1607,12 @@ final class TaskSyncEngine {
     try await signIn { try await $0.adoptDeviceSession(session) }
   }
 
+  /// The same, with the code mailed to `email` (ADR 0047). A new address
+  /// creates an account.
+  func signIn(email: String, code: String) async throws {
+    try await signIn { try await $0.verifyEmailSignIn(email: email, code: code) }
+  }
+
   private func signIn(_ authenticate: (TaskBackendClient) async throws -> String) async throws {
     let wasRunning = await pauseSync()
     defer { if wasRunning { start() } }
@@ -1586,6 +1620,18 @@ final class TaskSyncEngine {
     // No stored id (the first sign-in on this device, or a session from a
     // build before this check): keep the local data, as before.
     if let last = lastUserID, last != userID {
+      // Another account: the tasks here are the previous account's. Ask
+      // before removing them, unless there is nothing to remove (#575).
+      let summary = accountSwitchSummary()
+      if summary.tasks > 0 || summary.unsent > 0 {
+        let choice = await Self.confirmAccountSwitch?(summary) ?? .cancel
+        guard choice == .replace else {
+          await client.signOut()
+          signedIn = TaskBackendClient.hasSession
+          SeptenaLog.info("[TaskSync] another account signed in; the user kept this device's tasks")
+          throw AccountSwitchDeclined()
+        }
+      }
       wipeLocalTaskData()
       SeptenaLog.info("[TaskSync] signed in as another account; local task data wiped")
     }
@@ -1628,6 +1674,13 @@ final class TaskSyncEngine {
 
   /// Backend user id of the active session on this device, for Settings ▸ Account (#565).
   var accountID: String? { signedIn ? lastUserID : nil }
+
+  /// Counts what `wipeLocalTaskData` would remove that the user can lose:
+  /// the tasks on this device and the changes not sent yet.
+  private func accountSwitchSummary() -> AccountSwitchSummary {
+    let tasks = (try? main.fetchCount(FetchDescriptor<TaskEntity>())) ?? 0
+    return AccountSwitchSummary(tasks: tasks, unsent: store()?.opCount() ?? pendingOps)
+  }
 
   /// Backend user id of the last sign-in on this device.
   private var lastUserID: String? {

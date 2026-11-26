@@ -8,6 +8,7 @@ import { MAX_ATTACHMENT_BYTES, zId } from "../store/columns.js";
 import { zPushBody, type Op } from "../store/ops.js";
 import type { ChangeEntry } from "../store/TaskStore.js";
 import { USER_ID_RE, accountStoreFor } from "../store/AccountStore.js";
+import { prepareReviewerAccount } from "../shadow/reviewer.js";
 import { AppleIdentityError, userIdForAppleSub, verifyAppleIdentityToken } from "./appleIdentity.js";
 import { HANDOFF_TTL_S, accountAlreadyDeleted, authenticate, issueSession, refreshSession, revokeSession, storeFor, withSession } from "./session.js";
 import { SESSION_HEADER } from "../store/sessions.js";
@@ -20,6 +21,7 @@ import {
   redeemWsTicket,
   webCorsMiddleware,
 } from "./webAuth.js";
+import { enabledSignInMethods, startEmailSignIn, verifyEmailSignIn, zEmailStartBody, zEmailVerifyBody } from "./emailSignIn.js";
 import {
   approvePairing,
   denyPairing,
@@ -33,7 +35,7 @@ import {
   zPairDenyBody,
   zPairInspectBody,
 } from "../shadow/oauth.js";
-import { MCP_READ_SCOPE, disconnectFamily, hasScope, isMcpAccessToken, verifyMcpAccess } from "../shadow/tokens.js";
+import { MCP_READ_SCOPE, MCP_WRITE_SCOPE, createAgentKey, disconnectFamily, hasScope, isMcpAccessToken, verifyMcpAccess } from "../shadow/tokens.js";
 import { MAX_AGENT_WEBHOOKS, validateWebhookUrl } from "./agentWake.js";
 import {
   TRIAL_ROW_ID,
@@ -72,6 +74,7 @@ import { notesHistoryRest } from "./notesHistoryRest.js";
 import { shares } from "./shares.js";
 import { projectStoreFor } from "../store/ProjectStore.js";
 import { tasksRest } from "./tasksRest.js";
+import { ERROR_FORMAT_HEADER, envelopeResponse } from "../errors.js";
 
 // Task backend API, mounted at /v1 (docs/SEPTASK_BACKEND.md in the app repo).
 // Phase 0: no app or MCP tool calls this yet. The live connector is unchanged.
@@ -96,6 +99,11 @@ export const api = new Hono<{ Bindings: Env; Variables: Vars }>();
 
 // CORS for browser clients (docs/WEB_CLIENT_SPEC.md §5).
 api.use("*", webCorsMiddleware);
+// The one error envelope, for a caller that asks for it (src/errors.ts).
+api.use("*", async (c, next) => {
+  await next();
+  if (c.req.header(ERROR_FORMAT_HEADER)?.trim().toLowerCase() === "envelope") c.res = await envelopeResponse(c.res);
+});
 
 const zAppleBody = z.object({
   identityToken: z.string().min(20).max(8_000),
@@ -209,6 +217,37 @@ api.post("/auth/signout", async (c) => {
     status: 204,
     headers: { "Set-Cookie": clearRefreshCookie(c.env) },
   });
+});
+
+// Which sign-in methods this server has on (ADR 0047, docs/SIGN_IN_SURFACES_SPEC.md §3).
+api.get("/auth/methods", (c) =>
+  c.json({ methods: enabledSignInMethods(c.env).map((id) => ({ id })) }, 200, { "Cache-Control": "no-store" }));
+
+// Email one-time code (ADR 0016, issue #169): see ./emailSignIn.ts.
+api.post("/auth/email/start", async (c) => {
+  const body = await parse(c, zEmailStartBody);
+  if (body instanceof Response) return body;
+  const res = await startEmailSignIn(c.env, body, c.req.header("CF-Connecting-IP"));
+  if (res.ok) return c.json({ status: "sent", expiresInSeconds: res.expiresInSeconds, codeLength: 6 }, 202, { "Cache-Control": "no-store" });
+  const headers: Record<string, string> = { "Cache-Control": "no-store" };
+  if (res.retryAfterSeconds) headers["Retry-After"] = String(res.retryAfterSeconds);
+  return c.json({ error: res.error, ...(res.retryAfterSeconds ? { retryAfterSeconds: res.retryAfterSeconds } : {}) }, res.status, headers);
+});
+
+api.post("/auth/email/verify", async (c) => {
+  const body = await parse(c, zEmailVerifyBody);
+  if (body instanceof Response) return body;
+  const cookieMode = body.sessionMode === "cookie";
+  if (cookieMode && !isAllowedWebOrigin(c.env, c.req.header("Origin"))) {
+    return c.json({ error: "origin_not_allowed" }, 403, { "Cache-Control": "no-store" });
+  }
+  const res = await verifyEmailSignIn(c.env, body, c.req.header("CF-Connecting-IP"));
+  if (!res.ok) {
+    return c.json({ error: res.error, ...(res.attemptsLeft !== undefined ? { attemptsLeft: res.attemptsLeft } : {}) }, res.status, { "Cache-Control": "no-store" });
+  }
+  return cookieMode
+    ? cookieSessionResponse(c.env, res.session)
+    : c.json(res.session, 200, { "Cache-Control": "no-store" });
 });
 
 // Device sign-in by approval (ADR 0016, issue #170): see src/shadow/oauth.ts.
@@ -675,6 +714,25 @@ api.delete("/access/connections/:id", async (c) => {
   return c.body(null, 204);
 });
 
+/// Creates an agent key (#86) for an agent that cannot sign in. Only an app
+/// session reaches this route, so an agent cannot mint keys. The key is in
+/// this reply only. The key's row in the Agents list is `id`: rename and
+/// revoke use the connection routes above and below.
+const zCreateKeyBody = z.object({
+  name: zAgentName,
+  access: z.enum(["read", "write"]).default("write"),
+}).strict();
+
+api.post("/access/keys", async (c) => {
+  const body = zCreateKeyBody.safeParse(await c.req.json().catch(() => null));
+  if (!body.success) return c.json({ error: "invalid_request" }, 400);
+  const userId = c.get("userId");
+  const scope = body.data.access === "write" ? `${MCP_READ_SCOPE} ${MCP_WRITE_SCOPE}` : MCP_READ_SCOPE;
+  const created = await createAgentKey(c.env, userId, body.data.name, scope);
+  logEvent("access_key_created", { userId, by: c.get("actor"), access: body.data.access });
+  return c.json(created, 201, { "Cache-Control": "no-store" });
+});
+
 /// Renames an agent. `name: null` goes back to the client's registered name.
 const zRenameConnectionBody = z.object({ name: zAgentName.nullable() }).strict();
 
@@ -904,6 +962,19 @@ api.delete("/admin/grants/:userId/:name", async (c) => {
   const removed = await storeFor(c.env, userId.data).deleteEntitlement(`grant:${name.data}`);
   logEvent("entitlement_grant_revoked", { userId: userId.data, name: name.data, removed });
   return removed ? c.body(null, 204) : c.json({ error: "not_found" }, 404);
+});
+
+// ---- admin: the directory reviewer demo account (ADR 0055) ----
+// Same gate as the grant routes, and 404 unless reviewer mode is on. Returns
+// a short-lived connector token for the demo account only; the seed script
+// (backend/scripts/reviewer-seed.mjs) fills the account with it and revokes it.
+
+api.post("/admin/reviewer/prepare", async (c) => {
+  if (!c.env.ADMIN_TOKEN) return c.notFound();
+  if (!(await adminAllowed(c))) return c.json({ error: "forbidden" }, 403);
+  const tokens = await prepareReviewerAccount(c.env);
+  if (!tokens) return c.json({ error: "reviewer_mode_off" }, 404);
+  return c.json(tokens, 200, { "Cache-Control": "no-store" });
 });
 
 // ---- admin: account move copy (docs/CLOUDFLARE_ACCOUNT_MOVE.md) ----
