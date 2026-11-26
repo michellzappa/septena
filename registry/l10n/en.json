@@ -268,6 +268,12 @@
       "surfaces.taskPage.blocks.taskPage.provenance.label"
     ]
   },
+  "Adds your device, Septena version and sync status. It never includes your tasks.": {
+    "text": "Adds your device, Septena version and sync status. It never includes your tasks.",
+    "paths": [
+      "surfaces.support.copy.diagnosticsDetail.label"
+    ]
+  },
   "Advanced": {
     "text": "Advanced",
     "paths": [
@@ -832,6 +838,19 @@
       "settings.copy.claude_connector.connectorUrl.label"
     ]
   },
+  "Contact Support": {
+    "text": "Contact Support",
+    "paths": [
+      "settings.pages.about.sections.actions.items.4.label",
+      "surfaces.support.title"
+    ]
+  },
+  "Contact Support…": {
+    "text": "Contact Support…",
+    "paths": [
+      "actions.actions.app.contactSupport.title"
+    ]
+  },
   "Continue": {
     "text": "Continue",
     "paths": [
@@ -938,6 +957,12 @@
     "paths": [
       "surfaces.sharing.copy.failed.label",
       "surfaces.deviceSignIn.copy.unreachable.label"
+    ]
+  },
+  "Couldn't send your message.": {
+    "text": "Couldn't send your message.",
+    "paths": [
+      "surfaces.support.copy.sendFailed.label"
     ]
   },
   "Couldn’t add the reference.": {
@@ -1278,6 +1303,7 @@
       "settings.copy.sign_in_approval.done.label",
       "actions.actions.task.select.activeTitle",
       "actions.actions.do.done.title",
+      "surfaces.support.copy.doneTitle.label",
       "surfaces.doing.exits.done.label",
       "plans.paywall.done"
     ]
@@ -1339,6 +1365,7 @@
   "Email": {
     "text": "Email",
     "paths": [
+      "surfaces.support.copy.emailLabel.label",
       "surfaces.taskReferences.kinds.email.label",
       "signIn.email.emailLabel"
     ]
@@ -1378,6 +1405,12 @@
     "text": "Enter the code from the other device. If you're connecting Claude, the code is in your browser.",
     "paths": [
       "settings.copy.sign_in_approval.enterFooter.label"
+    ]
+  },
+  "Enter your email so we can reply.": {
+    "text": "Enter your email so we can reply.",
+    "paths": [
+      "surfaces.support.copy.emailRequired.label"
     ]
   },
   "Error": {
@@ -1883,6 +1916,12 @@
       "settings.copy.calendar_detail.include.label"
     ]
   },
+  "Include diagnostics": {
+    "text": "Include diagnostics",
+    "paths": [
+      "surfaces.support.copy.diagnosticsLabel.label"
+    ]
+  },
   "Included": {
     "text": "Included",
     "paths": [
@@ -2158,6 +2197,12 @@
       "surfaces.sharing.copy.intro.label"
     ]
   },
+  "Message": {
+    "text": "Message",
+    "paths": [
+      "surfaces.support.copy.messageLabel.label"
+    ]
+  },
   "Monday": {
     "text": "Monday",
     "paths": [
@@ -2169,6 +2214,12 @@
     "text": "Month",
     "paths": [
       "surfaces.taskDetail.repeatUnits.2.title"
+    ]
+  },
+  "Most answers are in Help.": {
+    "text": "Most answers are in Help.",
+    "paths": [
+      "surfaces.support.copy.helpHint.label"
     ]
   },
   "Move": {
@@ -2371,6 +2422,12 @@
       "signIn.copy.subheading"
     ]
   },
+  "New reply": {
+    "text": "New reply",
+    "paths": [
+      "surfaces.support.copy.unreadReply.label"
+    ]
+  },
   "New tasks wait at the top of Today until you schedule or file them.": {
     "text": "New tasks wait at the top of Today until you schedule or file them.",
     "paths": [
@@ -2429,6 +2486,12 @@
     "text": "No matches",
     "paths": [
       "surfaces.quickFind.noResults.title"
+    ]
+  },
+  "No messages yet.": {
+    "text": "No messages yet.",
+    "paths": [
+      "surfaces.support.copy.noMessages.label"
     ]
   },
   "No open tasks in this area yet.": {
@@ -2678,6 +2741,12 @@
       "actions.actions.task.open.title",
       "actions.actions.task.reference.open.title",
       "actions.actions.notice.openStep.title"
+    ]
+  },
+  "Open Help": {
+    "text": "Open Help",
+    "paths": [
+      "surfaces.support.copy.helpLink.label"
     ]
   },
   "Open Today": {
@@ -3423,7 +3492,8 @@
     "paths": [
       "actions.actions.task.conversation.send.title",
       "surfaces.prompts.text.conversationOther.confirmTitle",
-      "surfaces.prompts.text.conversationReply.confirmTitle"
+      "surfaces.prompts.text.conversationReply.confirmTitle",
+      "surfaces.support.copy.send.label"
     ]
   },
   "Send Back…": {
@@ -3456,16 +3526,23 @@
       "signIn.email.sendCode"
     ]
   },
-  "Send feedback": {
-    "text": "Send feedback",
+  "Sending…": {
+    "text": "Sending…",
     "paths": [
-      "settings.pages.about.sections.actions.items.4.label"
+      "surfaces.support.copy.sending.label"
+    ]
+  },
+  "Sent. The reply shows here.": {
+    "text": "Sent. The reply shows here.",
+    "paths": [
+      "surfaces.support.copy.sent.label"
     ]
   },
   "Septena": {
     "text": "Septena",
     "paths": [
-      "actions.menuBar.app.title"
+      "actions.menuBar.app.title",
+      "surfaces.support.copy.fromSeptena.label"
     ]
   },
   "Septena Help": {
@@ -4377,6 +4454,12 @@
       "surfaces.taskDateBoard.tomorrow.label"
     ]
   },
+  "Too many messages. Try again later.": {
+    "text": "Too many messages. Try again later.",
+    "paths": [
+      "surfaces.support.copy.rateLimited.label"
+    ]
+  },
   "Too many requests. Try again later.": {
     "text": "Too many requests. Try again later.",
     "paths": [
@@ -4399,6 +4482,12 @@
     "text": "Topography",
     "paths": [
       "tokens.textures.topography.name"
+    ]
+  },
+  "Try Again": {
+    "text": "Try Again",
+    "paths": [
+      "surfaces.support.copy.tryAgain.label"
     ]
   },
   "Try Plus free for 14 days": {
@@ -4552,6 +4641,12 @@
       "tokens.textures.washiPaper.name"
     ]
   },
+  "We need your email to reply.": {
+    "text": "We need your email to reply.",
+    "paths": [
+      "surfaces.support.copy.emailDetail.label"
+    ]
+  },
   "We never hold your data back": {
     "text": "We never hold your data back",
     "paths": [
@@ -4607,6 +4702,12 @@
     "text": "Welcome to Septena",
     "paths": [
       "surfaces.firstRun.steps.welcome.title"
+    ]
+  },
+  "What happened, and what did you expect?": {
+    "text": "What happened, and what did you expect?",
+    "paths": [
+      "surfaces.support.copy.messagePlaceholder.label"
     ]
   },
   "What needs another pass?": {
@@ -4709,6 +4810,7 @@
     "text": "You",
     "paths": [
       "surfaces.sharing.copy.you.label",
+      "surfaces.support.copy.fromYou.label",
       "surfaces.taskPage.blocks.taskPage.provenance.selfLabel"
     ]
   },

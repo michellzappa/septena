@@ -613,20 +613,59 @@ actor TaskBackendClient {
     guard status == 204 || status == 200 else { throw Self.httpError(status, data) }
   }
 
+  // MARK: - Contact Support (ADR 0054, backend/src/support/)
+
+  /// Signed in: the bearer token, plus the support key so a signed-out
+  /// conversation moves to the account. Signed out: the support key alone.
+  private func support(path: String, method: String, body: Data?, supportKey: String) async throws -> (Data, Int) {
+    let headers = [SupportWire.keyHeader: supportKey]
+    if Self.hasSession {
+      return try await authed(path: path, method: method, body: body, headers: headers)
+    }
+    return try await perform(path: path, method: method, body: body, auth: nil, headers: headers)
+  }
+
+  func sendSupportMessage(_ message: SupportWire.Outgoing, supportKey: String) async throws -> SupportWire.Message {
+    let body = try JSONEncoder().encode(message)
+    let (data, status) = try await support(path: "/v1/support/messages", method: "POST", body: body, supportKey: supportKey)
+    switch status {
+    case 202:
+      return try decode(SupportWire.Sent.self, from: data, what: "support message").message
+    case 429:
+      throw SupportWire.SendError.rateLimited
+    case 400 where (try? JSONDecoder().decode(BackendErrorBody.self, from: data))?.error == "email_required":
+      throw SupportWire.SendError.emailRequired
+    default:
+      throw Self.httpError(status, data)
+    }
+  }
+
+  func supportConversation(supportKey: String) async throws -> SupportWire.Conversation {
+    let (data, status) = try await support(path: "/v1/support/messages", method: "GET", body: nil, supportKey: supportKey)
+    guard status == 200 else { throw Self.httpError(status, data) }
+    return try decode(SupportWire.Conversation.self, from: data, what: "support conversation")
+  }
+
+  func markSupportRead(supportKey: String) async throws {
+    let (data, status) = try await support(path: "/v1/support/read", method: "POST", body: nil, supportKey: supportKey)
+    guard status == 204 || status == 200 else { throw Self.httpError(status, data) }
+  }
+
   // MARK: - HTTP
 
   /// Sends with a bearer token. On 401 it refreshes once and retries. A
   /// transport error or a 5xx / 429 is retried up to twice; every op carries a
   /// deterministic `clientOpId`, so a repeated push does not apply twice.
   private func authed(path: String, method: String, body: Data?,
-                      contentType: String = "application/json") async throws -> (Data, Int) {
+                      contentType: String = "application/json",
+                      headers: [String: String] = [:]) async throws -> (Data, Int) {
     var forceRefresh = false
     var attempt = 0
     while true {
       let token = try await validAccessToken(forceRefresh: forceRefresh)
       do {
         let (data, status) = try await perform(path: path, method: method, body: body, auth: token,
-                                               contentType: contentType)
+                                               contentType: contentType, headers: headers)
         if status == 401, !forceRefresh { forceRefresh = true; continue }
         if (status >= 500 || status == 429), attempt < 2 {
           attempt += 1
@@ -643,7 +682,8 @@ actor TaskBackendClient {
   }
 
   private func perform(path: String, method: String, body: Data?, auth: String?,
-                       contentType: String = "application/json") async throws -> (Data, Int) {
+                       contentType: String = "application/json",
+                       headers: [String: String] = [:]) async throws -> (Data, Int) {
     guard let url = URL(string: path, relativeTo: Self.baseURL) else { throw TaskBackendError.badResponse("bad path") }
     var request = URLRequest(url: url)
     request.httpMethod = method
@@ -651,6 +691,7 @@ actor TaskBackendClient {
     request.setValue(Self.clientVersion, forHTTPHeaderField: "X-Septena-Version")
     request.setValue("application/json", forHTTPHeaderField: "Accept")
     if let auth { request.setValue("Bearer \(auth)", forHTTPHeaderField: "Authorization") }
+    for (name, value) in headers { request.setValue(value, forHTTPHeaderField: name) }
     if let body {
       request.setValue(contentType, forHTTPHeaderField: "Content-Type")
       request.setValue(String(body.count), forHTTPHeaderField: "Content-Length")

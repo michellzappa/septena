@@ -1116,7 +1116,7 @@
             { "kind": "customSurface", "surface": "check_updates", "label": "Check for Updates…", "platforms": ["macos", "windows"], "featureId": "mac.updates" },
             { "kind": "customSurface", "surface": "reset_get_started", "label": "Show Get Started Again" },
             { "kind": "customSurface", "surface": "reset_first_run", "label": "Show Welcome Again", "featureId": "onboarding.first-run" },
-            { "kind": "customSurface", "surface": "send_feedback", "label": "Send feedback", "icon": "settings.feedback" }
+            { "kind": "customSurface", "surface": "contact_support", "label": "Contact Support", "icon": "settings.feedback", "featureId": "support.contact" }
           ]
         },
         {
