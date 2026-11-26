@@ -8165,6 +8165,10 @@
       "comment" : "Generated from registry signIn.copy.terms. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
+    "By invitation. €120 a year or €14 a month once it goes on sale" : {
+      "comment" : "Generated from registry plans.levels.pro.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Calendar" : {
       "localizations" : {
         "de" : {
