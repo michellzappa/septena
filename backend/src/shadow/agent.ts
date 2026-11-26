@@ -5,6 +5,7 @@ import type { ChangeEntry, ConvoCandidate, Row } from "../store/TaskStore.js";
 import { AGENT_RUN_BUDGET, CLAIM_TTL_DEFAULT_MS, isAgentActor } from "../store/TaskStore.js";
 import { type StoreRpc, agentNameFromActor } from "./writes.js";
 import { notesForTask } from "./notes.js";
+import { REFUSALS } from "../errors.js";
 
 // The agent loop on the api.septena.app connector (docs/TASK_FACTORY_SPEC.md
 // §5, ADR 0008 in the app repo). These tools exist on this connector only:
@@ -52,7 +53,8 @@ export const AGENT_TOOLS: Tool[] = [
     description:
       "Claim a task before you work on it, so no other agent works it at the same time. The claim is a lease " +
       "(default 30 minutes, at most 240): call again with the same agent name to renew it while you work, and " +
-      "call tasks_release when you stop. A refusal names the rule that stopped you; respect it and do not retry: " +
+      "call tasks_release when you stop. A refusal names the rule that stopped you, and its `error` says whether a later retry can work " +
+      "(retryable; only `held` can, after claimUntil). Respect it: " +
       "paused (the user paused all agents), stopped (the user stopped this task), your_turn (a question waits for " +
       "the user), held (another agent holds it), doing (the user does it now), budget (" + AGENT_RUN_BUDGET + " runs since the user last wrote: " +
       "ask the user before you continue), terminal or closed. A successful claim returns the task's project and area " +
@@ -253,17 +255,11 @@ function historyEntry(e: ChangeEntry) {
   };
 }
 
-const REFUSAL_RULES: Record<string, string> = {
-  not_found: "No such task.",
-  closed: "The task is done or cancelled.",
-  terminal: "The conversation has an end state. Only the user reopens it.",
-  stopped: "The user stopped agent work on this task. Do not write to it; only the user can resume it.",
-  paused: "The user paused all agents. Do nothing until tasks_agent_events reports unpaused.",
-  your_turn: "A question waits for the user. Wait for a user_turn event on this task.",
-  held: "Another agent holds this task. Pick another task.",
-  doing: "The user does this task now. Do not work on it until a do_ended event on this task.",
-  budget: `${AGENT_RUN_BUDGET} runs since the user last wrote on this task. Ask the user (a provider turn with options) before you continue.`,
-};
+/// The claim refusals' rule text: the hint of the one refusal table.
+const REFUSAL_RULES: Record<string, string> = Object.fromEntries(
+  (["not_found", "closed", "terminal", "stopped", "paused", "your_turn", "held", "doing", "budget"] as const)
+    .map((code) => [code, REFUSALS[code].hint]),
+);
 
 /// Agent queue stage, derived from stored facts only (spec §3).
 export type AgentStage = "queued" | "working" | "your_turn" | "stopped";

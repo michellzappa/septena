@@ -9,6 +9,7 @@ import { zId } from "../store/columns.js";
 import type { Row } from "../store/TaskStore.js";
 import { randomId } from "../util.js";
 import { type StoreRpc, pushAs, requireApplied, rpcStoreFor } from "./writes.js";
+import { Refusal, codeForStatus } from "../errors.js";
 
 // Files an agent puts on a task. Two ways in, one write:
 //   - small content in the tool call (`text` or `base64`);
@@ -83,10 +84,12 @@ export function attachmentsOut(rows: Row[]) {
 type AttachmentStatus = 400 | 402 | 404 | 409 | 410 | 411 | 413 | 503;
 
 /// A refusal in words, with the HTTP status the upload route answers.
-export class AttachmentError extends Error {
+/// An upload refused before the store saw it. The HTTP status picks the
+/// envelope code (src/errors.ts).
+export class AttachmentError extends Refusal {
   readonly status: AttachmentStatus;
   constructor(message: string, status: AttachmentStatus = 400) {
-    super(message);
+    super(codeForStatus(status), message);
     this.status = status;
   }
 }

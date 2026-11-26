@@ -8,6 +8,7 @@ import { storeFor } from "../api/session.js";
 import { MAX_REFS_PER_TASK, MAX_TAGS_PER_TASK, TAG_NAME_MAX, zId } from "../store/columns.js";
 import { zPushBody, type Op, type OpResult } from "../store/ops.js";
 import { AGENT_WRITE_RULES, isAgentActor, type Row, type TaskStore } from "../store/TaskStore.js";
+import { Refusal } from "../errors.js";
 import {
   type CreateTaskInput,
   type RecurrenceRuleInput,
@@ -67,7 +68,8 @@ type StoreMethod =
   | "readOrderTop" | "readSetting" | "push" | "captureTask" | "claim" | "release" | "agentEvents" | "history" | "head"
   | "readDoing" | "readDoSession" | "readDoSessions"
   | "addUsage" | "connectionName"
-  | "readNote" | "noteRevisions" | "readContainer" | "readContainerTasks" | "readHeadings";
+  | "readNote" | "noteRevisions" | "readContainer" | "readContainerTasks" | "readHeadings"
+  | "idempotencyBegin" | "idempotencyFinish" | "idempotencyAbandon";
 export type StoreRpc = {
   [K in StoreMethod]: (...a: Parameters<TaskStore[K]>) => Promise<ReturnType<TaskStore[K]>>;
 };
@@ -329,8 +331,11 @@ export async function pushAs(store: StoreRpc, actor: string | undefined, ops: Ne
 export async function pushOps(ctx: WriteContext, ops: NewOp[]): Promise<void> {
   const results = await pushAs(ctx.store, ctx.actor, ops);
   for (const r of results) {
-    if (r.status === "rejected") throw new Error(/unknown_task|missing_required/.test(r.reason) ? "Task not found" : r.reason);
-    if (r.status === "dropped") throw new Error("Task not found");
+    if (r.status === "rejected") {
+      if (/unknown_task|missing_required/.test(r.reason)) throw new Refusal("not_found", "Task not found");
+      throw new Refusal(r.reason, r.reason);
+    }
+    if (r.status === "dropped") throw new Refusal("not_found", "Task not found");
   }
 }
 
@@ -352,18 +357,19 @@ const applied = (r: OpResult | undefined) => r?.status === "applied";
 export function requireApplied(r: OpResult | undefined, id: string): void {
   if (applied(r) || r?.status === "noop") return;
   if (r?.status === "dropped" || (r?.status === "rejected" && /unknown_task|missing_required/.test(r.reason))) {
-    throw new Error(`Task not found: ${id}`);
+    throw new Refusal("not_found", `Task not found: ${id}`);
   }
   if (r?.status === "rejected" && r.reason === "stopped") {
-    throw new Error(`Task ${id} was not changed: the user stopped agent work on it. Only the user can resume it in Septena.`);
+    throw new Refusal("stopped", `Task ${id} was not changed: the user stopped agent work on it. Only the user can resume it in Septena.`);
   }
   if (r?.status === "rejected" && r.reason === "paused") {
-    throw new Error(`Task ${id} was not changed (paused): ${AGENT_WRITE_RULES.paused}`);
+    throw new Refusal("paused", `Task ${id} was not changed (paused): ${AGENT_WRITE_RULES.paused}`);
   }
   if (r?.status === "rejected" && r.reason === "human_accepts") {
-    throw new Error(`Task ${id} was not completed (human_accepts): ${r.rule ?? AGENT_WRITE_RULES.human_accepts}`);
+    throw new Refusal("human_accepts", `Task ${id} was not completed (human_accepts): ${r.rule ?? AGENT_WRITE_RULES.human_accepts}`);
   }
-  throw new Error(`Task ${id} was not changed: ${r?.status === "rejected" ? r.reason : "no result"}`);
+  if (r?.status === "rejected") throw new Refusal(r.reason, `Task ${id} was not changed: ${r.reason}`);
+  throw new Error(`Task ${id} was not changed: no result`);
 }
 
 async function topPosition(store: StoreRpc): Promise<number> {
@@ -673,7 +679,10 @@ async function createTask(ctx: WriteContext, input: CreateTaskInput) {
     results = await pushAs(store, ctx.actor, ops);
   }
   const r = results[taskOpIdx];
-  if (!applied(r)) throw new Error(`Task was not created: ${r?.status === "rejected" ? (r.rule ? `${r.reason}: ${r.rule}` : r.reason) : r?.status ?? "no result"}`);
+  if (!applied(r)) {
+    const message = `Task was not created: ${r?.status === "rejected" ? (r.rule ? `${r.reason}: ${r.rule}` : r.reason) : r?.status ?? "no result"}`;
+    throw r?.status === "rejected" ? new Refusal(r.reason, message) : new Error(message);
+  }
   return {
     id,
     title: input.title,

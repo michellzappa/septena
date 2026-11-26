@@ -4,6 +4,7 @@ import { randomId } from "../util.js";
 import { todayYMD } from "../tz.js";
 import { zId } from "../store/columns.js";
 import { zPushBody, type Op, type OpResult } from "../store/ops.js";
+import { Refusal } from "../errors.js";
 import {
   AGENT_WRITE_RULES,
   NOTE_FIELD,
@@ -342,7 +343,7 @@ export async function runNotesTool(ctx: NotesContext, name: NotesToolName, args:
       await requireNote(store, container, id);
       const proposal = { body: args.brief as string, agent, at: new Date().toISOString(), why };
       const r = await pushOne(store, actor, { op: "upsert", entity: container, id, fields: { notesProposal: proposal } }, undefined, why);
-      if (r?.status !== "applied") throw new Error(`Proposal not saved: ${refusalText(r)}`);
+      if (r?.status !== "applied") throw refusalError(`Proposal not saved`, r);
       return { container, id, proposed: true };
     }
 
@@ -364,7 +365,7 @@ export async function runNotesTool(ctx: NotesContext, name: NotesToolName, args:
       if (args.notes) fields.context = args.notes;
       if (args.emoji) fields.emoji = args.emoji;
       const r = await pushOne(store, actor, { op: "upsert", entity: "area", id, fields }, undefined, why);
-      if (r?.status !== "applied") throw new Error(`Area not created: ${refusalText(r)}`);
+      if (r?.status !== "applied") throw refusalError(`Area not created`, r);
       return {
         id,
         title: args.title,
@@ -389,7 +390,7 @@ export async function runNotesTool(ctx: NotesContext, name: NotesToolName, args:
       if (args.notes) fields.notes = args.notes;
       if (args.githubRepo) fields.githubRepo = args.githubRepo;
       const r = await pushOne(store, actor, { op: "upsert", entity: "project", id, fields }, undefined, why);
-      if (r?.status !== "applied") throw new Error(`Project not created: ${refusalText(r)}`);
+      if (r?.status !== "applied") throw refusalError(`Project not created`, r);
       return { id, title: args.title, area: area ?? null, noteRev: args.notes ? 1 : 0 };
     }
 
@@ -438,7 +439,7 @@ export async function runNotesTool(ctx: NotesContext, name: NotesToolName, args:
         position: bottomKey(rows),
       };
       const r = await pushOne(store, actor, { op: "upsert", entity: "task", id, fields }, undefined, why);
-      if (r?.status !== "applied") throw new Error(`Heading not created: ${refusalText(r)}`);
+      if (r?.status !== "applied") throw refusalError(`Heading not created`, r);
       return { id, title: args.title, project };
     }
   }
@@ -452,7 +453,7 @@ async function updateContainer(
   if (updated.length === 0) throw new Error("Nothing to update: pass at least one field.");
   const r = await pushOne(store, actor, { op: "upsert", entity: container, id, fields }, undefined, why);
   if (r?.status !== "applied" && r?.status !== "noop") {
-    throw new Error(`${container === "project" ? "Project" : "Area"} not updated: ${refusalText(r)}`);
+    throw refusalError(`${container === "project" ? "Project" : "Area"} not updated`, r);
   }
   return { container, id, updated };
 }
@@ -558,7 +559,7 @@ async function writeNotes(
       ...(r.current ? { current: r.current } : {}),
     };
   }
-  throw new Error(`Notes not written: ${refusalText(r)}`);
+  throw refusalError(`Notes not written`, r);
 }
 
 type NewUpsert = Omit<Extract<Op, { op: "upsert" }>, "clientOpId" | "baseNoteRev">;
@@ -603,6 +604,13 @@ function revisionOut(r: NoteRevision) {
 
 function changeOut(e: ChangeEntry) {
   return { at: e.at, who: who(e.actor), op: e.op, fields: e.fields ?? undefined, why: e.reason ?? undefined };
+}
+
+/// The error for a write the store did not apply: a Refusal with the store's
+/// reason as its code, so the connector answers with the envelope.
+function refusalError(prefix: string, r: OpResult | undefined): Error {
+  const message = `${prefix}: ${refusalText(r)}`;
+  return r?.status === "rejected" ? new Refusal(r.reason, message) : new Error(message);
 }
 
 function refusalText(r: OpResult | undefined): string {
