@@ -3451,9 +3451,8 @@ export function SeptenaApp() {
 
       {pendingReschedule && (() => {
         const prompt = SURFACES_CATALOG.prompts.items.find((p) => p.id === "rescheduleFixedRepeat");
-        const options = "options" in (prompt ?? {}) && Array.isArray((prompt as { options?: unknown }).options)
-          ? (prompt as { options: Array<{ id: string; title: string }> }).options
-          : [];
+        const options: ReadonlyArray<{ readonly id: string; readonly title: string }> =
+          prompt && "options" in prompt ? prompt.options : [];
         const exceptionTitle = registryText(
           options.find((o) => o.id === "exception")?.title ?? "Only This Task",
           lang,
