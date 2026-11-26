@@ -934,11 +934,6 @@ export function SeptenaApp() {
       .flatMap((g) => g.items);
   }, [destination, listedTasks, prefs.reviewFadedExpanded, reviewGroups]);
 
-  const headerCount =
-    destination.kind === "smart" && destination.id === "review"
-      ? sumRows(reviewGroups.filter((g) => g.id !== "faded"))
-      : listedTasks.length;
-
   // Today's logged block: tasks completed or cancelled TODAY (local calendar
   // day), newest first — 1:1 with Apple LocalCache.tasksCompleted(onDay: today)
   // and Mac SeptaskKitTaskList.todayLoggedRows().
@@ -2388,7 +2383,11 @@ export function SeptenaApp() {
             {count}
           </span>
         )}
-        {collapse && <Chevron className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />}
+        {collapse && (
+          <Chevron
+            className={`h-4 w-4 shrink-0 text-[var(--text-muted)] ${typeof count === "number" ? "" : "ml-auto"}`}
+          />
+        )}
       </>
     );
     const className = "flex w-full items-center gap-2.5 px-3 pb-2 text-left";
@@ -2419,7 +2418,7 @@ export function SeptenaApp() {
     renderSectionHeader({
       leading: <RegistryIcon token={group.icon} className="h-4 w-4 text-[var(--text-muted)]" />,
       title: registryText(group.title, lang),
-      count: group.items.length,
+      count: collapse && !collapse.expanded ? group.items.length : undefined,
       collapse,
     });
 
@@ -3499,9 +3498,6 @@ export function SeptenaApp() {
               <h1 className="truncate text-2xl font-semibold tracking-tight text-[var(--text-primary)]">
                 {pageMeta.title}
               </h1>
-              <span className="font-mono-tabular text-sm text-[var(--text-muted)]">
-                {headerCount}
-              </span>
             </div>
           </div>
 
@@ -3926,7 +3922,7 @@ export function SeptenaApp() {
                     {renderSectionHeader({
                       leading: <Inbox className="h-4 w-4 text-[var(--accent)]" />,
                       title: "Inbox",
-                      count: todayInboxTasks.length,
+                      count: inboxCollapsed ? todayInboxTasks.length : undefined,
                       collapse: {
                         expanded: !inboxCollapsed,
                         onToggle: () => setInboxCollapsed((v) => !v),
@@ -3946,7 +3942,6 @@ export function SeptenaApp() {
                       renderSectionHeader({
                         leading: <Sun className="h-4 w-4" style={{ color: todayIconColor }} />,
                         title: "Today",
-                        count: todayCommittedTasks.length,
                       })
                     )}
 
@@ -3974,7 +3969,6 @@ export function SeptenaApp() {
                               {renderSectionHeader({
                                 leading,
                                 title: grp.title,
-                                count: grp.items.length,
                               })}
                               <div className={taskCardClass}>
                                 {grp.items.map((i) => renderTaskRow(i, true))}
@@ -4017,7 +4011,6 @@ export function SeptenaApp() {
                   <section key={day}>
                     {renderSectionHeader({
                       title: formatDayHeading(day, todayYMD, lang),
-                      count: items.length,
                     })}
                     <div className={taskCardClass}>{items.map((i) => renderTaskRow(i))}</div>
                   </section>
@@ -4085,7 +4078,6 @@ export function SeptenaApp() {
                     <section key={h.id}>
                       {renderSectionHeader({
                         title: h.title,
-                        count: under.length,
                         onContextMenu: (e) => {
                           e.preventDefault();
                           setContextMenu({
@@ -4146,7 +4138,6 @@ export function SeptenaApp() {
                       {renderSectionHeader({
                         leading,
                         title: grp.title,
-                        count: grp.items.length,
                       })}
                       <div className={taskCardClass}>
                         {grp.items.map((i) => renderTaskRow(i, true))}
