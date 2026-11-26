@@ -33,8 +33,9 @@ internal object JsonHttp {
         clientVersion: String,
         bearer: String? = null,
         pool: ExecutorService = executor,
+        headers: Map<String, String> = emptyMap(),
     ): HttpResponse = perform(pool) { onOpened ->
-        execute(baseUrl, path, method, clientVersion, bearer, accept = "application/json", onOpened) { connection ->
+        execute(baseUrl, path, method, clientVersion, bearer, accept = "application/json", onOpened, headers) { connection ->
             if (body != null) {
                 connection.doOutput = true
                 connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
@@ -125,6 +126,7 @@ internal object JsonHttp {
         bearer: String?,
         accept: String,
         onConnectionOpened: (HttpURLConnection) -> Unit,
+        headers: Map<String, String> = emptyMap(),
         exchange: (HttpURLConnection) -> HttpResponse,
     ): HttpResponse {
         val connection = URL(baseUrl.trimEnd('/') + path).openConnection() as HttpURLConnection
@@ -137,6 +139,7 @@ internal object JsonHttp {
             connection.setRequestProperty("Accept", accept)
             connection.setRequestProperty("X-Septena-Client", "android $clientVersion")
             if (bearer != null) connection.setRequestProperty("Authorization", "Bearer $bearer")
+            for ((name, value) in headers) connection.setRequestProperty(name, value)
             return exchange(connection)
         } finally {
             connection.disconnect()
