@@ -97,6 +97,7 @@ import app.septena.ui.CalendarAgendaRow
 import app.septena.core.RegistryActionContext
 import app.septena.core.RegistryActionResolver
 import app.septena.core.RegistryCatalog
+import app.septena.core.formatUpcomingDayHeader
 import app.septena.core.generated.RegistryActionIds
 import app.septena.core.generated.RegistryDestinationIds
 import app.septena.core.generated.RegistryEntityFields

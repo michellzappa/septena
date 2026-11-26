@@ -5,7 +5,11 @@ plugins {
     alias(libs.plugins.sqldelight) apply false
 }
 
-kotlin { jvmToolchain(17) }
+kotlin {
+    jvmToolchain(17)
+    // Compile the same portable task-list UI as Android without applying its SDK plugin.
+    sourceSets["main"].kotlin.srcDir("../android/ui/src/commonMain/kotlin")
+}
 
 val sharedCore = project(":core")
 val coreNatives = sharedCore.layout.buildDirectory.file("core-natives/septena-core-jvm-natives.jar")

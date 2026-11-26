@@ -18,6 +18,7 @@ import app.septena.core.TaskSnapshot
 import app.septena.core.TaskViewRules
 import app.septena.core.asSyncRecord
 import app.septena.core.booleanValue
+import app.septena.core.formatUpcomingDayHeader
 import app.septena.core.stringValue
 import app.septena.core.generated.RegistryActionIds
 import app.septena.core.generated.RegistryDestinationIds
