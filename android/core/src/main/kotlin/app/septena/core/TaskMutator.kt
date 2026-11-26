@@ -496,6 +496,32 @@ class TaskMutator(
     }
 
     /**
+     * Waiting On… and Got It Back (docs/REVIEW_SPEC.md §6, ADR 0053). A name starts or renames the
+     * wait: the name is trimmed, and `waitingSince` becomes today when the task had no wait. A null
+     * or blank name ends the wait and clears both fields. [scheduled] is the day to chase: a day sets
+     * the When date in the same gesture; null leaves When as it is. Only the gesture layer calls
+     * this, so the caller records the undo step and stamps the fade clock (a wait ends a fade).
+     */
+    suspend fun setWaiting(id: String, on: String?, scheduled: String? = null): TaskRecord? {
+        val existing = store.record(RegistryEntityNames.TASK, id)?.asTaskRecord() ?: return null
+        if (existing.deletedAt != null) return null
+        val name = on?.trim { it.isWhitespace() }?.takeIf(String::isNotEmpty)
+        val hadWait = !existing.fields[RegistryEntityFields.Task.WAITING_ON].stringValue().isNullOrBlank()
+        val changes = linkedMapOf<String, JsonValue>(
+            RegistryEntityFields.Task.WAITING_ON to JsonValue.stringOrNull(name),
+        )
+        when {
+            name == null -> changes[RegistryEntityFields.Task.WAITING_SINCE] = JsonValue.Null
+            !hadWait -> changes[RegistryEntityFields.Task.WAITING_SINCE] =
+                JsonValue.StringValue(clock.today(clock.now()).toString())
+        }
+        if (name != null) changes[RegistryEntityFields.Task.FADED_AT] = JsonValue.Null
+        val updated = updateFields(id, changes) ?: return null
+        if (name == null || scheduled == null) return updated
+        return setWhen(id, scheduled)
+    }
+
+    /**
      * Faded ▸ Let Go (spec §5, as iOS dropFaded): cancel it with dropReason "faded"; it goes to the Logbook.
      * A task that came back since the row was drawn is left as is.
      */
@@ -528,6 +554,8 @@ class TaskMutator(
             if (record.deletedAt != null) continue
             val task = runCatching { TaskSnapshot.from(record) }.getOrNull() ?: continue
             if (task.status != app.septena.core.generated.RegistryEntityEnums.TaskStatus.OPEN || task.fadedAt != null) continue
+            // A waiting task never fades (docs/REVIEW_SPEC.md §6).
+            if (task.isWaiting) continue
             val convo = conversations[task.id]
             val fades = runCatching {
                 TaskFadeRules.shouldFade(

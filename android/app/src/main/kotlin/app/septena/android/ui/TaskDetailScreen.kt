@@ -235,6 +235,7 @@ fun TaskDetailScreen(
     var tagFilterDraft by remember(taskId) { mutableStateOf("") }
     var showAddReferenceDialog by remember(taskId) { mutableStateOf(false) }
     var doTitleEditing by remember(taskId) { mutableStateOf(false) }
+    var waitingSheetOpen by remember(taskId) { mutableStateOf(false) }
 
     LaunchedEffect(graph, taskId, dataVersion) {
         val loaded = withContext(Dispatchers.IO) { loadTaskDetail(graph, taskId) }
@@ -707,6 +708,19 @@ fun TaskDetailScreen(
     val mutedInk = MaterialTheme.colorScheme.onSurfaceVariant
     val overdueRed = if (isDark) Color(0xFFFF453A) else Color(0xFFFF3B30)
 
+    if (waitingSheetOpen) {
+        WaitingOnDialog(
+            initialName = taskFields[RegistryEntityFields.Task.WAITING_ON].stringValue().orEmpty(),
+            today = todayDate,
+            languageTag = languageTag,
+            onDismiss = { waitingSheetOpen = false },
+            onConfirm = { name, checkBack ->
+                waitingSheetOpen = false
+                write { check(graph.taskMutator.setWaiting(taskId, name, checkBack) != null) }
+            },
+        )
+    }
+
     Box(modifier = modifier.fillMaxSize().background(canvasBackground)) {
         HeaderWashBackdrop()
         Scaffold(
@@ -879,6 +893,54 @@ fun TaskDetailScreen(
                                                             .fillMaxWidth()
                                                             .semantics { contentDescription = labels.field(RegistryTaskDetail.Fields.TITLE) },
                                                     )
+                                                }
+                                            }
+
+                                            // Waiting On… / Got It Back (docs/REVIEW_SPEC.md §6).
+                                            if (isTaskOpen && !isDoPage) {
+                                                val waitingOn = taskFields[RegistryEntityFields.Task.WAITING_ON]
+                                                    .stringValue()?.trim()?.takeIf(String::isNotEmpty)
+                                                FlowRow(
+                                                    verticalArrangement = Arrangement.Center,
+                                                    modifier = Modifier.padding(
+                                                        start = TaskCardMetrics.LeadingColumnWidth + TaskCardMetrics.IconTextGap,
+                                                        top = 4.dp,
+                                                    ),
+                                                ) {
+                                                    if (waitingOn != null) {
+                                                        Text(
+                                                            text = WaitingCopy.label(
+                                                                waitingOn,
+                                                                taskFields[RegistryEntityFields.Task.WAITING_SINCE].stringValue(),
+                                                                todayDate,
+                                                                languageTag,
+                                                            ),
+                                                            fontSize = 13.sp,
+                                                            color = mutedInk,
+                                                            modifier = Modifier.align(Alignment.CenterVertically),
+                                                        )
+                                                    }
+                                                    TextButton(onClick = { waitingSheetOpen = true }, enabled = canEdit) {
+                                                        Text(
+                                                            RegistryCatalog.actionTitle(
+                                                                RegistryActionIds.TASK_WAITING_ON,
+                                                                languageTag = languageTag,
+                                                            ).orEmpty(),
+                                                        )
+                                                    }
+                                                    if (waitingOn != null) {
+                                                        TextButton(
+                                                            onClick = { write { check(graph.taskMutator.setWaiting(taskId, null) != null) } },
+                                                            enabled = canEdit,
+                                                        ) {
+                                                            Text(
+                                                                RegistryCatalog.actionTitle(
+                                                                    RegistryActionIds.TASK_GOT_IT_BACK,
+                                                                    languageTag = languageTag,
+                                                                ).orEmpty(),
+                                                            )
+                                                        }
+                                                    }
                                                 }
                                             }
 
