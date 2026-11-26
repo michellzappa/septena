@@ -1749,6 +1749,7 @@ enum RegistryPromptID: String, CaseIterable, Hashable, Sendable {
   case clearLogged = "clearLogged"
   case rescheduleFixedRepeat = "rescheduleFixedRepeat"
   case disconnectAgent = "disconnectAgent"
+  case agentKeyCreated = "agentKeyCreated"
   case agentReplaces = "agentReplaces"
   case scanSignInCode = "scanSignInCode"
   case cameraUnavailable = "cameraUnavailable"
@@ -1760,6 +1761,7 @@ enum RegistryPromptID: String, CaseIterable, Hashable, Sendable {
   case renameProject = "renameProject"
   case renameAgent = "renameAgent"
   case nameAgent = "nameAgent"
+  case newAgentKey = "newAgentKey"
   case conversationOther = "conversationOther"
   case conversationReply = "conversationReply"
   case sendBackReview = "sendBackReview"
@@ -1804,6 +1806,7 @@ enum RegistryPrompts {
   static let fixed: [RegistryPromptID: RegistryPromptCopy] = [
     .deleteSection: RegistryPromptCopy(id: .deleteSection, title: RegistryL10n.t("Delete this section?"), message: RegistryL10n.t("Its tasks stay in the project."), confirmTitle: RegistryL10n.t("Delete Section"), options: []),
     .rescheduleFixedRepeat: RegistryPromptCopy(id: .rescheduleFixedRepeat, title: RegistryL10n.t("Reschedule repeating task?"), message: RegistryL10n.t("Move only this task, or update the repeating schedule to the new date?"), confirmTitle: nil, options: [RegistryPromptOption(id: .exception, title: RegistryL10n.t("Only This Task")), RegistryPromptOption(id: .updateRule, title: RegistryL10n.t("Update Schedule"))]),
+    .agentKeyCreated: RegistryPromptCopy(id: .agentKeyCreated, title: RegistryL10n.t("Your agent key"), message: RegistryL10n.t("Septena shows this key only once. Paste it into your script or agent. To stop the agent, disconnect it in this list."), confirmTitle: RegistryL10n.t("Copy Key"), options: []),
     .agentReplaces: RegistryPromptCopy(id: .agentReplaces, title: RegistryL10n.t("Replaces"), message: RegistryL10n.t("If this agent takes the place of one you connected before, pick it. That agent stops working."), confirmTitle: nil, options: [RegistryPromptOption(id: .none, title: RegistryL10n.t("Nothing, a new agent")), RegistryPromptOption(id: .agent, title: RegistryL10n.t("An agent below"))]),
     .scanSignInCode: RegistryPromptCopy(id: .scanSignInCode, title: RegistryL10n.t("Scan a sign-in code"), message: RegistryL10n.t("Point the camera at the QR code on the other screen."), confirmTitle: RegistryL10n.t("Scan Code"), options: []),
     .cameraUnavailable: RegistryPromptCopy(id: .cameraUnavailable, title: RegistryL10n.t("Septena can’t use the camera"), message: RegistryL10n.t("Allow camera access for Septena in Settings, or enter the code instead."), confirmTitle: nil, options: []),
@@ -1817,6 +1820,7 @@ enum RegistryPrompts {
     .renameProject: RegistryTextPrompt(id: .renameProject, title: RegistryL10n.t("Rename Project"), placeholder: RegistryL10n.t("Project name"), confirmTitle: RegistryL10n.t("Rename")),
     .renameAgent: RegistryTextPrompt(id: .renameAgent, title: RegistryL10n.t("Rename Agent"), placeholder: RegistryL10n.t("Agent name"), confirmTitle: RegistryL10n.t("Rename")),
     .nameAgent: RegistryTextPrompt(id: .nameAgent, title: RegistryL10n.t("Name this agent"), placeholder: RegistryL10n.t("Agent name"), confirmTitle: RegistryL10n.t("Save")),
+    .newAgentKey: RegistryTextPrompt(id: .newAgentKey, title: RegistryL10n.t("New Agent Key"), placeholder: RegistryL10n.t("Agent name"), confirmTitle: RegistryL10n.t("Create")),
     .conversationOther: RegistryTextPrompt(id: .conversationOther, title: RegistryL10n.t("Other…"), placeholder: RegistryL10n.t("Type your answer"), confirmTitle: RegistryL10n.t("Send")),
     .conversationReply: RegistryTextPrompt(id: .conversationReply, title: RegistryL10n.t("Reply…"), placeholder: RegistryL10n.t("Reply to thread"), confirmTitle: RegistryL10n.t("Send")),
     .sendBackReview: RegistryTextPrompt(id: .sendBackReview, title: RegistryL10n.t("Send back for another pass"), placeholder: RegistryL10n.t("What needs another pass?"), confirmTitle: RegistryL10n.t("Send back")),

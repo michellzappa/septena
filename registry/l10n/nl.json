@@ -813,5 +813,9 @@
   "1 change was not sent yet and will be lost.": "1 wijziging is nog niet verstuurd en gaat verloren.",
   "{count} changes were not sent yet and will be lost.": "{count} wijzigingen zijn nog niet verstuurd en gaan verloren.",
   "Export a Backup First": "Eerst een back-up exporteren",
-  "Replace": "Vervangen"
+  "Replace": "Vervangen",
+  "New Agent Key": "Nieuwe agentsleutel",
+  "Your agent key": "Je agentsleutel",
+  "Septena shows this key only once. Paste it into your script or agent. To stop the agent, disconnect it in this list.": "Septena toont deze sleutel maar één keer. Plak hem in je script of agent. Wil je de agent stoppen, ontkoppel hem dan in deze lijst.",
+  "Copy Key": "Sleutel kopiëren"
 }

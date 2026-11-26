@@ -43,6 +43,7 @@ import {
   HELP_URL,
   REGISTRY_LANGUAGES,
   SETTINGS_REGISTRY,
+  SURFACES_CATALOG,
   registryText,
 } from "@/lib/generated/registries";
 import {
@@ -66,6 +67,10 @@ import type {
   StoreSnapshot,
 } from "@/lib/types";
 import { HeaderWashPreview } from "./HeaderWash";
+
+// New Agent Key copy (#86), from the registry.
+const NEW_KEY_PROMPT = SURFACES_CATALOG.prompts.text.find((p) => p.id === "newAgentKey");
+const KEY_CREATED_PROMPT = SURFACES_CATALOG.prompts.items.find((p) => p.id === "agentKeyCreated");
 
 export type SettingsTab =
   | "account"
@@ -175,6 +180,11 @@ export function SettingsModal({
   const [pairPreview, setPairPreview] = useState<{ kind: "connector" | "device"; client: string } | null>(null);
   const [pairStatus, setPairStatus] = useState<string | null>(null);
   const [renamingAgentId, setRenamingAgentId] = useState<string | null>(null);
+  // New Agent Key (#86): null = closed, "" or a name = the form is open.
+  const [keyNameDraft, setKeyNameDraft] = useState<string | null>(null);
+  // The new key, shown once.
+  const [createdKey, setCreatedKey] = useState<string | null>(null);
+  const [keyError, setKeyError] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
   const [welcomeNameDraft, setWelcomeNameDraft] = useState("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -1222,6 +1232,78 @@ export function SettingsModal({
                       })}
                     </div>
                   )}
+                  <div className="mt-2 space-y-1.5 text-xs">
+                    {createdKey ? (
+                      <div className="space-y-2 rounded-lg border border-[var(--accent)] p-3">
+                        <p className="font-medium text-[var(--text-primary)]">{registryText(KEY_CREATED_PROMPT?.title ?? "", lang)}</p>
+                        <p className="text-[11px] text-[var(--text-muted)]">{registryText(KEY_CREATED_PROMPT?.message ?? "", lang)}</p>
+                        <code className="block break-all rounded bg-[var(--bg-hover)] px-2 py-1 font-mono text-[11px] select-all">{createdKey}</code>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            await navigator.clipboard.writeText(createdKey).catch(() => {});
+                            setCreatedKey(null);
+                          }}
+                          className="rounded bg-[var(--accent)] px-2 py-0.5 font-medium"
+                          style={{ color: "var(--accent-check)" }}
+                        >
+                          {registryText(KEY_CREATED_PROMPT?.confirmTitle ?? "", lang)}
+                        </button>
+                      </div>
+                    ) : keyNameDraft !== null ? (
+                      <form
+                        onSubmit={async (e) => {
+                          e.preventDefault();
+                          const name = keyNameDraft.trim();
+                          if (!name) return;
+                          try {
+                            const created = await api.createAgentKey(name);
+                            setKeyError(null);
+                            setKeyNameDraft(null);
+                            setCreatedKey(created.key);
+                          } catch (err) {
+                            setKeyError(err instanceof Error ? err.message : String(err));
+                          }
+                          void loadAccess();
+                        }}
+                        className="flex items-center gap-2 rounded-lg border border-[var(--border-subtle)] px-3 py-2"
+                      >
+                        <input
+                          type="text"
+                          autoFocus
+                          maxLength={40}
+                          value={keyNameDraft}
+                          onChange={(e) => setKeyNameDraft(e.target.value)}
+                          placeholder={registryText(NEW_KEY_PROMPT?.placeholder ?? "", lang)}
+                          className="min-w-0 flex-1 rounded border border-[var(--accent)] bg-transparent px-2 py-0.5 text-xs outline-none"
+                        />
+                        <button
+                          type="submit"
+                          disabled={!keyNameDraft.trim()}
+                          className="rounded bg-[var(--accent)] px-2 py-0.5 font-medium disabled:opacity-50"
+                          style={{ color: "var(--accent-check)" }}
+                        >
+                          {registryText(NEW_KEY_PROMPT?.confirmTitle ?? "", lang)}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setKeyNameDraft(null)}
+                          className="rounded px-1.5 py-0.5 text-[var(--text-muted)]"
+                        >
+                          {registryText(SURFACES_CATALOG.prompts.cancelTitle, lang)}
+                        </button>
+                      </form>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setKeyNameDraft("")}
+                        className="inline-flex items-center gap-1 rounded px-2 py-1 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+                      >
+                        {registryText(NEW_KEY_PROMPT?.title ?? "", lang)}
+                      </button>
+                    )}
+                    {keyError && <p className="text-[11px] text-[var(--overdue-red)]">{keyError}</p>}
+                  </div>
                 </section>
 
                 <section className="space-y-2.5 rounded-xl border border-[var(--border-subtle)] p-4 text-xs">

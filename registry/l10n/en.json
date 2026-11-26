@@ -285,7 +285,8 @@
     "text": "Agent name",
     "paths": [
       "surfaces.prompts.text.renameAgent.placeholder",
-      "surfaces.prompts.text.nameAgent.placeholder"
+      "surfaces.prompts.text.nameAgent.placeholder",
+      "surfaces.prompts.text.newAgentKey.placeholder"
     ]
   },
   "Agent tools": {
@@ -869,6 +870,12 @@
       "actions.actions.task.copy.title"
     ]
   },
+  "Copy Key": {
+    "text": "Copy Key",
+    "paths": [
+      "surfaces.prompts.items.agentKeyCreated.confirmTitle"
+    ]
+  },
   "Copy Link": {
     "text": "Copy Link",
     "paths": [
@@ -928,7 +935,8 @@
     "text": "Create",
     "paths": [
       "surfaces.prompts.text.newArea.confirmTitle",
-      "surfaces.prompts.text.newProject.confirmTitle"
+      "surfaces.prompts.text.newProject.confirmTitle",
+      "surfaces.prompts.text.newAgentKey.confirmTitle"
     ]
   },
   "Create Next Copy": {
@@ -2273,6 +2281,12 @@
       "surfaces.prompts.text.nameAgent.title"
     ]
   },
+  "New Agent Key": {
+    "text": "New Agent Key",
+    "paths": [
+      "surfaces.prompts.text.newAgentKey.title"
+    ]
+  },
   "New Area": {
     "text": "New Area",
     "paths": [
@@ -3475,6 +3489,12 @@
     "text": "Septena runs the sync server and the connector. When you connect Claude or another agent, its bill stays with that provider.",
     "paths": [
       "plans.promises.own_ai.detail"
+    ]
+  },
+  "Septena shows this key only once. Paste it into your script or agent. To stop the agent, disconnect it in this list.": {
+    "text": "Septena shows this key only once. Paste it into your script or agent. To stop the agent, disconnect it in this list.",
+    "paths": [
+      "surfaces.prompts.items.agentKeyCreated.message"
     ]
   },
   "Set up Septena for me using https://septena.app/agents.md": {
@@ -4716,6 +4736,12 @@
     "text": "Your agent asks",
     "paths": [
       "surfaces.taskPage.blocks.taskPage.conversation.askKicker"
+    ]
+  },
+  "Your agent key": {
+    "text": "Your agent key",
+    "paths": [
+      "surfaces.prompts.items.agentKeyCreated.title"
     ]
   },
   "Your agent's questions, finished work and tasks in progress show up here. Faded tasks do too.": {
