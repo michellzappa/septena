@@ -79,6 +79,7 @@ app.post("/oauth/register", oauth.register);
 app.get("/oauth/authorize", oauth.authorize);
 app.get("/oauth/pair/continue", oauth.pairContinue);
 app.post("/oauth/pair/email", oauth.pairEmail);
+app.get("/oauth/pair/oidc/:provider", oauth.pairOidc);
 app.post("/oauth/pair/reviewer", oauth.pairReviewer);
 // Where a sign-in QR lands when a system camera opens it (src/shadow/pairQr.ts).
 app.get("/pair/:code", oauth.pairLanding);

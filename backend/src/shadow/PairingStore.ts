@@ -41,9 +41,9 @@ export interface PendingAuth {
 export interface PairApproval {
   userId: string;
   timeZone?: string;
-  /// How this pairing was approved. Email-approved connector pairings (ADR 0047)
-  /// may belong to a brand-new account with no app session yet.
-  approvedVia?: "app" | "email";
+  /// How this pairing was approved. Email- or OIDC-approved connector pairings
+  /// (ADR 0047) may belong to a brand-new account with no app session yet.
+  approvedVia?: "app" | "email" | "oidc";
   approvedAt?: number;
   /// Connector codes only: the name the user gave the agent, and the agent
   /// (token family id) it replaces. Both land at the token exchange.

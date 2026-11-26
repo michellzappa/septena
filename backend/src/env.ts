@@ -54,6 +54,19 @@ export interface Env {
   /// Cloudflare Email Service send binding (septena.app is onboarded).
   EMAIL?: SendEmail;
 
+  /// OIDC sign-in providers (ADR 0047, #637, #638). Each provider stays off
+  /// until its secrets are configured via `wrangler secret put`.
+  GOOGLE_CLIENT_ID?: string;
+  GOOGLE_CLIENT_SECRET?: string;
+  GOOGLE_ANDROID_CLIENT_ID?: string;
+  GOOGLE_IOS_CLIENT_ID?: string;
+  MICROSOFT_CLIENT_ID?: string;
+  MICROSOFT_CLIENT_SECRET?: string;
+  APPLE_WEB_CLIENT_ID?: string;
+  APPLE_SIGNIN_TEAM_ID?: string;
+  APPLE_SIGNIN_KEY_ID?: string;
+  APPLE_SIGNIN_KEY?: string;
+
   /// Directory reviewer access (ADR 0055, src/shadow/reviewer.ts). The pairing
   /// page offers the demo account REVIEWER_ACCOUNT_ID to whoever types
   /// REVIEWER_CODE, until REVIEWER_MODE_UNTIL (optional ISO date). Any one

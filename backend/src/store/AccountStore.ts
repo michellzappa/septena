@@ -65,6 +65,10 @@ export type LinkIdentityResult =
   | { ok: true; created: boolean; row: IdentityRow }
   | { ok: false; reason: "already_linked" };
 
+export type UnlinkIdentityResult =
+  | { ok: true; remaining: IdentityRow[] }
+  | { ok: false; reason: "not_found" | "last_identity" };
+
 /// Email sign-in codes (ADR 0016 decision 2, issue #169).
 export const EMAIL_CODE_TTL_MS = 10 * 60 * 1000;
 export const EMAIL_CODE_WINDOW_MS = 10 * 60 * 1000;
@@ -267,6 +271,26 @@ export class AccountStore extends DurableObject<Env> {
       );
       const row: IdentityRow = { key, provider: p, subject: s, userId, createdAt: now, updatedAt: now };
       return { ok: true as const, created: true, row };
+    });
+  }
+
+  /// Removes one sign-in identity from `userId` (ADR 0047 decision 6, #643).
+  /// Refuses to remove the account's last sign-in method.
+  unlinkIdentity(userId: string, key: string): UnlinkIdentityResult {
+    if (!USER_ID_RE.test(userId)) {
+      throw new Error("invalid userId");
+    }
+    return this.ctx.storage.transactionSync(() => {
+      const rows = this.listIdentitiesForUser(userId);
+      const target = rows.find((r) => r.key === key);
+      if (!target) return { ok: false as const, reason: "not_found" as const };
+      if (rows.length <= 1) return { ok: false as const, reason: "last_identity" as const };
+      this.sql.exec("DELETE FROM identities WHERE key = ? AND userId = ?", key, userId);
+      if (target.provider === "email") {
+        this.sql.exec("DELETE FROM email_codes WHERE email = ?", target.subject);
+        this.sql.exec("DELETE FROM agent_signup_limits WHERE email = ?", target.subject);
+      }
+      return { ok: true as const, remaining: rows.filter((r) => r.key !== key) };
     });
   }
 
