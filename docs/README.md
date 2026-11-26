@@ -80,6 +80,7 @@ See [ADR 0007](adr/0007-septena-is-the-task-app.md).
 | [LINKED_PROJECTS_SPEC.md](LINKED_PROJECTS_SPEC.md) | rewrite for Starlings before work (#12) |
 | [GITHUB_SPEC.md](GITHUB_SPEC.md) | dropped (ADR 0033) |
 | [TASK_REFERENCES_SPEC.md](TASK_REFERENCES_SPEC.md) | building (ADR 0031, ADR 0033; first release #386, #387) |
+| [agent-spec/spec.md](agent-spec/spec.md) | v0, unstable until 1.0: the public agent spec (records, IDs, claim lifecycle, refusal codes). Generated from `agent-spec/spec.src.md`; published at septena.app/spec.md |
 | [AGENT_SURFACE_SPEC.md](AGENT_SURFACE_SPEC.md) | accepted (ADR 0050): what agents read on septena.app and call on api.septena.app, AS1 to AS14 |
 | [RAYCAST_EXTENSION_SPEC.md](RAYCAST_EXTENSION_SPEC.md) | proposal (ADR 0051, #667): Septena from the Raycast launcher, RX0 to RX5 |
 | [PROJECT_SHARING_SPEC.md](PROJECT_SHARING_SPEC.md) | MVP built |

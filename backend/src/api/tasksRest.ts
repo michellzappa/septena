@@ -217,7 +217,7 @@ function containerNames(areas: Row[], projects: Row[]): Map<string, string> {
   return m;
 }
 
-const zView = z.enum(["today", "inbox", "upcoming", "repeating", "anytime", "completed", "starred", "review", "added", "questions"]);
+export const zView = z.enum(["today", "inbox", "upcoming", "repeating", "anytime", "completed", "starred", "review", "added", "questions"]);
 
 /// Mirrors `TaskStructureOrder.positionOrdered` in SeptenaCore: positive
 /// `position` ascending, unset (`0` / missing) sinks to the bottom, ties break
@@ -307,13 +307,15 @@ tasksRest.get("/lists", async (c) => {
   });
 });
 
+export const zTasksQuery = z.object({
+  view: zView.default("today"),
+  area: zId.optional(),
+  project: zId.optional(),
+  limit: z.coerce.number().int().min(1).max(500).default(300),
+});
+
 tasksRest.get("/", async (c) => {
-  const q = z.object({
-    view: zView.default("today"),
-    area: zId.optional(),
-    project: zId.optional(),
-    limit: z.coerce.number().int().min(1).max(500).default(300),
-  }).safeParse(c.req.query());
+  const q = zTasksQuery.safeParse(c.req.query());
   if (!q.success) return c.json({ error: "invalid_request" }, 400);
   const store = rpcStoreFor(c.env, c.get("userId"));
   const timeZone = await timeZoneFor(c, store);
@@ -416,11 +418,13 @@ tasksRest.get("/", async (c) => {
 
 /// The tasks that point at a key, a URL or a `message://` link. The key is in
 /// the body, never in the URL: request logs hold URLs, and a key is content.
+export const zByRefBody = z.object({
+  key: z.string().min(1).max(MAX_REF_INPUT),
+  limit: z.number().int().min(1).max(200).default(50),
+}).strict();
+
 tasksRest.post("/by-ref", async (c) => {
-  const body = await json(c, z.object({
-    key: z.string().min(1).max(MAX_REF_INPUT),
-    limit: z.number().int().min(1).max(200).default(50),
-  }).strict());
+  const body = await json(c, zByRefBody);
   if (body instanceof Response) return body;
   try {
     return c.json(await findByRef(rpcStoreFor(c.env, c.get("userId")), body.key, body.limit));
@@ -431,13 +435,15 @@ tasksRest.post("/by-ref", async (c) => {
 
 const zWhen = z.enum(["inbox", "today", "tomorrow"]);
 
+export const zCreateTaskBody = z.object({
+  title: z.string().trim().min(1).max(500),
+  when: zWhen.default("inbox"),
+  refs: zRefs.optional(),
+  allow_duplicate: z.boolean().optional(),
+}).strict();
+
 tasksRest.post("/", async (c) => {
-  const body = await json(c, z.object({
-    title: z.string().trim().min(1).max(500),
-    when: zWhen.default("inbox"),
-    refs: zRefs.optional(),
-    allow_duplicate: z.boolean().optional(),
-  }).strict());
+  const body = await json(c, zCreateTaskBody);
   if (body instanceof Response) return body;
   const ctx = await writeContext(c);
   const args: Record<string, unknown> = { title: body.title };
@@ -450,13 +456,15 @@ tasksRest.post("/", async (c) => {
 
 /// Starts a Do (docs/DO_SPEC.md §7). The client mints the session id, so a
 /// retry starts nothing new. The start is human engagement: it resets the fade.
+export const zDoStartBody = z.object({
+  sessionId: zId,
+  plannedMinutes: z.number().int().min(1).max(ENTITY_LIMITS.doPlannedMinutesMax).optional(),
+}).strict();
+
 tasksRest.post("/:id/do", async (c) => {
   const id = zId.safeParse(c.req.param("id"));
   if (!id.success) return c.json({ error: "invalid_request" }, 400);
-  const body = await json(c, z.object({
-    sessionId: zId,
-    plannedMinutes: z.number().int().min(1).max(ENTITY_LIMITS.doPlannedMinutesMax).optional(),
-  }).strict());
+  const body = await json(c, zDoStartBody);
   if (body instanceof Response) return body;
   const ctx = await writeContext(c);
   const read = await ctx.store.readTask(id.data);
@@ -482,11 +490,14 @@ tasksRest.post("/:id/do", async (c) => {
 
 /// Ends (`stop`) or confirms (`confirm`) one Do. It names the session, so an
 /// old request cannot touch a newer Do. A repeat returns 200.
+export const zDoVerb = z.enum(["stop", "confirm"]);
+export const zDoEndBody = z.object({ note: z.string().trim().min(1).max(ENTITY_LIMITS.doNoteMax).optional() }).strict();
+
 tasksRest.post("/do/:sessionId/:verb", async (c) => {
   const id = zId.safeParse(c.req.param("sessionId"));
-  const verb = z.enum(["stop", "confirm"]).safeParse(c.req.param("verb"));
+  const verb = zDoVerb.safeParse(c.req.param("verb"));
   if (!id.success || !verb.success) return c.json({ error: "invalid_request" }, 400);
-  const body = await json(c, z.object({ note: z.string().trim().min(1).max(ENTITY_LIMITS.doNoteMax).optional() }).strict());
+  const body = await json(c, zDoEndBody);
   if (body instanceof Response) return body;
   const ctx = await writeContext(c);
   const session = await ctx.store.readDoSession(id.data);
@@ -517,7 +528,7 @@ async function endDo(ctx: WriteContext, sessionId: string, exit: "stopped" | "la
   }]);
 }
 
-const zVerb = z.enum(["complete", "today", "untoday", "tomorrow", "defer", "cancel"]);
+export const zVerb = z.enum(["complete", "today", "untoday", "tomorrow", "defer", "cancel"]);
 
 /// Answers an open agent question turn from a thin client (the Apple Watch's
 /// notification action, F1b #213, and the desk orb). Runs
@@ -526,16 +537,18 @@ const zVerb = z.enum(["complete", "today", "untoday", "tomorrow", "defer", "canc
 /// index in the question's list, for a client that cannot hold the full text.
 /// With `inReplyTo` a question that is no longer the open one is refused, and
 /// the same answer sent again is not written again.
+export const zAnswerBody = z.object({
+  chosen: z.string().trim().min(1).max(ENTITY_LIMITS.turnChosenMax).optional(),
+  option: z.number().int().min(0).max(ENTITY_LIMITS.turnMaxOptions - 1).optional(),
+  inReplyTo: z.number().int().min(1).optional(),
+  step: z.enum(["confirm", "ground", "scope", "decide", "work"]).default("decide"),
+}).strict().refine((b) => (b.chosen === undefined) !== (b.option === undefined), "chosen or option")
+  .refine((b) => b.option === undefined || b.inReplyTo !== undefined, "option needs inReplyTo");
+
 tasksRest.post("/:id/answer", async (c) => {
   const id = zId.safeParse(c.req.param("id"));
   if (!id.success) return c.json({ error: "invalid_request" }, 400);
-  const body = await json(c, z.object({
-    chosen: z.string().trim().min(1).max(ENTITY_LIMITS.turnChosenMax).optional(),
-    option: z.number().int().min(0).max(ENTITY_LIMITS.turnMaxOptions - 1).optional(),
-    inReplyTo: z.number().int().min(1).optional(),
-    step: z.enum(["confirm", "ground", "scope", "decide", "work"]).default("decide"),
-  }).strict().refine((b) => (b.chosen === undefined) !== (b.option === undefined), "chosen or option")
-    .refine((b) => b.option === undefined || b.inReplyTo !== undefined, "option needs inReplyTo"));
+  const body = await json(c, zAnswerBody);
   if (body instanceof Response) return body;
   const ctx = await writeContext(c);
   let { chosen, step } = body as { chosen?: string; step: string };
@@ -570,10 +583,12 @@ async function reviewGate(c: Ctx, ctx: WriteContext, id: string, reviewAt: strin
   return null;
 }
 
+export const zAcceptBody = z.object({ reviewAt: z.string().max(40).optional() }).strict();
+
 tasksRest.post("/:id/accept", async (c) => {
   const id = zId.safeParse(c.req.param("id"));
   if (!id.success) return c.json({ error: "invalid_request" }, 400);
-  const body = await json(c, z.object({ reviewAt: z.string().max(40).optional() }).strict());
+  const body = await json(c, zAcceptBody);
   if (body instanceof Response) return body;
   const ctx = await writeContext(c);
   // A repeat of an accept that landed: say so, do not refuse it.
@@ -588,13 +603,15 @@ tasksRest.post("/:id/accept", async (c) => {
   });
 });
 
+export const zSendBackBody = z.object({
+  note: z.string().trim().min(1).max(10_000).default("Sent back without a note."),
+  reviewAt: z.string().max(40).optional(),
+}).strict();
+
 tasksRest.post("/:id/send_back", async (c) => {
   const id = zId.safeParse(c.req.param("id"));
   if (!id.success) return c.json({ error: "invalid_request" }, 400);
-  const body = await json(c, z.object({
-    note: z.string().trim().min(1).max(10_000).default("Sent back without a note."),
-    reviewAt: z.string().max(40).optional(),
-  }).strict());
+  const body = await json(c, zSendBackBody);
   if (body instanceof Response) return body;
   const ctx = await writeContext(c);
   const gate = await reviewGate(c, ctx, id.data, body.reviewAt);
@@ -605,6 +622,9 @@ tasksRest.post("/:id/send_back", async (c) => {
     return sent;
   });
 });
+
+/// The body of the `defer` verb. `session`: the Do this Later ends.
+export const zDeferBody = z.object({ until: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), session: zId.optional() }).strict();
 
 tasksRest.post("/:id/:verb", async (c) => {
   const id = zId.safeParse(c.req.param("id"));
@@ -620,8 +640,7 @@ tasksRest.post("/:id/:verb", async (c) => {
     case "tomorrow":
       return run(c, ctx, "tasks_defer", { id: id.data, until: addDaysYMD(today, 1) });
     case "defer": {
-      // `session`: the Do this Later ends.
-      const body = await json(c, z.object({ until: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), session: zId.optional() }).strict());
+      const body = await json(c, zDeferBody);
       if (body instanceof Response) return body;
       const response = await run(c, ctx, "tasks_defer", { id: id.data, until: body.until });
       if (response.ok && body.session) {
