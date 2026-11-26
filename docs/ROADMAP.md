@@ -62,6 +62,9 @@ GitHub milestone: `"Launch Septena (iPhone, iPad, Mac)"`, label `track:launch`.
 The task app ships as **Septena** (ADR 0007). Needs M1. Runs before M2
 *(default: ship first, agents and switchers next; mz can overrule)*.
 
+- Support (ADR 0054, `docs/SUPPORT_SPEC.md`): #675 backend routes, #676
+  native Contact Support on every client, Starlings envisioning/starlings#1430,
+  site septena-site#41 and #42; #677 later.
 - #32 done: App Store records "Septena" (`com.septena.tasks`) and
   "Septena Life" (`com.septena.cloud`) exist (ADR 0007).
 - #80, #81, #82 done: faster cold launch (Today draws first).
