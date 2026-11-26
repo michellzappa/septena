@@ -2120,7 +2120,7 @@ export function SeptenaApp() {
     // account's tasks are still on this device, ready to export.
     return (
       <>
-        <SignInScreen api={api} onSignedIn={(s) => void handleSignedIn(s)} />
+        <SignInScreen api={api} language={prefs.language} onSignedIn={(s) => void handleSignedIn(s)} />
         {settingsModal}
       </>
     );
