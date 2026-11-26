@@ -114,7 +114,7 @@
     },
     {
       "file": "Septena/Shell/Sidebar/SidebarView.swift",
-      "literal": "None",
+      "literal": "No Area",
       "reasonId": "predates-rule"
     },
     {
@@ -608,17 +608,22 @@
       "reasonId": "predates-rule"
     },
     {
-      "file": "Septask/SeptaskRootView.swift",
+      "file": "Septena/Shell/Tasks/TaskListChrome.swift",
       "literal": "Tap for a new project or area, or drag onto a list position.",
       "reasonId": "predates-rule"
     },
     {
-      "file": "Septask/SeptaskRootView.swift",
+      "file": "Septena/Shell/Tasks/TaskListChrome.swift",
       "literal": "Tap for a new task or section, or drag onto a list position.",
       "reasonId": "predates-rule"
     },
     {
-      "file": "Septask/SeptaskRootView.swift",
+      "file": "Septena/Shell/Tasks/TaskListChrome.swift",
+      "literal": "Tap for a new task or project, or drag onto a list position.",
+      "reasonId": "predates-rule"
+    },
+    {
+      "file": "Septena/Shell/Tasks/TaskListChrome.swift",
       "literal": "Tap for a new task, or drag onto a list position.",
       "reasonId": "predates-rule"
     },

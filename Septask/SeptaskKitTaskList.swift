@@ -18,6 +18,9 @@ extension NSPasteboard.PasteboardType {
   /// so smart lists can only reorder within their own top cluster and never mix
   /// with areas or projects below.
   static let septaskSmartListItem = NSPasteboard.PasteboardType("com.septena.septask.smart-list-item")
+  /// Dragged Magic Plus button from the sidebar footer — drops a new Area (at
+  /// area level) or a new Project (inside an area or loose projects zone).
+  static let septaskMagicPlus = NSPasteboard.PasteboardType("com.septena.septask.magic-plus")
 }
 
 /// Shared by the list (reorder/re-file drops) and the sidebar (file/schedule
