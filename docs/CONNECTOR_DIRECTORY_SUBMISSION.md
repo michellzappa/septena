@@ -81,7 +81,7 @@ Complete these checks before clicking Submit in either portal:
 - **Onboarding Guide**: `https://api.septena.app/onboard.md` (also exposed as MCP prompt `onboard_septena`)
 - **Privacy Policy URL**: `https://septena.app/privacy`
 - **Support URL**: `https://septena.app/support`
-- **Support Contact**: `[mz: fill in support email, e.g. support@septena.app]`
+- **Support Contact**: `https://septena.app/support`
 - **Developer / Publisher Name**: `Michell Zappa` (or `Septena`)
 - **Open-Source Repository (MIT)**: `https://github.com/michellzappa/septena`
 
@@ -191,7 +191,7 @@ The demo account holds sample data you may read and change:
 - A task assigned to Claude (try tasks_pending_reasoning, then tasks_claim).
 - A task waiting in Review (tasks_list view "review"). Completing an agent's task is refused as human_accepts, by design.
 
-Support during review: mz@centaur-labs.io
+Support during review: mz@centaur-labs.io <!-- septena-lint:allow contact-email: the reviewer form needs an address -->
 ```
 
 **Setup before submitting (mz, once):** set the two secrets and fill the account, in this order, from `backend/`:

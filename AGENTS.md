@@ -557,6 +557,16 @@ The product is Septena; the code targets keep the working names `Septask` (iOS),
   written in a comment where the branch lives. "It was built that way first"
   is not a reason. When you find one platform drifting, fix it on all of them
   in the same change, or file an issue for the platform you cannot reach.
+- **No email address anywhere (mz, 2026-11-26, ADR 0054).** Support is the
+  in-app Contact Support form and https://septena.app/support, which both go
+  to the Septena workspace in Starlings (`docs/SUPPORT_SPEC.md`). Never write
+  mz's address, a company address or a role address (`support@`,
+  `contact@`) into copy, a page, a doc, a README, a registry string or code.
+  Link to `/support` instead. The privacy policy is the one page with an
+  address (`PRIVACY_EMAIL` on the site). A store or reviewer form that
+  requires an address carries `septena-lint:allow contact-email` with the
+  reason. Enforced by `scripts/lint-contact-email.sh` (run from
+  `lint-design.sh`, so CI fails on a new address).
 - **Never name platforms in copy (mz, 2026-11-26).** Every platform
   (iPhone, iPad, Mac, Windows, web, Android, Watch) gets every feature: the
   paywall, MCP and agents, sharing, accounts. Copy, registry strings, skill
