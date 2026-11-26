@@ -46,10 +46,9 @@ page load, which stops working long before a million accounts.
   "opened the app", and an app that syncs in the background counts.
 - Plausible counts a custom event only after mz adds it as a goal. The page
   lists the site events that have no goal yet.
-- The Plausible Stats API needs the Business plan; septena.app is on Growth
-  (#685). Until mz upgrades, the page embeds a Plausible shared-dashboard link
-  (`PLAUSIBLE_SHARED_LINK`, a secret), and the website funnel and goal
-  conversion stay empty. The code for the API block is in place and turns on
-  with `PLAUSIBLE_API_KEY`.
-- Adding App Store Connect, Google Play or Stripe needs a key per source and a
-  change to this ADR's list of sources.
+- Septena's Plausible site lives in the Envisioning Plausible account
+  (mz, 2026-11-26). That account's older plan includes the Stats API and
+  custom properties, so `PLAUSIBLE_API_KEY` is set and the page draws the
+  website block from the API. Funnels still need the Business plan (#685).
+  The embed of a shared dashboard (`PLAUSIBLE_SHARED_LINK`) stays in the
+  code as the fallback for an account without API access; it is not set.
