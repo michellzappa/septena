@@ -547,6 +547,16 @@ The product is Septena; the code targets keep the working names `Septask` (iOS),
   written in a comment where the branch lives. "It was built that way first"
   is not a reason. When you find one platform drifting, fix it on all of them
   in the same change, or file an issue for the platform you cannot reach.
+- **A temporary gap is not a product fact (mz, 2026-11-26).** "Android
+  cannot create an account yet", "checkout is closed", "limits only log" are
+  states of the build. Every platform gets every feature, and a plan or
+  platform that exists is shown as existing (Pro exists, Android exists).
+  Never write copy, status lines, specs or audit findings that present a
+  build gap as how Septena is, and never change copy to match a gap. A gap on
+  one platform is a parity bug: fix it or file it. Say "not yet" only where a
+  person acts on it today ("You can't buy Pro yet"). A `planned` cell in
+  `registry/capabilities.json` means "not built yet", never "not in the
+  product".
 - **One selection/target language per surface — NEVER two.** There is exactly
   ONE visual treatment for "this row/item is selected, focused, hovered, pressed,
   or a drop target" on any given surface, and it is the app's canonical token
