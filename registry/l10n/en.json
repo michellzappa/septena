@@ -4336,7 +4336,7 @@
   "Tomorrow": {
     "text": "Tomorrow",
     "paths": [
-      "surfaces.taskDateBoard.rows.dateBoard.tomorrow.label"
+      "surfaces.taskDateBoard.tomorrow.label"
     ]
   },
   "Too many requests. Try again later.": {

@@ -414,6 +414,38 @@ export function localTodayYMD(date = new Date()): string {
   return `${y}-${m}-${d}`;
 }
 
+/**
+ * Local wall-clock completion timestamp (`YYYY-MM-DDTHH:mm:ss`, no timezone),
+ * matching Apple (`ckTimestampFormatter`) and Backend (`localServerTimestamp`).
+ */
+export function localWallClockTimestamp(date = new Date()): string {
+  const hh = String(date.getHours()).padStart(2, "0");
+  const mm = String(date.getMinutes()).padStart(2, "0");
+  const ss = String(date.getSeconds()).padStart(2, "0");
+  return `${localTodayYMD(date)}T${hh}:${mm}:${ss}`;
+}
+
+/**
+ * Resolve a task's `completedAt` stamp to the user's local calendar day
+ * (`YYYY-MM-DD`). Matches Android (`TaskHomeViewModel.kt`) and Apple:
+ * - Zoned ISO instants (`...Z` or `...+01:00`) convert to local calendar day.
+ * - Unzoned wall-clock stamps (`YYYY-MM-DDTHH:mm:ss`) or plain dates use their
+ *   leading `YYYY-MM-DD` directly.
+ */
+export function completedLocalDay(stamp: string | null | undefined): string | null {
+  if (!stamp) return null;
+  const trimmed = stamp.trim();
+  if (!trimmed) return null;
+  if (/(Z|[+-]\d{2}:?\d{2})$/i.test(trimmed)) {
+    const parsed = new Date(trimmed);
+    if (!Number.isNaN(parsed.getTime())) {
+      return localTodayYMD(parsed);
+    }
+  }
+  const m = /^(\d{4}-\d{2}-\d{2})/.exec(trimmed);
+  return m ? m[1] : null;
+}
+
 export function localUtcOffsetSeconds(date = new Date()): number {
   return -date.getTimezoneOffset() * 60;
 }

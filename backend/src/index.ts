@@ -67,6 +67,12 @@ app.get("/onboard.md", (c) =>
 // client registration, and the app-pairing authorize flow (src/shadow/oauth.ts).
 app.get("/.well-known/oauth-authorization-server", oauth.authServerMetadata);
 app.get("/.well-known/oauth-protected-resource", oauth.protectedResourceMetadata);
+// OpenAI apps directory domain verification (docs/CONNECTOR_DIRECTORY_SUBMISSION.md).
+app.get("/.well-known/openai-apps-challenge", (c) =>
+  c.env.OPENAI_APPS_CHALLENGE
+    ? c.text(c.env.OPENAI_APPS_CHALLENGE.trim(), 200, { "Cache-Control": "no-store" })
+    : c.text("Not found", 404),
+);
 app.post("/oauth/register", oauth.register);
 app.get("/oauth/authorize", oauth.authorize);
 app.get("/oauth/pair/continue", oauth.pairContinue);
