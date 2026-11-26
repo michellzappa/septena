@@ -28,6 +28,7 @@ import java.time.LocalDate
 class FixedRepeatRescheduleTest {
 
     private class FixedClock(private val instant: Instant, private val day: LocalDate) : DayClock {
+        override fun today(): LocalDate = day
         override fun now(): Instant = instant
         override fun today(at: Instant): LocalDate = day
     }
