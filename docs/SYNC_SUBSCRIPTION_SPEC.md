@@ -56,7 +56,7 @@ with limits, paid lifts the limits.**
 ## 3. Free and paid
 
 Three levels: Free, Plus and Pro (ADR 0010, ADR 0023, ADR 0036, ADR 0045,
-ADR 0052). Pro is given by invitation. An account
+ADR 0052). Pro is a real plan; no store sells it yet. An account
 adds the server; Plus adds more than one. The earlier rule "the server is paid" is
 replaced. The public rule: **free on one device, Plus on all of them.** The
 paid plan is named **Septena Plus** on every surface.

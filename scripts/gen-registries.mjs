@@ -661,7 +661,7 @@ const TASK_PAGE_BLOCK_KINDS = new Set(["header", "notes", "attributes", "checkli
 const TASK_PAGE_DEPTHS = new Set(["inline", "page", "review"]);
 
 // ---- plans.json (ADR 0010, ADR 0023) ----
-// Pro is a real plan, given by invitation (ADR 0045, ADR 0052): the site shows it,
+// Pro is a real plan (ADR 0045, ADR 0052): the site shows it,
 // the server applies it, and the apps name it on an account that has it. No
 // store sells it yet.
 const PLAN_LEVELS = ["free", "plus", "pro"];
