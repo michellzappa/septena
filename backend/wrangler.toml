@@ -54,6 +54,9 @@ WEB_ALLOWED_ORIGINS = "https://web.septena.app"
 ADMIN_EMAILS = "mz@envisioning.com"
 ACCESS_TEAM_DOMAIN = "wispy-tooth-45ec.cloudflareaccess.com"
 ACCESS_AUD = "5154cf50dab7e60f4e49494cd5cafab0e5cd1ebec1f44fdf99fcc0445236a83a"
+# Email sign-in codes (ADR 0016, #169). Off until Terms of Use and the
+# privacy copy ship (#564); then "true".
+EMAIL_SIGNIN = "false"
 
 # Account summaries for the admin page (src/admin/accounts.ts).
 [triggers]
@@ -116,6 +119,11 @@ class_name = "ProjectStore"
 [[migrations]]
 tag = "v4-project-store"
 new_sqlite_classes = ["ProjectStore"]
+
+# Sign-in code mail through Cloudflare Email Service (septena.app is onboarded:
+# `wrangler email sending list`).
+[[send_email]]
+name = "EMAIL"
 
 # Attachment bytes. Create once: wrangler r2 bucket create septena-attachments
 [[r2_buckets]]

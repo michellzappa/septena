@@ -58,8 +58,9 @@ All flows end in `issueSession()` and an `AccountStore` identity row.
 
 | Route | Does |
 |---|---|
-| `GET /v1/auth/methods` | Lists the methods this server has turned on. |
-| `POST /v1/auth/email/start`, `/verify` | Email code (#169). |
+| `GET /v1/auth/methods` | Built. `{methods:[{id}]}`: `apple`, `email` when on, `device`. |
+| `POST /v1/auth/email/start` `{email}` | Built (#169). 202 `{status:"sent", expiresInSeconds, codeLength:6}`, the same for a known and an unknown address. 429 `{error:"too_many_requests", retryAfterSeconds}`, 503 `{error:"email_signin_off" \| "email_send_failed"}`. |
+| `POST /v1/auth/email/verify` `{email, code, sessionMode?}` | Built (#169). 200 the session (`sessionMode:"cookie"` from the web app sets the refresh cookie, as device poll does). A new address creates the account and its trial (once per address). 401 `{error:"invalid_code", attemptsLeft}`, 410 `{error:"expired_or_unknown"}`, 429 `{error:"too_many_attempts"}`. |
 | `GET /v1/auth/oidc/:provider/start` | Starts a redirect with PKCE and a `state` bound to the client (`return_to` from an allowlist: the web app, each app's claimed redirect, the connector page). |
 | `GET /v1/auth/oidc/:provider/callback` | Exchanges the code, verifies the ID token (issuer, audience, nonce, expiry, signature from the provider's JWKS), then signs in or creates the account. Returns to the client with a one-time result code; the client trades it for the session at `POST /v1/auth/oidc/redeem`. |
 | `POST /v1/auth/google/native` | Android Credential Manager ID token, verified like the callback. |
@@ -78,6 +79,13 @@ Rules:
 - Rate limits per IP on every start route, as for device start.
 - Account deletion deletes every identity row.
 - Secrets (client secrets, the Apple key) are Worker secrets only.
+
+Email limits: 3 codes per address per 10 minutes; 5 wrong codes lock the
+address until the window ends (a new code does not unlock it); 20 starts and
+30 failed verifies per IP per 10 minutes. Codes are stored hashed in
+`AccountStore` and spent on first use. The switch is `EMAIL_SIGNIN` in
+`backend/wrangler.toml`; it stays `"false"` until #564 ships, and the
+`EMAIL` send binding uses Cloudflare Email Service on `septena.app`.
 
 ## 5. Clients
 
