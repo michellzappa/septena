@@ -48,6 +48,12 @@ export interface Env {
   /// Optional global APNs host override ("true" = sandbox, "false" = prod; unset = per-token).
   APNS_SANDBOX?: string;
 
+  /// Email sign-in (ADR 0016, #169). "true" turns it on; it stays off until
+  /// Terms of Use and the privacy copy ship (#564). Needs the EMAIL binding.
+  EMAIL_SIGNIN?: string;
+  /// Cloudflare Email Service send binding (septena.app is onboarded).
+  EMAIL?: SendEmail;
+
   // KV namespaces
   STATE: KVNamespace;    // short-lived OAuth state (src/shadow/oauth.ts)
   TOKENS: KVNamespace;   // MCP grants: access and refresh tokens (src/shadow/tokens.ts)

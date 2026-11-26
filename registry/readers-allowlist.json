@@ -70,10 +70,6 @@
     "PLAN_PRODUCTS": {
       "reason": "The server accepts any product under the sync prefix; the StoreKit work narrows it to these IDs.",
       "issue": "#46"
-    },
-    "SIGN_IN": {
-      "reason": "No client renders the sign-in registry yet (SI0); the sign-in screens read it in SI2 and SI4.",
-      "issue": "#636"
     }
   },
   "kotlin": {

@@ -20,6 +20,7 @@ import {
   redeemWsTicket,
   webCorsMiddleware,
 } from "./webAuth.js";
+import { enabledSignInMethods, startEmailSignIn, verifyEmailSignIn, zEmailStartBody, zEmailVerifyBody } from "./emailSignIn.js";
 import {
   approvePairing,
   denyPairing,
@@ -209,6 +210,37 @@ api.post("/auth/signout", async (c) => {
     status: 204,
     headers: { "Set-Cookie": clearRefreshCookie(c.env) },
   });
+});
+
+// Which sign-in methods this server has on (ADR 0047, docs/SIGN_IN_SURFACES_SPEC.md §3).
+api.get("/auth/methods", (c) =>
+  c.json({ methods: enabledSignInMethods(c.env).map((id) => ({ id })) }, 200, { "Cache-Control": "no-store" }));
+
+// Email one-time code (ADR 0016, issue #169): see ./emailSignIn.ts.
+api.post("/auth/email/start", async (c) => {
+  const body = await parse(c, zEmailStartBody);
+  if (body instanceof Response) return body;
+  const res = await startEmailSignIn(c.env, body, c.req.header("CF-Connecting-IP"));
+  if (res.ok) return c.json({ status: "sent", expiresInSeconds: res.expiresInSeconds, codeLength: 6 }, 202, { "Cache-Control": "no-store" });
+  const headers: Record<string, string> = { "Cache-Control": "no-store" };
+  if (res.retryAfterSeconds) headers["Retry-After"] = String(res.retryAfterSeconds);
+  return c.json({ error: res.error, ...(res.retryAfterSeconds ? { retryAfterSeconds: res.retryAfterSeconds } : {}) }, res.status, headers);
+});
+
+api.post("/auth/email/verify", async (c) => {
+  const body = await parse(c, zEmailVerifyBody);
+  if (body instanceof Response) return body;
+  const cookieMode = body.sessionMode === "cookie";
+  if (cookieMode && !isAllowedWebOrigin(c.env, c.req.header("Origin"))) {
+    return c.json({ error: "origin_not_allowed" }, 403, { "Cache-Control": "no-store" });
+  }
+  const res = await verifyEmailSignIn(c.env, body, c.req.header("CF-Connecting-IP"));
+  if (!res.ok) {
+    return c.json({ error: res.error, ...(res.attemptsLeft !== undefined ? { attemptsLeft: res.attemptsLeft } : {}) }, res.status, { "Cache-Control": "no-store" });
+  }
+  return cookieMode
+    ? cookieSessionResponse(c.env, res.session)
+    : c.json(res.session, 200, { "Cache-Control": "no-store" });
 });
 
 // Device sign-in by approval (ADR 0016, issue #170): see src/shadow/oauth.ts.
