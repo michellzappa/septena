@@ -108,7 +108,11 @@ export function planView(summary: AccountSummary | null, now = Date.now()): Plan
   };
 }
 
-const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const WEEK_MS = 7 * DAY_MS;
+
+/// An account that used Septena for real: it completed a task (ADR 0050).
+export const isActivated = (summary: AccountSummary | null) => (summary?.closedTasks ?? 0) >= 1;
 
 /// The funnel counts of docs/SYNC_SUBSCRIPTION_SPEC.md §3.3, from server data.
 export function overview(rows: AccountIndexRow[], now = Date.now()) {
@@ -119,7 +123,10 @@ export function overview(rows: AccountIndexRow[], now = Date.now()) {
   return {
     accounts: rows.length,
     newThisWeek: count((r) => now - r.createdAt < WEEK_MS),
+    activeToday: count((r) => now - (seen(r) ?? 0) < DAY_MS),
     activeThisWeek: count((r) => now - (seen(r) ?? 0) < WEEK_MS),
+    activeThisMonth: count((r) => now - (seen(r) ?? 0) < 30 * DAY_MS),
+    activated: count((r) => isActivated(r.summary)),
     twoDevices: count((r) => (r.summary?.devices.length ?? 0) >= 2),
     withAgent: count((r) => (r.summary?.agents.length ?? 0) > 0),
     agentChangesWeek: rows.reduce((n, r) => n + (r.summary?.agentChangesWeek ?? 0), 0),

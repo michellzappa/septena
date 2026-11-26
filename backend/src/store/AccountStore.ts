@@ -154,6 +154,10 @@ export class AccountStore extends DurableObject<Env> {
         sends       INTEGER NOT NULL DEFAULT 0,
         windowStart INTEGER NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS metric_days (
+        day  TEXT PRIMARY KEY,
+        data TEXT NOT NULL
+      );
     `);
     this.links.migrate();
   }
@@ -452,6 +456,20 @@ export class AccountStore extends DurableObject<Env> {
         plusLinks: links.get(r.userId) ?? [],
       };
     });
+  }
+
+  // ---- daily metrics (ADR 0048, src/admin/metrics.ts) ----
+
+  /// One row per UTC day (`YYYY-MM-DD`), counts only. The hourly cron
+  /// rewrites today's row, so a day keeps its last count.
+  saveMetricDay(day: string, data: Record<string, number>): void {
+    this.sql.exec("INSERT OR REPLACE INTO metric_days (day, data) VALUES (?, ?)", day, JSON.stringify(data));
+  }
+
+  /// The days on and after `since`, oldest first.
+  listMetricDays(since: string): { day: string; data: Record<string, number> }[] {
+    return this.sql.exec<{ day: string; data: string }>("SELECT day, data FROM metric_days WHERE day >= ? ORDER BY day", since)
+      .toArray().map((r) => ({ day: r.day, data: JSON.parse(r.data) as Record<string, number> }));
   }
 
   // ---- Plus links (src/store/plusLinks.ts) ----

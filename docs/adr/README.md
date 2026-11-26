@@ -62,6 +62,7 @@ a new ADR and set the old one to `superseded by NNNN`.
 | [0055](0055-directory-reviewers-use-a-demo-account.md) | Directory reviewers use a demo account behind a reviewer code | accepted |
 | [0056](0056-agents-create-accounts-with-email-confirmation.md) | Agents can create and connect Septena accounts with human email confirmation | accepted |
 | [0057](0057-agent-responses-stay-typed-data-not-generative-ui.md) | Agent responses and hooks stay typed data, not generative UI (A2UI review) | proposed |
+| [0050](0050-admin-growth-from-daily-snapshots-then-an-event-stream.md) | Admin growth comes from daily snapshots now, and from an event stream at scale (amends 0043) | accepted |
 
 ## Template
 
