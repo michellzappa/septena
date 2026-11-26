@@ -145,8 +145,8 @@ class SeptenaAuthClient(
         return when (response.statusCode) {
             200 -> OidcRedeemResult.SignedIn(parseSession(response.body))
             409 -> {
-                val err = errorBody(response.body)
-                if (err?.get("error").stringValue() == "account_exists") {
+                val err = errorBody(response.body) ?: throw AuthHttpException(409, response.body)
+                if (err["error"].stringValue() == "account_exists") {
                     OidcRedeemResult.AccountExists(
                         email = err["email"].stringValue().orEmpty(),
                         provider = err["provider"].stringValue().orEmpty(),
@@ -172,8 +172,8 @@ class SeptenaAuthClient(
         return when (response.statusCode) {
             200 -> EmailVerifyResult.SignedIn(parseSession(response.body))
             401 -> {
-                val failure = errorBody(response.body)
-                if (failure?.get("error").stringValue() != "invalid_code") throw AuthHttpException(401, response.body)
+                val failure = errorBody(response.body) ?: throw AuthHttpException(401, response.body)
+                if (failure["error"].stringValue() != "invalid_code") throw AuthHttpException(401, response.body)
                 val left = failure["attemptsLeft"].longValue()?.toInt() ?: 0
                 EmailVerifyResult.WrongCode(left.coerceAtLeast(0))
             }

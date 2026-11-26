@@ -254,7 +254,8 @@ export function SignInMethodsSection({ api, language }: SignInMethodsSectionProp
           {(emailAvailable || addableOidc.length > 0) && !addingEmail && (
             <div className="flex flex-wrap gap-2 pt-1">
               {addableOidc.map((provider) => {
-                const name = SIGN_IN.methods.find((m) => m.id === provider)?.name ?? provider;
+                const method = SIGN_IN.methods.find((m) => m.id === provider);
+                const name = method && "name" in method ? method.name : provider;
                 return (
                   <button
                     key={provider}

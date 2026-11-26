@@ -505,7 +505,7 @@ export function SeptenaApp() {
   // Finish an OIDC provider-link redirect returning to `/?oidc_link=1&oidc_code=...`
   // while signed in (Settings ▸ Account ▸ Sign-in methods, #643).
   useEffect(() => {
-    if (bootPhase !== "ready" || typeof window === "undefined") return;
+    if (bootPhase !== "signed_in" || typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     if (params.get("oidc_link") !== "1") return;
     const code = params.get("oidc_code");

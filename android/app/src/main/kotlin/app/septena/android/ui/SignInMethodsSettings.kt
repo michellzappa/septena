@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.septena.android.AndroidAppGraph
 import app.septena.core.generated.RegistrySignInMethodIds
+import app.septena.core.stringValue
 import app.septena.transport.AccessHttpException
 import app.septena.transport.AuthMethodEntry
 import app.septena.transport.LinkedIdentities

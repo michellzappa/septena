@@ -83,7 +83,7 @@ internal fun signInText(languageTag: String, vararg path: String): String {
     return registryText(node.stringValue(), languageTag)
 }
 
-private fun signInMethod(id: String): JsonValue.ObjectValue? =
+internal fun signInMethod(id: String): JsonValue.ObjectValue? =
     (signInRegistry.fields["methods"] as? JsonValue.ArrayValue)?.values
         ?.firstOrNull { (it as? JsonValue.ObjectValue)?.fields?.get("id").stringValue() == id } as? JsonValue.ObjectValue
 

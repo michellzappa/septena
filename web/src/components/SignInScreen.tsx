@@ -40,7 +40,8 @@ function visibleMethods(serverEntries: readonly AuthMethodEntry[]): MethodId[] {
 }
 
 function providerName(id: string): string {
-  return SIGN_IN.methods.find((m) => m.id === id)?.name ?? id;
+  const method = SIGN_IN.methods.find((m) => m.id === id);
+  return method && "name" in method ? method.name : id;
 }
 
 function methodTitle(id: MethodId, lang: string): string {
