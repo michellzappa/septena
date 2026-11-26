@@ -16,7 +16,7 @@ separate Agent list (ADR 0046).
 |---|---|---|---|
 | **Questions** | The last turn is a provider turn with options, on an open task that is not stopped. | The user answers, stops the agent, or closes the task. | It stays. It does not fade. |
 | **Finished work** | `endState = needs_verify` on an open task. | The user accepts, sends back, or closes the task. | It stays. It does not fade. |
-| **Waiting** | The open task waits on a person (§6): `waitingOn` is set, or a shared task is assigned to another member. | The user taps Got It Back, completes or cancels it, or the member completes it. | It stays. It does not fade. On its follow-up date it counts in the badge. |
+| **Waiting** | The open task waits on a person (§6): `waitingOn` is set, or the user assigned a shared task to another member. | The user taps Got It Back, completes or cancels it, or the member completes it. | It stays. It does not fade. Its When date brings it to Today to chase. |
 | **Working** | An agent holds a live claim on the open task. | The claim ends, the agent asks or hands over, or the user takes the task back. | It stays. It does not fade. |
 | **Queued** | Agent work (§3) with no live claim, not stopped and not terminal. | An agent claims it, or the user takes the task back or closes it. | It stays. |
 | **Stopped** | The user stopped the agent on this task. | The user resumes the agent, takes the task back or closes it. | It stays. |
@@ -33,9 +33,8 @@ Today), overdue tasks, and the Today rollover (§6 of the fade spec).
 
 - Sidebar: right below Today, while it has an item. Go ▸ Review and Quick Find
   always open it.
-- Badge: Questions plus Finished work, plus each Waiting task whose follow-up
-  date is today or past. Working, Queued, Stopped, Faded and Projects do not
-  count.
+- Badge: Questions plus Finished work. Waiting, Working, Queued, Stopped,
+  Faded and Projects do not count.
 - Faded starts collapsed. Its notice opens the keep-or-let-go sheet on any day.
 - The weekly prompt on Today opens the same sheet.
 - Opening a row in any group but Faded (tap, click, double-click, Return)
@@ -104,23 +103,21 @@ Work handed to a person (ADR 0053). Not built: #669.
 
 | Field | Type | Set by |
 |---|---|---|
-| `waitingOn` | text, 1 to 80 characters, or null | The user (Waiting On…), or an agent the user asked |
-| `waitingSince` | `YYYY-MM-DD` | The store, on the day `waitingOn` goes from null to a value |
-| `followUpOn` | `YYYY-MM-DD` or null | The user or an agent; optional |
+| `waitingOn` | text, 1 to 80 characters, or null | The user (Waiting On…), or an agent |
+| `waitingSince` | `YYYY-MM-DD` or null | The store, on the day `waitingOn` goes from null to a value. Cleared with it. |
 
-All three sync, and the store clears `waitingSince` and `followUpOn` when
-`waitingOn` is cleared. A shared task assigned to another member waits on
-that member: the client shows the member's name, and `waitingSince` is the
-day of the assignment. These fields are personal on a shared task, like When
-*(default)*.
+Both sync. There is no follow-up field: **the task's When date is the day to
+chase.** Waiting On… offers a When date in the same sheet (*default* a week
+out, the user can clear it).
+
+On a shared task the two fields are personal, like When *(default)*.
 
 ### Where a waiting task shows
 
-- In Review ▸ Waiting, follow-up due first, then oldest `waitingSince` first.
-- In its project or area, with a "Waiting on Anna" chip on the row.
-- Not on Today, in Anytime or in Upcoming *(default)*: it is not the user's
-  next action. On its follow-up date it counts in the badge; it does not move
-  to Today.
+- In Review ▸ Waiting, oldest `waitingSince` first.
+- Everywhere else as any task does: on Today when its When date comes, in
+  Upcoming before that, in Anytime when it has no date, and in its project or
+  area. The row carries a "Waiting on Anna · 5 days" label.
 - The weekly review shows the Waiting group *(default)*.
 
 ### Actions
@@ -129,28 +126,37 @@ Row menu, swipe and task page, from `registry/actions.json`:
 
 | Action | Writes |
 |---|---|
-| Waiting On… | `waitingOn`, optional `followUpOn` |
-| Follow Up On… | `followUpOn` (a new date to chase) |
-| Got It Back | clears the wait; the task returns to its list |
+| Waiting On… | `waitingOn`, and optionally When |
+| Got It Back | clears `waitingOn` (and `waitingSince`); the task stays open in its list |
 | Complete | completes the task; the wait ends with it |
+
+To chase later, the user changes When, as for any task.
 
 ### Store rules
 
 - A waiting task never fades. Setting a wait ends a fade.
-- Only the user ends a wait. An agent's write that clears `waitingOn` is
-  refused as `in_review`. An agent may set or change `waitingOn` and
-  `followUpOn`.
+- Only the user ends a wait. On a waiting task, an agent's write that clears
+  `waitingOn`, completes, cancels or deletes the task is refused as
+  `in_review`, as for every Review group (ADR 0044).
+- An agent may set a wait and change its When date: the user asked it to
+  chase someone, or it made the task from a message the user sent.
 - An agent that sees a reply (it reads the reference the task points at,
   ADR 0038) asks with a provider turn: "Anna replied. Got it back?" with the
-  options Got It Back and Still Waiting. The task is then a Question (§1), the
-  first group that fits.
-- A task the member completes closes for everyone. It is not a hand-off: no
-  Accept step.
+  options Got It Back and Still Waiting. The task is then a Question (§1),
+  the first group that fits.
+
+### Shared projects
+
+A shared task waits on a member only when **this user** assigned it to that
+member: the client shows the member's name, and `waitingSince` is the day of
+the assignment. A task someone else assigned, or one assigned to the user,
+does not wait. When the member completes it, it closes for everyone, with no
+Accept step.
 
 ### Wire
 
-- MCP: `tasks_set_waiting {id, waiting_on | null, follow_up_on?}` (`waiting_on: null` from an agent is
-  refused), `tasks_list view=waiting`, and the three fields in the task
-  shape. REST mirrors them (#90).
+- MCP: `tasks_set_waiting {id, waiting_on, scheduled?}` (`waiting_on: null`
+  from an agent is refused), `tasks_list view=waiting`, and both fields in the
+  task shape. REST mirrors them (#90).
 - Core: `reviewGroup` returns `waiting` between `finishedWork` and the agent
-  stages; `reviewBadgeCount` adds the due waits.
+  stages. The badge does not change.
