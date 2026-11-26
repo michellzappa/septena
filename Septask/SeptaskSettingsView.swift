@@ -646,6 +646,8 @@ struct SeptaskSettingsView: View {
   @ViewBuilder
   private func page(_ pageID: String) -> some View {
     switch pageID {
+    case SupportView.surfaceID:
+      SupportView()
     case RegistrySettings.PageID.account:
       SeptaskAccountPane()
     case RegistrySettings.PageID.claudePairing:
@@ -944,11 +946,21 @@ private struct SeptaskAboutPane: View {
       Link(destination: RegistrySettings.helpURL) {
         label(item)
       }
-    case "send_feedback":
-      // Interim until #676 replaces this with the native Contact Support form.
-      Link(destination: URL(string: "mailto:mz@centaur-labs.io?subject=Septena%20feedback")!) { // septena-lint:allow contact-email
-        label(item)
+    case SupportView.surfaceID:
+      // Contact Support (ADR 0054): a page in Settings on every platform.
+      NavigationLink(value: SupportView.surfaceID) {
+        HStack {
+          label(item)
+          if SupportCenter.shared.unread > 0 {
+            Spacer()
+            Circle()
+              .fill(Color.accentColor)
+              .frame(width: 8, height: 8)
+              .accessibilityLabel(RegistrySupport.unreadReply)
+          }
+        }
       }
+      .task { await SupportCenter.shared.refresh() }
     default:
       EmptyView()
     }

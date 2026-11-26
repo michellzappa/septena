@@ -1,7 +1,6 @@
 package app.septena.android.ui
 
 import android.content.Context
-import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -51,7 +50,7 @@ internal class SettingsSurfaceEnv(
 
 /** The custom surfaces this file renders; the others stay in SettingsScreen or their own files. */
 internal val SETTINGS_SURFACES = setOf(
-    "about_header", "open_source", "open_help", "send_feedback", "privacy_explainer", "ai_explainer",
+    "about_header", "open_source", "open_help", CONTACT_SUPPORT, "privacy_explainer", "ai_explainer",
     "mcp_skills", "sync_diagnostics", "smart_lists_editor", "plus_offer", "calendar_detail",
     "reset_get_started", "reset_first_run", DELETE_ACCOUNT,
     "sign_in_approval", "claude_connector", "import_export",
@@ -70,12 +69,7 @@ internal fun SettingsCustomSurface(
         "about_header" -> AboutHeader(label, detail, context)
         "open_source" -> OpenSourceRow(label, detail) { openUrl(context, REPO_URL) }
         "open_help" -> ActionRow(label) { openUrl(context, RegistryLinks.HELP) }
-        "send_feedback" -> ActionRow(label) {
-            if (!openUrl(context, FEEDBACK_URL)) {
-                copyToClipboard(context, label.orEmpty(), FEEDBACK_EMAIL)
-                Toast.makeText(context, FEEDBACK_EMAIL, Toast.LENGTH_SHORT).show()
-            }
-        }
+        CONTACT_SUPPORT -> ContactSupportRow(label, env, languageTag)
         "privacy_explainer" -> detail?.let { Text(it, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
         "ai_explainer" -> ExpandableRow(label) { AiExplainer(appName(context), languageTag) }
         // Clears synced Get Started dismissal and completed steps (as Apple `SettingsMirror.resetGetStarted`).
@@ -269,7 +263,4 @@ private const val AI_EXPLAINER = "ai_explainer"
 private const val MCP_SKILLS = "mcp_skills"
 private const val SYNC_DIAGNOSTICS = "sync_diagnostics"
 private const val MAX_ISSUES = 20
-// Interim until #676 replaces these with the native Contact Support form.
-private const val FEEDBACK_EMAIL = "mz@centaur-labs.io" // septena-lint:allow contact-email
-private const val FEEDBACK_URL = "mailto:mz@centaur-labs.io?subject=Septena%20feedback" // septena-lint:allow contact-email
 private const val REPO_URL = "https://github.com/michellzappa/septena"

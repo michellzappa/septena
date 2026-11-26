@@ -241,6 +241,9 @@ private struct SmartListCommands: View {
 /// order, titles and shortcuts. This struct binds each action ID to a handler.
 struct SeptaskCommandMenus: Commands {
   @Environment(\.openURL) private var openURL
+  #if os(macOS)
+  @Environment(\.openWindow) private var openWindow
+  #endif
   @FocusedValue(\.septaskNavigationActions) private var actions
   @FocusedValue(\.taskActions) private var taskActions
   @AppStorage(SettingsKey.textSizeStep) private var textSizeRaw = 0
@@ -372,6 +375,13 @@ struct SeptaskCommandMenus: Commands {
 
     case .appHelp:
       return .init { openURL(RegistrySettings.helpURL) }
+
+    case .appContactSupport:
+      #if os(macOS)
+      return .init { openWindow(id: SupportView.windowID) }
+      #else
+      return .init { SupportCenter.shared.isPresentingSheet = true }
+      #endif
 
     case .appKeyboardShortcuts:
       #if os(macOS)

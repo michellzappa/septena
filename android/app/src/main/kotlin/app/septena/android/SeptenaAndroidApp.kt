@@ -42,6 +42,7 @@ import app.septena.store.db.SeptenaDatabase
 import app.septena.transport.SeptenaAccessClient
 import app.septena.transport.SeptenaAuthClient
 import app.septena.transport.SeptenaShareClient
+import app.septena.transport.SeptenaSupportClient
 import app.septena.transport.SeptenaTaskBackendClient
 import app.septena.transport.SyncLiveSocket
 import app.septena.transport.UrlConnectionSyncTransport
@@ -105,6 +106,9 @@ class AndroidAppGraph(application: Application) {
     private val transport = UrlConnectionSyncTransport(credentials, clientVersion)
     val access = SeptenaAccessClient(credentials, clientVersion)
     val shares = SeptenaShareClient(access)
+    /** Contact Support (ADR 0054): the client and this device's support key. */
+    val support = SeptenaSupportClient(credentials, clientVersion)
+    val supportKeys = app.septena.android.auth.SupportKeyStore(application)
     val taskBackend = SeptenaTaskBackendClient(credentials, clientVersion)
     val attachments = TaskAttachmentStore(application, taskStore, registryEntityMutator, clock, taskBackend)
     val accountWipe = AccountWipe(application, taskStore, attachments, taskUndoHistory)

@@ -448,6 +448,10 @@
     "RegistryEntityEnums.DoExit.CLOSED": {
       "reason": "The shared core decides this exit (resolve_do_sessions); Android stores what it answers.",
       "issue": "#517"
+    },
+    "RegistryActionIds.APP_CONTACT_SUPPORT": {
+      "reason": "Android has no Help menu; Contact Support opens from Settings (ADR 0054)",
+      "issue": "#676"
     }
   },
   "ships": {

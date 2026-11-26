@@ -8,10 +8,10 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 
 | Status | iPhone | iPad | Mac | Web | Android | Windows | Watch |
 |---|---|---|---|---|---|---|---|
-| ships | 58 | 59 | 59 | 51 | 55 | 0 | 1 |
+| ships | 59 | 60 | 60 | 52 | 56 | 0 | 1 |
 | partial | 1 | 1 | 1 | 1 | 2 | 0 | 3 |
-| planned | 3 | 3 | 3 | 7 | 4 | 62 | 2 |
-| - | 4 | 3 | 3 | 7 | 5 | 4 | 60 |
+| planned | 3 | 3 | 3 | 7 | 4 | 63 | 2 |
+| - | 4 | 3 | 3 | 7 | 5 | 4 | 61 |
 
 | ID | Feature | iPhone | iPad | Mac | Web | Android | Windows | Watch |
 |---|---|---|---|---|---|---|---|---|
@@ -77,6 +77,7 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 | `data.import-export` | Export as JSON, Markdown or CSV; import JSON with a preview | ships | ships | ships | ships | ships | planned | - |
 | `agents.list` | Connected agents: list, name, disconnect | ships | ships | ships | ships | ships | planned | - |
 | `settings.display` | Display, badge and privacy preferences | ships | ships | ships | ships | ships | planned | - |
+| `support.contact` | Contact Support: a native form, with replies in the app | ships | ships | ships | ships | ships | planned | - |
 | `appearance.accents` | Accent colors (Colorful and the fruit accents) | ships | ships | ships | ships | ships | planned | - |
 | `appearance.textures` | Header textures with intensity and slow drift | ships | ships | ships | ships | ships | planned | - |
 | `appearance.mode` | Light, dark or system appearance | ships | ships | ships | ships | ships | planned | - |

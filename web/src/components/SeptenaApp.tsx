@@ -96,6 +96,7 @@ import { FadeSweepModal } from "./FadeSweepModal";
 import { FirstRunModal } from "./FirstRunModal";
 import { HeaderWash } from "./HeaderWash";
 import { KeyboardShortcutsModal, formatShortcutKeycaps } from "./KeyboardShortcutsModal";
+import { SupportModal, supportKey } from "./SupportModal";
 import { QuickAddModal, type QuickAddInitial } from "./QuickAddModal";
 import { QuickFindModal, type CommandBarItem } from "./QuickFindModal";
 import { RegistryIcon } from "./RegistryIcon";
@@ -244,6 +245,25 @@ export function SeptenaApp() {
     { userId: string; summary: AccountSwitchSummary } | null
   >(null);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  // Contact Support (ADR 0054): the modal and the unread replies' dot.
+  const [supportOpen, setSupportOpen] = useState(false);
+  const [supportUnread, setSupportUnread] = useState(0);
+  // The dot on Settings, About, Contact Support: read when Settings opens.
+  useEffect(() => {
+    if (!settingsOpen) return;
+    let cancelled = false;
+    api
+      .supportConversation(supportKey())
+      .then((c) => {
+        if (!cancelled) setSupportUnread(c.unread);
+      })
+      .catch(() => {
+        // The dot stays as it was; the modal reads again when it opens.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [api, settingsOpen]);
   /** The tasks of the open keep-or-let-go sheet, fixed when it opens. Null: closed. */
   const [sweepTasks, setSweepTasks] = useState<TaskRow[] | null>(null);
   const [waitingTaskId, setWaitingTaskId] = useState<string | null>(null);
@@ -1552,7 +1572,7 @@ export function SeptenaApp() {
       }
 
       const anyModalOpen =
-        quickFindOpen || quickAddOpen || settingsOpen || shortcutsOpen || sweepTasks !== null || firstRunOpen;
+        quickFindOpen || quickAddOpen || settingsOpen || shortcutsOpen || supportOpen || sweepTasks !== null || firstRunOpen;
       if (anyModalOpen) return;
 
       if (primary && !e.altKey && key === "z" && !typing) {
@@ -2667,6 +2687,9 @@ export function SeptenaApp() {
       makeCmd("app.keyboardShortcuts", () => setShortcutsOpen(true), {
         keywords: ["keys", "hotkeys", "help"],
       }),
+      makeCmd("app.contactSupport", () => setSupportOpen(true), {
+        keywords: ["support", "feedback", "help", "bug", "contact"],
+      }),
     );
 
     return items;
@@ -2713,6 +2736,8 @@ export function SeptenaApp() {
       onDeleteAccount={handleDeleteAccount}
       onShowWelcomeAgain={() => setFirstRunOpen(true)}
       onOpenShortcuts={() => setShortcutsOpen(true)}
+      onOpenSupport={() => setSupportOpen(true)}
+      supportUnread={supportUnread}
     />
   );
 
@@ -4403,6 +4428,14 @@ export function SeptenaApp() {
           onSwept={() => engine.setSetting("fadeSweptAt", new Date().toISOString())}
         />
       )}
+
+      <SupportModal
+        open={supportOpen}
+        language={lang}
+        api={api}
+        onClose={() => setSupportOpen(false)}
+        onUnreadChange={setSupportUnread}
+      />
 
       <KeyboardShortcutsModal
         open={shortcutsOpen}

@@ -5290,6 +5290,48 @@
         }
       }
     },
+    "Adds your device, Septena version and sync status. It never includes your tasks." : {
+      "comment" : "Generated from registry surfaces.support.copy.diagnosticsDetail.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fügt dein Gerät, die Septena-Version und den Sync-Status hinzu. Deine Aufgaben sind nie dabei."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Añade tu dispositivo, la versión de Septena y el estado de sincronización. Nunca incluye tus tareas."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajoute votre appareil, la version de Septena et l'état de la synchronisation. Vos tâches n'en font jamais partie."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiunge il dispositivo, la versione di Septena e lo stato della sincronizzazione. Non include mai le tue attività."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voegt je apparaat, de Septena-versie en de syncstatus toe. Je taken zitten er nooit bij."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adiciona seu dispositivo, a versão do Septena e o status da sincronização. Nunca inclui suas tarefas."
+          }
+        }
+      }
+    },
     "Advanced" : {
       "comment" : "Generated from registry settings.pages.about.sections.advanced_link.items.0.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -10570,6 +10612,90 @@
         }
       }
     },
+    "Contact Support" : {
+      "comment" : "Generated from registry settings.pages.about.sections.actions.items.4.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Support kontaktieren"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contactar con soporte"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contacter le support"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contatta il supporto"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contact met support"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Falar com o suporte"
+          }
+        }
+      }
+    },
+    "Contact Support…" : {
+      "comment" : "Generated from registry actions.actions.app.contactSupport.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Support kontaktieren …"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contactar con soporte…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contacter le support…"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contatta il supporto…"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contact met support…"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Falar com o suporte…"
+          }
+        }
+      }
+    },
     "Container" : {
       "localizations" : {
         "nl" : {
@@ -11311,6 +11437,48 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Não foi possível excluir sua conta. Nada foi excluído."
+          }
+        }
+      }
+    },
+    "Couldn't send your message." : {
+      "comment" : "Generated from registry surfaces.support.copy.sendFailed.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deine Nachricht konnte nicht gesendet werden."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudo enviar tu mensaje."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible d'envoyer votre message."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile inviare il messaggio."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Je bericht kon niet worden verstuurd."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não foi possível enviar sua mensagem."
           }
         }
       }
@@ -14412,7 +14580,7 @@
       }
     },
     "Email" : {
-      "comment" : "Generated from registry surfaces.taskReferences.kinds.email.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry surfaces.support.copy.emailFieldLabel.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
@@ -14617,6 +14785,48 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Digite o código do outro dispositivo. Se estiver conectando o Claude, o código aparece no navegador."
+          }
+        }
+      }
+    },
+    "Enter your email so we can reply." : {
+      "comment" : "Generated from registry surfaces.support.copy.emailRequired.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gib deine E-Mail-Adresse ein, damit wir antworten können."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escribe tu correo para que podamos responder."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saisissez votre e-mail pour que nous puissions répondre."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inserisci la tua email così possiamo rispondere."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vul je e-mailadres in zodat we kunnen antwoorden."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Digite seu e-mail para podermos responder."
           }
         }
       }
@@ -19345,6 +19555,48 @@
         }
       }
     },
+    "Include diagnostics" : {
+      "comment" : "Generated from registry surfaces.support.copy.diagnosticsLabel.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diagnosedaten mitsenden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Incluir diagnósticos"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inclure les diagnostics"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Includi la diagnostica"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diagnose meesturen"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Incluir diagnóstico"
+          }
+        }
+      }
+    },
     "Included" : {
       "comment" : "Generated from registry plans.labels.included. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -21675,6 +21927,48 @@
         }
       }
     },
+    "Message" : {
+      "comment" : "Generated from registry surfaces.support.copy.messageLabel.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nachricht"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mensaje"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Message"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Messaggio"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bericht"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mensagem"
+          }
+        }
+      }
+    },
     "Method" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -22086,6 +22380,48 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Estado de ánimo"
+          }
+        }
+      }
+    },
+    "Most answers are in Help." : {
+      "comment" : "Generated from registry surfaces.support.copy.helpHint.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die meisten Antworten stehen in der Hilfe."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La mayoría de las respuestas están en la Ayuda."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La plupart des réponses sont dans l'aide."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La maggior parte delle risposte è nella Guida."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De meeste antwoorden staan in Help."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A maioria das respostas está na Ajuda."
           }
         }
       }
@@ -23440,6 +23776,48 @@
         }
       }
     },
+    "New reply" : {
+      "comment" : "Generated from registry surfaces.support.copy.unreadReply.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Neue Antwort"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nueva respuesta"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouvelle réponse"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nuova risposta"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nieuw antwoord"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nova resposta"
+          }
+        }
+      }
+    },
     "New Section" : {
       "comment" : "SeptaskKit localization pass 2026-08-09",
       "localizations" : {
@@ -24157,6 +24535,48 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nenhum resultado"
+          }
+        }
+      }
+    },
+    "No messages yet." : {
+      "comment" : "Generated from registry surfaces.support.copy.noMessages.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Noch keine Nachrichten."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aún no hay mensajes."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun message pour l'instant."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ancora nessun messaggio."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nog geen berichten."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhuma mensagem ainda."
           }
         }
       }
@@ -26557,6 +26977,48 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Abra uma tarefa ou escolha Manter para trazê-la de volta. Revise a lista e descarte as demais."
+          }
+        }
+      }
+    },
+    "Open Help" : {
+      "comment" : "Generated from registry surfaces.support.copy.helpLink.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hilfe öffnen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abrir la Ayuda"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir l'aide"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apri la Guida"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Help openen"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abrir a Ajuda"
           }
         }
       }
@@ -32255,6 +32717,48 @@
       "comment" : "Generated from registry signIn.email.resend. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
+    "Send Again" : {
+      "comment" : "Generated from registry surfaces.support.copy.sendAgain.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erneut senden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reenviar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renvoyer"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Invia di nuovo"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opnieuw versturen"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enviar novamente"
+          }
+        }
+      }
+    },
     "Send back" : {
       "comment" : "Generated from registry surfaces.prompts.text.sendBackReview.confirmTitle. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -32423,6 +32927,90 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Enviar feedback"
+          }
+        }
+      }
+    },
+    "Sending…" : {
+      "comment" : "Generated from registry surfaces.support.copy.sending.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wird gesendet …"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enviando…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envoi…"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Invio in corso…"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Versturen…"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enviando…"
+          }
+        }
+      }
+    },
+    "Sent. The reply shows here." : {
+      "comment" : "Generated from registry surfaces.support.copy.sent.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gesendet. Die Antwort erscheint hier."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enviado. La respuesta aparecerá aquí."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envoyé. La réponse s'affichera ici."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inviato. La risposta apparirà qui."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verstuurd. Het antwoord verschijnt hier."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enviado. A resposta aparece aqui."
           }
         }
       }
@@ -39411,6 +39999,48 @@
         }
       }
     },
+    "Too many messages. Try again later." : {
+      "comment" : "Generated from registry surfaces.support.copy.tooManyMessages.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zu viele Nachrichten. Versuche es später noch einmal."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Demasiados mensajes. Inténtalo más tarde."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trop de messages. Réessayez plus tard."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Troppi messaggi. Riprova più tardi."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Te veel berichten. Probeer het later opnieuw."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mensagens demais. Tente novamente mais tarde."
+          }
+        }
+      }
+    },
     "Too many requests. Try again later." : {
       "comment" : "Generated from registry signIn.errors.rateLimited. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
@@ -39533,6 +40163,48 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Entrenamiento"
+          }
+        }
+      }
+    },
+    "Try Again" : {
+      "comment" : "Generated from registry surfaces.support.copy.tryAgain.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erneut versuchen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reintentar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réessayer"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Riprova"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opnieuw proberen"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tentar novamente"
           }
         }
       }
@@ -40852,6 +41524,48 @@
         }
       }
     },
+    "We need your email to reply." : {
+      "comment" : "Generated from registry surfaces.support.copy.emailDetail.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wir brauchen deine E-Mail-Adresse, um zu antworten."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Necesitamos tu correo para responder."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nous avons besoin de votre e-mail pour répondre."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ci serve la tua email per rispondere."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "We hebben je e-mailadres nodig om te antwoorden."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Precisamos do seu e-mail para responder."
+          }
+        }
+      }
+    },
     "We never hold your data back" : {
       "comment" : "Generated from registry plans.promises.no_hostage.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -41184,6 +41898,48 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Boas-vindas ao Septena"
+          }
+        }
+      }
+    },
+    "What happened, and what did you expect?" : {
+      "comment" : "Generated from registry surfaces.support.copy.messagePlaceholder.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Was ist passiert, und was hast du erwartet?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Qué pasó y qué esperabas?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Que s'est-il passé, et à quoi vous attendiez-vous ?"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cosa è successo, e cosa ti aspettavi?"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wat gebeurde er, en wat verwachtte je?"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O que aconteceu, e o que você esperava?"
           }
         }
       }

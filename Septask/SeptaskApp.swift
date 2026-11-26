@@ -86,6 +86,17 @@ struct SeptaskApp: App {
     }
     .windowStyle(.hiddenTitleBar)
     .windowResizability(.contentSize)
+
+    // Contact Support from the Help menu (ADR 0054). Settings shows the same
+    // view as a page.
+    Window(RegistrySupport.title, id: SupportView.windowID) {
+      NavigationStack { SupportView() }
+        .frame(minWidth: 460, idealWidth: 520, minHeight: 520, idealHeight: 640)
+        .septenaTextSize()
+        .tint(AppearancePreferences.shared.accentSwiftUIColor)
+        .preferredColorScheme(AppearancePreferences.shared.preferredColorScheme)
+    }
+    .windowResizability(.contentSize)
     #endif
   }
 }
@@ -121,6 +132,7 @@ private struct SeptaskSettingsSceneRoot: View {
 /// created here, inside the WindowGroup content closure, rather than on App.
 private struct SeptaskMainWindow: View {
   @State private var navigation = NavigationState()
+  @State private var support = SupportCenter.shared
 
   let localStore: LocalStore
   let services: SeptenaServices
@@ -136,6 +148,20 @@ private struct SeptaskMainWindow: View {
   var body: some View {
     SeptaskRootView()
       .overlay { LogCommitOverlay() }
+      #if os(iOS)
+      // Contact Support from the iPad Help menu (ADR 0054). Settings pushes
+      // the same view as a page.
+      .sheet(isPresented: $support.isPresentingSheet) {
+        NavigationStack {
+          SupportView()
+            .toolbar {
+              ToolbarItem(placement: .confirmationAction) {
+                Button(RegistrySupport.closeTitle) { support.isPresentingSheet = false }
+              }
+            }
+        }
+      }
+      #endif
       .tint(appearance.accentSwiftUIColor)
       .preferredColorScheme(appearance.preferredColorScheme)
       // No CloudKit batch listener: Septask's settings arrive with the task

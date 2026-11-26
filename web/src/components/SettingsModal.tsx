@@ -98,6 +98,10 @@ interface SettingsModalProps {
   onDeleteAccount: () => Promise<void>;
   onShowWelcomeAgain: () => void;
   onOpenShortcuts: () => void;
+  /** Opens Contact Support (ADR 0054). */
+  onOpenSupport: () => void;
+  /** Unread support replies: a dot on the Contact Support row. */
+  supportUnread: number;
   /** The tab to show when the modal opens. Without it, the last tab stays. */
   initialTab?: SettingsTab;
 }
@@ -110,6 +114,15 @@ const TABS: Array<{ id: SettingsTab; title: string; icon: typeof UserCircle }> =
   { id: "privacy", title: "Privacy & Data", icon: Shield },
   { id: "about", title: "About", icon: Info },
 ];
+
+/** The About row and its unread label, from the registry (ADR 0054). */
+const SETTINGS_ITEMS: ReadonlyArray<{ surface?: string; label?: string }> = (
+  SETTINGS_REGISTRY.pages as ReadonlyArray<{ sections: ReadonlyArray<{ items: ReadonlyArray<object> }> }>
+).flatMap((page) => page.sections.flatMap((section) => section.items));
+const CONTACT_SUPPORT_LABEL =
+  SETTINGS_ITEMS.find((item) => item.surface === "contact_support")?.label ?? SURFACES_CATALOG.support.title;
+const SUPPORT_UNREAD_LABEL =
+  SURFACES_CATALOG.support.copy.find((c) => c.id === "unreadReply")?.label ?? SURFACES_CATALOG.support.title;
 
 const CUSTOMIZABLE_SMART_LISTS: SmartDestination[] = SIDEBAR_DESTINATIONS.map((d) => d.id);
 
@@ -171,6 +184,8 @@ export function SettingsModal({
   onDeleteAccount,
   onShowWelcomeAgain,
   onOpenShortcuts,
+  onOpenSupport,
+  supportUnread,
   initialTab,
 }: SettingsModalProps) {
   const [tab, setTab] = useState<SettingsTab>("general");
@@ -1743,16 +1758,24 @@ export function SettingsModal({
                     <span>Open source</span>
                     <span className="ml-auto text-[11px] text-[var(--text-muted)]">MIT License</span>
                   </a>
-                  <a
-                    href="https://github.com/michellzappa/septena/issues"
-                    target="_blank"
-                    rel="noreferrer"
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onOpenSupport();
+                    }}
                     className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
                   >
                     <Send className="h-4 w-4 text-[var(--text-muted)]" />
-                    <span>Send feedback</span>
-                    <ExternalLink className="ml-auto h-3.5 w-3.5 text-[var(--text-muted)]" />
-                  </a>
+                    <span>{registryText(CONTACT_SUPPORT_LABEL, lang)}</span>
+                    {supportUnread > 0 && (
+                      <span
+                        className="ml-auto h-2 w-2 rounded-full bg-[var(--accent)]"
+                        role="status"
+                        aria-label={registryText(SUPPORT_UNREAD_LABEL, lang)}
+                      />
+                    )}
+                  </button>
                 </section>
 
                 <section className="space-y-2 rounded-xl border border-[var(--border-subtle)] p-4 text-xs">
