@@ -70,7 +70,13 @@ import {
 import { hexWithAlpha, type HeaderTextureStyle } from "@/lib/headerWash";
 import { loadWebPrefs, saveWebPref, type WebDisplayPrefs } from "@/lib/prefs";
 import { AccountSwitchRequiredError, type AccountSwitchSummary } from "@/lib/sync/accountSwitch";
-import { WebSyncEngine, type CompletionReceipt, type SyncState } from "@/lib/sync/engine";
+import {
+  WebSyncEngine,
+  needsFixedRepeatPrompt,
+  type CompletionReceipt,
+  type RescheduleMode,
+  type SyncState,
+} from "@/lib/sync/engine";
 import { UndoStack, type UndoSnapshot } from "@/lib/sync/undo";
 import type {
   ActiveDestination,
@@ -1180,12 +1186,23 @@ export function SeptenaApp() {
     [engine],
   );
 
-  const setTaskDay = useCallback(
-    async (attribute: DateBoardAttribute, taskIds: string[], day: string | null) => {
+  const [pendingReschedule, setPendingReschedule] = useState<
+    | { kind: "when"; taskIds: string[]; day: string }
+    | { kind: "toggleToday"; tasks: TaskRow[]; bulkPutOnToday?: boolean }
+    | null
+  >(null);
+
+  const applyTaskDay = useCallback(
+    async (
+      attribute: DateBoardAttribute,
+      taskIds: string[],
+      day: string | null,
+      mode: RescheduleMode = "makeException",
+    ) => {
       const before = findTasks(taskIds);
       const apply = async () => {
         for (const task of findTasks(taskIds)) {
-          if (attribute === "when") await engine.setTaskScheduled(task, day);
+          if (attribute === "when") await engine.setTaskScheduled(task, day, mode);
           else await engine.setTaskDeadline(task, day);
         }
       };
@@ -1203,6 +1220,69 @@ export function SeptenaApp() {
       });
     },
     [engine, findTasks, prefs.language, undoStack],
+  );
+
+  const setTaskDay = useCallback(
+    async (attribute: DateBoardAttribute, taskIds: string[], day: string | null) => {
+      if (
+        attribute === "when" &&
+        day !== null &&
+        findTasks(taskIds).some((task) => needsFixedRepeatPrompt(task, day))
+      ) {
+        setPendingReschedule({ kind: "when", taskIds, day });
+        return;
+      }
+      await applyTaskDay(attribute, taskIds, day, "makeException");
+    },
+    [applyTaskDay, findTasks],
+  );
+
+  const applyToggleToday = useCallback(
+    async (tasks: TaskRow[], mode: RescheduleMode, bulkPutOnToday?: boolean) => {
+      if (tasks.length === 0) return;
+      if (bulkPutOnToday !== undefined) {
+        await engine.bulkToggleToday(tasks, bulkPutOnToday, mode);
+        return;
+      }
+      const task = tasks[0];
+      const prev = {
+        today: Boolean(task.today),
+        todaySetOn: task.todaySetOn ?? null,
+        scheduled: task.scheduled ?? null,
+        deadline: task.deadline ?? null,
+        deferredDeadline: task.deferredDeadline ?? null,
+      };
+      await engine.toggleTaskToday(task, mode);
+      undoStack.record({
+        label: prev.today ? `Removed “${task.title}” from Today` : `Moved “${task.title}” to Today`,
+        undo: () => engine.updateTaskFields(task, prev),
+        redo: () => engine.toggleTaskToday(task, mode),
+      });
+    },
+    [engine, undoStack],
+  );
+
+  const requestToggleToday = useCallback(
+    async (task: TaskRow, isCurrentlyOnToday?: boolean) => {
+      const adding = isCurrentlyOnToday !== undefined ? !isCurrentlyOnToday : !task.today;
+      if (adding && needsFixedRepeatPrompt(task, todayYMD)) {
+        setPendingReschedule({ kind: "toggleToday", tasks: [task] });
+        return;
+      }
+      await applyToggleToday([task], "makeException");
+    },
+    [applyToggleToday, todayYMD],
+  );
+
+  const requestBulkToggleToday = useCallback(
+    async (tasks: TaskRow[], putOnToday: boolean) => {
+      if (putOnToday && tasks.some((t) => needsFixedRepeatPrompt(t, todayYMD))) {
+        setPendingReschedule({ kind: "toggleToday", tasks, bulkPutOnToday: true });
+        return;
+      }
+      await applyToggleToday(tasks, "makeException", putOnToday);
+    },
+    [applyToggleToday, todayYMD],
   );
 
   const openDatePicker = useCallback(
@@ -1292,11 +1372,11 @@ export function SeptenaApp() {
       if (!reg) return;
       switch (reg.dropBehavior) {
         case "setToday":
-          await engine.bulkToggleToday([task], true);
+          await requestBulkToggleToday([task], true);
           showToast(`Moved “${task.title}” to Today`);
           break;
         case "scheduleTomorrow":
-          await engine.setTaskScheduled(task, addDays(todayYMD, 1));
+          await setTaskDay("when", [task.id], addDays(todayYMD, 1));
           showToast(`Scheduled “${task.title}” for tomorrow`);
           break;
         case "clearDates":
@@ -1311,7 +1391,7 @@ export function SeptenaApp() {
           break;
       }
     },
-    [draggedTaskId, engine, showToast, syncState.snapshot.tasks, todayYMD, toggleDone],
+    [draggedTaskId, engine, requestBulkToggleToday, setTaskDay, showToast, syncState.snapshot.tasks, todayYMD, toggleDone],
   );
 
   const handleDropOnSidebarPlace = useCallback(
@@ -1458,10 +1538,10 @@ export function SeptenaApp() {
         }
         if (primary && !e.shiftKey && !e.altKey && key === "t") {
           e.preventDefault();
-          if (activeSelectedTasks.length === 1) void engine.toggleTaskToday(single);
+          if (activeSelectedTasks.length === 1) void requestToggleToday(single);
           else {
             const anyNotToday = activeSelectedTasks.some((t) => !t.today);
-            void engine.bulkToggleToday(activeSelectedTasks, anyNotToday);
+            void requestBulkToggleToday(activeSelectedTasks, anyNotToday);
           }
           return;
         }
@@ -1920,7 +2000,7 @@ export function SeptenaApp() {
               kind: "item",
               label: membership.isOnToday ? "Remove from Today" : "Move to Today",
               shortcut: "⌘T",
-              onSelect: () => void engine.toggleTaskToday(task),
+              onSelect: () => void requestToggleToday(task, membership.isOnToday),
             },
             {
               kind: "item",
@@ -2014,21 +2094,7 @@ export function SeptenaApp() {
       onOpenTaskPage: () => openTask(task, "page"),
       onCollapse: () => setExpandedTaskId(null),
       onToggleDone: () => void toggleDone(task),
-      onToggleToday: async () => {
-        const prev = {
-          today: Boolean(task.today),
-          todaySetOn: task.todaySetOn ?? null,
-          scheduled: task.scheduled ?? null,
-          deadline: task.deadline ?? null,
-          deferredDeadline: task.deferredDeadline ?? null,
-        };
-        await engine.toggleTaskToday(task);
-        undoStack.record({
-          label: prev.today ? `Removed “${task.title}” from Today` : `Moved “${task.title}” to Today`,
-          undo: () => engine.updateTaskFields(task, prev),
-          redo: () => engine.toggleTaskToday(task),
-        });
-      },
+      onToggleToday: () => void requestToggleToday(task, membership.isOnToday),
       onToggleStar: () => void engine.toggleTaskStar(task),
       onDuplicate: async () => {
         await engine.duplicateTask(task);
@@ -3566,6 +3632,73 @@ export function SeptenaApp() {
         }}
         onClose={() => setFirstRunOpen(false)}
       />
+
+      {pendingReschedule && (() => {
+        const prompt = SURFACES_CATALOG.prompts.items.find((p) => p.id === "rescheduleFixedRepeat");
+        const options: ReadonlyArray<{ readonly id: string; readonly title: string }> =
+          prompt && "options" in prompt ? prompt.options : [];
+        const exceptionTitle = registryText(
+          options.find((o) => o.id === "exception")?.title ?? "Only This Task",
+          lang,
+        );
+        const updateRuleTitle = registryText(
+          options.find((o) => o.id === "updateRule")?.title ?? "Update Schedule",
+          lang,
+        );
+        const cancelTitle = registryText(SURFACES_CATALOG.prompts.cancelTitle, lang);
+        const title = registryText(typeof prompt?.title === "string" ? prompt.title : "Reschedule repeating task?", lang);
+        const message = registryText(typeof prompt?.message === "string" ? prompt.message : "", lang);
+        const choose = (mode: RescheduleMode) => {
+          const current = pendingReschedule;
+          setPendingReschedule(null);
+          if (current.kind === "when") {
+            void applyTaskDay("when", current.taskIds, current.day, mode);
+          } else {
+            void applyToggleToday(current.tasks, mode, current.bulkPutOnToday);
+          }
+        };
+        return (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-xs"
+            role="dialog"
+            aria-modal="true"
+            aria-label={title}
+            onClick={() => setPendingReschedule(null)}
+          >
+            <div
+              className="w-full max-w-sm rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)] p-5 shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h2 className="text-sm font-semibold text-[var(--text-primary)]">{title}</h2>
+              {message && <p className="mt-1.5 text-xs text-[var(--text-secondary)]">{message}</p>}
+              <div className="mt-4 flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={() => choose("makeException")}
+                  className="w-full rounded-lg bg-[var(--accent)] px-3 py-2 text-xs font-medium hover:opacity-90"
+                  style={{ color: "var(--accent-check)" }}
+                >
+                  {exceptionTitle}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => choose("updateRule")}
+                  className="w-full rounded-lg border border-[var(--border-subtle)] px-3 py-2 text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
+                >
+                  {updateRuleTitle}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPendingReschedule(null)}
+                  className="w-full rounded-lg px-3 py-2 text-xs text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"
+                >
+                  {cancelTitle}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {settingsModal}
     </div>

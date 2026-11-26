@@ -399,6 +399,12 @@
       { "id": "yourProfile", "label": "Your Profile" },
       { "id": "signInToSync", "label": "On this device · Sign in to sync" }
     ],
+    "sync_account_status": [
+      { "id": "accountIdLabel", "label": "Account ID" },
+      { "id": "accountIdFooter", "label": "Share this ID with support if you need help with your account." },
+      { "id": "copy", "label": "Copy" },
+      { "id": "copied", "label": "Copied" }
+    ],
     "syncStatus": [
       { "id": "syncing", "label": "Syncing" },
       { "id": "synced", "label": "Synced" },

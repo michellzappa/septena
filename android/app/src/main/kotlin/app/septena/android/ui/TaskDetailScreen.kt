@@ -228,6 +228,7 @@ fun TaskDetailScreen(
     var titleBase by remember(taskId) { mutableStateOf("") }
     var notesBase by remember(taskId) { mutableStateOf("") }
     var textIsDirty by remember(taskId) { mutableStateOf(false) }
+    var pendingRescheduleDay by remember(taskId) { mutableStateOf<String?>(null) }
     var saving by remember(taskId) { mutableStateOf(false) }
     var saveFailed by remember(taskId) { mutableStateOf(false) }
     // The attribute whose picker is folded open in its row on the page. One at a time.
@@ -488,8 +489,22 @@ fun TaskDetailScreen(
         write { check(graph.taskMutator.setStarred(taskId, !isStarred) != null) }
     }
 
-    fun setWhen(day: String?) {
-        write { check(graph.taskMutator.setWhen(taskId, day) != null) }
+    fun setWhen(
+        day: String?,
+        mode: app.septena.sharedcore.RescheduleMode = app.septena.sharedcore.RescheduleMode.MAKE_EXCEPTION,
+    ) {
+        write { check(graph.taskMutator.setWhen(taskId, day, mode) != null) }
+    }
+
+    pendingRescheduleDay?.let { day ->
+        RescheduleFixedRepeatDialog(
+            languageTag = languageTag,
+            onPickMode = { mode ->
+                pendingRescheduleDay = null
+                setWhen(day, mode)
+            },
+            onDismiss = { pendingRescheduleDay = null },
+        )
     }
 
     fun setTimeSlot(start: String?, duration: Int?) {
@@ -1007,7 +1022,14 @@ fun TaskDetailScreen(
                                                         today = todayDate,
                                                         languageTag = languageTag,
                                                         enabled = canEdit,
-                                                        onSelect = { day -> openPicker = null; setWhen(day) },
+                                                        onSelect = { day ->
+                                                            openPicker = null
+                                                            if (app.septena.core.TaskMutator.needsFixedRepeatReschedulePrompt(taskFields, day)) {
+                                                                pendingRescheduleDay = day
+                                                            } else {
+                                                                setWhen(day)
+                                                            }
+                                                        },
                                                         onClear = { openPicker = null; setWhen(null) },
                                                         startTime = startTime,
                                                         durationMinutes = durationMinutes,

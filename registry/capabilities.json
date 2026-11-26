@@ -41,7 +41,7 @@
     "edit.multi-select": { "title": "Select multiple tasks", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "ships", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
     "find.quick-find": { "title": "Quick Find", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "ships", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
     "task.page": { "title": "Task page (ADR 0029)", "ios": "partial", "ipados": "partial", "macos": "partial", "web": "partial", "android": "partial", "windows": "planned", "watchos": "partial" },
-    "mac.keyboard": { "title": "Keyboard-first shortcuts", "ios": "not_applicable", "ipados": "ships", "macos": "ships", "web": "ships", "android": "planned", "windows": "planned", "watchos": "not_applicable" },
+    "mac.keyboard": { "title": "Keyboard-first shortcuts", "ios": "not_applicable", "ipados": "ships", "macos": "ships", "web": "ships", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
     "mac.updates": { "title": "In-app updates (Sparkle)", "ios": "not_applicable", "ipados": "not_applicable", "macos": "ships", "web": "not_applicable", "android": "not_applicable", "windows": "planned", "watchos": "not_applicable" },
     "calendar.events": { "title": "Calendar events in Today and Upcoming", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "planned", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
     "import.reminders": { "title": "Apple Reminders into Inbox", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "not_applicable", "android": "not_applicable", "windows": "not_applicable", "watchos": "not_applicable" },

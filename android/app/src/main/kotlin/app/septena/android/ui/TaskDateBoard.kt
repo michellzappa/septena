@@ -46,10 +46,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.septena.core.DateBoardGroups
 import app.septena.core.DateBoardRowKinds
+import app.septena.core.JsonValue
 import app.septena.core.RegistryCatalog
 import app.septena.core.TaskTimeSlot
 import app.septena.core.generated.RegistryDestinationIds
+import app.septena.core.generated.RegistryPromptIds
 import app.septena.core.generated.RegistryTaskDetail
+import app.septena.core.stringValue
+import app.septena.sharedcore.RescheduleMode
 import app.septena.ui.CalendarSmallGlyph
 import app.septena.ui.ClockSmallGlyph
 import app.septena.ui.CloseSmallGlyph
@@ -60,6 +64,75 @@ import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
+
+/**
+ * Registry-driven confirmation prompt when rescheduling a fixed repeating task
+ * (`rescheduleFixedRepeat`, TASK_DATES_SPEC §4, #573): "Only This Task" or
+ * "Update Schedule", plus Cancel.
+ */
+@Composable
+internal fun RescheduleFixedRepeatDialog(
+    languageTag: String,
+    onPickMode: (RescheduleMode) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val copy = remember(languageTag) { rescheduleFixedRepeatCopy(languageTag) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(copy.title) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (copy.message.isNotBlank()) {
+                    Text(copy.message)
+                }
+                TextButton(
+                    onClick = { onPickMode(RescheduleMode.MAKE_EXCEPTION) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(copy.exceptionTitle)
+                }
+                TextButton(
+                    onClick = { onPickMode(RescheduleMode.UPDATE_RULE) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(copy.updateRuleTitle)
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(copy.cancelTitle)
+            }
+        },
+    )
+}
+
+private data class ReschedulePromptCopy(
+    val title: String,
+    val message: String,
+    val exceptionTitle: String,
+    val updateRuleTitle: String,
+    val cancelTitle: String,
+)
+
+private fun rescheduleFixedRepeatCopy(languageTag: String): ReschedulePromptCopy {
+    val prompt = RegistryCatalog.surface(RegistryPromptIds.RESCHEDULE_FIXED_REPEAT)?.fields.orEmpty()
+    val rawTitle = prompt["title"].stringValue().orEmpty()
+    val rawMessage = prompt["message"].stringValue().orEmpty()
+    val optionTitles = (prompt["options"] as? JsonValue.ArrayValue)?.values.orEmpty()
+        .mapNotNull { (it as? JsonValue.ObjectValue)?.fields?.get("title")?.stringValue() }
+    val promptsRoot = RegistryCatalog.document("surfaces").fields["prompts"] as? JsonValue.ObjectValue
+    val rawCancel = promptsRoot?.fields?.get("cancelTitle").stringValue().orEmpty()
+    fun loc(raw: String): String = RegistryCatalog.localizedString(raw, languageTag) ?: raw
+    return ReschedulePromptCopy(
+        title = loc(rawTitle),
+        message = loc(rawMessage),
+        exceptionTitle = loc(optionTitles.getOrNull(0).orEmpty()),
+        updateRuleTitle = loc(optionTitles.getOrNull(1).orEmpty()),
+        cancelTitle = loc(rawCancel),
+    )
+}
 
 /** Today and the next six days: the same window as the Apple strips. */
 private const val STRIP_DAYS = 7L
