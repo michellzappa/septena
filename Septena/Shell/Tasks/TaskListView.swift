@@ -770,7 +770,11 @@ struct TaskListView: View {
       editDetails: editDetailsSelectedAction,
       doTask: doSelectedAction,
       duplicate: duplicateSelectedAction,
-      copy: copySelectedAction
+      copy: copySelectedAction,
+      toggleStar: !hasTaskSelection ? nil : toggleStarForSelected,
+      openTags: !hasTaskSelection ? nil : openTagsForSelected,
+      openReminder: singleSelectedTask == nil ? nil : openReminderForSelected,
+      moveSuggested: moveSuggestedSelectedAction
     ))
     #else
     // `focusedSceneValue` spins the iPad focus arbiter (see comment above).
@@ -823,7 +827,11 @@ struct TaskListView: View {
       editDetails: editDetailsSelectedAction,
       doTask: doSelectedAction,
       duplicate: duplicateSelectedAction,
-      copy: copySelectedAction
+      copy: copySelectedAction,
+      toggleStar: !hasTaskSelection ? nil : toggleStarForSelected,
+      openTags: !hasTaskSelection ? nil : openTagsForSelected,
+      openReminder: singleSelectedTask == nil ? nil : openReminderForSelected,
+      moveSuggested: moveSuggestedSelectedAction
     )
   }
   #endif
@@ -1307,9 +1315,10 @@ struct TaskListView: View {
     }
   }
 
-  /// Pull to refresh: the foreground CloudKit fetch, then a mirror re-read.
+  /// Pull to refresh: a sync with the task backend (send, then pull), then a
+  /// re-read. Without an account `syncNow` returns at once.
   private func refreshFromCloud() async {
-    try? await ckEngine.fetchChanges()
+    await TaskSyncEngine.shared.syncNow()
     await load()
   }
 
@@ -3801,6 +3810,52 @@ struct TaskListView: View {
     let ids = orderedActionIDs()
     guard !ids.isEmpty else { return }
     whenSheet = WhenSheet(taskIds: ids, kind: .deadline)
+  }
+
+  /// ⌥⌘S — favorite the selected rows, or unfavorite them when all are
+  /// favorites. The same write and undo entry as the row menu's item.
+  private func toggleStarForSelected() {
+    let ids = orderedActionIDs()
+    let tasks = ids.compactMap { currentTask(id: $0) }
+    guard !tasks.isEmpty else { return }
+    let starred = !tasks.allSatisfy(\.starred)
+    Haptics.commit()
+    recordingSchedule(starred
+                      ? RegistryActions.title(.taskToggleStar, .add)
+                      : RegistryActions.title(.taskToggleStar, .remove),
+                      ids) {
+      for id in ids { mutator.setStarred(id: id, starred: starred) }
+    }
+    Task { await load() }
+  }
+
+  /// ⇧⌘T — open the tag picker for the selected row(s).
+  private func openTagsForSelected() {
+    let ids = orderedActionIDs()
+    guard !ids.isEmpty else { return }
+    tagsTargetIds = ids
+  }
+
+  /// The one selected task, for the single-selection commands.
+  private var singleSelectedTask: SeptenaTask? {
+    guard !showingRecentlyDeleted else { return nil }
+    let ids = orderedActionIDs()
+    guard ids.count == 1, let task = currentTask(id: ids[0]) else { return nil }
+    return task
+  }
+
+  /// ⌥⌘R — open the reminder picker for the one selected task.
+  private func openReminderForSelected() {
+    guard let task = singleSelectedTask else { return }
+    reminderTargetId = task.id
+  }
+
+  /// ⌥⌘M — file the one selected task where its "Suggested" capsule points.
+  /// Nil (the command disables) when the task has no suggestion.
+  private var moveSuggestedSelectedAction: (() -> Void)? {
+    guard let task = singleSelectedTask,
+          let suggestion = filingChipSuggestion(for: task) else { return nil }
+    return { applySuggestion(task: task, suggestion: suggestion) }
   }
 
   /// ⌘M / ⌘⇧M — open the Move destination picker for the focused row(s).

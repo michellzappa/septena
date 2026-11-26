@@ -1,13 +1,13 @@
 import SwiftUI
 
 // A read-only reference of every keyboard shortcut, grouped by area.
-// Presented as a sheet from the Help menu (⌘?) and discoverable on both
-// macOS and iPad (where it complements the hold-⌘ HUD).
+// Presented as a sheet from the Help menu (⇧⌘/) and discoverable on iPad
+// (where it complements the hold-⌘ HUD).
 //
-// The list is hand-maintained here as the single human-facing catalogue —
-// the shortcuts themselves are defined in the various CommandMenus
-// (App.swift, TaskCommands.swift) and view-level onKeyPress handlers. Keep
-// this in sync when adding or changing a binding.
+// Built from the registry (`registry/actions.json`, `RegistryActions`), so it
+// lists only what this platform binds: an action whose `availability.platforms`
+// leaves this platform out, or whose shortcut excludes it, is not shown
+// (#577). Only the list's own selection keys are written by hand below.
 
 struct KeyboardShortcut2: Identifiable {
   let id = UUID()
@@ -47,6 +47,10 @@ enum KeyboardShortcutsCatalogue {
     let platform = currentPlatformKey
     return entries
       .filter { !$0.excludePlatforms.contains(platform) }
+      .filter { entry in
+        let platforms = RegistryActions.availability[entry.actionId]?.platforms ?? []
+        return platforms.isEmpty || platforms.contains(platform)
+      }
       .map { KeyboardShortcut2(keys: $0.keycaps, label: $0.label) }
   }
 
@@ -64,27 +68,15 @@ enum KeyboardShortcutsCatalogue {
       KeyboardShortcut2(keys: ["return"], label: "Open / edit"),
       KeyboardShortcut2(keys: ["esc"], label: "Clear selection"),
       KeyboardShortcut2(keys: ["esc"], label: "Save and close the open task"),
-      KeyboardShortcut2(keys: ["⌘", "N"], label: "New task"),
     ]
     shortcuts += fromRegistry(RegistryActions.shortcutsTaskList)
     return KeyboardShortcutGroup(title: "Task list", shortcuts: shortcuts)
-  }
-
-  private static var quickCaptureLabel: String {
-    "Quick add: new task"
   }
 
   @MainActor static var groups: [KeyboardShortcutGroup] { [
     navigation,
     generalGroup,
     taskList,
-    KeyboardShortcutGroup(title: "Edit & section sheets", shortcuts: [
-      KeyboardShortcut2(keys: ["⌘", "N"], label: "Quick-add in an open section"),
-      KeyboardShortcut2(keys: ["←"], label: "Time travel: previous day"),
-      KeyboardShortcut2(keys: ["→"], label: "Time travel: next day"),
-      KeyboardShortcut2(keys: ["return"], label: "Save the open edit form"),
-      KeyboardShortcut2(keys: ["esc"], label: "Cancel the open edit form"),
-    ]),
   ] }
 }
 
