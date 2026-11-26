@@ -160,6 +160,11 @@ export const zWriteArgs = {
     refs_remove: zRefKeys.optional(),
   }),
   tasks_defer: z.object({ id: zId, until: zDay }),
+  tasks_set_waiting: z.object({
+    id: zId,
+    waiting_on: z.string().trim().min(1).max(80).nullable(),
+    scheduled: zDay.nullable().optional(),
+  }),
   tasks_move_to_today: z.object({ id: zId }),
   tasks_thread_append: z.object({
     id: zId,
@@ -281,6 +286,8 @@ export async function runWriteTool(ctx: WriteContext, name: WriteToolName, args:
       return updateTask(ctx, { id: args.id as string, today: false, scheduled: args.until as string });
     case "tasks_move_to_today":
       return updateTask(ctx, { id: args.id as string, today: true, scheduled: null });
+    case "tasks_set_waiting":
+      return setWaiting(ctx, args as { id: string; waiting_on: string | null; scheduled?: string | null });
     case "tasks_thread_append":
       return threadAppend(ctx, args as { id: string; turn: Omit<ConvoTurn, "seq" | "ts"> & { ts?: string } });
     case "tasks_set_acceptance": {
@@ -792,6 +799,25 @@ async function updateTask(ctx: WriteContext, input: UpdateTaskInput) {
     r.status === "rejected" ? [{ reason: r.reason, ...(r.rule ? { rule: r.rule } : {}) }] : []);
   if (refused.length === 0) updated.push(...refOps.updated);
   return { id: input.id, updated, ...(refused.length > 0 ? { refs_refused: refused } : {}), ...(p.notes !== undefined ? { notesRev: notesRev(clear(p.notes)) } : {}) };
+}
+
+/// `tasks_set_waiting` (docs/REVIEW_SPEC.md §6): who the task waits on, and
+/// optionally its When date as the day to chase. The day the wait started is
+/// the user's today. The store refuses an agent that ends a wait.
+async function setWaiting(ctx: WriteContext, input: { id: string; waiting_on: string | null; scheduled?: string | null }) {
+  const current = await ctx.store.readTask(input.id);
+  if (!current || str(current.task.kind) === "heading") throw new Error(`Task not found: ${input.id}`);
+  const old = current.task;
+  const fields: Record<string, unknown> = { waitingOn: input.waiting_on };
+  if (input.waiting_on && !str(old.waitingOn)) fields.waitingSince = todayYMD(ctx.timeZone);
+  const results = await pushAs(ctx.store, ctx.actor, [{ op: "upsert", entity: "task", id: input.id, fields }]);
+  requireApplied(results[0], input.id);
+  const updated = ["waitingOn"];
+  if (input.scheduled !== undefined) {
+    const res = await updateTask(ctx, { id: input.id, today: false, scheduled: input.scheduled } as UpdateTaskInput);
+    updated.push(...((res as { updated?: string[] }).updated ?? []));
+  }
+  return { id: input.id, waitingOn: input.waiting_on, updated };
 }
 
 /// The ops of `refs` (add or update by key) and `refs_remove`. Removals go

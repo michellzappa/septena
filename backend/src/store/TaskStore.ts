@@ -431,12 +431,34 @@ export class TaskStore extends DurableObject<Env> {
     }
   }
 
+  /// Waiting (docs/REVIEW_SPEC.md §6): a write that starts a wait without a
+  /// day gets today's (UTC; clients send their own local day), and a write
+  /// that ends the wait clears its day. A change of who keeps the first day.
+  private stampWaiting(row: Record<string, unknown> | null, fields: Record<string, unknown>, names: string[]): void {
+    const who = typeof fields.waitingOn === "string" ? fields.waitingOn.trim() : "";
+    const add = (f: string) => { if (!names.includes(f)) names.push(f); };
+    if (!who) {
+      fields.waitingOn = null;
+      fields.waitingSince = null;
+      add("waitingSince");
+      return;
+    }
+    fields.waitingOn = who;
+    if (row?.waitingOn && row.waitingSince && !("waitingSince" in fields)) return;
+    if (typeof fields.waitingSince !== "string") {
+      fields.waitingSince = new Date().toISOString().slice(0, 10);
+      add("waitingSince");
+    }
+  }
+
   /// True when an open row is marked faded and may not be
   /// (docs/TASK_FADE_SPEC.md §4.1): it has a deadline, or a touch is newer
   /// than the fade. The second case is a device that pushes an old fade over
   /// a task the human touched since.
   private fadeEnds(task: Record<string, unknown>): boolean {
     if (!task.fadedAt || task.status !== "open") return false;
+    // A task that waits on a person never fades (ADR 0053).
+    if (task.waitingOn) return true;
     // An unaccepted proposal expires with or without a date (ADR 0039).
     if (task.deadline && !(task.source === "mcp" && !task.acknowledgedAt)) return true;
     return !!task.touchedAt && Date.parse(task.touchedAt as string) > Date.parse(task.fadedAt as string);
@@ -459,7 +481,7 @@ export class TaskStore extends DurableObject<Env> {
     const convo = this.sql.exec<{ assignee: string | null; endState: string | null }>(
       "SELECT assignee, endState FROM convos WHERE id = ? AND deletedAt IS NULL", taskId,
     ).toArray()[0];
-    return convo?.assignee === "claude" || convo?.endState === "needs_verify" || this.awaitsHuman(taskId);
+    return !!row.waitingOn || convo?.assignee === "claude" || convo?.endState === "needs_verify" || this.awaitsHuman(taskId);
   }
 
   /// One time: ends the fade of every row `fadeEnds` is true for, so rows
@@ -990,6 +1012,7 @@ export class TaskStore extends DurableObject<Env> {
         op.base.notes, (row.notes as string | null) ?? null, (op.fields.notes as string | null) ?? null, ENTITY_LIMITS.notesMax,
       );
     }
+    if (op.entity === "task" && "waitingOn" in op.fields) this.stampWaiting(row as Record<string, unknown> | null, op.fields, names);
     if (op.entity === "task"
       && ((row && this.fadeIsStale(op.id, row as Record<string, unknown>, op.fields)) || this.fadeEnds({ ...row, ...op.fields }))) {
       if (!names.includes("fadedAt")) names.push("fadedAt");
@@ -1531,6 +1554,13 @@ export class TaskStore extends DurableObject<Env> {
     if (op.op !== "appendTurn" && op.entity === "task") {
       const ends = op.op === "delete" || op.fields.status === "done" || op.fields.status === "cancelled";
       if (ends && this.convoRequiresHumanAccept(op.id)) return "human_accepts";
+      // Only the user ends a wait (ADR 0053): an agent may set one, never
+      // clear it or close the task while it waits.
+      if (this.isWaiting(op.id)) {
+        const clears = op.op === "upsert" && "waitingOn" in op.fields
+          && !(typeof op.fields.waitingOn === "string" && op.fields.waitingOn.trim());
+        if (ends || clears) return "in_review";
+      }
     }
     if (op.op === "upsert" && op.entity === "convo") return this.agentHandoffRefusal(op.id, op.fields);
     return null;
@@ -1566,6 +1596,12 @@ export class TaskStore extends DurableObject<Env> {
     return ["endStateNote", "artifact", "handoff"].some(
       (f) => f in fields && JSON.stringify(fields[f] ?? null) !== JSON.stringify(before[f] ?? null),
     );
+  }
+
+  private isWaiting(taskId: string): boolean {
+    return this.sql.exec(
+      "SELECT 1 FROM tasks WHERE id = ? AND deletedAt IS NULL AND status = 'open' AND waitingOn IS NOT NULL", taskId,
+    ).toArray().length > 0;
   }
 
   private convoStopped(taskId: string): boolean {

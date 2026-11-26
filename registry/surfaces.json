@@ -244,7 +244,8 @@
     "countPhrases": [
       { "id": "tasks", "label": { "one": "1 task", "other": "{count} tasks" } },
       { "id": "projects", "label": { "one": "1 project", "other": "{count} projects" } },
-      { "id": "agents", "label": { "one": "1 agent", "other": "{count} agents" } }
+      { "id": "agents", "label": { "one": "1 agent", "other": "{count} agents" } },
+      { "id": "waitingDays", "label": { "one": "1 day", "other": "{count} days" } }
     ],
     "text": [
       { "id": "newSection", "title": "New Section", "placeholder": "Section name", "confirmTitle": "Add", "featureId": "places.sections" },
@@ -493,6 +494,19 @@
       "limitReached": { "format": "This task already has {count} references." },
       "failed": { "message": "Couldn’t add the reference." }
     }
+  },
+  "waiting": {
+    "id": "waiting",
+    "featureId": "review.waiting",
+    "label": { "format": "Waiting on {name}" },
+    "sheet": {
+      "title": "Waiting On",
+      "placeholder": "Name",
+      "confirmTitle": "Save",
+      "checkBack": { "title": "Check back" },
+      "noCheckBack": { "title": "No date" }
+    },
+    "defaultCheckBackDays": 7
   },
   "doing": {
     "id": "doing",

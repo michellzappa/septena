@@ -602,6 +602,20 @@ function validateDoing(surfaces, caps, entities) {
 // References (docs/TASK_REFERENCES_SPEC.md §8): a label and an icon per key
 // kind, the fallback for a kind this build does not know, the labels of the
 // roles that show one, and the copy of Add Reference.
+// Waiting (docs/REVIEW_SPEC.md §6): the row label, the sheet copy and the
+// check-back date the sheet offers.
+function validateWaiting(surfaces, caps) {
+  const w = surfaces.waiting;
+  assert(w && w.featureId in caps.capabilities, "surfaces.json: waiting needs a known featureId");
+  assert(typeof w.label?.format === "string" && w.label.format.includes("{name}"), "surfaces.json: waiting.label.format needs {name}");
+  for (const [f, v] of [["title", w.sheet?.title], ["placeholder", w.sheet?.placeholder], ["confirmTitle", w.sheet?.confirmTitle],
+    ["checkBack.title", w.sheet?.checkBack?.title], ["noCheckBack.title", w.sheet?.noCheckBack?.title]]) {
+    assert(typeof v === "string" && v.length > 0, `surfaces.json: waiting.sheet.${f} is missing`);
+  }
+  assert(Number.isInteger(w.defaultCheckBackDays) && w.defaultCheckBackDays > 0, "surfaces.json: waiting.defaultCheckBackDays is not a positive integer");
+  for (const [p, v] of stringsOf(w, "waiting")) assert(!/[–—]/.test(v), `surfaces.json: ${p} contains an em or en dash`);
+}
+
 function validateTaskReferences(surfaces, icons, caps, entities) {
   const t = surfaces.taskReferences;
   assert(t && t.featureId in caps.capabilities, "surfaces.json: taskReferences needs a known featureId");
@@ -1883,6 +1897,24 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("}");
   lines.push("");
 
+  // 8a. Waiting (surfaces.json `waiting`, docs/REVIEW_SPEC.md §6)
+  const waiting = surfaces.waiting;
+  lines.push("/// Waiting on a person (`registry/surfaces.json` `waiting`, docs/REVIEW_SPEC.md §6).");
+  lines.push("enum RegistryWaiting {");
+  {
+    const t = L10N.swiftTemplate(BY_KEY, tmplKey(waiting.label.format, waiting.label, "format"));
+    lines.push(`  static func label(${t.params}) -> String { ${t.body} }`);
+  }
+  for (const [name, node, field] of [
+    ["sheetTitle", waiting.sheet, "title"], ["namePlaceholder", waiting.sheet, "placeholder"],
+    ["confirmTitle", waiting.sheet, "confirmTitle"], ["checkBackTitle", waiting.sheet.checkBack, "title"],
+    ["noCheckBackTitle", waiting.sheet.noCheckBack, "title"],
+  ]) lines.push(`  static let ${name}: String = ${L(node[field], node, field)}`);
+  lines.push("  /// The check-back date Waiting On… offers, in days from today.");
+  lines.push(`  static let defaultCheckBackDays = ${waiting.defaultCheckBackDays}`);
+  lines.push("}");
+  lines.push("");
+
   // 8a. Project and area notes (surfaces.json `placeNotes`)
   const placeNotes = surfaces.placeNotes;
   lines.push("/// The notes on a project's or an area's page (`registry/surfaces.json` `placeNotes`).");
@@ -2276,7 +2308,7 @@ function generateTS({ entities, rules, icons, tokens, caps, settings, dests, act
   lines.push(`export const DESIGN_TOKENS = ${JSON.stringify({ accentPolicy: tokens.accentPolicy, fruitAccents: tokens.fruitAccents ?? [], textures: tokens.textures ?? [], selection: tokens.selection, colors: tokens.colors, multicolorGlyphs: tokens.multicolorGlyphs?.glyphs ?? {}, accentPalette: tokens.accentPalette, radii: tokens.radii, spacing: tokens.spacing, desktopColumn: tokens.desktopColumn, textScale: tokens.textScale })} as const;`);
   lines.push(`export const CAPABILITIES = ${JSON.stringify(caps.capabilities)} as const;`);
   lines.push(`export const ACTIONS_CATALOG = ${JSON.stringify({ actions: actions.actions, contextMenus: actions.contextMenus, menuBar: actions.menuBar, shortcutsSheet: actions.shortcutsSheet })} as const;`);
-  lines.push(`export const SURFACES_CATALOG = ${JSON.stringify({ notices: surfaces.notices, prompts: surfaces.prompts, toasts: surfaces.toasts, taskAttributes: surfaces.taskAttributes, taskDateBoard: surfaces.taskDateBoard, taskPage: surfaces.taskPage, accountSwitch: surfaces.accountSwitch, deviceSignIn: surfaces.deviceSignIn })} as const;`);
+  lines.push(`export const SURFACES_CATALOG = ${JSON.stringify({ notices: surfaces.notices, prompts: surfaces.prompts, toasts: surfaces.toasts, taskAttributes: surfaces.taskAttributes, taskDateBoard: surfaces.taskDateBoard, taskPage: surfaces.taskPage, waiting: surfaces.waiting, accountSwitch: surfaces.accountSwitch, deviceSignIn: surfaces.deviceSignIn })} as const;`);
   lines.push(`export const FIRST_RUN = ${JSON.stringify(surfaces.firstRun)} as const;`);
   lines.push("/** Plan limits (registry/plans.json). The server's plan table: every gate reads these, never a plan name. */");
   lines.push(`export const PLAN_LIMITS = ${JSON.stringify(plans.limits)} as const;`);
@@ -2697,6 +2729,7 @@ const destIds = validateDestinations(dests, icons, caps);
 validateActions(actions, icons, caps, destIds);
 validateSurfaces(surfaces, icons, caps, plans);
 validateTaskReferences(surfaces, icons, caps, entities);
+validateWaiting(surfaces, caps);
 validatePlaceNotes(surfaces, caps);
 validateDoing(surfaces, caps, entities);
 checkOpensAttribute({ actions, surfaces });

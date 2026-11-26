@@ -457,7 +457,6 @@
   "Purchase received. Plus turns on when Septena reaches the server.": "Aankoop ontvangen. Plus wordt geactiveerd zodra je aankoop de Septena-server heeft bereikt.",
   "Pure Canvas": "Puur canvas",
   "Questions": "Vragen",
-  "Your agent's questions, finished work and tasks in progress show up here. Faded tasks do too.": "Vragen, afgerond werk en lopende taken van je agent verschijnen hier. Vervaagde taken ook.",
   "Queued": "In wachtrij",
   "Quick Add…": "Snel toevoegen…",
   "Quick Entry": "Snelle invoer",
@@ -817,5 +816,18 @@
   "Your agent key": "Je agentsleutel",
   "Septena shows this key only once. Paste it into your script or agent. To stop the agent, disconnect it in this list.": "Septena toont deze sleutel maar één keer. Plak hem in je script of agent. Wil je de agent stoppen, ontkoppel hem dan in deze lijst.",
   "Copy Key": "Sleutel kopiëren",
-  "Files are still syncing between your devices.": "Bestanden worden nog gesynchroniseerd tussen je apparaten."
+  "Files are still syncing between your devices.": "Bestanden worden nog gesynchroniseerd tussen je apparaten.",
+  "Check back": "Navragen op",
+  "Got It Back": "Terug ontvangen",
+  "Name": "Naam",
+  "No date": "Geen datum",
+  "Waiting": "Wacht",
+  "Waiting On": "Wacht op",
+  "Waiting On…": "Wacht op…",
+  "Waiting on {name}": "Wacht op {name}",
+  "{count} days": {
+    "one": "1 dag",
+    "other": "{count} dagen"
+  },
+  "Your agent's questions, finished work and tasks in progress show up here, and so do tasks you are waiting on. Faded tasks do too.": "Hier verschijnen de vragen van je agent, afgerond werk en taken die lopen, en ook taken waarop je wacht. Vervaagde taken ook."
 }

@@ -457,7 +457,6 @@
   "Purchase received. Plus turns on when Septena reaches the server.": "Compra recibida. Plus se activará cuando Septena se conecte al servidor.",
   "Pure Canvas": "Lienzo limpio",
   "Questions": "Preguntas",
-  "Your agent's questions, finished work and tasks in progress show up here. Faded tasks do too.": "Aquí aparecen las preguntas, el trabajo terminado y las tareas en curso de tu agente. También las tareas atenuadas.",
   "Queued": "En cola",
   "Quick Add…": "Añadir rápidamente…",
   "Quick Entry": "Entrada rápida",
@@ -817,5 +816,18 @@
   "Your agent key": "Tu clave de agente",
   "Septena shows this key only once. Paste it into your script or agent. To stop the agent, disconnect it in this list.": "Septena muestra esta clave solo una vez. Pégala en tu script o agente. Para detener al agente, desconéctalo en esta lista.",
   "Copy Key": "Copiar clave",
-  "Files are still syncing between your devices.": "Los archivos aún se están sincronizando entre tus dispositivos."
+  "Files are still syncing between your devices.": "Los archivos aún se están sincronizando entre tus dispositivos.",
+  "Check back": "Revisar el",
+  "Got It Back": "Ya lo tengo",
+  "Name": "Nombre",
+  "No date": "Sin fecha",
+  "Waiting": "En espera",
+  "Waiting On": "Esperando a",
+  "Waiting On…": "Esperando a…",
+  "Waiting on {name}": "Esperando a {name}",
+  "{count} days": {
+    "one": "1 día",
+    "other": "{count} días"
+  },
+  "Your agent's questions, finished work and tasks in progress show up here, and so do tasks you are waiting on. Faded tasks do too.": "Aquí aparecen las preguntas de tu agente, el trabajo terminado y las tareas en curso, y también las tareas que esperas de otros. Las tareas desvanecidas también."
 }

@@ -89,7 +89,7 @@ const byName = new Map(allTools.map((t) => [t.name, t]));
 
 test("every api.septena.app tool has unique name, title, and explicit MCP ToolAnnotations", () => {
   assert.equal(byName.size, allTools.length, "duplicate tool names detected");
-  assert.equal(taskTools.length, 24, `expected 24 task tools, got ${taskTools.length}`);
+  assert.equal(taskTools.length, 25, `expected 25 task tools, got ${taskTools.length}`);
   assert.equal(agentTools.length, 5, "expected 5 agent tools");
   assert.equal(notesTools.length, 10, "expected 10 project, area and notes tools (docs/PROJECT_NOTES_SPEC.md §5)");
 

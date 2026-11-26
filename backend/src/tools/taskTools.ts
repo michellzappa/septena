@@ -6,6 +6,7 @@ import {
   completeTaskJsonSchema,
   createTaskJsonSchema,
   deferTaskJsonSchema,
+  setWaitingJsonSchema,
   getTaskJsonSchema,
   moveToTodayJsonSchema,
   pendingReasoningJsonSchema,
@@ -178,6 +179,13 @@ export const TASK_TOOLS: Tool[] = [
     description: "Set a task’s When to a future date (sets scheduled, clears today). The task leaves Today until that date. Its deadline does not change: a task that is due or overdue stays marked so in Upcoming.",
     inputSchema: deferTaskJsonSchema,
     annotations: { title: "Defer task", readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  {
+    name: "tasks_set_waiting",
+    title: "Set waiting on a person",
+    description: "Mark a task as waiting on a person (docs/REVIEW_SPEC.md §6): the user handed it to someone and waits for it to come back. Pass who as waiting_on, and the day to chase as scheduled (the task's When date). Use it when the user says they asked someone, or when you make a task from a message the user sent. It shows in Review ▸ Waiting with how many days it has waited, and never fades. Only the user ends a wait: completing, cancelling or clearing a waiting task is refused as in_review. When the thread the task points at has a reply, ask with tasks_thread_append (a provider turn with options \"Got It Back\" and \"Still Waiting\").",
+    inputSchema: setWaitingJsonSchema,
+    annotations: { title: "Set waiting on a person", readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   {
     name: "tasks_move_to_today",

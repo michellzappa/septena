@@ -8,7 +8,7 @@ import { deriveConversation, taskViewMembership, type CoreConversation, type Cor
 // disagree on what "Today" or "pending reasoning" means.
 
 export type TaskView =
-  | "today" | "inbox" | "review" | "anytime" | "upcoming" | "completed" | "faded";
+  | "today" | "inbox" | "review" | "anytime" | "upcoming" | "completed" | "faded" | "waiting";
 
 export interface TaskOut {
   id: string;
@@ -26,6 +26,9 @@ export interface TaskOut {
   deadline?: string;
   // The deadline the user planned past (docs/TASK_DATES_SPEC.md I8).
   deferredDeadline?: string;
+  // Who the task waits on, and since which day (docs/REVIEW_SPEC.md §6).
+  waitingOn?: string;
+  waitingSince?: string;
   area?: string;
   project?: string;
   // The id of the project heading the task is filed under (a heading row).

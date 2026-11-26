@@ -158,5 +158,7 @@ Accept step.
 - MCP: `tasks_set_waiting {id, waiting_on, scheduled?}` (`waiting_on: null`
   from an agent is refused), `tasks_list view=waiting`, and both fields in the
   task shape. REST mirrors them (#90).
-- Core: `reviewGroup` returns `waiting` between `finishedWork` and the agent
-  stages. The badge does not change.
+- Clients: the Review group is `waiting` when the open task has `waitingOn`,
+  after the core's conversation group (Questions, Finished work) and before
+  the core's agent stage. Clients already compose the groups this way (ADR
+  0046), so the core needs no release. The badge does not change.
