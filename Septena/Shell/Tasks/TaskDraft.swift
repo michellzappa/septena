@@ -299,10 +299,18 @@ struct DetectedToken: Identifiable {
     case project(id: String, title: String)
     case area(id: String, title: String)
   }
+
   let id = UUID()
   let kind: Kind
   /// The matched text to remove from the title when this token is applied.
   let phrase: String
+
+  /// True for a token the user typed as syntax (`!today`, `#project`,
+  /// `@area`); false for a date phrase found in ordinary words.
+  var isExplicit: Bool {
+    if case .date = kind { return false }
+    return true
+  }
 
   var displayText: String {
     switch kind {
