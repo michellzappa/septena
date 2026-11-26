@@ -534,7 +534,10 @@ The product is Septena; the code targets keep the working names `Septask` (iOS),
   page (no viewer in this repo), and `appstore/upload.sh` uploads through
   fastlane deliver. It is outward-facing: run it only when mz asks; never a
   binary, never a review submission (docs/APPSTORE-SEPTASK.md "Uploading").
-  Mac is a separate ASC app (own deliver run). See `docs/APPSTORE.md`.
+  The Mac is the macOS platform of the same App Store Connect record as
+  iPhone and iPad (one bundle id, universal purchase, mz 2026-11-26), with its
+  own deliver run: `docs/APPSTORE-SEPTASK.md`. The separate record in
+  `docs/APPSTORE.md` is Septena Life.
   For generated Photo Studio lifestyle images and device variants, use
   `docs/photo-studio/SKILL.md`. A device screen in a photo is always a composed
   PNG, never a generated screen: `docs/photo-composite/SKILL.md`.
