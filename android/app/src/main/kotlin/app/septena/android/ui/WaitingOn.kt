@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import app.septena.core.DateBoardRowKinds
 import app.septena.core.JsonValue
 import app.septena.core.RegistryCatalog
+import app.septena.core.generated.RegistryCountPhraseIds
 import app.septena.core.generated.RegistryDestinationIds
 import app.septena.core.generated.RegistryEntities
 import app.septena.core.generated.RegistryEntityFields
@@ -70,10 +71,9 @@ internal object WaitingCopy {
         val start = since?.let { runCatching { LocalDate.parse(it.take(10)) }.getOrNull() } ?: return base
         val days = ChronoUnit.DAYS.between(start, today).toInt()
         if (days <= 0) return base
-        return "$base · ${countPhrase(WAITING_DAYS_PHRASE, days, languageTag)}"
+        return "$base · ${countPhrase(RegistryCountPhraseIds.WAITING_DAYS, days, languageTag)}"
     }
 
-    private const val WAITING_DAYS_PHRASE = "waitingDays"
     private const val DEFAULT_NAME_MAX = 80
     private const val DEFAULT_CHECK_BACK_DAYS = 7L
 }

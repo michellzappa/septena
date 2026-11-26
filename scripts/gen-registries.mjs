@@ -2540,6 +2540,9 @@ function generateKotlinCore(bundle) {
     }
     emitIdObject(objectName, ids);
   }
+  // Count phrase IDs (`prompts.countPhrases`): `countPhrase(id, …)` looks them
+  // up in that list alone, so they need not be unique in the whole document.
+  emitIdObject("RegistryCountPhraseIds", surfaces.prompts.countPhrases.map((p) => p.id));
   if (surfaces.taskDetail) {
     const detail = surfaces.taskDetail;
     assert(idCounts.get(detail.id) === 1, `surfaces.json: id "${detail.id}" must be unique in the document`);

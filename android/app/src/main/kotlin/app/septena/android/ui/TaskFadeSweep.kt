@@ -150,7 +150,7 @@ object FadeSweepRules {
         parts += if (!scheduled.isNullOrBlank()) {
             fadeSweepText("pastDate", languageTag).ifBlank { "Past date" }
         } else {
-            fadeSweepText("noDate", languageTag).ifBlank { "No date" }
+            fadeSweepText("noDate", languageTag)
         }
         parts += listName?.takeIf(String::isNotBlank) ?: inboxLabel
         return parts.joinToString(" · ")
