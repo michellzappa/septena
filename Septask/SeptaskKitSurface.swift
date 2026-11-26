@@ -436,6 +436,8 @@ final class KitFilterSurface: NSObject, NSSearchFieldDelegate, NSTableViewDataSo
     }
   }
 
+  var isVisible: Bool { panel?.isVisible == true }
+
   func dismiss() {
     anchored.close()
     dismissPanel()

@@ -1,11 +1,11 @@
 {
   "1": "1",
+  "3": "3",
   "1 change was not sent yet and will be lost.": "1 alteração ainda não foi enviada e será perdida.",
   "1 task is on this device.": "Há 1 tarefa neste dispositivo.",
   "10 GB synced": "10 GB sincronizados",
   "1st": "1º",
   "2nd": "2º",
-  "3": "3",
   "30 days": "30 dias",
   "365 days": "365 dias",
   "3rd": "3º",
@@ -95,6 +95,7 @@
   "Change Emoji…": "Mudar emoji…",
   "Change history": "Histórico de alterações",
   "Changes the server refused appear here, newest first. The server kept its own version of each.": "Aqui aparecem as alterações recusadas pelo servidor, começando pelas mais recentes. O servidor manteve sua própria versão de cada uma.",
+  "Check back": "Cobrar em",
   "Check for Updates…": "Verificar atualizações…",
   "Checking the code…": "Verificando o código…",
   "Checklist": "Checklist",
@@ -115,6 +116,7 @@
   "Close": "Fechar",
   "Code from the browser page": "Código exibido no navegador",
   "Colorful": "Colorido",
+  "Command Bar…": "Barra de comandos…",
   "Complete": "Concluir",
   "Completed": "Concluída",
   "Completion animations": "Animações ao concluir",
@@ -255,6 +257,7 @@
   "GitHub issue": "Issue do GitHub",
   "Give any task a Repeat rule and it will show up here.": "Defina uma repetição para qualquer tarefa e ela aparecerá aqui.",
   "Go": "Ir",
+  "Got It Back": "Recebi de volta",
   "Group Today by list": "Agrupar Hoje por lista",
   "Hand off": "Atribuir",
   "Haskap": "Haskap",
@@ -356,6 +359,7 @@
   },
   "Moves reminders into your Inbox. Each one you import leaves Reminders.": "Os lembretes vão para a Caixa de entrada; cada item importado é removido do app Lembretes.",
   "Move…": "Mover…",
+  "Name": "Nome",
   "Name this agent": "Dê um nome a este agente",
   "New Agent Key": "Nova chave de agente",
   "New Area": "Nova área",
@@ -370,6 +374,7 @@
   "No Faded Tasks": "Nenhuma tarefa inativa",
   "No Favorites": "Nenhuma tarefa favorita",
   "No agent work": "Nenhum trabalho do agente",
+  "No date": "Sem data",
   "No length": "Sem duração",
   "No limit": "Sem limite",
   "No matches": "Nenhum resultado",
@@ -519,6 +524,7 @@
   "Scan a sign-in code": "Ler código de acesso",
   "Schedule": "Agendar",
   "Search Tasks": "Buscar tarefas",
+  "Search or run a command…": "Buscar ou executar um comando…",
   "Search tasks, projects, areas…": "Buscar tarefas, projetos, áreas…",
   "Section name": "Nome da seção",
   "Sections": "Seções",
@@ -694,7 +700,11 @@
   "Use my Claude": "Usar meu Claude",
   "Version {version}": "Versão {version}",
   "View": "Visualizar",
+  "Waiting": "Aguardando",
+  "Waiting On": "Aguardando",
+  "Waiting On…": "Aguardando…",
   "Waiting for approval.": "Aguardando aprovação.",
+  "Waiting on {name}": "Aguardando {name}",
   "Washi Paper": "Papel washi",
   "We never hold your data back": "Nunca limitamos o acesso aos seus dados",
   "Web page": "Página da web",
@@ -737,6 +747,7 @@
   "Your account is now a free account. One device keeps syncing. Your tasks on every device stay where they are.": "Sua conta agora é gratuita. Um dispositivo continuará sincronizando. Suas tarefas permanecem em cada dispositivo.",
   "Your agent asks": "Seu agente pergunta",
   "Your agent key": "Sua chave de agente",
+  "Your agent's questions, finished work and tasks in progress show up here, and so do tasks you are waiting on. Faded tasks do too.": "Aqui aparecem as perguntas do seu agente, o trabalho concluído e as tarefas em andamento, e também as tarefas que você aguarda de outras pessoas. As tarefas esmaecidas também.",
   "Your agent's questions, finished work and tasks in progress show up here. Faded tasks do too.": "As perguntas, o trabalho concluído e as tarefas em andamento do seu agente aparecem aqui. As tarefas inativas também.",
   "Your agents do the work": "Seus agentes fazem o trabalho",
   "Your attachments": "Seus anexos",
@@ -768,6 +779,10 @@
     "other": "{count} agentes"
   },
   "{count} changes were not sent yet and will be lost.": "{count} alterações ainda não foram enviadas e serão perdidas.",
+  "{count} days": {
+    "one": "1 dia",
+    "other": "{count} dias"
+  },
   "{count} files": {
     "one": "{count} arquivo",
     "other": "{count} arquivos"
@@ -819,18 +834,5 @@
   "€5 a month. You save €24 against paying monthly.": "€5 por mês. Você economiza €24 em relação ao pagamento mensal.",
   "€60 a year": "€60 por ano",
   "€60 a year or €7 a month": "€60 por ano ou €7 por mês",
-  "€7 a month": "€7 por mês",
-  "Check back": "Cobrar em",
-  "Got It Back": "Recebi de volta",
-  "Name": "Nome",
-  "No date": "Sem data",
-  "Waiting": "Aguardando",
-  "Waiting On": "Aguardando",
-  "Waiting On…": "Aguardando…",
-  "Waiting on {name}": "Aguardando {name}",
-  "{count} days": {
-    "one": "1 dia",
-    "other": "{count} dias"
-  },
-  "Your agent's questions, finished work and tasks in progress show up here, and so do tasks you are waiting on. Faded tasks do too.": "Aqui aparecem as perguntas do seu agente, o trabalho concluído e as tarefas em andamento, e também as tarefas que você aguarda de outras pessoas. As tarefas esmaecidas também."
+  "€7 a month": "€7 por mês"
 }

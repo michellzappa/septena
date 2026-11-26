@@ -907,7 +907,7 @@ function appleKeycaps(sc) {
   if (sc.modifiers.includes("alt")) caps.push("⌥");
   if (sc.modifiers.includes("shift")) caps.push("⇧");
   if (sc.modifiers.includes("primary")) caps.push("⌘");
-  const keyMap = { delete: "⌫", escape: "esc", return: "return", space: "space", tab: "tab" };
+  const keyMap = { delete: "⌫", escape: "esc", return: "↩", space: "space", tab: "tab" };
   caps.push(keyMap[sc.key] ?? sc.key.toUpperCase());
   return caps;
 }
@@ -1790,6 +1790,7 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   const qf = surfaces.quickFind;
   lines.push("  /// Quick Find copy (`surfaces.json` `quickFind`).");
   lines.push(`  static let quickFindPlaceholder: String = ${L(qf.placeholder, qf, "placeholder")}`);
+  lines.push(`  static let quickFindCommandPlaceholder: String = ${L(qf.commandPlaceholder, qf, "commandPlaceholder")}`);
   lines.push(`  static let quickFindEmptyTitle: String = ${L(qf.emptyState.title, qf.emptyState, "title")}`);
   lines.push(`  static let quickFindEmptyDetail: String = ${L(qf.emptyState.detail, qf.emptyState, "detail")}`);
   lines.push(`  static let quickFindCompletedLabel: String = ${L(qf.completed.label, qf.completed, "label")}`);
@@ -2328,7 +2329,7 @@ function generateTS({ entities, rules, icons, tokens, caps, settings, dests, act
   lines.push(`export const DESIGN_TOKENS = ${JSON.stringify({ accentPolicy: tokens.accentPolicy, fruitAccents: tokens.fruitAccents ?? [], textures: tokens.textures ?? [], selection: tokens.selection, colors: tokens.colors, multicolorGlyphs: tokens.multicolorGlyphs?.glyphs ?? {}, accentPalette: tokens.accentPalette, radii: tokens.radii, spacing: tokens.spacing, desktopColumn: tokens.desktopColumn, textScale: tokens.textScale })} as const;`);
   lines.push(`export const CAPABILITIES = ${JSON.stringify(caps.capabilities)} as const;`);
   lines.push(`export const ACTIONS_CATALOG = ${JSON.stringify({ actions: actions.actions, contextMenus: actions.contextMenus, menuBar: actions.menuBar, shortcutsSheet: actions.shortcutsSheet })} as const;`);
-  lines.push(`export const SURFACES_CATALOG = ${JSON.stringify({ notices: surfaces.notices, prompts: surfaces.prompts, toasts: surfaces.toasts, taskAttributes: surfaces.taskAttributes, taskDateBoard: surfaces.taskDateBoard, taskPage: surfaces.taskPage, waiting: surfaces.waiting, accountSwitch: surfaces.accountSwitch, deviceSignIn: surfaces.deviceSignIn })} as const;`);
+  lines.push(`export const SURFACES_CATALOG = ${JSON.stringify({ notices: surfaces.notices, prompts: surfaces.prompts, toasts: surfaces.toasts, taskAttributes: surfaces.taskAttributes, taskDateBoard: surfaces.taskDateBoard, taskPage: surfaces.taskPage, waiting: surfaces.waiting, accountSwitch: surfaces.accountSwitch, deviceSignIn: surfaces.deviceSignIn, quickFind: surfaces.quickFind })} as const;`);
   lines.push(`export const FIRST_RUN = ${JSON.stringify(surfaces.firstRun)} as const;`);
   lines.push("/** Plan limits (registry/plans.json). The server's plan table: every gate reads these, never a plan name. */");
   lines.push(`export const PLAN_LIMITS = ${JSON.stringify(plans.limits)} as const;`);

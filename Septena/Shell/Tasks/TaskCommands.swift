@@ -13,10 +13,10 @@ struct TaskActions {
   var openWhen: (() -> Void)?
   var openDeadline: (() -> Void)?
   var openMove: (() -> Void)?
-  /// Toggles done/open on the selected row(s) — invoked by the explicit ⌘K
+  /// Toggles done/open on the selected row(s) — invoked by the explicit ⌘↩
   /// Task-menu command.
   var toggleComplete: (() -> Void)?
-  /// Retires the selected row(s) as cancelled — ⌥⌘K. Distinct from complete:
+  /// Retires the selected row(s) as cancelled — ⌥⌘↩. Distinct from complete:
   /// the work didn't happen, and the Logbook records that difference.
   var cancel: (() -> Void)?
   var delete: (() -> Void)?
@@ -97,11 +97,35 @@ extension FocusedValues {
   }
 }
 
+/// Plain main-actor hook exposing the frontmost SwiftUI `TaskListView`'s live
+/// actions to the ⌘K Command Bar without touching `FocusedValues` (which
+/// SIGKILLs iPad when published from a split-view detail) or `@Observable`.
+@MainActor
+enum ActiveTaskCommandBridge {
+  private static var ownerID: UUID?
+  private static var provider: (() -> TaskActions)?
+
+  static func register(owner: UUID, provider: @escaping () -> TaskActions) {
+    ownerID = owner
+    self.provider = provider
+  }
+
+  static func unregister(owner: UUID) {
+    guard ownerID == owner else { return }
+    ownerID = nil
+    provider = nil
+  }
+
+  static func current() -> TaskActions? {
+    provider?()
+  }
+}
+
 /// Row actions published by `NextView` while the Next checklist is focused.
 /// Only checklist-toggle is exposed here — the rest of the Task menu stays
 /// task-list-only so ⌘T / ⌘S / … don't silently no-op on a habit row.
 struct NextListActions {
-  /// Toggles done/open on the selected row — invoked by ⌘K.
+  /// Toggles done/open on the selected row — invoked by ⌘↩.
   var toggleComplete: (() -> Void)?
 }
 

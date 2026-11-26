@@ -9,9 +9,19 @@ import {
   Tag,
 } from "lucide-react";
 import { SIDEBAR_DESTINATIONS } from "@/lib/destinations";
-import { registryText } from "@/lib/generated/registries";
+import { SURFACES_CATALOG, registryText } from "@/lib/generated/registries";
 import type { ActiveDestination, AreaRow, ProjectRow, SmartDestination, TagRow, TaskRow } from "@/lib/types";
 import { RegistryIcon } from "./RegistryIcon";
+
+export interface CommandBarItem {
+  id: string;
+  title: string;
+  icon: string;
+  shortcutKeys?: string[];
+  keywords?: string[];
+  contextual?: boolean;
+  run: () => void;
+}
 
 interface QuickFindModalProps {
   open: boolean;
@@ -20,6 +30,7 @@ interface QuickFindModalProps {
   areas: AreaRow[];
   projects: ProjectRow[];
   tags: TagRow[];
+  commands?: CommandBarItem[];
   language: string;
   onNavigate: (dest: ActiveDestination) => void;
   onSelectTask: (task: TaskRow) => void;
@@ -27,11 +38,31 @@ interface QuickFindModalProps {
 }
 
 type ResultItem =
+  | { kind: "command"; command: CommandBarItem }
   | { kind: "smart"; id: SmartDestination; icon: string; title: string; subtitle: string }
   | { kind: "area"; area: AreaRow }
   | { kind: "project"; project: ProjectRow }
   | { kind: "tag"; tag: TagRow }
   | { kind: "task"; task: TaskRow };
+
+function scoreCommand(cmd: CommandBarItem, rawQuery: string, tokens: string[]): number {
+  const title = cmd.title.toLowerCase();
+  const body = (cmd.keywords ?? []).join(" ").toLowerCase();
+  let total = 0;
+  for (const tok of tokens) {
+    const inTitle = title.includes(tok);
+    const inBody = body.includes(tok);
+    if (!inTitle && !inBody) return 0;
+    if (inTitle) {
+      total += 10;
+      if (title.startsWith(tok)) total += 8;
+      else if (title.includes(` ${tok}`)) total += 4;
+    }
+    if (inBody) total += 3;
+  }
+  if (title === rawQuery) total += 20;
+  return total + (cmd.contextual ? 10 : 0);
+}
 
 export function QuickFindModal({
   open,
@@ -40,6 +71,7 @@ export function QuickFindModal({
   areas,
   projects,
   tags,
+  commands = [],
   language,
   onNavigate,
   onSelectTask,
@@ -48,6 +80,7 @@ export function QuickFindModal({
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const listRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -58,50 +91,95 @@ export function QuickFindModal({
   }, [open]);
 
   const results = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const raw = query.trim();
+    const commandsOnly = raw.startsWith(">");
+    const q = (commandsOnly ? raw.slice(1).trim() : raw).toLowerCase();
+    const tokens = q ? q.split(/\s+/).filter(Boolean) : [];
+
+    const matchCommands = (): ResultItem[] => {
+      if (!q) return commands.map((command) => ({ kind: "command", command }));
+      return commands
+        .map((command, idx) => ({ command, score: scoreCommand(command, q, tokens), idx }))
+        .filter((x) => x.score > 0)
+        .sort((a, b) => b.score - a.score || a.idx - b.idx)
+        .map(({ command }) => ({ kind: "command", command }));
+    };
+
+    if (commandsOnly) {
+      return matchCommands().slice(0, 40);
+    }
+
     const out: ResultItem[] = [];
+
+    if (!q) {
+      const contextual = commands.filter((c) => c.contextual).slice(0, 6);
+      const global = commands.filter((c) => !c.contextual).slice(0, 6);
+      for (const command of contextual) out.push({ kind: "command", command });
+      for (const d of SIDEBAR_DESTINATIONS) {
+        const title = registryText(d.title, language);
+        out.push({ kind: "smart", id: d.id, icon: d.icon, title, subtitle: "List" });
+      }
+      for (const command of global) out.push({ kind: "command", command });
+      for (const a of areas) {
+        if (!a.deletedAt) out.push({ kind: "area", area: a });
+      }
+      for (const p of projects) {
+        if (!p.deletedAt && p.status === "active") out.push({ kind: "project", project: p });
+      }
+      return out.slice(0, 40);
+    }
+
+    out.push(...matchCommands());
 
     for (const d of SIDEBAR_DESTINATIONS) {
       const title = registryText(d.title, language);
-      if (!q || title.toLowerCase().includes(q)) {
+      if (title.toLowerCase().includes(q)) {
         out.push({ kind: "smart", id: d.id, icon: d.icon, title, subtitle: "List" });
       }
     }
     for (const a of areas) {
       if (a.deletedAt) continue;
-      if (!q || a.title.toLowerCase().includes(q)) out.push({ kind: "area", area: a });
+      if (a.title.toLowerCase().includes(q)) out.push({ kind: "area", area: a });
     }
     for (const p of projects) {
       if (p.deletedAt || p.status !== "active") continue;
-      if (!q || p.title.toLowerCase().includes(q)) out.push({ kind: "project", project: p });
+      if (p.title.toLowerCase().includes(q)) out.push({ kind: "project", project: p });
     }
     for (const t of tags) {
       if (t.deletedAt) continue;
-      if (q && t.name.toLowerCase().includes(q)) out.push({ kind: "tag", tag: t });
+      if (t.name.toLowerCase().includes(q)) out.push({ kind: "tag", tag: t });
     }
-    if (q) {
-      let count = 0;
-      for (const task of tasks) {
-        if (task.deletedAt || task.kind === "heading") continue;
-        if (
-          task.title.toLowerCase().includes(q) ||
-          (task.notes && task.notes.toLowerCase().includes(q))
-        ) {
-          out.push({ kind: "task", task });
-          if (++count >= 25) break;
-        }
+    let count = 0;
+    for (const task of tasks) {
+      if (task.deletedAt || task.kind === "heading") continue;
+      if (
+        task.title.toLowerCase().includes(q) ||
+        (task.notes && task.notes.toLowerCase().includes(q))
+      ) {
+        out.push({ kind: "task", task });
+        if (++count >= 25) break;
       }
     }
-    return out.slice(0, 30);
-  }, [areas, language, projects, query, tags, tasks]);
+    return out.slice(0, 40);
+  }, [areas, commands, language, projects, query, tags, tasks]);
 
   useEffect(() => {
     setActiveIndex(0);
   }, [query]);
 
+  useEffect(() => {
+    const el = listRef.current?.querySelector<HTMLElement>(`[data-cmd-idx="${activeIndex}"]`);
+    el?.scrollIntoView({ block: "nearest" });
+  }, [activeIndex, open]);
+
   if (!open) return null;
 
   const activate = (item: ResultItem) => {
+    if (item.kind === "command") {
+      onClose();
+      setTimeout(() => item.command.run(), 0);
+      return;
+    }
     if (item.kind === "smart") onNavigate({ kind: "smart", id: item.id });
     else if (item.kind === "area") onNavigate({ kind: "area", id: item.area.id });
     else if (item.kind === "project") onNavigate({ kind: "project", id: item.project.id });
@@ -109,6 +187,8 @@ export function QuickFindModal({
     else onSelectTask(item.task);
     onClose();
   };
+
+  const placeholder = registryText(SURFACES_CATALOG.quickFind.commandPlaceholder, language);
 
   return (
     <div
@@ -129,7 +209,7 @@ export function QuickFindModal({
             onKeyDown={(e) => {
               if (e.key === "ArrowDown") {
                 e.preventDefault();
-                setActiveIndex((i) => Math.min(results.length - 1, i + 1));
+                setActiveIndex((i) => Math.min(Math.max(0, results.length - 1), i + 1));
               } else if (e.key === "ArrowUp") {
                 e.preventDefault();
                 setActiveIndex((i) => Math.max(0, i - 1));
@@ -141,7 +221,7 @@ export function QuickFindModal({
                 onClose();
               }
             }}
-            placeholder="Quick Find lists, projects, tags, and tasks…"
+            placeholder={placeholder}
             className="min-w-0 flex-1 bg-transparent text-sm text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)]"
           />
           <kbd className="font-mono-tabular rounded bg-[var(--bg-hover)] px-1.5 py-0.5 text-[10px] text-[var(--text-muted)]">
@@ -149,7 +229,7 @@ export function QuickFindModal({
           </kbd>
         </div>
 
-        <div className="max-h-80 overflow-y-auto p-1.5">
+        <div ref={listRef} className="max-h-96 overflow-y-auto p-1.5">
           {results.length === 0 ? (
             <div className="py-10 text-center text-xs text-[var(--text-muted)]">No matches</div>
           ) : (
@@ -158,9 +238,16 @@ export function QuickFindModal({
               let key = "";
               let label = "";
               let meta = "";
+              let shortcutKeys: string[] | undefined;
               let icon = <Circle className="h-3.5 w-3.5 text-[var(--text-muted)]" />;
 
-              if (item.kind === "smart") {
+              if (item.kind === "command") {
+                key = `cmd:${item.command.id}`;
+                label = item.command.title;
+                shortcutKeys = item.command.shortcutKeys;
+                meta = shortcutKeys?.length ? "" : item.command.contextual ? "Task" : "Command";
+                icon = <RegistryIcon token={item.command.icon} className="h-3.5 w-3.5 text-[var(--text-muted)]" />;
+              } else if (item.kind === "smart") {
                 key = `smart:${item.id}`;
                 label = item.title;
                 meta = item.subtitle;
@@ -199,6 +286,7 @@ export function QuickFindModal({
               return (
                 <button
                   key={key}
+                  data-cmd-idx={idx}
                   type="button"
                   onMouseEnter={() => setActiveIndex(idx)}
                   onClick={() => activate(item)}
@@ -210,7 +298,20 @@ export function QuickFindModal({
                 >
                   <span className="shrink-0">{icon}</span>
                   <span className="min-w-0 flex-1 truncate">{label}</span>
-                  <span className="font-mono-tabular shrink-0 text-[11px] text-[var(--text-muted)]">{meta}</span>
+                  {shortcutKeys && shortcutKeys.length > 0 ? (
+                    <span className="flex shrink-0 items-center gap-0.5">
+                      {shortcutKeys.map((k, kIdx) => (
+                        <kbd
+                          key={`${k}-${kIdx}`}
+                          className="font-mono-tabular inline-flex min-w-[20px] items-center justify-center rounded border border-[var(--border-subtle)] bg-[var(--bg-hover)] px-1 py-0.5 text-[10px] font-medium text-[var(--text-muted)]"
+                        >
+                          {k}
+                        </kbd>
+                      ))}
+                    </span>
+                  ) : (
+                    <span className="font-mono-tabular shrink-0 text-[11px] text-[var(--text-muted)]">{meta}</span>
+                  )}
                 </button>
               );
             })

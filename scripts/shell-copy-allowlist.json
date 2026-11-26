@@ -8,11 +8,6 @@
   },
   "entries": [
     {
-      "file": "Septena/Shell/Capture/QuickFindView.swift",
-      "literal": "Search",
-      "reasonId": "predates-rule"
-    },
-    {
       "file": "Septena/Shell/Sections/SectionDrawer.swift",
       "literal": "Discard",
       "reasonId": "predates-rule"
@@ -510,11 +505,6 @@
     {
       "file": "Septena/Shell/UI/EmojiPicker.swift",
       "literal": "More…",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/UI/SeptenaPage.swift",
-      "literal": "Quick Find (⌘⇧F)",
       "reasonId": "predates-rule"
     },
     {

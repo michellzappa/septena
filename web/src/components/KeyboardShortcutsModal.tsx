@@ -16,9 +16,10 @@ interface ShortcutSpec {
   key: string;
   modifiers: readonly string[];
   excludePlatforms?: readonly string[];
+  alternates?: readonly ShortcutSpec[];
 }
 
-function formatKeycaps(sc: ShortcutSpec, isMac: boolean): string[] {
+export function formatShortcutKeycaps(sc: ShortcutSpec, isMac: boolean): string[] {
   const caps: string[] = [];
   for (const mod of sc.modifiers) {
     if (mod === "ctrl") caps.push(isMac ? "⌃" : "Ctrl");
@@ -119,10 +120,18 @@ export function KeyboardShortcutsModal({
       if (def.shortcut.excludePlatforms?.includes("web")) continue;
       if (def.availability?.platforms && !def.availability.platforms.includes("web")) continue;
       if (id === "task.moveSuggested") continue;
+      const label = registryText(def.desktopTitle ?? def.title, language);
       rows.push({
-        label: registryText(def.desktopTitle ?? def.title, language),
-        keys: formatKeycaps(def.shortcut, isMac),
+        label,
+        keys: formatShortcutKeycaps(def.shortcut, isMac),
       });
+      for (const alt of def.shortcut.alternates ?? []) {
+        if (alt.excludePlatforms?.includes("web")) continue;
+        rows.push({
+          label,
+          keys: formatShortcutKeycaps(alt, isMac),
+        });
+      }
     }
     return { title: grp.title, rows };
   });

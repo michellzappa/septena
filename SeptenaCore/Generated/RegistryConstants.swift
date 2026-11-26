@@ -1344,6 +1344,7 @@ enum RegistryActions {
     .taskDelete: ["pluralTitle": RegistryL10n.t("Delete Tasks")],
     .noticeToggleStep: ["activeTitle": RegistryL10n.t("Mark as Not Done")],
     .appQuickAdd: ["addTitle": RegistryL10n.t("Add")],
+    .appQuickFind: ["desktopTitle": RegistryL10n.t("Command Bar…")],
     .appPauseAgents: ["activeTitle": RegistryL10n.t("Resume all agents")],
     .taskConversationStop: ["activeTitle": RegistryL10n.t("Resume")],
     .appToggleSidebar: ["addTitle": RegistryL10n.t("Show Sidebar"), "removeTitle": RegistryL10n.t("Hide Sidebar")],
@@ -1356,8 +1357,8 @@ enum RegistryActions {
     .taskCopy: RegistryShortcut(key: "c", modifiers: ["primary"], keycaps: ["⌘", "C"], excludePlatforms: []),
     .taskDuplicate: RegistryShortcut(key: "d", modifiers: ["primary"], keycaps: ["⌘", "D"], excludePlatforms: []),
     .taskDo: RegistryShortcut(key: "j", modifiers: ["primary"], keycaps: ["⌘", "J"], excludePlatforms: []),
-    .taskToggleComplete: RegistryShortcut(key: "k", modifiers: ["primary"], keycaps: ["⌘", "K"], excludePlatforms: []),
-    .taskCancel: RegistryShortcut(key: "k", modifiers: ["primary", "alt"], keycaps: ["⌥", "⌘", "K"], excludePlatforms: []),
+    .taskToggleComplete: RegistryShortcut(key: "return", modifiers: ["primary"], keycaps: ["⌘", "↩"], excludePlatforms: []),
+    .taskCancel: RegistryShortcut(key: "return", modifiers: ["primary", "alt"], keycaps: ["⌥", "⌘", "↩"], excludePlatforms: []),
     .taskToggleToday: RegistryShortcut(key: "t", modifiers: ["primary"], keycaps: ["⌘", "T"], excludePlatforms: []),
     .taskToggleStar: RegistryShortcut(key: "s", modifiers: ["primary", "alt"], keycaps: ["⌥", "⌘", "S"], excludePlatforms: []),
     .taskTags: RegistryShortcut(key: "t", modifiers: ["primary", "shift"], keycaps: ["⇧", "⌘", "T"], excludePlatforms: []),
@@ -1371,11 +1372,11 @@ enum RegistryActions {
     .taskDelete: RegistryShortcut(key: "delete", modifiers: ["primary"], keycaps: ["⌘", "⌫"], excludePlatforms: []),
     .taskDeletePermanently: RegistryShortcut(key: "delete", modifiers: ["primary"], keycaps: ["⌘", "⌫"], excludePlatforms: []),
     .sectionRename: RegistryShortcut(key: "r", modifiers: ["primary"], keycaps: ["⌘", "R"], excludePlatforms: []),
-    .noticeToggleStep: RegistryShortcut(key: "k", modifiers: ["primary"], keycaps: ["⌘", "K"], excludePlatforms: []),
+    .noticeToggleStep: RegistryShortcut(key: "return", modifiers: ["primary"], keycaps: ["⌘", "↩"], excludePlatforms: []),
     .appNewTask: RegistryShortcut(key: "n", modifiers: ["primary"], keycaps: ["⌘", "N"], excludePlatforms: []),
     .appQuickAdd: RegistryShortcut(key: "i", modifiers: ["primary"], keycaps: ["⌘", "I"], excludePlatforms: []),
     .appQuickEntry: RegistryShortcut(key: "space", modifiers: ["ctrl", "alt"], keycaps: ["⌃", "⌥", "space"], excludePlatforms: []),
-    .appQuickFind: RegistryShortcut(key: "f", modifiers: ["primary", "shift"], keycaps: ["⇧", "⌘", "F"], excludePlatforms: []),
+    .appQuickFind: RegistryShortcut(key: "k", modifiers: ["primary"], keycaps: ["⌘", "K"], excludePlatforms: [], alternates: [RegistryShortcut(key: "f", modifiers: ["primary", "shift"], keycaps: ["⇧", "⌘", "F"], excludePlatforms: [])]),
     .appToggleSidebar: RegistryShortcut(key: "s", modifiers: ["ctrl", "primary"], keycaps: ["⌃", "⌘", "S"], excludePlatforms: ["ios", "ipados"]),
     .appSettings: RegistryShortcut(key: ",", modifiers: ["primary"], keycaps: ["⌘", ","], excludePlatforms: []),
     .appKeyboardShortcuts: RegistryShortcut(key: "/", modifiers: ["primary", "shift"], keycaps: ["⇧", "⌘", "/"], excludePlatforms: []),
@@ -1668,7 +1669,8 @@ enum RegistryActions {
   static let shortcutsGeneral: [RegistryShortcutEntry] = [
     RegistryShortcutEntry(id: "app.newTask", actionId: .appNewTask, label: RegistryL10n.t("New Task"), keycaps: ["⌘", "N"], excludePlatforms: []),
     RegistryShortcutEntry(id: "app.quickAdd", actionId: .appQuickAdd, label: RegistryL10n.t("Quick Add…"), keycaps: ["⌘", "I"], excludePlatforms: []),
-    RegistryShortcutEntry(id: "app.quickFind", actionId: .appQuickFind, label: RegistryL10n.t("Quick Find…"), keycaps: ["⇧", "⌘", "F"], excludePlatforms: []),
+    RegistryShortcutEntry(id: "app.quickFind", actionId: .appQuickFind, label: RegistryL10n.t("Quick Find…"), keycaps: ["⌘", "K"], excludePlatforms: []),
+    RegistryShortcutEntry(id: "app.quickFind.alt0", actionId: .appQuickFind, label: RegistryL10n.t("Quick Find…"), keycaps: ["⇧", "⌘", "F"], excludePlatforms: []),
     RegistryShortcutEntry(id: "app.toggleSidebar", actionId: .appToggleSidebar, label: RegistryL10n.t("Show / Hide Sidebar"), keycaps: ["⌃", "⌘", "S"], excludePlatforms: ["ios", "ipados"]),
     RegistryShortcutEntry(id: "app.settings", actionId: .appSettings, label: RegistryL10n.t("Settings…"), keycaps: ["⌘", ","], excludePlatforms: []),
     RegistryShortcutEntry(id: "app.keyboardShortcuts", actionId: .appKeyboardShortcuts, label: RegistryL10n.t("Keyboard Shortcuts"), keycaps: ["⇧", "⌘", "/"], excludePlatforms: []),
@@ -1679,8 +1681,8 @@ enum RegistryActions {
     RegistryShortcutEntry(id: "task.toggleInfo", actionId: .taskToggleInfo, label: RegistryL10n.t("Show Info"), keycaps: ["⌥", "⌘", "I"], excludePlatforms: []),
     RegistryShortcutEntry(id: "task.copy", actionId: .taskCopy, label: RegistryL10n.t("Copy"), keycaps: ["⌘", "C"], excludePlatforms: []),
     RegistryShortcutEntry(id: "task.duplicate", actionId: .taskDuplicate, label: RegistryL10n.t("Duplicate"), keycaps: ["⌘", "D"], excludePlatforms: []),
-    RegistryShortcutEntry(id: "task.toggleComplete", actionId: .taskToggleComplete, label: RegistryL10n.t("Mark as Complete"), keycaps: ["⌘", "K"], excludePlatforms: []),
-    RegistryShortcutEntry(id: "task.cancel", actionId: .taskCancel, label: RegistryL10n.t("Cancel Task"), keycaps: ["⌥", "⌘", "K"], excludePlatforms: []),
+    RegistryShortcutEntry(id: "task.toggleComplete", actionId: .taskToggleComplete, label: RegistryL10n.t("Mark as Complete"), keycaps: ["⌘", "↩"], excludePlatforms: []),
+    RegistryShortcutEntry(id: "task.cancel", actionId: .taskCancel, label: RegistryL10n.t("Cancel Task"), keycaps: ["⌥", "⌘", "↩"], excludePlatforms: []),
     RegistryShortcutEntry(id: "task.toggleToday", actionId: .taskToggleToday, label: RegistryL10n.t("Toggle Today"), keycaps: ["⌘", "T"], excludePlatforms: []),
     RegistryShortcutEntry(id: "task.toggleStar", actionId: .taskToggleStar, label: RegistryL10n.t("Toggle Favorite"), keycaps: ["⌥", "⌘", "S"], excludePlatforms: []),
     RegistryShortcutEntry(id: "task.tags", actionId: .taskTags, label: RegistryL10n.t("Tags…"), keycaps: ["⇧", "⌘", "T"], excludePlatforms: []),
@@ -2009,6 +2011,7 @@ enum RegistrySurfaces {
   static let fadeSweepTitle: String = RegistryL10n.t("Faded Tasks")
   /// Quick Find copy (`surfaces.json` `quickFind`).
   static let quickFindPlaceholder: String = RegistryL10n.t("Search tasks, projects, areas…")
+  static let quickFindCommandPlaceholder: String = RegistryL10n.t("Search or run a command…")
   static let quickFindEmptyTitle: String = RegistryL10n.t("Search Tasks")
   static let quickFindEmptyDetail: String = RegistryL10n.t("Find any task, project, or area.")
   static let quickFindCompletedLabel: String = RegistryL10n.t("Completed")

@@ -1,11 +1,11 @@
 {
   "1": "1",
+  "3": "3",
   "1 change was not sent yet and will be lost.": "1 wijziging is nog niet verstuurd en gaat verloren.",
   "1 task is on this device.": "Er staat 1 taak op dit apparaat.",
   "10 GB synced": "10 GB gesynchroniseerd",
   "1st": "1e",
   "2nd": "2e",
-  "3": "3",
   "30 days": "30 dagen",
   "365 days": "365 dagen",
   "3rd": "3e",
@@ -95,6 +95,7 @@
   "Change Emoji…": "Emoji wijzigen…",
   "Change history": "Wijzigingsgeschiedenis",
   "Changes the server refused appear here, newest first. The server kept its own version of each.": "Wijzigingen die de server heeft geweigerd, staan hier, nieuwste eerst. De server heeft van elke wijziging zijn eigen versie behouden.",
+  "Check back": "Navragen op",
   "Check for Updates…": "Controleer op updates…",
   "Checking the code…": "Code controleren…",
   "Checklist": "Checklist",
@@ -115,6 +116,7 @@
   "Close": "Sluiten",
   "Code from the browser page": "Code van de browserpagina",
   "Colorful": "Kleurrijk",
+  "Command Bar…": "Opdrachtbalk…",
   "Complete": "Voltooien",
   "Completed": "Voltooid",
   "Completion animations": "Voltooiingsanimaties",
@@ -255,6 +257,7 @@
   "GitHub issue": "GitHub-issue",
   "Give any task a Repeat rule and it will show up here.": "Voeg een herhaalregel toe aan een taak en die verschijnt hier.",
   "Go": "Gaan",
+  "Got It Back": "Terug ontvangen",
   "Group Today by list": "Vandaag groeperen op lijst",
   "Hand off": "Overdragen",
   "Haskap": "Haskap",
@@ -356,6 +359,7 @@
   },
   "Moves reminders into your Inbox. Each one you import leaves Reminders.": "Verplaatst herinneringen naar je Postvak IN. Elke geïmporteerde herinnering verdwijnt uit Herinneringen.",
   "Move…": "Verplaatsen…",
+  "Name": "Naam",
   "Name this agent": "Geef deze agent een naam",
   "New Agent Key": "Nieuwe agentsleutel",
   "New Area": "Nieuw gebied",
@@ -370,6 +374,7 @@
   "No Faded Tasks": "Geen vervaagde taken",
   "No Favorites": "Geen favorieten",
   "No agent work": "Geen werk van agents",
+  "No date": "Geen datum",
   "No length": "Geen duur",
   "No limit": "Onbeperkt",
   "No matches": "Geen resultaten",
@@ -519,6 +524,7 @@
   "Scan a sign-in code": "Aanmeldcode scannen",
   "Schedule": "Inplannen",
   "Search Tasks": "Taken zoeken",
+  "Search or run a command…": "Zoek of voer een opdracht uit…",
   "Search tasks, projects, areas…": "Taken, projecten en gebieden zoeken…",
   "Section name": "Sectienaam",
   "Sections": "Secties",
@@ -694,7 +700,11 @@
   "Use my Claude": "Gebruik mijn Claude",
   "Version {version}": "Versie {version}",
   "View": "Weergeven",
+  "Waiting": "Wacht",
+  "Waiting On": "Wacht op",
+  "Waiting On…": "Wacht op…",
   "Waiting for approval.": "Wachten op goedkeuring.",
+  "Waiting on {name}": "Wacht op {name}",
   "Washi Paper": "Washi Paper",
   "We never hold your data back": "We houden je gegevens nooit achter",
   "Web page": "Webpagina",
@@ -737,6 +747,7 @@
   "Your account is now a free account. One device keeps syncing. Your tasks on every device stay where they are.": "Je account is nu een gratis account. Eén apparaat blijft synchroniseren. Je taken op elk apparaat blijven staan.",
   "Your agent asks": "Je agent vraagt het eerst",
   "Your agent key": "Je agentsleutel",
+  "Your agent's questions, finished work and tasks in progress show up here, and so do tasks you are waiting on. Faded tasks do too.": "Hier verschijnen de vragen van je agent, afgerond werk en taken die lopen, en ook taken waarop je wacht. Vervaagde taken ook.",
   "Your agent's questions, finished work and tasks in progress show up here. Faded tasks do too.": "Vragen, afgerond werk en lopende taken van je agent verschijnen hier. Vervaagde taken ook.",
   "Your agents do the work": "Je agents doen het werk",
   "Your attachments": "Je bijlagen",
@@ -768,6 +779,10 @@
     "other": "{count} agents"
   },
   "{count} changes were not sent yet and will be lost.": "{count} wijzigingen zijn nog niet verstuurd en gaan verloren.",
+  "{count} days": {
+    "one": "1 dag",
+    "other": "{count} dagen"
+  },
   "{count} files": {
     "one": "{count} bestand",
     "other": "{count} bestanden"
@@ -819,18 +834,5 @@
   "€5 a month. You save €24 against paying monthly.": "€5 per maand. Je bespaart €24 ten opzichte van maandelijks betalen.",
   "€60 a year": "€60 per jaar",
   "€60 a year or €7 a month": "€60 per jaar of €7 per maand",
-  "€7 a month": "€7 per maand",
-  "Check back": "Navragen op",
-  "Got It Back": "Terug ontvangen",
-  "Name": "Naam",
-  "No date": "Geen datum",
-  "Waiting": "Wacht",
-  "Waiting On": "Wacht op",
-  "Waiting On…": "Wacht op…",
-  "Waiting on {name}": "Wacht op {name}",
-  "{count} days": {
-    "one": "1 dag",
-    "other": "{count} dagen"
-  },
-  "Your agent's questions, finished work and tasks in progress show up here, and so do tasks you are waiting on. Faded tasks do too.": "Hier verschijnen de vragen van je agent, afgerond werk en taken die lopen, en ook taken waarop je wacht. Vervaagde taken ook."
+  "€7 a month": "€7 per maand"
 }

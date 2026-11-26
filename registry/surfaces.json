@@ -754,7 +754,7 @@
     ],
     "featureId": "task.notes"
   },
-  "quickFind": {"id":"quickFind","featureId":"find.quick-find","placeholder":"Search tasks, projects, areas…","emptyState":{"title":"Search Tasks","detail":"Find any task, project, or area."},"noResults":{"title":"No matches","detail":"No tasks, projects, or areas match your search."},"completed":{"label":"Completed"},"controls":{"back":"Back"}},
+  "quickFind": {"id":"quickFind","featureId":"find.quick-find","placeholder":"Search tasks, projects, areas…","commandPlaceholder":"Search or run a command…","emptyState":{"title":"Search Tasks","detail":"Find any task, project, or area."},"noResults":{"title":"No matches","detail":"No tasks, projects, or areas match your search."},"completed":{"label":"Completed"},"controls":{"back":"Back"}},
   "fadeSweep": {
     "id": "fadeSweep",
     "featureId": "fade.sweep",

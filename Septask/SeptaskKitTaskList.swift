@@ -514,7 +514,8 @@ final class SeptaskKitTaskListController: NSViewController {
     tableView.delegate = self
     tableView.target = self
     tableView.doubleAction = #selector(beginEditFromDoubleClick)
-    tableView.onToggleComplete = { [weak self] in self?.toggleCompleteSelection() }
+    tableView.onToggleComplete = { [weak self] in self?.toggleCompleteSelection(fromKeyboard: true) }
+    tableView.onCancel = { [weak self] in self?.cancelSelection() }
     tableView.onToggleToday = { [weak self] in self?.toggleTodaySelection() }
     tableView.onDo = { [weak self] in self?.startDo() }
     tableView.onBeginEdit = { [weak self] in self?.beginEditSelectedRow() }
@@ -3233,10 +3234,38 @@ final class SeptaskKitTaskListController: NSViewController {
 
   // MARK: - Mutations
 
-  func toggleCompleteSelection() {
-    // ⌘K on a focused checklist step ticks the step (composer or inspector).
+  /// Uptime of the last ⌘↩ commit that closed an open row editor (or returned
+  /// focus from the inspector). A rapid second ⌘↩ within the guard window is
+  /// swallowed so finishing an edit cannot accidentally complete the task.
+  private var lastCommandReturnCommitAt: TimeInterval = 0
+  private static let completeGuardAfterCommit: TimeInterval = 0.55
+
+  func suppressCompleteBriefly() {
+    lastCommandReturnCommitAt = ProcessInfo.processInfo.systemUptime
+  }
+
+  /// Commit an open composer or field editor in response to ⌘↩, stamping the
+  /// double-tap guard. Returns false when no row editor is active.
+  @discardableResult
+  func commitOpenEditsForCommandReturn() -> Bool {
+    guard composingTaskId != nil || isTitleEditorActive else { return false }
+    commitComposerEditing()
+    return true
+  }
+
+  func toggleCompleteSelection(fromKeyboard: Bool = false) {
+    if fromKeyboard {
+      if composingTaskId != nil || isTitleEditorActive {
+        commitComposerEditing()
+        return
+      }
+      if ProcessInfo.processInfo.systemUptime - lastCommandReturnCommitAt < Self.completeGuardAfterCommit {
+        return
+      }
+    }
+    // ⌘↩ on a focused checklist step ticks the step (composer or inspector).
     if KitChecklistView.toggleFocusedStep(in: tableView.window) { return }
-    // ⌘K with the row open: save the typed text, close, complete (Things).
+    // Checkbox tap with the row open: save the typed text, close, complete.
     if composingTaskId != nil {
       completeComposingTask()
       return
@@ -3275,6 +3304,7 @@ final class SeptaskKitTaskListController: NSViewController {
   /// rows are left alone; trash has nothing to cancel.
   func cancelSelection() {
     guard !showingRecentlyDeleted else { return }
+    if composingTaskId != nil { collapseComposer(commit: true, animated: false) }
     let open = actionableSelection.filter { $0.status == .open }
     guard !open.isEmpty else { return }
     applyCancel(open)
@@ -4151,6 +4181,7 @@ final class SeptaskKitTaskListController: NSViewController {
   /// all. Descending is `↓` on the title's last line or Tab, both of which
   /// read top-to-bottom instead of as a chord.
   func commitComposerEditing() {
+    suppressCompleteBriefly()
     // ⌘↩ in a bare field editor (⌘R, the "New task" line) finishes it too.
     if composingTaskId == nil, isTitleEditorActive {
       commitFieldEditorNow()
@@ -8364,6 +8395,7 @@ final class SeptaskKitTableView: NSTableView {
     return resigned
   }
   var onToggleComplete: (() -> Void)?
+  var onCancel: (() -> Void)?
   var onToggleToday: (() -> Void)?
   /// ⌘J — Do the selected task (docs/DO_SPEC.md §4.1).
   var onDo: (() -> Void)?
@@ -8496,13 +8528,13 @@ final class SeptaskKitTableView: NSTableView {
       let commandShift = flags == [.command, .shift]
       let commandOption = flags == [.command, .option]
       let allowed: Bool
-      if command, ["\r", "\u{3}", "n", ","].contains(key) {
-        allowed = true            // ⌘↩ save + close, ⌘N save then create, ⌘, settings
+      if command, ["\r", "\u{3}", "n", ",", "k"].contains(key) {
+        allowed = true            // ⌘↩ save + close, ⌘K command bar, ⌘N save then create, ⌘, settings
       } else if (commandShift && key == "f") || (commandOption && key == "i") {
-        allowed = true            // Quick Find, inspector: window-level, no row write
-      } else if (command && ["k", "t", "s", "m", "j"].contains(key))
+        allowed = true            // Command bar alias, inspector: window-level, no row write
+      } else if (command && ["t", "s", "m", "j"].contains(key))
                   || (commandShift && ["m", "d", "c"].contains(key))
-                  || (commandOption && ["r", "s"].contains(key)) {
+                  || (commandOption && ["r", "s", "\r", "\u{3}"].contains(key)) {
         allowed = composer        // act on the composing row (text saved first)
       } else {
         allowed = false
@@ -8522,6 +8554,8 @@ final class SeptaskKitTableView: NSTableView {
 
     if flags == [.command, .option] {
       switch key {
+      // ⌥⌘↩ — cancel selected open tasks (registry task.cancel).
+      case "\r", "\u{3}": onCancel?(); return true
       // ⌥⌘I — the platform's inspector toggle.
       case "i": onToggleInspector?(); return true
       // ⌥⌘M — file into the SUGGESTED list, deliberately one modifier from
@@ -8559,16 +8593,16 @@ final class SeptaskKitTableView: NSTableView {
     }
     switch key {
     // ⌘↩ / ⌘keypad-Enter — save and close the open row (composer or field
-    // editor), the platform's "finish this". Caught here rather than in the
-    // composer cell so ONE handler covers the caret being in the title, in
-    // notes, or on a pill. With nothing open it is not ours: pass it on.
+    // editor), or mark the closed selected row(s) complete (with double-tap
+    // guard after closing an editor).
     case "\r", "\u{3}":
-      guard isComposing?() == true || focus == .fieldEditor else {
-        return super.performKeyEquivalent(with: event)
+      if isComposing?() == true || focus == .fieldEditor {
+        onCommitEditing?()
+      } else {
+        onToggleComplete?()
       }
-      onCommitEditing?()
       return true
-    case "k": onToggleComplete?(); return true
+    case "k": onQuickFind?(); return true
     case "t": onToggleToday?(); return true
     case "j": onDo?(); return true
     case "r": onBeginEdit?(); return true

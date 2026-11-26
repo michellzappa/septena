@@ -361,7 +361,9 @@ private struct PageChromeModifier: ViewModifier {
       // toolbar needs no "···" on macOS at all.
       if addClosure == nil {
         ToolbarItem(placement: .navigation) {
-          QuickFindToolbarButton().help("Quick Find (⌘⇧F)")
+          QuickFindToolbarButton().help(
+            "\(RegistryActions.title(.appQuickFind)) (\(RegistryActions.shortcut(for: .appQuickFind)?.keycaps.joined() ?? "⌘K"))"
+          )
         }
       }
     } else if showsGlobal {

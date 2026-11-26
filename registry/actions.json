@@ -87,7 +87,7 @@
       "shortTitle": "Complete",
       "icon": "action.complete",
       "role": "default",
-      "shortcut": { "key": "k", "modifiers": ["primary"] },
+      "shortcut": { "key": "return", "modifiers": ["primary"] },
       "availability": { "selection": "any", "excludeDestinations": ["recentlyDeleted"] },
       "featureId": "lists.today"
     },
@@ -96,7 +96,7 @@
       "pluralTitle": "Cancel Tasks",
       "icon": "action.cancel",
       "role": "default",
-      "shortcut": { "key": "k", "modifiers": ["primary", "alt"] },
+      "shortcut": { "key": "return", "modifiers": ["primary", "alt"] },
       "availability": { "selection": "any", "excludeDestinations": ["recentlyDeleted"] },
       "featureId": "lists.today"
     },
@@ -391,7 +391,7 @@
       "activeTitle": "Mark as Not Done",
       "icon": "action.complete",
       "role": "default",
-      "shortcut": { "key": "k", "modifiers": ["primary"] },
+      "shortcut": { "key": "return", "modifiers": ["primary"] },
       "availability": { "selection": "any" },
       "featureId": "lists.today"
     },
@@ -430,9 +430,10 @@
     },
     "app.quickFind": {
       "title": "Quick Find…",
+      "desktopTitle": "Command Bar…",
       "icon": "action.search",
       "role": "default",
-      "shortcut": { "key": "f", "modifiers": ["primary", "shift"] },
+      "shortcut": { "key": "k", "modifiers": ["primary"], "alternates": [{ "key": "f", "modifiers": ["primary", "shift"] }] },
       "availability": { "selection": "none" },
       "featureId": "find.quick-find"
     },

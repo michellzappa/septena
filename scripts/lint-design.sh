@@ -274,7 +274,7 @@ space_bound=$(grep -rnE '(onKeyPress\(\.space|keyboardShortcut\(\.space)' --incl
 if [ -n "$space_bound" ]; then
   printf '%s✗ %s%s\n' "$RED" "task-space-binding" "$OFF"
   errors=$((errors + 1))
-  printf '  %s\n' 'Do not bind Space on a task surface — it collides with the row checkbox. Use a modifier shortcut (⌘K completes).'
+  printf '  %s\n' 'Do not bind Space on a task surface — it collides with the row checkbox. Use a modifier shortcut (⌘↩ completes).'
   printf '%s' "$DIM"; printf '%s\n' "$space_bound" | sed 's/^/    /'
   printf '%s\n' "$OFF"
 fi
