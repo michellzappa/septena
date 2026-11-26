@@ -144,3 +144,6 @@ bucket_name = "septena-attachments"
 #                   reviewer access (ADR 0055): with the first two set, the
 #                   pairing page offers the demo account for the reviewer code.
 #                   Setup: docs/CONNECTOR_DIRECTORY_SUBMISSION.md section 5.
+# OPENAI_APPS_CHALLENGE — optional. The token platform.openai.com/apps-manage
+#                   gives for domain verification, served at
+#                   /.well-known/openai-apps-challenge.

@@ -21,7 +21,7 @@ Complete these checks before clicking Submit in either portal:
 - [x] **Check canonical web URLs.** Checked 2026-11-26: `https://www.septena.app/privacy`, `/support` and `/agents` answer 301 to `https://septena.app/...`. The fields below use the `https://septena.app` URLs.
 - [ ] **Prepare reviewer test access (see Section 5, ADR 0055).** Both Anthropic and OpenAI reviewers need a frictionless way to authenticate without getting blocked by MFA or an unavailable second device. Because Septena pairs via an 8-character code approved in the signed-in app, fill in Section 5 before submitting.
 - [x] **ChatGPT pairing page wording.** Fixed 2026-11-26: the pairing page in `backend/src/shadow/oauth.ts` names the connecting client (`opts.clientName`) in "If you did not start this from …", and gives the full app path (Settings ▸ AI & Agents ▸ Connect Claude). For a client that is not Claude, it adds that the same screen connects every agent.
-- [ ] **OpenAI domain verification.** After creating the draft in `platform.openai.com/apps-manage`, serve the portal's verification token at `https://api.septena.app/.well-known/openai-apps-challenge`.
+- [ ] **OpenAI domain verification.** Set the token with `wrangler secret put OPENAI_APPS_CHALLENGE`; the Worker serves it at the path below. After creating the draft in `platform.openai.com/apps-manage`, serve the portal's verification token at `https://api.septena.app/.well-known/openai-apps-challenge`.
 - [ ] **Optional tool-surface decision.** `tasks_list_tags` and `tasks_checklist_*` are currently live in `tools/list` and included in Section 6 below. If you hide them before the app UI renders tags and checklists, update Section 6 and trigger a portal rescan.
 
 ---

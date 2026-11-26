@@ -61,6 +61,9 @@ export interface Env {
   REVIEWER_CODE?: string;
   REVIEWER_ACCOUNT_ID?: string;
   REVIEWER_MODE_UNTIL?: string;
+  /// The OpenAI apps directory's domain verification token, served as plain
+  /// text at /.well-known/openai-apps-challenge. Unset: that path is 404.
+  OPENAI_APPS_CHALLENGE?: string;
 
   // KV namespaces
   STATE: KVNamespace;    // short-lived OAuth state (src/shadow/oauth.ts)
