@@ -34,6 +34,9 @@ Today), overdue tasks, and the Today rollover (§6 of the fade spec).
   Projects do not count.
 - Faded starts collapsed. Its notice opens the keep-or-let-go sheet on any day.
 - The weekly prompt on Today opens the same sheet.
+- Opening a row in any group but Faded (tap, click, double-click, Return)
+  opens the task page, where the conversation is. It never expands the row
+  inline. Faded rows expand inline like any other list.
 - Agent work that is done has no group: it is in the Logbook.
 
 ## 3. Rules the store enforces
