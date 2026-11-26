@@ -22,7 +22,9 @@ Windows x64 CI runs the shared core/store conformance vectors and the spike's he
 
 The first fixture slice uses the shared task rows for Today with its Inbox band, Upcoming and Anytime (`lists.today`, `lists.inbox`, `lists.upcoming`, `lists.anytime`). The released core decides membership and Upcoming dates. The desktop shell provides navigation and sends create, rename and complete through the existing mutator. Windows CI checks those actions and the resulting fixture sync. Win365 acceptance covers layout, input, accessibility and launch from the bundle.
 
-Build the next slices in this order. Start with areas, projects and their headings to exercise filing and the shared sidebar vocabulary. Then add When, Deadline, Repeat, notes and undo using the existing task edits and date rules. Add Quick Find against SQLite, then conversations and agent actions. These slices can use fixture workspaces until live W1 is ready. A feature's fixture and CI evidence stays separate from its Win365 result.
+The second fixture slice adds areas, projects and project sections (`places.areas`, `places.projects`, `places.sections`). The desktop sidebar shows the hierarchy, including empty sections. A project displays unsectioned tasks and groups the rest by section. Create and rename locations, create tasks directly inside them, and file an existing task with its **Move** action. The fixture check covers offline creation and filing, rejects a section that belongs to another project, and confirms that a second database sees the hierarchy after reconnect. Win365 acceptance covers navigation, the move picker, and keyboard and screen-reader behavior.
+
+Next add When, Deadline, Repeat, notes and undo using the existing task edits and date rules. Add Quick Find against SQLite, then conversations and agent actions. These slices can use fixture workspaces until live W1 is ready. A feature's fixture and CI evidence stays separate from its Win365 result.
 
 ## Checkpoint 2 — live W1 on Win365
 

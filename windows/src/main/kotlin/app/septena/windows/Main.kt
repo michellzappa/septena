@@ -1,14 +1,19 @@
 package app.septena.windows
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.OutlinedTextField
@@ -30,7 +35,13 @@ import app.septena.core.RegistryCatalog
 import app.septena.core.SystemDayClock
 import app.septena.core.generated.RegistryActionIds
 import app.septena.core.generated.RegistryDestinationIds
+import app.septena.core.generated.RegistryPlacesScreenIds
+import app.septena.core.generated.RegistryPromptIds
+import app.septena.core.generated.RegistrySurfaceIds
+import app.septena.core.stringValue
 import app.septena.ui.TaskHomeContent
+import app.septena.ui.TaskMenuActionIcon
+import app.septena.ui.TaskRowMenuAction
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -60,36 +71,46 @@ fun main() {
     }
 }
 
-private data class EditTask(val title: String = "", val id: String? = null)
+private data class NameEditor(
+    val title: String,
+    val fieldLabel: String,
+    val confirmTitle: String,
+    val initialValue: String = "",
+    val save: suspend (String) -> DesktopLocation?,
+)
 
 @Composable
 private fun DesktopTasks(workspace: SpikeWorkspace, transport: FixtureTransport, onBusyChange: (Boolean) -> Unit) {
     val scope = rememberCoroutineScope()
     val languageTag = remember { Locale.getDefault().toLanguageTag() }
-    var destination by remember { mutableStateOf(RegistryDestinationIds.TODAY) }
+    val today = DesktopLocation.Smart(RegistryDestinationIds.TODAY)
+    var destination by remember { mutableStateOf<DesktopLocation>(today) }
     var lists by remember { mutableStateOf(DesktopTaskLists()) }
-    var editor by remember { mutableStateOf<EditTask?>(null) }
+    var editor by remember { mutableStateOf<NameEditor?>(null) }
+    var movingTask by remember { mutableStateOf<String?>(null) }
     var status by remember { mutableStateOf("Loading fixture") }
     var error by remember { mutableStateOf<String?>(null) }
     var online by remember { mutableStateOf(true) }
     var busy by remember { mutableStateOf(false) }
     var loaded by remember { mutableStateOf(false) }
 
-    fun work(onSuccess: () -> Unit = {}, action: suspend () -> String?) {
+    fun <T> work(action: suspend () -> T, onSuccess: (T) -> Unit = {}) {
         if (busy) return
         busy = true
         onBusyChange(true)
         error = null
         scope.launch {
             try {
-                val (message, rows) = withContext(Dispatchers.IO) {
-                    val message = action()
-                    message to workspace.lists(languageTag)
+                val (result, rows) = withContext(Dispatchers.IO) {
+                    val result = action()
+                    result to workspace.lists(languageTag)
                 }
                 lists = rows
-                status = message ?: status
+                if (destination !is DesktopLocation.Smart && rows.places.place(destination) == null) {
+                    destination = today
+                }
                 loaded = true
-                onSuccess()
+                onSuccess(result)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (failure: Exception) {
@@ -101,37 +122,98 @@ private fun DesktopTasks(workspace: SpikeWorkspace, transport: FixtureTransport,
         }
     }
 
-    LaunchedEffect(Unit) {
-        work {
-            workspace.sync()
-            "Fixture connected"
-        }
+    fun openEditor(value: NameEditor) {
+        error = null
+        editor = value
     }
 
-    val isToday = destination == RegistryDestinationIds.TODAY
+    LaunchedEffect(Unit) {
+        work({ workspace.sync() }) { status = "Fixture connected" }
+    }
+
+    val smart = destination as? DesktopLocation.Smart
+    val place = lists.places.place(destination)
+    val project = when (val selected = destination) {
+        is DesktopLocation.Project -> selected
+        is DesktopLocation.Section -> DesktopLocation.Project(selected.projectId)
+        else -> null
+    }
+    val outline = lists.places.outline()
+    val isToday = destination == today
     val rows = lists.rows(destination)
     val inbox = if (isToday) lists.inbox else emptyList()
-    val newTaskTitle = RegistryCatalog.actionTitle(RegistryActionIds.APP_NEW_TASK, languageTag = languageTag).orEmpty()
-    val canAdd = loaded && RegistryCatalog.destinationSupportsInlineCreate(destination)
+    val newTaskTitle = actionTitle(RegistryActionIds.APP_NEW_TASK, languageTag)
+    val canAdd = loaded && (place != null || smart?.let { RegistryCatalog.destinationSupportsInlineCreate(it.id) } == true)
+    val moveTitle = actionTitle(RegistryActionIds.TASK_MOVE, languageTag)
+    val moveAction = TaskRowMenuAction(RegistryActionIds.TASK_MOVE, moveTitle, icon = TaskMenuActionIcon.Move)
 
     Row(Modifier.fillMaxSize()) {
-        Column(Modifier.width(160.dp).padding(8.dp)) {
-            for (id in desktopDestinations) {
-                NavigationDrawerItem(
-                    selected = id == destination,
-                    onClick = { destination = id },
-                    label = { Text(RegistryCatalog.destinationTitle(id, languageTag).orEmpty()) },
-                )
+        Column(Modifier.width(212.dp).padding(8.dp)) {
+            LazyColumn(Modifier.weight(1f)) {
+                items(desktopDestinations, key = { "smart:$it" }) { id ->
+                    val target = DesktopLocation.Smart(id)
+                    NavigationDrawerItem(
+                        selected = target == destination,
+                        onClick = { destination = target },
+                        label = { Text(RegistryCatalog.destinationTitle(id, languageTag).orEmpty()) },
+                    )
+                }
+                items(outline, key = { it.location.key() }) { item ->
+                    NavigationDrawerItem(
+                        selected = item.location == destination,
+                        onClick = { destination = item.location },
+                        label = { Text(item.title) },
+                        modifier = Modifier.padding(start = placeIndent(item).dp),
+                    )
+                }
             }
+            TextButton(enabled = loaded && !busy, onClick = {
+                openEditor(placeEditor(RegistryPromptIds.NEW_AREA, languageTag, save = workspace::addArea))
+            }) { Text(actionTitle(RegistryActionIds.SIDEBAR_NEW_AREA, languageTag)) }
+            TextButton(enabled = loaded && !busy, onClick = {
+                val area = destination as? DesktopLocation.Area
+                openEditor(placeEditor(RegistryPromptIds.NEW_PROJECT, languageTag) { title ->
+                    workspace.addProject(title, area)
+                })
+            }) { Text(actionTitle(RegistryActionIds.SIDEBAR_NEW_PROJECT, languageTag)) }
         }
         Column(Modifier.weight(1f).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (place != null) {
+                Text(place.title, style = MaterialTheme.typography.headlineSmall)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 if (canAdd) {
                     Button(enabled = !busy, onClick = {
-                        error = null
-                        editor = EditTask()
+                        val target = destination
+                        openEditor(NameEditor(newTaskTitle, localized("Title", languageTag), localized("Add", languageTag)) { title ->
+                            workspace.add(title, target)
+                            null
+                        })
                     }) { Text(newTaskTitle) }
                 }
+                if (project != null) {
+                    TextButton(enabled = !busy, onClick = {
+                        openEditor(placeEditor(RegistryPromptIds.NEW_SECTION, languageTag) { title ->
+                            workspace.addSection(title, project)
+                        })
+                    }) { Text(actionTitle(RegistryActionIds.SECTION_NEW, languageTag)) }
+                }
+                if (place != null) {
+                    TextButton(enabled = !busy, onClick = {
+                        val prompt = when (place.location) {
+                            is DesktopLocation.Area -> RegistryPromptIds.RENAME_AREA
+                            is DesktopLocation.Project -> RegistryPromptIds.RENAME_PROJECT
+                            is DesktopLocation.Section -> RegistryPromptIds.RENAME_SECTION
+                            is DesktopLocation.Smart -> error("Expected an area, project, or section")
+                        }
+                        openEditor(placeEditor(prompt, languageTag, place.title) { title ->
+                            workspace.renamePlace(place.location, title)
+                            null
+                        })
+                    }) { Text(localized("Rename", languageTag)) }
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 TextButton(enabled = !busy, onClick = {
                     online = !online
                     transport.online = online
@@ -139,96 +221,185 @@ private fun DesktopTasks(workspace: SpikeWorkspace, transport: FixtureTransport,
                     status = if (online) "Fixture online" else "Fixture offline"
                 }) { Text(if (online) "Go offline" else "Go online") }
                 TextButton(enabled = !busy, onClick = {
-                    work {
-                        val result = workspace.sync()
-                        "Task writes sent: ${result.pushedOperations}"
-                    }
+                    work({ workspace.sync() }) { status = "Task writes sent: ${it.pushedOperations}" }
                 }) { Text("Sync") }
             }
             Text(status, style = MaterialTheme.typography.bodySmall)
             TaskHomeContent(
-                completeTitle = RegistryCatalog.actionTitle(
-                    RegistryActionIds.TASK_TOGGLE_COMPLETE,
-                    languageTag = languageTag,
-                ).orEmpty(),
-                emptyTitle = RegistryCatalog.destinationEmptyTitle(destination, languageTag).orEmpty(),
-                emptyDescription = RegistryCatalog.destinationEmptyDetail(destination, languageTag).orEmpty(),
+                completeTitle = actionTitle(RegistryActionIds.TASK_TOGGLE_COMPLETE, languageTag),
+                emptyTitle = emptyTitleFor(destination, languageTag),
+                emptyDescription = smart?.let { RegistryCatalog.destinationEmptyDetail(it.id, languageTag) }.orEmpty(),
                 inboxBandTitle = RegistryCatalog.destinationTitle(RegistryDestinationIds.INBOX, languageTag).orEmpty(),
                 todayTitle = RegistryCatalog.destinationTitle(RegistryDestinationIds.TODAY, languageTag).orEmpty(),
                 todayTint = MaterialTheme.colorScheme.secondary,
                 hasLoaded = loaded,
                 isToday = isToday,
-                isUpcoming = destination == RegistryDestinationIds.UPCOMING,
+                isUpcoming = smart?.id == RegistryDestinationIds.UPCOMING,
                 inboxTasks = inbox,
                 tasks = rows,
                 canQuickAdd = canAdd,
                 canComplete = true,
                 errorMessage = error,
-                rowMenuGroups = emptyList(),
-                rowMenuAccessibilityLabel = "",
+                rowMenuGroups = listOf(listOf(moveAction)),
+                rowMenuAccessibilityLabel = surfaceLabel(RegistrySurfaceIds.TASK_ROW_MENU, "accessibilityLabel", languageTag),
                 listKey = destination,
                 onComplete = { id ->
-                    work {
+                    work({
                         checkNotNull(workspace.complete(id)) { localized("Task is no longer available.", languageTag) }
-                        null
-                    }
+                    }) { status = "Task saved to the outbox" }
                 },
                 onOpenTask = { id ->
                     if (!busy) {
                         val row = (rows + inbox).firstOrNull { it.id == id }
-                        if (row != null) {
-                            error = null
-                            editor = EditTask(row.title, row.id)
-                        }
+                        if (row != null) openEditor(
+                            NameEditor(
+                                localized("Task Details", languageTag),
+                                localized("Title", languageTag),
+                                localized("Save", languageTag),
+                                row.title,
+                            ) { title ->
+                                checkNotNull(workspace.rename(row.id, title)) { localized("Task is no longer available.", languageTag) }
+                                null
+                            },
+                        )
                     }
                 },
-                onTaskAction = { _, _ -> },
+                onTaskAction = { id, action ->
+                    if (!busy && action == RegistryActionIds.TASK_MOVE) {
+                        error = null
+                        movingTask = id
+                    }
+                },
+                onOpenGroupTarget = project?.let { current -> { id -> destination = DesktopLocation.Section(current.id, id) } },
             )
         }
     }
 
-    editor?.let { task ->
-        var title by remember(task) { mutableStateOf(task.title) }
-        AlertDialog(
-            onDismissRequest = { if (!busy) editor = null },
-            title = { Text(if (task.id == null) newTaskTitle else localized("Task Details", languageTag)) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        value = title,
-                        onValueChange = { title = it },
-                        enabled = !busy,
-                        singleLine = true,
-                        label = { Text(localized("Title", languageTag)) },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                }
-            },
-            confirmButton = {
-                Button(
-                    enabled = !busy && title.isNotBlank() && title.trim() != task.title,
-                    onClick = {
-                        val editedTitle = title
-                        work(onSuccess = { editor = null }) {
-                            if (task.id == null) {
-                                workspace.add(editedTitle, today = isToday)
-                            } else {
-                                checkNotNull(workspace.rename(task.id, editedTitle)) {
-                                    localized("Task is no longer available.", languageTag)
-                                }
-                            }
-                            "Task saved to the outbox"
-                        }
-                    },
-                ) { Text(localized(if (task.id == null) "Add" else "Save", languageTag)) }
-            },
-            dismissButton = {
-                TextButton(enabled = !busy, onClick = { editor = null }) { Text(localized("Cancel", languageTag)) }
-            },
-        )
+    editor?.let { edit ->
+        EditNameDialog(edit, busy, error, languageTag, onDismiss = { editor = null }) { value ->
+            work({ edit.save(value) }) { next ->
+                if (next != null) destination = next
+                editor = null
+                status = "Saved to the outbox"
+            }
+        }
+    }
+    movingTask?.let { id ->
+        MoveTaskDialog(outline, busy, error, languageTag, onDismiss = { movingTask = null }) { target ->
+            work({ workspace.move(id, target) }) {
+                movingTask = null
+                status = "Task saved to the outbox"
+            }
+        }
     }
 }
+
+@Composable
+private fun EditNameDialog(
+    edit: NameEditor,
+    busy: Boolean,
+    error: String?,
+    languageTag: String,
+    onDismiss: () -> Unit,
+    onSave: (String) -> Unit,
+) {
+    var title by remember(edit) { mutableStateOf(edit.initialValue) }
+    AlertDialog(
+        onDismissRequest = { if (!busy) onDismiss() },
+        title = { Text(edit.title) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    enabled = !busy,
+                    singleLine = true,
+                    label = { Text(edit.fieldLabel) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            }
+        },
+        confirmButton = {
+            Button(
+                enabled = !busy && title.isNotBlank() && title.trim() != edit.initialValue,
+                onClick = { onSave(title) },
+            ) { Text(edit.confirmTitle) }
+        },
+        dismissButton = {
+            TextButton(enabled = !busy, onClick = onDismiss) { Text(localized("Cancel", languageTag)) }
+        },
+    )
+}
+
+@Composable
+private fun MoveTaskDialog(
+    places: List<DesktopPlace>,
+    busy: Boolean,
+    error: String?,
+    languageTag: String,
+    onDismiss: () -> Unit,
+    onMove: (DesktopLocation) -> Unit,
+) {
+    val inbox = DesktopPlace(
+        DesktopLocation.Smart(RegistryDestinationIds.INBOX),
+        RegistryCatalog.destinationTitle(RegistryDestinationIds.INBOX, languageTag).orEmpty(),
+    )
+    AlertDialog(
+        onDismissRequest = { if (!busy) onDismiss() },
+        title = { Text(actionTitle(RegistryActionIds.TASK_MOVE, languageTag)) },
+        text = {
+            Column {
+                error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                LazyColumn(Modifier.heightIn(max = 320.dp)) {
+                    items(listOf(inbox) + places, key = { it.location.key() }) { destination ->
+                        ListItem(
+                            headlineContent = { Text(destination.title) },
+                            modifier = Modifier
+                                .clickable(enabled = !busy) { onMove(destination.location) }
+                                .padding(start = placeIndent(destination).dp),
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(enabled = !busy, onClick = onDismiss) { Text(localized("Cancel", languageTag)) }
+        },
+    )
+}
+
+private fun placeIndent(place: DesktopPlace): Int = when {
+    place.location is DesktopLocation.Section -> 28
+    place.areaId != null -> 14
+    else -> 0
+}
+
+private fun emptyTitleFor(location: DesktopLocation, languageTag: String): String = when (location) {
+    is DesktopLocation.Smart -> RegistryCatalog.destinationEmptyTitle(location.id, languageTag).orEmpty()
+    is DesktopLocation.Area -> surfaceLabel(RegistryPlacesScreenIds.EMPTY_AREA_TASKS, "title", languageTag)
+    is DesktopLocation.Project -> surfaceLabel(RegistryPlacesScreenIds.EMPTY_PROJECT_TASKS, "title", languageTag)
+    is DesktopLocation.Section -> surfaceLabel(RegistryPlacesScreenIds.EMPTY_SECTION_TASKS, "title", languageTag)
+}
+
+private fun placeEditor(
+    prompt: String,
+    languageTag: String,
+    initialValue: String = "",
+    save: suspend (String) -> DesktopLocation?,
+): NameEditor = NameEditor(
+    title = surfaceLabel(prompt, "title", languageTag),
+    fieldLabel = surfaceLabel(prompt, "placeholder", languageTag),
+    confirmTitle = surfaceLabel(prompt, "confirmTitle", languageTag),
+    initialValue = initialValue,
+    save = save,
+)
+
+private fun surfaceLabel(id: String, field: String, languageTag: String): String =
+    RegistryCatalog.surface(id)?.get(field).stringValue()?.let { localized(it, languageTag) }.orEmpty()
+
+private fun actionTitle(id: String, languageTag: String): String =
+    RegistryCatalog.actionTitle(id, languageTag = languageTag).orEmpty()
 
 private fun localized(label: String, languageTag: String): String =
     RegistryCatalog.localizedString(label, languageTag) ?: label
