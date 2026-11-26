@@ -21,6 +21,20 @@ export const zSessionResponse = z.object({
 });
 export type SessionResponse = z.infer<typeof zSessionResponse>;
 
+// Sign-in methods this server has turned on (GET /v1/auth/methods, ADR 0047).
+export const zAuthMethodsResponse = z.object({
+  methods: z.array(z.object({ id: z.string() })),
+});
+export type AuthMethodsResponse = z.infer<typeof zAuthMethodsResponse>;
+
+// POST /v1/auth/email/start (202).
+export const zEmailStartResponse = z.object({
+  status: z.literal("sent"),
+  expiresInSeconds: z.number(),
+  codeLength: z.number().int().min(4).max(10).optional(),
+});
+export type EmailStartResponse = z.infer<typeof zEmailStartResponse>;
+
 export const zWsTicketResponse = z.object({
   ticket: z.string(),
   expiresIn: z.number(),

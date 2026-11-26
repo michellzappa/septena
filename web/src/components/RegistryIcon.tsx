@@ -10,7 +10,9 @@ import {
   Clock,
   Eye,
   Layers,
+  Mail,
   MessageCircleQuestion,
+  MonitorSmartphone,
   Repeat,
   Star,
   Sun,
@@ -19,8 +21,8 @@ import {
 } from "lucide-react";
 import { ICONS } from "@/lib/generated/registries";
 
-// The lucide icons that registry/icons.json names for the smart lists and
-// their groups. A named import keeps the rest of lucide out of the bundle.
+// The lucide icons that registry/icons.json names for the smart lists, their
+// groups and the sign-in methods. A named import keeps the rest of lucide out of the bundle.
 const LUCIDE: Record<string, LucideIcon> = {
   bot: Bot,
   calendar: Calendar,
@@ -32,7 +34,9 @@ const LUCIDE: Record<string, LucideIcon> = {
   clock: Clock,
   eye: Eye,
   layers: Layers,
+  mail: Mail,
   "message-circle-question": MessageCircleQuestion,
+  "monitor-smartphone": MonitorSmartphone,
   repeat: Repeat,
   star: Star,
   sun: Sun,
