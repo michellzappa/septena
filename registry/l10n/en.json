@@ -241,6 +241,24 @@
       "actions.actions.do.addAndDo.title"
     ]
   },
+  "Add another sign-in method before removing your last one.": {
+    "text": "Add another sign-in method before removing your last one.",
+    "paths": [
+      "signIn.manage.lastMethod"
+    ]
+  },
+  "Add another sign-in method to open this same account on any device. You cannot remove your last method.": {
+    "text": "Add another sign-in method to open this same account on any device. You cannot remove your last method.",
+    "paths": [
+      "signIn.manage.footer"
+    ]
+  },
+  "Add email": {
+    "text": "Add email",
+    "paths": [
+      "signIn.manage.addEmail"
+    ]
+  },
   "Add time": {
     "text": "Add time",
     "paths": [
@@ -260,6 +278,15 @@
     ],
     "paths": [
       "surfaces.taskReferences.add.suggestions.format"
+    ]
+  },
+  "Add {provider}": {
+    "text": "Add {provider}",
+    "placeholders": [
+      "provider"
+    ],
+    "paths": [
+      "signIn.manage.addProvider"
     ]
   },
   "Added by": {
@@ -574,7 +601,8 @@
     "text": "Cancel",
     "paths": [
       "surfaces.prompts.cancelTitle",
-      "surfaces.accountSwitch.copy.cancel.label"
+      "surfaces.accountSwitch.copy.cancel.label",
+      "signIn.manage.cancel"
     ]
   },
   "Cancel Project": {
@@ -952,11 +980,29 @@
       "surfaces.firstRun.steps.connectClaude.instructions.0"
     ]
   },
+  "Could not add sign-in method.": {
+    "text": "Could not add sign-in method.",
+    "paths": [
+      "signIn.manage.addFailed"
+    ]
+  },
+  "Could not load sign-in methods.": {
+    "text": "Could not load sign-in methods.",
+    "paths": [
+      "signIn.manage.loadFailed"
+    ]
+  },
   "Could not reach Septena.": {
     "text": "Could not reach Septena.",
     "paths": [
       "surfaces.sharing.copy.failed.label",
       "surfaces.deviceSignIn.copy.unreachable.label"
+    ]
+  },
+  "Could not remove sign-in method.": {
+    "text": "Could not remove sign-in method.",
+    "paths": [
+      "signIn.manage.removeFailed"
     ]
   },
   "Couldn't send your message.": {
@@ -2095,6 +2141,12 @@
       "settings.keys.pccReasoning.options.0.title"
     ]
   },
+  "Link your Apple ID to sign in to this same Septena account.": {
+    "text": "Link your Apple ID to sign in to this same Septena account.",
+    "paths": [
+      "signIn.manage.addAppleDetail"
+    ]
+  },
   "Links in this task": {
     "text": "Links in this task",
     "paths": [
@@ -3185,7 +3237,8 @@
     "text": "Remove",
     "paths": [
       "actions.actions.task.reference.remove.title",
-      "surfaces.sharing.copy.remove.label"
+      "surfaces.sharing.copy.remove.label",
+      "signIn.manage.remove"
     ]
   },
   "Remove from Today": {
@@ -3843,6 +3896,16 @@
       "surfaces.firstRun.steps.account.body"
     ]
   },
+  "Sign in with {email}, then add {provider} in Settings.": {
+    "text": "Sign in with {email}, then add {provider} in Settings.",
+    "placeholders": [
+      "email",
+      "provider"
+    ],
+    "paths": [
+      "signIn.existingAccount.manualDetail"
+    ]
+  },
   "Sign in…": {
     "text": "Sign in…",
     "paths": [
@@ -3862,6 +3925,24 @@
     ],
     "paths": [
       "settings.copy.access_devices.signOutTitle.label"
+    ]
+  },
+  "Sign-in method added.": {
+    "text": "Sign-in method added.",
+    "paths": [
+      "signIn.manage.added"
+    ]
+  },
+  "Sign-in method removed.": {
+    "text": "Sign-in method removed.",
+    "paths": [
+      "signIn.manage.removed"
+    ]
+  },
+  "Sign-in methods": {
+    "text": "Sign-in methods",
+    "paths": [
+      "signIn.manage.heading"
     ]
   },
   "Skip": {
@@ -4223,6 +4304,12 @@
     "text": "That device stops syncing within the hour. Its tasks stay on it until you sign in there again.",
     "paths": [
       "settings.copy.access_devices.signOutMessage.label"
+    ]
+  },
+  "That sign-in method already belongs to another Septena account.": {
+    "text": "That sign-in method already belongs to another Septena account.",
+    "paths": [
+      "signIn.manage.alreadyLinked"
     ]
   },
   "The brief did not load. Check your connection and open this page again.": {

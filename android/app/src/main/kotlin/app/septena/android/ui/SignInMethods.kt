@@ -8,6 +8,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -21,6 +22,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.autofill.ContentType
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentType
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.LinkAnnotation
@@ -32,6 +34,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.septena.android.AndroidAppGraph
 import app.septena.android.auth.AccountSwitchChoice
 import app.septena.core.JsonValue
@@ -39,8 +42,10 @@ import app.septena.core.RegistryCatalog
 import app.septena.core.generated.RegistryPlatformIds
 import app.septena.core.generated.RegistrySignInMethodIds
 import app.septena.core.stringValue
+import app.septena.transport.AuthMethodEntry
 import app.septena.transport.EmailStartResult
 import app.septena.transport.EmailVerifyResult
+import app.septena.transport.OidcRedeemResult
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.delay
@@ -49,10 +54,17 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * The methods this client draws itself today (ADR 0047). Google and Apple come with #640; until then they
- * stay hidden, so the screen never shows a dead button.
+ * The methods this client draws without capability flags (kept for [visibleSignInMethods] tests).
+ * OIDC providers (`google`, `apple`, `microsoft`) are also supported via [visibleSignInMethodsFromEntries]
+ * whenever the server reports `web = true`.
  */
 private val IMPLEMENTED_METHODS = setOf(RegistrySignInMethodIds.EMAIL, RegistrySignInMethodIds.DEVICE)
+private val OIDC_PROVIDER_IDS = setOf(
+    RegistrySignInMethodIds.GOOGLE,
+    RegistrySignInMethodIds.APPLE,
+    RegistrySignInMethodIds.MICROSOFT,
+)
+internal const val ANDROID_OIDC_CALLBACK_URL = "septask://auth/callback"
 
 /** An answer from `GET /v1/auth/methods` later than this counts as a failure: device approval only. */
 private const val METHODS_TIMEOUT_MS = 10_000L
@@ -104,10 +116,29 @@ internal fun visibleSignInMethods(
 }
 
 /**
- * Every way in this device offers, from sign-in.json: the email code above "I use Septena on another
- * device" when the server has email on, else device approval only. The sign-in screen and the first run's
- * account step both show it. [deviceStartTitle] and [deviceIntro] label device approval when it is the only
- * way in, as before. Callers watch `credentials.signedIn` for the result.
+ * The methods the sign-in screen shows, from `GET /v1/auth/methods` entries (including web OIDC providers).
+ */
+internal fun visibleSignInMethodsFromEntries(
+    registryOrder: List<String>,
+    serverEntries: List<AuthMethodEntry>?,
+): List<String> {
+    val fallback = registryOrder.filter { it == RegistrySignInMethodIds.DEVICE }
+    if (serverEntries == null) return fallback
+    val byId = serverEntries.associateBy { it.id }
+    return registryOrder.filter { id ->
+        val entry = byId[id] ?: return@filter false
+        when (id) {
+            in OIDC_PROVIDER_IDS -> entry.web
+            RegistrySignInMethodIds.EMAIL, RegistrySignInMethodIds.DEVICE -> true
+            else -> false
+        }
+    }.ifEmpty { fallback }
+}
+
+/**
+ * Every way in this device offers, from sign-in.json: enabled OIDC providers (Google, Apple, Microsoft),
+ * email code, and "I use Septena on another device" in Android registry order. Callers watch
+ * `credentials.signedIn` for the result.
  */
 @Composable
 internal fun SignInMethodsPanel(
@@ -116,42 +147,201 @@ internal fun SignInMethodsPanel(
     deviceStartTitle: String = deviceSignInCopy("start", languageTag),
     deviceIntro: String? = null,
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var methods by remember { mutableStateOf<List<String>?>(null) }
+    var oidcBusy by remember { mutableStateOf(false) }
+    var oidcError by remember { mutableStateOf<String?>(null) }
+    var collision by remember { mutableStateOf<OidcRedeemResult.AccountExists?>(null) }
+    var question by remember { mutableStateOf<AccountSwitchQuestion?>(null) }
+    val pendingOidc by graph.pendingOidcCallback.collectAsStateWithLifecycle()
+
     LaunchedEffect(Unit) {
-        val serverMethods = try {
-            withTimeoutOrNull(METHODS_TIMEOUT_MS) { graph.auth.signInMethods() }
+        val entries = try {
+            withTimeoutOrNull(METHODS_TIMEOUT_MS) { graph.auth.signInMethodEntries() }
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Exception) {
             null
         }
-        methods = visibleSignInMethods(signInRegistryOrder(), serverMethods)
+        methods = visibleSignInMethodsFromEntries(signInRegistryOrder(), entries)
+    }
+
+    // Redeem `septask://auth/callback?oidc_code=...` when returning from the browser.
+    LaunchedEffect(pendingOidc) {
+        val cb = pendingOidc ?: return@LaunchedEffect
+        graph.pendingOidcCallback.value = null
+        if (cb.error != null) {
+            if (cb.error != "cancelled" && cb.error != "access_denied") {
+                oidcError = signInText(languageTag, "errors", "network")
+            }
+            return@LaunchedEffect
+        }
+        val code = cb.code ?: return@LaunchedEffect
+        oidcBusy = true
+        oidcError = null
+        try {
+            when (val res = withTimeout(EMAIL_REQUEST_TIMEOUT_MS) { graph.auth.redeemOidcSignIn(code) }) {
+                is OidcRedeemResult.SignedIn -> {
+                    completeSignIn(graph, res.tokens) { question = it }
+                }
+                is OidcRedeemResult.AccountExists -> {
+                    collision = res
+                }
+                OidcRedeemResult.Expired -> {
+                    oidcError = signInText(languageTag, "errors", "codeExpired")
+                }
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            oidcError = signInText(languageTag, "errors", "network")
+        } finally {
+            oidcBusy = false
+        }
     }
 
     val shown = methods
-    if (shown == null) {
+    if (shown == null || oidcBusy) {
         CircularProgressIndicator()
         return
     }
-    val showsEmail = RegistrySignInMethodIds.EMAIL in shown
+    val activeCollision = collision
+    if (activeCollision != null) {
+        CollisionLinkPanel(
+            graph = graph,
+            languageTag = languageTag,
+            collision = activeCollision,
+            onCancel = { collision = null },
+            onQuestion = { question = it },
+        )
+        question?.let { asked -> AccountSwitchDialog(asked, languageTag) }
+        return
+    }
+
+    val hasPrimary = shown.any { it != RegistrySignInMethodIds.DEVICE }
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        if (showsEmail) Text(signInText(languageTag, "copy", "subheading"))
+        if (hasPrimary) Text(signInText(languageTag, "copy", "subheading"))
+        oidcError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         for (id in shown) {
             when (id) {
+                in OIDC_PROVIDER_IDS -> {
+                    OutlinedButton(
+                        onClick = {
+                            oidcError = null
+                            openUrl(context, graph.auth.oidcStartUrl(id, ANDROID_OIDC_CALLBACK_URL))
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(signInMethodTitle(id, languageTag))
+                    }
+                }
                 RegistrySignInMethodIds.EMAIL -> EmailSignInPanel(graph, languageTag)
                 RegistrySignInMethodIds.DEVICE -> {
-                    if (!showsEmail) deviceIntro?.let { Text(it) }
+                    if (!hasPrimary) deviceIntro?.let { Text(it) }
                     DeviceSignInPanel(
                         graph = graph,
                         languageTag = languageTag,
-                        startTitle = if (showsEmail) signInMethodTitle(id, languageTag) else deviceStartTitle,
-                        secondary = showsEmail,
+                        startTitle = if (hasPrimary) signInMethodTitle(id, languageTag) else deviceStartTitle,
+                        secondary = hasPrimary,
                     )
                 }
             }
         }
-        // Email creates an account, so the Terms line stands under it (ADR 0047, #564).
-        if (showsEmail) SignInTermsLine(languageTag)
+        // Any account-creating method shows the Terms line under it (ADR 0047, #564).
+        if (hasPrimary) SignInTermsLine(languageTag)
+    }
+    question?.let { asked -> AccountSwitchDialog(asked, languageTag) }
+}
+
+/** No-silent-linking collision step (ADR 0047 decision 5). */
+@Composable
+private fun CollisionLinkPanel(
+    graph: AndroidAppGraph,
+    languageTag: String,
+    collision: OidcRedeemResult.AccountExists,
+    onCancel: () -> Unit,
+    onQuestion: (AccountSwitchQuestion?) -> Unit,
+) {
+    var code by rememberSaveable { mutableStateOf("") }
+    var busy by remember { mutableStateOf(false) }
+    var message by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+    val providerName = signInMethod(collision.provider)?.fields?.get("name").stringValue()
+        ?: collision.provider.replaceFirstChar { it.uppercase() }
+
+    fun submit() {
+        val token = collision.linkToken ?: return
+        if (code.length != 6 || busy) return
+        busy = true
+        message = null
+        scope.launch {
+            val result = try {
+                withTimeout(EMAIL_REQUEST_TIMEOUT_MS) { graph.auth.completeCollisionLink(token, code) }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                null
+            }
+            when (result) {
+                is EmailVerifyResult.SignedIn -> {
+                    try {
+                        completeSignIn(graph, result.tokens, onQuestion)
+                        onCancel()
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (_: Exception) {
+                        message = signInText(languageTag, "errors", "network")
+                    }
+                }
+                is EmailVerifyResult.WrongCode -> {
+                    code = ""
+                    message = signInPlural("wrongCode", result.attemptsLeft, languageTag)
+                }
+                EmailVerifyResult.Expired -> message = signInText(languageTag, "errors", "codeExpired")
+                EmailVerifyResult.TooManyAttempts -> message = signInText(languageTag, "errors", "tooManyTries")
+                null -> message = signInText(languageTag, "errors", "network")
+            }
+            busy = false
+        }
+    }
+
+    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(signInText(languageTag, "existingAccount", "title"), style = MaterialTheme.typography.titleMedium)
+        Text(
+            signInText(languageTag, "existingAccount", "detail")
+                .replace("{email}", collision.email)
+                .replace("{provider}", providerName),
+        )
+        if (collision.linkToken != null) {
+            OutlinedTextField(
+                value = code,
+                onValueChange = { typed ->
+                    code = typed.filter(Char::isDigit).take(6)
+                    message = null
+                },
+                label = { Text(signInText(languageTag, "email", "codeLabel")) },
+                singleLine = true,
+                enabled = !busy,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword, imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { submit() }),
+                modifier = Modifier.fillMaxWidth().semantics { contentType = ContentType.SmsOtpCode },
+            )
+            Button(onClick = ::submit, enabled = !busy && code.length == 6) {
+                Text(signInText(languageTag, "email", "signIn")) // septena-lint:allow registry-id-literal
+            }
+        } else {
+            Text(
+                signInText(languageTag, "existingAccount", "manualDetail")
+                    .replace("{email}", collision.email)
+                    .replace("{provider}", providerName),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (busy) CircularProgressIndicator()
+        message?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        TextButton(onClick = onCancel, enabled = !busy) { Text(signInText(languageTag, "manage", "cancel")) }
     }
 }
 

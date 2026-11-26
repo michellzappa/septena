@@ -32,6 +32,13 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="septask" android:host="join" />
             </intent-filter>
+            <!-- OIDC sign-in & link return (ADR 0047, #640, #643). -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="septask" android:host="auth" android:pathPrefix="/callback" />
+            </intent-filter>
             <meta-data
                 android:name="android.app.shortcuts"
                 android:resource="@xml/shortcuts" />

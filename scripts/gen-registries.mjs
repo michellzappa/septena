@@ -910,6 +910,8 @@ function validateSignIn(signIn, icons, caps, plans) {
   assert(signIn.copy.terms.includes("{terms}") && signIn.copy.terms.includes("{privacy}"), "sign-in.json: copy.terms needs {terms} and {privacy}");
   assert(signIn.email.codeSent.includes("{email}"), "sign-in.json: email.codeSent needs {email}");
   assert(signIn.existingAccount.detail.includes("{email}") && signIn.existingAccount.detail.includes("{provider}"), "sign-in.json: existingAccount.detail needs {email} and {provider}");
+  assert(signIn.existingAccount.manualDetail.includes("{email}") && signIn.existingAccount.manualDetail.includes("{provider}"), "sign-in.json: existingAccount.manualDetail needs {email} and {provider}");
+  assert(signIn.manage?.addProvider?.includes("{provider}"), "sign-in.json: manage.addProvider needs {provider}");
   assert(signIn.errors.wrongCode?.other?.includes("{count}"), "sign-in.json: errors.wrongCode must be a plural with {count}");
   assert(plans.legal?.terms && plans.legal?.privacy, "sign-in.json: the Terms and Privacy URLs come from plans.json legal");
 }
@@ -2312,7 +2314,7 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  static var termsURL: URL { RegistryPlans.termsURL }");
   lines.push("  static var privacyURL: URL { RegistryPlans.privacyURL }");
   lines.push("");
-  for (const [name, block] of [["Copy", SI.copy], ["Email", SI.email], ["Errors", SI.errors], ["ExistingAccount", SI.existingAccount]]) {
+  for (const [name, block] of [["Copy", SI.copy], ["Email", SI.email], ["Errors", SI.errors], ["ExistingAccount", SI.existingAccount], ["Manage", SI.manage]]) {
     lines.push(`  enum ${name} {`);
     swiftBlock(block);
     lines.push("  }");
@@ -2424,7 +2426,7 @@ function generateTS({ entities, rules, icons, tokens, caps, settings, dests, act
   lines.push("/** Upsell copy by moment id (registry/plans.json `upsells`). Server refusals quote it, so the words match the app. */");
   lines.push(`export const PLAN_UPSELLS = ${JSON.stringify(Object.fromEntries(plans.upsells.map((u) => [u.id, { title: u.title, detail: u.detail }])))} as const;`);
   lines.push("/** Sign-in methods, order per platform and screen copy (registry/sign-in.json, ADR 0047). Copy is English; localize with registryText(). GET /v1/auth/methods says which methods are on. */");
-  lines.push(`export const SIGN_IN = ${JSON.stringify({ platforms: bundle.signIn.platforms, methods: bundle.signIn.methods.map(({ notes, ...m }) => m), order: bundle.signIn.order, copy: bundle.signIn.copy, email: bundle.signIn.email, errors: bundle.signIn.errors, existingAccount: bundle.signIn.existingAccount, legal: plans.legal })} as const;`);
+  lines.push(`export const SIGN_IN = ${JSON.stringify({ platforms: bundle.signIn.platforms, methods: bundle.signIn.methods.map(({ notes, ...m }) => m), order: bundle.signIn.order, copy: bundle.signIn.copy, email: bundle.signIn.email, errors: bundle.signIn.errors, existingAccount: bundle.signIn.existingAccount, manage: bundle.signIn.manage, legal: plans.legal })} as const;`);
   lines.push("");
   lines.push("// Localized registry copy (ADR 0020). Keys are the English text.");
   lines.push(L10N.tsTables(BY_KEY, TRANSLATIONS));

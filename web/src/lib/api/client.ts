@@ -3,6 +3,7 @@ import {
   zAuthMethodsResponse,
   zCreatedAgentKey,
   zEmailStartResponse,
+  zLinkedIdentitiesResponse,
   zChangesResponse,
   zDeviceStartResponse,
   zIcalFeedSettings,
@@ -11,10 +12,13 @@ import {
   zSessionResponse,
   zWsTicketResponse,
   type AccessSummary,
+  type AuthMethodEntry,
   type ChangeEntry,
   type DeviceStartResponse,
   type EmailStartResponse,
   type IcalFeedSettings,
+  type LinkedIdentitiesResponse,
+  type OidcRedeemSignInResult,
   type OutboxOp,
   type PullResponse,
   type PushResponse,
@@ -179,14 +183,173 @@ export class SeptenaApiClient {
     return { status: "approved", session };
   }
 
-  /** The sign-in method ids this server has turned on. Throws on any failure: the caller fails closed. */
-  async authMethods(signal?: AbortSignal): Promise<string[]> {
+  /** The sign-in methods this server has turned on (with web/native capability flags). */
+  async authMethodEntries(signal?: AbortSignal): Promise<AuthMethodEntry[]> {
     const res = await fetch(`${this.apiBase}/v1/auth/methods`, {
       headers: { "X-Septena-Client": CLIENT_HEADER },
       signal,
     });
     if (!res.ok) throw new ApiError(res.status, "auth_methods_failed");
-    return zAuthMethodsResponse.parse(await res.json()).methods.map((m) => m.id);
+    return zAuthMethodsResponse.parse(await res.json()).methods;
+  }
+
+  /** The sign-in method ids this server has turned on. Throws on any failure: the caller fails closed. */
+  async authMethods(signal?: AbortSignal): Promise<string[]> {
+    return (await this.authMethodEntries(signal)).map((m) => m.id);
+  }
+
+  /** Top-level OIDC redirect URL for Google, Microsoft, or Web Sign in with Apple (ADR 0047). */
+  oidcStartUrl(provider: "apple" | "google" | "microsoft", returnTo: string): string {
+    const u = new URL(`${this.apiBase}/v1/auth/oidc/${provider}/start`);
+    u.searchParams.set("return_to", returnTo);
+    return u.toString();
+  }
+
+  /** Trades the one-time `oidc_code` from the callback URL for a cookie session or collision-link step. */
+  async redeemOidcSignIn(code: string, signal?: AbortSignal): Promise<OidcRedeemSignInResult> {
+    const res = await fetch(`${this.apiBase}/v1/auth/oidc/redeem`, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Septena-Client": CLIENT_HEADER,
+      },
+      body: JSON.stringify({ code, sessionMode: "cookie" }),
+      signal,
+    });
+    if (res.status === 409) {
+      const body = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        email?: string;
+        provider?: string;
+        linkToken?: string;
+        codeSent?: boolean;
+      };
+      if (body.error === "account_exists" && body.email && body.provider) {
+        return {
+          status: "account_exists",
+          email: body.email,
+          provider: body.provider,
+          linkToken: body.linkToken,
+          codeSent: body.codeSent,
+        };
+      }
+    }
+    if (!res.ok) {
+      const raw = await res.text().catch(() => "");
+      const err = parseErr(raw);
+      throw new ApiError(res.status, err.error ?? "oidc_redeem_failed", err.message, raw);
+    }
+    const session = zSessionResponse.parse(await res.json());
+    this.setSession(session);
+    return { status: "signed_in", session };
+  }
+
+  /** Finishes the no-silent-linking collision step with the emailed 6-digit code. */
+  async completeCollisionLink(linkToken: string, code: string, signal?: AbortSignal): Promise<SessionResponse> {
+    const res = await fetch(`${this.apiBase}/v1/auth/link/complete`, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Septena-Client": CLIENT_HEADER,
+      },
+      body: JSON.stringify({ linkToken, code, sessionMode: "cookie" }),
+      signal,
+    });
+    if (!res.ok) {
+      const raw = await res.text().catch(() => "");
+      const err = parseErr(raw);
+      throw new ApiError(res.status, err.error ?? "link_complete_failed", err.message, raw);
+    }
+    const session = zSessionResponse.parse(await res.json());
+    this.setSession(session);
+    return session;
+  }
+
+  /** Lists sign-in methods linked to the signed-in account (Settings ▸ Account, #643). */
+  async listIdentities(): Promise<LinkedIdentitiesResponse> {
+    const res = await this.authedFetch("/v1/auth/identities");
+    if (!res.ok) {
+      const raw = await res.text().catch(() => "");
+      const err = parseErr(raw);
+      throw new ApiError(res.status, err.error ?? "identities_failed", err.message, raw);
+    }
+    return zLinkedIdentitiesResponse.parse(await res.json());
+  }
+
+  /** Removes a linked sign-in method; backend refuses removing the last one with 409 last_method. */
+  async unlinkIdentity(id: string): Promise<LinkedIdentitiesResponse> {
+    const res = await this.authedFetch(`/v1/auth/identities/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    });
+    if (!res.ok) {
+      const raw = await res.text().catch(() => "");
+      const err = parseErr(raw);
+      throw new ApiError(res.status, err.error ?? "unlink_failed", err.message, raw);
+    }
+    return zLinkedIdentitiesResponse.parse(await res.json());
+  }
+
+  /** Sends a 6-digit verification code to add an email address to the signed-in account. */
+  async startLinkEmail(email: string): Promise<EmailStartResponse> {
+    const res = await this.authedFetch("/v1/auth/link/email/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+    if (!res.ok) {
+      const raw = await res.text().catch(() => "");
+      const err = parseErr(raw);
+      throw new ApiError(res.status, err.error ?? "link_email_start_failed", err.message, raw);
+    }
+    return zEmailStartResponse.parse(await res.json());
+  }
+
+  /** Verifies the emailed code and attaches the email to the signed-in account. */
+  async verifyLinkEmail(email: string, code: string): Promise<LinkedIdentitiesResponse> {
+    const res = await this.authedFetch("/v1/auth/link/email/verify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, code }),
+    });
+    if (!res.ok) {
+      const raw = await res.text().catch(() => "");
+      const err = parseErr(raw);
+      throw new ApiError(res.status, err.error ?? "link_email_verify_failed", err.message, raw);
+    }
+    return zLinkedIdentitiesResponse.parse(await res.json());
+  }
+
+  /** Starts an OIDC redirect flow to link Apple, Google, or Microsoft to the signed-in account. */
+  async startLinkOidc(provider: "apple" | "google" | "microsoft", returnTo: string): Promise<string> {
+    const res = await this.authedFetch("/v1/auth/link/oidc/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ provider, returnTo }),
+    });
+    if (!res.ok) {
+      const raw = await res.text().catch(() => "");
+      const err = parseErr(raw);
+      throw new ApiError(res.status, err.error ?? "link_oidc_start_failed", err.message, raw);
+    }
+    const data = (await res.json()) as { url: string };
+    return data.url;
+  }
+
+  /** Completes an OIDC link flow after redirect back with `?oidc_code=`. */
+  async redeemOidcLink(code: string): Promise<LinkedIdentitiesResponse> {
+    const res = await this.authedFetch("/v1/auth/oidc/redeem", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code }),
+    });
+    if (!res.ok) {
+      const raw = await res.text().catch(() => "");
+      const err = parseErr(raw);
+      throw new ApiError(res.status, err.error ?? "link_oidc_redeem_failed", err.message, raw);
+    }
+    return zLinkedIdentitiesResponse.parse(await res.json());
   }
 
   /** Sends a sign-in code to `email` (POST /v1/auth/email/start). */

@@ -760,6 +760,7 @@ private struct SeptaskAccountPane: View {
       }
 
       SeptaskSyncAccountSection()
+      SeptaskSignInMethodsSection()
       SeptaskSignInApprovalSection()
       SeptaskDeleteAccountSection()
     }

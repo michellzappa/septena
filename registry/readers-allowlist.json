@@ -145,10 +145,6 @@
       "reason": "Apple-only clipboard paste attribute.",
       "issue": "#180"
     },
-    "RegistrySignInMethodIds.MICROSOFT": {
-      "reason": "Microsoft sign-in provider on Android is tracked in SI4.",
-      "issue": "#640"
-    },
     "RegistryNoticeIds.SIGN_IN": {
       "reason": "Today notices on Android are not rendered yet.",
       "issue": "#682"

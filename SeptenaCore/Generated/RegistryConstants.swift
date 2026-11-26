@@ -2596,6 +2596,23 @@ enum RegistrySignIn {
     static var title: String { RegistryL10n.t("This email already has a Septena account") }
     static func detail(email: String, provider: String) -> String { RegistryL10n.format("We'll send a code to %@. Enter it to sign in, and we'll add %@ to that account.", english: "We'll send a code to %@. Enter it to sign in, and we'll add %@ to that account.", args: [email, provider]) }
     static var button: String { RegistryL10n.t("Email me a code") }
+    static func manualDetail(email: String, provider: String) -> String { RegistryL10n.format("Sign in with %@, then add %@ in Settings.", english: "Sign in with %@, then add %@ in Settings.", args: [email, provider]) }
+  }
+  enum Manage {
+    static var heading: String { RegistryL10n.t("Sign-in methods") }
+    static var footer: String { RegistryL10n.t("Add another sign-in method to open this same account on any device. You cannot remove your last method.") }
+    static var remove: String { RegistryL10n.t("Remove") }
+    static var cancel: String { RegistryL10n.t("Cancel") }
+    static func addProvider(provider: String) -> String { RegistryL10n.format("Add %@", english: "Add %@", args: [provider]) }
+    static var addEmail: String { RegistryL10n.t("Add email") }
+    static var addAppleDetail: String { RegistryL10n.t("Link your Apple ID to sign in to this same Septena account.") }
+    static var alreadyLinked: String { RegistryL10n.t("That sign-in method already belongs to another Septena account.") }
+    static var lastMethod: String { RegistryL10n.t("Add another sign-in method before removing your last one.") }
+    static var added: String { RegistryL10n.t("Sign-in method added.") }
+    static var removed: String { RegistryL10n.t("Sign-in method removed.") }
+    static var loadFailed: String { RegistryL10n.t("Could not load sign-in methods.") }
+    static var addFailed: String { RegistryL10n.t("Could not add sign-in method.") }
+    static var removeFailed: String { RegistryL10n.t("Could not remove sign-in method.") }
   }
 }
 

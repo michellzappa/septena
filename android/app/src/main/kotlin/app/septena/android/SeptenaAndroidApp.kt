@@ -124,6 +124,10 @@ class AndroidAppGraph(application: Application) {
     val appearance = AppearanceStore(deviceSettings, syncedSettings, syncedSettingsMutator, sync, clock, appScope)
     val firstRun = FirstRunState(application, taskStore, syncedSettings, syncedSettingsMutator, clock)
 
+    /** One-shot OIDC callback from `septask://auth/callback?oidc_code=...` (ADR 0047). */
+    data class OidcCallback(val code: String?, val error: String?)
+    val pendingOidcCallback = kotlinx.coroutines.flow.MutableStateFlow<OidcCallback?>(null)
+
     /** Finishes the wipe of a deleted account that failed earlier (`AccountWipe`); nothing to do otherwise. */
     suspend fun finishPendingWipe() {
         if (accountWipe.finishIfPending()) sync.noteLocalChange()

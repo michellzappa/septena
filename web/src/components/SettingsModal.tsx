@@ -67,6 +67,7 @@ import type {
   StoreSnapshot,
 } from "@/lib/types";
 import { HeaderWashPreview } from "./HeaderWash";
+import { SignInMethodsSection } from "./SignInMethodsSection";
 
 // New Agent Key copy (#86), from the registry.
 const NEW_KEY_PROMPT = SURFACES_CATALOG.prompts.text.find((p) => p.id === "newAgentKey");
@@ -617,6 +618,8 @@ export function SettingsModal({
                     </p>
                   </section>
                 )}
+
+                <SignInMethodsSection api={api} language={lang} />
 
                 <section className="rounded-xl border border-[var(--border-subtle)] p-4">
                   <h3 className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold tracking-wide text-[var(--text-muted)] uppercase">

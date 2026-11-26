@@ -1613,6 +1613,16 @@ final class TaskSyncEngine {
     try await signIn { try await $0.verifyEmailSignIn(email: email, code: code) }
   }
 
+  /// The same, with a one-time OIDC callback code (`POST /v1/auth/oidc/redeem`).
+  func signIn(oidcCode: String) async throws {
+    try await signIn { try await $0.redeemOidcSignIn(code: oidcCode) }
+  }
+
+  /// The same, finishing a no-silent-linking email collision step (`POST /v1/auth/link/complete`).
+  func signIn(linkToken: String, code: String) async throws {
+    try await signIn { try await $0.completeCollisionLink(linkToken: linkToken, code: code) }
+  }
+
   private func signIn(_ authenticate: (TaskBackendClient) async throws -> String) async throws {
     let wasRunning = await pauseSync()
     defer { if wasRunning { start() } }

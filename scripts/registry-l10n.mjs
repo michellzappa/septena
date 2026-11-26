@@ -38,7 +38,9 @@ const FIELDS = {
   signIn: new Set([
     "title", "heading", "subheading", "terms", "termsLabel", "privacyLabel", "emailLabel", "emailPlaceholder", "sendCode",
     "codeSent", "codeLabel", "signIn", "resend", "differentEmail", "invalidEmail", "wrongCode", "tooManyTries",
-    "codeExpired", "rateLimited", "network", "detail", "button",
+    "codeExpired", "rateLimited", "network", "detail", "button", "manualDetail",
+    "footer", "remove", "cancel", "addProvider", "addEmail", "addAppleDetail", "alreadyLinked",
+    "lastMethod", "added", "removed", "loadFailed", "addFailed", "removeFailed",
   ]),
   tokens: new Set(["name", "tag", "label"]),
   plans: new Set([

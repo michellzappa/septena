@@ -37,32 +37,115 @@ enum SeptaskSignIn {
     return nonce.raw
   }
 
-  /// Hands Apple's result to the backend. Returns an error line, or nil when
-  /// it worked or the user cancelled.
-  static func finish(_ result: Result<ASAuthorization, Error>, rawNonce: String?) async -> String? {
+  /// Outcome of finishing a Sign in with Apple or OIDC sign-in attempt.
+  enum FinishOutcome {
+    case done
+    case error(String)
+    case collision(BackendAccountExistsError)
+  }
+
+  /// Hands Apple's result to the backend.
+  static func finishOutcome(_ result: Result<ASAuthorization, Error>, rawNonce: String?) async -> FinishOutcome {
     switch result {
     case .failure(let error):
-      if (error as? ASAuthorizationError)?.code == .canceled { return nil }
-      return error.localizedDescription
+      if (error as? ASAuthorizationError)?.code == .canceled { return .done }
+      return .error(error.localizedDescription)
     case .success(let auth):
       guard let credential = auth.credential as? ASAuthorizationAppleIDCredential,
             let data = credential.identityToken,
             let token = String(data: data, encoding: .utf8),
             let rawNonce else {
-        return String(localized: "Apple sign-in couldn’t be completed.",
-                      comment: "Septask sign-in: Apple returned no identity token")
+        return .error(String(localized: "Apple sign-in couldn’t be completed.",
+                             comment: "Septask sign-in: Apple returned no identity token"))
       }
       do {
         try await TaskSyncEngine.shared.signIn(identityToken: token, rawNonce: rawNonce)
         TaskNotices.clearSignInDismissal()
-        return nil
+        return .done
+      } catch let collision as BackendAccountExistsError {
+        return .collision(collision)
       } catch is TaskSyncEngine.AccountSwitchDeclined {
-        // The user kept this device's tasks; nothing went wrong.
-        return nil
+        return .done
       } catch {
-        return (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+        return .error((error as? LocalizedError)?.errorDescription ?? error.localizedDescription)
       }
     }
+  }
+
+  /// Backwards-compatible wrapper returning an optional error line.
+  static func finish(_ result: Result<ASAuthorization, Error>, rawNonce: String?) async -> String? {
+    switch await finishOutcome(result, rawNonce: rawNonce) {
+    case .done: return nil
+    case .error(let msg): return msg
+    case .collision(let c):
+      return RegistrySignIn.ExistingAccount.detail(email: c.email, provider: c.provider.capitalized)
+    }
+  }
+}
+
+// MARK: - Web OIDC via ASWebAuthenticationSession (ADR 0047, #639)
+
+/// Runs a system browser authentication sheet (`ASWebAuthenticationSession`)
+/// returning the `oidc_code` from `septask://auth/callback?oidc_code=...`.
+@MainActor
+final class SeptaskOidcBrowser: NSObject, ASWebAuthenticationPresentationContextProviding {
+  static let callbackScheme = "septask"
+  static let callbackURL = "septask://auth/callback"
+
+  private var session: ASWebAuthenticationSession?
+
+  static func run(url: URL) async -> Result<String?, Error> {
+    let runner = SeptaskOidcBrowser()
+    return await runner.start(url: url)
+  }
+
+  private func start(url: URL) async -> Result<String?, Error> {
+    await withCheckedContinuation { continuation in
+      let authSession = ASWebAuthenticationSession(url: url, callbackURLScheme: Self.callbackScheme) { [weak self] callbackURL, error in
+        self?.session = nil
+        if let error {
+          if (error as? ASWebAuthenticationSessionError)?.code == .canceledLogin {
+            continuation.resume(returning: .success(nil))
+          } else {
+            continuation.resume(returning: .failure(error))
+          }
+          return
+        }
+        guard let callbackURL,
+              let comps = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false) else {
+          continuation.resume(returning: .failure(TaskBackendError.badResponse("callback")))
+          return
+        }
+        if let err = comps.queryItems?.first(where: { $0.name == "oidc_error" })?.value {
+          if err == "cancelled" || err == "access_denied" {
+            continuation.resume(returning: .success(nil))
+          } else {
+            continuation.resume(returning: .failure(TaskBackendError.http(status: 400, code: err)))
+          }
+          return
+        }
+        let code = comps.queryItems?.first(where: { $0.name == "oidc_code" })?.value
+        continuation.resume(returning: .success(code))
+      }
+      authSession.presentationContextProvider = self
+      authSession.prefersEphemeralWebBrowserSession = false
+      self.session = authSession
+      if !authSession.start() {
+        self.session = nil
+        continuation.resume(returning: .failure(TaskBackendError.network("Could not open browser sign-in.")))
+      }
+    }
+  }
+
+  func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+    #if os(macOS)
+    return NSApp.keyWindow ?? NSApp.mainWindow ?? NSApp.windows.first ?? NSWindow()
+    #else
+    let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+    return scenes.flatMap(\.windows).first(where: \.isKeyWindow)
+      ?? scenes.first?.windows.first
+      ?? ASPresentationAnchor()
+    #endif
   }
 }
 
@@ -79,25 +162,41 @@ final class SeptaskSignInMethods {
   static let shared = SeptaskSignInMethods()
 
   /// The server's list, or nil before the first answer.
-  private var serverMethods: Set<String>?
+  private var serverEntries: [BackendAuthMethods.Method]?
   private var lastFetch: Date?
   private var fetching = false
 
+  func serverEntry(for id: RegistrySignInMethodId) -> BackendAuthMethods.Method? {
+    serverEntries?.first(where: { $0.id == id.rawValue })
+  }
+
   var methods: [RegistrySignInMethod] {
     let platform = RegistryPlatform.current
-    let on = serverMethods ?? [RegistrySignInMethodId.apple.rawValue, RegistrySignInMethodId.device.rawValue]
+    let entries = serverEntries ?? [
+      BackendAuthMethods.Method(id: RegistrySignInMethodId.apple.rawValue, web: nil, native: nil),
+      BackendAuthMethods.Method(id: RegistrySignInMethodId.device.rawValue, web: nil, native: nil),
+    ]
+    let byId = Dictionary(uniqueKeysWithValues: entries.map { ($0.id, $0) })
     return RegistrySignIn.methods(on: platform).filter { method in
       guard let flow = method.flows[platform], flow != .unavailable else { return false }
-      return on.contains(method.id.rawValue) && Self.implements(method.id)
+      guard let entry = byId[method.id.rawValue] else { return false }
+      return Self.isUsable(method.id, entry: entry)
     }
   }
 
-  private static func implements(_ id: RegistrySignInMethodId) -> Bool {
+  func usesWebOidc(for id: RegistrySignInMethodId) -> Bool {
     switch id {
-    // Web Apple, Google and Microsoft come with the OIDC routes (#639).
-    case .apple: return SeptaskSignIn.appleAvailable
+    case .apple: return !SeptaskSignIn.appleAvailable && serverEntry(for: .apple)?.web == true
+    case .google, .microsoft: return serverEntry(for: id)?.web == true
+    case .email, .device: return false
+    }
+  }
+
+  private static func isUsable(_ id: RegistrySignInMethodId, entry: BackendAuthMethods.Method) -> Bool {
+    switch id {
+    case .apple: return SeptaskSignIn.appleAvailable || entry.web == true
+    case .google, .microsoft: return entry.web == true
     case .email, .device: return true
-    case .google, .microsoft: return false
     }
   }
 
@@ -108,8 +207,8 @@ final class SeptaskSignInMethods {
     if let lastFetch, Date().timeIntervalSince(lastFetch) < 60 { return }
     fetching = true
     defer { fetching = false }
-    guard let ids = try? await TaskBackendClient.shared.signInMethods() else { return }
-    serverMethods = Set(ids)
+    guard let entries = try? await TaskBackendClient.shared.signInMethodEntries() else { return }
+    serverEntries = entries
     lastFetch = Date()
   }
 }
@@ -135,6 +234,7 @@ struct SeptaskSignInMethodList: View {
   @State private var rawNonce: String?
   @State private var working = false
   @State private var error: String?
+  @State private var collision: BackendAccountExistsError?
   private var available: SeptaskSignInMethods { .shared }
 
   var body: some View {
@@ -142,13 +242,19 @@ struct SeptaskSignInMethodList: View {
       ForEach(available.methods) { method in
         switch method.id {
         case .apple:
-          appleButton
+          if SeptaskSignIn.appleAvailable {
+            appleButton
+          } else {
+            methodButton(method) { startOidc(provider: "apple") }
+          }
+        case .google:
+          methodButton(method) { startOidc(provider: "google") }
+        case .microsoft:
+          methodButton(method) { startOidc(provider: "microsoft") }
         case .email:
           methodButton(method) { onChoose(.email) }
         case .device:
           methodButton(method) { onChoose(.device) }
-        default:
-          EmptyView()
         }
       }
       if let error {
@@ -157,6 +263,35 @@ struct SeptaskSignInMethodList: View {
       SeptaskSignInTermsLine()
     }
     .task { await available.refresh() }
+    .sheet(item: $collision) { item in
+      SeptaskCollisionLinkSheet(collision: item) { collision = nil }
+    }
+  }
+
+  private func startOidc(provider: String) {
+    guard !working, let url = TaskBackendClient.oidcStartURL(provider: provider, returnTo: SeptaskOidcBrowser.callbackURL) else { return }
+    working = true
+    error = nil
+    Task { @MainActor in
+      defer { working = false }
+      switch await SeptaskOidcBrowser.run(url: url) {
+      case .failure(let err):
+        error = (err as? LocalizedError)?.errorDescription ?? err.localizedDescription
+      case .success(nil):
+        return
+      case .success(let code?):
+        do {
+          try await TaskSyncEngine.shared.signIn(oidcCode: code)
+          TaskNotices.clearSignInDismissal()
+        } catch let exists as BackendAccountExistsError {
+          collision = exists
+        } catch is TaskSyncEngine.AccountSwitchDeclined {
+          return
+        } catch {
+          self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+        }
+      }
+    }
   }
 
   @ViewBuilder
@@ -169,7 +304,11 @@ struct SeptaskSignInMethodList: View {
       } onCompletion: { result in
         working = true
         Task { @MainActor in
-          error = await SeptaskSignIn.finish(result, rawNonce: rawNonce)
+          switch await SeptaskSignIn.finishOutcome(result, rawNonce: rawNonce) {
+          case .done: error = nil
+          case .error(let msg): error = msg
+          case .collision(let exists): collision = exists
+          }
           rawNonce = nil
           working = false
         }
@@ -188,6 +327,100 @@ struct SeptaskSignInMethodList: View {
     }
     .buttonStyle(.bordered)
     .controlSize(compact ? .regular : .large)
+    .disabled(working)
+  }
+}
+
+// MARK: - Collision link sheet (ADR 0047 decision 5)
+
+struct SeptaskCollisionLinkSheet: View {
+  let collision: BackendAccountExistsError
+  let onClose: () -> Void
+
+  @State private var code = ""
+  @State private var working = false
+  @State private var error: String?
+
+  private var providerName: String {
+    RegistrySignInMethodId(rawValue: collision.provider).flatMap { RegistrySignIn.method($0)?.name }
+      ?? collision.provider.capitalized
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 14) {
+      Text(RegistrySignIn.ExistingAccount.title)
+        .font(.title2.weight(.semibold))
+      Text(RegistrySignIn.ExistingAccount.detail(email: collision.email, provider: providerName))
+        .fixedSize(horizontal: false, vertical: true)
+      if let linkToken = collision.linkToken {
+        TextField(RegistrySignIn.Email.codeLabel, text: $code)
+          .textContentType(.oneTimeCode)
+          #if os(iOS)
+          .keyboardType(.numberPad)
+          #endif
+          .autocorrectionDisabled()
+          .textFieldStyle(.roundedBorder)
+          .onChange(of: code) { _, value in
+            let digits = String(value.filter { ("0"..."9").contains($0) }.prefix(6))
+            if digits != value { code = digits }
+          }
+          .disabled(working)
+        Button {
+          submit(linkToken: linkToken)
+        } label: {
+          Text(RegistrySignIn.Email.signIn).frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.borderedProminent)
+        .controlSize(.large)
+        .keyboardShortcut(.defaultAction)
+        .disabled(working || code.count != 6)
+      } else {
+        Text(RegistrySignIn.ExistingAccount.manualDetail(email: collision.email, provider: providerName))
+          .foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
+      }
+      if working { ProgressView().controlSize(.small) }
+      if let error {
+        Text(error).font(.callout).foregroundStyle(.red)
+          .fixedSize(horizontal: false, vertical: true)
+      }
+      HStack {
+        Spacer()
+        Button(RegistrySignIn.Manage.cancel, role: .cancel, action: onClose)
+          .keyboardShortcut(.cancelAction)
+      }
+    }
+    .padding(24)
+    #if os(macOS)
+    .frame(width: 420)
+    #else
+    .presentationDetents([.medium])
+    #endif
+  }
+
+  private func submit(linkToken: String) {
+    guard code.count == 6, !working else { return }
+    working = true
+    error = nil
+    Task { @MainActor in
+      defer { working = false }
+      do {
+        try await TaskSyncEngine.shared.signIn(linkToken: linkToken, code: code)
+        TaskNotices.clearSignInDismissal()
+        onClose()
+      } catch is TaskSyncEngine.AccountSwitchDeclined {
+        onClose()
+      } catch BackendEmailSignInError.wrongCode(let left) where left > 0 {
+        code = ""
+        error = RegistrySignIn.Errors.wrongCode(count: left)
+      } catch BackendEmailSignInError.wrongCode, BackendEmailSignInError.tooManyAttempts {
+        error = RegistrySignIn.Errors.tooManyTries
+      } catch BackendEmailSignInError.expired {
+        error = RegistrySignIn.Errors.codeExpired
+      } catch {
+        self.error = RegistrySignIn.Errors.network
+      }
+    }
   }
 }
 
@@ -569,6 +802,366 @@ struct SeptaskSyncAccountSection: View {
       parts.append("updated \(last.formatted(.relative(presentation: .named)))")
     }
     return parts.joined(separator: ", ")
+  }
+}
+
+// MARK: - Settings ▸ Account ▸ Sign-in methods (ADR 0047 decision 6, #171, #643)
+
+struct SeptaskSignInMethodsSection: View {
+  private var sync: TaskSyncEngine { .shared }
+  private var available: SeptaskSignInMethods { .shared }
+
+  @State private var linked: BackendLinkedIdentities?
+  @State private var loading = false
+  @State private var busy = false
+  @State private var error: String?
+  @State private var status: String?
+  @State private var showingAddEmail = false
+  @State private var showingAddApple = false
+
+  var body: some View {
+    if sync.signedIn {
+      Section {
+        if loading && linked == nil {
+          ProgressView().controlSize(.small)
+        }
+        if let linked {
+          ForEach(linked.identities) { item in
+            HStack {
+              let iconKey = RegistrySignInMethodId(rawValue: item.provider).flatMap { RegistrySignIn.method($0)?.icon }
+              Label(item.label, systemImage: iconKey.flatMap { RegistryIcons.sfSymbols[$0] } ?? "person.crop.circle")
+              Spacer()
+              if linked.canRemove {
+                Button(RegistrySignIn.Manage.remove, role: .destructive) {
+                  remove(id: item.id)
+                }
+                .buttonStyle(.borderless)
+                .disabled(busy)
+              }
+            }
+          }
+          if canAddApple {
+            Button {
+              if SeptaskSignIn.appleAvailable {
+                showingAddApple = true
+              } else {
+                addOidc(provider: "apple")
+              }
+            } label: {
+              let name = RegistrySignIn.method(.apple)?.name ?? "Apple"
+              Label(RegistrySignIn.Manage.addProvider(provider: name), systemImage: RegistryIcons.sfSymbols["auth.apple"] ?? "apple.logo")
+            }
+            .disabled(busy)
+          }
+          if canAddOidc(.google) {
+            Button { addOidc(provider: "google") } label: {
+              let name = RegistrySignIn.method(.google)?.name ?? "Google"
+              Label(RegistrySignIn.Manage.addProvider(provider: name), systemImage: RegistryIcons.sfSymbols["auth.google"] ?? "g.circle")
+            }
+            .disabled(busy)
+          }
+          if canAddOidc(.microsoft) {
+            Button { addOidc(provider: "microsoft") } label: {
+              let name = RegistrySignIn.method(.microsoft)?.name ?? "Microsoft"
+              Label(RegistrySignIn.Manage.addProvider(provider: name), systemImage: RegistryIcons.sfSymbols["auth.microsoft"] ?? "square.grid.2x2")
+            }
+            .disabled(busy)
+          }
+          if available.serverEntry(for: .email) != nil {
+            Button { showingAddEmail = true } label: {
+              Label(RegistrySignIn.Manage.addEmail, systemImage: RegistryIcons.sfSymbols["auth.email"] ?? "envelope")
+            }
+            .disabled(busy)
+          }
+        }
+        if let error {
+          Text(error).font(.caption).foregroundStyle(.red)
+        }
+        if let status {
+          Text(status).font(.caption).foregroundStyle(.secondary)
+        }
+      } header: {
+        Text(RegistrySignIn.Manage.heading)
+      } footer: {
+        Text(RegistrySignIn.Manage.footer)
+      }
+      .task(id: sync.signedIn) {
+        await available.refresh()
+        await reload()
+      }
+      .sheet(isPresented: $showingAddEmail) {
+        SeptaskLinkEmailSheet { updated in
+          linked = updated
+          status = RegistrySignIn.Manage.added
+          showingAddEmail = false
+        } onCancel: {
+          showingAddEmail = false
+        }
+      }
+      .sheet(isPresented: $showingAddApple) {
+        SeptaskLinkAppleSheet { updated in
+          linked = updated
+          status = RegistrySignIn.Manage.added
+          showingAddApple = false
+        } onCancel: {
+          showingAddApple = false
+        }
+      }
+    }
+  }
+
+  private var linkedProviders: Set<String> {
+    Set((linked?.identities ?? []).map(\.provider))
+  }
+
+  private var canAddApple: Bool {
+    !linkedProviders.contains("apple") && (SeptaskSignIn.appleAvailable || available.serverEntry(for: .apple)?.web == true)
+  }
+
+  private func canAddOidc(_ id: RegistrySignInMethodId) -> Bool {
+    !linkedProviders.contains(id.rawValue) && available.serverEntry(for: id)?.web == true
+  }
+
+  private func reload() async {
+    loading = true
+    error = nil
+    defer { loading = false }
+    do {
+      linked = try await TaskBackendClient.shared.listIdentities()
+    } catch {
+      self.error = RegistrySignIn.Manage.loadFailed
+    }
+  }
+
+  private func remove(id: String) {
+    guard !busy else { return }
+    busy = true
+    error = nil
+    status = nil
+    Task { @MainActor in
+      defer { busy = false }
+      do {
+        linked = try await TaskBackendClient.shared.unlinkIdentity(id: id)
+        status = RegistrySignIn.Manage.removed
+      } catch BackendAuthLinkError.lastMethod {
+        error = RegistrySignIn.Manage.lastMethod
+      } catch {
+        self.error = RegistrySignIn.Manage.removeFailed
+      }
+    }
+  }
+
+  private func addOidc(provider: String) {
+    guard !busy else { return }
+    busy = true
+    error = nil
+    status = nil
+    Task { @MainActor in
+      defer { busy = false }
+      do {
+        let startURL = try await TaskBackendClient.shared.startLinkOidc(provider: provider, returnTo: SeptaskOidcBrowser.callbackURL)
+        switch await SeptaskOidcBrowser.run(url: startURL) {
+        case .failure:
+          error = RegistrySignIn.Manage.addFailed
+        case .success(nil):
+          return
+        case .success(let code?):
+          linked = try await TaskBackendClient.shared.redeemOidcLink(code: code)
+          status = RegistrySignIn.Manage.added
+        }
+      } catch BackendAuthLinkError.alreadyLinked {
+        error = RegistrySignIn.Manage.alreadyLinked
+      } catch {
+        self.error = RegistrySignIn.Manage.addFailed
+      }
+    }
+  }
+}
+
+private struct SeptaskLinkAppleSheet: View {
+  let onLinked: (BackendLinkedIdentities) -> Void
+  let onCancel: () -> Void
+  @Environment(\.colorScheme) private var colorScheme
+  @State private var rawNonce: String?
+  @State private var working = false
+  @State private var error: String?
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 14) {
+      let appleName = RegistrySignIn.method(.apple)?.name ?? "Apple"
+      Text(RegistrySignIn.Manage.addProvider(provider: appleName)).font(.title2.weight(.semibold))
+      Text(RegistrySignIn.Manage.addAppleDetail)
+        .foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+      if working {
+        ProgressView().controlSize(.small)
+      } else {
+        SignInWithAppleButton(.continue) { request in
+          rawNonce = SeptaskSignIn.prepare(request)
+        } onCompletion: { result in
+          handleApple(result)
+        }
+        .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
+        .frame(height: 36)
+      }
+      if let error {
+        Text(error).font(.callout).foregroundStyle(.red)
+      }
+      HStack {
+        Spacer()
+        Button(RegistrySignIn.Manage.cancel, role: .cancel, action: onCancel).keyboardShortcut(.cancelAction)
+      }
+    }
+    .padding(24)
+    #if os(macOS)
+    .frame(width: 380)
+    #else
+    .presentationDetents([.height(260)])
+    #endif
+  }
+
+  private func handleApple(_ result: Result<ASAuthorization, Error>) {
+    switch result {
+    case .failure(let err):
+      if (err as? ASAuthorizationError)?.code == .canceled { return }
+      error = err.localizedDescription
+    case .success(let auth):
+      guard let credential = auth.credential as? ASAuthorizationAppleIDCredential,
+            let data = credential.identityToken,
+            let token = String(data: data, encoding: .utf8),
+            let rawNonce else {
+        error = RegistrySignIn.Manage.addFailed
+        return
+      }
+      working = true
+      error = nil
+      Task { @MainActor in
+        defer { working = false; self.rawNonce = nil }
+        do {
+          let updated = try await TaskBackendClient.shared.linkApple(identityToken: token, rawNonce: rawNonce)
+          onLinked(updated)
+        } catch BackendAuthLinkError.alreadyLinked {
+          error = RegistrySignIn.Manage.alreadyLinked
+        } catch {
+          self.error = RegistrySignIn.Manage.addFailed
+        }
+      }
+    }
+  }
+}
+
+private struct SeptaskLinkEmailSheet: View {
+  let onLinked: (BackendLinkedIdentities) -> Void
+  let onCancel: () -> Void
+  @State private var email = ""
+  @State private var sentTo: String?
+  @State private var code = ""
+  @State private var working = false
+  @State private var error: String?
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 14) {
+      Text(RegistrySignIn.Manage.addEmail).font(.title2.weight(.semibold))
+      if let sentTo {
+        Text(RegistrySignIn.Email.codeSent(email: sentTo))
+          .fixedSize(horizontal: false, vertical: true)
+        TextField(RegistrySignIn.Email.codeLabel, text: $code)
+          .textContentType(.oneTimeCode)
+          #if os(iOS)
+          .keyboardType(.numberPad)
+          #endif
+          .autocorrectionDisabled()
+          .textFieldStyle(.roundedBorder)
+          .onChange(of: code) { _, value in
+            let digits = String(value.filter { ("0"..."9").contains($0) }.prefix(6))
+            if digits != value { code = digits }
+          }
+          .disabled(working)
+        Button { verify(sentTo) } label: {
+          Text(RegistrySignIn.Manage.addEmail).frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.borderedProminent)
+        .controlSize(.large)
+        .disabled(working || code.count != 6)
+      } else {
+        TextField(RegistrySignIn.Email.emailLabel, text: $email,
+                  prompt: Text(RegistrySignIn.Email.emailPlaceholder))
+          .textContentType(.emailAddress)
+          #if os(iOS)
+          .keyboardType(.emailAddress)
+          .textInputAutocapitalization(.never)
+          #endif
+          .autocorrectionDisabled()
+          .textFieldStyle(.roundedBorder)
+          .disabled(working)
+        Button { send() } label: {
+          Text(RegistrySignIn.Email.sendCode).frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.borderedProminent)
+        .controlSize(.large)
+        .disabled(working || email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+      }
+      if working { ProgressView().controlSize(.small) }
+      if let error {
+        Text(error).font(.callout).foregroundStyle(.red)
+      }
+      HStack {
+        Spacer()
+        Button(RegistrySignIn.Manage.cancel, role: .cancel, action: onCancel).keyboardShortcut(.cancelAction)
+      }
+    }
+    .padding(24)
+    #if os(macOS)
+    .frame(width: 400)
+    #else
+    .presentationDetents([.medium])
+    #endif
+  }
+
+  private func send() {
+    let address = email.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard SeptaskEmailSignInForm.isPlausibleEmail(address) else {
+      error = RegistrySignIn.Errors.invalidEmail
+      return
+    }
+    working = true
+    error = nil
+    Task { @MainActor in
+      defer { working = false }
+      do {
+        _ = try await TaskBackendClient.shared.startLinkEmail(email: address)
+        sentTo = address
+        code = ""
+      } catch BackendEmailSignInError.rateLimited {
+        error = RegistrySignIn.Errors.rateLimited
+      } catch {
+        self.error = RegistrySignIn.Errors.network
+      }
+    }
+  }
+
+  private func verify(_ address: String) {
+    guard code.count == 6, !working else { return }
+    working = true
+    error = nil
+    Task { @MainActor in
+      defer { working = false }
+      do {
+        let updated = try await TaskBackendClient.shared.verifyLinkEmail(email: address, code: code)
+        onLinked(updated)
+      } catch BackendAuthLinkError.alreadyLinked {
+        error = RegistrySignIn.Manage.alreadyLinked
+      } catch BackendEmailSignInError.wrongCode(let left) where left > 0 {
+        code = ""
+        error = RegistrySignIn.Errors.wrongCode(count: left)
+      } catch BackendEmailSignInError.wrongCode, BackendEmailSignInError.tooManyAttempts {
+        error = RegistrySignIn.Errors.tooManyTries
+      } catch BackendEmailSignInError.expired {
+        error = RegistrySignIn.Errors.codeExpired
+      } catch {
+        self.error = RegistrySignIn.Errors.network
+      }
+    }
   }
 }
 
