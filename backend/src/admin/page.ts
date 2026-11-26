@@ -234,7 +234,7 @@ function websiteSection(t: TrafficResult, signupsByDay: Map<string, number>): st
   </div>
   <h3>Calls to action, 30 days</h3>
   ${table(["Goal", "Visitors", "Events", "Conversion"], goalRows, "No goals counted.")}
-  ${v.missingGoals.length ? `<p class="warn">Plausible has no goal for: ${esc(v.missingGoals.join(", "))}. Add each as a custom-event goal in the site settings, or it is not counted.</p>` : ""}
+  ${v.missingGoals.length ? `<p class="dim">No events in 30 days: ${esc(v.missingGoals.join(", "))}. Plausible leaves a goal out when it has no events, so a goal that stays here may also be missing in Plausible ▸ Goals.</p>` : ""}
   <div class="box cols">${tallyList("Sources", v.sources)}${tallyList("Pages", v.pages)}${tallyList("Countries", v.countries)}${tallyList("Download clicks by platform", v.downloads)}${tallyList("List-keeper CTA by placement", v.ctaPlacements)}</div>
   <p class="dim">From Plausible, ${esc(v.site)}, ${esc(when(v.fetchedAt, Date.now()))}; cached for 10 minutes. <a href="https://plausible.io/${esc(v.site)}">Open Plausible</a></p>`;
 }
