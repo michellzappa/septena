@@ -69,6 +69,7 @@ import {
 } from "@/lib/generated/registries";
 import { hexWithAlpha, type HeaderTextureStyle } from "@/lib/headerWash";
 import { loadWebPrefs, saveWebPref, type WebDisplayPrefs } from "@/lib/prefs";
+import { AccountSwitchRequiredError, type AccountSwitchSummary } from "@/lib/sync/accountSwitch";
 import { WebSyncEngine, type CompletionReceipt, type SyncState } from "@/lib/sync/engine";
 import { UndoStack, type UndoSnapshot } from "@/lib/sync/undo";
 import type {
@@ -80,6 +81,7 @@ import type {
   TaskRow,
 } from "@/lib/types";
 import { nextIsoDay } from "@/lib/upcomingGroups";
+import { AccountSwitchDialog, type AccountSwitchChoice } from "./AccountSwitchDialog";
 import { ContextMenu, type ContextMenuState } from "./ContextMenu";
 import { DateBoardPopover, anchorOf, type DateBoardAnchor } from "./DateBoard";
 import { FadeSweepModal } from "./FadeSweepModal";
@@ -89,7 +91,7 @@ import { KeyboardShortcutsModal } from "./KeyboardShortcutsModal";
 import { QuickAddModal, type QuickAddInitial } from "./QuickAddModal";
 import { QuickFindModal } from "./QuickFindModal";
 import { RegistryIcon } from "./RegistryIcon";
-import { SettingsModal } from "./SettingsModal";
+import { SettingsModal, type SettingsTab } from "./SettingsModal";
 import { SignInScreen } from "./SignInScreen";
 import { TaskPageDrawer } from "./TaskPageDrawer";
 import {
@@ -212,6 +214,11 @@ export function SeptenaApp() {
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [quickAddInitial, setQuickAddInitial] = useState<QuickAddInitial | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsInitialTab, setSettingsInitialTab] = useState<SettingsTab | undefined>(undefined);
+  /** A new session for another account, waiting for the user's answer (#575). Null: no question. */
+  const [accountSwitch, setAccountSwitch] = useState<
+    { userId: string; summary: AccountSwitchSummary } | null
+  >(null);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   /** The tasks of the open keep-or-let-go sheet, fixed when it opens. Null: closed. */
   const [sweepTasks, setSweepTasks] = useState<TaskRow[] | null>(null);
@@ -315,6 +322,31 @@ export function SeptenaApp() {
   useEffect(() => engine.subscribe(setSyncState), [engine]);
   useEffect(() => undoStack.subscribe(setUndoSnap), [undoStack]);
 
+  // Starts sync for a session. When the session is for another account and
+  // this device holds that account's data, it asks first instead (#575):
+  // `accountSwitch` shows the question and the boot phase does not change.
+  const beginSession = useCallback(
+    async (userId: string, replaceOtherAccount = false): Promise<void> => {
+      if (!replaceOtherAccount) {
+        const summary = await engine.accountSwitchSummary(userId);
+        if (summary) {
+          setAccountSwitch({ userId, summary });
+          return;
+        }
+      }
+      setBootPhase("signed_in");
+      try {
+        await engine.start(userId, { replaceOtherAccount });
+      } catch (err) {
+        if (!(err instanceof AccountSwitchRequiredError)) throw err;
+        // Another tab wrote between the check and the start: ask now.
+        engine.stop();
+        setAccountSwitch({ userId, summary: err.summary });
+      }
+    },
+    [engine],
+  );
+
   // Boot: load WASM core, restore cookie session (or offline cached account).
   useEffect(() => {
     let cancelled = false;
@@ -328,8 +360,7 @@ export function SeptenaApp() {
         const session = await api.restoreSession();
         if (cancelled) return;
         if (session) {
-          setBootPhase("signed_in");
-          await engine.start(session.userId);
+          await beginSession(session.userId);
           return;
         }
       } catch {
@@ -354,7 +385,7 @@ export function SeptenaApp() {
       cancelled = true;
       engine.stop();
     };
-  }, [api, engine]);
+  }, [api, beginSession, engine]);
 
   const isDark =
     prefs.appearanceMode === "dark" || (prefs.appearanceMode === "system" && systemDark);
@@ -400,10 +431,45 @@ export function SeptenaApp() {
 
   const handleSignedIn = useCallback(
     async (session: SessionResponse) => {
-      setBootPhase("signed_in");
-      await engine.start(session.userId);
+      await beginSession(session.userId);
     },
-    [engine],
+    [beginSession],
+  );
+
+  // The answer to the account-switch question. Every path ends in a phase:
+  // Replace starts the new account; Cancel and Export sign the new session out
+  // and keep this device's tasks (never `signOutAndWipe`).
+  const handleAccountSwitchChoice = useCallback(
+    async (choice: AccountSwitchChoice) => {
+      const pending = accountSwitch;
+      if (!pending) return;
+      setAccountSwitch(null);
+      if (choice === "replace") {
+        undoStack.clear();
+        setExpandedTaskId(null);
+        setTaskPageId(null);
+        setSelectedTaskId(null);
+        setSelectedIds(new Set());
+        try {
+          await beginSession(pending.userId, true);
+          return;
+        } catch {
+          // The replace did not start: fall through and sign out, keeping
+          // whatever is still on this device, so the app never stays on Loading.
+        }
+      }
+      try {
+        await api.signOut();
+      } catch {
+        // The session is dropped locally either way (`signOut` clears it in `finally`).
+      }
+      setBootPhase("signed_out");
+      if (choice === "exportFirst") {
+        setSettingsInitialTab("privacy");
+        setSettingsOpen(true);
+      }
+    },
+    [accountSwitch, api, beginSession, undoStack],
   );
 
   const handleSignOut = useCallback(async () => {
@@ -2117,6 +2183,44 @@ export function SeptenaApp() {
     return evaluatedTasks.find((e) => e.task.id === taskPageId) ?? null;
   }, [evaluatedTasks, taskPageId]);
 
+  const settingsModal = (
+    <SettingsModal
+      open={settingsOpen}
+      initialTab={settingsInitialTab}
+      onClose={() => {
+        setSettingsOpen(false);
+        setSettingsInitialTab(undefined);
+      }}
+      api={api}
+      engine={engine}
+      snapshot={syncState.snapshot}
+      notSynced={syncState.notSynced}
+      onClearNotSynced={() => engine.clearNotSynced()}
+      coreVersion={coreVersion}
+      dayISO={todayYMD}
+      isDark={isDark}
+      accentHex={accentHex}
+      prefs={prefs}
+      onChangePref={handleChangePref}
+      onSignOut={() => void handleSignOut()}
+      onDeleteAccount={handleDeleteAccount}
+      onShowWelcomeAgain={() => setFirstRunOpen(true)}
+      onOpenShortcuts={() => setShortcutsOpen(true)}
+    />
+  );
+
+  if (accountSwitch) {
+    return (
+      <main className="min-h-screen bg-[var(--bg-canvas)]">
+        <AccountSwitchDialog
+          summary={accountSwitch.summary}
+          language={prefs.language}
+          onChoose={handleAccountSwitchChoice}
+        />
+      </main>
+    );
+  }
+
   if (bootPhase === "loading") {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[var(--bg-canvas)] text-sm text-[var(--text-muted)]">
@@ -2126,7 +2230,14 @@ export function SeptenaApp() {
   }
 
   if (bootPhase === "signed_out") {
-    return <SignInScreen api={api} onSignedIn={(s) => void handleSignedIn(s)} />;
+    // Settings can open here after "Export a Backup First" (#575): the other
+    // account's tasks are still on this device, ready to export.
+    return (
+      <>
+        <SignInScreen api={api} language={prefs.language} onSignedIn={(s) => void handleSignedIn(s)} />
+        {settingsModal}
+      </>
+    );
   }
 
   const outboxCount = syncState.snapshot.outbox.length;
@@ -3448,25 +3559,7 @@ export function SeptenaApp() {
         onClose={() => setFirstRunOpen(false)}
       />
 
-      <SettingsModal
-        open={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-        api={api}
-        engine={engine}
-        snapshot={syncState.snapshot}
-        notSynced={syncState.notSynced}
-        onClearNotSynced={() => engine.clearNotSynced()}
-        coreVersion={coreVersion}
-        dayISO={todayYMD}
-        isDark={isDark}
-        accentHex={accentHex}
-        prefs={prefs}
-        onChangePref={handleChangePref}
-        onSignOut={() => void handleSignOut()}
-        onDeleteAccount={handleDeleteAccount}
-        onShowWelcomeAgain={() => setFirstRunOpen(true)}
-        onOpenShortcuts={() => setShortcutsOpen(true)}
-      />
+      {settingsModal}
     </div>
   );
 }

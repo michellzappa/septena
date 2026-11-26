@@ -208,6 +208,10 @@
     "RegistryEntityEnums.DoExit.CLOSED": {
       "reason": "The shared core decides this exit (resolve_do_sessions); Android stores what it answers.",
       "issue": "#517"
+    },
+    "RegistrySignInMethodIds.*": {
+      "reason": "No client renders the sign-in registry yet (SI0); the sign-in screens read it in SI2 and SI4.",
+      "issue": "#636"
     }
   }
 }

@@ -41,6 +41,7 @@
       "artifact": "Gallery email",
       "bodies": ["Dear Paloma and Yusuf, here they are. The gallery stays up for a year and the password is on your card. I hope you find the aunt.", "Dear Paloma and Yusuf, here is your gallery. 1. Open the link and type the password from your card. 2. Tap the heart on your favourites. 3. Order prints from the same page."],
       "otherBody": "Dear Paloma and Yusuf, your gallery is ready and stays up for a year. {answer}",
+      "otherAnswer": "Warm, with the download steps at the end",
       "handoff": "Read the email", "acceptance": "The email is ready to send with the link."
     },
     "discuss": {
@@ -49,6 +50,7 @@
       "artifact": "Reply to the couple",
       "bodies": ["Thank you for telling me your budget. It covers five hours, which is the ceremony, the portraits and the first dance.", "Thank you for telling me your budget. If you can marry on a weekday, I can be there all day for that price."],
       "otherBody": "Thank you for telling me your budget. Here is what I can offer: {answer}",
+      "otherAnswer": "Three hours and the portraits after",
       "draftHandoff": "Read the reply", "handoff": "Your next step: send it", "acceptance": "The couple has an offer.",
       "with": ["cull", "cover", "sensor", "invoice"]
     },

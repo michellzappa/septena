@@ -1,6 +1,6 @@
 # 0045. Pro is a real plan that is only given, never sold yet
 
-- Status: accepted (2026-11-25)
+- Status: accepted (2026-11-25); the website line amended by [ADR 0052](0052-the-site-shows-pro-as-a-real-plan.md)
 - Date: 2026-11-25
 - Deciders: mz
 - Amends: [ADR 0037](0037-show-free-plus-and-planned-pro.md) (Pro had no server

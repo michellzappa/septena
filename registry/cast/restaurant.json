@@ -41,6 +41,7 @@
       "artifact": "Hood quotes",
       "bodies": ["Only the first firm can install before the opening. Its total is €7,150 with the wall work. The other two start in January.", "The third firm is the cheapest at €6,320 with the wall work, but it installs in the second week of January."],
       "otherBody": "The totals with wall work are €7,150, €6,840 and €6,320. Looking at it your way: {answer}",
+      "otherAnswer": "Fewest days of wall work",
       "handoff": "Read the totals", "acceptance": "You can call one firm and say yes."
     },
     "discuss": {
@@ -49,6 +50,7 @@
       "artifact": "Letter to the neighbour",
       "bodies": ["Thank you for writing. The hood goes out through the back wall, away from your windows, and the kitchen closes at eleven every night.", "Thank you for writing. Would you like to come down and see the plans? The hood goes out at the back, and I would rather show you than explain it."],
       "otherBody": "Thank you for writing. About the smell and the noise: {answer}",
+      "otherAnswer": "Filters in by May, and my number",
       "draftHandoff": "Read the letter", "handoff": "Your next step: put it through the door", "acceptance": "The neighbour has an answer.",
       "with": ["hood", "tables", "flatbread", "rota"]
     },

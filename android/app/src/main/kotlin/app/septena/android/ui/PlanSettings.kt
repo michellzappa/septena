@@ -115,11 +115,14 @@ internal class PlanSettingsModel(private val graph: AndroidAppGraph) {
 /** The sync status word for `statusKey: syncStatus` (iOS `liveSyncSummary`). */
 internal fun syncStatusLine(signedIn: Boolean, state: SyncState, languageTag: String): String {
     if (!signedIn) return plansText(languageTag, "status", "device")
+    // The server does not sync this device: say where the tasks are (iOS `liveSyncSummary`).
+    if (state == SyncState.NotSyncing) return plansText(languageTag, "status", "device")
     val id = when (state) {
         SyncState.Syncing -> "syncing"
         is SyncState.Failed -> "offline"
         SyncState.NeedsSignIn -> "needsSignIn"
         SyncState.Idle, is SyncState.Synced -> "synced"
+        SyncState.NotSyncing -> "offline"
     }
     return settingsCopy(SYNC_STATUS_KEY, id, languageTag)
 }
@@ -166,7 +169,7 @@ private const val ACCOUNT_CARD = "account_profile_card"
  * the Google Play purchase is #176.
  */
 @Composable
-internal fun PlusOffer(plans: PlanSettingsModel, languageTag: String) {
+internal fun PlusOffer(plans: PlanSettingsModel, languageTag: String, syncState: SyncState? = null) {
     val document = RegistryCatalog.document("plans")
     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
         Text(
@@ -184,6 +187,15 @@ internal fun PlusOffer(plans: PlanSettingsModel, languageTag: String) {
             headlineContent = { Text(plansText(languageTag, "labels", "yourPlan")) },
             trailingContent = { Text(line, color = MaterialTheme.colorScheme.onSurfaceVariant) },
         )
+    }
+    // The second-device moment (iOS `SeptaskPlusPane`): the server answered HTTP 402 to sync.
+    if (syncState == SyncState.NotSyncing) {
+        planUpsell("second_device", languageTag)?.let { (title, detail) ->
+            ListItem(
+                headlineContent = { Text(title) },
+                supportingContent = { Text(detail) },
+            )
+        }
     }
     HorizontalDivider()
 
@@ -259,6 +271,11 @@ private fun PlanPrices(document: JsonValue.ObjectValue, languageTag: String) {
     val checkoutOpen = (document.fields["checkout"] as? JsonValue.ObjectValue)?.fields?.get("open").booleanValue() == true
     SectionFooter(if (checkoutOpen) plansText(languageTag, "priceFootnote") else plansText(languageTag, "checkout", "notice"))
 }
+
+/** Title and detail of a plans.json `upsells` note, localized; null when the id is unknown. */
+internal fun planUpsell(id: String, languageTag: String): Pair<String, String>? =
+    RegistryCatalog.document("plans").objects("upsells").firstOrNull { it.fields["id"].stringValue() == id }
+        ?.let { registryText(it.fields["title"].stringValue(), languageTag) to registryText(it.fields["detail"].stringValue(), languageTag) }
 
 /** A field of a plan card (plans.json `cards`). Pro has one, but no store sells it (ADR 0045). */
 private fun planCard(id: String, field: String, languageTag: String): String =

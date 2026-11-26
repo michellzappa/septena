@@ -41,6 +41,7 @@
       "artifact": "Timeline",
       "bodies": ["14:02 certificate ends. 14:06 first alert. 14:19 Maren sees it. 14:31 new certificate requested. 14:42 logins work again.", "Between 14:02 and 14:42 you could not sign in. A certificate had ended. We replaced it, and nobody’s data was affected."],
       "otherBody": "Logins failed between 14:02 and 14:42 because a certificate had ended. Your direction: {answer}",
+      "otherAnswer": "Support, so they can answer customers",
       "handoff": "Read the timeline", "acceptance": "The timeline is ready to share."
     },
     "discuss": {
@@ -49,6 +50,7 @@
       "artifact": "Message to the team",
       "bodies": ["Hi all, could we move stand-up to half past nine? I do the nursery run now and arrive out of breath. Say so if it breaks your morning.", "Hi all, could we do stand-up in writing on two days a week? I do the nursery run now, and I think we would all read faster than we talk."],
       "otherBody": "Hi all, I do the nursery run now and would like to change stand-up. {answer}",
+      "otherAnswer": "Ten o’clock, cameras optional",
       "draftHandoff": "Read the message", "handoff": "Your next step: post it", "acceptance": "The team knows what you are asking.",
       "with": ["timeline", "cert", "oncall", "nursery"]
     },

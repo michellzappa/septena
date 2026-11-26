@@ -51,6 +51,15 @@ a new ADR and set the old one to `superseded by NNNN`.
 | [0044](0044-review-is-one-place.md) | Review is the one place for everything that waits on you (amends 0006, 0008) | accepted |
 | [0045](0045-pro-is-a-real-plan-that-is-only-given.md) | Pro is a real plan that is only given, never sold yet (amends 0037, 0043) | accepted |
 | [0046](0046-agent-work-is-a-review-group.md) | Agent work in progress is a group of Review, not its own list (amends 0044) | accepted |
+| [0047](0047-every-way-in-creates-an-account.md) | Every way into Septena creates an account and offers every sign-in method it can (amends 0016) | accepted |
+| [0048](0048-decisions-and-questions-are-typed-log-entries.md) | Decisions and open questions are typed entries in the notes log | proposed |
+| [0049](0049-templates-are-a-versioned-json-file.md) | A template is a versioned JSON file of structure and briefs, never of private data | proposed |
+| [0050](0050-septena-publishes-its-agent-contract.md) | Septena publishes its agent contract: Markdown twins, a versioned spec, one error envelope, idempotency, OpenAPI, skills | accepted |
+| [0051](0051-clients-in-other-apps-are-septena-surfaces.md) | A Septena client inside another app (CLI, Raycast) is a Septena surface, not a source integration | accepted |
+| [0052](0052-the-site-shows-pro-as-a-real-plan.md) | The website shows Pro as a real plan (amends 0045) | accepted |
+| [0053](0053-waiting-on-people-is-a-review-group.md) | Work handed to a person is a Waiting group in Review (amends 0046) | accepted |
+| [0054](0054-support-lands-in-starlings.md) | Support goes to Starlings, through a native form (supersedes feedback.md) | accepted |
+| [0055](0055-directory-reviewers-use-a-demo-account.md) | Directory reviewers use a demo account behind a reviewer code | accepted |
 
 ## Template
 

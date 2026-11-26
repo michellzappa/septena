@@ -42,6 +42,7 @@
       "artifact": "Passenger counts",
       "bodies": ["Over three mornings 112 people got on. The bridge had 47, the school 38 and the shop 27. Two lines in the wet notebook are missing.", "Over three mornings 112 people got on. School was 51, the clinic 29, work 24, and 8 did not say."],
       "otherBody": "Over three mornings 112 people got on at three stops. Your direction: {answer}",
+      "otherAnswer": "By time of day",
       "handoff": "Read the table", "acceptance": "The numbers are ready for the county."
     },
     "discuss": {
@@ -50,6 +51,7 @@
       "artifact": "Letter to the county",
       "bodies": ["A last bus at 16:10 leaves before the clinic closes. We ask you to run it at 17:30, when people can use it.", "We counted 112 passengers in three mornings. We ask for one more year on the old timetable, and we will send you the numbers each month."],
       "otherBody": "The last bus at 16:10 leaves before the clinic closes. We ask for this: {answer}",
+      "otherAnswer": "A trial bus for the winter",
       "draftHandoff": "Read the letter", "handoff": "Your next step: sign and send it", "acceptance": "The county has our letter.",
       "with": ["count", "timetable", "tups", "hinges"]
     },

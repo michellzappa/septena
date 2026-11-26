@@ -12,6 +12,18 @@
       "plans.outcomes.agents.rows.connected.cells.plus"
     ]
   },
+  "1 change was not sent yet and will be lost.": {
+    "text": "1 change was not sent yet and will be lost.",
+    "paths": [
+      "surfaces.accountSwitch.copy.unsentOne.label"
+    ]
+  },
+  "1 task is on this device.": {
+    "text": "1 task is on this device.",
+    "paths": [
+      "surfaces.accountSwitch.copy.tasksOne.label"
+    ]
+  },
   "10 GB synced": {
     "text": "10 GB synced",
     "paths": [
@@ -62,12 +74,6 @@
     "text": "50 GB synced",
     "paths": [
       "plans.outcomes.nothing_lost.rows.files.cells.pro"
-    ]
-  },
-  "A free account allows 500 agent changes a day. Your agent can make changes again tomorrow. Plus has no daily limit.": {
-    "text": "A free account allows 500 agent changes a day. Your agent can make changes again tomorrow. Plus has no daily limit.",
-    "paths": [
-      "plans.upsells.connector_cap.detail"
     ]
   },
   "A free account shows 30 days of history. Plus shows a full year.": {
@@ -273,7 +279,8 @@
     "text": "Agent name",
     "paths": [
       "surfaces.prompts.text.renameAgent.placeholder",
-      "surfaces.prompts.text.nameAgent.placeholder"
+      "surfaces.prompts.text.nameAgent.placeholder",
+      "surfaces.prompts.text.newAgentKey.placeholder"
     ]
   },
   "Agent tools": {
@@ -288,6 +295,12 @@
       "settings.rootGroups.ai_agents_root.items.1.label",
       "settings.pages.agents.title",
       "plans.outcomes.agents.rows.connected.label"
+    ]
+  },
+  "Agents on this account made 500 changes today. They can make changes again tomorrow.": {
+    "text": "Agents on this account made 500 changes today. They can make changes again tomorrow.",
+    "paths": [
+      "plans.upsells.connector_cap.detail"
     ]
   },
   "All dated tasks": {
@@ -510,6 +523,16 @@
       "settings.copy.access_devices.deviceBrowser.label"
     ]
   },
+  "By continuing, you agree to the {terms} and the {privacy}.": {
+    "text": "By continuing, you agree to the {terms} and the {privacy}.",
+    "placeholders": [
+      "terms",
+      "privacy"
+    ],
+    "paths": [
+      "signIn.copy.terms"
+    ]
+  },
   "Calendar": {
     "text": "Calendar",
     "paths": [
@@ -529,10 +552,17 @@
       "surfaces.taskReferences.kinds.event.label"
     ]
   },
+  "Can't reach Septena. Check your connection and try again.": {
+    "text": "Can't reach Septena. Check your connection and try again.",
+    "paths": [
+      "signIn.errors.network"
+    ]
+  },
   "Cancel": {
     "text": "Cancel",
     "paths": [
-      "surfaces.prompts.cancelTitle"
+      "surfaces.prompts.cancelTitle",
+      "surfaces.accountSwitch.copy.cancel.label"
     ]
   },
   "Cancel Project": {
@@ -692,6 +722,12 @@
       "surfaces.firstRun.chrome.close.label"
     ]
   },
+  "Code": {
+    "text": "Code",
+    "paths": [
+      "signIn.email.codeLabel"
+    ]
+  },
   "Code from the browser page": {
     "text": "Code from the browser page",
     "paths": [
@@ -785,6 +821,30 @@
       "surfaces.firstRun.steps.connectClaude.afterDone.title"
     ]
   },
+  "Continue with Apple": {
+    "text": "Continue with Apple",
+    "paths": [
+      "signIn.methods.apple.title"
+    ]
+  },
+  "Continue with Google": {
+    "text": "Continue with Google",
+    "paths": [
+      "signIn.methods.google.title"
+    ]
+  },
+  "Continue with Microsoft": {
+    "text": "Continue with Microsoft",
+    "paths": [
+      "signIn.methods.microsoft.title"
+    ]
+  },
+  "Continue with email": {
+    "text": "Continue with email",
+    "paths": [
+      "signIn.methods.email.title"
+    ]
+  },
   "Conversation": {
     "text": "Conversation",
     "paths": [
@@ -808,6 +868,12 @@
     "paths": [
       "settings.copy.claude_connector.copy.label",
       "actions.actions.task.copy.title"
+    ]
+  },
+  "Copy Key": {
+    "text": "Copy Key",
+    "paths": [
+      "surfaces.prompts.items.agentKeyCreated.confirmTitle"
     ]
   },
   "Copy Link": {
@@ -869,7 +935,8 @@
     "text": "Create",
     "paths": [
       "surfaces.prompts.text.newArea.confirmTitle",
-      "surfaces.prompts.text.newProject.confirmTitle"
+      "surfaces.prompts.text.newProject.confirmTitle",
+      "surfaces.prompts.text.newAgentKey.confirmTitle"
     ]
   },
   "Create Next Copy": {
@@ -1251,7 +1318,14 @@
   "Email": {
     "text": "Email",
     "paths": [
-      "surfaces.taskReferences.kinds.email.label"
+      "surfaces.taskReferences.kinds.email.label",
+      "signIn.email.emailLabel"
+    ]
+  },
+  "Email me a code": {
+    "text": "Email me a code",
+    "paths": [
+      "signIn.existingAccount.button"
     ]
   },
   "Email thread": {
@@ -1271,6 +1345,12 @@
     "text": "Ended",
     "paths": [
       "surfaces.doing.exits.closed.label"
+    ]
+  },
+  "Enter a valid email address.": {
+    "text": "Enter a valid email address.",
+    "paths": [
+      "signIn.errors.invalidEmail"
     ]
   },
   "Enter the code from the other device. If you're connecting Claude, the code is in your browser.": {
@@ -1349,6 +1429,12 @@
     "text": "Export Markdown",
     "paths": [
       "settings.copy.import_export.exportMarkdownTitle.label"
+    ]
+  },
+  "Export a Backup First": {
+    "text": "Export a Backup First",
+    "paths": [
+      "surfaces.accountSwitch.copy.export.label"
     ]
   },
   "Export as JSON": {
@@ -1448,6 +1534,12 @@
     "text": "Files",
     "paths": [
       "plans.outcomes.nothing_lost.rows.files.label"
+    ]
+  },
+  "Files are still syncing between your devices.": {
+    "text": "Files are still syncing between your devices.",
+    "paths": [
+      "plans.status.filesSyncing"
     ]
   },
   "Find any task, project, or area.": {
@@ -1656,6 +1748,12 @@
     "text": "How a task conversation moves",
     "paths": [
       "settings.copy.ai_explainer.flowHeader.label"
+    ]
+  },
+  "I use Septena on another device": {
+    "text": "I use Septena on another device",
+    "paths": [
+      "signIn.methods.device.title"
     ]
   },
   "If this agent takes the place of one you connected before, pick it. That agent stops working.": {
@@ -2189,6 +2287,12 @@
       "surfaces.prompts.text.nameAgent.title"
     ]
   },
+  "New Agent Key": {
+    "text": "New Agent Key",
+    "paths": [
+      "surfaces.prompts.text.newAgentKey.title"
+    ]
+  },
   "New Area": {
     "text": "New Area",
     "paths": [
@@ -2226,6 +2330,12 @@
     "text": "New Task in Section",
     "paths": [
       "actions.actions.section.newTask.title"
+    ]
+  },
+  "New here? Your first sign-in creates your account.": {
+    "text": "New here? Your first sign-in creates your account.",
+    "paths": [
+      "signIn.copy.subheading"
     ]
   },
   "New tasks wait at the top of Today until you schedule or file them.": {
@@ -2451,6 +2561,12 @@
       "settings.copy.ai_explainer.flowFooter.label"
     ]
   },
+  "On another device where you are signed in, open Septena and go to Settings ▸ Account ▸ Approve a sign-in. Tap Scan Code and point the camera at this screen, or enter this code:": {
+    "text": "On another device where you are signed in, open Septena and go to Settings ▸ Account ▸ Approve a sign-in. Tap Scan Code and point the camera at this screen, or enter this code:",
+    "paths": [
+      "surfaces.deviceSignIn.copy.approve.label"
+    ]
+  },
   "On day": {
     "text": "On day",
     "paths": [
@@ -2479,12 +2595,6 @@
     "text": "On your device",
     "paths": [
       "plans.outcomes.nothing_lost.rows.files.cells.free"
-    ]
-  },
-  "On your iPhone, iPad or Mac, open Septena and go to Settings ▸ Account ▸ Approve a sign-in. Tap Scan Code and point the camera at this screen, or enter this code:": {
-    "text": "On your iPhone, iPad or Mac, open Septena and go to Settings ▸ Account ▸ Approve a sign-in. Tap Scan Code and point the camera at this screen, or enter this code:",
-    "paths": [
-      "surfaces.deviceSignIn.copy.approve.label"
     ]
   },
   "On-device": {
@@ -2683,12 +2793,6 @@
       "plans.labels.planned"
     ]
   },
-  "Planned: €120 a year or €14 a month": {
-    "text": "Planned: €120 a year or €14 a month",
-    "paths": [
-      "plans.levels.pro.detail"
-    ]
-  },
   "Play a short animation when you empty the Inbox.": {
     "text": "Play a short animation when you empty the Inbox.",
     "paths": [
@@ -2793,6 +2897,12 @@
       "settings.desktopTabs.privacy.title",
       "settings.rootGroups.meta_root.items.0.label",
       "settings.pages.privacy.title"
+    ]
+  },
+  "Privacy Policy": {
+    "text": "Privacy Policy",
+    "paths": [
+      "signIn.copy.privacyLabel"
     ]
   },
   "Private iCal feed": {
@@ -3031,6 +3141,18 @@
       "actions.actions.task.repeat.title"
     ]
   },
+  "Replace": {
+    "text": "Replace",
+    "paths": [
+      "surfaces.accountSwitch.copy.replace.label"
+    ]
+  },
+  "Replace the tasks on this device?": {
+    "text": "Replace the tasks on this device?",
+    "paths": [
+      "surfaces.accountSwitch.title"
+    ]
+  },
   "Replaces": {
     "text": "Replaces",
     "paths": [
@@ -3264,6 +3386,12 @@
       "actions.actions.task.sendBackReview.title"
     ]
   },
+  "Send a new code": {
+    "text": "Send a new code",
+    "paths": [
+      "signIn.email.resend"
+    ]
+  },
   "Send back": {
     "text": "Send back",
     "paths": [
@@ -3274,6 +3402,12 @@
     "text": "Send back for another pass",
     "paths": [
       "surfaces.prompts.text.sendBackReview.title"
+    ]
+  },
+  "Send code": {
+    "text": "Send code",
+    "paths": [
+      "signIn.email.sendCode"
     ]
   },
   "Send feedback": {
@@ -3355,6 +3489,12 @@
     "text": "Septena runs the sync server and the connector. When you connect Claude or another agent, its bill stays with that provider.",
     "paths": [
       "plans.promises.own_ai.detail"
+    ]
+  },
+  "Septena shows this key only once. Paste it into your script or agent. To stop the agent, disconnect it in this list.": {
+    "text": "Septena shows this key only once. Paste it into your script or agent. To stop the agent, disconnect it in this list.",
+    "paths": [
+      "surfaces.prompts.items.agentKeyCreated.message"
     ]
   },
   "Set up Septena for me using https://septena.app/agents.md": {
@@ -3505,7 +3645,8 @@
   "Sign in": {
     "text": "Sign in",
     "paths": [
-      "settings.copy.syncStatus.needsSignIn.label"
+      "settings.copy.syncStatus.needsSignIn.label",
+      "signIn.email.signIn"
     ]
   },
   "Sign in on {client}?": {
@@ -3526,7 +3667,8 @@
   "Sign in to Septena": {
     "text": "Sign in to Septena",
     "paths": [
-      "surfaces.deviceSignIn.title"
+      "surfaces.deviceSignIn.title",
+      "signIn.copy.heading"
     ]
   },
   "Sign in to Septena first.": {
@@ -3905,6 +4047,12 @@
       "plans.promises.core_free.detail"
     ]
   },
+  "Terms of Use": {
+    "text": "Terms of Use",
+    "paths": [
+      "signIn.copy.termsLabel"
+    ]
+  },
   "Text Size": {
     "text": "Text Size",
     "paths": [
@@ -3916,6 +4064,18 @@
     "text": "That code is wrong or has expired.",
     "paths": [
       "settings.copy.sign_in_approval.invalidCode.label"
+    ]
+  },
+  "That code is wrong. You have {count} tries left.": {
+    "forms": {
+      "one": "That code is wrong. You have 1 try left.",
+      "other": "That code is wrong. You have {count} tries left."
+    },
+    "placeholders": [
+      "count"
+    ],
+    "paths": [
+      "signIn.errors.wrongCode"
     ]
   },
   "That code was already used.": {
@@ -3978,8 +4138,8 @@
       "plans.paywall.failed"
     ]
   },
-  "The same tasks on your phone, tablet and Mac, updated as you type.": {
-    "text": "The same tasks on your phone, tablet and Mac, updated as you type.",
+  "The same tasks on every device, updated as you type.": {
+    "text": "The same tasks on every device, updated as you type.",
     "paths": [
       "plans.outcomes.everywhere.detail"
     ]
@@ -4034,6 +4194,12 @@
       "surfaces.firstRun.steps.done.returningBody"
     ]
   },
+  "This code has expired. Get a new code and try again.": {
+    "text": "This code has expired. Get a new code and try again.",
+    "paths": [
+      "signIn.errors.codeExpired"
+    ]
+  },
   "This deletes the following from the Septena server:": {
     "text": "This deletes the following from the Septena server:",
     "paths": [
@@ -4044,6 +4210,12 @@
     "text": "This device is not syncing",
     "paths": [
       "plans.upsells.second_device.title"
+    ]
+  },
+  "This email already has a Septena account": {
+    "text": "This email already has a Septena account",
+    "paths": [
+      "signIn.existingAccount.title"
     ]
   },
   "This file is on another device": {
@@ -4153,6 +4325,18 @@
       "surfaces.taskDateBoard.rows.dateBoard.tomorrow.label"
     ]
   },
+  "Too many requests. Try again later.": {
+    "text": "Too many requests. Try again later.",
+    "paths": [
+      "signIn.errors.rateLimited"
+    ]
+  },
+  "Too many wrong codes. Get a new code and try again.": {
+    "text": "Too many wrong codes. Get a new code and try again.",
+    "paths": [
+      "signIn.errors.tooManyTries"
+    ]
+  },
   "Too many wrong codes. Try again in 10 minutes.": {
     "text": "Too many wrong codes. Try again in 10 minutes.",
     "paths": [
@@ -4250,6 +4434,12 @@
       "surfaces.firstRun.steps.accountDevice.body"
     ]
   },
+  "Use a different email": {
+    "text": "Use a different email",
+    "paths": [
+      "signIn.email.differentEmail"
+    ]
+  },
   "Use my Claude": {
     "text": "Use my Claude",
     "paths": [
@@ -4287,6 +4477,25 @@
     "text": "We never hold your data back",
     "paths": [
       "plans.promises.no_hostage.title"
+    ]
+  },
+  "We sent a code to {email}.": {
+    "text": "We sent a code to {email}.",
+    "placeholders": [
+      "email"
+    ],
+    "paths": [
+      "signIn.email.codeSent"
+    ]
+  },
+  "We'll send a code to {email}. Enter it to sign in, and we'll add {provider} to that account.": {
+    "text": "We'll send a code to {email}. Enter it to sign in, and we'll add {provider} to that account.",
+    "placeholders": [
+      "email",
+      "provider"
+    ],
+    "paths": [
+      "signIn.existingAccount.detail"
     ]
   },
   "Web page": {
@@ -4487,6 +4696,12 @@
       "plans.promises.own_ai.title"
     ]
   },
+  "You signed in with a different account. The tasks on this device belong to the account you used before. They are removed from this device, and this account’s tasks take their place.": {
+    "text": "You signed in with a different account. The tasks on this device belong to the account you used before. They are removed from this device, and this account’s tasks take their place.",
+    "paths": [
+      "surfaces.accountSwitch.copy.body.label"
+    ]
+  },
   "Your 14 days of Plus have ended": {
     "text": "Your 14 days of Plus have ended",
     "paths": [
@@ -4521,6 +4736,12 @@
     "text": "Your agent asks",
     "paths": [
       "surfaces.taskPage.blocks.taskPage.conversation.askKicker"
+    ]
+  },
+  "Your agent key": {
+    "text": "Your agent key",
+    "paths": [
+      "surfaces.prompts.items.agentKeyCreated.title"
     ]
   },
   "Your agent's questions, finished work and tasks in progress show up here. Faded tasks do too.": {
@@ -4614,8 +4835,8 @@
       "settings.copy.delete_account.conversations.label"
     ]
   },
-  "Your tasks stay in step on iPhone, iPad and Mac.": {
-    "text": "Your tasks stay in step on iPhone, iPad and Mac.",
+  "Your tasks stay in step on every device you sign in to.": {
+    "text": "Your tasks stay in step on every device you sign in to.",
     "paths": [
       "surfaces.firstRun.steps.welcome.points.0.detail"
     ]
@@ -4654,6 +4875,12 @@
     "text": "iPhone or iPad",
     "paths": [
       "settings.copy.access_devices.deviceApplePhone.label"
+    ]
+  },
+  "you@example.com": {
+    "text": "you@example.com",
+    "paths": [
+      "signIn.email.emailPlaceholder"
     ]
   },
   "{app}’s servers never run AI on your tasks. AI runs on your device, or in your own Claude when you connect it. Turn AI off and the app works the same, without conversations.": {
@@ -4702,6 +4929,15 @@
     ],
     "paths": [
       "surfaces.prompts.countPhrases.agents.label"
+    ]
+  },
+  "{count} changes were not sent yet and will be lost.": {
+    "text": "{count} changes were not sent yet and will be lost.",
+    "placeholders": [
+      "count"
+    ],
+    "paths": [
+      "surfaces.accountSwitch.copy.unsentOther.label"
     ]
   },
   "{count} files": {
@@ -4803,6 +5039,15 @@
       "surfaces.prompts.countPhrases.tasks.label"
     ]
   },
+  "{count} tasks are on this device.": {
+    "text": "{count} tasks are on this device.",
+    "placeholders": [
+      "count"
+    ],
+    "paths": [
+      "surfaces.accountSwitch.copy.tasksOther.label"
+    ]
+  },
   "{count} tasks deleted": {
     "forms": {
       "one": "Task deleted",
@@ -4880,6 +5125,12 @@
     "text": "€120 a year",
     "paths": [
       "plans.cards.pro.priceLabel"
+    ]
+  },
+  "€120 a year or €14 a month": {
+    "text": "€120 a year or €14 a month",
+    "paths": [
+      "plans.levels.pro.detail"
     ]
   },
   "€5 a month. You save €24 against paying monthly.": {

@@ -1422,7 +1422,7 @@ struct SeptaskImportExportPane: View {
     } header: {
       Text("Restore backup")
     } footer: {
-      Text("Imports a Septena JSON backup into this device. Matching IDs update in place; non-task records are skipped. For a .zip backup, unzip it and choose the JSON file inside; its attachments are not restored yet.")
+      Text("Imports a Septena JSON backup into this device. Items with the same ID are replaced by the backup’s version, new items are added, and nothing is deleted. For a .zip backup, unzip it and choose the JSON file inside; its attachments are not restored yet.")
     }
   }
 

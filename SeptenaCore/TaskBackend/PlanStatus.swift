@@ -108,6 +108,11 @@ final class PlanStatus {
   /// This Apple ID holds a verified Plus entitlement whose `appAccountToken`
   /// belongs to another Septena account (spec §6.4 finding 7).
   private(set) var plusOwnedByAnotherAccount = false
+  /// The account holds an active App Store subscription. It can also hold a
+  /// grant (a Pro grant on top of a paid Plus, ADR 0045), and then `plan`
+  /// names the grant. The subscription still renews, so Manage Subscription
+  /// must stay reachable.
+  private(set) var hasAppleSubscription = false
 
   private init() {}
 
@@ -124,6 +129,29 @@ final class PlanStatus {
     if case .plus(_, "grant") = plan { return true }
     return false
   }
+
+  /// The plan pane shows its Manage button: the account is on a plan that
+  /// was bought, or it still pays for an App Store subscription under a grant.
+  var showsPlanButton: Bool {
+    plan != nil && (!isGranted || hasAppleSubscription)
+  }
+
+  /// The account pays an App Store subscription that is active now.
+  nonisolated static func hasAppleSubscription(_ answer: BackendEntitlement) -> Bool {
+    answer.entitlements.contains { $0.active && $0.source == "apple" }
+  }
+
+  /// The account has file sync in its plan: Plus, Pro, the trial, or a server
+  /// limit that gives storage. Unknown (nil plan) counts as no answer yet.
+  var fileSyncInPlan: Bool? {
+    guard plan != nil else { return nil }
+    if isPlus { return true }
+    if let gb = limits?.attachmentsGB { return gb > 0 }
+    return false
+  }
+
+  /// The file-sync Plus upsell applies: the plan is known and has no file sync.
+  var showsFileSyncUpsell: Bool { fileSyncInPlan == false }
 
   /// The name of the plan page and its Settings row: Plus is the offer, and an
   /// account on Pro sees its own plan.
@@ -194,6 +222,7 @@ final class PlanStatus {
       syncThisDeviceLimitMessage = nil
       trialEnded = false
       plusOwnedByAnotherAccount = false
+      hasAppleSubscription = false
       return
     }
     do {
@@ -206,6 +235,7 @@ final class PlanStatus {
       deviceSyncing = answer.device?.syncing ?? true
       serverBlockedDevice = false
       trialEnded = Self.trialEnded(answer)
+      hasAppleSubscription = Self.hasAppleSubscription(answer)
       lastError = nil
       TaskSyncEngine.shared.applyPlanStatus(
         deviceNotSyncing: deviceNotSyncing,

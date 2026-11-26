@@ -445,6 +445,12 @@ class SqlDelightTaskStore(private val database: SeptenaDatabase) : TaskStore {
     }
 
     /**
+     * The outbox entries the server has not confirmed yet, sent or not: what an account switch would lose
+     * (#575). Not part of [TaskStore]: only the app's account flow calls it.
+     */
+    fun outboxCount(): Int = queries.selectAllOutbox().executeAsList().size
+
+    /**
      * Removes every local row, turn, outbox entry, shadow and the sync cursor: the account is gone
      * (account deletion). Not part of [TaskStore]: only the app's account flow calls it.
      */

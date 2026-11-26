@@ -63,6 +63,8 @@ See [ADR 0007](adr/0007-septena-is-the-task-app.md).
 | [SEPTASK_BACKEND.md](SEPTASK_BACKEND.md) | building (migration track) |
 | [REPO_SPLIT_PLAN.md](REPO_SPLIT_PLAN.md) | done (ADR 0017) — historical |
 | [SYNC_SUBSCRIPTION_SPEC.md](SYNC_SUBSCRIPTION_SPEC.md) | proposed (launch track) |
+| [SIGN_IN_SURFACES_SPEC.md](SIGN_IN_SURFACES_SPEC.md) | accepted (ADR 0047; #137, SI0 to SI6) |
+| [SUPPORT_SPEC.md](SUPPORT_SPEC.md) | accepted (ADR 0054; SUP1 to SUP5) |
 | [IDENTIFIERS.md](IDENTIFIERS.md) | current |
 | [CloudKitSchema.md](CloudKitSchema.md) | current until the iCloud exit, then historical |
 | [PROD_CUTOVER.md](PROD_CUTOVER.md) | CloudKit-era checklist |
@@ -77,11 +79,15 @@ See [ADR 0007](adr/0007-septena-is-the-task-app.md).
 | [LINKED_PROJECTS_SPEC.md](LINKED_PROJECTS_SPEC.md) | rewrite for Starlings before work (#12) |
 | [GITHUB_SPEC.md](GITHUB_SPEC.md) | dropped (ADR 0033) |
 | [TASK_REFERENCES_SPEC.md](TASK_REFERENCES_SPEC.md) | building (ADR 0031, ADR 0033; first release #386, #387) |
+| [AGENT_SURFACE_SPEC.md](AGENT_SURFACE_SPEC.md) | accepted (ADR 0050): what agents read on septena.app and call on api.septena.app, AS1 to AS14 |
+| [RAYCAST_EXTENSION_SPEC.md](RAYCAST_EXTENSION_SPEC.md) | proposal (ADR 0051, #667): Septena from the Raycast launcher, RX0 to RX5 |
 | [PROJECT_SHARING_SPEC.md](PROJECT_SHARING_SPEC.md) | MVP built |
 | [PUBLIC_LINKS_SPEC.md](PUBLIC_LINKS_SPEC.md) | proposal (#22, phase S4 of project sharing) |
 | [TASK_FACTORY_SPEC.md](TASK_FACTORY_SPEC.md) | accepted |
 | [DO_SPEC.md](DO_SPEC.md) | building (ADR 0041): Do one task, full on one device, a notice on the others, the orb takes over |
 | [REVIEW_SPEC.md](REVIEW_SPEC.md) | accepted (ADR 0044, 0046; store rules built) |
+| [DAILY_REVIEW_SPEC.md](DAILY_REVIEW_SPEC.md) | proposal (#618): a short end-of-day review in Review |
+| [DECISIONS_SPEC.md](DECISIONS_SPEC.md) | proposal (#620, ADR 0048): decisions and open questions as typed log entries |
 | [TASK_FADE_SPEC.md](TASK_FADE_SPEC.md) | accepted (§6 amended by ADR 0014, proposals by ADR 0039) |
 | [INBOX_ZERO_MOTION_SPEC.md](INBOX_ZERO_MOTION_SPEC.md) | shipped — historical (#298) |
 | [PROJECT_NOTES_SPEC.md](PROJECT_NOTES_SPEC.md) | accepted (ADR 0012) |
@@ -90,6 +96,7 @@ See [ADR 0007](adr/0007-septena-is-the-task-app.md).
 | [TIMED_REMINDERS_SPEC.md](TIMED_REMINDERS_SPEC.md) | proposal (#97) |
 | [RECURRENCE_V2_SPEC.md](RECURRENCE_V2_SPEC.md) | proposal (#126) |
 | [MOVING_IN_SPEC.md](MOVING_IN_SPEC.md) | building (#99, ADR 0021): one import engine, source adapters |
+| [TEMPLATES_SPEC.md](TEMPLATES_SPEC.md) | proposal (#621, ADR 0049): shareable templates and a gallery |
 | [CHECKLISTS_SPEC.md](CHECKLISTS_SPEC.md) | proposal (#76) |
 | [DATA_EXPORT_SPEC.md](DATA_EXPORT_SPEC.md) | proposal (#130) |
 | [TASK_ROW_MENU_SPEC.md](TASK_ROW_MENU_SPEC.md) | building (#300): one flat row menu, Repeat in the When picker |

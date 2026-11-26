@@ -16,9 +16,11 @@ import {
   Inbox,
   Layers,
   ListChecks,
+  Mail,
   MessageCircleQuestion,
   MessageSquare,
   MessageSquareText,
+  MonitorSmartphone,
   Paperclip,
   Repeat,
   Star,
@@ -29,8 +31,8 @@ import {
 } from "lucide-react";
 import { ICONS } from "@/lib/generated/registries";
 
-// The lucide icons that registry/icons.json names for smart lists, groups, and
-// task row chrome. Named imports keep the rest of lucide out of the bundle.
+// The lucide icons that registry/icons.json names for smart lists, their groups,
+// sign-in methods, and task row chrome. Named imports keep the rest of lucide out of the bundle.
 const LUCIDE: Record<string, LucideIcon> = {
   "align-left": AlignLeft,
   bell: Bell,
@@ -48,9 +50,11 @@ const LUCIDE: Record<string, LucideIcon> = {
   inbox: Inbox,
   layers: Layers,
   "list-checks": ListChecks,
+  mail: Mail,
   "message-circle-question": MessageCircleQuestion,
   "message-square": MessageSquare,
   "message-square-text": MessageSquareText,
+  "monitor-smartphone": MonitorSmartphone,
   paperclip: Paperclip,
   repeat: Repeat,
   star: Star,

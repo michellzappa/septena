@@ -18,6 +18,8 @@ import java.io.IOException
 class AppCredentials(
     private val store: SessionStore,
     private val auth: SeptenaAuthClient,
+    /** The last signed-in user id; sign-out keeps it (#575). */
+    private val lastAccount: LastAccountStore,
     private val nowMs: () -> Long = System::currentTimeMillis,
     /** Must succeed before a new session is stored: the wipe of a deleted account, when one is pending. */
     private val beforeAdopt: suspend () -> Unit = {},
@@ -28,6 +30,17 @@ class AppCredentials(
 
     private val _signedIn = MutableStateFlow(store.load() != null)
     val signedIn: StateFlow<Boolean> = _signedIn.asStateFlow()
+
+    init {
+        // A session stored by a build before the account-switch check: its account is the last one.
+        if (lastAccount.load() == null) store.load()?.let { lastAccount.save(it.userId) }
+    }
+
+    /** The user id of the last session stored on this device, signed in or not; null when none is known. */
+    fun lastUserId(): String? = lastAccount.load()
+
+    /** Account deletion: the deleted account's data is gone, so its id must not start an account-switch question. */
+    fun forgetLastAccount() = lastAccount.clear()
 
     suspend fun adopt(tokens: SessionTokens) {
         beforeAdopt()
@@ -85,6 +98,7 @@ class AppCredentials(
 
     private fun remember(tokens: SessionTokens) {
         if (!store.save(tokens.refreshToken, tokens.userId)) throw IOException("The session was not stored")
+        lastAccount.save(tokens.userId)
         access = tokens.accessToken
         accessExpiresAtMs = nowMs() + tokens.expiresInSeconds * 1000L
         _signedIn.value = true

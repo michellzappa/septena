@@ -54,6 +54,9 @@ WEB_ALLOWED_ORIGINS = "https://web.septena.app"
 ADMIN_EMAILS = "mz@envisioning.com"
 ACCESS_TEAM_DOMAIN = "wispy-tooth-45ec.cloudflareaccess.com"
 ACCESS_AUD = "5154cf50dab7e60f4e49494cd5cafab0e5cd1ebec1f44fdf99fcc0445236a83a"
+# Email sign-in codes (ADR 0016, #169). Off until Terms of Use and the
+# privacy copy ship (#564); then "true".
+EMAIL_SIGNIN = "false"
 
 # Account summaries for the admin page (src/admin/accounts.ts).
 [triggers]
@@ -117,6 +120,11 @@ class_name = "ProjectStore"
 tag = "v4-project-store"
 new_sqlite_classes = ["ProjectStore"]
 
+# Sign-in code mail through Cloudflare Email Service (septena.app is onboarded:
+# `wrangler email sending list`).
+[[send_email]]
+name = "EMAIL"
+
 # Attachment bytes. Create once: wrangler r2 bucket create septena-attachments
 [[r2_buckets]]
 binding = "ATTACHMENTS"
@@ -132,3 +140,7 @@ bucket_name = "septena-attachments"
 # APNS_TEAM_ID    — optional, 10-character Apple Developer Team ID.
 # APNS_BUNDLE_ID  — optional, defaults to "com.septena.tasks".
 # APNS_SANDBOX    — optional, "true" forces sandbox host; unset uses per-token flag.
+# REVIEWER_CODE, REVIEWER_ACCOUNT_ID, REVIEWER_MODE_UNTIL — optional. Directory
+#                   reviewer access (ADR 0055): with the first two set, the
+#                   pairing page offers the demo account for the reviewer code.
+#                   Setup: docs/CONNECTOR_DIRECTORY_SUBMISSION.md section 5.

@@ -1,0 +1,12 @@
+{
+  "name": "septena",
+  "version": "0.1.0",
+  "description": "Your Septena tasks from the terminal.",
+  "license": "MIT",
+  "type": "module",
+  "bin": { "septena": "bin/septena.mjs" },
+  "files": ["bin"],
+  "engines": { "node": ">=20" },
+  "scripts": { "test": "node --test test/*.test.mjs" },
+  "repository": { "type": "git", "url": "https://github.com/michellzappa/septena.git", "directory": "tools/cli" }
+}

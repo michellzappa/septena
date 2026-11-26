@@ -41,6 +41,7 @@
       "artifact": "Two replies",
       "bodies": ["Hello, thank you for asking about the blue bowls. The wholesale price is €19 each, and I can have twenty ready for you by the end of March.", "Hello, thank you for asking about the blue bowls. From twenty bowls the price is €19 each, and from thirty it is €17. I can deliver by the end of March."],
       "otherBody": "Hello, thank you for asking about the blue bowls. I can have forty ready by spring. On the price: {answer}",
+      "otherAnswer": "Ten percent off for the café",
       "handoff": "Read both replies", "acceptance": "Both shops know the price and the date."
     },
     "discuss": {
@@ -49,6 +50,7 @@
       "artifact": "Message to Anouk",
       "bodies": ["Hi Anouk, could we have a spot by the windows this time? The bowls looked grey all day in the corner by the door.", "Hi Anouk, could we have a spot on the main aisle? We were behind the coffee queue last year and nobody came round the back."],
       "otherBody": "Hi Anouk, about the stall: we would like another spot this year. {answer}",
+      "otherAnswer": "Shade in the afternoon",
       "draftHandoff": "Read the message", "handoff": "Your next step: send it", "acceptance": "Anouk knows which spot we want.",
       "with": ["glaze", "crates", "till", "cat"]
     },

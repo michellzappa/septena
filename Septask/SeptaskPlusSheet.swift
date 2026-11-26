@@ -200,7 +200,9 @@ private struct PlusOwnedView: View {
         .font(.largeTitle)
         .foregroundStyle(.tint)
       Text(line).multilineTextAlignment(.center)
-      if source == "apple" {
+      // A grant can sit on top of a paid App Store subscription (Pro on a
+      // paid Plus). The subscription still renews, so Manage stays here.
+      if source == "apple" || PlanStatus.shared.hasAppleSubscription {
         #if os(iOS)
         Button(RegistryPlans.Action.manage) { managing = true }
           .buttonStyle(.borderedProminent)

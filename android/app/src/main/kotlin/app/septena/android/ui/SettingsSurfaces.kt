@@ -87,7 +87,7 @@ internal fun SettingsCustomSurface(
         "smart_lists_editor" -> SmartListsEditor(env.values, languageTag, env.onValueChange)
         "plus_offer" -> {
             LaunchedEffect(env.signedIn) { env.plans.refresh(env.signedIn) }
-            PlusOffer(env.plans, languageTag)
+            PlusOffer(env.plans, languageTag, env.syncState)
         }
         "calendar_detail" -> CalendarFeedSection(env.graph, env.signedIn, env.values, env.onValueChange, languageTag)
         "sign_in_approval" -> SignInApprovalSection(env.graph, env.signedIn, languageTag)
@@ -265,6 +265,6 @@ private const val AI_EXPLAINER = "ai_explainer"
 private const val MCP_SKILLS = "mcp_skills"
 private const val SYNC_DIAGNOSTICS = "sync_diagnostics"
 private const val MAX_ISSUES = 20
-private const val FEEDBACK_EMAIL = "mz@envisioning.com"
-private const val FEEDBACK_URL = "mailto:mz@envisioning.com?subject=Septena%20feedback"
+private const val FEEDBACK_EMAIL = "mz@centaur-labs.io"
+private const val FEEDBACK_URL = "mailto:mz@centaur-labs.io?subject=Septena%20feedback"
 private const val REPO_URL = "https://github.com/michellzappa/septena"

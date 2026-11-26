@@ -661,8 +661,9 @@ const TASK_PAGE_BLOCK_KINDS = new Set(["header", "notes", "attributes", "checkli
 const TASK_PAGE_DEPTHS = new Set(["inline", "page", "review"]);
 
 // ---- plans.json (ADR 0010, ADR 0023) ----
-// Pro is planned: the site shows it and no store sells it. The server has it for
-// grants, and the apps name it on an account that has it (ADR 0037, ADR 0045).
+// Pro is a real plan (ADR 0045, ADR 0052): the site shows it,
+// the server applies it, and the apps name it on an account that has it. No
+// store sells it yet.
 const PLAN_LEVELS = ["free", "plus", "pro"];
 const PLAN_LIMIT_PLANS = ["account", "plus", "pro"];
 
@@ -724,7 +725,8 @@ function validatePlans(plans, icons, caps, importSources) {
 
   assert(JSON.stringify(plans.levels.map((l) => l.id)) === JSON.stringify(PLAN_LEVELS), `plans.json: levels must be ${PLAN_LEVELS.join(", ")}`);
   assert(JSON.stringify(plans.cards.map((c) => c.id)) === JSON.stringify(PLAN_LEVELS), `plans.json: cards must be ${PLAN_LEVELS.join(", ")}`);
-  assert(plans.cards.find((c) => c.id === "pro").status === "planned", "plans.json: the pro card must be planned");
+  // ADR 0052: Pro is a real plan. No store sells it yet, so accounts get it as a grant.
+  assert(plans.cards.find((c) => c.id === "pro").status === "given", "plans.json: the pro card must be given (no store product yet)");
   assert(plans.cards.filter((c) => c.highlighted).length === 1, "plans.json: exactly one card must be highlighted");
   for (const k of ["seePlus", "startTrial", "trialStarted", "trialBilling", "success", "pending", "serverRetry", "failed", "ownedApple", "ownedWeb", "ownedGoogle", "ownedGrant", "ownedGrantPro", "ownedOtherAccount", "done"]) {
     assert(typeof plans.paywall?.[k] === "string" && plans.paywall[k].length > 0, `plans.json: paywall.${k} missing`);
@@ -781,6 +783,52 @@ function validatePlans(plans, icons, caps, importSources) {
       assert(n.title && n.detail, `plans.json: ${list} ${n.id} needs title and detail`);
     }
   }
+}
+
+// ---- sign-in.json (ADR 0047, docs/SIGN_IN_SURFACES_SPEC.md §3) ----
+const SIGN_IN_FLOWS = new Set(["native", "web", "none"]);
+const SIGN_IN_KINDS = ["provider", "email", "device"];
+
+function validateSignIn(signIn, icons, caps, plans) {
+  assert(signIn.version === 1, "sign-in.json: version must be 1");
+  for (const [p, v] of stringsOf(signIn, "signIn")) assert(!/[–—]/.test(v), `sign-in.json: ${p} contains an em or en dash`);
+  assert(Array.isArray(signIn.platforms) && signIn.platforms.length > 0, "sign-in.json: missing platforms");
+  for (const p of signIn.platforms) assert(caps.platforms.includes(p), `sign-in.json: unknown platform "${p}"`);
+  const ids = new Set();
+  for (const m of signIn.methods) {
+    assert(/^[a-z]+$/.test(m.id) && !ids.has(m.id), `sign-in.json: bad or duplicate method id "${m.id}"`);
+    ids.add(m.id);
+    assert(SIGN_IN_KINDS.includes(m.kind), `sign-in.json: method ${m.id} unknown kind "${m.kind}"`);
+    assert(m.kind !== "provider" || (typeof m.name === "string" && m.name.length > 0), `sign-in.json: provider ${m.id} needs a name`);
+    assert(typeof m.title === "string" && m.title.length > 0, `sign-in.json: method ${m.id} needs a title`);
+    assert(m.icon in icons.icons, `sign-in.json: method ${m.id} icon "${m.icon}" is not in icons.json`);
+    assert(typeof m.createsAccount === "boolean", `sign-in.json: method ${m.id} createsAccount must be a boolean`);
+    // ADR 0047: device approval needs a signed-in device; every other method creates an account.
+    assert(m.createsAccount === (m.kind !== "device"), `sign-in.json: method ${m.id} createsAccount must be ${m.kind !== "device"}`);
+    assert(m.featureId in caps.capabilities, `sign-in.json: method ${m.id} unknown featureId "${m.featureId}"`);
+    assert(JSON.stringify(Object.keys(m.flows ?? {}).sort()) === JSON.stringify([...signIn.platforms].sort()), `sign-in.json: method ${m.id} needs a flow for exactly ${signIn.platforms.join(", ")}`);
+    for (const [p, f] of Object.entries(m.flows)) {
+      assert(SIGN_IN_FLOWS.has(f), `sign-in.json: method ${m.id} flow on ${p} must be native, web or none`);
+      assert(f !== "none" || (typeof m.notes === "string" && m.notes.length > 0), `sign-in.json: method ${m.id} is none on ${p}; say why in notes`);
+    }
+  }
+  const byId = Object.fromEntries(signIn.methods.map((m) => [m.id, m]));
+  assert(JSON.stringify(Object.keys(signIn.order ?? {}).sort()) === JSON.stringify([...signIn.platforms].sort()), `sign-in.json: order needs exactly ${signIn.platforms.join(", ")}`);
+  for (const [p, list] of Object.entries(signIn.order)) {
+    const want = signIn.methods.filter((m) => m.flows[p] !== "none").map((m) => m.id).sort();
+    assert(new Set(list).size === list.length && JSON.stringify([...list].sort()) === JSON.stringify(want), `sign-in.json: order.${p} must list exactly the methods that are not none on ${p} (${want.join(", ")})`);
+    // Providers, then email, then device approval; the platform's native provider first.
+    const ranks = list.map((id) => SIGN_IN_KINDS.indexOf(byId[id].kind));
+    assert(ranks.every((r, i) => i === 0 || ranks[i - 1] <= r), `sign-in.json: order.${p} must list providers, then email, then device`);
+    const native = list.filter((id) => byId[id].kind === "provider" && byId[id].flows[p] === "native");
+    assert(native.length <= 1, `sign-in.json: order.${p} has more than one native provider`);
+    assert(native.length === 0 || list[0] === native[0], `sign-in.json: order.${p} must start with its native provider "${native[0]}"`);
+  }
+  assert(signIn.copy.terms.includes("{terms}") && signIn.copy.terms.includes("{privacy}"), "sign-in.json: copy.terms needs {terms} and {privacy}");
+  assert(signIn.email.codeSent.includes("{email}"), "sign-in.json: email.codeSent needs {email}");
+  assert(signIn.existingAccount.detail.includes("{email}") && signIn.existingAccount.detail.includes("{provider}"), "sign-in.json: existingAccount.detail needs {email} and {provider}");
+  assert(signIn.errors.wrongCode?.other?.includes("{count}"), "sign-in.json: errors.wrongCode must be a plural with {count}");
+  assert(plans.legal?.terms && plans.legal?.privacy, "sign-in.json: the Terms and Privacy URLs come from plans.json legal");
 }
 
 function validateConformance() {
@@ -1865,6 +1913,15 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("}");
   lines.push("");
 
+  // 8a'. Signing in with another account (surfaces.json `accountSwitch`, #575)
+  const accountSwitch = surfaces.accountSwitch;
+  lines.push("/// The question before a sign-in replaces another account's tasks (`registry/surfaces.json` `accountSwitch`).");
+  lines.push("enum RegistryAccountSwitch {");
+  lines.push(`  static let title: String = ${L(accountSwitch.title, accountSwitch, "title")}`);
+  for (const e of accountSwitch.copy) lines.push(`  static let ${e.id}: String = ${L(e.label, e, "label")}`);
+  lines.push("}");
+  lines.push("");
+
   // 8b. First run (surfaces.json `firstRun`)
   const fr = surfaces.firstRun;
   emitIdEnum("RegistryFirstRunStepID", "Canonical first-run step IDs (`registry/surfaces.json` `firstRun.steps`).", fr.steps.map((s) => s.id));
@@ -2002,7 +2059,7 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  ] }");
   lines.push("  static var cards: [RegistryPlanCard] { [");
   const cardSwift = (c) => `RegistryPlanCard(id: ${swiftStr(c.id)}, title: ${L(c.title, c, "title")}, icon: ${swiftStr(c.icon)}, detail: ${L(c.detail, c, "detail")}, footnote: ${LOpt(c.footnote, c, "footnote")}, highlighted: ${c.highlighted === true})`;
-  for (const c of P.cards.filter((c) => c.status !== "planned")) lines.push(`    ${cardSwift(c)},`);
+  for (const c of P.cards.filter((c) => c.status === undefined)) lines.push(`    ${cardSwift(c)},`);
   lines.push("  ] }");
   lines.push("  /// Only for an account that has Pro: no store sells it (ADR 0037, ADR 0045).");
   lines.push(`  static var proCard: RegistryPlanCard { ${cardSwift(P.cards.find((c) => c.id === "pro"))} }`);
@@ -2046,6 +2103,82 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
     }
     lines.push("  }");
     if (name === "Status") lines.push("");
+  }
+  lines.push("}");
+  lines.push("");
+
+  // 11. Sign-in methods and the sign-in screen (sign-in.json, ADR 0047).
+  const SI = bundle.signIn;
+  const swiftBlock = (block, indent = "    ") => {
+    for (const [k, v] of Object.entries(block)) {
+      if (k === "l10nKeys") continue;
+      const isPl = typeof v === "object";
+      if (isPl || /\{[a-zA-Z]/.test(v)) {
+        const t = L10N.swiftTemplate(BY_KEY, block.l10nKeys?.[k] ?? (isPl ? v.other : v));
+        lines.push(`${indent}static func ${k}(${t.params}) -> String { ${t.body} }`);
+      } else {
+        lines.push(`${indent}static var ${k}: String { ${L(v, block, k)} }`);
+      }
+    }
+  };
+  lines.push("/// How a platform offers a sign-in method (`registry/sign-in.json`).");
+  lines.push("enum RegistrySignInFlow: String, Sendable {");
+  lines.push("  /// The platform's own flow. For email and device, the client draws the form.");
+  lines.push("  case native");
+  lines.push("  /// A redirect through api.septena.app in the system browser sheet.");
+  lines.push("  case web");
+  lines.push("  /// The platform cannot offer the method.");
+  lines.push('  case unavailable = "none"');
+  lines.push("}");
+  lines.push("");
+  lines.push("enum RegistrySignInMethodId: String, Sendable, CaseIterable {");
+  for (const m of SI.methods) lines.push(`  case ${swiftCaseDecl(m.id)} = ${swiftStr(m.id)}`);
+  lines.push("}");
+  lines.push("");
+  lines.push("struct RegistrySignInMethod: Sendable, Hashable, Identifiable {");
+  lines.push("  let id: RegistrySignInMethodId");
+  lines.push("  /// `provider`, `email` or `device`.");
+  lines.push("  let kind: String");
+  lines.push("  /// The provider's name for copy (`{provider}`); nil for email and device.");
+  lines.push("  let name: String?");
+  lines.push("  let title: String");
+  lines.push("  /// Registry icon id (icons.json).");
+  lines.push("  let icon: String");
+  lines.push("  /// False only for device approval: it needs an account that exists.");
+  lines.push("  let createsAccount: Bool");
+  lines.push("  let featureId: String");
+  lines.push("  /// Flow by platform id (`ios`, `ipados`, `macos`, ...).");
+  lines.push("  let flows: [String: RegistrySignInFlow]");
+  lines.push("}");
+  lines.push("");
+  lines.push("/// The sign-in screen (`registry/sign-in.json`, ADR 0047). It is also the");
+  lines.push("/// create-account screen. The backend's GET /v1/auth/methods says which");
+  lines.push("/// methods are on; hide the others.");
+  lines.push("enum RegistrySignIn {");
+  lines.push("  static var methods: [RegistrySignInMethod] { [");
+  for (const m of SI.methods) {
+    const flows = SI.platforms.map((p) => `${swiftStr(p)}: .${m.flows[p] === "none" ? "unavailable" : m.flows[p]}`).join(", ");
+    lines.push(`    RegistrySignInMethod(id: ${swiftCaseRef(m.id)}, kind: ${swiftStr(m.kind)}, name: ${swiftOptStr(m.name)}, title: ${L(m.title, m, "title")}, icon: ${swiftStr(m.icon)}, createsAccount: ${m.createsAccount}, featureId: ${swiftStr(m.featureId)}, flows: [${flows}]),`);
+  }
+  lines.push("  ] }");
+  lines.push("  /// Method order by platform id: the platform's provider, the other providers, email, device.");
+  lines.push("  static let order: [String: [RegistrySignInMethodId]] = [");
+  for (const p of SI.platforms) lines.push(`    ${swiftStr(p)}: [${SI.order[p].map(swiftCaseRef).join(", ")}],`);
+  lines.push("  ]");
+  lines.push("  static func method(_ id: RegistrySignInMethodId) -> RegistrySignInMethod? { methods.first { $0.id == id } }");
+  lines.push("  /// The methods `platform` offers, in screen order.");
+  lines.push("  static func methods(on platform: String) -> [RegistrySignInMethod] {");
+  lines.push("    let all = methods");
+  lines.push("    return (order[platform] ?? []).compactMap { id in all.first { $0.id == id } }");
+  lines.push("  }");
+  lines.push("  /// The Terms line's links (plans.json `legal`).");
+  lines.push("  static var termsURL: URL { RegistryPlans.termsURL }");
+  lines.push("  static var privacyURL: URL { RegistryPlans.privacyURL }");
+  lines.push("");
+  for (const [name, block] of [["Copy", SI.copy], ["Email", SI.email], ["Errors", SI.errors], ["ExistingAccount", SI.existingAccount]]) {
+    lines.push(`  enum ${name} {`);
+    swiftBlock(block);
+    lines.push("  }");
   }
   lines.push("}");
   lines.push("");
@@ -2143,7 +2276,7 @@ function generateTS({ entities, rules, icons, tokens, caps, settings, dests, act
   lines.push(`export const DESIGN_TOKENS = ${JSON.stringify({ accentPolicy: tokens.accentPolicy, fruitAccents: tokens.fruitAccents ?? [], textures: tokens.textures ?? [], selection: tokens.selection, colors: tokens.colors, multicolorGlyphs: tokens.multicolorGlyphs?.glyphs ?? {}, accentPalette: tokens.accentPalette, radii: tokens.radii, spacing: tokens.spacing, desktopColumn: tokens.desktopColumn, textScale: tokens.textScale })} as const;`);
   lines.push(`export const CAPABILITIES = ${JSON.stringify(caps.capabilities)} as const;`);
   lines.push(`export const ACTIONS_CATALOG = ${JSON.stringify({ actions: actions.actions, contextMenus: actions.contextMenus, menuBar: actions.menuBar, shortcutsSheet: actions.shortcutsSheet })} as const;`);
-  lines.push(`export const SURFACES_CATALOG = ${JSON.stringify({ notices: surfaces.notices, prompts: surfaces.prompts, toasts: surfaces.toasts, taskAttributes: surfaces.taskAttributes, taskDateBoard: surfaces.taskDateBoard, taskPage: surfaces.taskPage })} as const;`);
+  lines.push(`export const SURFACES_CATALOG = ${JSON.stringify({ notices: surfaces.notices, prompts: surfaces.prompts, toasts: surfaces.toasts, taskAttributes: surfaces.taskAttributes, taskDateBoard: surfaces.taskDateBoard, taskPage: surfaces.taskPage, accountSwitch: surfaces.accountSwitch, deviceSignIn: surfaces.deviceSignIn })} as const;`);
   lines.push(`export const FIRST_RUN = ${JSON.stringify(surfaces.firstRun)} as const;`);
   lines.push("/** Plan limits (registry/plans.json). The server's plan table: every gate reads these, never a plan name. */");
   lines.push(`export const PLAN_LIMITS = ${JSON.stringify(plans.limits)} as const;`);
@@ -2151,6 +2284,8 @@ function generateTS({ entities, rules, icons, tokens, caps, settings, dests, act
   lines.push(`export const PLAN_PRODUCTS = ${JSON.stringify(plans.prices.map((p) => p.productId))} as const;`);
   lines.push("/** Upsell copy by moment id (registry/plans.json `upsells`). Server refusals quote it, so the words match the app. */");
   lines.push(`export const PLAN_UPSELLS = ${JSON.stringify(Object.fromEntries(plans.upsells.map((u) => [u.id, { title: u.title, detail: u.detail }])))} as const;`);
+  lines.push("/** Sign-in methods, order per platform and screen copy (registry/sign-in.json, ADR 0047). Copy is English; localize with registryText(). GET /v1/auth/methods says which methods are on. */");
+  lines.push(`export const SIGN_IN = ${JSON.stringify({ platforms: bundle.signIn.platforms, methods: bundle.signIn.methods.map(({ notes, ...m }) => m), order: bundle.signIn.order, copy: bundle.signIn.copy, email: bundle.signIn.email, errors: bundle.signIn.errors, existingAccount: bundle.signIn.existingAccount, legal: plans.legal })} as const;`);
   lines.push("");
   lines.push("// Localized registry copy (ADR 0020). Keys are the English text.");
   lines.push(L10N.tsTables(BY_KEY, TRANSLATIONS));
@@ -2339,6 +2474,7 @@ function generateKotlinCore(bundle) {
   emitIdObject("RegistryCapabilityIds", Object.keys(caps.capabilities));
   emitIdObject("RegistryIconIds", Object.keys(icons.icons));
   emitIdObject("RegistryPlatformIds", caps.platforms);
+  emitIdObject("RegistrySignInMethodIds", bundle.signIn.methods.map((m) => m.id));
 
   // Surface IDs (#283, ADR 0028). `RegistryCatalog.surface(id)` finds an
   // object by its `id` anywhere in surfaces.json, so a UI that names these
@@ -2421,6 +2557,7 @@ function generateKotlinCore(bundle) {
     actions: bundle.actions,
     surfaces: bundle.surfaces,
     plans: bundle.plans,
+    signIn: bundle.signIn,
     conformance: bundle.conformance,
     localizations: bundle.translations,
   })) {
@@ -2548,6 +2685,7 @@ const actions = readJSON("registry/actions.json");
 const surfaces = readJSON("registry/surfaces.json");
 const plans = readJSON("registry/plans.json");
 const importSources = readJSON("registry/import-sources.json");
+const signIn = readJSON("registry/sign-in.json");
 
 validateEntities(entities);
 validateRules(rules);
@@ -2566,6 +2704,7 @@ checkTaskDateBoard({ surfaces, icons, caps, actions });
 validateFirstRun(surfaces, icons, caps, settings);
 validateImportSources(importSources, caps);
 validatePlans(plans, icons, caps, importSources);
+validateSignIn(signIn, icons, caps, plans);
 validateConformance();
 // Marketing content only: no generated bindings, no localized strings (ADR 0030).
 validateCast(
@@ -2575,7 +2714,7 @@ validateCast(
   assert,
 );
 
-BY_KEY = L10N.collectStrings({ settings, destinations: dests, actions, surfaces, tokens, plans, importSources }, assert);
+BY_KEY = L10N.collectStrings({ settings, destinations: dests, actions, surfaces, tokens, plans, importSources, signIn }, assert);
 
 const CATALOG_PATH = "Septena/Localizable.xcstrings";
 const catalog = readJSON(CATALOG_PATH);
@@ -2598,7 +2737,7 @@ const conformance = Object.fromEntries(
     .map((name) => [name.replace(/\.json$/, ""), readJSON(`registry/conformance/${name}`)]),
 );
 const bundle = {
-  entities, rules, icons, tokens, caps, settings, dests, actions, surfaces, plans, importSources, conformance,
+  entities, rules, icons, tokens, caps, settings, dests, actions, surfaces, plans, importSources, signIn, conformance,
   translations: { en: JSON.parse(L10N.englishFile(BY_KEY)), ...TRANSLATIONS },
 };
 /**
@@ -2673,7 +2812,7 @@ if (CHECK) {
   if (problems.length) {
     throw new Error(`generated registry code without a reader:\n  ${problems.join("\n  ")}`);
   }
-  console.log("registries: ok (all 10 registries valid and generated files up to date)");
+  console.log("registries: ok (all 11 registries valid and generated files up to date)");
 } else if (changed === 0) {
   console.log("registries: already up to date");
 }

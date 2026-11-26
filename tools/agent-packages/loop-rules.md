@@ -7,6 +7,10 @@ task server (`https://api.septena.app/mcp`, MCP over streamable HTTP with OAuth
 PKCE). Full setup instructions for humans and agents live at
 https://septena.app/agents.md (human version: https://septena.app/agents).
 
+Every tool and its rules are in the live brief at
+https://api.septena.app/skill.md. Read it before your first write in a session:
+it changes when the tools change. `tasks_orientation` returns the same guide.
+
 ## Check the connection
 
 Call `tasks_list` with `{"view": "today"}` to confirm the connection works. If a
@@ -27,15 +31,18 @@ Tasks assigned to you show up in `tasks_pending_reasoning`. Each has a `stage`:
    `claude-code`, `gemini-cli`, or `runner:my-mac`). Use the same name for the
    whole run. The claim is a lease of 30 minutes by default (`ttlMinutes`, at
    most 240). Call `tasks_claim` again to renew it while you work.
-2. **Read first.** Use `tasks_get`, `tasks_thread_get` and `tasks_activity` to
-   see the task, its conversation and what earlier runs did.
+2. **Read first.** The claim returns the project and area notes: read them.
+   Use `tasks_get`, `tasks_thread_get` and `tasks_activity` to see the task,
+   its conversation and what earlier runs did.
 3. **Write each step as a turn** with `tasks_thread_append` (role `provider`).
 4. **Ask with options.** When you need the person, append a provider turn with a
    `question` and 2 to 4 `options`. That ends your claim. Wait for a `user_turn`
    event on the task before you continue.
 5. **Hand back the result** with `tasks_set_artifact`, and a `tasks_set_handoff`
-   when the person has to finish something themselves. Set `tasks_set_endstate`
-   when your part is done. Do not complete the task: the person does that.
+   when the person has to finish something themselves. When your part is done,
+   call `tasks_set_endstate` with `needs_verify` and a note that says what to
+   check. That puts the task in the person's Review list. Do not complete,
+   cancel or delete the task: only the person accepts it or sends it back.
 6. **Release** with `tasks_release` and a one-line `why` that says what this run
    did. The person reads it in the task's activity.
 
@@ -53,6 +60,7 @@ To learn about new work without polling the whole list, call
     resume it.
   - `your_turn`: a question waits for the person.
   - `held`: another agent has it. Pick another task.
+  - `doing`: the person is working on this task right now. Pick another task.
   - `budget`: five runs since the person last wrote on this task. Ask them
     before you continue.
   - `terminal` or `closed`: the work is over.

@@ -50,6 +50,19 @@ final class AgentRoster {
     await refresh()
   }
 
+  /// Creates an agent key (#86). Returns the key to show once, or nil.
+  func createKey(name: String) async -> String? {
+    defer { Task { await refresh() } }
+    do {
+      let created = try await TaskBackendClient.shared.createAgentKey(name: name)
+      lastError = nil
+      return created.key
+    } catch {
+      lastError = error.localizedDescription
+      return nil
+    }
+  }
+
   func disconnect(_ agent: BackendAccess.Connection) async {
     do {
       try await TaskBackendClient.shared.disconnect(connectionID: agent.id)
@@ -75,16 +88,23 @@ struct SeptaskAgentsPane: View {
   }
 }
 
-/// The agent list, with rename and disconnect. The Mac AI & Agents tab shows
+/// The agent list, with rename and disconnect, and New Agent Key for an
+/// agent that cannot sign in (#86). The Mac AI & Agents tab shows
 /// it inline; `SeptaskAgentsPane` wraps it as a page.
 struct SeptaskAgentsSections: View {
   private var roster: AgentRoster { .shared }
   private static let section = RegistrySettings.section("agents", page: RegistrySettings.PageID.agents)
   private static let renamePrompt = RegistryPrompts.text[.renameAgent]
+  private static let newKeyPrompt = RegistryPrompts.text[.newAgentKey]
+  private static let keyCreatedPrompt = RegistryPrompts.fixed[.agentKeyCreated]
 
   @State private var renaming: BackendAccess.Connection?
   @State private var draftName = ""
   @State private var pendingDisconnect: BackendAccess.Connection?
+  @State private var naming = false
+  @State private var keyName = ""
+  /// The new key, shown once.
+  @State private var createdKey: String?
 
   var body: some View {
     Section {
@@ -92,6 +112,7 @@ struct SeptaskAgentsSections: View {
       ForEach(roster.agents) { agent in
         agentRow(agent)
       }
+      newKeyRow
       if let error = roster.lastError {
         Text(error).font(.caption).foregroundStyle(.red)
       }
@@ -141,6 +162,35 @@ struct SeptaskAgentsSections: View {
       Button(RegistryPrompts.cancelTitle, role: .cancel) {}
     } message: { agent in
       Text(RegistryPrompts.disconnectAgent(name: agent.displayName).message)
+    }
+  }
+
+  /// New Agent Key: name it, then the key shows once with Copy Key.
+  private var newKeyRow: some View {
+    Button(Self.newKeyPrompt?.title ?? "") {
+      keyName = ""
+      naming = true
+    }
+    .alert(Self.newKeyPrompt?.title ?? "", isPresented: $naming) {
+      TextField(Self.newKeyPrompt?.placeholder ?? "", text: $keyName)
+      Button(Self.newKeyPrompt?.confirmTitle ?? "") {
+        let name = keyName
+        Task { createdKey = await roster.createKey(name: name) }
+      }
+      .disabled(keyName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+      Button(RegistryPrompts.cancelTitle, role: .cancel) {}
+    }
+    .alert(
+      Self.keyCreatedPrompt?.title ?? "",
+      isPresented: Binding(get: { createdKey != nil }, set: { if !$0 { createdKey = nil } }),
+      presenting: createdKey
+    ) { key in
+      Button(Self.keyCreatedPrompt?.confirmTitle ?? "") {
+        SeptenaPasteboard.copy(key)
+        createdKey = nil
+      }
+    } message: { key in
+      Text("\(Self.keyCreatedPrompt?.message ?? "")\n\n\(key)")
     }
   }
 
