@@ -1,16 +1,38 @@
 {
+  "id": "/",
   "name": "Septena",
   "short_name": "Septena",
-  "description": "Tasks that think with you — calm, local-first task manager on the web.",
+  "description": "Calm, local-first task manager on the web.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "prefer_related_applications": false,
   "background_color": "#ffffff",
-  "theme_color": "#007aff",
+  "theme_color": "#ffffff",
   "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
     {
       "src": "/icon.svg",
       "sizes": "any",
-      "type": "image/svg+xml"
+      "type": "image/svg+xml",
+      "purpose": "any"
     }
   ],
   "share_target": {

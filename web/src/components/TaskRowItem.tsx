@@ -2,18 +2,21 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
+  AlignLeft,
   Bell,
+  Calendar,
   Check,
   CheckSquare,
+  Clock,
   CopyPlus,
   ExternalLink,
   Flag,
   Folder,
   History,
   Link2,
+  ListChecks,
   Maximize2,
   MessageSquare,
-  MessageSquareText,
   Paperclip,
   Pause,
   Play,
@@ -32,7 +35,12 @@ import {
 } from "lucide-react";
 import { attributeLabel } from "@/lib/dateBoard";
 import { ACTIONS_CATALOG, registryText } from "@/lib/generated/registries";
-import type { CoreConversationState, CoreMembership, CoreProjection } from "@/lib/core";
+import {
+  completedLocalDay,
+  type CoreConversationState,
+  type CoreMembership,
+  type CoreProjection,
+} from "@/lib/core";
 import { agentStageTitle } from "@/lib/destinations";
 import { waitingLabel } from "@/lib/waiting";
 import type {
@@ -61,6 +69,10 @@ export interface TaskRowItemProps {
   expanded: boolean;
   isDeletedView?: boolean;
   isFadedView?: boolean;
+  /** True on off-Today lists (Projects, Areas, Anytime, etc.); false on Today (matching iOS TaskRow.showsTodayIndicator). */
+  showsTodayIndicator?: boolean;
+  /** True on Projects/Areas when faded tasks are shown inline. */
+  showsFadedIndicator?: boolean;
   isColorfulAccent?: boolean;
   animateCompletion?: boolean;
   draggable?: boolean;
@@ -145,6 +157,26 @@ function isoToLocalDatetimeInput(iso: string | null | undefined): string {
   return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
 }
 
+function formatShortDate(ymd: string | null | undefined, todayYMD: string): string | null {
+  if (!ymd) return null;
+  const clean = ymd.slice(0, 10);
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(clean);
+  if (!m) return clean;
+  const dt = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  const tm = /^(\d{4})-(\d{2})-(\d{2})$/.exec(todayYMD);
+  if (tm) {
+    const tdt = new Date(Number(tm[1]), Number(tm[2]) - 1, Number(tm[3]));
+    const diff = Math.round(
+      (Date.UTC(dt.getFullYear(), dt.getMonth(), dt.getDate()) -
+        Date.UTC(tdt.getFullYear(), tdt.getMonth(), tdt.getDate())) /
+        86_400_000,
+    );
+    if (diff === 0) return "Today";
+    if (diff === 1) return "Tomorrow";
+  }
+  return dt.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
 const REPEAT_UNITS: Record<string, string> = {
   day: "Daily",
   week: "Weekly",
@@ -173,6 +205,62 @@ export function openRepeatSelect(select: HTMLSelectElement | null | undefined) {
   } catch {
     // The browser opens a menu only inside a user gesture. The focus stays on the control.
   }
+}
+
+/**
+ * iOS TaskCheckbox (Task Row Language v2):
+ * - Neutral gray 17px rounded-square stroke (no yellow Today box)
+ * - Dashed border for unratified MCP triage-band proposals
+ * - 7px haloed accent corner dot on committed tasks with unread agent context
+ * - Centered inside a fixed 22px column so every row aligns with group header icons
+ */
+function TaskCheckboxControl({
+  isDone,
+  isCancelled,
+  isProposal,
+  hasCornerDot,
+  justChecked,
+  onToggle,
+}: {
+  isDone: boolean;
+  isCancelled: boolean;
+  isProposal: boolean;
+  hasCornerDot: boolean;
+  justChecked: boolean;
+  onToggle: (e: React.MouseEvent) => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-label={isDone ? "Mark open" : "Complete task"}
+      className="flex h-[22px] w-[22px] shrink-0 items-center justify-center"
+    >
+      <span
+        className={`relative flex h-[17px] w-[17px] items-center justify-center rounded-[4.5px] border-[1.4px] transition-colors ${
+          justChecked ? "animate-check-pop" : ""
+        } ${
+          isDone
+            ? "border-[var(--accent)] bg-[var(--accent)]"
+            : isCancelled
+              ? "border-[var(--text-muted)]/40 bg-[var(--text-muted)]/20 text-[var(--text-muted)]"
+              : isProposal
+                ? "border-dashed border-[var(--checkbox-stroke)] hover:border-[var(--accent)]"
+                : "border-[var(--checkbox-stroke)] hover:border-[var(--accent)]"
+        }`}
+        style={isDone ? { color: "var(--accent-check)" } : undefined}
+      >
+        {isDone && <Check className="h-[11px] w-[11px] stroke-[3]" />}
+        {isCancelled && <X className="h-[11px] w-[11px] stroke-[2.5]" />}
+        {hasCornerDot && (
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute -top-[3px] -right-[3px] h-[7px] w-[7px] rounded-full bg-[var(--accent)] ring-[1.5px] ring-[var(--bg-card)]"
+          />
+        )}
+      </span>
+    </button>
+  );
 }
 
 export function TaskDetailEditor({
@@ -271,6 +359,9 @@ export function TaskDetailEditor({
   };
 
   const todayColor = isColorfulAccent ? "var(--today-gold)" : "var(--accent)";
+  const isProposal = membership.inTriageBand && task.source === "mcp";
+  const hasCornerDot =
+    !isProposal && !isDone && !isCancelled && props.convoProjection?.badge != null;
 
   return (
     <div
@@ -278,7 +369,7 @@ export function TaskDetailEditor({
       className={
         isPageMode
           ? "space-y-4"
-          : "my-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)] p-4 shadow-sm"
+          : "bg-[var(--bg-elevated)] px-3 py-3.5"
       }
       onDragOver={(e) => {
         if (e.dataTransfer.types.includes("Files")) {
@@ -292,28 +383,23 @@ export function TaskDetailEditor({
         }
       }}
     >
-      <div className="flex items-start gap-3">
-        <button
-          type="button"
-          onClick={() => {
-            if (animateCompletion && !isDone) {
-              setJustChecked(true);
-              setTimeout(() => setJustChecked(false), 260);
-            }
-            props.onToggleDone();
-          }}
-          aria-label={isDone ? "Mark open" : "Complete task"}
-          className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition-colors ${
-            justChecked ? "animate-check-pop" : ""
-          } ${
-            isDone
-              ? "border-[var(--accent)] bg-[var(--accent)]"
-              : "border-[var(--text-muted)]/50 hover:border-[var(--accent)]"
-          }`}
-          style={isDone ? { color: "var(--accent-check)" } : undefined}
-        >
-          {isDone && <Check className="h-3.5 w-3.5 stroke-[2.75]" />}
-        </button>
+      <div className="flex items-start gap-2.5">
+        <div className="mt-[1px]">
+          <TaskCheckboxControl
+            isDone={isDone}
+            isCancelled={isCancelled}
+            isProposal={isProposal}
+            hasCornerDot={hasCornerDot}
+            justChecked={justChecked}
+            onToggle={() => {
+              if (animateCompletion && !isDone) {
+                setJustChecked(true);
+                setTimeout(() => setJustChecked(false), 260);
+              }
+              props.onToggleDone();
+            }}
+          />
+        </div>
 
         <div className="min-w-0 flex-1 space-y-3">
           {/* 1. Header */}
@@ -908,7 +994,12 @@ export function TaskDetailEditor({
 
           {/* 8. Provenance */}
           <div className="flex items-center gap-1.5 text-[11px] text-[var(--text-muted)]">
-            {task.source === "mcp" && <MessageSquareText className="h-3.5 w-3.5 text-[var(--accent)]" />}
+            {task.source === "mcp" && (
+              <RegistryIcon
+                token="task.added_by_agent"
+                className="h-3.5 w-3.5 text-[var(--text-muted)]"
+              />
+            )}
             <span>
               Added by{" "}
               <strong className="font-medium text-[var(--text-secondary)]">
@@ -1040,13 +1131,15 @@ export function TaskRowItem(props: TaskRowItemProps) {
     expanded,
     isDeletedView,
     isFadedView,
+    showsTodayIndicator = true,
+    showsFadedIndicator = false,
+    todayYMD,
     isColorfulAccent = true,
     animateCompletion = true,
     draggable = false,
     isDropTarget = false,
     checklistItems,
     allTags,
-    taskRefs,
     attachments,
     convoProjection,
     convoState,
@@ -1060,13 +1153,48 @@ export function TaskRowItem(props: TaskRowItemProps) {
 
   const isDone = task.status === "done";
   const isCancelled = task.status === "cancelled";
+  const isInactive = isDone || isCancelled;
   const isToday = membership.isOnToday;
+  const isProposal = membership.inTriageBand && task.source === "mcp";
+  const hasCornerDot = !isProposal && !isInactive && convoProjection?.badge != null;
+  const isAgentAuthored = task.source === "mcp";
+  const hasNotes = Boolean(task.notes && task.notes.trim().length > 0);
   const tagMap = new Map(allTags.map((t) => [t.id, t]));
-  const taskTagIds = Array.isArray(task.tags) ? task.tags : [];
+  const resolvedTags = (Array.isArray(task.tags) ? task.tags : [])
+    .map((tid) => tagMap.get(tid))
+    .filter((t): t is TagRow => Boolean(t));
   const checkedCount = checklistItems.filter((c) => c.checked).length;
   const todayColor = isColorfulAccent ? "var(--today-gold)" : "var(--accent)";
   const hasActiveReminder = Boolean(task.reminderAt && !task.reminderDismissedAt);
   const rowWaitingLabel = isDone || isCancelled ? null : waitingLabel(task, props.todayYMD, props.lang);
+  const reminderPastDue =
+    hasActiveReminder &&
+    Number.isFinite(Date.parse(task.reminderSnoozedUntil || task.reminderAt!)) &&
+    Date.parse(task.reminderSnoozedUntil || task.reminderAt!) <= Date.now();
+
+  const showFadedPill = Boolean(
+    showsFadedIndicator && task.fadedAt && !isDeletedView && !isInactive,
+  );
+  const showTodayPill = Boolean(
+    !showFadedPill &&
+      showsTodayIndicator &&
+      isToday &&
+      !isDeletedView &&
+      !isInactive &&
+      !task.fadedAt,
+  );
+
+  const deadlineYMD = task.deadline ? task.deadline.slice(0, 10) : null;
+  const deadlineIsToday = deadlineYMD === todayYMD;
+  const scheduledYMD = task.scheduled ? task.scheduled.slice(0, 10) : null;
+  const showScheduledDate = Boolean(
+    !isInactive &&
+      !task.deadline &&
+      scheduledYMD &&
+      !(!showsTodayIndicator && scheduledYMD <= todayYMD) &&
+      !(showTodayPill && scheduledYMD <= todayYMD),
+  );
+  const completedShort = formatShortDate(completedLocalDay(task.completedAt), todayYMD);
 
   return (
     <div
@@ -1086,7 +1214,7 @@ export function TaskRowItem(props: TaskRowItemProps) {
           props.onRowClick(e as unknown as React.MouseEvent);
         }
       }}
-      className={`group relative flex w-full cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors ${
+      className={`group relative flex w-full cursor-pointer items-center gap-2.5 px-3 py-2.5 text-left transition-colors ${
         isDropTarget ? "border-t-2 border-[var(--accent)]" : ""
       } ${
         selected || multiSelected
@@ -1095,9 +1223,13 @@ export function TaskRowItem(props: TaskRowItemProps) {
       }`}
     >
       {!isDeletedView && (
-        <button
-          type="button"
-          onClick={(e) => {
+        <TaskCheckboxControl
+          isDone={isDone}
+          isCancelled={isCancelled}
+          isProposal={isProposal}
+          hasCornerDot={hasCornerDot}
+          justChecked={justChecked}
+          onToggle={(e) => {
             e.stopPropagation();
             if (animateCompletion && !isDone) {
               setJustChecked(true);
@@ -1105,44 +1237,18 @@ export function TaskRowItem(props: TaskRowItemProps) {
             }
             props.onToggleDone();
           }}
-          aria-label={isDone ? "Mark open" : "Complete task"}
-          className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[5px] border transition-colors ${
-            justChecked ? "animate-check-pop" : ""
-          } ${
-            isDone
-              ? "border-[var(--accent)] bg-[var(--accent)]"
-              : isCancelled
-                ? "border-[var(--text-muted)]/40 bg-[var(--text-muted)]/20 text-[var(--text-muted)]"
-                : "border-[var(--text-muted)]/55 hover:border-[var(--accent)]"
-          }`}
-          style={isDone ? { color: "var(--accent-check)" } : undefined}
-        >
-          {isDone && <Check className="h-3 w-3 stroke-[3]" />}
-          {isCancelled && <X className="h-3 w-3" />}
-        </button>
+        />
       )}
 
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <span
-            className={`truncate text-[15px] ${
-              isDone || isCancelled ? "text-[var(--text-muted)] line-through" : "text-[var(--text-primary)]"
+            className={`line-clamp-2 text-[15px] leading-[1.3] ${
+              isInactive ? "text-[var(--text-muted)] line-through" : "text-[var(--text-primary)]"
             }`}
           >
             {task.title}
           </span>
-          {convoProjection?.badge === "needsYou" && (
-            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">
-              <span className="h-1.5 w-1.5 rounded-full bg-[var(--convo-needs-you)]" />
-              {convoState?.needsHumanReview ? "Review" : "Your turn"}
-            </span>
-          )}
-          {convoProjection?.badge === "working" && (
-            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-blue-500/15 px-1.5 py-0.5 text-[10px] font-medium text-blue-600 dark:text-blue-400">
-              <span className="h-1.5 w-1.5 rounded-full bg-[var(--convo-working)]" />
-              Working
-            </span>
-          )}
           {hasPendingOp && (
             <span
               title="Queued locally — waiting to push"
@@ -1151,71 +1257,16 @@ export function TaskRowItem(props: TaskRowItemProps) {
           )}
         </div>
 
-        {(containerLabel ||
-          task.notes ||
-          checklistItems.length > 0 ||
-          taskTagIds.length > 0 ||
-          taskRefs.length > 0 ||
-          attachments.length > 0 ||
-          hasActiveReminder ||
-          rowWaitingLabel ||
-          task.source === "mcp") && (
-          <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-[var(--text-muted)]">
-            {containerLabel && <span className="truncate">{containerLabel}</span>}
-            {rowWaitingLabel && (
-              <span className="inline-flex min-w-0 items-center gap-1">
-                <RegistryIcon token="action.waiting" className="h-3 w-3 shrink-0" />
-                <span className="truncate">{rowWaitingLabel}</span>
-              </span>
-            )}
-            {task.source === "mcp" && (
-              <span
-                className={`inline-flex items-center gap-1 text-[11px] ${
-                  !task.acknowledgedAt ? "text-[var(--accent)]" : "text-[var(--text-muted)]"
-                }`}
-              >
-                <MessageSquareText className="h-3 w-3" />
-                {task.sourceClient || "Claude"}
-              </span>
-            )}
-            {checklistItems.length > 0 && (
-              <span className="font-mono-tabular inline-flex items-center gap-1">
-                <CheckSquare className="h-3 w-3" />
-                {checkedCount}/{checklistItems.length}
-              </span>
-            )}
-            {taskRefs.length > 0 && (
-              <span className="font-mono-tabular inline-flex items-center gap-0.5">
-                <Link2 className="h-3 w-3" />
-                {taskRefs.length}
-              </span>
-            )}
-            {attachments.length > 0 && (
-              <span className="font-mono-tabular inline-flex items-center gap-0.5">
-                <Paperclip className="h-3 w-3" />
-                {attachments.length}
-              </span>
-            )}
-            {hasActiveReminder && (
-              <span className="inline-flex items-center gap-0.5" title="Reminder set">
-                <Bell className="h-3 w-3" />
-              </span>
-            )}
-            {taskTagIds.slice(0, 3).map((tid) => {
-              const t = tagMap.get(tid);
-              if (!t) return null;
-              return (
-                <span key={tid} className="rounded bg-[var(--bg-hover)] px-1.5 py-0 text-[11px]">
-                  {t.name}
-                </span>
-              );
-            })}
-            {task.notes && <span className="max-w-[260px] truncate opacity-80">{task.notes}</span>}
+        {containerLabel && (
+          <div className="mt-0.5 truncate text-[12px] leading-tight text-[var(--text-muted)]">
+            {containerLabel}
           </div>
         )}
       </div>
 
-      <div className="flex shrink-0 items-center gap-2">
+      {/* Trailing cluster — exact iOS left-to-right order (TaskComponents.swift):
+          actions · status pill · date · time · checklist · tags · attachments · reminder · repeat · star · notes · agent provenance */}
+      <div className="flex shrink-0 items-center gap-1.5 text-[11px] text-[var(--text-muted)]">
         {isDeletedView && props.onRestoreDeleted && (
           <button
             type="button"
@@ -1223,7 +1274,7 @@ export function TaskRowItem(props: TaskRowItemProps) {
               e.stopPropagation();
               props.onRestoreDeleted!();
             }}
-            className="inline-flex items-center gap-1 rounded-md bg-[var(--bg-hover)] px-2 py-1 text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-selected)]"
+            className="inline-flex items-center gap-1 rounded-full bg-[var(--bg-pill)] px-2.5 py-0.5 text-[11px] font-medium text-[var(--text-primary)] hover:bg-[var(--bg-selected)]"
           >
             <RotateCcw className="h-3 w-3" />
             Restore
@@ -1238,7 +1289,7 @@ export function TaskRowItem(props: TaskRowItemProps) {
                 e.stopPropagation();
                 props.onKeepFaded!();
               }}
-              className="rounded-md bg-[var(--bg-selected)] px-2 py-1 text-xs font-medium text-[var(--text-primary)]"
+              className="rounded-full bg-[var(--bg-selected)] px-2.5 py-0.5 text-[11px] font-medium text-[var(--text-primary)]"
             >
               Keep
             </button>
@@ -1248,7 +1299,7 @@ export function TaskRowItem(props: TaskRowItemProps) {
                 e.stopPropagation();
                 props.onDropFaded!();
               }}
-              className="rounded-md bg-[var(--bg-hover)] px-2 py-1 text-xs text-[var(--text-secondary)]"
+              className="rounded-full bg-[var(--bg-pill)] px-2.5 py-0.5 text-[11px] text-[var(--text-secondary)]"
             >
               Let go
             </button>
@@ -1262,40 +1313,145 @@ export function TaskRowItem(props: TaskRowItemProps) {
               e.stopPropagation();
               props.onAcceptReview();
             }}
-            className="rounded-md bg-emerald-600 px-2 py-0.5 text-xs font-medium text-white hover:opacity-90"
+            className="rounded-full bg-emerald-600 px-2.5 py-0.5 text-[11px] font-medium text-white hover:opacity-90"
           >
             Accept
           </button>
         )}
 
-        {task.startTime && (
-          <span className="font-mono-tabular text-xs text-[var(--text-muted)]">{task.startTime}</span>
-        )}
-        {task.deadline && (
-          <span
-            className={`font-mono-tabular inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs ${
-              membership.deadlineRed
-                ? "bg-[var(--overdue-red)]/10 font-medium text-[var(--overdue-red)]"
-                : "text-[var(--text-muted)]"
-            }`}
-          >
-            <Flag className="h-3 w-3" />
-            {task.deadline}
+        {showFadedPill && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-[var(--bg-pill)] px-2 py-0.5 text-[11px] font-medium text-[var(--text-secondary)]">
+            <RegistryIcon token="list.faded" className="h-[11px] w-[11px] shrink-0" />
+            <span>Faded</span>
           </span>
         )}
-        {!isToday && task.scheduled && (
-          <span className="font-mono-tabular text-xs text-[var(--text-muted)]">{task.scheduled}</span>
+
+        {showTodayPill && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-[var(--bg-pill)] px-2 py-0.5 text-[11px] font-medium text-[var(--text-secondary)]">
+            <RegistryIcon
+              token="list.today"
+              className="h-[11px] w-[11px] shrink-0"
+              style={{ color: todayColor }}
+            />
+            <span>Today</span>
+          </span>
         )}
-        {task.recurrenceUnit && (
-          <Repeat
-            className={`h-3.5 w-3.5 ${task.recurrencePaused ? "opacity-40" : "text-[var(--text-muted)]"}`}
+
+        {rowWaitingLabel && !isDeletedView && (
+          <span className="inline-flex min-w-0 items-center gap-1 rounded-full bg-[var(--bg-pill)] px-2 py-0.5 text-[11px] font-medium text-[var(--text-secondary)]">
+            <RegistryIcon token="action.waiting" className="h-[11px] w-[11px] shrink-0" />
+            <span className="truncate">{rowWaitingLabel}</span>
+          </span>
+        )}
+
+        {isDone && completedShort && (
+          <span className="font-mono-tabular inline-flex items-center gap-0.5 text-[11px] text-[var(--text-muted)]">
+            <Check className="h-3 w-3" />
+            {completedShort}
+          </span>
+        )}
+
+        {isCancelled && (
+          <span className="font-mono-tabular text-[11px] text-[var(--text-muted)]">
+            {task.dropReason === "faded" ? "Let go" : "Cancelled"}
+            {completedShort ? ` · ${completedShort}` : ""}
+          </span>
+        )}
+
+        {!isInactive && deadlineYMD && (
+          deadlineIsToday ? (
+            <span className="text-[11px] font-semibold text-[var(--overdue-red)]">Today</span>
+          ) : membership.deadlineRed ? (
+            <span className="text-[11px] font-semibold text-[var(--overdue-red)]">Overdue</span>
+          ) : (
+            <span className="font-mono-tabular inline-flex items-center gap-0.5 text-[11px] text-[var(--text-muted)]">
+              <Flag className="h-[11px] w-[11px]" />
+              {formatShortDate(deadlineYMD, todayYMD)}
+            </span>
+          )
+        )}
+
+        {showScheduledDate && (
+          <span className="font-mono-tabular inline-flex items-center gap-0.5 text-[11px] text-[var(--text-muted)]">
+            <Calendar className="h-[11px] w-[11px]" />
+            {formatShortDate(scheduledYMD, todayYMD)}
+          </span>
+        )}
+
+        {!isInactive && task.startTime && (
+          <span className="font-mono-tabular inline-flex items-center gap-0.5 text-[11px] text-[var(--text-muted)]">
+            <Clock className="h-[11px] w-[11px]" />
+            {task.startTime}
+          </span>
+        )}
+
+        {checklistItems.length > 0 && (
+          <span className="font-mono-tabular inline-flex items-center gap-0.5 text-[11px] text-[var(--text-muted)]">
+            <ListChecks className="h-[11px] w-[11px]" />
+            {checkedCount}/{checklistItems.length}
+          </span>
+        )}
+
+        {resolvedTags.slice(0, 2).map((t) => (
+          <span
+            key={t.id}
+            className="max-w-[96px] truncate rounded-full border border-[var(--text-muted)]/30 px-1.5 py-[1px] text-[10.5px] leading-tight text-[var(--text-secondary)]"
+          >
+            {t.name}
+          </span>
+        ))}
+        {resolvedTags.length > 2 && (
+          <span className="font-mono-tabular text-[10.5px] text-[var(--text-muted)]">
+            +{resolvedTags.length - 2}
+          </span>
+        )}
+
+        {attachments.length > 0 && (
+          <span className="font-mono-tabular inline-flex items-center gap-0.5 text-[11px] text-[var(--text-muted)]">
+            <Paperclip className="h-[11px] w-[11px]" />
+            {attachments.length}
+          </span>
+        )}
+
+        {hasActiveReminder && (
+          <Bell
+            className={`h-[12px] w-[12px] shrink-0 ${
+              reminderPastDue ? "text-[var(--overdue-red)]" : "text-[var(--text-muted)]"
+            }`}
+            aria-label="Reminder set"
           />
         )}
-        {task.starred && (
-          <Star className="h-3.5 w-3.5 shrink-0" style={{ color: "#f59e0b", fill: "#f59e0b" }} />
+
+        {task.recurrenceUnit && (
+          <Repeat
+            className={`h-[12px] w-[12px] shrink-0 ${
+              task.recurrencePaused ? "opacity-40" : "text-[var(--text-muted)]"
+            }`}
+            aria-label="Repeating task"
+          />
         )}
-        {isToday && (
-          <Sun className="h-3.5 w-3.5 shrink-0" style={{ color: todayColor }} />
+
+        {task.starred && (
+          <Star
+            className="h-[12px] w-[12px] shrink-0"
+            style={{ color: "var(--today-gold)", fill: "var(--today-gold)" }}
+            aria-label="Favorite"
+          />
+        )}
+
+        {hasNotes && !isAgentAuthored && (
+          <AlignLeft
+            className="h-[12px] w-[12px] shrink-0 text-[var(--text-muted)]"
+            aria-label="Has notes"
+          />
+        )}
+
+        {isAgentAuthored && (
+          <RegistryIcon
+            token="task.added_by_agent"
+            className="h-[12px] w-[12px] shrink-0 text-[var(--text-muted)]"
+            aria-label={`Added by ${task.sourceClient || "agent"}`}
+          />
         )}
       </div>
     </div>

@@ -1,4 +1,6 @@
 import {
+  AlignLeft,
+  Bell,
   Bot,
   Calendar,
   Check,
@@ -10,21 +12,31 @@ import {
   Clock,
   Eye,
   Hourglass,
+  Flag,
+  Folder,
+  Inbox,
   Layers,
+  ListChecks,
   Mail,
   MessageCircleQuestion,
+  MessageSquare,
+  MessageSquareText,
   MonitorSmartphone,
+  Paperclip,
   Repeat,
   Star,
   Sun,
+  Trash2,
   type LucideIcon,
   type LucideProps,
 } from "lucide-react";
 import { ICONS } from "@/lib/generated/registries";
 
-// The lucide icons that registry/icons.json names for the smart lists, their
-// groups and the sign-in methods. A named import keeps the rest of lucide out of the bundle.
+// The lucide icons that registry/icons.json names for smart lists, their groups,
+// sign-in methods, and task row chrome. Named imports keep the rest of lucide out of the bundle.
 const LUCIDE: Record<string, LucideIcon> = {
+  "align-left": AlignLeft,
+  bell: Bell,
   bot: Bot,
   calendar: Calendar,
   check: Check,
@@ -35,18 +47,26 @@ const LUCIDE: Record<string, LucideIcon> = {
   clock: Clock,
   eye: Eye,
   hourglass: Hourglass,
+  flag: Flag,
+  folder: Folder,
+  inbox: Inbox,
   layers: Layers,
+  "list-checks": ListChecks,
   mail: Mail,
   "message-circle-question": MessageCircleQuestion,
+  "message-square": MessageSquare,
+  "message-square-text": MessageSquareText,
   "monitor-smartphone": MonitorSmartphone,
+  paperclip: Paperclip,
   repeat: Repeat,
   star: Star,
   sun: Sun,
+  "trash-2": Trash2,
 };
 
 const REGISTRY_ICONS: Record<string, { lucide: string } | undefined> = ICONS;
 
-/** The icon of a registry/icons.json token, such as `list.review`. */
+/** The icon of a registry/icons.json token, such as `list.review` or `task.added_by_agent`. */
 export function RegistryIcon({ token, ...props }: { token: string } & LucideProps) {
   const Icon = LUCIDE[REGISTRY_ICONS[token]?.lucide ?? ""] ?? Circle;
   return <Icon {...props} />;

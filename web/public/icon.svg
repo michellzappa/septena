@@ -1,5 +1,56 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
-  <rect width="64" height="64" rx="16" fill="#18181B"/>
-  <circle cx="32" cy="32" r="18" stroke="#FFFFFF" stroke-width="4"/>
-  <path d="M24 32.5L29.5 38L41 26.5" stroke="#F5C721" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="64" height="64">
+  <defs>
+    <clipPath id="septena_clip"><path d="M 291.84 0 L 732.16 0 C 918.94 0, 1024 105.06, 1024 291.84 L 1024 732.16 C 1024 918.94, 918.94 1024, 732.16 1024 L 291.84 1024 C 105.06 1024, 0 918.94, 0 732.16 L 0 291.84 C 0 105.06, 105.06 0, 291.84 0 Z"/></clipPath>
+    <linearGradient id="septena_shell" x1="0.16" y1="0.02" x2="0.84" y2="1">
+      <stop offset="0%" stop-color="#3B3C46"/>
+      <stop offset="48%" stop-color="#27272E"/>
+      <stop offset="100%" stop-color="#15151A"/>
+    </linearGradient>
+    <radialGradient id="septena_sheen" cx="0.28" cy="0.12" r="0.72">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.16"/>
+      <stop offset="55%" stop-color="#FFFFFF" stop-opacity="0.03"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0.12"/>
+    </radialGradient>
+    <linearGradient id="septena_well" x1="0.2" y1="0" x2="0.8" y2="1">
+      <stop offset="0%" stop-color="#07070A"/>
+      <stop offset="55%" stop-color="#0F1015"/>
+      <stop offset="100%" stop-color="#181920"/>
+    </linearGradient>
+    <radialGradient id="septena_face" cx="42%" cy="30%" r="72%">
+      <stop offset="0%" stop-color="#FFFEFD"/>
+      <stop offset="62%" stop-color="#FFFDF8"/>
+      <stop offset="100%" stop-color="#F5F1E9"/>
+    </radialGradient>
+    <linearGradient id="septena_acc" x1="0.18" y1="0" x2="0.82" y2="1">
+      <stop offset="0%" stop-color="#FF7738"/>
+      <stop offset="52%" stop-color="#E05212"/>
+      <stop offset="100%" stop-color="#A12504"/>
+    </linearGradient>
+    <linearGradient id="septena_ink" x1="0.25" y1="0" x2="0.75" y2="1">
+      <stop offset="0%" stop-color="#4C5058"/>
+      <stop offset="100%" stop-color="#363940"/>
+    </linearGradient>
+    <filter id="septena_shPlate" x="-16%" y="-14%" width="132%" height="136%">
+      <feDropShadow dx="0" dy="14" stdDeviation="14" flood-color="#040407" flood-opacity="0.44"/>
+      <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#040407" flood-opacity="0.26"/>
+    </filter>
+    <filter id="septena_shSm" x="-22%" y="-22%" width="144%" height="148%">
+      <feDropShadow dx="0" dy="6" stdDeviation="6" flood-color="#040407" flood-opacity="0.30"/>
+    </filter>
+  </defs>
+  <g clip-path="url(#septena_clip)">
+    <rect x="0" y="0" width="1024" height="1024" fill="url(#septena_shell)"/>
+    <rect x="0" y="0" width="1024" height="1024" fill="url(#septena_sheen)"/>
+    <path d="M 292.26 8 L 731.74 8 C 913.67 8, 1016 110.33, 1016 292.26 L 1016 731.74 C 1016 913.67, 913.67 1016, 731.74 1016 L 292.26 1016 C 110.33 1016, 8 913.67, 8 731.74 L 8 292.26 C 8 110.33, 110.33 8, 292.26 8 Z" fill="none" stroke="#686A78" stroke-opacity="0.32" stroke-width="5"/>
+    <circle cx="512" cy="512" r="416" fill="url(#septena_well)"/>
+    <circle cx="512" cy="512" r="412" fill="none" stroke="#040407" stroke-opacity="0.55" stroke-width="8"/>
+    <circle cx="512" cy="515" r="415" fill="none" stroke="#FFFFFF" stroke-opacity="0.2" stroke-width="4"/>
+    <g filter="url(#septena_shPlate)">
+      <circle cx="512" cy="512" r="354" fill="url(#septena_face)"/>
+      <circle cx="512" cy="512" r="351" fill="none" stroke="#FFFFFF" stroke-opacity="0.94" stroke-width="5"/>
+    </g>
+    <g><line x1="715.28" y1="349.89" x2="754.37" y2="318.72" stroke="#6A6770" stroke-width="24" stroke-linecap="round" opacity="0.28"/><line x1="765.48" y1="569.86" x2="814.23" y2="580.98" stroke="#6A6770" stroke-width="24" stroke-linecap="round" opacity="0.28"/><line x1="624.81" y1="746.25" x2="646.5" y2="791.3" stroke="#6A6770" stroke-width="24" stroke-linecap="round" opacity="0.28"/><line x1="399.19" y1="746.25" x2="377.5" y2="791.3" stroke="#6A6770" stroke-width="24" stroke-linecap="round" opacity="0.28"/><line x1="258.52" y1="569.86" x2="209.77" y2="580.98" stroke="#6A6770" stroke-width="24" stroke-linecap="round" opacity="0.28"/><line x1="308.72" y1="349.89" x2="269.63" y2="318.72" stroke="#6A6770" stroke-width="24" stroke-linecap="round" opacity="0.28"/></g>
+    <path d="M 512 176 L 558.23 278.53 L 512 252 L 465.77 278.53 Z" fill="url(#septena_acc)" stroke="#A12504" stroke-opacity="0.24" stroke-width="2" filter="url(#septena_shSm)"/>
+    <g filter="url(#septena_shSm)"><path d="M 377 511 L 460 598 L 639 426" fill="none" stroke="url(#septena_acc)" stroke-width="64" stroke-linecap="round" stroke-linejoin="round"/></g>
+  </g>
 </svg>

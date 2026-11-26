@@ -29,11 +29,13 @@ import {
 } from "lucide-react";
 import { SeptenaApiClient } from "@/lib/api/client";
 import {
+  completedLocalDay,
   ensureCoreReady,
   fadeFill,
   getCoreVersion,
   localTodayYMD,
   localUtcOffsetSeconds,
+  localWallClockTimestamp,
   rowOpacity,
   shouldArmReminder,
   taskViewMembership,
@@ -212,6 +214,8 @@ export function SeptenaApp() {
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
   const [taskPageId, setTaskPageId] = useState<string | null>(null);
   const [inboxCollapsed, setInboxCollapsed] = useState(false);
+  const [todayLoggedExpanded, setTodayLoggedExpanded] = useState(true);
+  const [scopeLoggedExpandedIds, setScopeLoggedExpandedIds] = useState<Set<string>>(() => new Set());
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [tagFilterId, setTagFilterId] = useState<string | null>(null);
   const [composerTitle, setComposerTitle] = useState("");
@@ -282,10 +286,18 @@ export function SeptenaApp() {
     return () => mq.removeEventListener("change", handler);
   }, []);
 
+  // Keep the address bar on the canonical app root (`/`) so iOS Add to Home
+  // Screen and browser installs always save https://web.septena.app/.
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.location.pathname !== "/") {
+      window.history.replaceState({}, "", `/${window.location.search}`);
+    }
+  }, []);
+
   // Register offline shell Service Worker.
   useEffect(() => {
     if (typeof window !== "undefined" && "serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").catch(() => {});
+      navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(() => {});
     }
   }, []);
 
@@ -311,7 +323,7 @@ export function SeptenaApp() {
       today: false,
     });
     setQuickAddOpen(true);
-    window.history.replaceState({}, "", window.location.pathname);
+    window.history.replaceState({}, "", "/");
   }, [bootPhase]);
 
   // DayClock midnight rollover watcher.
@@ -706,7 +718,7 @@ export function SeptenaApp() {
         continue;
       }
       if (task.status === "done" || task.status === "cancelled") {
-        if (String(task.completedAt ?? "").startsWith(todayYMD)) counts.logbook++;
+        if (completedLocalDay(task.completedAt) === todayYMD) counts.logbook++;
         continue;
       }
       if (task.status !== "open") continue;
@@ -790,13 +802,8 @@ export function SeptenaApp() {
       .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
   }, [destination, syncState.snapshot.tasks]);
 
-  const listedTasks = useMemo(() => {
-    const filtered = evaluatedTasks.filter(({ task, membership, convoState }) => {
-      if (tagFilterId) {
-        const tags = Array.isArray(task.tags) ? task.tags : [];
-        if (!tags.includes(tagFilterId)) return false;
-      }
-
+  const destinationTasks = useMemo(() => {
+    return evaluatedTasks.filter(({ task, membership, convoState }) => {
       if (destination.kind === "smart") {
         if (destination.id === "logbook") {
           if (logbookTab === "deleted") return Boolean(task.deletedAt);
@@ -824,8 +831,29 @@ export function SeptenaApp() {
       }
       return task.project === destination.id;
     });
+  }, [destination, evaluatedTasks, logbookTab, prefs.tasksShowFaded, projectById]);
 
-    return filtered.sort((a, b) => {
+  // Progressive disclosure (matching iOS TaskListView.swift): only surface tags
+  // that actually appear on tasks in the current list; empty → zero chrome.
+  const availableTagsInList = useMemo(() => {
+    const usedIds = new Set<string>();
+    for (const { task } of destinationTasks) {
+      if (Array.isArray(task.tags)) {
+        for (const tid of task.tags) usedIds.add(tid);
+      }
+    }
+    return activeTags.filter((t) => usedIds.has(t.id));
+  }, [activeTags, destinationTasks]);
+
+  const listedTasks = useMemo(() => {
+    const filtered = tagFilterId
+      ? destinationTasks.filter(({ task }) => {
+          const tags = Array.isArray(task.tags) ? task.tags : [];
+          return tags.includes(tagFilterId);
+        })
+      : destinationTasks;
+
+    return [...filtered].sort((a, b) => {
       if (destination.kind === "smart" && destination.id === "logbook") {
         const ka = logbookTab === "deleted" ? String(a.task.deletedAt ?? "") : String(a.task.completedAt ?? "");
         const kb = logbookTab === "deleted" ? String(b.task.deletedAt ?? "") : String(b.task.completedAt ?? "");
@@ -844,7 +872,7 @@ export function SeptenaApp() {
       if (pa !== pb) return pa - pb;
       return String(b.task.createdAt ?? "").localeCompare(String(a.task.createdAt ?? ""));
     });
-  }, [destination, evaluatedTasks, logbookTab, prefs.tasksShowFaded, projectById, tagFilterId]);
+  }, [destination, destinationTasks, logbookTab, tagFilterId]);
 
   // Review grouped by what waits on the user, then agent work in progress (docs/REVIEW_SPEC.md §1), in registry order.
   const reviewGroups = useMemo(() => {
@@ -874,19 +902,45 @@ export function SeptenaApp() {
       ? sumRows(reviewGroups.filter((g) => g.id !== "faded"))
       : listedTasks.length;
 
+  // Today's logged block: tasks completed or cancelled TODAY (local calendar
+  // day), newest first — 1:1 with Apple LocalCache.tasksCompleted(onDay: today)
+  // and Mac SeptaskKitTaskList.todayLoggedRows().
   const completedTodayTasks = useMemo(() => {
     if (!(destination.kind === "smart" && destination.id === "today" && prefs.todayShowCompleted)) {
       return [];
     }
     return evaluatedTasks
-      .filter(
-        ({ task }) =>
-          !task.deletedAt &&
-          task.status === "done" &&
-          String(task.completedAt ?? "").startsWith(todayYMD),
-      )
+      .filter(({ task }) => {
+        if (task.deletedAt) return false;
+        if (task.status !== "done" && task.status !== "cancelled") return false;
+        if (completedLocalDay(task.completedAt) !== todayYMD) return false;
+        if (tagFilterId) {
+          const tags = Array.isArray(task.tags) ? task.tags : [];
+          if (!tags.includes(tagFilterId)) return false;
+        }
+        return true;
+      })
       .sort((a, b) => String(b.task.completedAt ?? "").localeCompare(String(a.task.completedAt ?? "")));
-  }, [destination, evaluatedTasks, prefs.todayShowCompleted, todayYMD]);
+  }, [destination, evaluatedTasks, prefs.todayShowCompleted, tagFilterId, todayYMD]);
+
+  // Project / Area logged footer: completed tasks in this scope, newest first
+  // (collapsed by default, matching iOS TaskListView.scopeLoggedSection & Mac).
+  const loggedScopeTasks = useMemo(() => {
+    if (destination.kind !== "area" && destination.kind !== "project") return [];
+    return evaluatedTasks
+      .filter(({ task }) => {
+        if (task.deletedAt || task.status !== "done") return false;
+        if (tagFilterId) {
+          const tags = Array.isArray(task.tags) ? task.tags : [];
+          if (!tags.includes(tagFilterId)) return false;
+        }
+        if (destination.kind === "project") return task.project === destination.id;
+        if (task.area === destination.id) return true;
+        const proj = task.project ? projectById.get(task.project) : null;
+        return proj?.area === destination.id;
+      })
+      .sort((a, b) => String(b.task.completedAt ?? "").localeCompare(String(a.task.completedAt ?? "")));
+  }, [destination, evaluatedTasks, projectById, tagFilterId]);
 
   // On Today: foldable Inbox band at top (matching iOS/Mac, docs/TRIAGE_BAND_SPEC.md).
   const { todayInboxTasks, todayCommittedTasks } = useMemo(() => {
@@ -910,20 +964,32 @@ export function SeptenaApp() {
     ) {
       return null;
     }
+    type TodayGroup =
+      | { kind: "project"; projectId: string; title: string; items: EvaluatedTask[] }
+      | { kind: "area"; areaId: string; emoji: string | null; title: string; items: EvaluatedTask[] };
     const ungrouped: EvaluatedTask[] = [];
-    const groups = new Map<string, { label: string; items: EvaluatedTask[] }>();
+    const groups = new Map<string, TodayGroup>();
     for (const item of todayCommittedTasks) {
       const t = item.task;
       if (t.project && projectById.has(t.project)) {
+        const p = projectById.get(t.project)!;
         const key = `p:${t.project}`;
-        const cur = groups.get(key) ?? { label: projectById.get(t.project)!.title, items: [] };
+        const cur = groups.get(key) ?? {
+          kind: "project" as const,
+          projectId: p.id,
+          title: p.title,
+          items: [],
+        };
         cur.items.push(item);
         groups.set(key, cur);
       } else if (t.area && areaById.has(t.area)) {
         const a = areaById.get(t.area)!;
         const key = `a:${t.area}`;
         const cur = groups.get(key) ?? {
-          label: `${a.emoji ? `${a.emoji} ` : ""}${a.title}`,
+          kind: "area" as const,
+          areaId: a.id,
+          emoji: a.emoji ?? null,
+          title: a.title,
           items: [],
         };
         cur.items.push(item);
@@ -1101,10 +1167,11 @@ export function SeptenaApp() {
     [engine, undoStack],
   );
 
-  // Sync container notes draft when switching Area / Project.
+  // Sync container notes draft & clear active tag filter when switching lists.
   useEffect(() => {
     setShowContainerNotes(false);
     setSelectedIds(new Set());
+    setTagFilterId(null);
     if (destination.kind === "area") {
       setContainerNotesDraft(areaById.get(destination.id)?.context ?? "");
     } else if (destination.kind === "project") {
@@ -1448,7 +1515,7 @@ export function SeptenaApp() {
           e.preventDefault();
           void engine.bulkUpdateTasks(activeSelectedTasks, {
             status: "cancelled",
-            completedAt: new Date().toISOString(),
+            completedAt: localWallClockTimestamp(),
             dropReason: "user",
           });
           return;
@@ -1790,6 +1857,8 @@ export function SeptenaApp() {
       destination.kind === "smart" &&
       destination.id === "review" &&
       reviewGroupOf(task, convoState) === "faded";
+    const showsTodayIndicator = !(destination.kind === "smart" && destination.id === "today");
+    const showsFadedIndicator = destination.kind === "area" || destination.kind === "project";
 
     return {
       task,
@@ -1802,6 +1871,8 @@ export function SeptenaApp() {
       expanded: expandedTaskId === task.id,
       isDeletedView,
       isFadedView,
+      showsTodayIndicator,
+      showsFadedIndicator,
       todayYMD,
       lang,
       isColorfulAccent,
@@ -2118,35 +2189,86 @@ export function SeptenaApp() {
     <TaskRowItem key={item.task.id} {...buildTaskRowProps(item, hideContainerLabel)} />
   );
 
+  // iOS TaskCardChrome: 14px continuous rounded card on soft gray canvas with
+  // hairline dividers; translucent frosted glass when a Header Wash is active.
+  const taskCardClass = `overflow-hidden rounded-[14px] border border-[var(--border-subtle)]/75 divide-y divide-[var(--border-hairline)] ${
+    canvasTexture !== "none"
+      ? "bg-[var(--bg-card-glass)] backdrop-blur-md"
+      : "bg-[var(--bg-card)]"
+  }`;
+
+  // Unified iOS group/section header: shares the exact horizontal inset (`px-3`)
+  // and 22px leading icon slot (`w-[22px]` + `gap-2.5`) as every task row
+  // checkbox below it. Sentence case, no bottom underline.
+  const renderSectionHeader = ({
+    leading,
+    title,
+    count,
+    muted = false,
+    collapse,
+    onContextMenu,
+  }: {
+    leading?: React.ReactNode;
+    title: string;
+    count?: number;
+    muted?: boolean;
+    collapse?: { expanded: boolean; onToggle: () => void };
+    onContextMenu?: (e: React.MouseEvent) => void;
+  }) => {
+    const Chevron = collapse?.expanded ? ChevronDown : ChevronRight;
+    const inner = (
+      <>
+        {leading && (
+          <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center">
+            {leading}
+          </span>
+        )}
+        <span
+          className={`truncate text-[15px] font-semibold tracking-[-0.01em] ${
+            muted ? "text-[var(--text-secondary)]" : "text-[var(--text-primary)]"
+          }`}
+        >
+          {title}
+        </span>
+        {typeof count === "number" && (
+          <span className="font-mono-tabular ml-auto text-[13px] font-normal text-[var(--text-muted)]">
+            {count}
+          </span>
+        )}
+        {collapse && <Chevron className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />}
+      </>
+    );
+    const className = "flex w-full items-center gap-2.5 px-3 pb-2 text-left";
+    if (collapse) {
+      return (
+        <button
+          type="button"
+          aria-expanded={collapse.expanded}
+          onClick={collapse.onToggle}
+          onContextMenu={onContextMenu}
+          className={`${className} transition-opacity hover:opacity-80`}
+        >
+          {inner}
+        </button>
+      );
+    }
+    return (
+      <div onContextMenu={onContextMenu} className={className}>
+        {inner}
+      </div>
+    );
+  };
+
   const renderGroupHeader = (
     group: { title: string; icon: string; items: EvaluatedTask[] },
     collapse?: { expanded: boolean; onToggle: () => void },
-  ) => {
-    const Chevron = collapse?.expanded ? ChevronDown : ChevronRight;
-    const content = (
-      <>
-        <RegistryIcon token={group.icon} className="h-3.5 w-3.5 text-[var(--text-muted)]" />
-        <span>{registryText(group.title, lang)}</span>
-        <span className="font-mono-tabular ml-auto font-normal text-[var(--text-muted)]">
-          {group.items.length}
-        </span>
-        {collapse && <Chevron className="h-3.5 w-3.5 text-[var(--text-muted)]" />}
-      </>
-    );
-    const className =
-      "mb-1.5 flex w-full items-center gap-2 border-b border-[var(--border-subtle)] pb-1.5 text-left text-xs font-semibold tracking-wide text-[var(--text-secondary)] uppercase";
-    if (!collapse) return <div className={className}>{content}</div>;
-    return (
-      <button
-        type="button"
-        aria-expanded={collapse.expanded}
-        onClick={collapse.onToggle}
-        className={`${className} hover:text-[var(--text-primary)]`}
-      >
-        {content}
-      </button>
-    );
-  };
+  ) =>
+    renderSectionHeader({
+      leading: <RegistryIcon token={group.icon} className="h-4 w-4 text-[var(--text-muted)]" />,
+      title: registryText(group.title, lang),
+      count: group.items.length,
+      collapse,
+    });
 
   const taskPageItem = useMemo(() => {
     if (!taskPageId) return null;
@@ -2340,7 +2462,7 @@ export function SeptenaApp() {
                     setSelectedIds(new Set());
                     setMobileMenuOpen(false);
                   }}
-                  className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm font-medium transition-colors ${
+                  className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm font-medium transition-colors ${
                     isAreaDrop
                       ? "ring-2 ring-[var(--accent)] bg-[var(--bg-selected)] text-[var(--text-primary)]"
                       : areaSelected
@@ -2348,11 +2470,13 @@ export function SeptenaApp() {
                         : "text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
                   }`}
                 >
-                  {area.emoji ? (
-                    <span className="w-4 text-center text-sm leading-none">{area.emoji}</span>
-                  ) : (
-                    <Folder className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
-                  )}
+                  <span className="flex h-4 w-4 shrink-0 items-center justify-center">
+                    {area.emoji ? (
+                      <span className="text-[14px] leading-none">{area.emoji}</span>
+                    ) : (
+                      <Folder className="h-4 w-4 text-[var(--text-muted)]" />
+                    )}
+                  </span>
                   <span className="truncate">{area.title}</span>
                 </button>
 
@@ -2390,7 +2514,7 @@ export function SeptenaApp() {
                             setSelectedIds(new Set());
                             setMobileMenuOpen(false);
                           }}
-                          className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-1 text-sm transition-colors ${
+                          className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1 text-sm transition-colors ${
                             isProjDrop
                               ? "ring-2 ring-[var(--accent)] bg-[var(--bg-selected)] text-[var(--text-primary)]"
                               : projSelected
@@ -2398,7 +2522,9 @@ export function SeptenaApp() {
                                 : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
                           }`}
                         >
-                          <ProjectRing done={stats.done} total={stats.total} />
+                          <span className="flex h-4 w-4 shrink-0 items-center justify-center">
+                            <ProjectRing done={stats.done} total={stats.total} />
+                          </span>
                           <span className="flex-1 truncate text-left">{proj.title}</span>
                           {prefs.sidebarCounts && stats.total - stats.done > 0 && (
                             <span className="font-mono-tabular text-xs text-[var(--text-muted)]">
@@ -2448,7 +2574,7 @@ export function SeptenaApp() {
                     setSelectedIds(new Set());
                     setMobileMenuOpen(false);
                   }}
-                  className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm transition-colors ${
+                  className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm transition-colors ${
                     isProjDrop
                       ? "ring-2 ring-[var(--accent)] bg-[var(--bg-selected)] text-[var(--text-primary)]"
                       : projSelected
@@ -2456,7 +2582,9 @@ export function SeptenaApp() {
                         : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
                   }`}
                 >
-                  <ProjectRing done={stats.done} total={stats.total} />
+                  <span className="flex h-4 w-4 shrink-0 items-center justify-center">
+                    <ProjectRing done={stats.done} total={stats.total} />
+                  </span>
                   <span className="flex-1 truncate text-left">{proj.title}</span>
                   {prefs.sidebarCounts && stats.total - stats.done > 0 && (
                     <span className="font-mono-tabular text-xs text-[var(--text-muted)]">
@@ -2604,7 +2732,11 @@ export function SeptenaApp() {
           fadeHeight={240}
         />
 
-        <header className="relative z-10 flex flex-wrap items-center gap-3 border-b border-[var(--border-subtle)]/70 px-4 py-3 md:px-10 md:py-5">
+        <header
+          className={`relative z-10 flex flex-wrap items-center gap-3 px-4 py-3 md:px-10 md:py-5 ${
+            canvasTexture === "none" ? "border-b border-[var(--border-subtle)]/70" : ""
+          }`}
+        >
           <button
             type="button"
             onClick={() => setMobileMenuOpen(true)}
@@ -2977,58 +3109,65 @@ export function SeptenaApp() {
               </form>
             )}
 
-            {/* Tag filter strip */}
-            {activeTags.length > 0 && !(destination.kind === "smart" && destination.id === "logbook") && (
-              <div className="mb-3 flex flex-wrap items-center gap-1.5 text-xs">
-                <Tag className="h-3 w-3 text-[var(--text-muted)]" />
-                {tagFilterId && (
-                  <button
-                    type="button"
-                    onClick={() => setTagFilterId(null)}
-                    className="inline-flex items-center gap-1 rounded-full bg-[var(--bg-hover)] px-2 py-0.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                  >
-                    All <X className="h-3 w-3" />
-                  </button>
-                )}
-                {activeTags.map((t) => {
-                  const active = tagFilterId === t.id;
-                  return (
+            {/* Tag filter strip — progressive disclosure (only tags present in this list) */}
+            {availableTagsInList.length > 0 &&
+              !(destination.kind === "smart" && destination.id === "logbook") && (
+                <div className="mb-3 flex flex-wrap items-center gap-1.5 px-1 text-xs">
+                  <Tag className="h-3 w-3 text-[var(--text-muted)]" />
+                  {tagFilterId && (
                     <button
-                      key={t.id}
                       type="button"
-                      onClick={() => setTagFilterId(active ? null : t.id)}
-                      className={`rounded-full px-2.5 py-0.5 transition-colors ${
-                        active
-                          ? "bg-[var(--bg-selected)] font-medium text-[var(--text-primary)]"
-                          : "bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-                      }`}
+                      onClick={() => setTagFilterId(null)}
+                      className="inline-flex items-center gap-1 rounded-full bg-[var(--bg-pill)] px-2.5 py-0.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                     >
-                      {t.name}
+                      All <X className="h-3 w-3" />
                     </button>
-                  );
-                })}
-              </div>
-            )}
+                  )}
+                  {availableTagsInList.map((t) => {
+                    const active = tagFilterId === t.id;
+                    return (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => setTagFilterId(active ? null : t.id)}
+                        className={`rounded-full px-2.5 py-0.5 transition-colors ${
+                          active
+                            ? "bg-[var(--bg-selected)] font-medium text-[var(--text-primary)]"
+                            : "bg-[var(--bg-pill)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                        }`}
+                      >
+                        {t.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
 
-            {/* Inline Quick-Add Composer */}
+            {/* Inline Quick-Add Composer — aligned on the same 22px leading axis as task checkboxes */}
             {pageMeta.supportsInlineCreate && (
               <form
                 onSubmit={(e) => void handleQuickAddInline(e)}
-                className="mb-4 flex items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/95 px-3 py-2 focus-within:border-[var(--accent)]"
+                className={`mb-5 flex items-center gap-2.5 rounded-[14px] border border-[var(--border-subtle)]/75 px-3 py-2.5 focus-within:border-[var(--accent)] ${
+                  canvasTexture !== "none"
+                    ? "bg-[var(--bg-card-glass)] backdrop-blur-md"
+                    : "bg-[var(--bg-card)]"
+                }`}
               >
-                <Plus className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
+                <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center text-[var(--text-muted)]">
+                  <Plus className="h-[17px] w-[17px]" />
+                </span>
                 <input
                   ref={composerRef}
                   type="text"
                   value={composerTitle}
                   onChange={(e) => setComposerTitle(e.target.value)}
                   placeholder={`New task in ${pageMeta.title}… (press N)`}
-                  className="min-w-0 flex-1 bg-transparent text-sm text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)]"
+                  className="min-w-0 flex-1 bg-transparent text-[15px] text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)]"
                 />
                 {composerTitle.trim() && (
                   <button
                     type="submit"
-                    className="rounded-md bg-[var(--accent)] px-2.5 py-1 text-xs font-medium hover:opacity-90"
+                    className="rounded-lg bg-[var(--accent)] px-2.5 py-1 text-xs font-medium hover:opacity-90"
                     style={{ color: "var(--accent-check)" }}
                   >
                     Add
@@ -3037,7 +3176,7 @@ export function SeptenaApp() {
               </form>
             )}
 
-            {/* Task Lists */}
+            {/* Task Lists — iOS grouped rounded cards on soft gray canvas */}
             {listedTasks.length === 0 && projectHeadings.length === 0 && completedTodayTasks.length === 0 ? (
               <div className="py-16 text-center">
                 <p className="text-sm font-medium text-[var(--text-secondary)]">{pageMeta.emptyTitle}</p>
@@ -3047,65 +3186,68 @@ export function SeptenaApp() {
               <div className="space-y-6">
                 {todayInboxTasks.length > 0 && (
                   <section aria-label="Inbox">
-                    <button
-                      type="button"
-                      onClick={() => setInboxCollapsed((v) => !v)}
-                      className="mb-1.5 flex w-full items-center gap-2 border-b border-[var(--border-subtle)] pb-1.5 text-left text-xs font-semibold tracking-wide text-[var(--text-secondary)] uppercase hover:text-[var(--text-primary)]"
-                    >
-                      <Inbox className="h-3.5 w-3.5 text-[var(--accent)]" />
-                      <span>Inbox</span>
-                      <span className="font-mono-tabular font-normal text-[var(--text-muted)]">
-                        {todayInboxTasks.length}
-                      </span>
-                      <span className="ml-auto text-[var(--text-muted)]">
-                        {inboxCollapsed ? (
-                          <ChevronRight className="h-3.5 w-3.5" />
-                        ) : (
-                          <ChevronDown className="h-3.5 w-3.5" />
-                        )}
-                      </span>
-                    </button>
+                    {renderSectionHeader({
+                      leading: <Inbox className="h-4 w-4 text-[var(--accent)]" />,
+                      title: "Inbox",
+                      count: todayInboxTasks.length,
+                      collapse: {
+                        expanded: !inboxCollapsed,
+                        onToggle: () => setInboxCollapsed((v) => !v),
+                      },
+                    })}
                     {!inboxCollapsed && (
-                      <div className="space-y-0.5">{todayInboxTasks.map((i) => renderTaskRow(i))}</div>
+                      <div className={taskCardClass}>
+                        {todayInboxTasks.map((i) => renderTaskRow(i))}
+                      </div>
                     )}
                   </section>
                 )}
 
                 {todayCommittedTasks.length > 0 && (
-                  <section aria-label="Today" className="space-y-4">
+                  <section aria-label="Today" className="space-y-5">
                     {todayInboxTasks.length > 0 && !todayListGroups && (
-                      <div className="mb-1.5 flex items-center gap-2 border-b border-[var(--border-subtle)] pb-1.5 text-xs font-semibold tracking-wide text-[var(--text-secondary)] uppercase">
-                        <Sun className="h-3.5 w-3.5" style={{ color: todayIconColor }} />
-                        <span>Today</span>
-                        <span className="font-mono-tabular font-normal text-[var(--text-muted)]">
-                          {todayCommittedTasks.length}
-                        </span>
-                      </div>
+                      renderSectionHeader({
+                        leading: <Sun className="h-4 w-4" style={{ color: todayIconColor }} />,
+                        title: "Today",
+                        count: todayCommittedTasks.length,
+                      })
                     )}
 
                     {todayListGroups ? (
                       <>
                         {todayListGroups.ungrouped.length > 0 && (
-                          <div className="space-y-0.5">
+                          <div className={taskCardClass}>
                             {todayListGroups.ungrouped.map((i) => renderTaskRow(i, true))}
                           </div>
                         )}
-                        {todayListGroups.groups.map(([key, grp]) => (
-                          <div key={key}>
-                            <div className="mb-1 flex items-center justify-between border-b border-[var(--border-subtle)] pb-1 text-xs font-semibold text-[var(--text-secondary)]">
-                              <span>{grp.label}</span>
-                              <span className="font-mono-tabular font-normal text-[var(--text-muted)]">
-                                {grp.items.length}
-                              </span>
+                        {todayListGroups.groups.map(([key, grp]) => {
+                          const leading =
+                            grp.kind === "project" ? (
+                              <ProjectRing
+                                done={projectStats.get(grp.projectId)?.done ?? 0}
+                                total={projectStats.get(grp.projectId)?.total ?? 0}
+                              />
+                            ) : grp.emoji ? (
+                              <span className="text-[16px] leading-none">{grp.emoji}</span>
+                            ) : (
+                              <Folder className="h-4 w-4 text-[var(--text-muted)]" />
+                            );
+                          return (
+                            <div key={key}>
+                              {renderSectionHeader({
+                                leading,
+                                title: grp.title,
+                                count: grp.items.length,
+                              })}
+                              <div className={taskCardClass}>
+                                {grp.items.map((i) => renderTaskRow(i, true))}
+                              </div>
                             </div>
-                            <div className="space-y-0.5">
-                              {grp.items.map((i) => renderTaskRow(i, true))}
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </>
                     ) : (
-                      <div className="space-y-0.5">
+                      <div className={taskCardClass}>
                         {todayCommittedTasks.map((i) => renderTaskRow(i))}
                       </div>
                     )}
@@ -3113,39 +3255,47 @@ export function SeptenaApp() {
                 )}
 
                 {completedTodayTasks.length > 0 && (
-                  <section aria-label="Completed today">
-                    <div className="mb-1.5 flex items-center justify-between border-b border-[var(--border-subtle)] pb-1.5 text-xs font-semibold tracking-wide text-[var(--text-muted)] uppercase">
-                      <span>Completed today</span>
-                      <span className="font-mono-tabular font-normal">{completedTodayTasks.length}</span>
-                    </div>
-                    <div className="space-y-0.5">
-                      {completedTodayTasks.map((i) => renderTaskRow(i))}
-                    </div>
+                  <section aria-label="Logged today" className="pt-2">
+                    <button
+                      type="button"
+                      aria-expanded={todayLoggedExpanded}
+                      onClick={() => setTodayLoggedExpanded((v) => !v)}
+                      className="font-mono-tabular flex w-full items-center px-3 py-2 text-left text-[13px] font-medium text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]"
+                    >
+                      {todayLoggedExpanded
+                        ? `Hide ${completedTodayTasks.length} logged ${completedTodayTasks.length === 1 ? "item" : "items"}`
+                        : `Show ${completedTodayTasks.length} logged ${completedTodayTasks.length === 1 ? "item" : "items"}`}
+                    </button>
+                    {todayLoggedExpanded && (
+                      <div className={taskCardClass}>
+                        {completedTodayTasks.map((i) => renderTaskRow(i))}
+                      </div>
+                    )}
                   </section>
                 )}
               </div>
             ) : destination.kind === "smart" && destination.id === "upcoming" ? (
-              <div className="space-y-5">
+              <div className="space-y-6">
                 {upcomingGroups.map(([day, items]) => (
                   <section key={day}>
-                    <div className="mb-1.5 flex items-center justify-between border-b border-[var(--border-subtle)] pb-1.5 text-xs font-semibold text-[var(--text-secondary)]">
-                      <span>{formatDayHeading(day, todayYMD, lang)}</span>
-                      <span className="font-mono-tabular font-normal text-[var(--text-muted)]">
-                        {items.length}
-                      </span>
-                    </div>
-                    <div className="space-y-0.5">{items.map((i) => renderTaskRow(i))}</div>
+                    {renderSectionHeader({
+                      title: formatDayHeading(day, todayYMD, lang),
+                      count: items.length,
+                    })}
+                    <div className={taskCardClass}>{items.map((i) => renderTaskRow(i))}</div>
                   </section>
                 ))}
               </div>
             ) : destination.kind === "smart" && destination.id === "review" ? (
-              <div className="space-y-5">
+              <div className="space-y-6">
                 {reviewGroups.map((group) => {
                   if (group.id !== "faded") {
                     return (
                       <section key={group.id}>
                         {renderGroupHeader(group)}
-                        <div className="space-y-0.5">{group.items.map((i) => renderTaskRow(i))}</div>
+                        <div className={taskCardClass}>
+                          {group.items.map((i) => renderTaskRow(i))}
+                        </div>
                       </section>
                     );
                   }
@@ -3158,7 +3308,7 @@ export function SeptenaApp() {
                       })}
                       {prefs.reviewFadedExpanded && (
                         <>
-                          <div className="my-2 flex items-center justify-between gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/90 px-4 py-3 text-xs">
+                          <div className="mb-3 flex items-center justify-between gap-3 rounded-[14px] border border-[var(--border-subtle)]/75 bg-[var(--bg-card)] px-4 py-3 text-xs">
                             <div>
                               <p className="font-medium text-[var(--text-primary)]">
                                 {registryText(FADED_PILE_NOTICE.title, lang)}
@@ -3176,7 +3326,9 @@ export function SeptenaApp() {
                               {registryText(FADED_PILE_NOTICE.primaryTitle, lang)}
                             </button>
                           </div>
-                          <div className="space-y-0.5">{group.items.map((i) => renderTaskRow(i))}</div>
+                          <div className={taskCardClass}>
+                            {group.items.map((i) => renderTaskRow(i))}
+                          </div>
                         </>
                       )}
                     </section>
@@ -3184,9 +3336,9 @@ export function SeptenaApp() {
                 })}
               </div>
             ) : destination.kind === "project" && projectHeadings.length > 0 ? (
-              <div className="space-y-5">
+              <div className="space-y-6">
                 {visibleTasks.filter((i) => !i.task.heading).length > 0 && (
-                  <div className="space-y-0.5">
+                  <div className={taskCardClass}>
                     {visibleTasks.filter((i) => !i.task.heading).map((i) => renderTaskRow(i))}
                   </div>
                 )}
@@ -3194,8 +3346,10 @@ export function SeptenaApp() {
                   const under = visibleTasks.filter((i) => i.task.heading === h.id);
                   return (
                     <section key={h.id}>
-                      <div
-                        onContextMenu={(e) => {
+                      {renderSectionHeader({
+                        title: h.title,
+                        count: under.length,
+                        onContextMenu: (e) => {
                           e.preventDefault();
                           setContextMenu({
                             x: e.clientX,
@@ -3222,22 +3376,52 @@ export function SeptenaApp() {
                               },
                             ],
                           });
-                        }}
-                        className="mb-1.5 flex items-center justify-between border-b border-[var(--border-subtle)] pb-1.5 text-xs font-semibold text-[var(--text-secondary)]"
-                      >
-                        <span>{h.title}</span>
-                        <span className="font-mono-tabular font-normal text-[var(--text-muted)]">
-                          {under.length}
-                        </span>
-                      </div>
-                      <div className="space-y-0.5">{under.map((i) => renderTaskRow(i))}</div>
+                        },
+                      })}
+                      {under.length > 0 && (
+                        <div className={taskCardClass}>{under.map((i) => renderTaskRow(i))}</div>
+                      )}
                     </section>
                   );
                 })}
               </div>
             ) : (
-              <div className="space-y-0.5">{visibleTasks.map((i) => renderTaskRow(i))}</div>
+              <div className={taskCardClass}>{visibleTasks.map((i) => renderTaskRow(i))}</div>
             )}
+
+            {/* Project / Area collapsible logged items footer (1:1 with iOS/Mac) */}
+            {(destination.kind === "area" || destination.kind === "project") &&
+              loggedScopeTasks.length > 0 && (() => {
+                const scopeKey = `${destination.kind}:${destination.id}`;
+                const expanded = scopeLoggedExpandedIds.has(scopeKey);
+                const count = loggedScopeTasks.length;
+                return (
+                  <section aria-label="Logged items" className="pt-5">
+                    <button
+                      type="button"
+                      aria-expanded={expanded}
+                      onClick={() =>
+                        setScopeLoggedExpandedIds((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(scopeKey)) next.delete(scopeKey);
+                          else next.add(scopeKey);
+                          return next;
+                        })
+                      }
+                      className="font-mono-tabular flex w-full items-center px-3 py-2 text-left text-[13px] font-medium text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]"
+                    >
+                      {expanded
+                        ? `Hide ${count} logged ${count === 1 ? "item" : "items"}`
+                        : `Show ${count} logged ${count === 1 ? "item" : "items"}`}
+                    </button>
+                    {expanded && (
+                      <div className={taskCardClass}>
+                        {loggedScopeTasks.map((i) => renderTaskRow(i))}
+                      </div>
+                    )}
+                  </section>
+                );
+              })()}
           </div>
         </div>
 
