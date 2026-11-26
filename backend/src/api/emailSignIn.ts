@@ -125,15 +125,28 @@ export async function startEmailSignIn(
   return { ok: true, expiresInSeconds: Math.round((issued.expiresAt - Date.now()) / 1000) };
 }
 
-export type EmailVerifyOutcome =
-  | { ok: true; session: IssuedSession; created: boolean }
-  | { ok: false; status: 401 | 410 | 429 | 503; error: string; attemptsLeft?: number };
+export type EmailFailure = { ok: false; status: 401 | 410 | 429 | 503; error: string; attemptsLeft?: number };
+export type EmailVerifyOutcome = { ok: true; session: IssuedSession; created: boolean } | EmailFailure;
+export type EmailAccountOutcome = { ok: true; userId: string; created: boolean } | EmailFailure;
 
 export async function verifyEmailSignIn(
   env: Env,
   body: z.infer<typeof zEmailVerifyBody>,
   clientIp?: string | null,
 ): Promise<EmailVerifyOutcome> {
+  const res = await verifyEmailAccount(env, body, clientIp);
+  if (!res.ok) return res;
+  return { ok: true, session: await issueSession(env, res.userId), created: res.created };
+}
+
+/// Checks the code and returns the account, created on first use. The app
+/// routes turn it into a session; the connector page approves its pairing
+/// with it (src/shadow/oauth.ts).
+export async function verifyEmailAccount(
+  env: Env,
+  body: { email: string; code: string },
+  clientIp?: string | null,
+): Promise<EmailAccountOutcome> {
   const accounts = accountStoreFor(env);
   if (!emailSignInEnabled(env) || !accounts) return { ok: false, status: 503, error: "email_signin_off" };
   let ip: { key: string; count: number } | null = null;
@@ -164,5 +177,5 @@ export async function verifyEmailSignIn(
     }
   }
   logEvent("email_signin_verify", { ok: true, created });
-  return { ok: true, session: await issueSession(env, userId), created };
+  return { ok: true, userId, created };
 }

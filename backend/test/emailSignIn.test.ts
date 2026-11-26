@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { createTestAccountStore, createTestTaskStore, installWorkerTestHooks } from "./taskStoreHarness.ts";
+import { Hono } from "hono";
+import { createTestAccountStore, createTestPairingStore, createTestTaskStore, installWorkerTestHooks } from "./taskStoreHarness.ts";
 
 installWorkerTestHooks();
 
@@ -10,6 +11,7 @@ const { api } = await import("../src/api/routes.ts");
 const { verifyAccessToken } = await import("../src/api/session.ts");
 const { EMAIL_CODE_MAX_ATTEMPTS, EMAIL_CODE_MAX_SENDS, EMAIL_CODE_TTL_MS } = await import("../src/store/AccountStore.ts");
 const { newEmailCode } = await import("../src/api/emailSignIn.ts");
+const oauth = await import("../src/shadow/oauth.ts");
 
 const TEST_SIGNING_KEY = Buffer.alloc(32, 5).toString("base64");
 const EXEC_CTX = { waitUntil() {}, passThroughOnException() {} } as unknown as ExecutionContext;
@@ -35,6 +37,12 @@ async function makeHarness(opts: { enabled?: boolean; failSend?: boolean } = {})
     return s;
   };
   const { store: accountStore } = await createTestAccountStore();
+  const pairingStores = new Map<string, Awaited<ReturnType<typeof createTestPairingStore>>>();
+  const ensurePairing = async (id: string) => {
+    let p = pairingStores.get(id);
+    if (!p) { p = await createTestPairingStore(); pairingStores.set(id, p); }
+    return p.store;
+  };
   const sent: { to: string; subject: string; text: string }[] = [];
   const proxy = (target: () => Promise<unknown>) => new Proxy({}, {
     get(_t, prop: string) {
@@ -64,6 +72,7 @@ async function makeHarness(opts: { enabled?: boolean; failSend?: boolean } = {})
     CLIENTS: makeMemoryKv(),
     TASK_STORE: { idFromName: (n: string) => n, get: (id: string) => proxy(() => ensureTaskStore(id)) },
     ACCOUNT_STORE: { idFromName: (n: string) => n, get: () => proxy(async () => accountStore) },
+    PAIRING: { idFromName: (n: string) => n, get: (id: string) => proxy(() => ensurePairing(id)) },
   } as never;
 
   const call = (path: string, body: unknown, headers: Record<string, string> = {}) =>
@@ -73,7 +82,21 @@ async function makeHarness(opts: { enabled?: boolean; failSend?: boolean } = {})
       body: JSON.stringify(body),
     }), env, EXEC_CTX);
   const lastCode = () => /(\d{6})/.exec(sent.at(-1)!.text)![1];
-  return { env, sent, call, lastCode, accountStore };
+  const app = new Hono();
+  app.get("/oauth/authorize", oauth.authorize);
+  app.get("/oauth/pair/continue", oauth.pairContinue);
+  app.post("/oauth/pair/email", oauth.pairEmail);
+  app.route("/v1", api);
+  const clients = (env as unknown as { CLIENTS: ReturnType<typeof makeMemoryKv> }).CLIENTS;
+  async function openConnector() {
+    await clients.put("v2:client:c1", JSON.stringify({ id: "c1", name: "Claude", redirectUris: ["https://claude.ai/api/mcp/auth_callback"] }));
+    const url = new URL("https://api.septena.app/oauth/authorize");
+    for (const [k, v] of Object.entries({ response_type: "code", client_id: "c1", redirect_uri: "https://claude.ai/api/mcp/auth_callback", state: "st", code_challenge: "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM", code_challenge_method: "S256" })) url.searchParams.set(k, v);
+    const res = await app.fetch(new Request(url), env, EXEC_CTX);
+    return { html: await res.text(), cookie: (res.headers.get("Set-Cookie") ?? "").split(";")[0] };
+  }
+  const page = (path: string, init: RequestInit = {}) => app.fetch(new Request(`https://api.septena.app${path}`, init), env, EXEC_CTX);
+  return { env, sent, call, lastCode, accountStore, openConnector, page };
 }
 
 describe("email sign-in", () => {
@@ -181,6 +204,28 @@ describe("email sign-in", () => {
   it("reports a failed send", async () => {
     const h = await makeHarness({ failSend: true });
     assert.equal((await h.call("/auth/email/start", { email: "a@example.com" })).status, 503);
+  });
+
+  it("connects a connector by email from the authorize page", async () => {
+    const h = await makeHarness();
+    const { html, cookie } = await h.openConnector();
+    assert.match(html, /id="email-start"/);
+    await h.page("/v1/auth/email/start", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: "agent@example.com" }) });
+    const body = JSON.stringify({ email: "agent@example.com", code: h.lastCode(), timeZone: "Europe/Amsterdam" });
+    const headers = { "Content-Type": "application/json", Cookie: cookie, Origin: "https://api.septena.app" };
+    const foreign = await h.page("/oauth/pair/email", { method: "POST", headers: { ...headers, Origin: "https://evil.example" }, body });
+    assert.equal(foreign.status, 403);
+    const ok = await h.page("/oauth/pair/email", { method: "POST", headers, body });
+    assert.equal(ok.status, 200);
+    const done = await h.page("/oauth/pair/continue", { headers: { Cookie: cookie } });
+    assert.equal(done.status, 302);
+    assert.match(done.headers.get("Location") ?? "", /^https:\/\/claude\.ai\/api\/mcp\/auth_callback\?code=/);
+  });
+
+  it("hides the email form on the connector page while switched off", async () => {
+    const h = await makeHarness({ enabled: false });
+    const { html } = await h.openConnector();
+    assert.doesNotMatch(html, /id="email-start"/);
   });
 
   it("makes six-digit codes", () => {

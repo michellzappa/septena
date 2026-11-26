@@ -70,6 +70,7 @@ app.get("/.well-known/oauth-protected-resource", oauth.protectedResourceMetadata
 app.post("/oauth/register", oauth.register);
 app.get("/oauth/authorize", oauth.authorize);
 app.get("/oauth/pair/continue", oauth.pairContinue);
+app.post("/oauth/pair/email", oauth.pairEmail);
 // Where a sign-in QR lands when a system camera opens it (src/shadow/pairQr.ts).
 app.get("/pair/:code", oauth.pairLanding);
 // Where an invite to a shared project opens (src/api/shares.ts).
