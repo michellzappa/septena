@@ -57,7 +57,7 @@ struct SupportView: View {
             center.resetSendState()
           }
         if center.needsEmail {
-          TextField(RegistrySupport.emailLabel, text: $email)
+          TextField(RegistrySupport.emailFieldLabel, text: $email)
             .textContentType(.emailAddress)
             #if os(iOS)
             .keyboardType(.emailAddress)
@@ -119,7 +119,7 @@ struct SupportView: View {
     case .failed(let reason):
       VStack(alignment: .leading, spacing: 4) {
         Text(reason).foregroundStyle(.red)
-        Button(RegistrySupport.tryAgain) { Task { await send() } }
+        Button(RegistrySupport.sendAgain) { Task { await send() } }
           .disabled(!canSend)
       }
     case .idle, .sending:

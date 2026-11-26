@@ -147,7 +147,7 @@ final class SupportCenter {
     } catch SupportWire.SendError.emailRequired {
       sendState = .failed(RegistrySupport.emailRequired)
     } catch SupportWire.SendError.rateLimited {
-      sendState = .failed(RegistrySupport.rateLimited)
+      sendState = .failed(RegistrySupport.tooManyMessages)
     } catch {
       sendState = .failed(RegistrySupport.sendFailed)
     }

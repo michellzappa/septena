@@ -880,7 +880,7 @@
         "label": "What happened, and what did you expect?"
       },
       {
-        "id": "emailLabel",
+        "id": "emailFieldLabel",
         "label": "Email"
       },
       {
@@ -912,8 +912,8 @@
         "label": "Couldn't send your message."
       },
       {
-        "id": "tryAgain",
-        "label": "Try Again"
+        "id": "sendAgain",
+        "label": "Send Again"
       },
       {
         "id": "noMessages",
@@ -932,7 +932,7 @@
         "label": "Enter your email so we can reply."
       },
       {
-        "id": "rateLimited",
+        "id": "tooManyMessages",
         "label": "Too many messages. Try again later."
       },
       {
@@ -940,7 +940,7 @@
         "label": "New reply"
       },
       {
-        "id": "doneTitle",
+        "id": "closeTitle",
         "label": "Done"
       }
     ]

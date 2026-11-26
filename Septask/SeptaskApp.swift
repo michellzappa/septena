@@ -156,7 +156,7 @@ private struct SeptaskMainWindow: View {
           SupportView()
             .toolbar {
               ToolbarItem(placement: .confirmationAction) {
-                Button(RegistrySupport.doneTitle) { support.isPresentingSheet = false }
+                Button(RegistrySupport.closeTitle) { support.isPresentingSheet = false }
               }
             }
         }

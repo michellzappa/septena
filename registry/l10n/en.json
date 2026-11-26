@@ -1303,7 +1303,7 @@
       "settings.copy.sign_in_approval.done.label",
       "actions.actions.task.select.activeTitle",
       "actions.actions.do.done.title",
-      "surfaces.support.copy.doneTitle.label",
+      "surfaces.support.copy.closeTitle.label",
       "surfaces.doing.exits.done.label",
       "plans.paywall.done"
     ]
@@ -1365,7 +1365,7 @@
   "Email": {
     "text": "Email",
     "paths": [
-      "surfaces.support.copy.emailLabel.label",
+      "surfaces.support.copy.emailFieldLabel.label",
       "surfaces.taskReferences.kinds.email.label",
       "signIn.email.emailLabel"
     ]
@@ -3496,6 +3496,12 @@
       "surfaces.support.copy.send.label"
     ]
   },
+  "Send Again": {
+    "text": "Send Again",
+    "paths": [
+      "surfaces.support.copy.sendAgain.label"
+    ]
+  },
   "Send Back…": {
     "text": "Send Back…",
     "paths": [
@@ -4457,7 +4463,7 @@
   "Too many messages. Try again later.": {
     "text": "Too many messages. Try again later.",
     "paths": [
-      "surfaces.support.copy.rateLimited.label"
+      "surfaces.support.copy.tooManyMessages.label"
     ]
   },
   "Too many requests. Try again later.": {
@@ -4482,12 +4488,6 @@
     "text": "Topography",
     "paths": [
       "tokens.textures.topography.name"
-    ]
-  },
-  "Try Again": {
-    "text": "Try Again",
-    "paths": [
-      "surfaces.support.copy.tryAgain.label"
     ]
   },
   "Try Plus free for 14 days": {

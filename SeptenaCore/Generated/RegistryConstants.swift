@@ -2243,7 +2243,7 @@ enum RegistrySupport {
   static let helpLink: String = RegistryL10n.t("Open Help")
   static let messageLabel: String = RegistryL10n.t("Message")
   static let messagePlaceholder: String = RegistryL10n.t("What happened, and what did you expect?")
-  static let emailLabel: String = RegistryL10n.t("Email")
+  static let emailFieldLabel: String = RegistryL10n.t("Email")
   static let emailDetail: String = RegistryL10n.t("We need your email to reply.")
   static let diagnosticsLabel: String = RegistryL10n.t("Include diagnostics")
   static let diagnosticsDetail: String = RegistryL10n.t("Adds your device, Septena version and sync status. It never includes your tasks.")
@@ -2251,14 +2251,14 @@ enum RegistrySupport {
   static let sending: String = RegistryL10n.t("Sending…")
   static let sent: String = RegistryL10n.t("Sent. The reply shows here.")
   static let sendFailed: String = RegistryL10n.t("Couldn't send your message.")
-  static let tryAgain: String = RegistryL10n.t("Try Again")
+  static let sendAgain: String = RegistryL10n.t("Send Again")
   static let noMessages: String = RegistryL10n.t("No messages yet.")
   static let fromYou: String = RegistryL10n.t("You")
   static let fromSeptena: String = RegistryL10n.t("Septena")
   static let emailRequired: String = RegistryL10n.t("Enter your email so we can reply.")
-  static let rateLimited: String = RegistryL10n.t("Too many messages. Try again later.")
+  static let tooManyMessages: String = RegistryL10n.t("Too many messages. Try again later.")
   static let unreadReply: String = RegistryL10n.t("New reply")
-  static let doneTitle: String = RegistryL10n.t("Done")
+  static let closeTitle: String = RegistryL10n.t("Done")
 }
 
 /// Canonical first-run step IDs (`registry/surfaces.json` `firstRun.steps`).
