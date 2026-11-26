@@ -598,7 +598,8 @@
   "Cancel at any time.": {
     "text": "Cancel at any time.",
     "paths": [
-      "plans.prices.monthly.detail"
+      "plans.prices.monthly.detail",
+      "plans.proPrices.pro_monthly.detail"
     ]
   },
   "Capture": {
@@ -5211,9 +5212,16 @@
       "plans.cards.free.priceLabel"
     ]
   },
+  "€10 a month. You save €48 against paying monthly.": {
+    "text": "€10 a month. You save €48 against paying monthly.",
+    "paths": [
+      "plans.proPrices.pro_annual.detail"
+    ]
+  },
   "€120 a year": {
     "text": "€120 a year",
     "paths": [
+      "plans.proPrices.pro_annual.label",
       "plans.cards.pro.priceLabel"
     ]
   },
@@ -5221,6 +5229,12 @@
     "text": "€120 a year or €14 a month",
     "paths": [
       "plans.levels.pro.detail"
+    ]
+  },
+  "€14 a month": {
+    "text": "€14 a month",
+    "paths": [
+      "plans.proPrices.pro_monthly.label"
     ]
   },
   "€5 a month. You save €24 against paying monthly.": {

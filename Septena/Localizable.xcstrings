@@ -85,6 +85,14 @@
         }
       }
     },
+    "€10 a month. You save €48 against paying monthly." : {
+      "comment" : "Generated from registry plans.proPrices.pro_annual.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "€14 a month" : {
+      "comment" : "Generated from registry plans.proPrices.pro_monthly.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "€120 a year or €14 a month" : {
       "comment" : "Generated from registry plans.levels.pro.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
@@ -474,7 +482,7 @@
       }
     },
     "€120 a year" : {
-      "comment" : "Generated from registry plans.cards.pro.priceLabel. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry plans.proPrices.pro_annual.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {

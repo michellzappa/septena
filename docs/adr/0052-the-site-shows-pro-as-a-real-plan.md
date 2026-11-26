@@ -1,6 +1,6 @@
 # 0052. The website shows Pro as a real plan
 
-- Status: accepted (2026-11-26)
+- Status: accepted (2026-11-26); the note under the Pro button amended by [ADR 0059](0059-pro-sells-like-plus.md)
 - Date: 2026-11-26
 - Deciders: mz
 - Amends: [ADR 0045](0045-pro-is-a-real-plan-that-is-only-given.md) (the website line)

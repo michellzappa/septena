@@ -750,11 +750,27 @@ function validatePlans(plans, icons, caps, importSources) {
     assert(pr.label.includes(whole), `plans.json: price ${pr.id} label must state ${whole}`);
   }
   assert(plans.prices.filter((x) => x.highlighted).length === 1, "plans.json: exactly one price must be highlighted");
+  // ADR 0059: Pro sells like Plus, in the same subscription group. Its prices
+  // must state the Pro level's amounts, and its products sit under .sync.pro.
+  const proLevel = plans.levels.find((l) => l.id === "pro");
+  for (const pr of plans.proPrices ?? []) {
+    assert(!priceIds.has(pr.id), `plans.json: duplicate price "${pr.id}"`);
+    priceIds.add(pr.id);
+    assert(/^com\.septena\.tasks\.sync\.pro\.[a-z]+$/.test(pr.productId), `plans.json: pro price ${pr.id} productId must start com.septena.tasks.sync.pro.`);
+    assert(Number.isInteger(pr.amountMinor) && pr.amountMinor > 0, `plans.json: pro price ${pr.id} amountMinor must be a positive integer`);
+    assert(pr.currency === "EUR", `plans.json: pro price ${pr.id} currency must be EUR`);
+    assert(["year", "month"].includes(pr.interval), `plans.json: pro price ${pr.id} unknown interval "${pr.interval}"`);
+    const whole = String(pr.amountMinor / 100);
+    assert(pr.label.includes(whole), `plans.json: pro price ${pr.id} label must state ${whole}`);
+    assert(proLevel.detail.includes(whole), `plans.json: the pro level detail must state ${whole}`);
+  }
+  assert(Array.isArray(plans.proPrices) && plans.proPrices.length > 0, "plans.json: proPrices missing (ADR 0059)");
 
   assert(JSON.stringify(plans.levels.map((l) => l.id)) === JSON.stringify(PLAN_LEVELS), `plans.json: levels must be ${PLAN_LEVELS.join(", ")}`);
   assert(JSON.stringify(plans.cards.map((c) => c.id)) === JSON.stringify(PLAN_LEVELS), `plans.json: cards must be ${PLAN_LEVELS.join(", ")}`);
-  // ADR 0052: Pro is a real plan. No store sells it yet, so accounts get it as a grant.
-  assert(plans.cards.find((c) => c.id === "pro").status === "given", "plans.json: the pro card must be given (no store product yet)");
+  // ADR 0052, ADR 0059: Pro is a real plan. `given` keeps it out of the in-app
+  // purchase list until the app paywalls offer the Pro products.
+  assert(plans.cards.find((c) => c.id === "pro").status === "given", "plans.json: the pro card must be given until the app paywalls sell Pro (ADR 0059)");
   assert(plans.cards.filter((c) => c.highlighted).length === 1, "plans.json: exactly one card must be highlighted");
   for (const k of ["seePlus", "startTrial", "trialStarted", "trialBilling", "success", "pending", "serverRetry", "failed", "ownedApple", "ownedWeb", "ownedGoogle", "ownedGrant", "ownedGrantPro", "ownedOtherAccount", "done"]) {
     assert(typeof plans.paywall?.[k] === "string" && plans.paywall[k].length > 0, `plans.json: paywall.${k} missing`);
@@ -2335,6 +2351,8 @@ function generateTS({ entities, rules, icons, tokens, caps, settings, dests, act
   lines.push(`export const PLAN_LIMITS = ${JSON.stringify(plans.limits)} as const;`);
   lines.push(`export const PLAN_TRIAL_DAYS = ${plans.trial.days};`);
   lines.push(`export const PLAN_PRODUCTS = ${JSON.stringify(plans.prices.map((p) => p.productId))} as const;`);
+  lines.push("/** The plan each store product gives (ADR 0059). A product not listed gives nothing. */");
+  lines.push(`export const PLAN_PRODUCT_PLANS = ${JSON.stringify(Object.fromEntries([...plans.prices.map((p) => [p.productId, "plus"]), ...plans.proPrices.map((p) => [p.productId, "pro"])]))} as const;`);
   lines.push("/** Upsell copy by moment id (registry/plans.json `upsells`). Server refusals quote it, so the words match the app. */");
   lines.push(`export const PLAN_UPSELLS = ${JSON.stringify(Object.fromEntries(plans.upsells.map((u) => [u.id, { title: u.title, detail: u.detail }])))} as const;`);
   lines.push("/** Sign-in methods, order per platform and screen copy (registry/sign-in.json, ADR 0047). Copy is English; localize with registryText(). GET /v1/auth/methods says which methods are on. */");
