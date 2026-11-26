@@ -33,7 +33,7 @@ mz@centaur-labs.io. The phases below remove them.
 iOS / iPadOS / macOS / Android / web client
    │  POST /v1/support/messages
    ▼
-api.septena.app (backend/)  ── D1 septena-support: the conversation
+api.septena.app (backend/)  ── SupportStore (Durable Object): the conversation
    │  POST /api/support/app-intake   (signed "intake")
    ▼
 septena.starlings.work  ── intake record, one private thread per sender, Inbox row
@@ -94,8 +94,13 @@ titles or notes.
 
 ## 5. The backend
 
-New module `backend/src/support/`. Storage: D1 database `septena-support`
-*(default; a new database, not `SIGNUPS`, which the website owns)*.
+New module `backend/src/support/`. Storage: one SQLite Durable Object,
+`SupportStore` (`src/support/store.ts`), for every sender *(default, changed
+from a D1 database while building #675: a Durable Object needs no resource
+made by hand, deploys with its migration, and its single writer keeps
+`message_id` idempotency simple; mz can overrule)*. A conversation that
+moves to an account keeps an alias, so a Starlings reply to the old ref
+lands on the account.
 
 ### Who is the sender
 
@@ -129,7 +134,7 @@ New module `backend/src/support/`. Storage: D1 database `septena-support`
 - **Reply notice:** when the sender has an email, the backend mails it
   through the `EMAIL` binding: the reply text, and "Open Septena, Settings,
   About, Contact Support to answer." *(default: the mail carries the reply
-  text)*. A push notification is later (SUP5).
+  text)*. It is sent from `noreply@septena.app`. A push notification is later (SUP5).
 - **Retention:** 365 days, then the cron deletes the rows.
 - Never log a message body, an email or a support key.
 
@@ -180,7 +185,7 @@ Work in `envisioning/starlings`:
 
 | Question | Default |
 |---|---|
-| A new D1 database or a table in an existing one | New database `septena-support` |
+| Where conversations are stored | One `SupportStore` Durable Object (changed from a new D1 database, #675) |
 | Diagnostics toggle starts on or off | Off |
 | Reply notice mail carries the reply text | Yes |
 | A signed-out conversation moves to the account at sign-in | Yes |

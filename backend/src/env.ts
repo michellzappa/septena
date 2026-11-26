@@ -4,6 +4,7 @@ import type { TaskStore } from "./store/TaskStore.js";
 import type { ProjectStore } from "./store/ProjectStore.js";
 import type { AccountStore } from "./store/AccountStore.js";
 import type { PairingStore } from "./shadow/PairingStore.js";
+import type { SupportStore } from "./support/store.js";
 
 export interface Env {
   // Vars (public-ish, set in wrangler.toml)
@@ -53,6 +54,14 @@ export interface Env {
   EMAIL_SIGNIN?: string;
   /// Cloudflare Email Service send binding (septena.app is onboarded).
   EMAIL?: SendEmail;
+
+  /// Contact Support (ADR 0054, src/support/). APP_INTAKE_KEY is a secret: 64
+  /// hex, shared with the Starlings septena workspace (SEPTENA_APP_INTAKE_KEY
+  /// there). Unset: the support routes answer 503. STARLINGS_INTAKE_URL
+  /// overrides the app channel address (tests, staging).
+  APP_INTAKE_KEY?: string;
+  STARLINGS_INTAKE_URL?: string;
+  SUPPORT_STORE?: DurableObjectNamespace<SupportStore>;
 
   /// OIDC sign-in providers (ADR 0047, #637, #638). Each provider stays off
   /// until its secrets are configured via `wrangler secret put`.

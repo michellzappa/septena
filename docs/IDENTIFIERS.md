@@ -185,6 +185,23 @@ the title to the user.
   request sends `X-Septena-Errors: envelope`: the app clients decode `error`
   as a string.
 
+## Support wire (ADR 0054, `backend/src/support/`)
+
+- **Sender ref:** `user:<userId>` when signed in; `install:<sha256 base64url
+  of the support key>` when signed out. The app makes the support key once
+  (32 random bytes, base64url, 43 characters) and sends it as
+  `X-Septena-Support-Key`. The backend keeps only the hash. The same ref is
+  `reporter.ref` on the Starlings app channel, which keys its thread by it.
+- **Message id:** a client-made UUID, the idempotency key on
+  `POST /v1/support/messages` and the `message_id` sent to Starlings. An id
+  that another sender used answers 409.
+- **Body:** `{ message_id, text (1..4000), email?, name?, diagnostics? }`,
+  strict. `diagnostics.platform` is `ios`, `ipados`, `macos`, `android` or
+  `web`.
+- **Read:** `GET /v1/support/messages` → `{ messages: [{ id, direction
+  ("in"|"out"), text, authorName, createdAt, readAt, state }], unread }`.
+  `POST /v1/support/read` marks replies read (204).
+
 ## What this design doesn't try to do
 
 - **URL-safe handles for deeplinks**. If you later need them, derive

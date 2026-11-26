@@ -247,6 +247,21 @@ export async function createTestAccountStore(existing?: DatabaseSync) {
   return { store, db };
 }
 
+/// Creates a real `SupportStore` (src/support/store.ts) on in-memory SQLite.
+export async function createTestSupportStore(existing?: DatabaseSync) {
+  installWorkerTestHooks();
+  const { SupportStore } = await import("../src/support/store.ts");
+  const db = existing ?? new DatabaseSync(":memory:");
+  const ctx = {
+    storage: { sql: makeSqlStorage(db) },
+    blockConcurrencyWhile<T>(fn: () => Promise<T>): Promise<T> {
+      return fn();
+    },
+  };
+  const store = new SupportStore(ctx as never, {} as never);
+  return { store, db };
+}
+
 /// Creates a real `PairingStore` instance backed by an in-memory KV map so
 /// tests exercise the actual Durable Object methods and alarm/expiry cleanup.
 export async function createTestPairingStore() {

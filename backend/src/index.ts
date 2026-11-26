@@ -6,6 +6,7 @@ import { joinLanding } from "./api/shares.js";
 import { admin } from "./admin/routes.js";
 import { sweepAccounts } from "./admin/accounts.js";
 import { recordMetrics } from "./admin/metrics.js";
+import { sweepSupport } from "./support/routes.js";
 import * as oauth from "./shadow/oauth.js";
 import * as agentSignup from "./shadow/agentSignup.js";
 import { previewMcpHandler } from "./shadow/mcp.js";
@@ -22,6 +23,7 @@ export { TaskStore } from "./store/TaskStore.js";
 export { ProjectStore } from "./store/ProjectStore.js";
 export { AccountStore } from "./store/AccountStore.js";
 export { PairingStore } from "./shadow/PairingStore.js";
+export { SupportStore } from "./support/store.js";
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -118,6 +120,7 @@ export default {
     if (env.MAINTENANCE !== "true") {
       await sweepAccounts(env);
       await recordMetrics(env);
+      await sweepSupport(env);
     }
   },
 } satisfies ExportedHandler<Env>;
