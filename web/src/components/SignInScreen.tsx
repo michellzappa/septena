@@ -176,6 +176,18 @@ export function SignInScreen({ api, onSignedIn }: SignInScreenProps) {
           </div>
         )}
 
+        {/* A visitor with no Septena app has nothing to approve this browser
+            from: point them at the apps. Same tab, like every site link. */}
+        <p className="mt-5 text-center text-sm text-[var(--text-secondary)]">
+          New to Septena?{" "}
+          <a
+            href="https://septena.app/download"
+            className="font-medium text-[var(--accent)] underline-offset-4 hover:underline"
+          >
+            Get the app
+          </a>
+        </p>
+
         <p className="mt-6 border-t border-[var(--border-subtle)] pt-4 text-xs leading-relaxed text-[var(--text-muted)]">
           Task data syncs directly between this browser and{" "}
           <span className="font-mono-tabular">api.septena.app</span>, stored locally in
