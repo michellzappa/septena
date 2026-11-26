@@ -28,7 +28,34 @@ import {
 // - Single-flight refresh prevents concurrent 401s from racing cookie rotation.
 
 const DEFAULT_API_BASE = "https://api.septena.app";
-const CLIENT_HEADER = "web 0.2.0";
+
+/** `/v1/support/*` wire (backend/src/support/routes.ts). */
+export interface SupportDiagnostics {
+  platform: "web";
+  osVersion?: string;
+  deviceModel?: string;
+  appVersion?: string;
+  signedIn?: boolean;
+}
+export interface SupportOutgoing {
+  message_id: string;
+  text: string;
+  email?: string;
+  diagnostics?: SupportDiagnostics;
+}
+export interface SupportMessage {
+  id: string;
+  direction: "in" | "out";
+  text: string;
+  authorName: string | null;
+  createdAt: number;
+  readAt: number | null;
+}
+export interface SupportConversation {
+  messages: SupportMessage[];
+  unread: number;
+}
+export const CLIENT_HEADER = "web 0.2.0";
 
 export class ApiError extends Error {
   readonly status: number;
@@ -250,6 +277,46 @@ export class SeptenaApiClient {
       res = await doReq(refreshed.accessToken);
     }
     return res;
+  }
+
+  // Contact Support (ADR 0054, docs/IDENTIFIERS.md "Support wire"). Signed
+  // in: the session plus the support key, so a signed-out conversation moves
+  // to the account. Signed out: the support key alone.
+  private async supportFetch(path: string, supportKey: string, init: RequestInit = {}): Promise<Response> {
+    const headers = { ...(init.headers ?? {}), "X-Septena-Support-Key": supportKey };
+    if (this.isAuthenticated) return this.authedFetch(path, { ...init, headers });
+    return fetch(`${this.apiBase}${path}`, {
+      ...init,
+      headers: { ...headers, "X-Septena-Client": CLIENT_HEADER },
+    });
+  }
+
+  async sendSupportMessage(message: SupportOutgoing, supportKey: string): Promise<SupportMessage> {
+    const res = await this.supportFetch("/v1/support/messages", supportKey, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(message),
+    });
+    if (res.status !== 202) {
+      const raw = await res.text().catch(() => "");
+      const err = parseErr(raw);
+      throw new ApiError(res.status, err.error ?? "support_failed", err.message, raw);
+    }
+    return ((await res.json()) as { message: SupportMessage }).message;
+  }
+
+  async supportConversation(supportKey: string): Promise<SupportConversation> {
+    const res = await this.supportFetch("/v1/support/messages", supportKey, { method: "GET" });
+    if (!res.ok) {
+      const raw = await res.text().catch(() => "");
+      throw new ApiError(res.status, parseErr(raw).error ?? "support_failed", undefined, raw);
+    }
+    return (await res.json()) as SupportConversation;
+  }
+
+  async markSupportRead(supportKey: string): Promise<void> {
+    const res = await this.supportFetch("/v1/support/read", supportKey, { method: "POST" });
+    if (!res.ok && res.status !== 204) throw new ApiError(res.status, "support_failed");
   }
 
   async pull(since: number): Promise<PullResponse> {
