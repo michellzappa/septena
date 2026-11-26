@@ -8,6 +8,7 @@ import { registerClient } from "../oauth/register.js";
 import { validateRedirectUri } from "../oauth/redirects.js";
 import { storeFor } from "../api/session.js";
 import { emailSignInEnabled, verifyEmailAccount, zEmailAddress } from "../api/emailSignIn.js";
+import { SIGN_IN } from "../generated/registries.js";
 import { pairApproveUrl, pairQrMatrix, pairQrSvg } from "./pairQr.js";
 import { AGENT_NAME_MAX, MCP_CLIENT_PREFIX, MCP_GRANT_SCOPE, MCP_SCOPES, issueMcpTokens, redeemMcpRefresh, revokeMcpToken, settleNewAgent } from "./tokens.js";
 
@@ -682,15 +683,20 @@ const EMAIL_FORM_CSS = `
 
 // Email sign-in on the connector page (ADR 0047, issue #636). A person with
 // no signed-in app nearby connects with an email code; a new address starts a
-// new account. Copy moves to registry/sign-in.json with #635.
+// new account. Copy comes from registry/sign-in.json.
+const EMAIL_METHOD = SIGN_IN.methods.find((m) => m.id === "email")!;
 const EMAIL_FORM_HTML = `<section class="alt" id="email">
-      <p>No signed-in Septena app nearby? Use your email. A new address starts a new Septena account.</p>
-      <form id="email-start"><input id="email-address" type="email" autocomplete="email" placeholder="you@example.com" required aria-label="Email"><button type="submit">Send code</button></form>
-      <form id="email-verify" hidden><input id="email-code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" placeholder="6-digit code" required aria-label="Code"><button type="submit">Connect</button></form>
+      <p><b>${escapeHtml(EMAIL_METHOD.title)}</b>. ${escapeHtml(SIGN_IN.copy.subheading)}</p>
+      <form id="email-start"><input id="email-address" type="email" autocomplete="email" placeholder="${escapeHtml(SIGN_IN.email.emailPlaceholder)}" required aria-label="${escapeHtml(SIGN_IN.email.emailLabel)}"><button type="submit">${escapeHtml(SIGN_IN.email.sendCode)}</button></form>
+      <form id="email-verify" hidden><input id="email-code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required aria-label="${escapeHtml(SIGN_IN.email.codeLabel)}"><button type="submit">${escapeHtml(SIGN_IN.email.signIn)}</button></form>
       <p class="small" id="email-note" role="status"></p>
     </section>`;
 
+// The page script. Strings arrive as JSON, so registry text never meets the
+// script as code.
+const PAIR_PAGE_TEXT = JSON.stringify({ email: SIGN_IN.email, errors: SIGN_IN.errors }).replace(/</g, "\\u003c");
 const PAIR_PAGE_JS = `(() => {
+  const T = ${PAIR_PAGE_TEXT};
   const go = () => { location.href = "/oauth/pair/continue"; };
   let busy = false;
   setInterval(async () => {
@@ -708,20 +714,23 @@ const PAIR_PAGE_JS = `(() => {
   const codeIn = document.getElementById("email-code");
   const say = (t, err) => { note.textContent = t; note.className = err ? "small err" : "small"; };
   const errors = {
-    invalid_request: "Check the email address.",
-    too_many_requests: "Too many codes for now. Try again in 10 minutes.",
-    too_many_attempts: "Too many tries. Wait 10 minutes, then ask for a new code.",
-    expired_or_unknown: "This code expired. Ask for a new one.",
-    email_signin_off: "Email sign-in is not available right now.",
+    invalid_request: T.errors.invalidEmail,
+    too_many_requests: T.errors.rateLimited,
+    too_many_attempts: T.errors.tooManyTries,
+    expired_or_unknown: T.errors.codeExpired,
   };
-  const fail = (j) => j && j.error === "invalid_code"
-    ? say("Wrong code. " + j.attemptsLeft + (j.attemptsLeft === 1 ? " try" : " tries") + " left.", true)
-    : say((j && errors[j.error]) || "Something went wrong. Try again.", true);
+  const fail = (j) => {
+    if (j && j.error === "invalid_code") {
+      const n = j.attemptsLeft;
+      return say((n === 1 ? T.errors.wrongCode.one : T.errors.wrongCode.other).replace("{count}", String(n)), true);
+    }
+    say((j && errors[j.error]) || T.errors.network, true);
+  };
   start.addEventListener("submit", async (e) => {
     e.preventDefault(); busy = true; start.querySelector("button").disabled = true;
     try {
       const r = await fetch("/v1/auth/email/start", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: addr.value }) });
-      if (r.status === 202) { verify.hidden = false; codeIn.focus(); say("We sent a code to " + addr.value.trim() + ". It works for 10 minutes."); }
+      if (r.status === 202) { verify.hidden = false; codeIn.focus(); say(T.email.codeSent.replace("{email}", addr.value.trim())); start.querySelector("button").textContent = T.email.resend; }
       else fail(await r.json().catch(() => null));
     } catch { fail(null); }
     start.querySelector("button").disabled = false; busy = false;
