@@ -1,4 +1,4 @@
-# 0048. A template is a versioned JSON file of structure and briefs, never of private data
+# 0049. A template is a versioned JSON file of structure and briefs, never of private data
 
 - Status: proposed (2026-11-26)
 - Date: 2026-11-26

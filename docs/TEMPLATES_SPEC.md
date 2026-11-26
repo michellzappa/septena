@@ -1,7 +1,7 @@
 # Templates and the gallery: spec
 
 **Status:** proposal (2026-11-26). Issue #621.
-**Decisions:** [ADR 0048](adr/0048-templates-are-a-versioned-json-file.md)
+**Decisions:** [ADR 0049](adr/0049-templates-are-a-versioned-json-file.md)
 (the file format), [ADR 0021](adr/0021-one-import-engine-with-source-adapters.md)
 (one import engine), [ADR 0012](adr/0012-project-notes-are-agent-context.md)
 (notes are agent context), [ADR 0038](adr/0038-agents-are-the-integrations.md)
@@ -258,7 +258,7 @@ matches the Swift engine. The web client follows when it lands
 
 | Phase | Work | Needs |
 |---|---|---|
-| **T0 Format** | `registry/template.json`, conformance cases, validator and recipe section parser in the shared core, ADR 0048 accepted | #194 |
+| **T0 Format** | `registry/template.json`, conformance cases, validator and recipe section parser in the shared core, ADR 0049 accepted | #194 |
 | **T1 Copy** | Template adapter, preview labels, merge rules, undo, file and link entry points on iPhone, iPad, Mac and Android | T0, #99 |
 | **T2 Export** | Export from areas and projects, stripping, flags, review screen, share as file | T0 |
 | **T3 Agent** | `tasks_orientation` lists recipes; `skill.md`, `TasksSkill.swift` paragraph; `onboard.md` offers the gallery when the user starts fresh | T0 |

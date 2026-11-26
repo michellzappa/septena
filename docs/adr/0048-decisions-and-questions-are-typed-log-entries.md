@@ -1,4 +1,4 @@
-# 0047. Decisions and open questions are typed entries in the notes log
+# 0048. Decisions and open questions are typed entries in the notes log
 
 - Status: proposed (2026-11-26), agent defaults, mz may overrule
 - Date: 2026-11-26

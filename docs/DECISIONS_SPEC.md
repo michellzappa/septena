@@ -1,7 +1,7 @@
 # Decisions and open questions: spec
 
 **Status:** proposal (2026-11-26, #620).
-**Decisions:** [ADR 0047](adr/0047-decisions-and-questions-are-typed-log-entries.md),
+**Decisions:** [ADR 0048](adr/0048-decisions-and-questions-are-typed-log-entries.md),
 [ADR 0012](adr/0012-project-notes-are-agent-context.md),
 [ADR 0008](adr/0008-agent-loop-rules-live-in-the-store.md),
 [ADR 0044](adr/0044-review-is-one-place.md),
@@ -74,7 +74,7 @@ Rules:
 - Unknown keys are ignored. Writers keep them on a rewrite.
 - The tokens are English data. Apps show localized labels from the registry.
 - A question has no `task` key. A question about one task is a task question
-  (ADR 0047 §4). *(default)*
+  (ADR 0048 §4). *(default)*
 
 The grammar goes into `docs/IDENTIFIERS.md` as a wire contract, next to the
 `## Log` split rule.
@@ -297,7 +297,7 @@ with it.
 
 | Phase | Scope | Needs |
 |---|---|---|
-| **D0 Contract and core** | §3 grammar in `docs/IDENTIFIERS.md`, `notes_log.rs`, conformance fixtures, core release and pin | ADR 0047 accepted |
+| **D0 Contract and core** | §3 grammar in `docs/IDENTIFIERS.md`, `notes_log.rs`, conformance fixtures, core release and pin | ADR 0048 accepted |
 | **D1 Store** | §4 rules and refusals, `base` on area notes, `note_entry` event, tests in `backend/test/` | D0 |
 | **D2 MCP** | §6 arguments, `tasks_open_items`, claim and project payloads, orientation, the three briefs | D1 |
 | **D3 Apps: notes log** | §7.1 and §8 on iPhone, iPad, Mac and Android, registry copy | D0 (D1 for safe merges) |
