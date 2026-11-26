@@ -172,6 +172,12 @@
       "settings.pages.account.title"
     ]
   },
+  "Account ID": {
+    "text": "Account ID",
+    "paths": [
+      "settings.copy.sync_account_status.accountIdLabel.label"
+    ]
+  },
   "Active {time}": {
     "text": "Active {time}",
     "placeholders": [
@@ -860,6 +866,7 @@
   "Copied": {
     "text": "Copied",
     "paths": [
+      "settings.copy.sync_account_status.copied.label",
       "settings.copy.claude_connector.copied.label"
     ]
   },
@@ -872,6 +879,7 @@
   "Copy": {
     "text": "Copy",
     "paths": [
+      "settings.copy.sync_account_status.copy.label",
       "settings.copy.claude_connector.copy.label",
       "actions.actions.task.copy.title"
     ]
@@ -3557,6 +3565,12 @@
     "text": "Share Project…",
     "paths": [
       "actions.actions.project.share.title"
+    ]
+  },
+  "Share this ID with support if you need help with your account.": {
+    "text": "Share this ID with support if you need help with your account.",
+    "paths": [
+      "settings.copy.sync_account_status.accountIdFooter.label"
     ]
   },
   "Shared by": {

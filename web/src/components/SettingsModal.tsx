@@ -552,6 +552,57 @@ export function SettingsModal({
                   </p>
                 </section>
 
+                {snapshot.userId && (
+                  <section className="rounded-xl border border-[var(--border-subtle)] p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium text-[var(--text-primary)]">
+                          {registryText(
+                            SETTINGS_REGISTRY.copy.sync_account_status.find((c) => c.id === "accountIdLabel")?.label ?? "Account ID",
+                            lang,
+                          )}
+                        </p>
+                        <p className="font-mono-tabular mt-1 truncate text-xs text-[var(--text-secondary)]">
+                          {snapshot.userId}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => void copyText("account-id", snapshot.userId!)}
+                        className="flex shrink-0 items-center gap-1 rounded-lg border border-[var(--border-subtle)] px-2.5 py-1 text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+                      >
+                        {copiedId === "account-id" ? (
+                          <>
+                            <Check className="h-3.5 w-3.5 text-[var(--accent)]" />
+                            <span>
+                              {registryText(
+                                SETTINGS_REGISTRY.copy.sync_account_status.find((c) => c.id === "copied")?.label ?? "Copied",
+                                lang,
+                              )}
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="h-3.5 w-3.5" />
+                            <span>
+                              {registryText(
+                                SETTINGS_REGISTRY.copy.sync_account_status.find((c) => c.id === "copy")?.label ?? "Copy",
+                                lang,
+                              )}
+                            </span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                    <p className="mt-1.5 text-[11px] text-[var(--text-muted)]">
+                      {registryText(
+                        SETTINGS_REGISTRY.copy.sync_account_status.find((c) => c.id === "accountIdFooter")?.label ?? "",
+                        lang,
+                      )}
+                    </p>
+                  </section>
+                )}
+
                 <section className="rounded-xl border border-[var(--border-subtle)] p-4">
                   <h3 className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold tracking-wide text-[var(--text-muted)] uppercase">
                     <KeyRound className="h-3.5 w-3.5" />

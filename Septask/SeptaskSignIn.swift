@@ -489,12 +489,39 @@ struct SeptaskEmailSignInForm: View {
 struct SeptaskSyncAccountSection: View {
   private static let syncSection = RegistrySettings.section("sync", page: RegistrySettings.PageID.account)
   private var sync: TaskSyncEngine { .shared }
+  @State private var copiedAccountID = false
 
   var body: some View {
     Section {
       if sync.signedIn {
         LabeledContent(Self.syncSection?.header ?? "") {
           Text(statusLine).foregroundStyle(.secondary)
+        }
+        if let accountID = sync.accountID, !accountID.isEmpty {
+          LabeledContent(RegistrySettings.copy("sync_account_status", "accountIdLabel")) {
+            HStack(spacing: 8) {
+              Text(accountID)
+                .font(.septenaMeta)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .textSelection(.enabled)
+              Button {
+                SeptenaPasteboard.copy(accountID)
+                copiedAccountID = true
+                Task { @MainActor in
+                  try? await Task.sleep(nanoseconds: 2_000_000_000)
+                  copiedAccountID = false
+                }
+              } label: {
+                Label(
+                  RegistrySettings.copy("sync_account_status", copiedAccountID ? "copied" : "copy"),
+                  systemImage: copiedAccountID ? "checkmark" : "doc.on.doc"
+                )
+              }
+              .buttonStyle(.borderless)
+            }
+          }
         }
         if let error = sync.lastError {
           Text(error).font(.caption).foregroundStyle(.red)

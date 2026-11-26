@@ -4352,6 +4352,48 @@
         }
       }
     },
+    "Account ID" : {
+      "comment" : "Generated from registry settings.copy.sync_account_status.accountIdLabel.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Konto-ID"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ID de cuenta"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ID de compte"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ID account"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Account-ID"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ID da conta"
+          }
+        }
+      }
+    },
     "Active %@" : {
       "comment" : "Generated from registry settings.copy.access_devices.active.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -33206,6 +33248,48 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Compartilhar projeto…"
+          }
+        }
+      }
+    },
+    "Share this ID with support if you need help with your account." : {
+      "comment" : "Generated from registry settings.copy.sync_account_status.accountIdFooter.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Teile diese ID mit dem Support, wenn du Hilfe zu deinem Konto brauchst."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Comparte este ID con el soporte si necesitas ayuda con tu cuenta."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Partagez cet ID avec l’assistance si vous avez besoin d’aide pour votre compte."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Condividi questo ID con l’assistenza se hai bisogno di aiuto per il tuo account."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deel dit ID met support als je hulp nodig hebt met je account."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compartilhe este ID com o suporte se precisar de ajuda com sua conta."
           }
         }
       }

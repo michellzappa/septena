@@ -1672,6 +1672,9 @@ final class TaskSyncEngine {
     #endif
   }
 
+  /// Backend user id of the active session on this device, for Settings ▸ Account (#565).
+  var accountID: String? { signedIn ? lastUserID : nil }
+
   /// Counts what `wipeLocalTaskData` would remove that the user can lose:
   /// the tasks on this device and the changes not sent yet.
   private func accountSwitchSummary() -> AccountSwitchSummary {
