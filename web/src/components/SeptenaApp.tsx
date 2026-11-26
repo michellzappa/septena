@@ -220,7 +220,7 @@ export function SeptenaApp() {
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
   const [taskPageId, setTaskPageId] = useState<string | null>(null);
   const [inboxCollapsed, setInboxCollapsed] = useState(false);
-  const [todayLoggedExpanded, setTodayLoggedExpanded] = useState(true);
+  const [todayLoggedExpanded, setTodayLoggedExpanded] = useState(false);
   const [scopeLoggedExpandedIds, setScopeLoggedExpandedIds] = useState<Set<string>>(() => new Set());
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [tagFilterId, setTagFilterId] = useState<string | null>(null);
