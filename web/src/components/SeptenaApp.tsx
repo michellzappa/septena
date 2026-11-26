@@ -269,10 +269,18 @@ export function SeptenaApp() {
     return () => mq.removeEventListener("change", handler);
   }, []);
 
+  // Keep the address bar on the canonical app root (`/`) so iOS Add to Home
+  // Screen and browser installs always save https://web.septena.app/.
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.location.pathname !== "/") {
+      window.history.replaceState({}, "", `/${window.location.search}`);
+    }
+  }, []);
+
   // Register offline shell Service Worker.
   useEffect(() => {
     if (typeof window !== "undefined" && "serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").catch(() => {});
+      navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(() => {});
     }
   }, []);
 
@@ -298,7 +306,7 @@ export function SeptenaApp() {
       today: false,
     });
     setQuickAddOpen(true);
-    window.history.replaceState({}, "", window.location.pathname);
+    window.history.replaceState({}, "", "/");
   }, [bootPhase]);
 
   // DayClock midnight rollover watcher.
