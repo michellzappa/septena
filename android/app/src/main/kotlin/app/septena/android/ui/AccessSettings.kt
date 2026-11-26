@@ -390,6 +390,14 @@ internal fun countPhrase(id: String, count: Int, languageTag: String): String {
     val phrase = phrases.firstOrNull { (it as? JsonValue.ObjectValue)?.fields?.get("id").stringValue() == id }
         as? JsonValue.ObjectValue
     val label = phrase?.fields?.get("label") as? JsonValue.ObjectValue ?: return count.toString()
+    return registryPlural(label, count, languageTag)
+}
+
+/**
+ * A registry plural (`{one, other}`), localized, with `{count}` filled. The localization entry for the
+ * `other` form holds the plural forms per language.
+ */
+internal fun registryPlural(label: JsonValue.ObjectValue, count: Int, languageTag: String): String {
     val other = label.fields["other"].stringValue().orEmpty()
     val forms = localizedPluralForms(other, languageTag) ?: label
     val form = (if (count == 1) forms.fields["one"].stringValue() else null)
