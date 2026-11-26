@@ -10,6 +10,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -34,6 +35,7 @@ import app.septena.core.RegistryCatalog
 import app.septena.core.stringValue
 import app.septena.transport.DeviceCode
 import app.septena.transport.DevicePollResult
+import app.septena.transport.SessionTokens
 import app.septena.transport.SignInQr
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
@@ -55,7 +57,7 @@ private sealed interface SignInStep {
  * The open account-switch question (#575). It lives outside [SignInStep]: the sign-in coroutine waits on
  * [answer], and a step change would restart the effect that runs it.
  */
-private class AccountSwitchQuestion(
+internal class AccountSwitchQuestion(
     val summary: AccountSwitchSummary,
     val answer: CompletableDeferred<AccountSwitchChoice> = CompletableDeferred(),
 )
@@ -63,10 +65,6 @@ private class AccountSwitchQuestion(
 /** surfaces.json `deviceSignIn`: the block that holds the sign-in-by-code copy. */
 private val deviceSignIn: JsonValue.ObjectValue?
     get() = RegistryCatalog.document("surfaces").fields["deviceSignIn"] as? JsonValue.ObjectValue
-
-/** The sign-in screen's title (surfaces.json `deviceSignIn.title`), localized. */
-internal fun deviceSignInTitle(languageTag: String): String =
-    registryText(deviceSignIn?.fields?.get("title").stringValue(), languageTag)
 
 /** One line of surfaces.json `deviceSignIn.copy` by id, localized. */
 internal fun deviceSignInCopy(id: String, languageTag: String): String {
@@ -107,16 +105,41 @@ internal fun accountSwitchMessage(summary: AccountSwitchSummary, languageTag: St
 }
 
 /**
+ * Stores a new session from any sign-in method, as device approval always did. Another account's session
+ * waits for the user's answer to the account-switch question (#575), which [ask] shows (null hides it).
+ * Returns the user's declining answer, or null when the device is signed in (and a sync is asked for).
+ */
+internal suspend fun completeSignIn(
+    graph: AndroidAppGraph,
+    tokens: SessionTokens,
+    ask: (AccountSwitchQuestion?) -> Unit,
+): AccountSwitchChoice? = withContext(Dispatchers.IO) {
+    val declined = graph.signIn(tokens) { summary ->
+        val asked = AccountSwitchQuestion(summary)
+        ask(asked)
+        try {
+            asked.answer.await()
+        } finally {
+            ask(null)
+        }
+    }
+    // In here: signing in removes the sign-in screen, which cancels what follows.
+    if (declined == null) graph.sync.requestSync()
+    declined
+}
+
+/**
  * Sign-in by device approval (ADR 0016): this device shows a code and the user enters it in Septena on a
  * signed-in iPhone, iPad or Mac (Settings ▸ Account ▸ Approve a sign-in), which shows this device's name before
- * the user approves. Used by the sign-in screen and by the first run's account step. [startTitle] labels the
- * first button. Callers watch `credentials.signedIn` for the result.
+ * the user approves. Shown by [SignInMethodsPanel]. [startTitle] labels the first button; [secondary] draws it
+ * outlined. Callers watch `credentials.signedIn` for the result.
  */
 @Composable
 internal fun DeviceSignInPanel(
     graph: AndroidAppGraph,
     languageTag: String,
     startTitle: String = deviceSignInCopy("start", languageTag),
+    secondary: Boolean = false,
 ) {
     var step by remember { mutableStateOf<SignInStep>(SignInStep.Start) }
     var question by remember { mutableStateOf<AccountSwitchQuestion?>(null) }
@@ -137,21 +160,7 @@ internal fun DeviceSignInPanel(
                         DevicePollResult.Expired -> break
                         is DevicePollResult.Approved -> {
                             runCatching {
-                                withContext(Dispatchers.IO) {
-                                    // Another account's session waits here for the user's answer (#575).
-                                    val declined = graph.signIn(result.tokens) { summary ->
-                                        val asked = AccountSwitchQuestion(summary)
-                                        question = asked
-                                        try {
-                                            asked.answer.await()
-                                        } finally {
-                                            question = null
-                                        }
-                                    }
-                                    // In here: signing in removes this panel, which cancels what follows.
-                                    if (declined == null) graph.sync.requestSync()
-                                    declined
-                                }
+                                completeSignIn(graph, result.tokens) { question = it }
                             }.onSuccess { declined ->
                                 // Not signed in: the device keeps its tasks and the panel starts over.
                                 when (declined) {
@@ -175,7 +184,12 @@ internal fun DeviceSignInPanel(
 
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         when (val current = step) {
-            SignInStep.Start -> Button(onClick = { step = SignInStep.Requesting }) { Text(startTitle) }
+            // Below the email form the device way in is the second choice: an outlined button.
+            SignInStep.Start -> if (secondary) {
+                OutlinedButton(onClick = { step = SignInStep.Requesting }) { Text(startTitle) }
+            } else {
+                Button(onClick = { step = SignInStep.Requesting }) { Text(startTitle) }
+            }
             SignInStep.Requesting -> CircularProgressIndicator()
             is SignInStep.ShowCode -> {
                 Text(deviceSignInCopy("approve", languageTag))
@@ -209,7 +223,7 @@ internal fun DeviceSignInPanel(
  * which keeps this device's tasks.
  */
 @Composable
-private fun AccountSwitchDialog(asked: AccountSwitchQuestion, languageTag: String) {
+internal fun AccountSwitchDialog(asked: AccountSwitchQuestion, languageTag: String) {
     fun answer(choice: AccountSwitchChoice) {
         asked.answer.complete(choice)
     }

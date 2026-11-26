@@ -312,10 +312,10 @@ private fun StepContent(
         "account" -> if (checkingAccount) {
             CircularProgressIndicator()
         } else {
-            DeviceSignInPanel(
+            SignInMethodsPanel(
                 graph = graph,
                 languageTag = languageTag,
-                startTitle = step.primary?.title ?: deviceSignInCopy("start", languageTag),
+                deviceStartTitle = step.primary?.title ?: deviceSignInCopy("start", languageTag),
             )
         }
         // The code field is the one on Settings ▸ Connect Claude. Its approval dialog ticks the Get started

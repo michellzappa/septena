@@ -84,6 +84,7 @@ object RegistryCatalog {
         "actions" to { RegistryDocuments.actionsJson },
         "surfaces" to { RegistryDocuments.surfacesJson },
         "plans" to { RegistryDocuments.plansJson },
+        "sign-in" to { RegistryDocuments.signInJson },
         "conformance" to { RegistryDocuments.conformanceJson },
         "localizations" to { RegistryDocuments.localizationsJson },
     )

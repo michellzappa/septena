@@ -216,10 +216,6 @@
     "RegistrySignInMethodIds.*": {
       "reason": "No client renders the sign-in registry yet (SI0); the sign-in screens read it in SI2 and SI4.",
       "issue": "#636"
-    },
-    "RegistryDocuments.signInJson": {
-      "reason": "No client renders the sign-in registry yet (SI0); the sign-in screens read it in SI2 and SI4.",
-      "issue": "#636"
     }
   }
 }
