@@ -55,7 +55,6 @@ of the arc. The June 2026 life-OS story below is superseded.
 | The centaur essay | "Field Notes from a Centaur", michellzappa.com/blog/field-notes-from-a-centaur-2026 (15 Dec 2025). /about links to it. |
 | mz's own account (2026-11-26) | mz, in chat: has used every to-do app and runs his digital life on them; loves the craft of Cultured Code, the versatility of Doist and the native integrations of Reminders; practises GTD-lite; tried shapes where his agents felt native for reading, writing and accountability; dogfooded Septena for six months; built it by vibe coding, mostly with Claude Opus 5 and 5.5, Gemini Neon 4 and GPT 6 Sol and Luna; uses it for brain dumps, accountability, prioritizing and sharing ideas; every agent reads the same list. |
 | The name, per mz | "Septena is a made-up word referring to seven, or a week" (mz, 2026-11-26). Overrides "Latin for a group of seven" in Block I. |
-| A real week on /about | Real tasks from mz's list, read 2026-11-26 and picked one by one by mz (`MY_WEEK` in the site's `app/about/page.tsx`). Not the marketing cast. No names of people, money or IDs. |
 | The numbers are trustworthy | Going open source rewrote hashes (a secrets + history scrub) but preserved author dates, so counts and dates are real. The history from before the rename lives inside this repo; don't double-count. |
 
 ### Block G — the origin line (canonical, 2026-11-21)
@@ -233,24 +232,23 @@ Canonical wording. Reuse verbatim where it fits; adapt length, not meaning.
 
 ### Block B — Maker's note (long, for the website /about) — rewritten 2026-11-26
 
-Led by the person, in mz's own words from 2026-11-26 (§1). The live text is
+Led by the person, in mz's own words from 2026-11-26 (§1). No tasks from mz's own list: he found that too specific (2026-11-26). The live text is
 `app/about/page.tsx` in septena-site; this is its outline, so the two cannot
 drift word by word. Humanizer pass done.
 
 1. **Hi, I'm Michell** (photo from `MAKER_PHOTOS`): every to-do app under the
    sun; the craft of Cultured Code, the versatility of Doist, the native
    integrations of Reminders. Not a programmer. Envisioning (linked), Artificial
-   Insights, Starlings and Bipe. Stockholm, São Paulo, Amsterdam.
+   Insights (linked to envisioning.com/newsletter), Starlings and Bipe. Stockholm, São Paulo, Amsterdam.
 2. **Why I built it:** GTD-lite, wanted more; agents that feel native for
    reading, writing and accountability; Block G's day-two fields; six months of
    dogfooding; Block H with a link to the centaur essay.
 3. **How I use it:** brain dumps, accountability, prioritizing, sharing ideas;
    all agents on one list; the stop; the runner is next.
-4. **A real week of my list:** the vetted tasks (§1).
-5. **How it's made:** vibe coding with the models in §1; AGENTS.md.
-6. **Why it's open:** unchanged; signed with michellzappa.com and envisioning.com.
-7. **The name:** "a made-up word. It refers to seven, as in the days of a week."
-8. A press-kit band to /about/brand, then Get in touch with Block F's line.
+4. **How it's made:** vibe coding with the models in §1; AGENTS.md.
+5. **Why it's open:** unchanged; signed with michellzappa.com and envisioning.com.
+6. **The name:** "a made-up word. It refers to seven, as in the days of a week."
+7. A press-kit band to /about/brand, then Get in touch with Block F's line.
 
 Naming other apps here is mz's own choice (2026-11-26): it is admiration in his
 voice, never a comparison.
@@ -311,7 +309,7 @@ Where the identity appears, which block, which repo/file, current state.
 | Patronage / Septena+ | cloud · `SettingsPanes.swift` (`SeptenaPlus.reasons` → "Pays the AI bill") | C | **done** (iOS+Mac green 2026-06-21) |
 | Support intro line | cloud · `SupportSettingsPane.swift` (ticket footer + email fallback) | F | **done** (iOS+Mac green 2026-06-21) |
 | Changelog voice | cloud · `Septena/Resources/changelog.json` | E | ongoing, tighten |
-| Website /about | site · `app/about/page.tsx` | B + D + F | **done** 2026-11-26: Block B, mz's own account, a real week of his list, press photo, press-kit band. michellzappa.com/blog/septena-2026 still has the 2026-11-21 text |
+| Website /about | site · `app/about/page.tsx` | B + D + F | **done** 2026-11-26: Block B, mz's own account, press photo, press-kit band. michellzappa.com/blog/septena-2026 still has the 2026-11-21 text |
 | Website /ownership | site · `app/ownership/page.tsx` | B + D | review vs. this doc |
 | Website /support | site · `app/support/page.tsx` | C + F | reframe |
 | Website /supporters | site · `app/supporters/page.tsx` | C | review |
