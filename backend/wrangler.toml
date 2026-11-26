@@ -147,3 +147,8 @@ bucket_name = "septena-attachments"
 # OPENAI_APPS_CHALLENGE — optional. The token platform.openai.com/apps-manage
 #                   gives for domain verification, served at
 #                   /.well-known/openai-apps-challenge.
+# OIDC sign-in providers (ADR 0047, #637, #638) — each stays off until set:
+# GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_ANDROID_CLIENT_ID, GOOGLE_IOS_CLIENT_ID
+# MICROSOFT_CLIENT_ID, MICROSOFT_CLIENT_SECRET
+# APPLE_WEB_CLIENT_ID (Services ID), APPLE_SIGNIN_KEY_ID, APPLE_SIGNIN_KEY (.p8 PEM),
+#   APPLE_SIGNIN_TEAM_ID (optional override of APNS_TEAM_ID)

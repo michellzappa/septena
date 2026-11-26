@@ -23,6 +23,29 @@ import {
 } from "./webAuth.js";
 import { enabledSignInMethods, startEmailSignIn, verifyEmailSignIn, zEmailStartBody, zEmailVerifyBody } from "./emailSignIn.js";
 import {
+  completeCollisionLink,
+  linkEmailToAccount,
+  linkProviderToAccount,
+  listUserIdentities,
+  resolveProviderLogin,
+  unlinkIdentityFromAccount,
+  zLinkCompleteBody,
+  zLinkEmailVerifyBody,
+} from "./authLink.js";
+import {
+  OidcTokenError,
+  acceptedAppleAudiences,
+  isGoogleNativeEnabled,
+  isOidcWebEnabled,
+  oidcCallback,
+  oidcRedeem,
+  oidcStart,
+  startOidcLinkUrl,
+  verifyGoogleNativeToken,
+  zGoogleNativeBody,
+  zOidcLinkStartBody,
+} from "./oidc.js";
+import {
   approvePairing,
   denyPairing,
   zAgentName,
@@ -138,21 +161,30 @@ api.post("/auth/apple", async (c) => {
   const body = await parse(c, zAppleBody);
   if (body instanceof Response) return body;
   try {
-    const { sub } = await verifyAppleIdentityToken(body.identityToken, body.nonce, c.env.APPLE_AUDIENCES.split(","));
-    const derivedUserId = await userIdForAppleSub(sub);
-    // Keep existing Apple accounts on their derived `u_` id while recording
-    // `apple:<sub>` -> `userId` in the global identity table (ADR 0016, #168).
-    const accounts = accountStoreFor(c.env);
-    const userId = accounts
-      ? (await accounts.resolveOrCreateIdentity("apple", sub, derivedUserId)).userId
-      : derivedUserId;
-    // Every new account starts with 14 days of Plus (spec §3). Only the
-    // first sign-in writes the row; a KV marker keeps account deletion from
-    // granting a second trial (spec §6.4 finding 4).
-    const trialStarted = await startTrialOnce(c.env, userId);
-    if (trialStarted) logEvent("trial_started", { userId });
+    const apple = await verifyAppleIdentityToken(body.identityToken, body.nonce, acceptedAppleAudiences(c.env));
+    const derivedUserId = await userIdForAppleSub(apple.sub);
+    const login = await resolveProviderLogin(c.env, {
+      provider: "apple",
+      subject: apple.sub,
+      preferredUserId: derivedUserId,
+      email: apple.email,
+      emailVerified: apple.emailVerified,
+      clientIp: c.req.header("CF-Connecting-IP"),
+    });
+    if (login.outcome === "needs_link") {
+      return c.json({
+        error: "account_exists",
+        email: login.email,
+        provider: login.provider,
+        linkToken: login.linkToken,
+        codeSent: login.codeSent,
+      }, 409, { "Cache-Control": "no-store" });
+    }
+    if (login.outcome === "needs_link_email_off") {
+      return c.json({ error: "account_exists", email: login.email, provider: login.provider }, 409, { "Cache-Control": "no-store" });
+    }
     logEvent("api_signin", { ok: true });
-    return c.json(await issueSession(c.env, userId));
+    return c.json(await issueSession(c.env, login.userId));
   } catch (e) {
     if (e instanceof AppleIdentityError) {
       logEvent("api_signin", { ok: false, reason: e.message });
@@ -160,6 +192,67 @@ api.post("/auth/apple", async (c) => {
     }
     throw e;
   }
+});
+
+// Native Android Google Credential Manager sign-in (ADR 0047, #637).
+api.post("/auth/google/native", async (c) => {
+  if (!isGoogleNativeEnabled(c.env)) return c.json({ error: "provider_off" }, 503, { "Cache-Control": "no-store" });
+  const body = await parse(c, zGoogleNativeBody);
+  if (body instanceof Response) return body;
+  try {
+    const google = await verifyGoogleNativeToken(c.env, body);
+    const login = await resolveProviderLogin(c.env, {
+      provider: "google",
+      subject: google.subject,
+      email: google.email,
+      emailVerified: google.emailVerified,
+      clientIp: c.req.header("CF-Connecting-IP"),
+    });
+    if (login.outcome === "needs_link") {
+      return c.json({
+        error: "account_exists",
+        email: login.email,
+        provider: login.provider,
+        linkToken: login.linkToken,
+        codeSent: login.codeSent,
+      }, 409, { "Cache-Control": "no-store" });
+    }
+    if (login.outcome === "needs_link_email_off") {
+      return c.json({ error: "account_exists", email: login.email, provider: login.provider }, 409, { "Cache-Control": "no-store" });
+    }
+    logEvent("api_signin", { ok: true, provider: "google" });
+    return c.json(await issueSession(c.env, login.userId), 200, { "Cache-Control": "no-store" });
+  } catch (e) {
+    if (e instanceof OidcTokenError) {
+      logEvent("api_signin", { ok: false, provider: "google", reason: e.message });
+      return c.json({ error: "invalid_identity_token" }, 401, { "Cache-Control": "no-store" });
+    }
+    throw e;
+  }
+});
+
+// OIDC web redirects for Google, Microsoft and Web Sign in with Apple (ADR 0047, #637).
+api.get("/auth/oidc/:provider/start", oidcStart);
+api.get("/auth/oidc/:provider/callback", oidcCallback);
+api.post("/auth/oidc/:provider/callback", oidcCallback);
+api.post("/auth/oidc/redeem", oidcRedeem);
+
+// Finish no-silent-linking collision step with email code (ADR 0047 decision 5).
+api.post("/auth/link/complete", async (c) => {
+  const body = await parse(c, zLinkCompleteBody);
+  if (body instanceof Response) return body;
+  const cookieMode = body.sessionMode === "cookie";
+  if (cookieMode && !isAllowedWebOrigin(c.env, c.req.header("Origin"))) {
+    return c.json({ error: "origin_not_allowed" }, 403, { "Cache-Control": "no-store" });
+  }
+  const res = await completeCollisionLink(c.env, body, c.req.header("CF-Connecting-IP"));
+  if (!res.ok) {
+    return c.json({ error: res.error, ...(res.attemptsLeft !== undefined ? { attemptsLeft: res.attemptsLeft } : {}) }, res.status, { "Cache-Control": "no-store" });
+  }
+  const session = await issueSession(c.env, res.userId);
+  return cookieMode
+    ? cookieSessionResponse(c.env, session)
+    : c.json(session, 200, { "Cache-Control": "no-store" });
 });
 
 async function parseRefreshInput(
@@ -222,8 +315,23 @@ api.post("/auth/signout", async (c) => {
 });
 
 // Which sign-in methods this server has on (ADR 0047, docs/SIGN_IN_SURFACES_SPEC.md §3).
-api.get("/auth/methods", (c) =>
-  c.json({ methods: enabledSignInMethods(c.env).map((id) => ({ id })) }, 200, { "Cache-Control": "no-store" }));
+api.get("/auth/methods", (c) => {
+  const methods: Array<{ id: string; web?: boolean; native?: boolean }> = [
+    { id: "apple", ...(isOidcWebEnabled(c.env, "apple") ? { web: true } : {}) },
+  ];
+  const googleWeb = isOidcWebEnabled(c.env, "google");
+  const googleNative = isGoogleNativeEnabled(c.env);
+  if (googleWeb || googleNative) {
+    methods.push({ id: "google", ...(googleWeb ? { web: true } : {}), ...(googleNative ? { native: true } : {}) });
+  }
+  if (isOidcWebEnabled(c.env, "microsoft")) {
+    methods.push({ id: "microsoft", web: true });
+  }
+  for (const id of enabledSignInMethods(c.env)) {
+    if (id !== "apple") methods.push({ id });
+  }
+  return c.json({ methods }, 200, { "Cache-Control": "no-store" });
+});
 
 // Email one-time code (ADR 0016, issue #169): see ./emailSignIn.ts.
 api.post("/auth/email/start", async (c) => {
@@ -450,6 +558,12 @@ api.use("/changes", requireUser, loadPlan("open", "changes"), requireSyncDevice)
 api.use("/notes/*", requireUser);
 api.use("/pair/*", requireUser);
 api.use("/auth/device", requireUser);
+api.use("/auth/identities", requireUser);
+api.use("/auth/identities/*", requireUser);
+api.use("/auth/link/email/*", requireUser);
+api.use("/auth/link/apple", requireUser);
+api.use("/auth/link/google/*", requireUser);
+api.use("/auth/link/oidc/*", requireUser);
 // The watch is a companion of a signed-in phone or Mac: it loads the plan
 // but takes no sync device slot of its own.
 api.use("/tasks", requireUser, loadPlan("open", "tasks"));
@@ -632,6 +746,88 @@ api.post("/auth/device", async (c) => {
   const userId = c.get("userId");
   logEvent("api_device_session", { by: c.get("actor") });
   return c.json(await issueSession(c.env, userId, HANDOFF_TTL_S));
+});
+
+// ---- Sign-in methods management (ADR 0047 decision 6, #171, #643) ----
+// Only app sessions reach these routes; agents cannot list, add, or remove
+// sign-in methods.
+
+api.get("/auth/identities", async (c) => {
+  return c.json(await listUserIdentities(c.env, c.get("userId")), 200, { "Cache-Control": "no-store" });
+});
+
+api.delete("/auth/identities/:id", async (c) => {
+  let id: string;
+  try {
+    id = decodeURIComponent(c.req.param("id") ?? "");
+  } catch {
+    return c.json({ error: "invalid_request" }, 400, { "Cache-Control": "no-store" });
+  }
+  if (!id || id.length > 300) return c.json({ error: "invalid_request" }, 400, { "Cache-Control": "no-store" });
+  const res = await unlinkIdentityFromAccount(c.env, c.get("userId"), id);
+  if (!res.ok) return c.json({ error: res.error }, res.status, { "Cache-Control": "no-store" });
+  return c.json({ ok: true, identities: res.identities, canRemove: res.canRemove }, 200, { "Cache-Control": "no-store" });
+});
+
+api.post("/auth/link/email/start", async (c) => {
+  const body = await parse(c, zEmailStartBody);
+  if (body instanceof Response) return body;
+  const res = await startEmailSignIn(c.env, body, c.req.header("CF-Connecting-IP"));
+  if (res.ok) return c.json({ status: "sent", expiresInSeconds: res.expiresInSeconds, codeLength: 6 }, 202, { "Cache-Control": "no-store" });
+  const headers: Record<string, string> = { "Cache-Control": "no-store" };
+  if (res.retryAfterSeconds) headers["Retry-After"] = String(res.retryAfterSeconds);
+  return c.json({ error: res.error, ...(res.retryAfterSeconds ? { retryAfterSeconds: res.retryAfterSeconds } : {}) }, res.status, headers);
+});
+
+api.post("/auth/link/email/verify", async (c) => {
+  const body = await parse(c, zLinkEmailVerifyBody);
+  if (body instanceof Response) return body;
+  const res = await linkEmailToAccount(c.env, c.get("userId"), body, c.req.header("CF-Connecting-IP"));
+  if (!res.ok) {
+    return c.json({ error: res.error, ...(res.attemptsLeft !== undefined ? { attemptsLeft: res.attemptsLeft } : {}) }, res.status, { "Cache-Control": "no-store" });
+  }
+  return c.json({ ok: true, created: res.created, identities: res.identities, canRemove: res.canRemove }, 200, { "Cache-Control": "no-store" });
+});
+
+api.post("/auth/link/apple", async (c) => {
+  const body = await parse(c, zAppleBody);
+  if (body instanceof Response) return body;
+  try {
+    const apple = await verifyAppleIdentityToken(body.identityToken, body.nonce, acceptedAppleAudiences(c.env));
+    const res = await linkProviderToAccount(c.env, c.get("userId"), "apple", apple.sub);
+    if (!res.ok) return c.json({ error: res.error }, res.status, { "Cache-Control": "no-store" });
+    return c.json({ ok: true, created: res.created, identities: res.identities, canRemove: res.canRemove }, 200, { "Cache-Control": "no-store" });
+  } catch (e) {
+    if (e instanceof AppleIdentityError) {
+      return c.json({ error: "invalid_identity_token" }, 401, { "Cache-Control": "no-store" });
+    }
+    throw e;
+  }
+});
+
+api.post("/auth/link/google/native", async (c) => {
+  if (!isGoogleNativeEnabled(c.env)) return c.json({ error: "provider_off" }, 503, { "Cache-Control": "no-store" });
+  const body = await parse(c, zGoogleNativeBody);
+  if (body instanceof Response) return body;
+  try {
+    const google = await verifyGoogleNativeToken(c.env, body);
+    const res = await linkProviderToAccount(c.env, c.get("userId"), "google", google.subject);
+    if (!res.ok) return c.json({ error: res.error }, res.status, { "Cache-Control": "no-store" });
+    return c.json({ ok: true, created: res.created, identities: res.identities, canRemove: res.canRemove }, 200, { "Cache-Control": "no-store" });
+  } catch (e) {
+    if (e instanceof OidcTokenError) {
+      return c.json({ error: "invalid_identity_token" }, 401, { "Cache-Control": "no-store" });
+    }
+    throw e;
+  }
+});
+
+api.post("/auth/link/oidc/start", async (c) => {
+  const body = await parse(c, zOidcLinkStartBody);
+  if (body instanceof Response) return body;
+  const res = await startOidcLinkUrl(c.env, c.get("userId"), body);
+  if (!res.ok) return c.json({ error: res.error }, res.status, { "Cache-Control": "no-store" });
+  return c.json({ url: res.url }, 200, { "Cache-Control": "no-store" });
 });
 
 // ---- APNs device push tokens (F1b #213, docs/TASK_FACTORY_SPEC.md §8) ----

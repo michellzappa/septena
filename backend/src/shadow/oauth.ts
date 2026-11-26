@@ -9,6 +9,7 @@ import { validateRedirectUri } from "../oauth/redirects.js";
 import { storeFor } from "../api/session.js";
 import { accountStoreFor } from "../store/AccountStore.js";
 import { emailSignInEnabled, verifyEmailAccount, zEmailAddress } from "../api/emailSignIn.js";
+import { enabledOidcWebProviders, pairOidcStart } from "../api/oidc.js";
 import { SIGN_IN } from "../generated/registries.js";
 import { pairApproveUrl, pairQrMatrix, pairQrSvg } from "./pairQr.js";
 import { REVIEWER_MAX_FAILURES, reviewerCodeMatches, reviewerMode } from "./reviewer.js";
@@ -257,7 +258,7 @@ export async function pairContinue(c: Context<{ Bindings: Env }>) {
 interface StoredCode {
   userId: string;
   timeZone?: string;
-  approvedVia?: "app" | "email";
+  approvedVia?: "app" | "email" | "oidc";
   approvedAt?: number;
   /// The agent's name and the agent it replaces, from the approval.
   label?: string;
@@ -266,6 +267,8 @@ interface StoredCode {
   redirectUri: string;
   codeChallenge: string;
 }
+
+export { pairOidcStart as pairOidc };
 
 // ---- the page's email path (ADR 0047, issue #636) ----
 
@@ -662,10 +665,10 @@ export async function token(c: Context<{ Bindings: Env }>) {
   }
 
   const store = storeFor(c.env, stored.userId);
-  if (stored.approvedVia === "email") {
-    // Email approval on the authorize page can create an agent-first account
-    // with no app session yet (ADR 0047, ADR 0056). Refuse only if the account
-    // was deleted after approval or no longer has an identity.
+  if (stored.approvedVia === "email" || stored.approvedVia === "oidc") {
+    // Email or OIDC approval on the authorize page can create an agent-first
+    // account with no app session yet (ADR 0047, ADR 0056). Refuse only if the
+    // account was deleted after approval or no longer has an identity.
     const accounts = accountStoreFor(c.env);
     const [identities, deletedAt] = await Promise.all([
       accounts ? accounts.listIdentitiesForUser(stored.userId) : Promise.resolve([{ userId: stored.userId }]),
@@ -737,11 +740,25 @@ const EMAIL_FORM_CSS = `
     background: #1a1a1a; color: #fff; cursor: pointer; }
   .alt button:disabled { opacity: 0.5; cursor: default; }
   .alt .err { color: #c0392b; }
+  .providers { display: flex; flex-direction: column; gap: 8px; margin: 0 0 12px; }
+  .providers a { display: block; text-align: center; text-decoration: none; font: inherit; font-size: 15px; font-weight: 600;
+    padding: 10px 14px; border-radius: 9px; border: 1px solid #d0d0d0; color: inherit; }
   @media (prefers-color-scheme: dark) {
     .alt { border-color: #2a2a2a; }
-    .alt input { border-color: #3a3a3a; }
+    .alt input, .providers a { border-color: #3a3a3a; }
     .alt button { background: #f5f5f5; color: #111; }
   }`;
+
+function oidcProvidersHtml(env: Env): string {
+  const enabled = enabledOidcWebProviders(env);
+  if (enabled.length === 0) return "";
+  const buttons = enabled.map((id) => {
+    const method = SIGN_IN.methods.find((m) => m.id === id);
+    const title = method?.title ?? `Continue with ${id}`;
+    return `<a href="/oauth/pair/oidc/${id}">${escapeHtml(title)}</a>`;
+  }).join("");
+  return `<section class="alt" id="oidc-providers"><p>${escapeHtml(SIGN_IN.copy.subheading)}</p><div class="providers">${buttons}</div></section>`;
+}
 
 // Email sign-in on the connector page (ADR 0047, issue #636). A person with
 // no signed-in app nearby connects with an email code; a new address starts a
@@ -866,6 +883,7 @@ function pairPage(
     <div class="code">${escapeHtml(shown)}</div>
     <p>${client} will be able to read and change your tasks.</p>
     <p class="small">The code works for 10 minutes. This page checks for your approval every few seconds.</p>
+    ${oidcProvidersHtml(c.env)}
     ${emailSignInEnabled(c.env) ? EMAIL_FORM_HTML : ""}
     ${reviewerMode(c.env) ? REVIEWER_FORM_HTML : ""}
     ${back}

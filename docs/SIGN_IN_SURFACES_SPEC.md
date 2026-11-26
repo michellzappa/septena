@@ -61,14 +61,14 @@ All flows end in `issueSession()` and an `AccountStore` identity row.
 
 | Route | Does |
 |---|---|
-| `GET /v1/auth/methods` | Built. `{methods:[{id}]}`: `apple`, `email` when on, `device`. |
+| `GET /v1/auth/methods` | Built. `{methods:[{id, web?, native?}]}`: `apple`, `google`/`microsoft` when configured, `email` when on, `device`. |
 | `POST /v1/auth/email/start` `{email}` | Built (#169). 202 `{status:"sent", expiresInSeconds, codeLength:6}`, the same for a known and an unknown address. 429 `{error:"too_many_requests", retryAfterSeconds}`, 503 `{error:"email_signin_off" \| "email_send_failed"}`. |
 | `POST /v1/auth/email/verify` `{email, code, sessionMode?}` | Built (#169). 200 the session (`sessionMode:"cookie"` from the web app sets the refresh cookie, as device poll does). A new address creates the account and its trial (once per address). 401 `{error:"invalid_code", attemptsLeft}`, 410 `{error:"expired_or_unknown"}`, 429 `{error:"too_many_attempts"}`. |
-| `GET /v1/auth/oidc/:provider/start` | Starts a redirect with PKCE and a `state` bound to the client (`return_to` from an allowlist: the web app, each app's claimed redirect, the connector page). |
-| `GET /v1/auth/oidc/:provider/callback` | Exchanges the code, verifies the ID token (issuer, audience, nonce, expiry, signature from the provider's JWKS), then signs in or creates the account. Returns to the client with a one-time result code; the client trades it for the session at `POST /v1/auth/oidc/redeem`. |
-| `POST /v1/auth/google/native` | Android Credential Manager ID token, verified like the callback. |
-| `POST /v1/auth/apple` | Unchanged native Apple flow. Web Apple adds the Services ID to the accepted audiences. |
-| `POST /v1/auth/link/*` | Signed-in: add a method (the same flows, ending in "add to this account"); remove one, never the last. |
+| `GET /v1/auth/oidc/:provider/start` | Built (#637). Starts a redirect with PKCE and a `state` bound to the client (`return_to` from an allowlist: the web app, each app's claimed redirect, or `/oauth/pair/oidc/:provider` for the connector page). |
+| `GET`/`POST /v1/auth/oidc/:provider/callback` | Built (#637). Exchanges the code, verifies the ID token (issuer, audience, nonce, expiry, signature from the provider's JWKS), then returns to the client with a one-time result code (`POST /v1/auth/oidc/redeem`) or approves the connector pairing directly. |
+| `POST /v1/auth/google/native` | Built (#637). Android Credential Manager ID token, verified like the callback. |
+| `POST /v1/auth/apple` | Built. Native Apple flow plus `APPLE_WEB_CLIENT_ID` audience support and no-silent-linking email collision catch (`409 account_exists` + `linkToken` -> `POST /v1/auth/link/complete`). |
+| `GET`/`DELETE /v1/auth/identities`, `POST /v1/auth/link/*` | Built (#171, #643 backend). Signed-in: list linked methods, add email/Apple/Google/OIDC, complete collision link, remove any method except the last (`409 last_method`). |
 
 Rules:
 

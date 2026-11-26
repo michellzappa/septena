@@ -136,6 +136,26 @@ export const REFUSALS = {
     retryable: true,
     hint: "Too many failed attempts. Wait ten minutes before trying again.",
   },
+  account_exists: {
+    retryable: false,
+    hint: "This email already has a Septena account. Confirm with the email code and linkToken to add this sign-in method to that account.",
+  },
+  already_linked: {
+    retryable: false,
+    hint: "This sign-in method already belongs to another Septena account.",
+  },
+  last_method: {
+    retryable: false,
+    hint: "You cannot remove your only sign-in method. Add another method first.",
+  },
+  provider_off: {
+    retryable: false,
+    hint: "This sign-in provider is not configured on this server.",
+  },
+  invalid_return_to: {
+    retryable: false,
+    hint: "The return_to URL is not on the server's allowlist.",
+  },
 
   // ---- the request itself ----
   invalid_arguments: { retryable: false, hint: "Fix the arguments the message names, then call again." },
