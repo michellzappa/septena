@@ -547,6 +547,12 @@ The product is Septena; the code targets keep the working names `Septask` (iOS),
   written in a comment where the branch lives. "It was built that way first"
   is not a reason. When you find one platform drifting, fix it on all of them
   in the same change, or file an issue for the platform you cannot reach.
+- **Never name platforms in copy (mz, 2026-11-26).** Every platform
+  (iPhone, iPad, Mac, Windows, web, Android, Watch) gets every feature: the
+  paywall, MCP and agents, sharing, accounts. Copy, registry strings, skill
+  briefs and docs say "every device" or "another device", never "iPhone, iPad
+  and Mac". A platform appears by name only where a person acts on it today
+  (a download button, that platform's own page, a build-state table).
 - **A temporary gap is not a product fact (mz, 2026-11-26).** "Android
   cannot create an account yet", "checkout is closed", "limits only log" are
   states of the build. Every platform gets every feature, and a plan or
