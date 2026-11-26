@@ -4,6 +4,7 @@
 import { DESTINATIONS } from "./generated/registries.ts";
 import type { CoreConversationState } from "./core/index.ts";
 import type { SmartDestination, TaskRow } from "./types";
+import { waitingName } from "./waiting.ts";
 
 export interface DestinationGroup {
   id: string;
@@ -46,17 +47,18 @@ export function destinationGroups(id: "review"): readonly DestinationGroup[] {
   return destinationInfo(id)?.groups ?? [];
 }
 
-type ReviewTask = Pick<TaskRow, "status" | "kind" | "deletedAt" | "fadedAt">;
+type ReviewTask = Pick<TaskRow, "status" | "kind" | "deletedAt" | "fadedAt" | "waitingOn">;
 
 /** Review groups that hold agent work in progress (ADR 0046): the core's agent stages of the same id. */
 const IN_PROGRESS_GROUP_IDS = new Set(["working", "queued", "stopped"]);
 
-/** Review groups that wait on the user. Only they count in the Review badge. */
+/** Review groups that wait on the user. Only they count in the Review badge. Waiting does not. */
 export const BADGE_GROUP_IDS: ReadonlySet<string> = new Set(["questions", "finished"]);
 
 /**
  * The Review group a task is in, or null. A faded task is in Faded only. What
- * waits on the user comes first, then agent work in progress by its stage.
+ * waits on the user comes first, then work handed to a person (Waiting,
+ * REVIEW_SPEC §6), then agent work in progress by its stage.
  */
 export function reviewGroupOf(
   task: ReviewTask,
@@ -64,6 +66,7 @@ export function reviewGroupOf(
 ): string | null {
   if (task.status !== "open" || task.deletedAt || task.kind === "heading") return null;
   if (convoState?.reviewGroup) return convoState.reviewGroup;
+  if (waitingName(task)) return "waiting";
   const stage = convoState?.agentStage;
   if (stage && IN_PROGRESS_GROUP_IDS.has(stage)) return stage;
   return task.fadedAt ? "faded" : null;

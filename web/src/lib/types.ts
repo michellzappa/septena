@@ -180,6 +180,10 @@ export interface TaskRow {
   deferCount?: number | null;
   fadedAt?: string | null;
   dropReason?: string | null;
+  /** The person the task waits on (ADR 0053), 1 to 80 characters, or null. */
+  waitingOn?: string | null;
+  /** The day the wait began, YYYY-MM-DD, or null. Cleared with `waitingOn`. */
+  waitingSince?: string | null;
   effort?: string | null;
   deletedAt?: string | null;
   updatedAt?: string | null;

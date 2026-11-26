@@ -19,6 +19,7 @@ import {
 } from "../core";
 import { evaluateConversation, groupTurnsByTask } from "../conversation";
 import { fadeInput, fadeSettings, isProposal, type FadeClock } from "../fade";
+import { clearWaitingFields, setWaitingFields } from "../waiting";
 import {
   AccountSwitchRequiredError,
   decideAccountSwitch,
@@ -627,6 +628,31 @@ export class WebSyncEngine {
         acknowledgedAt: task.acknowledgedAt ?? null,
       });
     }
+  }
+
+  /**
+   * Waiting On… (REVIEW_SPEC §6): the task waits on `name`. `scheduled` is the
+   * day to check back: a day, null for no date, or undefined to keep When.
+   */
+  async setTaskWaiting(task: TaskRow, name: string, scheduled?: string | null): Promise<void> {
+    await ensureCoreReady();
+    const now = new Date().toISOString();
+    const live = this.liveTask(task.id) ?? task;
+    await this.patchTask(live, {
+      ...setWaitingFields(live, name, localTodayYMD()),
+      touchedAt: now,
+      ...(isProposal(live) ? { acknowledgedAt: now } : {}),
+    });
+    if (scheduled === undefined) return;
+    const next = this.liveTask(task.id) ?? live;
+    if ((next.scheduled ?? null) === scheduled) return;
+    await this.setTaskScheduled(next, scheduled);
+  }
+
+  /** Got It Back: the wait ends, the task stays open in its list. */
+  async clearTaskWaiting(task: TaskRow): Promise<void> {
+    const now = new Date().toISOString();
+    await this.patchTask(this.liveTask(task.id) ?? task, { ...clearWaitingFields(), touchedAt: now });
   }
 
   async toggleTaskToday(task: TaskRow): Promise<void> {

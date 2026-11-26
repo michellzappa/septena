@@ -34,6 +34,7 @@ import { attributeLabel } from "@/lib/dateBoard";
 import { ACTIONS_CATALOG, registryText } from "@/lib/generated/registries";
 import type { CoreConversationState, CoreMembership, CoreProjection } from "@/lib/core";
 import { agentStageTitle } from "@/lib/destinations";
+import { waitingLabel } from "@/lib/waiting";
 import type {
   AreaRow,
   AttachmentRow,
@@ -47,6 +48,7 @@ import type {
   TurnRow,
 } from "@/lib/types";
 import { DateBoardButton } from "./DateBoard";
+import { RegistryIcon } from "./RegistryIcon";
 
 export interface TaskRowItemProps {
   task: TaskRow;
@@ -119,6 +121,10 @@ export interface TaskRowItemProps {
   onResumeAgent: () => void;
   onLoadHistory: () => Promise<ChangeEntry[]>;
   onKeepFaded?: () => void;
+  /** Waiting On… (REVIEW_SPEC §6): opens the sheet. */
+  onWaitingOn?: () => void;
+  /** Got It Back: only on a waiting task. */
+  onGotItBack?: () => void;
   onDropFaded?: () => void;
   onRestoreDeleted?: () => void;
   onCancelTask: () => void;
@@ -226,6 +232,7 @@ export function TaskDetailEditor({
   const isCancelled = task.status === "cancelled";
   const isToday = membership.isOnToday;
   const taskTagIds = Array.isArray(task.tags) ? task.tags : [];
+  const editorWaitingLabel = waitingLabel(task, props.todayYMD, props.lang);
 
   const commitTitle = () => {
     const trimmed = titleDraft.trim();
@@ -963,6 +970,28 @@ export function TaskDetailEditor({
               <Share2 className="h-3.5 w-3.5" />
               Share
             </button>
+            {!isDone && !isCancelled && props.onWaitingOn && (
+              <button
+                type="button"
+                onClick={props.onWaitingOn}
+                title={editorWaitingLabel ?? undefined}
+                className="inline-flex max-w-[16rem] items-center gap-1 rounded-lg px-2 py-1 text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+              >
+                <RegistryIcon token="action.waiting" className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">
+                  {editorWaitingLabel ?? registryText(ACTIONS_CATALOG.actions["task.waitingOn"].title, props.lang)}
+                </span>
+              </button>
+            )}
+            {!isDone && !isCancelled && editorWaitingLabel && props.onGotItBack && (
+              <button
+                type="button"
+                onClick={props.onGotItBack}
+                className="rounded-lg px-2 py-1 text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+              >
+                {registryText(ACTIONS_CATALOG.actions["task.gotItBack"].title, props.lang)}
+              </button>
+            )}
 
             <div className="ml-auto flex items-center gap-1.5">
               {!isCancelled && !isDone && (
@@ -1037,6 +1066,7 @@ export function TaskRowItem(props: TaskRowItemProps) {
   const checkedCount = checklistItems.filter((c) => c.checked).length;
   const todayColor = isColorfulAccent ? "var(--today-gold)" : "var(--accent)";
   const hasActiveReminder = Boolean(task.reminderAt && !task.reminderDismissedAt);
+  const rowWaitingLabel = isDone || isCancelled ? null : waitingLabel(task, props.todayYMD, props.lang);
 
   return (
     <div
@@ -1128,9 +1158,16 @@ export function TaskRowItem(props: TaskRowItemProps) {
           taskRefs.length > 0 ||
           attachments.length > 0 ||
           hasActiveReminder ||
+          rowWaitingLabel ||
           task.source === "mcp") && (
           <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-[var(--text-muted)]">
             {containerLabel && <span className="truncate">{containerLabel}</span>}
+            {rowWaitingLabel && (
+              <span className="inline-flex min-w-0 items-center gap-1">
+                <RegistryIcon token="action.waiting" className="h-3 w-3 shrink-0" />
+                <span className="truncate">{rowWaitingLabel}</span>
+              </span>
+            )}
             {task.source === "mcp" && (
               <span
                 className={`inline-flex items-center gap-1 text-[11px] ${
