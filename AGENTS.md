@@ -84,6 +84,15 @@ It does not run tests or launch the app. The mini currently has no Java runtime,
 so do not use `remote-build` for Android or install toolchains unless the user
 explicitly asks for that download.
 
+**The website rebuilds on a registry change.** septena.app copies
+`registry/`, the changelog and the connector's tool list from `main`. When a
+push to `main` touches `registry/**`, `changelog/**`, `tools/changelog.mjs` or
+`backend/src/**`, `.github/workflows/site-rebuild.yml` sends the
+`app-registry-changed` repository_dispatch to `michellzappa/septena-site`. The
+site's workflow then builds against this repo's `main` and deploys. The job
+needs the secret `SITE_DISPATCH_TOKEN` (a fine-grained token with Contents
+read and write on septena-site). Without it, the job skips with a notice.
+
 **A branch on mz's phone, with no Mac:** push it to `device/<name>`. mz
 approves the run, then TestFlight delivers it to the internal group only. See
 `docs/DEVICE_BUILDS.md`. Never use it to ship: `main` ships.
@@ -573,6 +582,16 @@ The product is Septena; the code targets keep the working names `Septask` (iOS),
   briefs and docs say "every device" or "another device", never "iPhone, iPad
   and Mac". Per-platform detail appears in exactly two places: the
   comparison (build-state) table and the changelog.
+  `scripts/lint-platform-copy.mjs` (run from `lint-design.sh`) enforces it.
+  It scans every string in `registry/*.json` and `registry/cast/`,
+  `backend/skill.md`, `backend/onboard.md` and `TasksSkill.swift`. It skips
+  per-platform data: `capabilities.json`, `device-frames.json`, ids, keys,
+  symbols and URLs. In Markdown and Swift, put
+  `septena-lint:allow platform-copy` on the line. JSON holds no comments, so
+  a JSON exception is an entry in the script's `ALLOW` list, with a category
+  and a reason. An entry that no longer matches fails. The category
+  `control-location` ("press ⌃⌥Space on your Mac") is an open question for
+  mz.
 - **A temporary gap is not a product fact (mz, 2026-11-26).** "Android
   cannot create an account yet", "checkout is closed", "limits only log" are
   states of the build. Every platform gets every feature, and a plan or
