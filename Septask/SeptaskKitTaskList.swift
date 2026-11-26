@@ -6665,7 +6665,7 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
                  reminderGlyph, reminderLabel, scheduleGlyph, detail, repeatGlyph, starGlyph] as [NSView] {
       view.alphaValue = fade
     }
-    checkbox.cornerDot = !done && !isProposal && task.conversation.hasStarted
+    checkbox.cornerDot = !done && !isProposal && task.conversation.hasStarted && deriveConvo(task.conversation).badge != nil
     checkbox.agentCue = !done && task.showsAgentCue()
 
     var titleAttributes: [NSAttributedString.Key: Any] = [

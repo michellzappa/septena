@@ -673,11 +673,13 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
   /// to silently revert an in-progress title edit the moment any OTHER pill
   /// was touched.
   func refreshPills(with task: SeptenaTask, listName: String?) {
-    checkbox.isDone = task.status != .open
-    checkbox.isDashed = task.status == .open && task.isInTriageBand
+    let done = task.status != .open
+    let isProposal = task.isInTriageBand && task.source == TaskSource.mcp
+    checkbox.isDone = done
+    checkbox.isDashed = !done && isProposal
     checkbox.isToday = task.isOnToday
     checkbox.tenureFill = TaskRowFlags.agingEnabled ? task.fadeFill() : nil
-    checkbox.cornerDot = task.conversation.hasStarted && !task.isInTriageBand
+    checkbox.cornerDot = !done && !isProposal && task.conversation.hasStarted && deriveConvo(task.conversation).badge != nil
     checkbox.agentCue = task.showsAgentCue()
 
     // A pill shows its registry label when empty and its value when set; the
