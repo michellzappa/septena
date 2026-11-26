@@ -79,7 +79,7 @@ describe("admin growth", () => {
     const on = renderAdmin({ ...base, traffic: { state: "ok", view } });
     assert.ok(on.includes("&lt;script&gt;") && !on.includes("<script>"));
     assert.match(on, /20\.00%/);
-    assert.match(on, /no goal for: Download click/);
+    assert.match(on, /No events in 30 days: Download click/);
   });
 
   it("embeds only a plausible.io share link", () => {

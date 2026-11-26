@@ -34,7 +34,8 @@ export interface TrafficView {
   pages: Row[];
   countries: Row[];
   goals: Row[];
-  /// Site events that Plausible has no goal for yet: they are not counted.
+  /// Site events with no events in the window. The Stats API leaves out a
+  /// goal with no events, so this cannot tell "no events" from "no goal".
   missingGoals: string[];
   downloads: Row[];
   ctaPlacements: Row[];
