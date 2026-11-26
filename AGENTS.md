@@ -551,8 +551,8 @@ The product is Septena; the code targets keep the working names `Septask` (iOS),
   (iPhone, iPad, Mac, Windows, web, Android, Watch) gets every feature: the
   paywall, MCP and agents, sharing, accounts. Copy, registry strings, skill
   briefs and docs say "every device" or "another device", never "iPhone, iPad
-  and Mac". A platform appears by name only where a person acts on it today
-  (a download button, that platform's own page, a build-state table).
+  and Mac". Per-platform detail appears in exactly two places: the
+  comparison (build-state) table and the changelog.
 - **A temporary gap is not a product fact (mz, 2026-11-26).** "Android
   cannot create an account yet", "checkout is closed", "limits only log" are
   states of the build. Every platform gets every feature, and a plan or
