@@ -9,6 +9,7 @@ installWorkerTestHooks();
 // the demo account only in reviewer mode, and only for the right code.
 
 const oauth = await import("../src/shadow/oauth.ts");
+const { api } = await import("../src/api/routes.ts");
 const { reviewerMode, REVIEWER_MAX_FAILURES } = await import("../src/shadow/reviewer.ts");
 
 const EXEC_CTX = { waitUntil() {}, passThroughOnException() {} } as unknown as ExecutionContext;
@@ -49,6 +50,10 @@ async function makeHarness(vars: Record<string, string | undefined> = { REVIEWER
   const clients = makeMemoryKv();
   const env = {
     API_PUBLIC_URL: "https://api.septena.app",
+    WEB_ALLOWED_ORIGINS: "https://web.septena.app",
+    SIGNED_SESSIONS: "true",
+    SESSION_SIGNING_KEY: Buffer.alloc(32, 7).toString("base64"),
+    ADMIN_TOKEN: "test-admin-token-0123456789abcdef",
     STATE: state,
     TOKENS: makeMemoryKv(),
     CLIENTS: clients,
@@ -61,6 +66,7 @@ async function makeHarness(vars: Record<string, string | undefined> = { REVIEWER
   app.get("/oauth/authorize", oauth.authorize);
   app.get("/oauth/pair/continue", oauth.pairContinue);
   app.post("/oauth/pair/reviewer", oauth.pairReviewer);
+  app.route("/v1", api);
   async function openConnector() {
     await clients.put("v2:client:c1", JSON.stringify({ id: "c1", name: "Claude", redirectUris: ["https://claude.ai/api/mcp/auth_callback"] }));
     const url = new URL("https://api.septena.app/oauth/authorize");
@@ -145,5 +151,63 @@ describe("directory reviewer access", () => {
     const { html, cookie } = await h.openConnector();
     assert.doesNotMatch(html, /id="reviewer-form"/);
     assert.equal((await h.submit(cookie, CODE)).status, 404);
+  });
+
+  it("lets an admin approve a web device sign-in code for the demo account only", async () => {
+    const h = await makeHarness();
+    const startRes = await h.page("/v1/auth/device/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Origin: "https://web.septena.app" },
+      body: JSON.stringify({ clientName: "Septena Web" }),
+    });
+    assert.equal(startRes.status, 200);
+    const started = await startRes.json() as { code: string; pollSecret: string };
+
+    // Wrong admin token is refused.
+    const badAuth = await h.page("/v1/admin/reviewer/approve-device", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Admin-Token": "wrong" },
+      body: JSON.stringify({ code: started.code }),
+    });
+    assert.equal(badAuth.status, 403);
+
+    // Connector codes are never approved by the device endpoint.
+    const { cookie } = await h.openConnector();
+    const connectorCode = cookie.split("=")[1].split(".")[0];
+    const wrongKind = await h.page("/v1/admin/reviewer/approve-device", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Admin-Token": "test-admin-token-0123456789abcdef" },
+      body: JSON.stringify({ code: connectorCode }),
+    });
+    assert.equal(wrongKind.status, 404);
+
+    // Approving the device code completes web sign-in into the demo account.
+    const approveRes = await h.page("/v1/admin/reviewer/approve-device", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Admin-Token": "test-admin-token-0123456789abcdef" },
+      body: JSON.stringify({ code: started.code }),
+    });
+    assert.equal(approveRes.status, 200);
+    assert.deepEqual(await approveRes.json(), { ok: true, client: "Septena Web", kind: "device" });
+
+    const pollRes = await h.page("/v1/auth/device/poll", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Origin: "https://web.septena.app" },
+      body: JSON.stringify({ code: started.code, pollSecret: started.pollSecret, sessionMode: "cookie" }),
+    });
+    assert.equal(pollRes.status, 200);
+    assert.match(pollRes.headers.get("Set-Cookie") ?? "", /HttpOnly/);
+    const session = await pollRes.json() as { userId: string; accessToken: string };
+    assert.equal(session.userId, DEMO);
+    assert.ok(session.accessToken.startsWith("sa1."));
+
+    // Returns 404 when reviewer mode is off.
+    const off = await makeHarness({});
+    const offRes = await off.page("/v1/admin/reviewer/approve-device", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Admin-Token": "test-admin-token-0123456789abcdef" },
+      body: JSON.stringify({ code: started.code }),
+    });
+    assert.equal(offRes.status, 404);
   });
 });
