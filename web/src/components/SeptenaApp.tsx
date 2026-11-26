@@ -543,6 +543,7 @@ export function SeptenaApp() {
     areaById,
     projectById,
     projectStats,
+    areaOpenCount,
     checklistsByTask,
     refsByTask,
     attachmentsByTask,
@@ -555,13 +556,27 @@ export function SeptenaApp() {
     );
     const tags = orderByPosition(syncState.snapshot.tags.filter((t) => !t.deletedAt));
 
+    // Project progress = done / (done + open). Cancelled and faded rows do not
+    // count toward either side, matching iOS SidebarView.aggregate (docs/TASK_FADE_SPEC.md §4).
+    // Area count = direct-in-area open non-faded tasks only (nested projects render separately).
     const pStats = new Map<string, { done: number; total: number }>();
+    const aOpen = new Map<string, number>();
     for (const t of syncState.snapshot.tasks) {
-      if (t.deletedAt || t.kind === "heading" || !t.project) continue;
-      const cur = pStats.get(t.project) ?? { done: 0, total: 0 };
-      cur.total++;
-      if (t.status === "done") cur.done++;
-      pStats.set(t.project, cur);
+      if (t.deletedAt || t.kind === "heading" || t.fadedAt) continue;
+      if (t.project) {
+        if (t.status === "done") {
+          const cur = pStats.get(t.project) ?? { done: 0, total: 0 };
+          cur.done++;
+          cur.total++;
+          pStats.set(t.project, cur);
+        } else if (t.status === "open") {
+          const cur = pStats.get(t.project) ?? { done: 0, total: 0 };
+          cur.total++;
+          pStats.set(t.project, cur);
+        }
+      } else if (t.area && t.status === "open") {
+        aOpen.set(t.area, (aOpen.get(t.area) ?? 0) + 1);
+      }
     }
 
     const cMap = new Map<string, typeof syncState.snapshot.checklistItems>();
@@ -598,6 +613,7 @@ export function SeptenaApp() {
       areaById: new Map(areas.map((a) => [a.id, a])),
       projectById: new Map(projects.map((p) => [p.id, p])),
       projectStats: pStats,
+      areaOpenCount: aOpen,
       checklistsByTask: cMap,
       refsByTask: rMap,
       attachmentsByTask: aMap,
@@ -2835,7 +2851,12 @@ export function SeptenaApp() {
                       <Folder className="h-4 w-4 text-[var(--text-muted)]" />
                     )}
                   </span>
-                  <span className="truncate">{area.title}</span>
+                  <span className="flex-1 truncate text-left">{area.title}</span>
+                  {prefs.sidebarCounts && (areaOpenCount.get(area.id) ?? 0) > 0 && (
+                    <span className="font-mono-tabular text-xs font-normal text-[var(--text-muted)]">
+                      {areaOpenCount.get(area.id)}
+                    </span>
+                  )}
                 </button>
 
                 {isMagicFirstProject && (
