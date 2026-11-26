@@ -302,6 +302,13 @@ fun AreasProjectsScreen(
                                 )
                                 if (destination is AreasProjectsDestination.Project) {
                                     PlaceMenuItem(
+                                        title = RegistryCatalog.submenuTitle("sidebar.project", "moveToArea", languageTag).orEmpty(),
+                                        onClick = {
+                                            menuOpen = false
+                                            dialog = PlacesDialog.MoveToArea
+                                        },
+                                    )
+                                    PlaceMenuItem(
                                         title = actionTitle(RegistryActionIds.PROJECT_SHARE, languageTag),
                                         onClick = {
                                             menuOpen = false
@@ -704,6 +711,18 @@ fun AreasProjectsScreen(
             onDismiss = { dialog = null },
             onConfirm = { viewModel.deleteSection(active.id); dialog = null },
         )
+        PlacesDialog.MoveToArea -> MoveProjectToAreaDialog(
+            areas = state.availableAreas,
+            currentAreaId = state.currentAreaId,
+            languageTag = languageTag,
+            onDismiss = { dialog = null },
+            onPick = { areaId ->
+                dialog = null
+                if (areaId != state.currentAreaId) {
+                    viewModel.moveProjectToArea(areaId)
+                }
+            },
+        )
     }
 }
 
@@ -1042,6 +1061,7 @@ private fun DeleteSectionDialog(
 private sealed interface PlacesDialog {
     data object CreateProject : PlacesDialog
     data object CreateSection : PlacesDialog
+    data object MoveToArea : PlacesDialog
     data class RenamePlace(val title: String) : PlacesDialog
     data class RenameSection(val id: String, val title: String) : PlacesDialog
     data class DeleteSection(val id: String) : PlacesDialog

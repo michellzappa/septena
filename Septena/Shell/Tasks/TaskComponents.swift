@@ -36,9 +36,23 @@ struct HeadingDragIDs: Codable, Transferable {
   }
 }
 
+/// Drag payload for reordering Areas and Projects, and moving Projects between
+/// Areas (or out to No Area) in the SwiftUI sidebar (`SidebarView`). Kept
+/// distinct from `TaskDragIDs` so task-filing drops and structure-arrangement
+/// drops never collide.
+enum SidebarStructureDragItem: Codable, Hashable, Transferable {
+  case area(String)
+  case project(String)
+
+  static var transferRepresentation: some TransferRepresentation {
+    CodableRepresentation(contentType: .septenaStructureDragItem)
+  }
+}
+
 extension UTType {
   static let septenaTaskDragIDs = UTType(exportedAs: "com.septena.task-drag-ids")
   static let septenaHeadingDragIDs = UTType(exportedAs: "com.septena.heading-drag-ids")
+  static let septenaStructureDragItem = UTType(exportedAs: "com.septena.structure-drag-item")
 }
 
 /// Row-level reorder target for manually-ordered lists — the in-list
