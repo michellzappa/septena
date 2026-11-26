@@ -2,11 +2,13 @@ name: Windows spike
 
 on:
   push:
-    branches: ["wt/windows-spike"]
+    branches: [main, "wt/windows-*"]
     paths:
       - "windows/**"
       - "android/core/**"
       - "android/store/**"
+      - "android/transport/**"
+      - "android/ui/**"
       - "android/gradle/**"
       - "android/gradlew*"
       - "core/release/release.json"
@@ -47,6 +49,12 @@ jobs:
           $image = "windows/build/compose/binaries/main/app/SeptenaSpike"
           if (!(Test-Path "$image/SeptenaSpike.exe")) { throw "Desktop launcher missing" }
           if (!(Test-Path "$image/runtime/bin/java.dll")) { throw "Bundled Java runtime missing" }
+          $coreJar = Get-ChildItem "$image/app" -Filter "*septena-core-jvm-natives*.jar" -File
+          if (@($coreJar).Count -ne 1) { throw "Expected one bundled shared core natives JAR" }
+          $entries = jar tf $coreJar.FullName
+          if ($LASTEXITCODE -ne 0 -or $entries -notcontains "win32-x86-64/septena_core.dll") {
+            throw "Windows x64 shared core DLL missing from the app image"
+          }
           git rev-parse HEAD | Set-Content -Encoding ascii "$image/source-commit.txt"
           "Fixture-only Windows x64 build. Extract the whole artifact, then open SeptenaSpike.exe." |
             Set-Content -Encoding ascii "$image/README.txt"

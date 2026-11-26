@@ -33,7 +33,7 @@ A green CI run closes the fixture checkpoint. W1 closes after the live Win365 ru
 
 ## Implementation assignments
 
-Use GPT-6 Luna at x-high for each implementation lane. Give each worker its row, the accepted spike commit, the shared interfaces, and the relevant verification commands. Use one worktree and branch per lane. The coordinator owns the integration branch, reviews boundaries, queues CI, and records Win365 acceptance. The Windows source packages in the table are relative to `windows/src/main/kotlin/app/septena/windows/`.
+Use GPT-6 Luna at x-high for each implementation lane. Give each worker its row, the accepted spike commit, the shared interfaces, and the relevant verification commands. Use one worktree and a `wt/windows-*` branch per lane so pushes trigger the Windows workflow. The coordinator owns the integration branch, reviews boundaries, queues CI, and records Win365 acceptance. The Windows source packages in the table are relative to `windows/src/main/kotlin/app/septena/windows/`.
 
 | Lane | Owns | Delivers and verifies |
 | --- | --- | --- |
