@@ -724,8 +724,8 @@ function validatePlans(plans, icons, caps, importSources) {
 
   assert(JSON.stringify(plans.levels.map((l) => l.id)) === JSON.stringify(PLAN_LEVELS), `plans.json: levels must be ${PLAN_LEVELS.join(", ")}`);
   assert(JSON.stringify(plans.cards.map((c) => c.id)) === JSON.stringify(PLAN_LEVELS), `plans.json: cards must be ${PLAN_LEVELS.join(", ")}`);
-  // ADR 0052: Pro is a real plan, given by invitation and not sold yet.
-  assert(plans.cards.find((c) => c.id === "pro").status === "invite", "plans.json: the pro card must be invite (given, not sold)");
+  // ADR 0052: Pro is a real plan. No store sells it yet, so accounts get it as a grant.
+  assert(plans.cards.find((c) => c.id === "pro").status === "given", "plans.json: the pro card must be given (no store product yet)");
   assert(plans.cards.filter((c) => c.highlighted).length === 1, "plans.json: exactly one card must be highlighted");
   for (const k of ["seePlus", "startTrial", "trialStarted", "trialBilling", "success", "pending", "serverRetry", "failed", "ownedApple", "ownedWeb", "ownedGoogle", "ownedGrant", "ownedGrantPro", "ownedOtherAccount", "done"]) {
     assert(typeof plans.paywall?.[k] === "string" && plans.paywall[k].length > 0, `plans.json: paywall.${k} missing`);

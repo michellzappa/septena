@@ -85,6 +85,10 @@
         }
       }
     },
+    "€120 a year or €14 a month" : {
+      "comment" : "Generated from registry plans.levels.pro.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "%lld changes were not sent yet and will be lost." : {
       "comment" : "Generated from registry surfaces.accountSwitch.copy.unsentOther.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
