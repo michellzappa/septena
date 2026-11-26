@@ -162,6 +162,15 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     return conversation.reviewGroup() ?? (isFaded ? .faded : nil)
   }
 
+  /// True when the task sits in a Review group about agent work (every group
+  /// but Faded). Opening such a row opens the task page, where the
+  /// conversation is: a question, finished work or work in progress is read
+  /// in its conversation, never in the inline editor.
+  var opensConversationInReview: Bool {
+    guard let group = reviewGroup else { return false }
+    return group != .faded
+  }
+
   /// Countdown progress (0…1) toward the 14-day fade window (`TaskFade.fadeFill`).
   /// Drives whole-row opacity in every open task list.
   func fadeFill(today: String = SeptenaDate.today, now: Date = Date()) -> Double? {

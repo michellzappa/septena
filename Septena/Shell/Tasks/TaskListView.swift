@@ -2004,6 +2004,12 @@ struct TaskListView: View {
     }
     guard selection.count <= 1 else { return }
     guard let task = currentTask(id: id) else { return }
+    // Review: an agent row (question, finished work, work in progress) opens
+    // the task page, where its conversation is. Only Faded rows expand inline.
+    if filter == .review, task.opensConversationInReview {
+      openPage(task)
+      return
+    }
     beginEdit(task)
   }
 
