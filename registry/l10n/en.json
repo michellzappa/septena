@@ -522,6 +522,16 @@
       "settings.copy.access_devices.deviceBrowser.label"
     ]
   },
+  "By continuing, you agree to the {terms} and the {privacy}.": {
+    "text": "By continuing, you agree to the {terms} and the {privacy}.",
+    "placeholders": [
+      "terms",
+      "privacy"
+    ],
+    "paths": [
+      "signIn.copy.terms"
+    ]
+  },
   "Calendar": {
     "text": "Calendar",
     "paths": [
@@ -539,6 +549,12 @@
     "text": "Calendar event",
     "paths": [
       "surfaces.taskReferences.kinds.event.label"
+    ]
+  },
+  "Can't reach Septena. Check your connection and try again.": {
+    "text": "Can't reach Septena. Check your connection and try again.",
+    "paths": [
+      "signIn.errors.network"
     ]
   },
   "Cancel": {
@@ -705,6 +721,12 @@
       "surfaces.firstRun.chrome.close.label"
     ]
   },
+  "Code": {
+    "text": "Code",
+    "paths": [
+      "signIn.email.codeLabel"
+    ]
+  },
   "Code from the browser page": {
     "text": "Code from the browser page",
     "paths": [
@@ -796,6 +818,30 @@
       "settings.copy.sign_in_approval.continue.label",
       "surfaces.firstRun.steps.welcome.primary.title",
       "surfaces.firstRun.steps.connectClaude.afterDone.title"
+    ]
+  },
+  "Continue with Apple": {
+    "text": "Continue with Apple",
+    "paths": [
+      "signIn.methods.apple.title"
+    ]
+  },
+  "Continue with Google": {
+    "text": "Continue with Google",
+    "paths": [
+      "signIn.methods.google.title"
+    ]
+  },
+  "Continue with Microsoft": {
+    "text": "Continue with Microsoft",
+    "paths": [
+      "signIn.methods.microsoft.title"
+    ]
+  },
+  "Continue with email": {
+    "text": "Continue with email",
+    "paths": [
+      "signIn.methods.email.title"
     ]
   },
   "Conversation": {
@@ -1264,7 +1310,14 @@
   "Email": {
     "text": "Email",
     "paths": [
-      "surfaces.taskReferences.kinds.email.label"
+      "surfaces.taskReferences.kinds.email.label",
+      "signIn.email.emailLabel"
+    ]
+  },
+  "Email me a code": {
+    "text": "Email me a code",
+    "paths": [
+      "signIn.existingAccount.button"
     ]
   },
   "Email thread": {
@@ -1284,6 +1337,12 @@
     "text": "Ended",
     "paths": [
       "surfaces.doing.exits.closed.label"
+    ]
+  },
+  "Enter a valid email address.": {
+    "text": "Enter a valid email address.",
+    "paths": [
+      "signIn.errors.invalidEmail"
     ]
   },
   "Enter the code from the other device. If you're connecting Claude, the code is in your browser.": {
@@ -1675,6 +1734,12 @@
     "text": "How a task conversation moves",
     "paths": [
       "settings.copy.ai_explainer.flowHeader.label"
+    ]
+  },
+  "I use Septena on another device": {
+    "text": "I use Septena on another device",
+    "paths": [
+      "signIn.methods.device.title"
     ]
   },
   "If this agent takes the place of one you connected before, pick it. That agent stops working.": {
@@ -2247,6 +2312,12 @@
       "actions.actions.section.newTask.title"
     ]
   },
+  "New here? Your first sign-in creates your account.": {
+    "text": "New here? Your first sign-in creates your account.",
+    "paths": [
+      "signIn.copy.subheading"
+    ]
+  },
   "New tasks wait at the top of Today until you schedule or file them.": {
     "text": "New tasks wait at the top of Today until you schedule or file them.",
     "paths": [
@@ -2814,6 +2885,12 @@
       "settings.pages.privacy.title"
     ]
   },
+  "Privacy Policy": {
+    "text": "Privacy Policy",
+    "paths": [
+      "signIn.copy.privacyLabel"
+    ]
+  },
   "Private iCal feed": {
     "text": "Private iCal feed",
     "paths": [
@@ -3295,6 +3372,12 @@
       "actions.actions.task.sendBackReview.title"
     ]
   },
+  "Send a new code": {
+    "text": "Send a new code",
+    "paths": [
+      "signIn.email.resend"
+    ]
+  },
   "Send back": {
     "text": "Send back",
     "paths": [
@@ -3305,6 +3388,12 @@
     "text": "Send back for another pass",
     "paths": [
       "surfaces.prompts.text.sendBackReview.title"
+    ]
+  },
+  "Send code": {
+    "text": "Send code",
+    "paths": [
+      "signIn.email.sendCode"
     ]
   },
   "Send feedback": {
@@ -3536,7 +3625,8 @@
   "Sign in": {
     "text": "Sign in",
     "paths": [
-      "settings.copy.syncStatus.needsSignIn.label"
+      "settings.copy.syncStatus.needsSignIn.label",
+      "signIn.email.signIn"
     ]
   },
   "Sign in on {client}?": {
@@ -3557,7 +3647,8 @@
   "Sign in to Septena": {
     "text": "Sign in to Septena",
     "paths": [
-      "surfaces.deviceSignIn.title"
+      "surfaces.deviceSignIn.title",
+      "signIn.copy.heading"
     ]
   },
   "Sign in to Septena first.": {
@@ -3936,6 +4027,12 @@
       "plans.promises.core_free.detail"
     ]
   },
+  "Terms of Use": {
+    "text": "Terms of Use",
+    "paths": [
+      "signIn.copy.termsLabel"
+    ]
+  },
   "Text Size": {
     "text": "Text Size",
     "paths": [
@@ -3947,6 +4044,18 @@
     "text": "That code is wrong or has expired.",
     "paths": [
       "settings.copy.sign_in_approval.invalidCode.label"
+    ]
+  },
+  "That code is wrong. You have {count} tries left.": {
+    "forms": {
+      "one": "That code is wrong. You have 1 try left.",
+      "other": "That code is wrong. You have {count} tries left."
+    },
+    "placeholders": [
+      "count"
+    ],
+    "paths": [
+      "signIn.errors.wrongCode"
     ]
   },
   "That code was already used.": {
@@ -4065,6 +4174,12 @@
       "surfaces.firstRun.steps.done.returningBody"
     ]
   },
+  "This code has expired. Get a new code and try again.": {
+    "text": "This code has expired. Get a new code and try again.",
+    "paths": [
+      "signIn.errors.codeExpired"
+    ]
+  },
   "This deletes the following from the Septena server:": {
     "text": "This deletes the following from the Septena server:",
     "paths": [
@@ -4075,6 +4190,12 @@
     "text": "This device is not syncing",
     "paths": [
       "plans.upsells.second_device.title"
+    ]
+  },
+  "This email already has a Septena account": {
+    "text": "This email already has a Septena account",
+    "paths": [
+      "signIn.existingAccount.title"
     ]
   },
   "This file is on another device": {
@@ -4184,6 +4305,18 @@
       "surfaces.taskDateBoard.rows.dateBoard.tomorrow.label"
     ]
   },
+  "Too many requests. Try again later.": {
+    "text": "Too many requests. Try again later.",
+    "paths": [
+      "signIn.errors.rateLimited"
+    ]
+  },
+  "Too many wrong codes. Get a new code and try again.": {
+    "text": "Too many wrong codes. Get a new code and try again.",
+    "paths": [
+      "signIn.errors.tooManyTries"
+    ]
+  },
   "Too many wrong codes. Try again in 10 minutes.": {
     "text": "Too many wrong codes. Try again in 10 minutes.",
     "paths": [
@@ -4281,6 +4414,12 @@
       "surfaces.firstRun.steps.accountDevice.body"
     ]
   },
+  "Use a different email": {
+    "text": "Use a different email",
+    "paths": [
+      "signIn.email.differentEmail"
+    ]
+  },
   "Use my Claude": {
     "text": "Use my Claude",
     "paths": [
@@ -4318,6 +4457,25 @@
     "text": "We never hold your data back",
     "paths": [
       "plans.promises.no_hostage.title"
+    ]
+  },
+  "We sent a code to {email}.": {
+    "text": "We sent a code to {email}.",
+    "placeholders": [
+      "email"
+    ],
+    "paths": [
+      "signIn.email.codeSent"
+    ]
+  },
+  "We'll send a code to {email}. Enter it to sign in, and we'll add {provider} to that account.": {
+    "text": "We'll send a code to {email}. Enter it to sign in, and we'll add {provider} to that account.",
+    "placeholders": [
+      "email",
+      "provider"
+    ],
+    "paths": [
+      "signIn.existingAccount.detail"
     ]
   },
   "Web page": {
@@ -4691,6 +4849,12 @@
     "text": "iPhone or iPad",
     "paths": [
       "settings.copy.access_devices.deviceApplePhone.label"
+    ]
+  },
+  "you@example.com": {
+    "text": "you@example.com",
+    "paths": [
+      "signIn.email.emailPlaceholder"
     ]
   },
   "{app}’s servers never run AI on your tasks. AI runs on your device, or in your own Claude when you connect it. Turn AI off and the app works the same, without conversations.": {

@@ -8161,6 +8161,10 @@
         }
       }
     },
+    "By continuing, you agree to the %@ and the %@." : {
+      "comment" : "Generated from registry signIn.copy.terms. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Calendar" : {
       "localizations" : {
         "de" : {
@@ -8318,6 +8322,10 @@
           }
         }
       }
+    },
+    "Can't reach Septena. Check your connection and try again." : {
+      "comment" : "Generated from registry signIn.errors.network. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Cancel" : {
       "comment" : "SeptaskKit localization pass 2026-08-09",
@@ -9683,6 +9691,10 @@
         }
       }
     },
+    "Code" : {
+      "comment" : "Generated from registry signIn.email.codeLabel. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Code from the browser page" : {
       "comment" : "Generated from registry settings.copy.claude_connector.codePlaceholder.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -10518,6 +10530,22 @@
           }
         }
       }
+    },
+    "Continue with Apple" : {
+      "comment" : "Generated from registry signIn.methods.apple.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Continue with email" : {
+      "comment" : "Generated from registry signIn.methods.email.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Continue with Google" : {
+      "comment" : "Generated from registry signIn.methods.google.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Continue with Microsoft" : {
+      "comment" : "Generated from registry signIn.methods.microsoft.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Conversation" : {
       "comment" : "Generated from registry surfaces.taskPage.blocks.taskPage.conversation.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -14246,6 +14274,10 @@
         }
       }
     },
+    "Email me a code" : {
+      "comment" : "Generated from registry signIn.existingAccount.button. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Email thread" : {
       "comment" : "Generated from registry surfaces.taskReferences.kinds.thread.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -14363,6 +14395,10 @@
           }
         }
       }
+    },
+    "Enter a valid email address." : {
+      "comment" : "Generated from registry signIn.errors.invalidEmail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Enter the code from the other device. If you're connecting Claude, the code is in your browser." : {
       "comment" : "Generated from registry settings.copy.sign_in_approval.enterFooter.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -18082,6 +18118,10 @@
           }
         }
       }
+    },
+    "I use Septena on another device" : {
+      "comment" : "Generated from registry signIn.methods.device.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "iCloud" : {
       "localizations" : {
@@ -22973,6 +23013,10 @@
           }
         }
       }
+    },
+    "New here? Your first sign-in creates your account." : {
+      "comment" : "Generated from registry signIn.copy.subheading. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "New Project" : {
       "comment" : "SeptaskKit localization pass 2026-08-09",
@@ -28010,6 +28054,10 @@
         }
       }
     },
+    "Privacy Policy" : {
+      "comment" : "Generated from registry signIn.copy.privacyLabel. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Private Cloud Compute" : {
       "localizations" : {
         "pt-BR" : {
@@ -31948,6 +31996,10 @@
         }
       }
     },
+    "Send a new code" : {
+      "comment" : "Generated from registry signIn.email.resend. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Send back" : {
       "comment" : "Generated from registry surfaces.prompts.text.sendBackReview.confirmTitle. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -32073,6 +32125,10 @@
           }
         }
       }
+    },
+    "Send code" : {
+      "comment" : "Generated from registry signIn.email.sendCode. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Send feedback" : {
       "comment" : "Generated from registry settings.pages.about.sections.actions.items.4.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -37185,6 +37241,10 @@
         }
       }
     },
+    "Terms of Use" : {
+      "comment" : "Generated from registry signIn.copy.termsLabel. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Text Size" : {
       "localizations" : {
         "de" : {
@@ -37263,6 +37323,30 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Esse código está incorreto ou expirou."
+          }
+        }
+      }
+    },
+    "That code is wrong. You have %lld tries left." : {
+      "comment" : "Generated from registry signIn.errors.wrongCode. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "That code is wrong. You have 1 try left."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "That code is wrong. You have %lld tries left."
+                }
+              }
+            }
           }
         }
       }
@@ -38155,6 +38239,10 @@
         }
       }
     },
+    "This code has expired. Get a new code and try again." : {
+      "comment" : "Generated from registry signIn.errors.codeExpired. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "This deletes the following from the Septena server:" : {
       "comment" : "Generated from registry settings.copy.delete_account.intro.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -38245,6 +38333,10 @@
           }
         }
       }
+    },
+    "This email already has a Septena account" : {
+      "comment" : "Generated from registry signIn.existingAccount.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "This file is on another device" : {
       "comment" : "Generated from registry plans.upsells.file_elsewhere.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -39121,6 +39213,14 @@
           }
         }
       }
+    },
+    "Too many requests. Try again later." : {
+      "comment" : "Generated from registry signIn.errors.rateLimited. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Too many wrong codes. Get a new code and try again." : {
+      "comment" : "Generated from registry signIn.errors.tooManyTries. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Too many wrong codes. Try again in 10 minutes." : {
       "comment" : "Generated from registry settings.copy.sign_in_approval.tooManyAttempts.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -40061,6 +40161,10 @@
         }
       }
     },
+    "Use a different email" : {
+      "comment" : "Generated from registry signIn.email.differentEmail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Use my Claude" : {
       "comment" : "Generated from registry settings.keys.aiMode.options.2.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -40544,6 +40648,14 @@
           }
         }
       }
+    },
+    "We sent a code to %@." : {
+      "comment" : "Generated from registry signIn.email.codeSent. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "We'll send a code to %@. Enter it to sign in, and we'll add %@ to that account." : {
+      "comment" : "Generated from registry signIn.existingAccount.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Web page" : {
       "comment" : "Generated from registry surfaces.taskReferences.kinds.url.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -42153,6 +42265,10 @@
           }
         }
       }
+    },
+    "you@example.com" : {
+      "comment" : "Generated from registry signIn.email.emailPlaceholder. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Your 14 days of Plus have ended" : {
       "comment" : "Generated from registry plans.upsells.trial_end.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",

@@ -60,12 +60,20 @@
     "RegistryRules.doLapseHours": {
       "reason": "The shared core applies it (resolve_do_sessions).",
       "issue": "#517"
+    },
+    "RegistrySignIn.method": {
+      "reason": "No client renders the sign-in registry yet (SI0); the sign-in screens read it in SI2 and SI4.",
+      "issue": "#636"
     }
   },
   "ts": {
     "PLAN_PRODUCTS": {
       "reason": "The server accepts any product under the sync prefix; the StoreKit work narrows it to these IDs.",
       "issue": "#46"
+    },
+    "SIGN_IN": {
+      "reason": "No client renders the sign-in registry yet (SI0); the sign-in screens read it in SI2 and SI4.",
+      "issue": "#636"
     }
   },
   "kotlin": {
@@ -208,6 +216,14 @@
     "RegistryEntityEnums.DoExit.CLOSED": {
       "reason": "The shared core decides this exit (resolve_do_sessions); Android stores what it answers.",
       "issue": "#517"
+    },
+    "RegistrySignInMethodIds.*": {
+      "reason": "No client renders the sign-in registry yet (SI0); the sign-in screens read it in SI2 and SI4.",
+      "issue": "#636"
+    },
+    "RegistryDocuments.signInJson": {
+      "reason": "No client renders the sign-in registry yet (SI0); the sign-in screens read it in SI2 and SI4.",
+      "issue": "#636"
     }
   }
 }

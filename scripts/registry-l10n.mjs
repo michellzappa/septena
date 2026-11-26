@@ -35,6 +35,11 @@ const FIELDS = {
     "askKicker", "reviewKicker", "reviewFallback", "acceptedLabel",
   ]),
   importSources: new Set(["detail"]),
+  signIn: new Set([
+    "title", "heading", "subheading", "terms", "termsLabel", "privacyLabel", "emailLabel", "emailPlaceholder", "sendCode",
+    "codeSent", "codeLabel", "signIn", "resend", "differentEmail", "invalidEmail", "wrongCode", "tooManyTries",
+    "codeExpired", "rateLimited", "network", "detail", "button",
+  ]),
   tokens: new Set(["name", "tag", "label"]),
   plans: new Set([
     "name", "shortName", "proName", "headline", "subhead", "notice", "title", "detail", "label", "priceLabel",
