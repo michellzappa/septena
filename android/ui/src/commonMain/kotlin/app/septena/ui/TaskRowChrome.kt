@@ -429,7 +429,7 @@ fun TaskCardRow(
     val isBeingDragged = reorderDrag != null && reorderDrag.isDragging && task.id in reorderDrag.draggedIds
     val mutedInk = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.80f)
     val overdueRed = if (isDark) Color(0xFFFF453A) else Color(0xFFFF3B30)
-    val showSubtitleLine = task.subtitle != null || task.assigneeName != null || task.tagNames.isNotEmpty() || task.filingSuggestionLabel != null
+    val showSubtitleLine = task.subtitle != null || task.assigneeName != null || task.waitingText != null || task.tagNames.isNotEmpty() || task.filingSuggestionLabel != null
     val hasLeadingSlot = selecting || canComplete || task.isCompleted
 
     TaskCardSlice(
@@ -696,6 +696,23 @@ fun TaskCardRow(
                                 PersonSmallGlyph(tint = mutedInk, size = 11.dp)
                                 Text(
                                     text = assignee,
+                                    fontSize = 12.5.sp,
+                                    lineHeight = 16.sp,
+                                    color = mutedInk,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+                        task.waitingText?.let { waiting ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(3.dp),
+                                modifier = Modifier.align(Alignment.CenterVertically),
+                            ) {
+                                PersonSmallGlyph(tint = mutedInk, size = 11.dp)
+                                Text(
+                                    text = waiting,
                                     fontSize = 12.5.sp,
                                     lineHeight = 16.sp,
                                     color = mutedInk,
@@ -1896,7 +1913,7 @@ fun ReviewTaskCardRow(
                             color = secondaryInk,
                         )
                     }
-                    listOfNotNull(task.reviewMeta?.takeIf(String::isNotBlank), task.assigneeName)
+                    listOfNotNull(task.reviewMeta?.takeIf(String::isNotBlank), task.assigneeName, task.waitingText)
                         .joinToString(" · ").takeIf(String::isNotEmpty)?.let { meta ->
                         Text(
                             text = meta,

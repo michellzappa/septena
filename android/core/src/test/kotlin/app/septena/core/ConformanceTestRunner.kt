@@ -15,6 +15,10 @@ object ConformanceTestRunner {
             taskViewVectors()
             conversationVectors()
         }
+        ReviewGroupTest().run {
+            registryOrder()
+            waitingOrder()
+        }
         SyncEngineConformanceTest().run {
             pullPageVectors()
             pushResponseVectors()
