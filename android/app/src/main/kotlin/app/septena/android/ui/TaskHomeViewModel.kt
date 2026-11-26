@@ -539,9 +539,9 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
 
     fun keepFaded(id: String) = editTask(id) { graph.taskMutator.keepFaded(id) }
 
-    /** Waiting On… (docs/REVIEW_SPEC.md §6): the name, and the day to check back as the When date. */
+    /** Waiting On… (docs/REVIEW_SPEC.md §6): the name, and the When date (null clears it). */
     fun setWaiting(id: String, name: String, checkBack: String?) =
-        editTask(id) { graph.taskMutator.setWaiting(id, name, checkBack) }
+        editTask(id) { graph.taskMutator.setWaiting(id, name, checkBack, changesWhen = true) }
 
     /** Got It Back: the wait ends; the task stays open in its list. */
     fun gotItBack(id: String) = editTask(id) { graph.taskMutator.setWaiting(id, null) }

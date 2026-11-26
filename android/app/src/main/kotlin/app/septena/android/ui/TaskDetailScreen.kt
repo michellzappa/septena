@@ -711,12 +711,13 @@ fun TaskDetailScreen(
     if (waitingSheetOpen) {
         WaitingOnDialog(
             initialName = taskFields[RegistryEntityFields.Task.WAITING_ON].stringValue().orEmpty(),
+            initialWhen = taskFields[RegistryEntityFields.Task.SCHEDULED].stringValue(),
             today = todayDate,
             languageTag = languageTag,
             onDismiss = { waitingSheetOpen = false },
             onConfirm = { name, checkBack ->
                 waitingSheetOpen = false
-                write { check(graph.taskMutator.setWaiting(taskId, name, checkBack) != null) }
+                write { check(graph.taskMutator.setWaiting(taskId, name, checkBack, changesWhen = true) != null) }
             },
         )
     }
