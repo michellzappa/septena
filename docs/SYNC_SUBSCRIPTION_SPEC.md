@@ -151,9 +151,11 @@ party. No per-user tracking, no SDKs.
 
 ## 4. Products
 
-- New subscription group on the `com.septena.tasks` record, one level:
-  - `com.septena.tasks.sync.monthly`
-  - `com.septena.tasks.sync.annual`
+- New subscription group on the `com.septena.tasks` record, two levels
+  (ADR 0059):
+  - Pro, the higher level: `com.septena.tasks.sync.pro.monthly`,
+    `com.septena.tasks.sync.pro.annual`
+  - Plus: `com.septena.tasks.sync.monthly`, `com.septena.tasks.sync.annual`
 - No StoreKit introductory offer. The trial is the server-side 14-day reverse
   trial (§3), with no card. Two trials would confuse the paywall. *(default,
   2026-11-22)*

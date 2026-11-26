@@ -4,7 +4,7 @@ import { createTestAccountStore, installWorkerTestHooks } from "./taskStoreHarne
 
 installWorkerTestHooks();
 
-// Growth on the admin page (ADR 0058).
+// Growth on the admin page (ADR 0059).
 
 const { change, cumulative, lastDays, perDay, snapshotSeries, weeklyCohorts, windowChange } = await import("../src/admin/metrics.ts");
 const { renderAdmin } = await import("../src/admin/page.ts");

@@ -63,6 +63,7 @@ a new ADR and set the old one to `superseded by NNNN`.
 | [0056](0056-agents-create-accounts-with-email-confirmation.md) | Agents can create and connect Septena accounts with human email confirmation | accepted |
 | [0057](0057-agent-responses-stay-typed-data-not-generative-ui.md) | Agent responses and hooks stay typed data, not generative UI (A2UI review) | proposed |
 | [0058](0058-admin-growth-from-daily-snapshots-then-an-event-stream.md) | Admin growth comes from daily snapshots now, and from an event stream at scale (amends 0043) | accepted |
+| [0059](0059-pro-sells-like-plus.md) | Pro sells like Plus, one subscription group (amends 0045, 0052) | accepted |
 
 ## Template
 

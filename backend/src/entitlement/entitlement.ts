@@ -33,8 +33,9 @@ export interface EntitlementRow {
   expiresAt: number | null;
   originalTransactionId: string | null;
   status: EntitlementStatus;
-  /// The plan the row gives. null or absent = Plus. Only grants give Pro
-  /// (ADR 0045): no store sells it.
+  /// The plan the row gives. null or absent = Plus. A grant gives Pro by
+  /// name (ADR 0045); an App Store row gives Pro when its product is a Pro
+  /// product (ADR 0059).
   plan?: PaidPlanId | null;
   /// Apple environment (Production / Sandbox); null for grants.
   environment: string | null;

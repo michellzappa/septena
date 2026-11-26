@@ -30,7 +30,7 @@ export interface AdminView {
   query: string;
   emailSignups: SignupRow[];
   emailUserId: string | null;
-  /// Daily snapshots, oldest first (ADR 0058).
+  /// Daily snapshots, oldest first (ADR 0059).
   history: MetricDay[];
   traffic: TrafficResult;
   releases: MacRelease[] | null;
@@ -147,7 +147,7 @@ const signupTable = (rows: SignupRow[]) => table(["Email", "List", "Screens", "T
   `<tr>${[r.email, r.list, r.platforms, r.tools, r.agents, r.source, r.created_at.slice(0, 10)].map((x) => `<td>${esc(x.replace(/[[\]"]/g, ""))}</td>`).join("")}</tr>`), "No signups.");
 
 
-// ---- growth (ADR 0058) ----
+// ---- growth (ADR 0059) ----
 
 const fmt = (n: number) => n >= 10_000 ? `${(n / 1000).toFixed(n >= 100_000 ? 0 : 1)}k` : n.toLocaleString("en-US");
 const pct = (x: number | null, digits = 0) => (x === null || !Number.isFinite(x) ? "n/a" : `${(x * 100).toFixed(digits)}%`);

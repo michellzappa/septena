@@ -599,7 +599,10 @@ The product is Septena; the code targets keep the working names `Septask` (iOS),
   Never write copy, status lines, specs or audit findings that present a
   build gap as how Septena is, and never change copy to match a gap. A gap on
   one platform is a parity bug: fix it or file it. Say "not yet" only where a
-  person acts on it today ("You can't buy Pro yet"). A `planned` cell in
+  person acts on it today, and say it once for the whole product, never per
+  plan or per platform: closed checkout is `checkout.notice` under every paid
+  plan, never "You can't buy Pro yet". Copy never tells a reader to write in,
+  email or contact mz to get a plan or a feature (ADR 0059). A `planned` cell in
   `registry/capabilities.json` means "not built yet", never "not in the
   product".
 - **One selection/target language per surface — NEVER two.** There is exactly
