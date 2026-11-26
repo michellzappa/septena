@@ -178,7 +178,7 @@ function bars(values: number[], days: string[], unit: string): string {
 }
 
 const deltaText = (abs: number | null, rel: number | null, label: string) => {
-  if (abs === null) return `<span class="delta dim">no ${esc(label)} yet</span>`;
+  if (abs === null) return `<span class="delta dim">no history yet</span>`;
   const cls = abs > 0 ? "up" : abs < 0 ? "down" : "dim";
   return `<span class="delta ${cls}">${abs > 0 ? "+" : ""}${fmt(abs)}${rel === null ? "" : ` (${rel > 0 ? "+" : ""}${pct(rel)})`} ${esc(label)}</span>`;
 };
