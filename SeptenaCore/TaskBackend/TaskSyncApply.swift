@@ -617,6 +617,8 @@ extension TaskSyncEngine {
     take("timeZone") { t.timeZone = $0.stringValue }
     take("deadline") { t.deadline = $0.stringValue }
     take("deferredDeadline") { t.deferredDeadline = $0.stringValue }
+    take("waitingOn") { t.waitingOn = $0.stringValue }
+    take("waitingSince") { t.waitingSince = $0.stringValue }
     take("today") { t.today = Self.bool($0) ?? false }
     take("starred") { t.starred = Self.bool($0) ?? false }
     take("tags") { v in

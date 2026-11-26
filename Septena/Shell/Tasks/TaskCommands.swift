@@ -34,6 +34,10 @@ struct TaskActions {
   var openReminder: (() -> Void)? = nil
   /// File one selected row into its suggested project or area — ⌥⌘M.
   var moveSuggested: (() -> Void)? = nil
+  /// Waiting On… for one selected open row (docs/REVIEW_SPEC.md §6).
+  var openWaiting: (() -> Void)? = nil
+  /// Got It Back for the selected waiting rows.
+  var gotItBack: (() -> Void)? = nil
 
   /// The registry actions this type can serve, in shortcuts-sheet order. The
   /// iPad hidden shortcut buttons render these.
@@ -74,6 +78,8 @@ struct TaskActions {
     case .taskTags: return \.openTags
     case .taskReminder: return \.openReminder
     case .taskMoveSuggested: return \.moveSuggested
+    case .taskWaitingOn: return \.openWaiting
+    case .taskGotItBack: return \.gotItBack
     case .taskDelete: return \.delete
     default: return nil
     }

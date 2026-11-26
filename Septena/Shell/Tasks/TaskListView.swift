@@ -539,6 +539,8 @@ struct TaskListView: View {
   @State private var issueRefs: [String: TaskRefRow] = [:]
   /// The task whose Add Reference sheet is open (row menu).
   @State private var referenceTargetId: String?
+  /// The task whose Waiting On… sheet is open (docs/REVIEW_SPEC.md §6).
+  @State private var waitingTargetId: String?
 
   /// Pending Things-style choice when a fixed-schedule repeating task is
   /// moved. The date picker dismisses before this appears, so the decision is
@@ -698,6 +700,18 @@ struct TaskListView: View {
         applyTimeSlot: applyTimeSlot
       ))
       .sheet(isPresented: Binding(
+        get: { waitingTargetId != nil },
+        set: { if !$0 { waitingTargetId = nil } }
+      )) {
+        if let id = waitingTargetId, let task = currentTask(id: id) {
+          WaitingOnSheet(task: task, today: clock.today) { name, checkBack in
+            TaskWaitingActions.save(task: task, name: name, checkBack: checkBack)
+            Task { await load() }
+          }
+          .taskPickerChrome(TaskPickerDetents.standard)
+        }
+      }
+      .sheet(isPresented: Binding(
         get: { sweepSheetTasks != nil },
         set: { if !$0 { sweepSheetTasks = nil } }
       )) {
@@ -774,7 +788,9 @@ struct TaskListView: View {
       toggleStar: !hasTaskSelection ? nil : toggleStarForSelected,
       openTags: !hasTaskSelection ? nil : openTagsForSelected,
       openReminder: singleSelectedTask == nil ? nil : openReminderForSelected,
-      moveSuggested: moveSuggestedSelectedAction
+      moveSuggested: moveSuggestedSelectedAction,
+      openWaiting: singleSelectedTask?.status == .open ? openWaitingForSelected : nil,
+      gotItBack: gotItBackSelectedAction
     ))
     #else
     // `focusedSceneValue` spins the iPad focus arbiter (see comment above).
@@ -831,7 +847,9 @@ struct TaskListView: View {
       toggleStar: !hasTaskSelection ? nil : toggleStarForSelected,
       openTags: !hasTaskSelection ? nil : openTagsForSelected,
       openReminder: singleSelectedTask == nil ? nil : openReminderForSelected,
-      moveSuggested: moveSuggestedSelectedAction
+      moveSuggested: moveSuggestedSelectedAction,
+      openWaiting: singleSelectedTask?.status == .open ? openWaitingForSelected : nil,
+      gotItBack: gotItBackSelectedAction
     )
   }
   #endif
@@ -2821,7 +2839,7 @@ struct TaskListView: View {
   /// last, behind its toggle.
   @ViewBuilder
   private var reviewGroupRows: some View {
-    let byGroup = Dictionary(grouping: visibleItems) { $0.reviewGroup }
+    let byGroup = ReviewGroup.grouped(visibleItems)
     ForEach(ReviewGroup.allCases, id: \.self) { group in
       if let tasks = byGroup[group], !tasks.isEmpty {
         if group == .faded {
@@ -3550,8 +3568,9 @@ struct TaskListView: View {
     case .unscheduled, .starred:
       return orderedFromGroupedOpen(pool: items) + quickAddOrderedIds
     case .review:
+      let byGroup = ReviewGroup.grouped(visibleItems)
       return ReviewGroup.allCases.flatMap { group in
-        group == .faded && !reviewFadedExpanded ? [] : visibleItems.filter { $0.reviewGroup == group }.map(\.id)
+        group == .faded && !reviewFadedExpanded ? [] : (byGroup[group] ?? []).map(\.id)
       }
     case .upcoming:
       // Upcoming has no inline trigger (`allowsInlineCreate` false) → sentinel empty.
@@ -3827,6 +3846,23 @@ struct TaskListView: View {
   private func openReminderForSelected() {
     guard let task = singleSelectedTask else { return }
     reminderTargetId = task.id
+  }
+
+  /// Waiting On… for the one selected task.
+  private func openWaitingForSelected() {
+    guard let task = singleSelectedTask else { return }
+    waitingTargetId = task.id
+  }
+
+  /// Got It Back for the selected waiting tasks. Nil when none waits.
+  private var gotItBackSelectedAction: (() -> Void)? {
+    guard !showingRecentlyDeleted else { return nil }
+    let ids = orderedActionIDs()
+    guard ids.contains(where: { currentTask(id: $0)?.isWaiting == true }) else { return nil }
+    return {
+      TaskWaitingActions.gotItBack(ids: ids)
+      Task { await load() }
+    }
   }
 
   /// ⌥⌘M — file the one selected task where its "Suggested" capsule points.
@@ -4710,6 +4746,11 @@ struct TaskListView: View {
           // Send back needs a note: open the page with its field ready.
           AgentPromptRequests.shared.sendBackTaskID = task.id
           openPage(task)
+        },
+        onWaitingOn: { task in waitingTargetId = task.id },
+        onGotItBack: { ids in
+          TaskWaitingActions.gotItBack(ids: ids)
+          Task { await load() }
         }
       )
     }

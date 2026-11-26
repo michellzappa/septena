@@ -532,6 +532,8 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     if command == .toggleComplete { return list?.hasCompletableSelection ?? false }
     // `task.open` acts on one row, like the row menu item.
     if command == .open || command == .addReference { return list?.hasSingleActionableSelection ?? false }
+    if command == .waitingOn { return list?.hasSingleOpenSelection ?? false }
+    if command == .gotItBack { return list?.hasWaitingSelection ?? false }
     return list?.hasActionableSelection ?? false
   }
 
@@ -578,6 +580,8 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     // `task.open` shows the task page, which on the Mac is the inspector
     // pane (ADR 0029). Double-click and Return keep the inline composer.
     case .open: list.onOpenInspector?()
+    case .waitingOn: list.presentWaitingPopover()
+    case .gotItBack: list.gotItBackSelection()
     }
   }
 
@@ -587,6 +591,7 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     case repeatEditor
     case open
     case startDo
+    case waitingOn, gotItBack
   }
 
   required init?(coder: NSCoder) { fatalError("SeptaskKitWindowController is code-only") }

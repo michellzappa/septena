@@ -241,6 +241,9 @@ struct TaskListRowContextMenu: View {
   /// Review rows (`needs_verify`) only.
   var onAcceptReview: ((SeptenaTask) -> Void)? = nil
   var onSendBackReview: ((SeptenaTask) -> Void)? = nil
+  /// Waiting On… (one task) and Got It Back (docs/REVIEW_SPEC.md §6). Nil hides them.
+  var onWaitingOn: ((SeptenaTask) -> Void)? = nil
+  var onGotItBack: (([String]) -> Void)? = nil
 
   private var count: Int { target.count }
   private var single: SeptenaTask? {
@@ -271,6 +274,12 @@ struct TaskListRowContextMenu: View {
       guard let task = single, task.conversation.needsHumanReview,
             let onSendBackReview else { return nil }
       return .init { onSendBackReview(task) }
+    case .taskWaitingOn:
+      guard let task = single, task.status == .open, let onWaitingOn else { return nil }
+      return .init { onWaitingOn(task) }
+    case .taskGotItBack:
+      guard tasks.contains(where: \.isWaiting), let onGotItBack else { return nil }
+      return .init { onGotItBack(target.ids) }
     case .taskDo:
       guard let task = single, DoFlow.canDo(task), let onDo else { return nil }
       return .init { onDo(task) }

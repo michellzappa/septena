@@ -123,6 +123,9 @@ enum TaskUndo {
     let starred: Bool
     let deadline: Date?
     let deferredDeadline: String?
+    /// The wait (docs/REVIEW_SPEC.md §6): Waiting On… changes it with When.
+    let waitingOn: String?
+    let waitingSince: String?
     let recurrence: Recurrence?
     let recurrencePaused: Bool
     let reminder: TaskReminder?
@@ -137,6 +140,8 @@ enum TaskUndo {
       starred = task.starred
       deadline = SeptenaDate.parse(task.deadline)
       deferredDeadline = task.deferredDeadline
+      waitingOn = task.waitingOn
+      waitingSince = task.waitingSince
       recurrence = task.recurrence
       recurrencePaused = task.recurrencePaused
       reminder = task.reminder
@@ -167,6 +172,7 @@ enum TaskUndo {
                           timeZone: snapshot.timeZone)
       mutator.setDeadline(id: snapshot.id, date: snapshot.deadline)
       mutator.setDeferredDeadline(id: snapshot.id, day: snapshot.deferredDeadline)
+      mutator.restoreWaiting(id: snapshot.id, on: snapshot.waitingOn, since: snapshot.waitingSince)
       mutator.setRecurrence(id: snapshot.id, recurrence: snapshot.recurrence)
       if snapshot.recurrence != nil {
         mutator.setRecurrencePaused(id: snapshot.id, paused: snapshot.recurrencePaused)
@@ -302,6 +308,28 @@ enum TaskUndo {
              mutator.complete(id: id)
              mutator.acknowledge(id: id)
            })
+  }
+
+  /// Waiting On… (docs/REVIEW_SPEC.md §6), the one path every Save calls:
+  /// writes the wait and, when `scheduled` is set, the check-back When date.
+  /// One undo step puts back both.
+  static func setWaiting(id: String, on name: String?, scheduled: Date??,
+                         context: ModelContext, mutator: TaskMutator) {
+    let before = LocalCache.liveTasks(ids: [id], in: context).map(ScheduleSnapshot.init)
+    mutator.setWaiting(id: id, on: name, scheduled: scheduled)
+    recordScheduleChange(name: RegistryWaiting.sheetTitle,
+                         before: before, context: context, mutator: mutator)
+  }
+
+  /// Got It Back (docs/REVIEW_SPEC.md §6): ends the wait on every waiting task
+  /// in `ids`; the tasks stay open where they are. One undo step.
+  static func gotItBack(ids: [String], context: ModelContext, mutator: TaskMutator) {
+    let before = LocalCache.liveTasks(ids: Set(ids), in: context)
+      .filter(\.isWaiting).map(ScheduleSnapshot.init)
+    guard !before.isEmpty else { return }
+    for snapshot in before { mutator.setWaiting(id: snapshot.id, on: nil) }
+    recordScheduleChange(name: RegistryActions.title(.taskGotItBack),
+                         before: before, context: context, mutator: mutator)
   }
 
   /// Send a task in Review back to the agent with a note. Undoing restores

@@ -1411,10 +1411,11 @@ struct SidebarRootView: View {
       if t.starred { starred += 1 }
       // Check the raw columns first so only rows that carry JSON decode it.
       if t.recurrenceUnit != nil, t.recurrence != nil { repeating += 1 }
-      if t.conversationJSON != nil {
+      if t.conversationJSON != nil || t.isWaiting {
         let convo = t.conversation
         // Review shows both; only what waits on the user counts in its badge.
-        if let group = convo.reviewGroup(at: now) {
+        // Waiting (docs/REVIEW_SPEC.md §6) shows but does not count.
+        if let group = convo.reviewGroup(at: now, waiting: t.isWaiting) {
           if group.countsInBadge { review += 1 } else { agent += 1 }
         }
       }

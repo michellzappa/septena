@@ -101,6 +101,13 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   private let provenanceLabel = NSTextField(labelWithString: "")
   private let provenanceGlyph = NSImageView()
   private let provenanceValue = NSTextField(labelWithString: "")
+  /// The wait (docs/REVIEW_SPEC.md §6): "Waiting on Anna · 5 days", Got It
+  /// Back and Waiting On…. Shown only while the task waits; the row menu and
+  /// the Task menu start a wait.
+  private let waitingLine = NSStackView()
+  private let waitingValue = NSTextField(labelWithString: "")
+  private let waitingEditButton = NSButton()
+  private let gotItBackButton = NSButton()
   /// The pane's own close control — the VISIBLE twin of `cancelOperation`'s
   /// Escape handling. The inspector is a plain split-view item with no title
   /// bar of its own, so without this the only ways out are Escape and ⌥⌘I,
@@ -421,7 +428,71 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     // The title's own gap follows the line (`applyDepth`): tight above it
     // when shown, the section gap when it is hidden and detached.
     form.setCustomSpacing(14, after: titleField)
-    return reviewListLabel
+    guard placement == .pane else { return reviewListLabel }
+    addWaitingLine()
+    return waitingLine
+  }
+
+  private func addWaitingLine() {
+    let glyph = NSImageView()
+    glyph.image = NSImage(systemSymbolName: RegistryIcons.sfSymbol(for: "action.waiting"),
+                          accessibilityDescription: nil)?
+      .withSymbolConfiguration(.init(pointSize: 11, weight: .regular))
+    glyph.contentTintColor = SeptaskKitTheme.inkSecondary
+    glyph.kitA11yIgnore()
+    waitingValue.font = SeptaskKitTheme.meta
+    waitingValue.textColor = SeptaskKitTheme.inkSecondary
+    waitingValue.lineBreakMode = .byTruncatingTail
+    waitingValue.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+    waitingEditButton.title = RegistryActions.title(.taskWaitingOn)
+    waitingEditButton.bezelStyle = .accessoryBarAction
+    waitingEditButton.controlSize = .small
+    waitingEditButton.target = self
+    waitingEditButton.action = #selector(editWaiting)
+    gotItBackButton.title = RegistryActions.title(.taskGotItBack)
+    gotItBackButton.bezelStyle = .accessoryBarAction
+    gotItBackButton.controlSize = .small
+    gotItBackButton.target = self
+    gotItBackButton.action = #selector(gotItBack)
+    let spacer = NSView()
+    spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
+    for view in [glyph, waitingValue, spacer, waitingEditButton, gotItBackButton] {
+      waitingLine.addArrangedSubview(view)
+    }
+    waitingLine.orientation = .horizontal
+    waitingLine.alignment = .centerY
+    waitingLine.spacing = 5
+    waitingLine.isHidden = true
+    form.addArrangedSubview(waitingLine)
+    fillWidth(waitingLine)
+  }
+
+  private func refreshWaiting(_ next: SeptenaTask) {
+    guard placement == .pane else { return }
+    let label = next.status == .open ? next.waitingLabel() : nil
+    waitingValue.stringValue = label ?? ""
+    waitingLine.isHidden = label == nil
+  }
+
+  @objc private func editWaiting() {
+    guard let current = task else { return }
+    SeptaskKitWaitingPopover.present(task: current, relativeTo: waitingEditButton.bounds,
+                                     of: waitingEditButton) { [weak self] name, checkBack in
+      guard let self else { return }
+      let live = LocalCache.task(id: current.id, in: self.context) ?? current
+      let scheduled: Date?? = SeptenaDate.format(checkBack) == live.scheduled ? nil : .some(checkBack)
+      TaskUndo.setWaiting(id: current.id, on: name, scheduled: scheduled,
+                          context: self.context, mutator: self.mutator)
+      NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+      self.refresh()
+    }
+  }
+
+  @objc private func gotItBack() {
+    guard let current = task else { return }
+    TaskUndo.gotItBack(ids: [current.id], context: context, mutator: mutator)
+    NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+    refresh()
   }
 
   private func addNotesBlock(_ block: RegistryTaskPageBlock) -> NSView {
@@ -809,6 +880,7 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   /// The dates/list/repeat controls — safe to resync on every re-show,
   /// same-task or not, since nothing here is a live text edit in progress.
   private func refreshReadOnlyFields(_ next: SeptenaTask) {
+    refreshWaiting(next)
     provenanceGlyph.isHidden = !next.isAgentAuthored
     provenanceValue.stringValue = next.addedByDetail
     let whenBase: String = if next.today {

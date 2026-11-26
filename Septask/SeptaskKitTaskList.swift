@@ -2204,7 +2204,7 @@ final class SeptaskKitTaskListController: NSViewController {
   /// (ADR 0046). Faded is last, behind its toggle. The AppKit twin of
   /// `TaskListView.reviewGroupRows`.
   private func reviewGroupRows(_ pool: [SeptenaTask]) -> [Row] {
-    let byGroup = Dictionary(grouping: pool) { $0.reviewGroup }
+    let byGroup = ReviewGroup.grouped(pool)
     var result: [Row] = []
     for group in ReviewGroup.allCases where group != .faded {
       guard let tasks = byGroup[group], !tasks.isEmpty else { continue }
@@ -2742,6 +2742,12 @@ final class SeptaskKitTaskListController: NSViewController {
   var hasActionableSelection: Bool { !actionableSelection.isEmpty }
   /// Exactly one task row is selected: the inspector has one subject.
   var hasSingleActionableSelection: Bool { actionableSelection.count == 1 }
+  /// One open task is selected: Waiting On… has a subject.
+  var hasSingleOpenSelection: Bool {
+    actionableSelection.count == 1 && actionableSelection[0].status == .open
+  }
+  /// A selected task waits on someone: Got It Back has a subject.
+  var hasWaitingSelection: Bool { actionableSelection.contains(where: \.isWaiting) }
 
   /// The selected Get started steps. They take Return (open), ⌘K (tick) and
   /// their own context menu; no task command sees them.
@@ -2997,6 +3003,42 @@ final class SeptaskKitTaskListController: NSViewController {
                               before: before)
       self.onStoreChanged?()
     }
+  }
+
+  /// Waiting On… (docs/REVIEW_SPEC.md §6) for the one selected open task,
+  /// anchored to its row (or to `anchor`). `task` names a task the list may
+  /// not have selected (the inspector).
+  func presentWaitingPopover(anchor: KitSurfaceAnchor? = nil, task named: SeptenaTask? = nil) {
+    commitComposerTextIfOpen()
+    guard let task = named ?? (hasSingleOpenSelection ? actionableSelection.first : nil) else {
+      NSSound.beep()
+      return
+    }
+    guard case .rect(let rect, let host)? = anchor ?? selectedRowAnchor else {
+      NSSound.beep()
+      return
+    }
+    SeptaskKitWaitingPopover.present(task: task, relativeTo: rect, of: host) { [weak self] name, checkBack in
+      guard let self else { return }
+      let live = LocalCache.task(id: task.id, in: self.context) ?? task
+      let day = SeptenaDate.format(checkBack)
+      let scheduled: Date?? = day == live.scheduled ? nil : .some(checkBack)
+      TaskUndo.setWaiting(id: task.id, on: name, scheduled: scheduled,
+                          context: self.context, mutator: self.mutator)
+      self.refreshComposerRow(taskId: task.id)
+      self.reload()
+      self.onStoreChanged?()
+    }
+  }
+
+  /// Got It Back (docs/REVIEW_SPEC.md §6) on the selected waiting tasks, or
+  /// on `ids` when given. The tasks stay open where they are.
+  func gotItBackSelection(ids: [String]? = nil) {
+    let targets = ids ?? actionableSelection.map(\.id)
+    TaskUndo.gotItBack(ids: targets, context: context, mutator: mutator)
+    for id in targets { refreshComposerRow(taskId: id) }
+    reload()
+    onStoreChanged?()
   }
 
   /// Open the type-to-filter/assign/create Tag popover (`⇧⌘T`) for the current
@@ -4652,6 +4694,12 @@ final class SeptaskKitTaskListController: NSViewController {
       case .taskSendBackReview:
         guard let single, single.conversation.needsHumanReview else { return nil }
         return .init { self.presentSendBackForSelectedRow(taskID: single.id) }
+      case .taskWaitingOn:
+        guard let single, single.status == .open else { return nil }
+        return .init { self.presentWaitingPopover() }
+      case .taskGotItBack:
+        guard selection.contains(where: \.isWaiting) else { return nil }
+        return .init { self.gotItBackSelection() }
       case .taskToggleInfo:
         let visible = UserDefaults.standard.bool(forKey: SettingsKey.septaskInspectorVisible)
         return .init(variant: visible ? .active : .base) { self.onToggleInspector?() }
@@ -6204,6 +6252,8 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
   private let statusChip = KitChipView()
   /// Shared projects: who does this task, when that is somebody else.
   private let assigneeChip = KitChipView()
+  /// "Waiting on Anna · 5 days" (docs/REVIEW_SPEC.md §6).
+  private let waitingChip = KitChipView()
   private let suggestionChip = KitSuggestionChipView()
   /// The item the task was created from (its `from` reference).
   private let fromGlyph = NSImageView()
@@ -6394,7 +6444,7 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     let trailingShove = NSView()
     trailingShove.setContentHuggingPriority(.defaultLow, for: .horizontal)
     trailingShove.setContentCompressionResistancePriority(.fittingSizeCompression, for: .horizontal)
-    let trailing = NSStackView(views: [trailingShove, suggestionChip, chip, assigneeChip, statusChip,
+    let trailing = NSStackView(views: [trailingShove, suggestionChip, chip, waitingChip, assigneeChip, statusChip,
                                       tagStack, attachmentGlyph, attachmentLabel,
                                       checklistGlyph, checklistLabel, reminderGlyph, reminderLabel,
                                       scheduleGlyph, detail, repeatGlyph, starGlyph, fromGlyph, notesGlyph, agentGlyph])
@@ -6420,6 +6470,7 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     chip.kitA11yIgnore()
     statusChip.kitA11yIgnore()
     assigneeChip.kitA11yIgnore()
+    waitingChip.kitA11yIgnore()
 
     addSubview(checkbox)
     addSubview(title)
@@ -6519,6 +6570,7 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
       chip.isHidden = true
       statusChip.isHidden = true
       assigneeChip.isHidden = true
+      waitingChip.isHidden = true
       fromGlyph.isHidden = true
       tagStack.isHidden = true
       attachmentGlyph.isHidden = true
@@ -6574,7 +6626,7 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     }
     // The whole row fades, checkbox included: same curve as `CheckableRow`.
     let fade = CGFloat(TaskFade.rowOpacity(checkbox.tenureFill))
-    for view in [checkbox, title, notesGlyph, agentGlyph, fromGlyph, chip, statusChip, suggestionChip,
+    for view in [checkbox, title, notesGlyph, agentGlyph, fromGlyph, chip, statusChip, waitingChip, suggestionChip,
                  tagStack, attachmentGlyph, attachmentLabel, checklistGlyph, checklistLabel,
                  reminderGlyph, reminderLabel, scheduleGlyph, detail, repeatGlyph, starGlyph] as [NSView] {
       view.alphaValue = fade
@@ -6628,6 +6680,13 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
       chip.configure(symbol: chipValue.symbol, title: chipValue.title)
     } else {
       chip.isHidden = true
+    }
+
+    if !done, task.deletedAt == nil, let waiting = task.waitingLabel() {
+      waitingChip.isHidden = false
+      waitingChip.configure(symbol: RegistryIcons.sfSymbol(for: "action.waiting"), title: waiting)
+    } else {
+      waitingChip.isHidden = true
     }
 
     if let name = SharedProjects.assigneeName(of: task, in: LocalStore.shared.container.mainContext) {

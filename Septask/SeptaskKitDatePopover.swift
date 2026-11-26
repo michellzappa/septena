@@ -2541,3 +2541,140 @@ private final class KitTagPopoverRow: NSView {
   override func mouseUp(with event: NSEvent) { onTap() }
 }
 #endif
+
+#if os(macOS)
+// MARK: - Waiting On… (docs/REVIEW_SPEC.md §6)
+
+/// Waiting On… — a TIER 1 popover anchored to the row: who the task waits on
+/// and the day to check back (the task's When date). The SwiftUI shells draw
+/// the same fields in `WaitingOnSheet`. Return or Save commits; Escape and
+/// click-away leave the task as it was.
+@MainActor
+enum SeptaskKitWaitingPopover {
+  static func present(task: SeptenaTask,
+                      relativeTo rect: NSRect,
+                      of view: NSView,
+                      onCommit: @escaping (String, Date?) -> Void) {
+    let board = KitWaitingBoard(task: task)
+    let handle = KitPopoverHandle()
+    board.onCommit = { name, checkBack in
+      onCommit(name, checkBack)
+      handle.close()
+    }
+    board.onCancel = { handle.close() }
+    KitPopover.present(board, relativeTo: rect, of: view, focus: board.nameField, handle: handle)
+  }
+}
+
+@MainActor
+private final class KitWaitingBoard: NSView {
+
+  var onCommit: ((String, Date?) -> Void)?
+  var onCancel: (() -> Void)?
+
+  let nameField = NSTextField()
+  private let datePicker = NSDatePicker()
+  private let noDateBox = NSButton()
+
+  private static let width: CGFloat = 320
+  private static let padding: CGFloat = 8
+  private static let rowHeight: CGFloat = 32
+
+  init(task: SeptenaTask) {
+    super.init(frame: .zero)
+    build(task: task)
+  }
+
+  required init?(coder: NSCoder) { fatalError("KitWaitingBoard is code-only") }
+
+  private func build(task: SeptenaTask) {
+    let today = SeptenaDate.today
+    // An edit keeps the task's When date; a new wait offers the default.
+    let initial = task.isWaiting
+      ? SeptenaDate.parse(task.scheduled)
+      : TaskWaiting.defaultCheckBack(today: today)
+
+    let title = NSTextField(labelWithString: RegistryWaiting.sheetTitle)
+    title.font = .systemFont(ofSize: SeptenaTypeScale.size(.headline), weight: .semibold)
+    title.textColor = SeptaskKitTheme.inkPrimary
+
+    nameField.placeholderString = RegistryWaiting.namePlaceholder
+    nameField.stringValue = task.waitingOn ?? ""
+    nameField.font = .systemFont(ofSize: SeptenaTypeScale.size(.body))
+    nameField.target = self
+    nameField.action = #selector(commitFromField)
+
+    let checkLabel = NSTextField(labelWithString: RegistryWaiting.checkBackTitle)
+    checkLabel.font = .systemFont(ofSize: SeptenaTypeScale.size(.footnote))
+    checkLabel.textColor = SeptaskKitTheme.inkSecondary
+    checkLabel.setContentHuggingPriority(.required, for: .horizontal)
+
+    datePicker.datePickerStyle = .textFieldAndStepper
+    datePicker.datePickerElements = [.yearMonthDay]
+    datePicker.font = .systemFont(ofSize: SeptenaTypeScale.size(.body))
+    datePicker.minDate = SeptenaDate.parse(today)
+    datePicker.dateValue = initial ?? TaskWaiting.defaultCheckBack(today: today) ?? DayClock.appNow
+    datePicker.isEnabled = initial != nil
+
+    noDateBox.setButtonType(.switch)
+    noDateBox.title = RegistryWaiting.noCheckBackTitle
+    noDateBox.state = initial == nil ? .on : .off
+    noDateBox.target = self
+    noDateBox.action = #selector(toggleNoDate)
+
+    let spacer = NSView()
+    spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
+    let dateRow = NSStackView(views: [checkLabel, datePicker, spacer, noDateBox])
+    dateRow.orientation = .horizontal
+    dateRow.alignment = .centerY
+    dateRow.spacing = 8
+    dateRow.edgeInsets = NSEdgeInsets(top: 2, left: 4, bottom: 2, right: 4)
+
+    let save = KitDateCell(radius: 8, height: Self.rowHeight) { [weak self] in
+      self?.commit()
+    }
+    save.fillRow(symbol: "checkmark.circle", tint: SeptaskKitTheme.inkPrimary,
+                 title: RegistryWaiting.confirmTitle)
+    save.isFocused = true
+
+    let views: [NSView] = [title, nameField, dateRow, KitSurface.separator(), save]
+    let stack = NSStackView(views: views)
+    stack.orientation = .vertical
+    stack.alignment = .leading
+    stack.spacing = 8
+    stack.translatesAutoresizingMaskIntoConstraints = false
+    addSubview(stack)
+
+    let pad = Self.padding
+    NSLayoutConstraint.activate([
+      widthAnchor.constraint(equalToConstant: Self.width),
+      stack.topAnchor.constraint(equalTo: topAnchor, constant: pad),
+      stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: pad),
+      stack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -pad),
+      stack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -pad),
+    ])
+    for view in views where view !== title {
+      view.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+    }
+  }
+
+  @objc private func toggleNoDate() {
+    datePicker.isEnabled = noDateBox.state != .on
+  }
+
+  @objc private func commitFromField() { commit() }
+
+  private func commit() {
+    window?.endEditing(for: nil)
+    guard let name = TaskWaiting.normalizedName(nameField.stringValue) else {
+      NSSound.beep()
+      return
+    }
+    onCommit?(name, noDateBox.state == .on ? nil : datePicker.dateValue)
+  }
+
+  override func cancelOperation(_ sender: Any?) {
+    onCancel?()
+  }
+}
+#endif
