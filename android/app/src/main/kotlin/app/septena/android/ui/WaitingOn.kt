@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import app.septena.core.DateBoardRowKinds
 import app.septena.core.JsonValue
 import app.septena.core.RegistryCatalog
+import app.septena.core.generated.RegistryCountPhraseIds
 import app.septena.core.generated.RegistryDestinationIds
 import app.septena.core.generated.RegistryEntities
 import app.septena.core.generated.RegistryEntityFields
@@ -70,23 +71,24 @@ internal object WaitingCopy {
         val start = since?.let { runCatching { LocalDate.parse(it.take(10)) }.getOrNull() } ?: return base
         val days = ChronoUnit.DAYS.between(start, today).toInt()
         if (days <= 0) return base
-        return "$base · ${countPhrase(WAITING_DAYS_PHRASE, days, languageTag)}"
+        return "$base · ${countPhrase(RegistryCountPhraseIds.WAITING_DAYS, days, languageTag)}"
     }
 
-    private const val WAITING_DAYS_PHRASE = "waitingDays"
     private const val DEFAULT_NAME_MAX = 80
     private const val DEFAULT_CHECK_BACK_DAYS = 7L
 }
 
 /**
- * The Waiting On… sheet: who the task waits on, and the day to check back (the task's When date).
- * The day starts at today + `defaultCheckBackDays`; "No date" leaves the When date as it is.
- * [onConfirm] gets the trimmed name and the day (`YYYY-MM-DD`) or null.
+ * The Waiting On… sheet: who the task waits on, and the day to check back, which IS the task's When
+ * date. The day opens on [initialWhen] when the task has one, else today + `defaultCheckBackDays`.
+ * [onConfirm] gets the trimmed name and the new When day (`YYYY-MM-DD`), or null for "No date",
+ * which clears When.
  */
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
 internal fun WaitingOnDialog(
     initialName: String,
+    initialWhen: String?,
     today: LocalDate,
     languageTag: String,
     onDismiss: () -> Unit,
@@ -106,7 +108,12 @@ internal fun WaitingOnDialog(
             .firstOrNull { it.kind == DateBoardRowKinds.TOMORROW }?.label.orEmpty()
     }
     var name by remember(initialName) { mutableStateOf(initialName) }
-    var checkBack by remember(today) { mutableStateOf<LocalDate?>(today.plusDays(WaitingCopy.defaultCheckBackDays())) }
+    var checkBack by remember(today, initialWhen) {
+        mutableStateOf<LocalDate?>(
+            initialWhen?.let { runCatching { LocalDate.parse(it.take(10)) }.getOrNull() }
+                ?: today.plusDays(WaitingCopy.defaultCheckBackDays()),
+        )
+    }
     var calendarOpen by remember { mutableStateOf(false) }
 
     AlertDialog(

@@ -498,11 +498,12 @@ class TaskMutator(
     /**
      * Waiting On… and Got It Back (docs/REVIEW_SPEC.md §6, ADR 0053). A name starts or renames the
      * wait: the name is trimmed, and `waitingSince` becomes today when the task had no wait. A null
-     * or blank name ends the wait and clears both fields. [scheduled] is the day to chase: a day sets
-     * the When date in the same gesture; null leaves When as it is. Only the gesture layer calls
+     * or blank name ends the wait and clears both fields. With [changesWhen], [scheduled] is the day to
+     * chase and becomes the When date in the same gesture through the date action: a day schedules
+     * the task, null clears When. Without it, When stays as it is (Got It Back, an agent's rename). Only the gesture layer calls
      * this, so the caller records the undo step and stamps the fade clock (a wait ends a fade).
      */
-    suspend fun setWaiting(id: String, on: String?, scheduled: String? = null): TaskRecord? {
+    suspend fun setWaiting(id: String, on: String?, scheduled: String? = null, changesWhen: Boolean = false): TaskRecord? {
         val existing = store.record(RegistryEntityNames.TASK, id)?.asTaskRecord() ?: return null
         if (existing.deletedAt != null) return null
         val name = on?.trim { it.isWhitespace() }?.takeIf(String::isNotEmpty)
@@ -517,7 +518,7 @@ class TaskMutator(
         }
         if (name != null) changes[RegistryEntityFields.Task.FADED_AT] = JsonValue.Null
         val updated = updateFields(id, changes) ?: return null
-        if (name == null || scheduled == null) return updated
+        if (name == null || !changesWhen) return updated
         return setWhen(id, scheduled)
     }
 

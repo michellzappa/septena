@@ -2254,6 +2254,14 @@ object RegistrySurfaceIds {
     const val FADE_SWEEP: String = "fadeSweep"
 }
 
+/** Stable IDs generated from the canonical registry: RegistryCountPhraseIds. */
+object RegistryCountPhraseIds {
+    const val TASKS: String = "tasks"
+    const val PROJECTS: String = "projects"
+    const val AGENTS: String = "agents"
+    const val WAITING_DAYS: String = "waitingDays"
+}
+
 /** Task detail surface (surfaces.json `taskDetail`): its ID and the keys of its field and control labels. */
 object RegistryTaskDetail {
     const val ID: String = "taskDetail"

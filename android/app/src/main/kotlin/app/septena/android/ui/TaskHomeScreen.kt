@@ -423,15 +423,18 @@ fun TaskHomeScreen(
     }
 
     waitingTaskId?.let { id ->
-        val initialName by produceState<String?>(initialValue = null, id) {
+        // The sheet opens on the task's name and When date.
+        val initial by produceState<Pair<String, String?>?>(initialValue = null, id) {
             value = withContext(Dispatchers.IO) {
-                graph.taskStore.record(RegistryEntityNames.TASK, id)
-                    ?.fields?.get(RegistryEntityFields.Task.WAITING_ON).stringValue().orEmpty()
+                val fields = graph.taskStore.record(RegistryEntityNames.TASK, id)?.fields
+                fields?.get(RegistryEntityFields.Task.WAITING_ON).stringValue().orEmpty() to
+                    fields?.get(RegistryEntityFields.Task.SCHEDULED).stringValue()
             }
         }
-        initialName?.let { name ->
+        initial?.let { (name, whenDay) ->
             WaitingOnDialog(
                 initialName = name,
+                initialWhen = whenDay,
                 today = graph.clock.today(graph.clock.now()),
                 languageTag = languageTag,
                 onDismiss = { waitingTaskId = null },
