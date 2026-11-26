@@ -1,0 +1,272 @@
+name: Android Release
+
+# Builds signed Centaur Labs OÜ Android distribution artifacts:
+#   - Direct-download APK (signed with ANDROID_RELEASE_KEYSTORE_B64 / septena-release)
+#   - Google Play App Bundle .aab + R8 mapping (signed with ANDROID_PLAY_UPLOAD_KEYSTORE_B64)
+#
+# Guide: docs/RELEASING-ANDROID.md.
+#
+# Triggered by:
+#   - Pushing a tag `android-vX.Y.Z` (publishes GitHub Release with --latest=false
+#     so the Mac Sparkle appcast redirect on /releases/latest is never disturbed).
+#   - Manual workflow_dispatch (dry-run artifacts, optional GitHub release, and
+#     optional upload to Google Play Console testing tracks).
+on:
+  push:
+    tags:
+      - "android-v*"
+  workflow_dispatch:
+    inputs:
+      publish_github_release:
+        description: "Publish signed APK to a GitHub Release (--latest=false)"
+        type: boolean
+        default: false
+      play_track:
+        description: "Google Play Console track to upload .aab to"
+        type: choice
+        default: none
+        options:
+          - none
+          - internal
+          - alpha
+          - beta
+      play_status:
+        description: "Google Play release status (use 'draft' before first app review)"
+        type: choice
+        default: draft
+        options:
+          - draft
+          - completed
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build & sign Android release
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Resolve version and build number
+        id: meta
+        run: |
+          VERSION="$(sed -n 's/^[[:space:]]*MARKETING_VERSION:[[:space:]]*"\([^"]*\)".*/\1/p' project.yml | head -1)"
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::project.yml has no valid MARKETING_VERSION"
+            exit 1
+          fi
+          BUILD_NUM="$(git rev-list --count HEAD)"
+          TAG=""
+          IS_TAG=false
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            TAG="$GITHUB_REF_NAME"
+            IS_TAG=true
+            TAG_VER="${TAG#android-v}"
+            if [[ "$TAG_VER" != "$VERSION" && "$TAG_VER" != "$VERSION-"* ]]; then
+              echo "::error::Tag $TAG does not match MARKETING_VERSION $VERSION in project.yml"
+              exit 1
+            fi
+          else
+            TAG="android-v${VERSION}-b${BUILD_NUM}"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "build_num=$BUILD_NUM" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "is_tag=$IS_TAG" >> "$GITHUB_OUTPUT"
+          echo "Building Septena Android $VERSION (build $BUILD_NUM, tag $TAG)"
+
+      - name: Run conformance and unit tests
+        working-directory: android
+        run: |
+          ./gradlew --no-daemon :core:test :store:test :app:testDebugUnitTest
+
+      - name: Decode Centaur Labs release signing keys
+        id: keys
+        env:
+          RELEASE_B64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_B64 }}
+          UPLOAD_B64: ${{ secrets.ANDROID_PLAY_UPLOAD_KEYSTORE_B64 }}
+        run: |
+          if [[ -z "$RELEASE_B64" ]]; then
+            echo "::error::Secret ANDROID_RELEASE_KEYSTORE_B64 is missing. Run scripts/android-release-keystore.sh once."
+            exit 1
+          fi
+          umask 077
+          printf '%s' "$RELEASE_B64" | base64 -d > "$RUNNER_TEMP/release.p12"
+          echo "release_store=$RUNNER_TEMP/release.p12" >> "$GITHUB_OUTPUT"
+
+          if [[ -n "$UPLOAD_B64" ]]; then
+            printf '%s' "$UPLOAD_B64" | base64 -d > "$RUNNER_TEMP/play-upload.p12"
+            echo "upload_store=$RUNNER_TEMP/play-upload.p12" >> "$GITHUB_OUTPUT"
+            echo "upload_alias=septena-play-upload" >> "$GITHUB_OUTPUT"
+            echo "separate_upload=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::ANDROID_PLAY_UPLOAD_KEYSTORE_B64 not set; signing .aab with ANDROID_RELEASE_KEYSTORE_B64 (septena-release)."
+            echo "upload_store=$RUNNER_TEMP/release.p12" >> "$GITHUB_OUTPUT"
+            echo "upload_alias=septena-release" >> "$GITHUB_OUTPUT"
+            echo "separate_upload=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build signed direct-distribution APK
+        working-directory: android
+        env:
+          ORG_GRADLE_PROJECT_septenaReleaseStorePassword: ${{ secrets.ANDROID_RELEASE_KEYSTORE_PASSWORD }}
+        run: |
+          ./gradlew --no-daemon :app:assembleRelease \
+            -PseptenaBuildNumber="${{ steps.meta.outputs.build_num }}" \
+            -PseptenaReleaseStoreFile="${{ steps.keys.outputs.release_store }}" \
+            -PseptenaReleaseKeyAlias="septena-release"
+
+      - name: Stage and verify direct APK
+        id: apk
+        run: |
+          VERSION="${{ steps.meta.outputs.version }}"
+          mkdir -p dist
+          SRC="$(ls android/app/build/outputs/apk/release/*.apk | head -1)"
+          cp "$SRC" "dist/Septena-${VERSION}.apk"
+          cp "$SRC" "dist/Septena.apk"
+
+          APKSIGNER="$(ls -d "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)"
+          CERT_OUT="$("$APKSIGNER" verify --verbose --print-certs "dist/Septena-${VERSION}.apk")"
+          echo "$CERT_OUT"
+          CERT_SHA256="$(printf '%s\n' "$CERT_OUT" | awk '/Signer #1 certificate SHA-256 digest:/{print $NF; exit}')"
+          echo "cert_sha256=$CERT_SHA256" >> "$GITHUB_OUTPUT"
+
+          # Verify 16 KB ELF page alignment (Google Play requirement for targetSdk >= 35).
+          # Currently warns if an older pinned core-v* release predates the linker flag.
+          if ! ./scripts/check-android-16kb.sh "dist/Septena-${VERSION}.apk"; then
+            echo "::warning::16 KB alignment check failed — cut a new core-v* release with -Wl,-z,max-page-size=16384 before uploading to Google Play."
+          fi
+
+      - name: Build signed Google Play App Bundle (.aab)
+        working-directory: android
+        env:
+          ORG_GRADLE_PROJECT_septenaReleaseStorePassword: ${{ steps.keys.outputs.separate_upload == 'true' && secrets.ANDROID_PLAY_UPLOAD_KEYSTORE_PASSWORD || secrets.ANDROID_RELEASE_KEYSTORE_PASSWORD }}
+        run: |
+          ./gradlew --no-daemon :app:bundleRelease \
+            -PseptenaBuildNumber="${{ steps.meta.outputs.build_num }}" \
+            -PseptenaReleaseStoreFile="${{ steps.keys.outputs.upload_store }}" \
+            -PseptenaReleaseKeyAlias="${{ steps.keys.outputs.upload_alias }}"
+
+      - name: Stage Play bundle, R8 mapping, and checksums
+        run: |
+          VERSION="${{ steps.meta.outputs.version }}"
+          BUILD_NUM="${{ steps.meta.outputs.build_num }}"
+          TAG="${{ steps.meta.outputs.tag }}"
+          CERT_SHA256="${{ steps.apk.outputs.cert_sha256 }}"
+
+          AAB_SRC="$(ls android/app/build/outputs/bundle/release/*.aab | head -1)"
+          cp "$AAB_SRC" "dist/Septena-${VERSION}.aab"
+
+          MAP_SRC="android/app/build/outputs/mapping/release/mapping.txt"
+          if [[ -f "$MAP_SRC" ]]; then
+            cp "$MAP_SRC" "dist/mapping-${VERSION}.txt"
+          fi
+
+          (cd dist && sha256sum "Septena-${VERSION}.apk" "Septena-${VERSION}.aab" > SHA256SUMS.txt)
+          APK_SHA256="$(sha256sum "dist/Septena-${VERSION}.apk" | awk '{print $1}')"
+          APK_BYTES="$(stat -c %s "dist/Septena-${VERSION}.apk")"
+
+          jq -n \
+            --arg version "$VERSION" \
+            --argjson buildNumber "$BUILD_NUM" \
+            --arg tag "$TAG" \
+            --arg packageName "app.septena.android" \
+            --arg publisher "CENTAUR LABS OÜ" \
+            --arg apkSha256 "$APK_SHA256" \
+            --argjson apkBytes "$APK_BYTES" \
+            --arg certSha256 "$CERT_SHA256" \
+            --arg apkUrl "https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/Septena-${VERSION}.apk" \
+            '{
+              version: $version,
+              buildNumber: $buildNumber,
+              tag: $tag,
+              packageName: $packageName,
+              publisher: $publisher,
+              apkUrl: $apkUrl,
+              apkSha256: $apkSha256,
+              apkBytes: $apkBytes,
+              signingCertSha256: $certSha256
+            }' > dist/android-release.json
+
+          cat dist/SHA256SUMS.txt
+          cat dist/android-release.json
+
+      - name: Clean up signing keys
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release.p12" "$RUNNER_TEMP/play-upload.p12"
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: septena-android-release-${{ steps.meta.outputs.version }}
+          path: dist/*
+          retention-days: 30
+
+      - name: Publish GitHub Release (direct APK, --latest=false)
+        if: steps.meta.outputs.is_tag == 'true' || inputs.publish_github_release == true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ steps.meta.outputs.version }}"
+          BUILD_NUM="${{ steps.meta.outputs.build_num }}"
+          TAG="${{ steps.meta.outputs.tag }}"
+          CERT_SHA256="${{ steps.apk.outputs.cert_sha256 }}"
+          APK_SHA256="$(sha256sum "dist/Septena-${VERSION}.apk" | awk '{print $1}')"
+
+          NOTES="$(cat <<EOF
+          Septena Android ${VERSION} (build ${BUILD_NUM}), signed by **CENTAUR LABS OÜ**.
+
+          - **Direct install:** Download \`Septena-${VERSION}.apk\` (or \`Septena.apk\`).
+          - **APK SHA-256:** \`${APK_SHA256}\`
+          - **Signing certificate SHA-256:** \`${CERT_SHA256}\`
+
+          Built from commit \`${GITHUB_SHA::8}\`.
+          EOF
+          )"
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" \
+              "dist/Septena-${VERSION}.apk" \
+              "dist/Septena.apk" \
+              "dist/SHA256SUMS.txt" \
+              "dist/android-release.json" \
+              --clobber
+          else
+            # --latest=false is mandatory: /releases/latest must remain a Mac release
+            # so Sparkle appcast.xml redirects stay intact (docs/RELEASING-MAC.md).
+            gh release create "$TAG" \
+              "dist/Septena-${VERSION}.apk" \
+              "dist/Septena.apk" \
+              "dist/SHA256SUMS.txt" \
+              "dist/android-release.json" \
+              --title "Septena Android ${VERSION}" \
+              --notes "$NOTES" \
+              --latest=false
+          fi
+
+      - name: Upload .aab to Google Play Console
+        if: inputs.play_track != '' && inputs.play_track != 'none' && secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON != ''
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: app.septena.android
+          releaseFiles: dist/Septena-${{ steps.meta.outputs.version }}.aab
+          mappingFile: dist/mapping-${{ steps.meta.outputs.version }}.txt
+          track: ${{ inputs.play_track }}
+          status: ${{ inputs.play_status }}
+          whatsNewDirectory: appstore/playstore/whatsnew
