@@ -34,7 +34,7 @@ export const PAGE_HEADERS = {
   "Cache-Control": "no-store",
   "Referrer-Policy": "same-origin",
   "X-Robots-Tag": "noindex, nofollow",
-  "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; frame-src https://plausible.io; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
+  "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; img-src https://septena.app; frame-src https://plausible.io; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
 };
 
 export interface AdminView {
@@ -69,7 +69,7 @@ const CSS = `
   .top .in { max-width: 1180px; margin: 0 auto; padding: 12px 16px 0; }
   .brand { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
   .brand h1 { font-size: 17px; margin: 0; display: flex; gap: 8px; align-items: center; }
-  .mark { width: 18px; height: 18px; border-radius: 6px; background: var(--accent); display: inline-block; }
+  .mark { width: 22px; height: 22px; display: block; }
   .who { display: flex; gap: 10px; align-items: center; }
   .tabs { display: flex; gap: 4px; overflow-x: auto; margin-top: 8px; }
   .tabs a { color: var(--dim); padding: 8px 10px; border-bottom: 2px solid transparent; white-space: nowrap; font-weight: 500; }
@@ -364,7 +364,7 @@ function shell(page: AdminPage, v: AdminView, body: string): string {
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>${esc(title)} · Septena admin</title><style>${CSS}</style></head>
 <body>
 <div class="top"><div class="in">
-  <div class="brand"><h1><span class="mark" aria-hidden="true"></span>Septena admin</h1>
+  <div class="brand"><h1><img class="mark" src="https://septena.app/icon.svg" alt="" width="22" height="22">Septena admin</h1>
     <div class="who"><span class="dim">${esc(v.admin)}</span>
     <form method="post" action="/admin/refresh"><input type="hidden" name="back" value="${esc(page)}"><button>Refresh counts</button></form></div></div>
   <nav class="tabs" aria-label="Admin pages">${tabs}</nav>

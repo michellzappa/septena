@@ -25,8 +25,8 @@ millions of accounts. It never shows what a user wrote (ADR 0043).
 
 ## 3. Layout (UX)
 
-The console is six pages under one top bar: the Septena mark, the admin's
-email, Refresh counts, and a tab per page. The tab of the open page carries
+The console is six pages under one top bar: the Septena icon, the admin's
+email, Refresh counts, and a tab per page. The icon is the app icon, loaded from septena.app/icon.svg. The tab of the open page carries
 the brand accent (Persimmon, `registry/tokens.json`). Each page loads only the
 data it shows, so a page with the account table is the only one that reads
 every account row.
