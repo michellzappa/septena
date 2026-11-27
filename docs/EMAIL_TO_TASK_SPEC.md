@@ -3,7 +3,7 @@
 **Status:** proposal (2026-11-21). Defaults in §6 stand unless mz overrules.
 **Decisions:** [ADR 0002](adr/0002-own-backend-replaces-icloud.md), [ADR 0007](adr/0007-septena-is-the-task-app.md), [ADR 0010](adr/0010-free-server-tier-with-limits.md), [ADR 0011](adr/0011-self-hostable-backend.md).
 **Builds on:** `backend/src/index.ts`, `backend/src/store/TaskStore.ts`, `docs/SYNC_SUBSCRIPTION_SPEC.md`, `Septask/SeptaskSettingsView.swift`.
-**Tracking issue:** [#134](https://github.com/michellzappa/septena/issues/134).
+**Tracking issue:** [#134](https://github.com/septena/septena/issues/134).
 **Owner of decisions:** mz. Defaults chosen by the author are marked *(default)*.
 
 ## 1. Goal

@@ -3,7 +3,7 @@
 **Status:** proposal (2026-11-21). Defaults in §7 stand unless mz overrules.
 **Decisions:** [ADR 0002](adr/0002-own-backend-replaces-icloud.md), [ADR 0007](adr/0007-septena-is-the-task-app.md), [ADR 0015](adr/0015-shared-registries-for-cross-platform-clients.md).
 **Builds on:** `registry/entities.json`, `backend/src/store/columns.ts`, `SeptenaCore/Models.swift`, `SeptenaCore/Persistence.swift`, `SeptenaCore/Outbox.swift`, `Septask/SeptaskKitRowViews.swift`, `Septena/Shell/Tasks/TaskComponents.swift`.
-**Tracking issue:** [#127](https://github.com/michellzappa/septena/issues/127).
+**Tracking issue:** [#127](https://github.com/septena/septena/issues/127).
 **Owner of decisions:** mz. Defaults chosen by the author are marked *(default)*.
 
 ## 1. Goal

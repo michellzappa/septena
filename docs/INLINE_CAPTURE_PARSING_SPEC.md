@@ -3,7 +3,7 @@
 **Status:** proposal (2026-11-21). Defaults in §6 stand unless mz overrules.
 **Decisions:** [ADR 0007](adr/0007-septena-is-the-task-app.md), [ADR 0015](adr/0015-shared-registries-for-cross-platform-clients.md).
 **Builds on:** `SeptenaCore/DateParser.swift`, `Septask/SeptaskKitQuickEntry.swift`, `Septask/SeptaskKitComposer.swift`, `Septena/Shell/Tasks/AddTaskPage.swift`, `Septena/Shell/Tasks/TaskComposer.swift`.
-**Tracking issue:** [#133](https://github.com/michellzappa/septena/issues/133).
+**Tracking issue:** [#133](https://github.com/septena/septena/issues/133).
 **Owner of decisions:** mz. Defaults chosen by the author are marked *(default)*.
 
 ## 1. Goal

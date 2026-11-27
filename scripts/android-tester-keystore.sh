@@ -17,7 +17,7 @@
 # Nothing is printed except the SHA-256 fingerprint of the certificate.
 set -eu
 
-repo=michellzappa/septena
+repo=septena/septena
 service=septena-android-tester-keystore
 account=septena
 

@@ -1,7 +1,7 @@
 # Platform chrome for marketing screens
 
-Status: **draft spec**, 2026-11-23. Owner: mz. Tracking: michellzappa/septena#227
-(App Store sets) and michellzappa/septena-site#15 to #20 (one per plan step).
+Status: **draft spec**, 2026-11-23. Owner: mz. Tracking: septena/septena#227
+(App Store sets) and septena/site#15 to #20 (one per plan step).
 
 ## Why
 

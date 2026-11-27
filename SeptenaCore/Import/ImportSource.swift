@@ -58,7 +58,7 @@ struct ImportSourceDescriptor: Sendable, Hashable, Identifiable {
   let displayName: String
   let inputKind: ImportInputKind
   let state: ImportSourceState
-  /// Tracking issue on michellzappa/septena.
+  /// Tracking issue on septena/septena.
   let issue: Int?
   /// What moving in does, shown on an available source's row.
   let detail: String?

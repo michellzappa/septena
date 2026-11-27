@@ -3,7 +3,7 @@
 **Status:** proposal (2026-11-21). Defaults in §8 stand unless mz overrules.
 **Decisions:** [ADR 0002](adr/0002-own-backend-replaces-icloud.md), [ADR 0007](adr/0007-septena-is-the-task-app.md), [ADR 0010](adr/0010-free-server-tier-with-limits.md), [ADR 0015](adr/0015-shared-registries-for-cross-platform-clients.md).
 **Builds on:** `Septask/SeptaskDataTransfer.swift` (`TaskJSONTransfer`, `septena_export_version: 1`), `Septask/SeptaskSettingsView.swift`, `backend/src/store/TaskStore.ts`, `registry/entities.json`.
-**Tracking issue:** [#130](https://github.com/michellzappa/septena/issues/130).
+**Tracking issue:** [#130](https://github.com/septena/septena/issues/130).
 **Owner of decisions:** mz. Defaults chosen by the author are marked *(default)*.
 
 ## 1. Goal

@@ -1,6 +1,6 @@
 # Customization: Generative Canvas Textures & Exotic-Fruit Accents — Spec
 
-**Status:** building ([#196](https://github.com/michellzappa/septena/issues/196))
+**Status:** building ([#196](https://github.com/septena/septena/issues/196))
 **Date:** 2026-11-21
 **Decisions:** [ADR 0007](adr/0007-septena-is-the-task-app.md), [ADR 0015](adr/0015-shared-registries-for-cross-platform-clients.md), [ADR 0019](adr/0019-generative-textures-and-fruit-accents.md)
 **Builds on:** `registry/tokens.json`, `registry/settings.json` (`docs/SETTINGS_UX_SPEC.md`), `docs/DesignSpec.md`, and `septena-site/components/task-ui/`

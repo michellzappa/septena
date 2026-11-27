@@ -1,7 +1,7 @@
 {
   "version": 1,
   "description": "The code map (ADR 0050, AS9): each public claim about Septena and the file in this repo that keeps it. septena.app/llms.txt and the site's open-source section render this list; the site build fails when a path is missing on main, and scripts/gen-registries.mjs --check fails when a path is missing here. A path that ends in / is a folder. `feature` is an ID in registry/capabilities.json. Labels are public copy: no platform names.",
-  "repo": "michellzappa/septena",
+  "repo": "septena/septena",
   "branch": "main",
   "entries": [
     { "id": "stop-pause", "feature": "agents.stop-pause", "label": "The server refuses agent writes after Stop, or after Pause all agents", "path": "backend/src/store/TaskStore.ts" },

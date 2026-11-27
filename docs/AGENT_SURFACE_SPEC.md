@@ -16,8 +16,8 @@ they live in the Starlings workspace (`AGENTS.md`, "This repo is PUBLIC").
 
 | Repo | Owns |
 |---|---|
-| `michellzappa/septena` (this repo) | The contract: spec source, schema, conformance vectors, error envelope, idempotency, OpenAPI, skills source, the `agent` field in `registry/capabilities.json` |
-| `michellzappa/septena-site` | Rendering: Markdown twins, content negotiation, JSON-LD, the pages, the waitlist endpoint |
+| `septena/septena` (this repo) | The contract: spec source, schema, conformance vectors, error envelope, idempotency, OpenAPI, skills source, the `agent` field in `registry/capabilities.json` |
+| `septena/site` | Rendering: Markdown twins, content negotiation, JSON-LD, the pages, the waitlist endpoint |
 
 The site never holds a second copy of a contract. It reads this repo's files
 at build time, as it does for `changelog.json`.

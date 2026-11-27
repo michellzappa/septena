@@ -4,7 +4,7 @@ Septena's apps and server are open source under the MIT License (see `LICENSE`; 
 
 ## Ways to contribute
 
-- Open an issue in [GitHub Issues](https://github.com/michellzappa/septena/issues) to report a bug or suggest a feature, comment on an existing roadmap issue or [write to support](https://septena.app/support).
+- Open an issue in [GitHub Issues](https://github.com/septena/septena/issues) to report a bug or suggest a feature, comment on an existing roadmap issue or [write to support](https://septena.app/support).
 - Send a pull request for an open issue or a clear bug fix. For larger changes, open an issue first so we agree on the shape before you write the code.
 
 ## Before changing code

@@ -32,7 +32,7 @@ esac
 
 TEAM=992N457T8D
 BUNDLE_ID=com.septena.tasks
-REPO=michellzappa/septena
+REPO=septena/septena
 # Not secret: installed copies check each update against it. The matching
 # private key is SEPTENA_SPARKLE_KEY. Changing it strands installed copies.
 SPARKLE_PUBLIC_ED_KEY="Skfl9xBh9KaQJC8CNn9SoBMJw/87UTDTktfatw5OJ5M="

@@ -33,4 +33,4 @@ The app repo already has part of a native path. `SeptaskUITests` and `SeptaskMac
 ## Links
 
 - Spec: [`docs/NATIVE_SCENES_SPEC.md`](../NATIVE_SCENES_SPEC.md)
-- #94 (capture hardening), #50 (site rewrite), michellzappa/septena-site#7 (a visual on every footer page)
+- #94 (capture hardening), #50 (site rewrite), septena/site#7 (a visual on every footer page)

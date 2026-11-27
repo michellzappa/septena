@@ -1,6 +1,6 @@
 name: Site scenes
 
-# The website (michellzappa/septena-site) copies registry/ from this repo's
+# The website (septena/site) copies registry/ from this repo's
 # main on every build and draws its scenes from it. A registry change that the
 # scenes cannot draw (ADR 0046 removed the Agent list) turned every site build
 # red after it merged. This job runs the site's scenes test against the pull
@@ -35,7 +35,7 @@ jobs:
       - uses: actions/checkout@v4
         if: env.SITE_READ_TOKEN != ''
         with:
-          repository: michellzappa/septena-site
+          repository: septena/site
           token: ${{ env.SITE_READ_TOKEN }}
           path: site
 

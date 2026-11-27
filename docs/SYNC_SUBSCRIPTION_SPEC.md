@@ -300,7 +300,7 @@ notification URLs to `https://api.septena.app/v1/webhooks/apple`, version 2.
 
 ### 6.2 Grant yourself (mz, one time)
 
-Run from `~/Dev/septena/backend` after this code is deployed.
+Run from `~/Dev/septena/septena/backend` after this code is deployed.
 
 1. Make an admin token and store it as a Worker secret. Keep the value in
    your password manager.

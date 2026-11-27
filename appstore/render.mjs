@@ -82,7 +82,7 @@ const flattenAlpha = (file) => {
 // The app's header textures, from the site's port of HeaderWashEngine.swift
 // (components/task-ui/header-wash-canvas.tsx). The drawing part has no React;
 // strip its types and inline it. SEPTENA_SITE overrides the site checkout.
-const SITE = process.env.SEPTENA_SITE ?? join(ROOT, "../../_/septena-site");
+const SITE = process.env.SEPTENA_SITE ?? join(ROOT, "../../site");
 const washCode = (() => {
   const dir = join(SITE, "components/task-ui");
   const dataFile = join(dir, "header-wash-data.ts"), file = join(dir, "header-wash-canvas.tsx");

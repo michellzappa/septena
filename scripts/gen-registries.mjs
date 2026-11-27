@@ -984,7 +984,7 @@ function validateSignIn(signIn, icons, caps, plans) {
 // No bindings: septena.app renders it. Every path must exist in this repo, so
 // a rename here fails before the site's own check does.
 function validateCodeMap(map, caps) {
-  assert(map.repo === "michellzappa/septena" && map.branch === "main", "code-map.json: repo must be michellzappa/septena on main");
+  assert(map.repo === "septena/septena" && map.branch === "main", "code-map.json: repo must be septena/septena on main");
   assert(Array.isArray(map.entries) && map.entries.length > 0, "code-map.json: entries must be a non-empty array");
   const ids = new Set();
   for (const e of map.entries) {

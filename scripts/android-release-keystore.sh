@@ -25,7 +25,7 @@
 # for every installed device. Never prints any password or private key material.
 set -euo pipefail
 
-REPO="michellzappa/septena"
+REPO="septena/septena"
 SIGNING_DIR="${SEPTENA_ANDROID_SIGNING_DIR:-$HOME/.config/signing/centaur-labs/android}"
 ACCOUNT="centaur-labs"
 

@@ -861,7 +861,7 @@ private struct SeptaskAboutPane: View {
       .padding(.vertical, 12)
       .listRowBackground(Color.clear)
     case "open_source":
-      Link(destination: URL(string: "https://github.com/michellzappa/septena")!) {
+      Link(destination: URL(string: "https://github.com/septena/septena")!) {
         LabeledContent {
           HStack(spacing: 4) {
             if let detail = item.detail {

@@ -10,7 +10,7 @@ Septena already has the components that ADR 0013 called W0. `android/core` owns 
 
 The existing backend and `SeptenaAuthClient` already support device approval and email codes. Device approval supplies both the QR modules and manual code. Email availability comes from `/v1/auth/methods`. The Android Keystore, account adoption, runtime wiring and Compose activity belong to the Android host. `JsonHttp.kt` and `SyncLiveSocket.kt` currently hard-code the Android client label, which the live Windows host must supply explicitly.
 
-Source checkpoints are Septena [ADR 0013](https://github.com/michellzappa/septena/blob/main/docs/adr/0013-native-windows-app-on-the-android-code.md), [ADR 0025](https://github.com/michellzappa/septena/blob/main/docs/adr/0025-shared-rust-core.md) and [#136](https://github.com/michellzappa/septena/issues/136), plus Bipe's [JVM spike](https://github.com/bipe-chat/bipe-app/tree/main/android/desktop-spike), [Windows account runtime](https://github.com/bipe-chat/bipe-app/tree/main/android/desktop-runtime), and [desktop evidence](https://github.com/bipe-chat/bipe-app/tree/main/android/desktop-app).
+Source checkpoints are Septena [ADR 0013](https://github.com/septena/septena/blob/main/docs/adr/0013-native-windows-app-on-the-android-code.md), [ADR 0025](https://github.com/septena/septena/blob/main/docs/adr/0025-shared-rust-core.md) and [#136](https://github.com/septena/septena/issues/136), plus Bipe's [JVM spike](https://github.com/bipe-chat/bipe-app/tree/main/android/desktop-spike), [Windows account runtime](https://github.com/bipe-chat/bipe-app/tree/main/android/desktop-runtime), and [desktop evidence](https://github.com/bipe-chat/bipe-app/tree/main/android/desktop-app).
 
 ## Checkpoint 1 — fixture spike
 
