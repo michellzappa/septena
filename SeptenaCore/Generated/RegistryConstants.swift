@@ -334,6 +334,12 @@ enum RegistryTokens {
     static let verticalInset: Double = 48
     static let titleBarGap: Double = 20
   }
+  enum CompletionMotion {
+    static let settleDelayMs: Int = 3000
+    static let fadeOutMs: Int = 350
+    static let checkPopMs: Int = 280
+    static let pulseRingMs: Int = 400
+  }
   static let accentPalette: [String] = ["#ef4444", "#f97316", "#f59e0b", "#eab308", "#84cc16", "#22c55e", "#10b981", "#14b8a6", "#06b6d4", "#0ea5e9", "#3b82f6", "#6366f1", "#8b5cf6", "#a855f7", "#ec4899", "#f43f5e"]
   static let fruitAccents: [RegistryFruitAccent] = [
     RegistryFruitAccent(id: "colorful", name: RegistryL10n.t("Colorful"), origin: "Default · Blue + semantic", lightHex: "#007AFF", darkHex: "#0A84FF", checkLightHex: "#FFFFFF", checkDarkHex: "#FFFFFF", multicolor: true),
