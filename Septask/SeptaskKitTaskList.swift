@@ -1480,10 +1480,8 @@ final class SeptaskKitTaskListController: NSViewController {
     guard sort != ListSort.manual else { return rows }
     var pinned = liveEditorIDs
     if let editingTaskId { pinned.insert(editingTaskId) }
-    let keepsInbox = filter == .today
     return ListSort.ordered(
-      rows, sort: sort,
-      isSortable: { $0.status == .open && !$0.isHeading && !(keepsInbox && $0.isUnfiled) },
+      rows, in: filter, sort: sort,
       pinned: pinned,
       onScreen: self.rows.compactMap { $0.task?.id })
   }

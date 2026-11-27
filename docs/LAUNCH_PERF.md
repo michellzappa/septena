@@ -90,15 +90,21 @@ A cold launch draws its first Today frame without a SwiftData fetch
   sidebar order. At most 150 rows, a size guard only.
 - **Writer:** `TodaySnapshotWriter`, iOS task app only, started with the
   deferred launch work. It rewrites the file 2 s after a burst of
-  `.septenaTasksChanged` / `.septenaStructureChanged` posts and at day
-  rollover. An empty Today removes the file. Signed out: no write.
+  `.septenaTasksChanged` / `.septenaStructureChanged` /
+  `.septenaListSortChanged` posts and at day rollover. An empty Today
+  removes the file. Signed out: no write.
+- **Sort By:** the writer stores the Today rows in Today's current sort
+  (`ListSort`, docs/LIST_SORT_SPEC.md) and records that sort. So the first
+  frame shows the sorted order and nothing moves at the first `load()`. The
+  sort runs on the writer's debounce, never on the launch path.
 - **Reader:** `TaskListView` on standalone Today, before its first
   `load()`, and only until `LaunchPhase` reports the first frame. The rows
   feed the same view, so the first `load()` swaps to the live rows with no
   layout change. The list ignores taps while it shows snapshot rows.
 - **Invalidation:** sign-out, account switch and account delete remove the
   file (`TaskSyncEngine`). A snapshot from another day than
-  `DayClock.today` is never used.
+  `DayClock.today` is never used. A snapshot in another sort than Today's
+  current one is never used: the live read draws the first frame.
 - **Still before the first frame:** the SwiftData store open
   (`launch.localStoreOpen`), Today's notices read, and the view itself.
 

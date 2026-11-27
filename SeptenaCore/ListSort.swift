@@ -58,6 +58,22 @@ enum ListSort {
 
   // MARK: - Ordering
 
+  /// The rows a sort may move on `filter`'s list: open tasks only, never a
+  /// heading. On Today the Inbox rows (unfiled) keep their place: the Inbox
+  /// band keeps its own order (spec §1). The one rule for both shells and
+  /// the Today launch snapshot, so the first frame matches the live list.
+  static func isSortable(_ task: SeptenaTask, in filter: TaskFilter) -> Bool {
+    task.status == .open && !task.isHeading && !(filter == .today && task.isUnfiled)
+  }
+
+  /// `rows` of `filter`'s list in `sort` (see the other `ordered`).
+  static func ordered(_ rows: [SeptenaTask], in filter: TaskFilter, sort: String,
+                      pinned: Set<String> = [],
+                      onScreen: [String] = []) -> [SeptenaTask] {
+    ordered(rows, sort: sort, isSortable: { isSortable($0, in: filter) },
+            pinned: pinned, onScreen: onScreen)
+  }
+
   /// `rows` in the order the list shows under `sort`.
   ///
   /// Only rows `isSortable` accepts move, and only into the slots sortable
