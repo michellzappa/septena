@@ -107,6 +107,8 @@ interface SettingsModalProps {
   supportUnread: number;
   /** The tab to show when the modal opens. Without it, the last tab stays. */
   initialTab?: SettingsTab;
+  /** Called when the user switches tabs inside Settings so the URL stays in sync. */
+  onTabChange?: (tab: SettingsTab) => void;
 }
 
 interface RegistryItem {
@@ -274,6 +276,7 @@ export function SettingsModal({
   onOpenSupport,
   supportUnread,
   initialTab,
+  onTabChange,
 }: SettingsModalProps) {
   const [tab, setTab] = useState<SettingsTab>("general");
   const [pageStack, setPageStack] = useState<string[]>([]);
@@ -316,13 +319,21 @@ export function SettingsModal({
     return Notification.permission;
   });
 
-  const selectTab = useCallback((next: SettingsTab) => {
+  const applyTab = useCallback((next: SettingsTab) => {
     setTab(next);
     setPageStack([]);
     setPairCode("");
     setPairPreview(null);
     setPairStatus(null);
   }, []);
+
+  const selectTab = useCallback(
+    (next: SettingsTab) => {
+      applyTab(next);
+      onTabChange?.(next);
+    },
+    [applyTab, onTabChange],
+  );
 
   const pushPage = useCallback((pageId: string) => {
     if (!PAGE_BY_ID.has(pageId)) return;
@@ -338,9 +349,9 @@ export function SettingsModal({
 
   useEffect(() => {
     if (open && initialTab) {
-      selectTab(initialTab);
+      applyTab(initialTab);
     }
-  }, [initialTab, open, selectTab]);
+  }, [applyTab, initialTab, open]);
 
   useEffect(() => {
     if (open) {

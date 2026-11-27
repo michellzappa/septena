@@ -64,6 +64,7 @@ import {
   ACTIONS_CATALOG,
   DESIGN_TOKENS,
   GENERIC_EMPTY_STATE,
+  SETTINGS_REGISTRY,
   SURFACES_CATALOG,
   registryText,
   PLAN_UI,
@@ -71,6 +72,16 @@ import {
 import { hexWithAlpha, type HeaderTextureStyle } from "@/lib/headerWash";
 import { groupTasksByList, orderByPosition } from "@/lib/listOrder";
 import { loadWebPrefs, saveWebPref, type WebDisplayPrefs } from "@/lib/prefs";
+import {
+  buildWebUrl,
+  destinationPath,
+  hasPendingAuthOrShareParams,
+  isPlainLeftClick,
+  parseWebRoute,
+  settingsPath,
+  type LogbookTab,
+  type ParsedWebRoute,
+} from "@/lib/routes";
 import { AccountSwitchRequiredError, type AccountSwitchSummary } from "@/lib/sync/accountSwitch";
 import {
   WebSyncEngine,
@@ -227,7 +238,7 @@ export function SeptenaApp() {
   const [systemDark, setSystemDark] = useState<boolean>(false);
 
   const [destination, setDestination] = useState<ActiveDestination>({ kind: "smart", id: "today" });
-  const [logbookTab, setLogbookTab] = useState<"completed" | "deleted">("completed");
+  const [logbookTab, setLogbookTab] = useState<LogbookTab>("completed");
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
@@ -253,7 +264,12 @@ export function SeptenaApp() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   // The plan sheet opened from a server limit (HTTP 402 `upsell`), by moment id.
   const [upsellSheet, setUpsellSheet] = useState<string | null>(null);
-  const [settingsInitialTab, setSettingsInitialTab] = useState<SettingsTab | undefined>(undefined);
+  const [settingsTab, setSettingsTab] = useState<SettingsTab>("general");
+  const [routeReady, setRouteReady] = useState(false);
+  const hasSyncedInitialUrlRef = useRef(false);
+  const initialRouteCanonicalizeRef = useRef(false);
+  const applyingPopStateRef = useRef(false);
+  const deepLinkTaskIdRef = useRef<string | null>(null);
   /** A new session for another account, waiting for the user's answer (#575). Null: no question. */
   const [accountSwitch, setAccountSwitch] = useState<
     { userId: string; summary: AccountSwitchSummary } | null
@@ -345,13 +361,83 @@ export function SeptenaApp() {
     return () => mq.removeEventListener("change", handler);
   }, []);
 
-  // Keep the address bar on the canonical app root (`/`) so iOS Add to Home
-  // Screen and browser installs always save https://web.septena.app/.
+  // Apply a parsed URL route to app navigation state (used on mount and popstate).
+  const applyParsedRoute = useCallback(
+    (parsed: ParsedWebRoute) => {
+      if (parsed.expandFaded) {
+        handleChangePref("reviewFadedExpanded", true);
+      }
+      if (parsed.destination) {
+        setDestination(parsed.destination);
+      }
+      setLogbookTab(parsed.logbookTab);
+      setTagFilterId(parsed.tagFilterId);
+      setTaskPageId(parsed.taskPageId);
+      setSettingsOpen(parsed.settingsOpen);
+      if (parsed.settingsTab) {
+        setSettingsTab(parsed.settingsTab);
+      }
+      setExpandedTaskId(null);
+      setSelectedTaskId(null);
+      setSelectedIds(new Set());
+      if (parsed.taskPageId && !parsed.destination) {
+        deepLinkTaskIdRef.current = parsed.taskPageId;
+      }
+    },
+    [handleChangePref],
+  );
+
+  // Read the initial browser URL on mount and follow Back/Forward navigation.
   useEffect(() => {
-    if (typeof window !== "undefined" && window.location.pathname !== "/") {
-      window.history.replaceState({}, "", `/${window.location.search}`);
+    if (typeof window === "undefined") return;
+    const initial = parseWebRoute(window.location.pathname, window.location.search);
+    initialRouteCanonicalizeRef.current = initial.canonicalize;
+    applyParsedRoute(initial);
+    setRouteReady(true);
+
+    const onPopState = () => {
+      applyingPopStateRef.current = true;
+      const next = parseWebRoute(window.location.pathname, window.location.search);
+      applyParsedRoute(next);
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [applyParsedRoute]);
+
+  // Keep the browser URL in sync with the active destination, task page, or settings tab.
+  // Never overwrite the URL while loading/signed out or while OIDC / Web Share params await handling.
+  useEffect(() => {
+    if (typeof window === "undefined" || !routeReady || bootPhase !== "signed_in") return;
+    if (hasPendingAuthOrShareParams(window.location.search)) return;
+    const nextUrl = buildWebUrl({
+      destination,
+      logbookTab,
+      tagFilterId,
+      taskPageId,
+      settingsOpen,
+      settingsTab,
+    });
+    const currentUrl = `${window.location.pathname}${window.location.search}`;
+    if (applyingPopStateRef.current) {
+      applyingPopStateRef.current = false;
+      if (nextUrl !== currentUrl) {
+        window.history.replaceState({}, "", nextUrl);
+      }
+      return;
     }
-  }, []);
+    if (nextUrl === currentUrl) {
+      hasSyncedInitialUrlRef.current = true;
+      initialRouteCanonicalizeRef.current = false;
+      return;
+    }
+    if (!hasSyncedInitialUrlRef.current || initialRouteCanonicalizeRef.current) {
+      hasSyncedInitialUrlRef.current = true;
+      initialRouteCanonicalizeRef.current = false;
+      window.history.replaceState({}, "", nextUrl);
+    } else {
+      window.history.pushState({}, "", nextUrl);
+    }
+  }, [bootPhase, destination, logbookTab, routeReady, settingsOpen, settingsTab, tagFilterId, taskPageId]);
 
   // Register offline shell Service Worker.
   useEffect(() => {
@@ -382,8 +468,8 @@ export function SeptenaApp() {
       today: false,
     });
     setQuickAddOpen(true);
-    window.history.replaceState({}, "", "/");
-  }, [bootPhase]);
+    window.history.replaceState({}, "", destinationPath(destination, logbookTab));
+  }, [bootPhase, destination, logbookTab]);
 
   // DayClock midnight rollover watcher.
   useEffect(() => {
@@ -535,7 +621,7 @@ export function SeptenaApp() {
       } catch {
         // Settings Account tab shows the current linked methods on open.
       } finally {
-        setSettingsInitialTab("account");
+        setSettingsTab("account");
         setSettingsOpen(true);
       }
     })();
@@ -570,7 +656,7 @@ export function SeptenaApp() {
       }
       setBootPhase("signed_out");
       if (choice === "exportFirst") {
-        setSettingsInitialTab("privacy");
+        setSettingsTab("privacy");
         setSettingsOpen(true);
       }
     },
@@ -582,8 +668,16 @@ export function SeptenaApp() {
     await engine.signOutAndWipe();
     setExpandedTaskId(null);
     setTaskPageId(null);
+    setSettingsOpen(false);
+    setTagFilterId(null);
     setSelectedTaskId(null);
     setSelectedIds(new Set());
+    setDestination({ kind: "smart", id: "today" });
+    setLogbookTab("completed");
+    hasSyncedInitialUrlRef.current = false;
+    if (typeof window !== "undefined") {
+      window.history.replaceState({}, "", "/");
+    }
     setBootPhase("signed_out");
   }, [engine, undoStack]);
 
@@ -592,8 +686,16 @@ export function SeptenaApp() {
     await engine.deleteAccountAndWipe();
     setExpandedTaskId(null);
     setTaskPageId(null);
+    setSettingsOpen(false);
+    setTagFilterId(null);
     setSelectedTaskId(null);
     setSelectedIds(new Set());
+    setDestination({ kind: "smart", id: "today" });
+    setLogbookTab("completed");
+    hasSyncedInitialUrlRef.current = false;
+    if (typeof window !== "undefined") {
+      window.history.replaceState({}, "", "/");
+    }
     setBootPhase("signed_out");
   }, [engine, undoStack]);
 
@@ -1128,6 +1230,8 @@ export function SeptenaApp() {
       } else {
         setDestination(dest);
       }
+      setTaskPageId(null);
+      setTagFilterId(null);
       setExpandedTaskId(null);
       setSelectedTaskId(null);
       setSelectedIds(new Set());
@@ -1255,18 +1359,50 @@ export function SeptenaApp() {
     [engine, undoStack],
   );
 
-  // Sync container notes draft & clear active tag filter when switching lists.
+  const destinationKey = `${destination.kind}:${destination.id}`;
+  const prevDestinationKeyRef = useRef(destinationKey);
+
+  // Clear per-list UI state only when switching to a different list (not on every sync update).
   useEffect(() => {
+    if (prevDestinationKeyRef.current === destinationKey) return;
+    prevDestinationKeyRef.current = destinationKey;
     setShowContainerNotes(false);
     setSelectedIds(new Set());
-    setTagFilterId(null);
     setAssigneeFilter(null);
+  }, [destinationKey]);
+
+  // Keep container notes draft aligned with the active area or project while not editing it.
+  useEffect(() => {
+    if (showContainerNotes) return;
     if (destination.kind === "area") {
       setContainerNotesDraft(areaById.get(destination.id)?.context ?? "");
     } else if (destination.kind === "project") {
       setContainerNotesDraft(projectById.get(destination.id)?.notes ?? "");
     }
-  }, [areaById, destination, projectById]);
+  }, [areaById, destination, projectById, showContainerNotes]);
+
+  // When a user opens `/task/:id` directly, resolve the task's home list behind the drawer
+  // once the snapshot loads so closing the drawer lands on that list.
+  useEffect(() => {
+    const deepId = deepLinkTaskIdRef.current;
+    if (!deepId || taskPageId !== deepId) return;
+    const task = syncState.snapshot.tasks.find((t) => t.id === deepId);
+    if (!task) return;
+    deepLinkTaskIdRef.current = null;
+    if (task.deletedAt) {
+      setDestination({ kind: "smart", id: "logbook" });
+      setLogbookTab("deleted");
+    } else if (task.status === "done" || task.status === "cancelled") {
+      setDestination({ kind: "smart", id: "logbook" });
+      setLogbookTab("completed");
+    } else if (task.project && projectById.has(task.project)) {
+      setDestination({ kind: "project", id: task.project });
+    } else if (task.area && areaById.has(task.area)) {
+      setDestination({ kind: "area", id: task.area });
+    } else {
+      setDestination({ kind: "smart", id: "today" });
+    }
+  }, [areaById, projectById, syncState.snapshot.tasks, taskPageId]);
 
   const activeSelectedTasks = useMemo(() => {
     if (selectedIds.size > 0) {
@@ -2869,6 +3005,30 @@ export function SeptenaApp() {
     undoStack,
   ]);
 
+  // Keep browser tab title aligned with the active view, task page, or settings tab.
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    if (bootPhase !== "signed_in") {
+      document.title = "Septena";
+      return;
+    }
+    if (settingsOpen) {
+      const tabDef = SETTINGS_REGISTRY.desktopTabs.find((t) => t.id === settingsTab);
+      const tabLabel = tabDef ? registryText(tabDef.title, lang) : "Settings";
+      document.title = `${tabLabel} · Settings — Septena`;
+      return;
+    }
+    if (taskPageItem) {
+      document.title = `${taskPageItem.task.title || "Task"} — Septena`;
+      return;
+    }
+    if (destination.kind === "smart" && destination.id === "logbook" && logbookTab === "deleted") {
+      document.title = `${registryText(destinationInfo("recentlyDeleted")?.title ?? "Deleted", lang)} — Septena`;
+      return;
+    }
+    document.title = `${pageMeta.title} — Septena`;
+  }, [bootPhase, destination, lang, logbookTab, pageMeta.title, settingsOpen, settingsTab, taskPageItem]);
+
   const settingsModal = (
     <>
     <PlanSheet
@@ -2880,10 +3040,10 @@ export function SeptenaApp() {
     />
     <SettingsModal
       open={settingsOpen}
-      initialTab={settingsInitialTab}
+      initialTab={settingsTab}
+      onTabChange={setSettingsTab}
       onClose={() => {
         setSettingsOpen(false);
-        setSettingsInitialTab(undefined);
       }}
       api={api}
       engine={engine}
@@ -2947,10 +3107,11 @@ export function SeptenaApp() {
     const selected = destination.kind === "smart" && destination.id === dest.id;
     const count = smartCounts.counts[dest.id];
     const isDropOver = dropTargetSidebar === `smart:${dest.id}`;
+    const destHref = destinationPath({ kind: "smart", id: dest.id });
     return (
-      <button
+      <a
         key={dest.id}
-        type="button"
+        href={destHref}
         onDragOver={(e) => {
           if (!draggedTaskId || dest.dropBehavior === "none") return;
           e.preventDefault();
@@ -2961,7 +3122,9 @@ export function SeptenaApp() {
           e.preventDefault();
           void handleDropOnSidebarSmart(dest.id);
         }}
-        onClick={() => {
+        onClick={(e) => {
+          if (!isPlainLeftClick(e)) return;
+          e.preventDefault();
           navigateTo({ kind: "smart", id: dest.id });
           setMobileMenuOpen(false);
         }}
@@ -2988,7 +3151,7 @@ export function SeptenaApp() {
         {prefs.sidebarCounts && count > 0 && (
           <span className="font-mono-tabular text-xs text-[var(--text-muted)]">{count}</span>
         )}
-      </button>
+      </a>
     );
   };
 
@@ -3018,14 +3181,18 @@ export function SeptenaApp() {
           >
             <Keyboard className="h-4 w-4" />
           </button>
-          <button
-            type="button"
-            onClick={() => setSettingsOpen(true)}
+          <a
+            href={settingsPath(settingsTab)}
+            onClick={(e) => {
+              if (!isPlainLeftClick(e)) return;
+              e.preventDefault();
+              setSettingsOpen(true);
+            }}
             title="Settings (⌘,)"
             className="rounded-md p-1.5 text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
           >
             <Settings className="h-4 w-4" />
-          </button>
+          </a>
           <button
             type="button"
             onClick={() => setMobileMenuOpen(false)}
@@ -3075,8 +3242,8 @@ export function SeptenaApp() {
               const stats = projectStats.get(proj.id) ?? { done: 0, total: 0 };
               return (
                 <div key={proj.id} className="relative">
-                  <button
-                    type="button"
+                  <a
+                    href={destinationPath({ kind: "project", id: proj.id })}
                     draggable
                     onDragStart={() => setDraggedSidebarItem({ kind: "project", id: proj.id })}
                     onDragEnd={() => {
@@ -3134,11 +3301,10 @@ export function SeptenaApp() {
                         label: proj.title,
                       });
                     }}
-                    onClick={() => {
-                      setDestination({ kind: "project", id: proj.id });
-                      setExpandedTaskId(null);
-                      setSelectedTaskId(null);
-                      setSelectedIds(new Set());
+                    onClick={(e) => {
+                      if (!isPlainLeftClick(e)) return;
+                      e.preventDefault();
+                      navigateTo({ kind: "project", id: proj.id });
                       setMobileMenuOpen(false);
                     }}
                     className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm transition-colors ${
@@ -3161,7 +3327,7 @@ export function SeptenaApp() {
                         {stats.total - stats.done}
                       </span>
                     )}
-                  </button>
+                  </a>
                   {isMagicHere && (
                     <div className="pointer-events-none flex items-center gap-1.5 py-0.5 pl-6 pr-2">
                       <span className="rounded-full bg-[var(--accent)] px-2 py-0.5 text-[10px] font-semibold text-white shadow">
@@ -3214,8 +3380,8 @@ export function SeptenaApp() {
                   </div>
                 )}
 
-                <button
-                  type="button"
+                <a
+                  href={destinationPath({ kind: "area", id: area.id })}
                   draggable
                   onDragStart={() => setDraggedSidebarItem({ kind: "area", id: area.id })}
                   onDragEnd={() => {
@@ -3295,11 +3461,10 @@ export function SeptenaApp() {
                     }
                     void handleDropOnSidebarPlace({ area: area.id, project: null, label: area.title });
                   }}
-                  onClick={() => {
-                    setDestination({ kind: "area", id: area.id });
-                    setExpandedTaskId(null);
-                    setSelectedTaskId(null);
-                    setSelectedIds(new Set());
+                  onClick={(e) => {
+                    if (!isPlainLeftClick(e)) return;
+                    e.preventDefault();
+                    navigateTo({ kind: "area", id: area.id });
                     setMobileMenuOpen(false);
                   }}
                   className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm font-medium transition-colors ${
@@ -3323,7 +3488,7 @@ export function SeptenaApp() {
                       {areaOpenCount.get(area.id)}
                     </span>
                   )}
-                </button>
+                </a>
 
                 {isMagicFirstProject && (
                   <div className="pointer-events-none flex items-center gap-1.5 py-0.5 pl-6 pr-2">
@@ -3346,8 +3511,8 @@ export function SeptenaApp() {
                       const stats = projectStats.get(proj.id) ?? { done: 0, total: 0 };
                       return (
                         <div key={proj.id}>
-                          <button
-                            type="button"
+                          <a
+                            href={destinationPath({ kind: "project", id: proj.id })}
                             draggable
                             onDragStart={() => setDraggedSidebarItem({ kind: "project", id: proj.id })}
                             onDragEnd={() => {
@@ -3405,11 +3570,10 @@ export function SeptenaApp() {
                                 label: proj.title,
                               });
                             }}
-                            onClick={() => {
-                              setDestination({ kind: "project", id: proj.id });
-                              setExpandedTaskId(null);
-                              setSelectedTaskId(null);
-                              setSelectedIds(new Set());
+                            onClick={(e) => {
+                              if (!isPlainLeftClick(e)) return;
+                              e.preventDefault();
+                              navigateTo({ kind: "project", id: proj.id });
                               setMobileMenuOpen(false);
                             }}
                             className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1 text-sm transition-colors ${
@@ -3432,7 +3596,7 @@ export function SeptenaApp() {
                                 {stats.total - stats.done}
                               </span>
                             )}
-                          </button>
+                          </a>
                           {isMagicAfterProj && (
                             <div className="pointer-events-none flex items-center gap-1.5 py-0.5 pl-2 pr-2">
                               <span className="rounded-full bg-[var(--accent)] px-2 py-0.5 text-[10px] font-semibold text-white shadow">
@@ -3719,9 +3883,13 @@ export function SeptenaApp() {
 
             {destination.kind === "smart" && destination.id === "logbook" && (
               <div className="inline-flex rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/80 p-0.5">
-                <button
-                  type="button"
-                  onClick={() => setLogbookTab("completed")}
+                <a
+                  href="/logbook"
+                  onClick={(e) => {
+                    if (!isPlainLeftClick(e)) return;
+                    e.preventDefault();
+                    setLogbookTab("completed");
+                  }}
                   className={`rounded-md px-2.5 py-1 font-medium ${
                     logbookTab === "completed"
                       ? "bg-[var(--bg-selected)] text-[var(--text-primary)]"
@@ -3729,10 +3897,14 @@ export function SeptenaApp() {
                   }`}
                 >
                   Logbook
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setLogbookTab("deleted")}
+                </a>
+                <a
+                  href="/logbook/deleted"
+                  onClick={(e) => {
+                    if (!isPlainLeftClick(e)) return;
+                    e.preventDefault();
+                    setLogbookTab("deleted");
+                  }}
                   className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 font-medium ${
                     logbookTab === "deleted"
                       ? "bg-[var(--bg-selected)] text-[var(--text-primary)]"
@@ -3746,7 +3918,7 @@ export function SeptenaApp() {
                       {smartCounts.deletedCount}
                     </span>
                   )}
-                </button>
+                </a>
               </div>
             )}
 
