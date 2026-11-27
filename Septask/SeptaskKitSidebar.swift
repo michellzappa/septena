@@ -150,6 +150,8 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
   var onFocusList: (() -> Void)?
 
   private let outlineView = KitSidebarOutlineView()
+  private let magicPlusBar = KitSidebarMagicPlusBar()
+  private let magicDropBadge = KitSidebarMagicDropBadge()
   private var roots: [Node] = []
   /// Every TOP-LEVEL area/loose-project row (not their nested project
   /// children) — each gets a bit of extra height above it in
@@ -275,7 +277,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     outlineView.indentationPerLevel = 0
     outlineView.dataSource = self
     outlineView.delegate = self
-    outlineView.registerForDraggedTypes([.septaskTask, .septaskStructureItem, .septaskSmartListItem])
+    outlineView.registerForDraggedTypes([.septaskTask, .septaskStructureItem, .septaskSmartListItem, .septaskMagicPlus])
     outlineView.setDraggingSourceOperationMask(.move, forLocal: true)
     // NOT `.menu`: same reasoning as the task table (SeptaskKitTaskList) —
     // AppKit's automatic path for a table's `.menu` paints its own native
@@ -287,12 +289,35 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     // sidebar, and focus stays here until Return or Tab.
     outlineView.onRowClick = { [weak self] in self?.onFocusList?() }
     outlineView.onReturn = { [weak self] in self?.handleReturn() }
+    outlineView.onDragEnded = { [weak self] in self?.hideMagicDropBadge() }
 
     let scroll = NSScrollView()
+    scroll.translatesAutoresizingMaskIntoConstraints = false
     scroll.documentView = outlineView
     scroll.hasVerticalScroller = true
     scroll.drawsBackground = false
-    view = scroll
+
+    magicPlusBar.translatesAutoresizingMaskIntoConstraints = false
+    magicPlusBar.onClick = { [weak self] button in self?.presentMagicPlusMenu(from: button) }
+    magicPlusBar.onDragEnded = { [weak self] in self?.hideMagicDropBadge() }
+
+    magicDropBadge.isHidden = true
+
+    let container = NSView()
+    container.addSubview(scroll)
+    container.addSubview(magicPlusBar)
+    container.addSubview(magicDropBadge)
+    NSLayoutConstraint.activate([
+      scroll.topAnchor.constraint(equalTo: container.topAnchor),
+      scroll.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+      scroll.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+      scroll.bottomAnchor.constraint(equalTo: magicPlusBar.topAnchor),
+      magicPlusBar.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+      magicPlusBar.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+      magicPlusBar.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+      magicPlusBar.heightAnchor.constraint(equalToConstant: 44),
+    ])
+    view = container
 
     rebuild(preserving: nil)
 
@@ -320,6 +345,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
         self?.outlineView.enumerateAvailableRowViews { rowView, _ in
           rowView.needsDisplay = true
         }
+        self?.magicPlusBar.refreshAppearance()
         // Recolor the Today sidebar icon immediately when the user switches accent.
         self?.scheduleRebuild()
       }
@@ -383,8 +409,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     }), collapsedKeys.contains(owner.key) {
       toggleFold(owner)
     }
-    if key == KitSidebarDestination.key(for: .filter(.review))
-        || key == KitSidebarDestination.key(for: .filter(.agent)),
+    if key == KitSidebarDestination.key(for: .filter(.review)),
        row(forKey: key) == nil {
       rebuild(preserving: key)
     }
@@ -489,25 +514,23 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     let today = SeptenaDate.today
     let inboxCount = open.filter { $0.isInTriageBand }.count
     let todayCount = open.filter { $0.isOnToday && !$0.isInTriageBand }.count
-    // One conversation decode per row that carries JSON feeds both the Review
-    // and the Agent counts. A claim lease is backend wall-clock time.
+    // One conversation decode per row that carries JSON. Review shows what
+    // waits on the user and agent work in progress (ADR 0046); only the
+    // first counts in its badge. A claim lease is backend wall-clock time.
     let now = Date()
     var reviewCount = 0, agentCount = 0
-    for task in open where task.conversationJSON != nil {
-      let convo = task.conversation
-      if convo.needsHumanReview { reviewCount += 1 }
-      if convo.agentStage(at: now) != nil { agentCount += 1 }
+    for task in open where task.conversationJSON != nil || task.isWaiting {
+      guard let group = task.conversation.reviewGroup(at: now, waiting: task.isWaiting) else { continue }
+      if group.countsInBadge { reviewCount += 1 } else { agentCount += 1 }
     }
     let smartCounts: [TaskFilter: Int] = [
       .review: reviewCount,
-      .agent: agentCount,
       .upcoming: open.filter(\.isUpcoming).count,
       .repeating: open.filter { $0.recurrenceUnit != nil && $0.recurrence != nil }.count,
       .unscheduled: open.filter {
         !$0.today && $0.scheduled == nil && $0.deadline == nil
       }.count,
       .starred: starredCount,
-      .faded: fadedCount,
     ]
     let openByProject = Dictionary(grouping: open.compactMap(\.project), by: { $0 })
       .mapValues(\.count)
@@ -547,16 +570,13 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     // Set + order come from `SmartListPreferences.shared` over
     // `registry/destinations.json`, shared across both sidebars and title menus.
     var nonEmptyIDs = Set<RegistryDestinationID>()
-    // Review and Agent also stay while selected, so accepting the last item
-    // does not yank the row away.
-    if reviewCount > 0 || key == KitSidebarDestination.key(for: .filter(.review)) {
+    // Review also stays while selected, so accepting the last item does not
+    // yank the row away.
+    if reviewCount + agentCount + fadedCount > 0
+        || key == KitSidebarDestination.key(for: .filter(.review)) {
       nonEmptyIDs.insert(.review)
     }
-    if agentCount > 0 || key == KitSidebarDestination.key(for: .filter(.agent)) {
-      nonEmptyIDs.insert(.agent)
-    }
     if starredCount > 0 { nonEmptyIDs.insert(.starred) }
-    if fadedCount > 0 { nonEmptyIDs.insert(.faded) }
     let makeViewNode: (KitSidebarDestination) -> Node = { destination in
       Node(destination.nodeContent, count: self.smartListCount(destination,
                                                                counts: smartCounts,
@@ -688,6 +708,10 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
   func outlineView(_ outlineView: NSOutlineView, validateDrop info: NSDraggingInfo,
                    proposedItem item: Any?, proposedChildIndex index: Int)
     -> NSDragOperation {
+    if isMagicPlusDrag(info) {
+      return validateMagicPlusDrop(info, proposedItem: item, proposedChildIndex: index)
+    }
+    hideMagicDropBadge()
     if !KitDrag.ids(from: info).isEmpty {
       // Target the row under the pointer, not AppKit's proposal: between two
       // rows it proposes the PARENT with a child index, which lit up the area
@@ -722,6 +746,10 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
 
   func outlineView(_ outlineView: NSOutlineView, acceptDrop info: NSDraggingInfo,
                    item: Any?, childIndex index: Int) -> Bool {
+    if isMagicPlusDrag(info) {
+      hideMagicDropBadge()
+      return acceptMagicPlusDrop(info, item: item, childIndex: index)
+    }
     guard !KitDrag.ids(from: info).isEmpty else {
       if draggedSmartListID(from: info) != nil {
         return acceptSmartListReorder(info, proposedItem: item, proposedChildIndex: index)
@@ -1090,6 +1118,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     // color; the rest stay quiet secondary ink), areas their emoji or the
     // muted dot, projects their completion ring.
     cell.emoji.isHidden = true
+    cell.sharedMark.isHidden = true
     switch node.content {
     case .filter(let filter, let title, let symbol):
       cell.textField?.font = SeptaskKitTheme.sidebarTitle
@@ -1126,6 +1155,11 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
       cell.textField?.stringValue = project.title
       cell.textField?.textColor = SeptaskKitTheme.inkPrimary
       cell.imageView?.image = KitGlyph.progress(progress)
+      if let share = project.share {
+        cell.sharedMark.isHidden = false
+        cell.sharedMark.toolTip = share.membersLabel
+        cell.sharedMark.setAccessibilityLabel(share.membersLabel)
+      }
     }
     cell.badge.stringValue = Self.showsCounts ? (node.count.map(String.init) ?? "") : ""
 
@@ -1193,6 +1227,8 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     /// An area's user glyph sits where the icon would — same slot, so titles
     /// stay aligned whether an area has an emoji or the muted dot.
     let emoji = NSTextField(labelWithString: "")
+    /// After the title of a shared project.
+    let sharedMark = NSImageView()
     /// Custom expand/collapse affordance — see the controller's
     /// `shouldShowOutlineCellForItem`.
     let disclosure = KitDisclosureView()
@@ -1291,6 +1327,14 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
       badge.translatesAutoresizingMaskIntoConstraints = false
       badge.setContentHuggingPriority(.required, for: .horizontal)
 
+      sharedMark.translatesAutoresizingMaskIntoConstraints = false
+      sharedMark.image = NSImage(systemSymbolName: RegistryIcons.sfSymbol(for: "project.shared"),
+                                 accessibilityDescription: nil)?
+        .withSymbolConfiguration(.init(pointSize: 10, weight: .regular))
+      sharedMark.contentTintColor = SeptaskKitTheme.iconMuted
+      sharedMark.setContentHuggingPriority(.required, for: .horizontal)
+      sharedMark.setContentCompressionResistancePriority(.required, for: .horizontal)
+
       disclosure.translatesAutoresizingMaskIntoConstraints = false
       disclosure.onTap = { [weak self] in self?.onToggleDisclosure?() }
       disclosure.setContentHuggingPriority(.required, for: .horizontal)
@@ -1298,6 +1342,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
       addSubview(text)
       addSubview(image)
       addSubview(emoji)
+      addSubview(sharedMark)
       addSubview(disclosure)
       addSubview(badge)
       textField = text
@@ -1327,6 +1372,9 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
         disclosure.centerYAnchor.constraint(equalTo: image.centerYAnchor),
         disclosure.widthAnchor.constraint(equalToConstant: 14),
         disclosure.heightAnchor.constraint(equalToConstant: 14),
+        sharedMark.leadingAnchor.constraint(equalTo: text.trailingAnchor, constant: 5),
+        sharedMark.centerYAnchor.constraint(equalTo: image.centerYAnchor),
+        sharedMark.trailingAnchor.constraint(lessThanOrEqualTo: disclosure.leadingAnchor, constant: -6),
         text.trailingAnchor.constraint(lessThanOrEqualTo: disclosure.leadingAnchor, constant: -6),
       ])
     }
@@ -1387,7 +1435,9 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
         case .projectRename: return .init { self.renameSelected() }
         case .projectMarkDone: return .init { self.markSelectedProjectDone() }
         case .projectCancel: return .init { self.cancelSelectedProject() }
-        case .projectDelete: return .init { self.deleteSelected() }
+        case .projectShare: return .init { SeptaskSharing.present(projectID: project.id) }
+        // A shared project ends from its Share screen.
+        case .projectDelete: return project.share == nil ? .init { self.deleteSelected() } : nil
         default: return nil
         }
       }, slot: { [weak self] id in
@@ -1400,6 +1450,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
         switch id {
         case .sidebarNewArea: return .init { self.newArea() }
         case .sidebarNewProject: return .init { self.newProjectLoose() }
+        case .sidebarJoinShared: return .init { SeptaskSharing.presentJoin() }
         default: return nil
         }
       }
@@ -1517,12 +1568,20 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
   /// rename's own select is a no-op on an already-selected row — so the row
   /// showed selected while the list still held the previous page. `show`
   /// leaves the keyboard in the sidebar, so the rename field still gets it.
-  @objc func newArea() {
+  @objc func newArea() { createArea(atIndex: nil) }
+
+  private func createArea(atIndex index: Int?) {
+    let beforeIDs = StructureCache.snapshot(in: context).areas.map(\.id)
     Task { [weak self] in
       guard let self,
             let area = try? await self.areasMutator.create(
               title: RegistryActions.title(.sidebarNewArea))
       else { return }
+      if let index {
+        var ids = beforeIDs.filter { $0 != area.id }
+        ids.insert(area.id, at: min(max(0, index), ids.count))
+        try? await self.areasMutator.reorder(orderedIDs: ids)
+      }
       self.recordAreaCreate(area)
       self.rebuild(preserving: "area:\(area.id)")
       self.onSelect?(.filter(.area(area.id), title: area.title))
@@ -1553,27 +1612,208 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
       })
   }
 
-  @objc private func newProjectLoose() { newProject(inArea: nil) }
+  @objc private func newProjectLoose() { newProject(inArea: nil, atIndex: nil) }
 
   @objc private func newProjectInSelectedArea() {
-    guard case .area(let area) = selectedNode?.content else { return }
-    newProject(inArea: area.id)
+    guard let areaId = selectedAreaID else { return }
+    newProject(inArea: areaId, atIndex: nil)
   }
 
-  @objc func newProject() { newProject(inArea: nil) }
+  /// The Area currently selected in the sidebar, or the owning Area of the
+  /// currently selected Project. Used to pre-select the target Area for
+  /// `New Project` commands (matching iOS / Android / Web).
+  private var selectedAreaID: String? {
+    switch selectedNode?.content {
+    case .area(let area): return area.id
+    case .project(let project, _): return project.area
+    default: return nil
+    }
+  }
 
-  private func newProject(inArea areaId: String?) {
+  private var selectedAreaTitle: String? {
+    switch selectedNode?.content {
+    case .area(let area):
+      return area.title
+    case .project(let project, _):
+      guard let areaId = project.area else { return nil }
+      return StructureCache.snapshot(in: context).areas.first(where: { $0.id == areaId })?.title
+    default:
+      return nil
+    }
+  }
+
+  @objc func newProject() { newProject(inArea: selectedAreaID, atIndex: nil) }
+
+  private func newProject(inArea areaId: String?, atIndex index: Int?) {
+    if let areaId { setCollapsed(false, forKey: "area:\(areaId)") }
+    let snapshot = StructureCache.snapshot(in: context)
+    let beforeSiblings = projectOrder(inArea: areaId, snapshot: snapshot)
     Task { [weak self] in
       guard let self,
             let project = try? await self.projectsMutator.create(
               title: RegistryActions.title(.sidebarNewProject),
               area: areaId)
       else { return }
+      if let index {
+        var ids = beforeSiblings.filter { $0 != project.id }
+        ids.insert(project.id, at: min(max(0, index), ids.count))
+        try? await self.projectsMutator.reorder(orderedIDs: ids)
+      }
       self.recordProjectCreate(project)
       self.rebuild(preserving: "project:\(project.id)")
       self.onSelect?(.filter(.project(project.id), title: project.title))
       self.beginRename(key: "project:\(project.id)")
     }
+  }
+
+  // MARK: - Sidebar Magic Plus (click menu + drag-to-create Area or Project)
+
+  private enum MagicPlusTarget {
+    case area(index: Int)
+    case project(areaId: String?, areaTitle: String?, index: Int?)
+  }
+
+  private func isMagicPlusDrag(_ info: NSDraggingInfo) -> Bool {
+    (info.draggingPasteboard.pasteboardItems ?? [])
+      .contains { $0.types.contains(.septaskMagicPlus) }
+  }
+
+  private func resolveMagicPlusTarget(proposedItem item: Any?,
+                                      proposedChildIndex index: Int) -> MagicPlusTarget? {
+    // Dropped ON an Area row → first Project inside that Area.
+    if index == NSOutlineViewDropOnItemIndex {
+      guard let target = item as? Node, case .area(let area) = target.content else { return nil }
+      return .project(areaId: area.id, areaTitle: area.title, index: 0)
+    }
+    // Dropped between an Area's nested Projects → Project inside that Area at `index`.
+    if let parent = item as? Node, case .area(let area) = parent.content {
+      return .project(areaId: area.id, areaTitle: area.title, index: max(0, index))
+    }
+    // Top-level drops: between loose projects makes a loose Project; at Area
+    // level (above first Area, between Areas, or below last Area) makes an Area.
+    guard item == nil else { return nil }
+    let hasLooseProjects = areaNodeRange.lowerBound > organizeStartIndex
+    if hasLooseProjects, index >= organizeStartIndex, index < areaNodeRange.lowerBound {
+      return .project(areaId: nil, areaTitle: nil, index: index - organizeStartIndex)
+    }
+    if index >= areaNodeRange.lowerBound, index <= areaNodeRange.upperBound {
+      return .area(index: index - areaNodeRange.lowerBound)
+    }
+    if index >= bottomStartIndex {
+      return .area(index: areaNodeRange.count)
+    }
+    return nil
+  }
+
+  private func validateMagicPlusDrop(_ info: NSDraggingInfo, proposedItem item: Any?,
+                                     proposedChildIndex index: Int) -> NSDragOperation {
+    guard let target = resolveMagicPlusTarget(proposedItem: item, proposedChildIndex: index) else {
+      hideMagicDropBadge()
+      return []
+    }
+    switch target {
+    case .area(let areaIdx):
+      outlineView.setDropItem(nil, dropChildIndex: areaNodeRange.lowerBound + areaIdx)
+      showMagicDropBadge(isArea: true, label: RegistryActions.title(.sidebarNewArea),
+                         atWindowPoint: info.draggingLocation)
+    case .project(let areaId, let areaTitle, let localIdx):
+      if let areaId, let areaNode = node(forKey: "area:\(areaId)") {
+        if index == NSOutlineViewDropOnItemIndex || collapsedKeys.contains(areaNode.key) {
+          outlineView.setDropItem(areaNode, dropChildIndex: NSOutlineViewDropOnItemIndex)
+        } else {
+          outlineView.setDropItem(areaNode, dropChildIndex: localIdx ?? areaNode.children.count)
+        }
+      } else {
+        outlineView.setDropItem(nil, dropChildIndex: organizeStartIndex + (localIdx ?? 0))
+      }
+      let label: String = if let areaTitle {
+        String(localized: "New Project in \(areaTitle)", comment: "Magic Plus: drop inside an area")
+      } else {
+        RegistryActions.title(.sidebarNewProject)
+      }
+      showMagicDropBadge(isArea: false, label: label, atWindowPoint: info.draggingLocation)
+    }
+    return .copy
+  }
+
+  private func acceptMagicPlusDrop(_ info: NSDraggingInfo, item: Any?, childIndex index: Int) -> Bool {
+    guard let target = resolveMagicPlusTarget(proposedItem: item, proposedChildIndex: index) else {
+      return false
+    }
+    switch target {
+    case .area(let areaIdx):
+      createArea(atIndex: areaIdx)
+    case .project(let areaId, _, let localIdx):
+      newProject(inArea: areaId, atIndex: localIdx)
+    }
+    return true
+  }
+
+  private func showMagicDropBadge(isArea: Bool, label: String, atWindowPoint windowPoint: NSPoint) {
+    magicDropBadge.configure(isArea: isArea, label: label)
+    let size = magicDropBadge.fittingSize
+    let pt = view.convert(windowPoint, from: nil)
+    let x = min(max(12, view.bounds.width - size.width - 12), max(12, pt.x - size.width / 2))
+    let y = min(max(50, pt.y + 12), view.bounds.height - size.height - 12)
+    magicDropBadge.frame = NSRect(origin: NSPoint(x: x, y: y), size: size)
+    magicDropBadge.isHidden = false
+  }
+
+  private func hideMagicDropBadge() {
+    magicDropBadge.isHidden = true
+  }
+
+  private func presentMagicPlusMenu(from button: NSView) {
+    let menu = NSMenu()
+    if let areaId = selectedAreaID, let areaTitle = selectedAreaTitle {
+      let inArea = NSMenuItem(
+        title: String(localized: "New Project in \(areaTitle)", comment: "Sidebar footer menu"),
+        action: #selector(newProjectInCurrentAreaFromFooter(_:)),
+        keyEquivalent: ""
+      )
+      inArea.target = self
+      inArea.representedObject = areaId
+      inArea.image = NSImage(systemSymbolName: "number", accessibilityDescription: nil)
+      menu.addItem(inArea)
+    }
+    let looseProject = NSMenuItem(
+      title: RegistryActions.title(.sidebarNewProject),
+      action: #selector(newProjectLoose),
+      keyEquivalent: ""
+    )
+    looseProject.target = self
+    looseProject.image = NSImage(systemSymbolName: "number", accessibilityDescription: nil)
+    menu.addItem(looseProject)
+
+    let areaItem = NSMenuItem(
+      title: RegistryActions.title(.sidebarNewArea),
+      action: #selector(newArea),
+      keyEquivalent: ""
+    )
+    areaItem.target = self
+    areaItem.image = NSImage(systemSymbolName: "square.stack.3d.up", accessibilityDescription: nil)
+    menu.addItem(areaItem)
+
+    menu.addItem(.separator())
+    let joinItem = NSMenuItem(
+      title: RegistryActions.title(.sidebarJoinShared),
+      action: #selector(joinSharedFromFooter),
+      keyEquivalent: ""
+    )
+    joinItem.target = self
+    joinItem.image = NSImage(systemSymbolName: RegistryIcons.sfSymbol(for: "action.share_project"),
+                             accessibilityDescription: nil)
+    menu.addItem(joinItem)
+
+    menu.popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.height + 4), in: button)
+  }
+
+  @objc private func newProjectInCurrentAreaFromFooter(_ sender: NSMenuItem) {
+    newProject(inArea: sender.representedObject as? String, atIndex: nil)
+  }
+
+  @objc private func joinSharedFromFooter() {
+    SeptaskSharing.presentJoin()
   }
 
   @objc private func renameSelected() {
@@ -1644,6 +1884,10 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
   }
 
   @objc private func deleteSelected() {
+    if case .project(let project, _) = selectedNode?.content, project.share != nil {
+      SeptaskSharing.present(projectID: project.id)
+      return
+    }
     // Copy matches the SwiftUI sidebar's confirmation exactly
     // (`RegistryPrompts.deleteArea` / `deleteProject`) — one deletion story between the two shells. A
     // window SHEET, not an app-modal alert, with Cancel as the Return default.
@@ -1777,6 +2021,19 @@ private final class KitSidebarOutlineView: NSOutlineView {
   var onRowClick: (() -> Void)?
   /// Return / Enter with no modifiers.
   var onReturn: (() -> Void)?
+  /// Fired when a drag leaves or ends over the outline view so transient drop
+  /// chrome (like the Magic Plus badge) hides cleanly.
+  var onDragEnded: (() -> Void)?
+
+  override func draggingExited(_ sender: NSDraggingInfo?) {
+    super.draggingExited(sender)
+    onDragEnded?()
+  }
+
+  override func draggingEnded(_ sender: NSDraggingInfo) {
+    super.draggingEnded(sender)
+    onDragEnded?()
+  }
 
   override func rightMouseDown(with event: NSEvent) {
     onRightClick?(event)
@@ -1818,6 +2075,187 @@ private final class KitSidebarOutlineView: NSOutlineView {
       return
     }
     super.keyDown(with: event)
+  }
+}
+
+/// Bottom strip of the macOS sidebar hosting the draggable Magic Plus control:
+/// click opens the New Project / New Area menu; drag into the sidebar drops a
+/// new Area (at Area level) or new Project (inside an Area or loose zone).
+@MainActor
+private final class KitSidebarMagicPlusBar: NSView, NSDraggingSource {
+  var onClick: ((NSView) -> Void)?
+  var onDragEnded: (() -> Void)?
+
+  private let divider = NSBox()
+  private let orb = NSView()
+  private let plusIcon = NSImageView()
+  private let label = NSTextField(labelWithString: String(localized: "New List", comment: "Sidebar footer button"))
+  private var mouseDownPoint: NSPoint?
+  private var didStartDrag = false
+
+  override init(frame frameRect: NSRect) {
+    super.init(frame: frameRect)
+    divider.boxType = .separator
+    divider.translatesAutoresizingMaskIntoConstraints = false
+
+    orb.wantsLayer = true
+    orb.layer?.cornerRadius = 11
+    orb.translatesAutoresizingMaskIntoConstraints = false
+
+    plusIcon.translatesAutoresizingMaskIntoConstraints = false
+    let cfg = NSImage.SymbolConfiguration(pointSize: 11, weight: .bold)
+    plusIcon.image = NSImage(systemSymbolName: "plus", accessibilityDescription: nil)?
+      .withSymbolConfiguration(cfg)
+
+    label.translatesAutoresizingMaskIntoConstraints = false
+    label.font = SeptaskKitTheme.sidebarTitle
+    label.textColor = SeptaskKitTheme.inkSecondary
+    toolTip = String(localized: "Click for New Project or Area, or drag into the sidebar",
+                     comment: "Sidebar Magic Plus tooltip")
+
+    orb.addSubview(plusIcon)
+    addSubview(divider)
+    addSubview(orb)
+    addSubview(label)
+    NSLayoutConstraint.activate([
+      divider.topAnchor.constraint(equalTo: topAnchor),
+      divider.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
+      divider.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
+      orb.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 14),
+      orb.centerYAnchor.constraint(equalTo: centerYAnchor),
+      orb.widthAnchor.constraint(equalToConstant: 22),
+      orb.heightAnchor.constraint(equalToConstant: 22),
+      plusIcon.centerXAnchor.constraint(equalTo: orb.centerXAnchor),
+      plusIcon.centerYAnchor.constraint(equalTo: orb.centerYAnchor),
+      label.leadingAnchor.constraint(equalTo: orb.trailingAnchor, constant: 8),
+      label.centerYAnchor.constraint(equalTo: orb.centerYAnchor),
+      label.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -12),
+    ])
+    refreshAppearance()
+  }
+
+  required init?(coder: NSCoder) { fatalError("KitSidebarMagicPlusBar is code-only") }
+
+  func refreshAppearance() {
+    orb.layer?.backgroundColor = AppearancePreferences.shared.magicPlusNSColor.cgColor
+    let ink: NSColor = AppearancePreferences.shared.magicPlusNSColor.isLightLuminance ? .black : .white
+    plusIcon.contentTintColor = ink
+  }
+
+  override func viewDidChangeEffectiveAppearance() {
+    super.viewDidChangeEffectiveAppearance()
+    refreshAppearance()
+  }
+
+  override func mouseDown(with event: NSEvent) {
+    mouseDownPoint = convert(event.locationInWindow, from: nil)
+    didStartDrag = false
+  }
+
+  override func mouseDragged(with event: NSEvent) {
+    guard !didStartDrag, let start = mouseDownPoint else { return }
+    let current = convert(event.locationInWindow, from: nil)
+    guard hypot(current.x - start.x, current.y - start.y) >= 5 else { return }
+    didStartDrag = true
+
+    let pbItem = NSPasteboardItem()
+    pbItem.setString("magic-plus", forType: .septaskMagicPlus)
+    let dragItem = NSDraggingItem(pasteboardWriter: pbItem)
+    let preview = Self.dragOrbImage()
+    let origin = NSPoint(x: current.x - preview.size.width / 2,
+                         y: current.y - preview.size.height / 2)
+    dragItem.setDraggingFrame(NSRect(origin: origin, size: preview.size), contents: preview)
+    beginDraggingSession(with: [dragItem], event: event, source: self)
+  }
+
+  override func mouseUp(with event: NSEvent) {
+    defer { mouseDownPoint = nil; didStartDrag = false }
+    guard !didStartDrag else { return }
+    let pt = convert(event.locationInWindow, from: nil)
+    if bounds.contains(pt) {
+      onClick?(orb)
+    }
+  }
+
+  func draggingSession(_ session: NSDraggingSession,
+                       sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation {
+    context == .withinApplication ? .copy : []
+  }
+
+  func draggingSession(_ session: NSDraggingSession, endedAt screenPoint: NSPoint,
+                       operation: NSDragOperation) {
+    onDragEnded?()
+  }
+
+  private static func dragOrbImage() -> NSImage {
+    let size = NSSize(width: 24, height: 24)
+    return NSImage(size: size, flipped: false) { rect in
+      let path = NSBezierPath(ovalIn: rect.insetBy(dx: 1, dy: 1))
+      AppearancePreferences.shared.magicPlusNSColor.setFill()
+      path.fill()
+      let ink: NSColor = AppearancePreferences.shared.magicPlusNSColor.isLightLuminance ? .black : .white
+      let cfg = NSImage.SymbolConfiguration(pointSize: 12, weight: .bold)
+      if let plus = NSImage(systemSymbolName: "plus", accessibilityDescription: nil)?
+        .withSymbolConfiguration(cfg) {
+        let tinted = plus.copy() as? NSImage ?? plus
+        tinted.isTemplate = true
+        let imgSize = tinted.size
+        let imgRect = NSRect(x: (rect.width - imgSize.width) / 2,
+                             y: (rect.height - imgSize.height) / 2,
+                             width: imgSize.width, height: imgSize.height)
+        ink.set()
+        tinted.draw(in: imgRect)
+      }
+      return true
+    }
+  }
+}
+
+/// Floating pill shown over the macOS sidebar while dragging Magic Plus so the
+/// user sees live whether releasing will create an Area or a Project (and in
+/// which Area).
+@MainActor
+private final class KitSidebarMagicDropBadge: NSView {
+  private let text = NSTextField(labelWithString: "")
+
+  override init(frame frameRect: NSRect) {
+    super.init(frame: frameRect)
+    wantsLayer = true
+    layer?.cornerRadius = 11
+    text.translatesAutoresizingMaskIntoConstraints = false
+    text.font = .systemFont(ofSize: 11, weight: .semibold)
+    text.lineBreakMode = .byTruncatingTail
+    addSubview(text)
+    NSLayoutConstraint.activate([
+      text.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 9),
+      text.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -9),
+      text.topAnchor.constraint(equalTo: topAnchor, constant: 3),
+      text.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -3),
+    ])
+  }
+
+  required init?(coder: NSCoder) { fatalError("KitSidebarMagicDropBadge is code-only") }
+
+  func configure(isArea: Bool, label: String) {
+    let fill = AppearancePreferences.shared.magicPlusNSColor
+    let ink: NSColor = fill.isLightLuminance ? .black : .white
+    layer?.backgroundColor = fill.cgColor
+    text.textColor = ink
+    text.stringValue = (isArea ? "• " : "○ ") + label
+    invalidateIntrinsicContentSize()
+  }
+
+  override var fittingSize: NSSize {
+    let textSize = text.fittingSize
+    return NSSize(width: min(210, textSize.width + 18), height: textSize.height + 6)
+  }
+}
+
+private extension NSColor {
+  var isLightLuminance: Bool {
+    guard let srgb = usingColorSpace(.sRGB) else { return false }
+    let luminance = 0.2126 * srgb.redComponent + 0.7152 * srgb.greenComponent + 0.0722 * srgb.blueComponent
+    return luminance > 0.62
   }
 }
 

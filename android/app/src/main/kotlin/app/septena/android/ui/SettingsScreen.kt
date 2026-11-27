@@ -15,6 +15,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -39,9 +40,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.septena.android.AndroidAppGraph
+import app.septena.ui.ChevronLeftGlyph
 import app.septena.core.JsonValue
 import app.septena.core.RegistryCatalog
 import app.septena.core.booleanValue
@@ -51,6 +57,7 @@ import app.septena.core.generated.RegistrySettingKeys
 import app.septena.core.generated.RegistryTaskDetail
 import app.septena.core.stringValue
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -138,7 +145,8 @@ internal fun SettingsScreen(graph: AndroidAppGraph, onBack: () -> Unit) {
     }
     // The account card and the Account page show the plan (`planStatus`).
     LaunchedEffect(signedIn) { plans.refresh(signedIn) }
-    val currentTitle = currentPageId?.let(::titleFor)?.takeIf(String::isNotEmpty)
+    val pageTitle = if (currentPageId == PlanSettingsModel.PAGE) plans.title(languageTag) else titleFor(currentPageId)
+    val currentTitle = pageTitle.takeIf(String::isNotEmpty)
         ?: RegistryCatalog.actionTitle(RegistryActionIds.APP_SETTINGS, languageTag = languageTag).orEmpty()
     val backTitle = RegistryCatalog.surface(RegistryTaskDetail.ID)
         ?.objectAt("controls")?.string("back")?.localized(languageTag).orEmpty()
@@ -194,7 +202,13 @@ internal fun SettingsScreen(graph: AndroidAppGraph, onBack: () -> Unit) {
             TopAppBar(
                 title = { Text(currentTitle) },
                 navigationIcon = {
-                    TextButton(onClick = ::closeOrPop, enabled = !signingOut) { Text(backTitle) }
+                    IconButton(
+                        onClick = ::closeOrPop,
+                        enabled = !signingOut,
+                        modifier = Modifier.semantics { contentDescription = backTitle },
+                    ) {
+                        ChevronLeftGlyph(tint = MaterialTheme.colorScheme.onSurface)
+                    }
                 },
             )
         },
@@ -317,7 +331,10 @@ private fun SettingsRegistryRow(
         "pageLink" -> {
             val target = item.page ?: return
             val page = pages[target]
-            val title = item.label ?: page?.title ?: return
+            val title = when (item.statusKey) {
+                PlanSettingsModel.PLAN_STATUS_KEY -> surfaceEnv.plans.title(languageTag)
+                else -> item.label ?: page?.title ?: return
+            }
             if (item.surface == ACCOUNT_PROFILE_CARD) {
                 AccountProfileCard(
                     name = values[RegistrySettingKeys.WELCOME_NAME].stringValue().orEmpty(),
@@ -379,13 +396,17 @@ private fun SettingsRegistryRow(
             when (item.surface) {
                 "sync_account_status" -> {
                     if (signedIn) {
+                        val accountId by surfaceEnv.graph.credentials.userId.collectAsStateWithLifecycle()
+                        accountId?.takeIf(String::isNotBlank)?.let { id ->
+                            AccountIdRow(accountId = id, languageTag = languageTag)
+                        }
                         TextButton(onClick = onSignOut, enabled = !signingOut) {
                             Text(RegistryCatalog.actionTitle(RegistryActionIds.ACCOUNT_SIGN_OUT, languageTag = languageTag).orEmpty())
                         }
                     }
                 }
                 "access_devices" -> AccessDevicesList(accessModel, signedIn, languageTag)
-                "access_agents" -> AccessAgentsList(accessModel, signedIn, languageTag)
+                "access_agents" -> AccessAgentsList(accessModel, signedIn, languageTag, surfaceEnv.plans)
                 APPEARANCE_PICKER_SURFACE -> AppearancePicker(languageTag)
                 "account_profile_editor" -> {
                     val key = item.ownsKeys.firstOrNull() ?: return
@@ -560,6 +581,52 @@ private fun optionTitle(definition: JsonValue.ObjectValue?, value: JsonValue?, l
 
 private const val ACCOUNT_PROFILE_CARD = "account_profile_card"
 private const val AI_MODE_STATUS_KEY = "aiMode"
+
+@Composable
+private fun AccountIdRow(accountId: String, languageTag: String) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var copied by remember(accountId) { mutableStateOf(false) }
+    val label = settingsCopy("sync_account_status", "accountIdLabel", languageTag)
+    val footer = settingsCopy("sync_account_status", "accountIdFooter", languageTag)
+    val copyLabel = settingsCopy("sync_account_status", if (copied) "copied" else "copy", languageTag)
+    ListItem(
+        headlineContent = { Text(label) },
+        supportingContent = {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    text = accountId,
+                    fontFamily = FontFamily.Monospace,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.MiddleEllipsis,
+                )
+                if (footer.isNotBlank()) {
+                    Text(
+                        text = footer,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        },
+        trailingContent = {
+            TextButton(
+                onClick = {
+                    copyToClipboard(context, label, accountId)
+                    copied = true
+                    scope.launch {
+                        delay(2_000L)
+                        copied = false
+                    }
+                },
+            ) {
+                Text(copyLabel)
+            }
+        },
+    )
+}
 
 private fun registrySettingDefinitions(): Map<String, JsonValue.ObjectValue> =
     RegistryCatalog.document("settings").objectAt("keys")?.fields.orEmpty()

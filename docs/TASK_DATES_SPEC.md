@@ -24,6 +24,7 @@ it is a bug. Rules marked **(Q)** rest on a decision mz made on 2026-11-23
 |---|---|---|
 | `scheduled` | day `YYYY-MM-DD` or nil | **When.** The day the user plans to start. A plan, never a commitment. A past When never turns red. |
 | `deadline` | day or nil | **Deadline.** The day the task must be done. The only field that can make a task overdue. |
+| `deferredDeadline` | day or nil | **The deadline the user planned past.** Set when the user picks a later When date for a task whose deadline has arrived. That deadline then does not hold the task on Today (I8). |
 | `today` | bool | **Today pin.** The user put the task on Today by hand. |
 | `todaySetOn` | day or nil | The day the pin was set. Drives days on Today. |
 | `todayPosition` | number or nil | Manual order inside Today. |
@@ -66,6 +67,11 @@ renders it with the read rules in §5. It does not crash and does not
   that removes the day also removes the time slot.
 - **I7. Clearing a start time clears the slot.** `startTime == nil` implies
   `durationMinutes == nil` and `timeZone == nil`.
+- **I8. A deferral names the deadline it defers.** If `deferredDeadline != nil`,
+  then `deferredDeadline == deadline` and `scheduled != nil`. Another deadline,
+  no deadline, a Today pin or no When date ends the deferral. Readers ignore a
+  deferral that breaks this rule, so a row from an old client shows on Today
+  instead of nowhere.
 
 ## 4. Actions
 
@@ -77,8 +83,8 @@ agent cue (`acknowledge`).
 | ID | Action | Triggers (all surfaces) | `scheduled` | `deadline` | pin | time slot | reminder |
 |---|---|---|---|---|---|---|---|
 | A1 | **Put on Today** | When ▸ Today, Move to Today, Toggle Today (on), drop on Today, quick tray, MCP `tasks_move_to_today`, REST `today`, watch `today` | nil (after the recurrence slot is recorded) | unchanged | set (I2) | unchanged | shifts to T if it was on the old When day |
-| A2 | **Schedule for a day D** (D > T) | When ▸ date / Tomorrow / This Weekend, drop on Upcoming, defer, MCP `tasks_defer` / `tasks_update scheduled`, REST `tomorrow` / `defer` | D (fixed repeat: mode from the prompt) | unchanged **(Q1)** | removed | unchanged | shifts with When (`shiftReminderOnReschedule`) |
-| A3 | **Remove from Today** | Toggle Today (off), swipe, context menu, REST `untoday`, watch `untoday`, MCP `tasks_update today:false` | nil if arrived | nil if arrived **(Q2)** | removed | removed if no day remains (I6) | unchanged |
+| A2 | **Schedule for a day D** (D > T) | When ▸ date / Tomorrow / This Weekend, drop on Upcoming, defer, MCP `tasks_defer` / `tasks_update scheduled`, REST `tomorrow` / `defer` | D (fixed repeat: mode from the prompt) | unchanged **(Q1)**; an arrived one is recorded in `deferredDeadline` **(Q8)** | removed | unchanged | shifts with When (`shiftReminderOnReschedule`) |
+| A3 | **Remove from Today** | Toggle Today (off), swipe, context menu, REST `untoday`, watch `untoday`, MCP `tasks_update today:false` | nil if arrived | nil if arrived **(Q2)**, unless the task is planned past it (I8) | removed | removed if no day remains (I6) | unchanged |
 | A4 | **Toggle Today** | ⌘T, row pill, swipe | A3 if the task is on Today (§5 R2), else A1. Reads `isOnToday`, never the raw pin. | | | | |
 | A5 | **Clear the When date** | When ▸ Clear (Anytime), composer clear, MCP `tasks_update scheduled:null` | nil | unchanged | removed | removed (I6) | unchanged |
 | A6 | **Clear When** (`task.clearSchedule`) | context menu ▸ Schedule ▸ Clear When, ⌘⇧., drop on Anytime **(Q6)** | nil | nil | removed | removed **(Q5)** | unchanged |
@@ -87,7 +93,7 @@ agent cue (`acknowledge`).
 | A9 | **Set a time slot** | time picker, composer, MCP `start_time` | unchanged | unchanged | set if the task has no When date and is not pinned | set (I7 on clear) | unchanged |
 | A10 | **Complete / cancel** | checkbox, ⌘K, widget, notification, watch, MCP | unchanged | unchanged | unchanged | unchanged | unchanged. A repeat spawns its next row (below). |
 | A11 | **File from the triage band** | move to area / project / list while the row is in the triage band | unchanged | unchanged | set | unchanged | unchanged |
-| A12 | **Create** | composer, quick entry, share sheet, Magic Plus, MCP `tasks_create`, REST `POST`, import | as given, then normalised by I1–I7 | as given | as given, stamped (I2) | as given | as given |
+| A12 | **Create** | composer, quick entry, share sheet, Magic Plus, MCP `tasks_create`, REST `POST`, import | as given, then normalised by I1–I8 | as given | as given, stamped (I2) | as given | as given |
 
 **Rules for the actions above:**
 
@@ -118,7 +124,7 @@ platform derives them itself.
 
 - **R1 active.** `status == open` and not a heading, not deleted, not faded.
 - **R2 on Today.** active, and (`today` or `scheduled ≤ T` or
-  `deadline ≤ T`).
+  `deadline ≤ T`). A deferred deadline (I8) does not count.
 - **R3 due state.** `overdue` if `deadline < T`; `dueToday` if
   `deadline == T`; else none. Only open tasks have a due state. **(Q4)**
 - **R4 red.** The deadline renders red when the due state is `overdue` or
@@ -131,12 +137,13 @@ platform derives them itself.
   triage band plus the Inbox rows that are on Today
   ([Inbox is a band on Today](TRIAGE_BAND_SPEC.md)).
 - **R8 arrived on its own.** active, not pinned, created before T, not an
-  agent row, and `scheduled == T` or `deadline == T`: the task landed on
+  agent row, and `scheduled == T` or `deadline == T` (a deferred deadline does
+  not count): the task landed on
   Today this morning by its date, not by hand. One rule for the row's arrived
   dot and the "rolled into Today" notice (decision Q7). It clears itself the
   next day. Before D2, the notice counted `scheduled < T` instead.
 - **R9 days on Today.** The earliest of `todaySetOn` (if pinned), an arrived
-  `scheduled`, an arrived `deadline`; floored at `created`; T minus that day.
+  `scheduled`, an arrived `deadline` that is not deferred; floored at `created`; T minus that day.
   0 when not on Today or when the agent cue shows.
 - **R10 counts.** Every badge and sidebar count is a count of rows that match
   R2, R5, R6 or R7. A count never uses its own predicate.
@@ -205,13 +212,20 @@ mz answered each question on 2026-11-23. Every answer was the proposed default.
 
 | # | Question | Decision | Why |
 |---|---|---|---|
-| Q1 | A future When on a task with an overdue deadline: keep the deadline (task stays on Today, red) or delete it? | Keep | A deadline is a commitment. Moving the plan does not move the commitment. This is iOS and Things behaviour. |
+| Q1 | A future When on a task with an overdue deadline: keep the deadline (task stays on Today, red) or delete it? | Keep the deadline. Q8 replaces "the task stays on Today". | A deadline is a commitment. Moving the plan does not move the commitment. |
 | Q2 | Remove from Today on a task with an overdue deadline: delete the deadline, or refuse? | Delete it (current Apple + REST) | Otherwise "Remove from Today" cannot remove the task. The undo entry restores it. |
 | Q3 | A task on Today with a future deadline: also show it in Upcoming? | No | One task, one place. |
 | Q4 | Due today: red, labelled "Today"; earlier: red, labelled "Overdue"? | Yes | The watch and widget already split the two; the app colours both red. |
 | Q5 | Clear When also removes the time slot? | Yes | A time with no day has no meaning (I6). |
 | Q6 | Drop on Anytime: Clear When (A6, removes the deadline) or Clear the When date (A5)? | A6 | A drop on Anytime must land in Anytime. The registry already says `clearDates`. |
 | Q7 | One "arrived on its own" cue (R8), or keep the rolled-in banner and the arrived dot separate? | One | Two definitions of one idea drift. |
+| Q8 | A later When date on a task whose deadline has arrived: does the task leave Today? (mz, 2026-11-25) | Yes. The deadline does not change and stays red in Upcoming. The task is back on Today on its When date. | The user said "not today". A row that stays looks like a failed action, and the toast says it moved. |
+
+Q8 needs a stored field because "a future When date beats the deadline" is not
+safe. A task with When Dec 10 and deadline Nov 30, both set in advance, must
+come to Today on Nov 30. The deferral counts only for a deadline that had
+arrived when the user picked the When date. A task created with an arrived
+deadline and a future When date is not deferred: it shows on Today.
 
 ## 9. Phases
 
@@ -245,7 +259,7 @@ mz answered each question on 2026-11-23. Every answer was the proposed default.
 and `tasks_move_to_today` and the REST verbs turn every date edit into §4
 actions that the core decides (`planDateEdits` in
 `backend/src/shadow/writes.ts`, core WASM). `tasks_create` normalises its
-fields (I1–I7). This fixes W6 (an unpin clears arrived dates), W7 (a future
+fields (I1–I8). This fixes W6 (an unpin clears arrived dates), W7 (a future
 When unpins) and W8 (`todaySetOn` is stamped only on false → true). An agent
 date edit does not clear the agent cue; a human surface (REST, the watch)
 does. REST `untoday` is plain A3, so an arrived deadline goes too (Q2).

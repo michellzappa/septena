@@ -35,9 +35,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.septena.core.JsonValue
 import app.septena.core.RegistryCatalog
+import app.septena.core.SyncedSettings
+import app.septena.core.SyncedSettingsMutator
+import app.septena.core.WireTimestamp
 import app.septena.core.generated.RegistryDestinationIds
 import app.septena.core.generated.RegistryNoticeIds
 import app.septena.core.generated.RegistryRules
+import app.septena.core.generated.RegistrySettingKeys
 import app.septena.core.generated.RegistrySurfaceIds
 import app.septena.core.stringValue
 import app.septena.ui.CheckmarkGlyph
@@ -45,11 +49,15 @@ import app.septena.ui.TaskCardMetrics
 import app.septena.ui.TaskCardPosition
 import app.septena.ui.TaskCardSlice
 import app.septena.ui.cardPosition
+import app.septena.ui.taskListMotion
 import java.time.DayOfWeek
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlin.math.max
 
 /** One faded task shown in the Weekly Sweep sheet (`docs/TASK_FADE_SPEC.md` §5). */
@@ -142,7 +150,7 @@ object FadeSweepRules {
         parts += if (!scheduled.isNullOrBlank()) {
             fadeSweepText("pastDate", languageTag).ifBlank { "Past date" }
         } else {
-            fadeSweepText("noDate", languageTag).ifBlank { "No date" }
+            fadeSweepText("noDate", languageTag)
         }
         parts += listName?.takeIf(String::isNotBlank) ?: inboxLabel
         return parts.joinToString(" · ")
@@ -182,35 +190,72 @@ internal fun registryNoticeCopy(noticeId: String, languageTag: String, count: In
     return RegistryNoticeCopy(title = title, detail = detail, primaryTitle = primary)
 }
 
-/** Device-local sweep timestamps matching Apple `TaskFade.lastSweepAt` / `dismissedSweepWeek`. */
-class FadeSweepStore(context: Context) {
+/** The word that closes a notice (surfaces.json `notices.dismissTitle`). */
+internal fun noticeDismissTitle(languageTag: String): String {
+    val notices = RegistryCatalog.document("surfaces").fields["notices"] as? JsonValue.ObjectValue
+    return registryText(notices?.fields?.get("dismissTitle").stringValue(), languageTag)
+}
+
+/**
+ * The sweep state of the account (`fadeSweptAt`, `fadeSweepDismissedOn`), as Apple
+ * `TaskFade.lastSweepAt` / `dismissedSweepWeek`. This device keeps a copy: a read takes the later of
+ * the two, so a sweep made offline holds, and an older synced value never brings the banner back.
+ */
+class FadeSweepStore(
+    context: Context,
+    private val syncedSettings: SyncedSettings,
+    private val syncedSettingsMutator: SyncedSettingsMutator,
+) {
     private val prefs = context.getSharedPreferences("septena_fade_sweep", Context.MODE_PRIVATE)
 
-    fun lastSweepAt(): Instant? = prefs.getLong(KEY_LAST_SWEEP_MS, 0L)
-        .takeIf { it > 0L }
-        ?.let(Instant::ofEpochMilli)
+    private val _fadedGroupExpanded = MutableStateFlow(prefs.getBoolean(KEY_FADED_GROUP_EXPANDED, false))
 
-    fun markSweepCompleted(at: Instant) {
-        prefs.edit().putLong(KEY_LAST_SWEEP_MS, at.toEpochMilli()).apply()
+    /** Whether Review's Faded group is open, remembered on this device. */
+    val fadedGroupExpanded: StateFlow<Boolean> = _fadedGroupExpanded.asStateFlow()
+
+    fun setFadedGroupExpanded(expanded: Boolean) {
+        _fadedGroupExpanded.value = expanded
+        prefs.edit().putBoolean(KEY_FADED_GROUP_EXPANDED, expanded).apply()
     }
 
-    fun dismissedSweepWeek(): LocalDate? = prefs.getString(KEY_DISMISSED_WEEK, null)
-        ?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+    suspend fun lastSweepAt(): Instant? {
+        val local = prefs.getLong(KEY_LAST_SWEEP_MS, 0L).takeIf { it > 0L }?.let(Instant::ofEpochMilli)
+        val synced = syncedSettings.rawValue(RegistrySettingKeys.FADE_SWEPT_AT).stringValue()
+            ?.let { runCatching { Instant.parse(it) }.getOrNull() }
+        return listOfNotNull(local, synced).maxOrNull()
+    }
 
-    fun dismissSweepForCurrentWeek(now: Instant, zoneId: ZoneId = ZoneId.systemDefault()) {
-        val anchor = FadeSweepRules.mostRecentSweepAnchor(now, zoneId)
-        prefs.edit().putString(KEY_DISMISSED_WEEK, anchor.toString()).apply()
+    suspend fun markSweepCompleted(at: Instant) {
+        prefs.edit().putLong(KEY_LAST_SWEEP_MS, at.toEpochMilli()).apply()
+        syncedSettingsMutator.set(RegistrySettingKeys.FADE_SWEPT_AT, JsonValue.StringValue(WireTimestamp.format(at)))
+    }
+
+    suspend fun dismissedSweepWeek(): LocalDate? = listOfNotNull(
+        prefs.getString(KEY_DISMISSED_WEEK, null),
+        syncedSettings.rawValue(RegistrySettingKeys.FADE_SWEEP_DISMISSED_ON).stringValue(),
+    ).mapNotNull { runCatching { LocalDate.parse(it) }.getOrNull() }.maxOrNull()
+
+    suspend fun dismissSweepForCurrentWeek(now: Instant, zoneId: ZoneId = ZoneId.systemDefault()) {
+        val anchor = FadeSweepRules.mostRecentSweepAnchor(now, zoneId).toString()
+        prefs.edit().putString(KEY_DISMISSED_WEEK, anchor).apply()
+        syncedSettingsMutator.set(RegistrySettingKeys.FADE_SWEEP_DISMISSED_ON, JsonValue.StringValue(anchor))
+    }
+
+    /** Drops this device's copy of the sweep state at sign-out. The Faded group's fold is the device's and stays. */
+    fun forgetAccount() {
+        prefs.edit().remove(KEY_LAST_SWEEP_MS).remove(KEY_DISMISSED_WEEK).apply()
     }
 
     companion object {
         private const val KEY_LAST_SWEEP_MS = "last_sweep_at_ms"
         private const val KEY_DISMISSED_WEEK = "dismissed_sweep_week"
+        private const val KEY_FADED_GROUP_EXPANDED = "review_faded_group_expanded"
     }
 }
 
 /**
- * Quiet translucent banner card shown on Today on sweep day, or on the Faded
- * list on any day (`docs/TASK_FADE_SPEC.md` §5). "Sweep" is internal; UI says "Review".
+ * Quiet translucent banner card shown on Today on sweep day, or in Review's Faded
+ * group on any day (`docs/TASK_FADE_SPEC.md` §5). "Sweep" is internal; UI says "Review".
  */
 @Composable
 internal fun FadeSweepBannerCard(
@@ -357,6 +402,7 @@ internal fun TaskFadeSweepSheet(
                             isSelected = false,
                             isDark = isDark,
                             hasActiveTexture = hasActiveTexture,
+                            modifier = taskListMotion(),
                         ) {
                             Row(
                                 modifier = Modifier

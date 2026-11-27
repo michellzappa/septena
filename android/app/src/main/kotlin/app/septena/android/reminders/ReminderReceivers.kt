@@ -32,13 +32,22 @@ private fun Intent.taskId(): String? = getStringExtra(TaskReminderScheduler.EXTR
 /** The alarm of one task reminder went off: post its notification. */
 class ReminderAlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action != ACTION_FIRE) return
-        val taskId = intent.taskId() ?: return
-        runAsync { context.graph().reminders.fire(taskId) }
+        when (intent.action) {
+            ACTION_FIRE -> {
+                val taskId = intent.taskId() ?: return
+                runAsync { context.graph().reminders.fire(taskId) }
+            }
+            // The planned length of the Do on this device ended (docs/DO_SPEC.md §4).
+            ACTION_DO_END -> {
+                val sessionId = intent.getStringExtra(TaskReminderScheduler.EXTRA_DO_SESSION_ID) ?: return
+                runAsync { context.graph().doing.firePlannedEnd(sessionId) }
+            }
+        }
     }
 
     companion object {
         const val ACTION_FIRE = "app.septena.android.reminders.FIRE"
+        const val ACTION_DO_END = "app.septena.android.reminders.DO_END"
     }
 }
 
@@ -55,7 +64,7 @@ class ReminderActionReceiver : BroadcastReceiver() {
             val graph = context.graph()
             val now = Instant.now()
             when (action) {
-                ACTION_COMPLETE -> graph.taskMutator.complete(taskId)
+                ACTION_COMPLETE -> graph.completeTask(taskId)
                 ACTION_SNOOZE_15M -> graph.taskMutator.snoozeReminder(taskId, now.plus(Duration.ofMinutes(15)))
                 ACTION_SNOOZE_1H -> graph.taskMutator.snoozeReminder(taskId, now.plus(Duration.ofHours(1)))
                 ACTION_DISMISS -> graph.taskMutator.dismissReminder(taskId)
@@ -98,7 +107,10 @@ class ReminderRearmReceiver : BroadcastReceiver() {
             Intent.ACTION_TIMEZONE_CHANGED,
             Intent.ACTION_TIME_CHANGED,
             AlarmManager.ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED,
-            -> runAsync { context.graph().reminders.reconcile() }
+            -> runAsync {
+                context.graph().reminders.reconcile()
+                context.graph().doing.refresh()
+            }
         }
     }
 }

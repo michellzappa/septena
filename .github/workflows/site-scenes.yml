@@ -1,0 +1,57 @@
+name: Site scenes
+
+# The website (michellzappa/septena-site) copies registry/ from this repo's
+# main on every build and draws its scenes from it. A registry change that the
+# scenes cannot draw (ADR 0046 removed the Agent list) turned every site build
+# red after it merged. This job runs the site's scenes test against the pull
+# request's registry, so the break shows on the pull request instead.
+#
+# The site repo is private. The job reads it with SITE_READ_TOKEN, a
+# fine-grained token with read access to septena-site contents. Without the
+# secret (forks, or before it is set) the job skips with a notice.
+
+on:
+  pull_request:
+    paths:
+      - "registry/**"
+      - ".github/workflows/site-scenes.yml"
+
+jobs:
+  scenes:
+    name: Site scenes test
+    runs-on: ubuntu-latest
+    env:
+      SITE_READ_TOKEN: ${{ secrets.SITE_READ_TOKEN }}
+    steps:
+      - name: Skip without the site token
+        if: env.SITE_READ_TOKEN == ''
+        run: echo "::notice::SITE_READ_TOKEN is not set; the site scenes test did not run."
+
+      - uses: actions/checkout@v4
+        if: env.SITE_READ_TOKEN != ''
+        with:
+          path: app
+
+      - uses: actions/checkout@v4
+        if: env.SITE_READ_TOKEN != ''
+        with:
+          repository: michellzappa/septena-site
+          token: ${{ env.SITE_READ_TOKEN }}
+          path: site
+
+      - uses: actions/setup-node@v4
+        if: env.SITE_READ_TOKEN != ''
+        with:
+          node-version: 24
+
+      # sync-registry copies this pull request's registry (SEPTENA_APP_REF)
+      # into the site checkout; the test needs no node_modules.
+      - name: Copy the registry and run the scenes test
+        if: env.SITE_READ_TOKEN != ''
+        working-directory: site
+        env:
+          SEPTENA_APP_DIR: ${{ github.workspace }}/app
+          SEPTENA_APP_REF: HEAD
+        run: |
+          node scripts/sync-registry.mjs
+          node --test scripts/scenes.test.mjs

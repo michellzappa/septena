@@ -8,12 +8,13 @@ import SwiftUI
 // each is a popover anchored to that row — no sheet, no modal window. The
 // Repeat editor below is the third member of that family.
 //
-// Layout is a ONE-WEEK day strip starting at TODAY, then one list of rows
-// (Tomorrow, Pick another date, Clear, Repeat, Add time). The rows, their order
-// and their words come from the registry (`RegistrySurfaces.dateBoardRows`),
-// and every row is the same `KitDateCell`. Tomorrow is also the strip's second
-// cell; its row stays because "tomorrow" is an answer people look for by name
-// (decided 2026-11-24). Scheduling answers "which of the next few days", so the
+// Layout, in three groups with a divider between them (mz, 2026-11-26):
+// pick (the typed-date line, a ONE-WEEK day strip starting at TODAY, Pick
+// another date), refine (Add time, Repeat) and remove (Clear). The rows, their
+// groups, their order and their words come from the registry
+// (`RegistrySurfaces.dateBoardRows`), and every row is the same `KitDateCell`.
+// Tomorrow is the strip's second cell only; the Tomorrow row duplicated it.
+// Scheduling answers "which of the next few days", so the
 // popover shows seven labeled cells (weekday over day number) instead of a
 // month grid.
 // Today is the strip's FIRST CELL, and its weekday line reads "Today". There
@@ -1523,33 +1524,61 @@ private final class KitDateBoard: NSView {
       }
     } ?? false
 
-    typedLabel.font = SeptaskKitTheme.meta
-    typedLabel.textColor = SeptaskKitTheme.iconMuted
+    // The typed-entry line is the first row of the pick group: the rows'
+    // body size, icon column and 10 pt inset, so it reads as an option, not
+    // a footnote.
+    typedLabel.font = .monospacedDigitSystemFont(ofSize: SeptenaTypeScale.size(.body), weight: .regular)
+    typedLabel.textColor = SeptaskKitTheme.inkSecondary
     typedLabel.lineBreakMode = .byTruncatingTail
     updateTypedLabel()
+    let typedIcon = NSImageView()
+    typedIcon.image = NSImage(systemSymbolName: "keyboard", accessibilityDescription: nil)
+    typedIcon.symbolConfiguration = NSImage.SymbolConfiguration(
+      pointSize: SeptenaTypeScale.size(.body), weight: .regular)
+    typedIcon.contentTintColor = SeptaskKitTheme.inkSecondary
+    typedIcon.widthAnchor.constraint(equalToConstant: SeptenaTypeScale.size(.body) + 6).isActive = true
+    let typedRow = NSStackView(views: [typedIcon, typedLabel])
+    typedRow.orientation = .horizontal
+    typedRow.spacing = 8
+    typedRow.alignment = .centerY
+    typedRow.edgeInsets = NSEdgeInsets(top: 4, left: 10, bottom: 2, right: 10)
+    typedLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
-    let separator = NSBox()
-    separator.boxType = .separator
-
-    let stack = NSStackView(views: [typedLabel, strip, separator])
+    let stack = NSStackView(views: [typedRow, strip])
     stack.orientation = .vertical
     stack.alignment = .leading
     stack.spacing = Self.rowSpacing
     stack.detachesHiddenViews = true
-    stack.setCustomSpacing(8, after: typedLabel)
-    stack.setCustomSpacing(8, after: strip)
-    stack.setCustomSpacing(4, after: separator)
+    stack.setCustomSpacing(8, after: typedRow)
+    stack.setCustomSpacing(6, after: strip)
 
+    // The rows this board can act on, before the dividers are placed, so a
+    // group with no rows draws no divider.
+    let rows = RegistrySurfaces.dateBoardRows(for: kind, on: RegistryPlatform.current).filter { row in
+      switch row.kind {
+      case .repeatRule: return repeatTitle != nil && onRepeat != nil
+      case .time: return onTimeSlotChange != nil
+      case .calendar, .clear: return true
+      }
+    }
+    // The strip opens the first group; a divider goes where the group changes.
+    var previousGroup = RegistryDateBoardGroup.pick
     var calendarCell: KitDateCell?
-    for row in RegistrySurfaces.dateBoardRows(for: kind, on: RegistryPlatform.current) {
+    for row in rows {
+      if row.group != previousGroup {
+        let divider = NSBox()
+        divider.boxType = .separator
+        stack.addArrangedSubview(divider)
+        divider.widthAnchor.constraint(equalToConstant: Self.boardWidth).isActive = true
+        if let before = stack.arrangedSubviews.dropLast().last {
+          stack.setCustomSpacing(6, after: before)
+        }
+        stack.setCustomSpacing(6, after: divider)
+        previousGroup = row.group
+      }
       var title = row.label(for: kind)
       let action: () -> Void
       switch row.kind {
-      case .tomorrow:
-        action = { [weak self] in
-          guard let tomorrow = KitDayFormat.day(offset: 1) else { return }
-          self?.pick(tomorrow)
-        }
       case .calendar:
         if beyondStrip, let initial {
           title = RegistrySurfaces.dateBoardCalendarLabel(
@@ -1635,7 +1664,12 @@ private final class KitDateBoard: NSView {
 
       timeControlsContainer.addArrangedSubview(topRow)
       timeControlsContainer.addArrangedSubview(durRow)
-      stack.addArrangedSubview(timeControlsContainer)
+      // Directly under the Add time row it replaces, inside the refine group.
+      if let index = stack.arrangedSubviews.firstIndex(of: timeCell) {
+        stack.insertArrangedSubview(timeControlsContainer, at: index + 1)
+      } else {
+        stack.addArrangedSubview(timeControlsContainer)
+      }
       timeControlsContainer.widthAnchor.constraint(equalTo: strip.widthAnchor).isActive = true
 
       let hasTime = startTime != nil
@@ -1644,9 +1678,7 @@ private final class KitDateBoard: NSView {
     }
 
     // The strip sets the width; everything else matches it.
-    for view in [typedLabel, separator] as [NSView] {
-      view.widthAnchor.constraint(equalTo: strip.widthAnchor).isActive = true
-    }
+    typedRow.widthAnchor.constraint(equalTo: strip.widthAnchor).isActive = true
 
     refreshCells()
     for cell in dayCells + rowCells {
@@ -1947,7 +1979,7 @@ private final class KitDateBoard: NSView {
   /// text and the date it means.
   private func updateTypedLabel() {
     if typed.isEmpty {
-      typedLabel.textColor = SeptaskKitTheme.iconMuted
+      typedLabel.textColor = SeptaskKitTheme.inkSecondary
       typedLabel.stringValue = String(localized: "Type a date: tomorrow, fri, +3, dec 4",
                                       comment: "SeptaskKit: date popover typed-entry hint")
       return
@@ -1970,6 +2002,11 @@ private final class KitDateCell: NSView {
   private let radius: CGFloat
   private let action: () -> Void
   private var tracking: NSTrackingArea?
+  /// Where the pointer was when this cell came on screen. A cell that opens
+  /// under a still pointer is not a hover: after a mouse pick the next task
+  /// slides into the same row, its picker opens in the same place, and the
+  /// pointer would move the highlight to the day picked for the LAST task.
+  private var pointerOnAppear: NSPoint?
 
   var onHover: ((KitDateCell) -> Void)?
   var isFocused = false { didSet { needsDisplay = true } }
@@ -2120,13 +2157,27 @@ private final class KitDateCell: NSView {
     super.updateTrackingAreas()
     if let tracking { removeTrackingArea(tracking) }
     let area = NSTrackingArea(rect: bounds,
-                              options: [.mouseEnteredAndExited, .activeInKeyWindow],
+                              options: [.mouseEnteredAndExited, .mouseMoved, .activeInKeyWindow],
                               owner: self, userInfo: nil)
     addTrackingArea(area)
     tracking = area
   }
 
-  override func mouseEntered(with event: NSEvent) { onHover?(self) }
+  override func viewDidMoveToWindow() {
+    super.viewDidMoveToWindow()
+    pointerOnAppear = window == nil ? nil : NSEvent.mouseLocation
+  }
+
+  override func mouseEntered(with event: NSEvent) { hover() }
+
+  /// A pointer that already rests on the cell sends no second `mouseEntered`,
+  /// so its first real move counts as the hover.
+  override func mouseMoved(with event: NSEvent) { hover() }
+
+  private func hover() {
+    guard !isFocused, NSEvent.mouseLocation != pointerOnAppear else { return }
+    onHover?(self)
+  }
 
   override func mouseUp(with event: NSEvent) { action() }
 
@@ -2508,5 +2559,142 @@ private final class KitTagPopoverRow: NSView {
   override func mouseEntered(with event: NSEvent) { hovered = true; needsDisplay = true }
   override func mouseExited(with event: NSEvent) { hovered = false; needsDisplay = true }
   override func mouseUp(with event: NSEvent) { onTap() }
+}
+#endif
+
+#if os(macOS)
+// MARK: - Waiting On… (docs/REVIEW_SPEC.md §6)
+
+/// Waiting On… — a TIER 1 popover anchored to the row: who the task waits on
+/// and the day to check back (the task's When date). The SwiftUI shells draw
+/// the same fields in `WaitingOnSheet`. Return or Save commits; Escape and
+/// click-away leave the task as it was.
+@MainActor
+enum SeptaskKitWaitingPopover {
+  static func present(task: SeptenaTask,
+                      relativeTo rect: NSRect,
+                      of view: NSView,
+                      onCommit: @escaping (String, Date?) -> Void) {
+    let board = KitWaitingBoard(task: task)
+    let handle = KitPopoverHandle()
+    board.onCommit = { name, checkBack in
+      onCommit(name, checkBack)
+      handle.close()
+    }
+    board.onCancel = { handle.close() }
+    KitPopover.present(board, relativeTo: rect, of: view, focus: board.nameField, handle: handle)
+  }
+}
+
+@MainActor
+private final class KitWaitingBoard: NSView {
+
+  var onCommit: ((String, Date?) -> Void)?
+  var onCancel: (() -> Void)?
+
+  let nameField = NSTextField()
+  private let datePicker = NSDatePicker()
+  private let noDateBox = NSButton()
+
+  private static let width: CGFloat = 320
+  private static let padding: CGFloat = 8
+  private static let rowHeight: CGFloat = 32
+
+  init(task: SeptenaTask) {
+    super.init(frame: .zero)
+    build(task: task)
+  }
+
+  required init?(coder: NSCoder) { fatalError("KitWaitingBoard is code-only") }
+
+  private func build(task: SeptenaTask) {
+    let today = SeptenaDate.today
+    // An edit keeps the task's When date; a new wait offers the default.
+    let initial = task.isWaiting
+      ? SeptenaDate.parse(task.scheduled)
+      : TaskWaiting.defaultCheckBack(today: today)
+
+    let title = NSTextField(labelWithString: RegistryWaiting.sheetTitle)
+    title.font = .systemFont(ofSize: SeptenaTypeScale.size(.headline), weight: .semibold)
+    title.textColor = SeptaskKitTheme.inkPrimary
+
+    nameField.placeholderString = RegistryWaiting.namePlaceholder
+    nameField.stringValue = task.waitingOn ?? ""
+    nameField.font = .systemFont(ofSize: SeptenaTypeScale.size(.body))
+    nameField.target = self
+    nameField.action = #selector(commitFromField)
+
+    let checkLabel = NSTextField(labelWithString: RegistryWaiting.checkBackTitle)
+    checkLabel.font = .systemFont(ofSize: SeptenaTypeScale.size(.footnote))
+    checkLabel.textColor = SeptaskKitTheme.inkSecondary
+    checkLabel.setContentHuggingPriority(.required, for: .horizontal)
+
+    datePicker.datePickerStyle = .textFieldAndStepper
+    datePicker.datePickerElements = [.yearMonthDay]
+    datePicker.font = .systemFont(ofSize: SeptenaTypeScale.size(.body))
+    datePicker.minDate = SeptenaDate.parse(today)
+    datePicker.dateValue = initial ?? TaskWaiting.defaultCheckBack(today: today) ?? DayClock.appNow
+    datePicker.isEnabled = initial != nil
+
+    noDateBox.setButtonType(.switch)
+    noDateBox.title = RegistryWaiting.noCheckBackTitle
+    noDateBox.state = initial == nil ? .on : .off
+    noDateBox.target = self
+    noDateBox.action = #selector(toggleNoDate)
+
+    let spacer = NSView()
+    spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
+    let dateRow = NSStackView(views: [checkLabel, datePicker, spacer, noDateBox])
+    dateRow.orientation = .horizontal
+    dateRow.alignment = .centerY
+    dateRow.spacing = 8
+    dateRow.edgeInsets = NSEdgeInsets(top: 2, left: 4, bottom: 2, right: 4)
+
+    let save = KitDateCell(radius: 8, height: Self.rowHeight) { [weak self] in
+      self?.commit()
+    }
+    save.fillRow(symbol: "checkmark.circle", tint: SeptaskKitTheme.inkPrimary,
+                 title: RegistryWaiting.confirmTitle)
+    save.isFocused = true
+
+    let views: [NSView] = [title, nameField, dateRow, KitSurface.separator(), save]
+    let stack = NSStackView(views: views)
+    stack.orientation = .vertical
+    stack.alignment = .leading
+    stack.spacing = 8
+    stack.translatesAutoresizingMaskIntoConstraints = false
+    addSubview(stack)
+
+    let pad = Self.padding
+    NSLayoutConstraint.activate([
+      widthAnchor.constraint(equalToConstant: Self.width),
+      stack.topAnchor.constraint(equalTo: topAnchor, constant: pad),
+      stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: pad),
+      stack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -pad),
+      stack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -pad),
+    ])
+    for view in views where view !== title {
+      view.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+    }
+  }
+
+  @objc private func toggleNoDate() {
+    datePicker.isEnabled = noDateBox.state != .on
+  }
+
+  @objc private func commitFromField() { commit() }
+
+  private func commit() {
+    window?.endEditing(for: nil)
+    guard let name = TaskWaiting.normalizedName(nameField.stringValue) else {
+      NSSound.beep()
+      return
+    }
+    onCommit?(name, noDateBox.state == .on ? nil : datePicker.dateValue)
+  }
+
+  override func cancelOperation(_ sender: Any?) {
+    onCancel?()
+  }
 }
 #endif

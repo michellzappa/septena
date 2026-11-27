@@ -4,6 +4,7 @@ import app.cash.sqldelight.db.SqlDriver
 import app.septena.core.JsonValue
 import app.septena.core.QueuedOperation
 import app.septena.core.RejectedSyncOperation
+import app.septena.core.ShareRejections
 import app.septena.core.SyncOperation
 import app.septena.core.SyncOperationResult
 import app.septena.core.SyncRecord
@@ -13,6 +14,7 @@ import app.septena.core.SyncWireCodec
 import app.septena.core.TaskStore
 import app.septena.core.WireTimestamp
 import app.septena.core.stringValue
+import app.septena.core.generated.RegistryEntityFields
 import app.septena.core.generated.RegistryEntityNames
 import app.septena.store.db.SeptenaDatabase
 import app.septena.sharedcore.CoreException
@@ -278,7 +280,8 @@ class SqlDelightTaskStore(private val database: SeptenaDatabase) : TaskStore {
                         queries.deleteOutbox(result.clientOpId)
                     }
                     SyncResultStatus.REJECTED -> {
-                        queries.upsertRejected(
+                        // A shared project's rule: the next pull brings the real row.
+                        if (result.reason !in ShareRejections.reasons) queries.upsertRejected(
                             client_op_id = result.clientOpId,
                             op_json = row.operationJson,
                             reason = result.reason?.takeIf(String::isNotBlank) ?: "The server rejected this change",
@@ -417,6 +420,19 @@ class SqlDelightTaskStore(private val database: SeptenaDatabase) : TaskStore {
     override suspend fun syncCursor(): Long =
         queries.selectSyncCursor().executeAsOneOrNull()?.toLongOrNull() ?: 0L
 
+    override suspend fun hasPulled(entity: String): Boolean =
+        queries.selectMetadata(pulledKey(entity)).executeAsOneOrNull() != null
+
+    override suspend fun markPulled(entity: String) {
+        queries.setMetadata(pulledKey(entity), "1")
+    }
+
+    override suspend fun rewindCursor() {
+        queries.setSyncCursor("0")
+    }
+
+    private fun pulledKey(entity: String): String = "pulled.$entity"
+
     override suspend fun resetForFullPull() {
         database.transaction {
             queries.resetRemoteRecords()
@@ -427,6 +443,12 @@ class SqlDelightTaskStore(private val database: SeptenaDatabase) : TaskStore {
         }
         invalidateCache()
     }
+
+    /**
+     * The outbox entries the server has not confirmed yet, sent or not: what an account switch would lose
+     * (#575). Not part of [TaskStore]: only the app's account flow calls it.
+     */
+    fun outboxCount(): Int = queries.selectAllOutbox().executeAsList().size
 
     /**
      * Removes every local row, turn, outbox entry, shadow and the sync cursor: the account is gone
@@ -448,8 +470,15 @@ class SqlDelightTaskStore(private val database: SeptenaDatabase) : TaskStore {
     private fun enqueueUpsert(operation: SyncOperation.Upsert, notBefore: Instant) {
         val last = queries.selectLastRowOperation(operation.entity, operation.id).executeAsOneOrNull()
         if (last != null && last.kind == "upsert" && last.sent == 0L) {
-            val mergedFields = parseObject(last.payloadJson) + operation.fields
-            val merged = operation.copy(clientOpId = last.clientOpId, fields = mergedFields)
+            val lastFields = parseObject(last.payloadJson)
+            val mergedFields = lastFields + operation.fields
+            // The queued write holds the notes the server knows; its base is the older one.
+            val base = if (RegistryEntityFields.Task.NOTES in lastFields) {
+                (SyncWireCodec.decodeOperation(last.operationJson) as? SyncOperation.Upsert)?.base
+            } else {
+                operation.base
+            }
+            val merged = operation.copy(clientOpId = last.clientOpId, fields = mergedFields, base = base)
             queries.updateUnsentOutbox(
                 op_json = SyncWireCodec.encodeOperation(merged).canonicalJson(),
                 payload_json = encodeObject(mergedFields),

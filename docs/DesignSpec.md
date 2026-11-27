@@ -165,6 +165,10 @@ Two channels tell the user something. Never a modal for an explanation.
 - **A lost write is neither** (`StoreHealthNotice`): it is an alert, because it is not confirmable or undoable.
 - Copy for notices and toasts goes through the humanizer pass like all human-facing copy.
 
+## 6.5.1 Plans and paid surfaces
+
+Every surface that names Plus or Pro uses the premium language: the plan mark, the wordmark, the plan head and the benefit row, in the brand color. No comparison grid in the app. See [PREMIUM_LANGUAGE.md](PREMIUM_LANGUAGE.md).
+
 ## 6.6 Words
 
 The unit of work is a **task**, on every platform and surface: UI copy,
@@ -207,6 +211,7 @@ Shape and motion tokens live alongside the type and color tokens — like color,
   - `Theme.tileGap` (12pt) — between tiles in any surface-level grid (Week tiles, Coach bands, Tasks smart lists).
 - **Corner radius** — `Theme.cornerRadius` (22pt, the iOS-26 "soft tile") and `Theme.cornerRadiusSmall` (6pt, chips and pills).
 - **Row rhythm** — `Theme.rowVPadding`, `iconTextGap`, `checkboxTap`, and the per-platform row/sidebar heights keep the icon column and text baseline aligned across every row type.
+- **Sidebar ink** — smart lists in the bottom section of the sidebar (below Areas & Projects: Logbook, and any list the person moves down) draw their title in secondary ink on every platform, in light and dark. Top smart lists, areas and projects keep primary ink. Only the title changes: the icon tint and the muted count stay as they are, and a selected row keeps the §4.5 treatment. SwiftUI: `Theme.inkSecondary`; AppKit: `SeptaskKitTheme.inkSecondary`; Android: `colorScheme.onSurfaceVariant`; web: `--text-secondary`.
 
 **Motion is gated for accessibility, centrally.** Use the helpers in [Accessibility.swift](../Septena/Shell/UI/Accessibility.swift) — never raw `withAnimation` or a raw `.animation(_:value:)`, both of which honor nothing:
 
@@ -217,6 +222,13 @@ Shape and motion tokens live alongside the type and color tokens — like color,
 Any animation a user can trigger repeatedly — and every celebratory flourish (confetti, the mood-commit animation, symbol bounces) — must route through these so Reduce Motion is honored. A screen flash or a `repeatForever` that ignores Reduce Motion is a bug.
 
 The two sanctioned exceptions are `LogCommit.swift` and `CommitMotion.swift`, which gate once at the overlay so the primitives inside them can animate freely; both say so in a comment at the call site. Everything else is enforced by `scripts/lint-design.sh` (§14).
+
+**A task list moves as whole rows.** When a row leaves, arrives or folds, the title, the checkbox and the card surface of every other row move as one piece, on one curve:
+
+- SwiftUI: everything that can shift in a task list carries `.geometryGroup()` (`taskCardChrome`, `asListRow`, `plainListChrome` and the group headers have it). Without it every leaf animates its own position and the titles drift away from their rows. A row or header leaves with `TaskListRowExit`.
+- Checking a row never changes its layout: the trailing cluster stays until the row leaves (`TaskRow.isSettling`).
+- AppKit: one `beginUpdates`/`endUpdates` batch per reload, height changes included. A height noted after the batch starts a second animation.
+- Android: every `LazyColumn` item that can move carries `taskListMotion()`, and a group header is its own item. An item without it jumps while its neighbors slide.
 
 **Haptics have one vocabulary.** Call a `Haptics` verb by what the gesture means (`press`, `selection`, `commit`, `threshold`, `success`, `warning`, or `play` for a composed pattern); local view state uses `.sensoryFeedback`. The table and the rules are in [HAPTICS_SPEC.md](HAPTICS_SPEC.md).
 

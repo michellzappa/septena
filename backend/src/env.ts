@@ -4,6 +4,7 @@ import type { TaskStore } from "./store/TaskStore.js";
 import type { ProjectStore } from "./store/ProjectStore.js";
 import type { AccountStore } from "./store/AccountStore.js";
 import type { PairingStore } from "./shadow/PairingStore.js";
+import type { SupportStore } from "./support/store.js";
 
 export interface Env {
   // Vars (public-ish, set in wrangler.toml)
@@ -48,6 +49,44 @@ export interface Env {
   /// Optional global APNs host override ("true" = sandbox, "false" = prod; unset = per-token).
   APNS_SANDBOX?: string;
 
+  /// Email sign-in (ADR 0016, #169). "true" turns it on; it stays off until
+  /// Terms of Use and the privacy copy ship (#564). Needs the EMAIL binding.
+  EMAIL_SIGNIN?: string;
+  /// Cloudflare Email Service send binding (septena.app is onboarded).
+  EMAIL?: SendEmail;
+
+  /// Contact Support (ADR 0054, src/support/). APP_INTAKE_KEY is a secret: 64
+  /// hex, shared with the Starlings septena workspace (SEPTENA_APP_INTAKE_KEY
+  /// there). Unset: the support routes answer 503. STARLINGS_INTAKE_URL
+  /// overrides the app channel address (tests, staging).
+  APP_INTAKE_KEY?: string;
+  STARLINGS_INTAKE_URL?: string;
+  SUPPORT_STORE?: DurableObjectNamespace<SupportStore>;
+
+  /// OIDC sign-in providers (ADR 0047, #637, #638). Each provider stays off
+  /// until its secrets are configured via `wrangler secret put`.
+  GOOGLE_CLIENT_ID?: string;
+  GOOGLE_CLIENT_SECRET?: string;
+  GOOGLE_ANDROID_CLIENT_ID?: string;
+  GOOGLE_IOS_CLIENT_ID?: string;
+  MICROSOFT_CLIENT_ID?: string;
+  MICROSOFT_CLIENT_SECRET?: string;
+  APPLE_WEB_CLIENT_ID?: string;
+  APPLE_SIGNIN_TEAM_ID?: string;
+  APPLE_SIGNIN_KEY_ID?: string;
+  APPLE_SIGNIN_KEY?: string;
+
+  /// Directory reviewer access (ADR 0055, src/shadow/reviewer.ts). The pairing
+  /// page offers the demo account REVIEWER_ACCOUNT_ID to whoever types
+  /// REVIEWER_CODE, until REVIEWER_MODE_UNTIL (optional ISO date). Any one
+  /// unset or malformed turns it off. All three are secrets.
+  REVIEWER_CODE?: string;
+  REVIEWER_ACCOUNT_ID?: string;
+  REVIEWER_MODE_UNTIL?: string;
+  /// The OpenAI apps directory's domain verification token, served as plain
+  /// text at /.well-known/openai-apps-challenge. Unset: that path is 404.
+  OPENAI_APPS_CHALLENGE?: string;
+
   // KV namespaces
   STATE: KVNamespace;    // short-lived OAuth state (src/shadow/oauth.ts)
   TOKENS: KVNamespace;   // MCP grants: access and refresh tokens (src/shadow/tokens.ts)
@@ -63,6 +102,19 @@ export interface Env {
   PROJECT_STORE?: DurableObjectNamespace<ProjectStore>;
   /// Website signups (septena-site). The admin page reads it; nothing here writes.
   SIGNUPS?: D1Database;
+  /// Read-only Plausible Stats API key for the admin page's website block
+  /// (src/admin/plausible.ts). Unset: the page says the block is off.
+  PLAUSIBLE_API_KEY?: string;
+  /// The Plausible site id; defaults to septena.app.
+  PLAUSIBLE_SITE_ID?: string;
+  /// A Plausible shared-dashboard link (https://plausible.io/share/…). The
+  /// page embeds it when there is no Stats API key: the Stats API needs the
+  /// Business plan, a shared link works on Growth. Secret: anyone with the
+  /// link sees the dashboard.
+  PLAUSIBLE_SHARED_LINK?: string;
+  /// Optional read-only GitHub token for the admin page's Mac download counts
+  /// (src/admin/releases.ts): without it GitHub rate-limits Worker IPs.
+  GITHUB_TOKEN?: string;
   ATTACHMENTS: R2Bucket;                         // attachment bytes, u/{userId}/att/{id}
   PAIRING: DurableObjectNamespace<PairingStore>; // one object per pending app-pairing code (src/shadow/)
 }

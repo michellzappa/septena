@@ -37,20 +37,32 @@ function decodePart<T>(part: string): T {
   }
 }
 
+export interface AppleIdentity {
+  sub: string;
+  email?: string;
+  emailVerified?: boolean;
+}
+
 export async function verifyAppleIdentityToken(
   token: string,
-  rawNonce: string,
+  rawNonce: string | null,
   audiences: string[],
-): Promise<{ sub: string }> {
+  opts: { keys?: AppleJwk[]; expectedNonce?: string } = {},
+): Promise<AppleIdentity> {
   const parts = token.split(".");
   if (parts.length !== 3) throw new AppleIdentityError("malformed token");
   const [h, p, s] = parts;
   const header = decodePart<{ alg: string; kid: string }>(h);
   if (header.alg !== "RS256") throw new AppleIdentityError("unexpected alg");
 
-  let jwk = (await appleKeys(false)).find((k) => k.kid === header.kid);
-  // Apple rotates keys; a kid we have not seen means our cache is stale.
-  if (!jwk) jwk = (await appleKeys(true)).find((k) => k.kid === header.kid);
+  let jwk: AppleJwk | undefined;
+  if (opts.keys) {
+    jwk = opts.keys.find((k) => k.kid === header.kid);
+  } else {
+    jwk = (await appleKeys(false)).find((k) => k.kid === header.kid);
+    // Apple rotates keys; a kid we have not seen means our cache is stale.
+    if (!jwk) jwk = (await appleKeys(true)).find((k) => k.kid === header.kid);
+  }
   if (!jwk) throw new AppleIdentityError("unknown signing key");
 
   const key = await crypto.subtle.importKey(
@@ -74,19 +86,37 @@ export async function verifyAppleIdentityToken(
   );
   if (!ok) throw new AppleIdentityError("bad signature");
 
-  const claims = decodePart<{ iss: string; aud: string; exp: number; iat: number; sub: string; nonce?: string }>(p);
+  const claims = decodePart<{
+    iss: string;
+    aud: string;
+    exp: number;
+    iat: number;
+    sub: string;
+    nonce?: string;
+    email?: string;
+    email_verified?: boolean | string;
+  }>(p);
   const now = Math.floor(Date.now() / 1000);
   if (claims.iss !== APPLE_ISSUER) throw new AppleIdentityError("bad issuer");
   if (!audiences.includes(claims.aud)) throw new AppleIdentityError("bad audience");
   if (claims.exp < now - CLOCK_SKEW_S) throw new AppleIdentityError("expired");
   if (claims.iat > now + CLOCK_SKEW_S) throw new AppleIdentityError("issued in the future");
   if (!claims.sub) throw new AppleIdentityError("no subject");
-  // Apple echoes the nonce the app passed, which is the hex SHA-256 of the
-  // raw nonce (Apple's sample code), so compare against hex.
-  if (!claims.nonce || claims.nonce !== (await sha256Hex(rawNonce))) {
-    throw new AppleIdentityError("nonce mismatch");
+  // Native Apple echoes SHA-256 hex of rawNonce; web OIDC echoes the raw nonce directly.
+  if (opts.expectedNonce !== undefined) {
+    if (!claims.nonce || claims.nonce !== opts.expectedNonce) {
+      throw new AppleIdentityError("nonce mismatch");
+    }
+  } else if (rawNonce !== null) {
+    if (!claims.nonce || claims.nonce !== (await sha256Hex(rawNonce))) {
+      throw new AppleIdentityError("nonce mismatch");
+    }
   }
-  return { sub: claims.sub };
+  const email = typeof claims.email === "string" && claims.email.trim().length > 0
+    ? claims.email.trim().toLowerCase()
+    : undefined;
+  const emailVerified = claims.email_verified === true || claims.email_verified === "true";
+  return { sub: claims.sub, ...(email ? { email, emailVerified } : {}) };
 }
 
 async function sha256Hex(input: string): Promise<string> {

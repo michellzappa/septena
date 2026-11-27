@@ -41,6 +41,7 @@
       "artifact": "Payroll comparison",
       "bodies": ["The second option is the least work. It files for both countries and needs one approval a month. It costs €84 a month more than the cheapest.", "The first option is the cheapest at €126 a month. You would file the Portuguese forms yourself, about four a year."],
       "otherBody": "All three can handle seven people in two countries. Looking at it your way: {answer}",
+      "otherAnswer": "Whatever our accountant already uses",
       "handoff": "Read the comparison", "acceptance": "You know which payroll to set up."
     },
     "discuss": {
@@ -49,6 +50,7 @@
       "artifact": "Reply to the candidate",
       "bodies": ["Thanks for being so clear about this. We can do two days at home from the start. One day a week we would like everyone at the table.", "Thanks for being so clear about this. Let’s try three days at home for the first two months, and then talk about how it went."],
       "otherBody": "Thanks for being so clear about this. Here is what we can do: {answer}",
+      "otherAnswer": "One day at home, start at ten",
       "draftHandoff": "Read the reply", "handoff": "Your next step: send it tonight", "acceptance": "The candidate knows what we offer.",
       "with": ["second-call", "salary", "refund", "seating"]
     },

@@ -84,7 +84,8 @@ list: nobody added it. Nor is an import.
 
 ### 7. Do (ADR 0041)
 
-Not built. `GET /v1/tasks` adds `doing`; a companion may start a Do, stop it and
+The routes are live for a user session (#516). Not built for a companion token.
+`GET /v1/tasks` adds `doing`; a companion may start a Do, stop it and
 confirm it. The routes and the orb's behavior are in `docs/DO_SPEC.md` §7. CD2
 puts these routes on its list.
 

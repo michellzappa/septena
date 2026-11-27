@@ -746,10 +746,15 @@ public struct ConversationState {
      */
     public var isClaimed: Bool
     /**
-     * The Agent smart list stage (`queued`, `working`, `yourTurn`, `review`,
-     * `done`), or none when the task is not agent work.
+     * The Agent smart list stage (`queued`, `working`, `yourTurn`, `stopped`,
+     * `review`, `done`), or none when the task is not agent work.
      */
     public var agentStage: String?
+    /**
+     * The Review group this conversation puts an open task in: `questions`,
+     * `finished`, or none (`docs/REVIEW_SPEC.md` §1).
+     */
+    public var reviewGroup: String?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -765,9 +770,13 @@ public struct ConversationState {
          * `claim_until` only when the claim has a claimant.
          */isClaimed: Bool, 
         /**
-         * The Agent smart list stage (`queued`, `working`, `yourTurn`, `review`,
-         * `done`), or none when the task is not agent work.
-         */agentStage: String?) {
+         * The Agent smart list stage (`queued`, `working`, `yourTurn`, `stopped`,
+         * `review`, `done`), or none when the task is not agent work.
+         */agentStage: String?, 
+        /**
+         * The Review group this conversation puts an open task in: `questions`,
+         * `finished`, or none (`docs/REVIEW_SPEC.md` §1).
+         */reviewGroup: String?) {
         self.isTerminal = isTerminal
         self.needsHumanReview = needsHumanReview
         self.hasOpenProviderQuestion = hasOpenProviderQuestion
@@ -775,6 +784,7 @@ public struct ConversationState {
         self.hasStarted = hasStarted
         self.isClaimed = isClaimed
         self.agentStage = agentStage
+        self.reviewGroup = reviewGroup
     }
 }
 
@@ -806,6 +816,9 @@ extension ConversationState: Equatable, Hashable {
         if lhs.agentStage != rhs.agentStage {
             return false
         }
+        if lhs.reviewGroup != rhs.reviewGroup {
+            return false
+        }
         return true
     }
 
@@ -817,6 +830,7 @@ extension ConversationState: Equatable, Hashable {
         hasher.combine(hasStarted)
         hasher.combine(isClaimed)
         hasher.combine(agentStage)
+        hasher.combine(reviewGroup)
     }
 }
 
@@ -835,7 +849,8 @@ public struct FfiConverterTypeConversationState: FfiConverterRustBuffer {
                 awaitsHuman: FfiConverterBool.read(from: &buf), 
                 hasStarted: FfiConverterBool.read(from: &buf), 
                 isClaimed: FfiConverterBool.read(from: &buf), 
-                agentStage: FfiConverterOptionString.read(from: &buf)
+                agentStage: FfiConverterOptionString.read(from: &buf), 
+                reviewGroup: FfiConverterOptionString.read(from: &buf)
         )
     }
 
@@ -847,6 +862,7 @@ public struct FfiConverterTypeConversationState: FfiConverterRustBuffer {
         FfiConverterBool.write(value.hasStarted, into: &buf)
         FfiConverterBool.write(value.isClaimed, into: &buf)
         FfiConverterOptionString.write(value.agentStage, into: &buf)
+        FfiConverterOptionString.write(value.reviewGroup, into: &buf)
     }
 }
 
@@ -969,6 +985,10 @@ public struct FadeInput {
     public var isAssignedToClaude: Bool
     public var isAwaitingHuman: Bool
     public var showsAgentCue: Bool
+    /**
+     * An agent added the task and the user has not accepted it (ADR 0039).
+     */
+    public var isProposal: Bool
     public var touchedAt: String?
     public var createdAt: String?
     public var created: String?
@@ -978,7 +998,10 @@ public struct FadeInput {
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(isOpen: Bool, isHeading: Bool, isDeleted: Bool, isFaded: Bool, deadline: String?, scheduled: String?, hasRecurrence: Bool, isAgentTurn: Bool, isAssignedToClaude: Bool, isAwaitingHuman: Bool, showsAgentCue: Bool, touchedAt: String?, createdAt: String?, created: String?, now: String, today: String, utcOffsetSeconds: Int32) {
+    public init(isOpen: Bool, isHeading: Bool, isDeleted: Bool, isFaded: Bool, deadline: String?, scheduled: String?, hasRecurrence: Bool, isAgentTurn: Bool, isAssignedToClaude: Bool, isAwaitingHuman: Bool, showsAgentCue: Bool, 
+        /**
+         * An agent added the task and the user has not accepted it (ADR 0039).
+         */isProposal: Bool, touchedAt: String?, createdAt: String?, created: String?, now: String, today: String, utcOffsetSeconds: Int32) {
         self.isOpen = isOpen
         self.isHeading = isHeading
         self.isDeleted = isDeleted
@@ -990,6 +1013,7 @@ public struct FadeInput {
         self.isAssignedToClaude = isAssignedToClaude
         self.isAwaitingHuman = isAwaitingHuman
         self.showsAgentCue = showsAgentCue
+        self.isProposal = isProposal
         self.touchedAt = touchedAt
         self.createdAt = createdAt
         self.created = created
@@ -1039,6 +1063,9 @@ extension FadeInput: Equatable, Hashable {
         if lhs.showsAgentCue != rhs.showsAgentCue {
             return false
         }
+        if lhs.isProposal != rhs.isProposal {
+            return false
+        }
         if lhs.touchedAt != rhs.touchedAt {
             return false
         }
@@ -1072,6 +1099,7 @@ extension FadeInput: Equatable, Hashable {
         hasher.combine(isAssignedToClaude)
         hasher.combine(isAwaitingHuman)
         hasher.combine(showsAgentCue)
+        hasher.combine(isProposal)
         hasher.combine(touchedAt)
         hasher.combine(createdAt)
         hasher.combine(created)
@@ -1101,6 +1129,7 @@ public struct FfiConverterTypeFadeInput: FfiConverterRustBuffer {
                 isAssignedToClaude: FfiConverterBool.read(from: &buf), 
                 isAwaitingHuman: FfiConverterBool.read(from: &buf), 
                 showsAgentCue: FfiConverterBool.read(from: &buf), 
+                isProposal: FfiConverterBool.read(from: &buf), 
                 touchedAt: FfiConverterOptionString.read(from: &buf), 
                 createdAt: FfiConverterOptionString.read(from: &buf), 
                 created: FfiConverterOptionString.read(from: &buf), 
@@ -1122,6 +1151,7 @@ public struct FfiConverterTypeFadeInput: FfiConverterRustBuffer {
         FfiConverterBool.write(value.isAssignedToClaude, into: &buf)
         FfiConverterBool.write(value.isAwaitingHuman, into: &buf)
         FfiConverterBool.write(value.showsAgentCue, into: &buf)
+        FfiConverterBool.write(value.isProposal, into: &buf)
         FfiConverterOptionString.write(value.touchedAt, into: &buf)
         FfiConverterOptionString.write(value.createdAt, into: &buf)
         FfiConverterOptionString.write(value.created, into: &buf)
@@ -1772,6 +1802,7 @@ public func FfiConverterTypeTaskConversation_lower(_ value: TaskConversation) ->
 public struct TaskDateFields {
     public var scheduled: String?
     public var deadline: String?
+    public var deferredDeadline: String?
     public var today: Bool
     public var todaySetOn: String?
     public var startTime: String?
@@ -1785,9 +1816,10 @@ public struct TaskDateFields {
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(scheduled: String?, deadline: String?, today: Bool, todaySetOn: String?, startTime: String?, durationMinutes: Int32?, timeZone: String?, reminderAt: String?, reminderSnoozedUntil: String?, reminderDismissedAt: String?, recurrenceAnchorDate: String?, acknowledgedAt: String?) {
+    public init(scheduled: String?, deadline: String?, deferredDeadline: String?, today: Bool, todaySetOn: String?, startTime: String?, durationMinutes: Int32?, timeZone: String?, reminderAt: String?, reminderSnoozedUntil: String?, reminderDismissedAt: String?, recurrenceAnchorDate: String?, acknowledgedAt: String?) {
         self.scheduled = scheduled
         self.deadline = deadline
+        self.deferredDeadline = deferredDeadline
         self.today = today
         self.todaySetOn = todaySetOn
         self.startTime = startTime
@@ -1812,6 +1844,9 @@ extension TaskDateFields: Equatable, Hashable {
             return false
         }
         if lhs.deadline != rhs.deadline {
+            return false
+        }
+        if lhs.deferredDeadline != rhs.deferredDeadline {
             return false
         }
         if lhs.today != rhs.today {
@@ -1850,6 +1885,7 @@ extension TaskDateFields: Equatable, Hashable {
     public func hash(into hasher: inout Hasher) {
         hasher.combine(scheduled)
         hasher.combine(deadline)
+        hasher.combine(deferredDeadline)
         hasher.combine(today)
         hasher.combine(todaySetOn)
         hasher.combine(startTime)
@@ -1874,6 +1910,7 @@ public struct FfiConverterTypeTaskDateFields: FfiConverterRustBuffer {
             try TaskDateFields(
                 scheduled: FfiConverterOptionString.read(from: &buf), 
                 deadline: FfiConverterOptionString.read(from: &buf), 
+                deferredDeadline: FfiConverterOptionString.read(from: &buf), 
                 today: FfiConverterBool.read(from: &buf), 
                 todaySetOn: FfiConverterOptionString.read(from: &buf), 
                 startTime: FfiConverterOptionString.read(from: &buf), 
@@ -1890,6 +1927,7 @@ public struct FfiConverterTypeTaskDateFields: FfiConverterRustBuffer {
     public static func write(_ value: TaskDateFields, into buf: inout [UInt8]) {
         FfiConverterOptionString.write(value.scheduled, into: &buf)
         FfiConverterOptionString.write(value.deadline, into: &buf)
+        FfiConverterOptionString.write(value.deferredDeadline, into: &buf)
         FfiConverterBool.write(value.today, into: &buf)
         FfiConverterOptionString.write(value.todaySetOn, into: &buf)
         FfiConverterOptionString.write(value.startTime, into: &buf)
@@ -2007,6 +2045,10 @@ public struct TaskSnapshot {
     public var createdAt: String?
     public var scheduled: String?
     public var deadline: String?
+    /**
+     * The deadline the user planned past (spec §2, I8).
+     */
+    public var deferredDeadline: String?
     public var today: Bool
     public var todaySetOn: String?
     public var source: String?
@@ -2035,7 +2077,10 @@ public struct TaskSnapshot {
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(id: String, title: String, status: String, kind: String?, area: String?, project: String?, created: String?, createdAt: String?, scheduled: String?, deadline: String?, today: Bool, todaySetOn: String?, source: String?, acknowledgedAt: String?, starred: Bool, recurrenceUnit: String?, deletedAt: String?, fadedAt: String?, 
+    public init(id: String, title: String, status: String, kind: String?, area: String?, project: String?, created: String?, createdAt: String?, scheduled: String?, deadline: String?, 
+        /**
+         * The deadline the user planned past (spec §2, I8).
+         */deferredDeadline: String?, today: Bool, todaySetOn: String?, source: String?, acknowledgedAt: String?, starred: Bool, recurrenceUnit: String?, deletedAt: String?, fadedAt: String?, 
         /**
          * `HH:MM` on the task's day.
          */startTime: String?, durationMinutes: Int32?, timeZone: String?, reminderAt: String?, reminderSnoozedUntil: String?, reminderDismissedAt: String?, 
@@ -2055,6 +2100,7 @@ public struct TaskSnapshot {
         self.createdAt = createdAt
         self.scheduled = scheduled
         self.deadline = deadline
+        self.deferredDeadline = deferredDeadline
         self.today = today
         self.todaySetOn = todaySetOn
         self.source = source
@@ -2109,6 +2155,9 @@ extension TaskSnapshot: Equatable, Hashable {
             return false
         }
         if lhs.deadline != rhs.deadline {
+            return false
+        }
+        if lhs.deferredDeadline != rhs.deferredDeadline {
             return false
         }
         if lhs.today != rhs.today {
@@ -2173,6 +2222,7 @@ extension TaskSnapshot: Equatable, Hashable {
         hasher.combine(createdAt)
         hasher.combine(scheduled)
         hasher.combine(deadline)
+        hasher.combine(deferredDeadline)
         hasher.combine(today)
         hasher.combine(todaySetOn)
         hasher.combine(source)
@@ -2211,6 +2261,7 @@ public struct FfiConverterTypeTaskSnapshot: FfiConverterRustBuffer {
                 createdAt: FfiConverterOptionString.read(from: &buf), 
                 scheduled: FfiConverterOptionString.read(from: &buf), 
                 deadline: FfiConverterOptionString.read(from: &buf), 
+                deferredDeadline: FfiConverterOptionString.read(from: &buf), 
                 today: FfiConverterBool.read(from: &buf), 
                 todaySetOn: FfiConverterOptionString.read(from: &buf), 
                 source: FfiConverterOptionString.read(from: &buf), 
@@ -2241,6 +2292,7 @@ public struct FfiConverterTypeTaskSnapshot: FfiConverterRustBuffer {
         FfiConverterOptionString.write(value.createdAt, into: &buf)
         FfiConverterOptionString.write(value.scheduled, into: &buf)
         FfiConverterOptionString.write(value.deadline, into: &buf)
+        FfiConverterOptionString.write(value.deferredDeadline, into: &buf)
         FfiConverterBool.write(value.today, into: &buf)
         FfiConverterOptionString.write(value.todaySetOn, into: &buf)
         FfiConverterOptionString.write(value.source, into: &buf)
@@ -3576,8 +3628,8 @@ public func checklistOccurrenceId(newTaskId: String, index: UInt32, sourceItemId
 /**
  * The predicates and the Agent-list stage of a conversation
  * (`docs/TASK_FACTORY_SPEC.md` §3). Review and Done win over a stale
- * assignee; a stop counts as Your turn, because only the human can resume it
- * (ADR 0008).
+ * assignee; a stop wins over an open question, because only the human can
+ * resume it (ADR 0008).
  */
 public func conversationState(conversation: TaskConversation, now: String)throws  -> ConversationState  {
     return try  FfiConverterTypeConversationState_lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
@@ -3683,7 +3735,7 @@ public func normalizeRefKey(key: String)throws  -> String  {
 })
 }
 /**
- * A12 and restore: the task's fields brought to invariants I1–I7. A pin
+ * A12 and restore: the task's fields brought to invariants I1–I8. A pin
  * with a future When date loses the pin; a pin with an arrived When date
  * loses the date. An empty or invalid day becomes none.
  */
@@ -3814,7 +3866,8 @@ public func shouldArmReminder(input: ReminderArmInput) -> Bool  {
 })
 }
 /**
- * True when the task has gone untouched for the whole fade window.
+ * True when the task has gone untouched for the whole fade window, or is a
+ * proposal that the user left alone for the cue window (ADR 0039).
  */
 public func shouldFade(input: FadeInput)throws  -> Bool  {
     return try  FfiConverterBool.lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
@@ -3875,7 +3928,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_septena_core_checksum_func_checklist_occurrence_id() != 31152) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_septena_core_checksum_func_conversation_state() != 24271) {
+    if (uniffi_septena_core_checksum_func_conversation_state() != 36620) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_septena_core_checksum_func_core_version() != 5866) {
@@ -3902,7 +3955,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_septena_core_checksum_func_normalize_ref_key() != 43412) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_septena_core_checksum_func_normalize_task_dates() != 27973) {
+    if (uniffi_septena_core_checksum_func_normalize_task_dates() != 42374) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_septena_core_checksum_func_occurrence_id() != 31912) {
@@ -3935,7 +3988,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_septena_core_checksum_func_should_arm_reminder() != 37582) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_septena_core_checksum_func_should_fade() != 20672) {
+    if (uniffi_septena_core_checksum_func_should_fade() != 10895) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_septena_core_checksum_func_task_ref_id() != 40151) {

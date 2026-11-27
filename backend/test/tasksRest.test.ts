@@ -20,6 +20,7 @@ async function harness() {
     readTags: async () => store.readTags(),
     readSetting: async (key: string) => store.readSetting(key),
     readOrderTop: async () => store.readOrderTop(),
+    readDoing: async () => store.readDoing(),
     push: async (ops: Parameters<typeof store.push>[0], actor: string) => store.push(ops, actor),
   };
   return { store, rpc };

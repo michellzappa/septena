@@ -42,6 +42,7 @@
       "artifact": "Address list",
       "bodies": ["Fourteen places need the new address. Five want it before you move: the bank, the insurance, the register, the clinic and the bass insurance.", "Fourteen places need the new address. Nine can get the same short message, drafted below. Five have their own form."],
       "otherBody": "Fourteen places need the new address, and five want it before you move. Your direction: {answer}",
+      "otherAnswer": "Only for the five urgent ones",
       "handoff": "Read the list", "acceptance": "Everyone who needs the address is on the list."
     },
     "discuss": {
@@ -50,6 +51,7 @@
       "artifact": "Message about the shelf",
       "bodies": ["Hello, we put up a shelf in the kitchen and should have asked first. It is solid and level, and we would be happy to leave it.", "Hello, we put up a shelf in the kitchen and should have asked first. We will take it with us, fill the holes and paint over them."],
       "otherBody": "Hello, we put up a shelf in the kitchen and should have asked first. {answer}",
+      "otherAnswer": "We’ll fill the holes and paint over them",
       "draftHandoff": "Read the message", "handoff": "Your next step: send it", "acceptance": "She knows about the shelf.",
       "with": ["boxes", "van", "rota", "setlist"]
     },

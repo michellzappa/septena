@@ -38,6 +38,9 @@ enum SeptaskSyncedSettings {
   /// so a previous account's preferences cannot leak into the next account.
   static func clearLocal() {
     UserDefaults.standard.removeObject(forKey: storeKey)
+    for key in [TaskFade.enabledDefaultsKey, TaskFade.lastSweepAtKey, TaskFade.dismissedSweepWeekKey] {
+      UserDefaults.standard.removeObject(forKey: key)
+    }
   }
 
   static func current() -> AppSettings {
@@ -68,6 +71,9 @@ enum SeptaskSyncedSettings {
     case "rolledInDismissedOn": return .from(s.rolledInDismissedOn)
     case "homeTimezone": return .from(s.time?.homeTimezone)
     case "agentsPaused": return s.agentsPaused.map { .bool($0) } ?? .null
+    case "tasksShowAging": return s.tasksShowAging.map { .bool($0) } ?? .null
+    case "fadeSweptAt": return s.fadeSweptAt.map { .string(stampFormatter.string(from: $0)) } ?? .null
+    case "fadeSweepDismissedOn": return .from(s.fadeSweepDismissedOn)
     case "getStartedDismissed": return s.getStartedDismissed.map { .bool($0) } ?? .null
     case "getStartedSteps": return s.getStartedSteps.map { .array($0.map { .string($0) }) } ?? .null
     case "upsellsSeen": return s.upsellsSeen.map { .array($0.map { .string($0) }) } ?? .null
@@ -91,6 +97,14 @@ enum SeptaskSyncedSettings {
   /// `ISO8601DateFormatter` is not `Sendable`.
   private static var stampFormatter: ISO8601DateFormatter { ISO8601DateFormatter() }
 
+  /// The web and Android write fractional seconds; the formatter wants to know.
+  private static func stamp(_ raw: String) -> Date? {
+    if let date = stampFormatter.date(from: raw) { return date }
+    let fractional = stampFormatter
+    fractional.formatOptions.insert(.withFractionalSeconds)
+    return fractional.date(from: raw)
+  }
+
   @discardableResult
   static func apply(_ key: String, _ v: BackendJSON, to s: inout AppSettings) -> Bool {
     func string() -> String?? {
@@ -110,7 +124,7 @@ enum SeptaskSyncedSettings {
     case "onboardedAt":
       guard let x = string() else { return false }
       guard let raw = x else { s.onboardedAt = nil; break }
-      guard let date = stampFormatter.date(from: raw) else { return false }
+      guard let date = stamp(raw) else { return false }
       s.onboardedAt = date
     case "homeTimezone":
       guard let x = string() else { return false }
@@ -122,6 +136,20 @@ enum SeptaskSyncedSettings {
       case .bool(let b): s.agentsPaused = b
       default: return false
       }
+    case "tasksShowAging":
+      switch v {
+      case .null: s.tasksShowAging = nil
+      case .bool(let b): s.tasksShowAging = b
+      default: return false
+      }
+    case "fadeSweptAt":
+      guard let x = string() else { return false }
+      guard let raw = x else { s.fadeSweptAt = nil; break }
+      guard let date = stamp(raw) else { return false }
+      s.fadeSweptAt = date
+    case "fadeSweepDismissedOn":
+      guard let x = string() else { return false }
+      s.fadeSweepDismissedOn = x
     case "getStartedDismissed":
       switch v {
       case .null: s.getStartedDismissed = nil

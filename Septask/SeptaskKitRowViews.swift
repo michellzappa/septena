@@ -276,14 +276,15 @@ private final class KitCheckboxCueOverlay: NSView {
       ring.stroke()
     }
 
-    // Unread-context dot, haloed so it reads on any row background.
+    // Conversation corner dot in the app's active accent color, haloed so it
+    // reads cleanly on any row background (matches iOS TaskCheckbox and Web).
     if cornerDot {
       let center = NSPoint(x: box.maxX + 1, y: box.minY - 1)
       let halo = NSRect(x: center.x - 3.4, y: center.y - 3.4, width: 6.8, height: 6.8)
       SeptaskKitTheme.cardSurface.setFill()
       NSBezierPath(ovalIn: halo).fill()
       let dot = NSRect(x: center.x - 2.1, y: center.y - 2.1, width: 4.2, height: 4.2)
-      SeptaskKitTheme.todayAccent.setFill()
+      SeptaskKitTheme.checkboxFill.setFill()
       NSBezierPath(ovalIn: dot).fill()
     }
   }
@@ -705,6 +706,27 @@ enum KitGlyph {
   /// picked up the right ink soon after a switch, but the sidebar sets its row
   /// images only on a structure reload — its project rings kept the
   /// light-mode `secondaryLabelColor` (near-black) on the dark sidebar.
+  /// The members of a shared project as initials. AppKit twin of
+  /// `MemberAvatars`.
+  static func members(_ share: ProjectShare, size: CGFloat = 24) -> NSImage {
+    var texts = share.members.prefix(MemberAvatars.limit).map(\.initials)
+    if share.members.count > MemberAvatars.limit { texts.append("+\(share.members.count - MemberAvatars.limit)") }
+    let step = size + 4
+    return draw(size: NSSize(width: size + step * CGFloat(max(texts.count - 1, 0)), height: size)) { rect in
+      for (i, text) in texts.enumerated() {
+        let circle = NSRect(x: CGFloat(i) * step, y: rect.minY, width: size, height: size)
+        NSColor.secondaryLabelColor.withAlphaComponent(0.18).setFill()
+        NSBezierPath(ovalIn: circle).fill()
+        let label = NSAttributedString(string: text, attributes: [
+          .font: NSFont.systemFont(ofSize: size * 0.4, weight: .semibold),
+          .foregroundColor: SeptaskKitTheme.inkSecondary,
+        ])
+        let bounds = label.size()
+        label.draw(at: NSPoint(x: circle.midX - bounds.width / 2, y: circle.midY - bounds.height / 2))
+      }
+    }
+  }
+
   private static func draw(size: NSSize, _ body: @escaping (NSRect) -> Void) -> NSImage {
     NSImage(size: size, flipped: false) { rect in
       body(rect)
@@ -955,8 +977,13 @@ final class KitCardRowView: NSTableRowView {
       }
       maskPath = NSBezierPath(roundedRect: r, xRadius: Self.corner, yRadius: Self.corner)
     }
+    // A bare layer animates its own changes. Off, so the card surface never
+    // trails the row it sits behind.
+    CATransaction.begin()
+    CATransaction.setDisableActions(true)
     mask.frame = local
     mask.path = maskPath.cgPath
+    CATransaction.commit()
 
     overlay.frame = bounds
     overlay.slicePath = slicePath(roundTop: isFirstInGroup, roundBottom: isLastInGroup)

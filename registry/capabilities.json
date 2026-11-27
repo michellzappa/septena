@@ -1,66 +1,860 @@
 {
   "version": 1,
-  "description": "Canonical capability parity ledger keyed by Feature ID (Starlings /product/feature-map-septena-task-app, ADR 0013, ADR 0015). Every registry entry references an ID here.",
-  "platforms": ["ios", "ipados", "macos", "web", "android", "windows", "watchos"],
-  "statuses": ["ships", "partial", "planned", "not_applicable"],
+  "description": "Canonical capability parity ledger keyed by Feature ID (Starlings /product/feature-map-septena-task-app, ADR 0013, ADR 0015). Every registry entry references an ID here. `agent` lists the MCP tools at api.septena.app/mcp that reach the capability, or \"none\" (ADR 0050, AS7). scripts/gen-registries.mjs checks each name against the tools the backend registers.",
+  "platforms": [
+    "ios",
+    "ipados",
+    "macos",
+    "web",
+    "android",
+    "windows",
+    "watchos"
+  ],
+  "statuses": [
+    "ships",
+    "partial",
+    "planned",
+    "not_applicable"
+  ],
   "capabilities": {
-    "lists.inbox": { "title": "Inbox band on Today", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "ships", "android": "ships", "windows": "planned", "watchos": "partial" },
-    "lists.today": { "title": "Today", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "ships", "android": "ships", "windows": "planned", "watchos": "partial" },
-    "lists.review": { "title": "Review (needs_verify)", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "ships", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
-    "lists.agent": { "title": "Agent (claimed and assigned work by stage)", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "ships", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
-    "lists.upcoming": { "title": "Upcoming", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "ships", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
-    "lists.anytime": { "title": "Anytime", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "ships", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
-    "lists.repeating": { "title": "Repeating", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "ships", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
-    "lists.logbook": { "title": "Logbook", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "ships", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
-    "lists.faded": { "title": "Faded pile", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "ships", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
-    "lists.starred": { "title": "Favorites list", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "ships", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
-    "lists.recently-deleted": { "title": "Recently Deleted (30 days)", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "ships", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
-    "places.areas": { "title": "Areas", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "ships", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
-    "places.projects": { "title": "Projects", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "ships", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
-    "places.sections": { "title": "Sections (headings)", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "ships", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
-    "task.when-deadline": { "title": "When and Deadline as separate dates", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "ships", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
-    "task.repeat": { "title": "Repeat from schedule or after completion, pause", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "ships", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
-    "task.notes": { "title": "Notes", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "ships", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
-    "task.attachments": { "title": "Attachments", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "partial", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
-    "task.references": { "title": "References: the email, link, issue or task that a task is about", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "ships", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
-    "task.history": { "title": "Per-task change history", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "ships", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
-    "task.provenance": { "title": "Who added a task: you or a named agent, on the row and the task page", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "ships", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
-    "task.aging": { "title": "Aging fade across open lists", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "ships", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
-    "task.checklists": { "title": "Checklists inside a task", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "ships", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
-    "task.tags": { "title": "Tags", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "ships", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
-    "task.share": { "title": "Share a task (title and notes) through the system share sheet", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "planned", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
-    "task.alerts": { "title": "Timed reminders", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "planned", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
-    "fade.sweep": { "title": "Fade pass, Faded pile and weekly sweep", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "planned", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
-    "capture.quick-add": { "title": "Quick Add sheet", "ios": "ships", "ipados": "ships", "macos": "not_applicable", "web": "planned", "android": "ships", "windows": "not_applicable", "watchos": "not_applicable" },
-    "capture.share-target": { "title": "Share into Inbox", "ios": "ships", "ipados": "ships", "macos": "not_applicable", "web": "planned", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
-    "capture.quick-entry": { "title": "Quick Entry global panel", "ios": "not_applicable", "ipados": "not_applicable", "macos": "ships", "web": "not_applicable", "android": "not_applicable", "windows": "planned", "watchos": "not_applicable" },
-    "edit.filing-suggestion": { "title": "On-device filing suggestion", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "not_applicable", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
-    "edit.undo": { "title": "Shared undo history", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "ships", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
-    "edit.multi-select": { "title": "Select multiple tasks", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "planned", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
-    "find.quick-find": { "title": "Quick Find", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "ships", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
-    "task.page": { "title": "Task page (ADR 0029)", "ios": "partial", "ipados": "partial", "macos": "partial", "web": "partial", "android": "partial", "windows": "planned", "watchos": "partial" },
-    "mac.keyboard": { "title": "Keyboard-first shortcuts", "ios": "not_applicable", "ipados": "ships", "macos": "ships", "web": "partial", "android": "planned", "windows": "planned", "watchos": "not_applicable" },
-    "mac.updates": { "title": "In-app updates (Sparkle)", "ios": "not_applicable", "ipados": "not_applicable", "macos": "ships", "web": "not_applicable", "android": "not_applicable", "windows": "planned", "watchos": "not_applicable" },
-    "calendar.events": { "title": "Calendar events in Today and Upcoming", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "planned", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
-    "import.reminders": { "title": "Apple Reminders into Inbox", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "not_applicable", "android": "not_applicable", "windows": "not_applicable", "watchos": "not_applicable" },
-    "import.things": { "title": "One-time Things import", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "not_applicable", "android": "not_applicable", "windows": "not_applicable", "watchos": "not_applicable" },
-    "ai.discuss": { "title": "Discuss: conversation on one task", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "ships", "android": "partial", "windows": "planned", "watchos": "not_applicable" },
-    "ai.reach-dial": { "title": "Where AI runs", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "planned", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
-    "agents.connector": { "title": "Official MCP connector at api.septena.app/mcp", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "planned", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
-    "onboarding.first-run": { "title": "First run: welcome, account, move in, connect Claude", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "planned", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
-    "agents.stop-pause": { "title": "Stop one task, pause all agents", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "ships", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
-    "sync.backend": { "title": "Sync through api.septena.app", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "ships", "android": "ships", "windows": "planned", "watchos": "planned" },
-    "account.delete": { "title": "Delete account", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "planned", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
-    "task.times": { "title": "Start time and duration on a task", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "ships", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
-    "calendar.feed": { "title": "Private read-only calendar feed (.ics)", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "planned", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
-    "widgets.tasks": { "title": "Today and Upcoming widgets", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "not_applicable", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
-    "watch.app": { "title": "Apple Watch app", "ios": "not_applicable", "ipados": "not_applicable", "macos": "not_applicable", "web": "not_applicable", "android": "not_applicable", "windows": "not_applicable", "watchos": "ships" },
-    "data.import-export": { "title": "Export as JSON, Markdown or CSV; import JSON with a preview", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "partial", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
-    "agents.list": { "title": "Connected agents: list, name, disconnect", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "ships", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
-    "settings.display": { "title": "Display, badge and privacy preferences", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "planned", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
-    "appearance.accents": { "title": "Accent colors (Colorful and the fruit accents)", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "ships", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
-    "appearance.textures": { "title": "Header textures with intensity and slow drift", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "planned", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
-    "appearance.mode": { "title": "Light, dark or system appearance", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "ships", "android": "ships", "windows": "planned", "watchos": "not_applicable" },
-    "appearance.text-size": { "title": "Text size", "ios": "ships", "ipados": "ships", "macos": "ships", "web": "ships", "android": "ships", "windows": "planned", "watchos": "not_applicable" }
+    "lists.inbox": {
+      "title": "Inbox band on Today",
+      "agent": [
+        "tasks_list"
+      ],
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "ships",
+      "android": "ships",
+      "windows": "planned",
+      "watchos": "partial"
+    },
+    "lists.today": {
+      "title": "Today",
+      "agent": [
+        "tasks_list",
+        "tasks_move_to_today"
+      ],
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "ships",
+      "android": "ships",
+      "windows": "planned",
+      "watchos": "partial"
+    },
+    "lists.review": {
+      "title": "Review (questions, finished work, agent work in progress, faded tasks)",
+      "agent": [
+        "tasks_list",
+        "tasks_set_endstate"
+      ],
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "ships",
+      "android": "ships",
+      "windows": "planned",
+      "watchos": "not_applicable"
+    },
+    "review.waiting": {
+      "title": "Waiting: work handed to a person, in Review",
+      "agent": [
+        "tasks_set_waiting",
+        "tasks_list"
+      ],
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "ships",
+      "android": "ships",
+      "windows": "planned",
+      "watchos": "not_applicable"
+    },
+    "lists.agent": {
+      "title": "Agent work by stage (Working, Queued, Stopped groups in Review)",
+      "agent": [
+        "tasks_pending_reasoning",
+        "tasks_claim",
+        "tasks_release",
+        "tasks_agent_events",
+        "tasks_set_assignee"
+      ],
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "ships",
+      "android": "ships",
+      "windows": "planned",
+      "watchos": "not_applicable"
+    },
+    "lists.upcoming": {
+      "title": "Upcoming",
+      "agent": [
+        "tasks_list",
+        "tasks_defer"
+      ],
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "ships",
+      "android": "ships",
+      "windows": "planned",
+      "watchos": "not_applicable"
+    },
+    "lists.anytime": {
+      "title": "Anytime",
+      "agent": [
+        "tasks_list"
+      ],
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "ships",
+      "android": "ships",
+      "windows": "planned",
+      "watchos": "not_applicable"
+    },
+    "lists.repeating": {
+      "title": "Repeating",
+      "agent": "none",
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "ships",
+      "android": "ships",
+      "windows": "planned",
+      "watchos": "not_applicable"
+    },
+    "lists.logbook": {
+      "title": "Logbook",
+      "agent": [
+        "tasks_list",
+        "tasks_complete"
+      ],
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "ships",
+      "android": "ships",
+      "windows": "planned",
+      "watchos": "not_applicable"
+    },
+    "lists.faded": {
+      "title": "Faded group of Review",
+      "agent": [
+        "tasks_list"
+      ],
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "ships",
+      "android": "ships",
+      "windows": "planned",
+      "watchos": "not_applicable"
+    },
+    "lists.starred": {
+      "title": "Favorites list",
+      "agent": [
+        "tasks_create",
+        "tasks_update"
+      ],
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "ships",
+      "android": "ships",
+      "windows": "planned",
+      "watchos": "not_applicable"
+    },
+    "lists.recently-deleted": {
+      "title": "Recently Deleted (30 days)",
+      "agent": "none",
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "ships",
+      "android": "ships",
+      "windows": "planned",
+      "watchos": "not_applicable"
+    },
+    "places.areas": {
+      "title": "Areas",
+      "agent": [
+        "tasks_list_areas",
+        "tasks_area_create",
+        "tasks_area_update",
+        "tasks_notes_log",
+        "tasks_notes_propose"
+      ],
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "ships",
+      "android": "ships",
+      "windows": "planned",
+      "watchos": "not_applicable"
+    },
+    "places.projects": {
+      "title": "Projects",
+      "agent": [
+        "tasks_list_projects",
+        "tasks_project_get",
+        "tasks_project_create",
+        "tasks_project_update",
+        "tasks_notes_log",
+        "tasks_notes_write",
+        "tasks_notes_propose",
+        "tasks_notes_history"
+      ],
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "ships",
+      "android": "ships",
+      "windows": "planned",
+      "watchos": "not_applicable"
+    },
+    "places.sections": {
+      "title": "Sections (headings)",
+      "agent": [
+        "tasks_project_get",
+        "tasks_heading_create"
+      ],
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "ships",
+      "android": "ships",
+      "windows": "planned",
+      "watchos": "not_applicable"
+    },
+    "task.when-deadline": {
+      "title": "When and Deadline as separate dates",
+      "agent": [
+        "tasks_create",
+        "tasks_update",
+        "tasks_defer"
+      ],
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "ships",
+      "android": "ships",
+      "windows": "planned",
+      "watchos": "not_applicable"
+    },
+    "task.repeat": {
+      "title": "Repeat from schedule or after completion, pause",
+      "agent": [
+        "tasks_create",
+        "tasks_update",
+        "tasks_complete"
+      ],
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "ships",
+      "android": "ships",
+      "windows": "planned",
+      "watchos": "not_applicable"
+    },
+    "task.notes": {
+      "title": "Notes",
+      "agent": [
+        "tasks_get",
+        "tasks_create",
+        "tasks_update"
+      ],
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "ships",
+      "android": "ships",
+      "windows": "planned",
+      "watchos": "not_applicable"
+    },
+    "task.attachments": {
+      "title": "Attachments",
+      "agent": [
+        "tasks_get",
+        "tasks_attachment_add"
+      ],
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "ships",
+      "android": "ships",
+      "windows": "planned",
+      "watchos": "not_applicable"
+    },
+    "task.do": {
+      "title": "Do: one task now, on every screen",
+      "agent": "none",
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "planned",
+      "android": "ships",
+      "windows": "planned",
+      "watchos": "planned"
+    },
+    "task.references": {
+      "title": "References: the email, link, issue or task that a task is about",
+      "agent": [
+        "tasks_find_by_ref",
+        "tasks_create",
+        "tasks_update"
+      ],
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "ships",
+      "android": "ships",
+      "windows": "planned",
+      "watchos": "not_applicable"
+    },
+    "task.history": {
+      "title": "Per-task change history",
+      "agent": [
+        "tasks_history",
+        "tasks_activity"
+      ],
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "ships",
+      "android": "ships",
+      "windows": "planned",
+      "watchos": "not_applicable"
+    },
+    "task.provenance": {
+      "title": "Who added a task: you or a named agent, on the row and the task page",
+      "agent": [
+        "tasks_create",
+        "tasks_get"
+      ],
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "ships",
+      "android": "ships",
+      "windows": "planned",
+      "watchos": "not_applicable"
+    },
+    "task.aging": {
+      "title": "Aging fade across open lists",
+      "agent": "none",
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "ships",
+      "android": "ships",
+      "windows": "planned",
+      "watchos": "not_applicable"
+    },
+    "task.checklists": {
+      "title": "Checklists inside a task",
+      "agent": [
+        "tasks_checklist_add",
+        "tasks_checklist_update",
+        "tasks_checklist_delete"
+      ],
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "ships",
+      "android": "ships",
+      "windows": "planned",
+      "watchos": "not_applicable"
+    },
+    "task.tags": {
+      "title": "Tags",
+      "agent": [
+        "tasks_list_tags",
+        "tasks_create",
+        "tasks_update"
+      ],
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "ships",
+      "android": "ships",
+      "windows": "planned",
+      "watchos": "not_applicable"
+    },
+    "task.share": {
+      "title": "Share a task (title and notes) through the system share sheet",
+      "agent": "none",
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "ships",
+      "android": "ships",
+      "windows": "planned",
+      "watchos": "not_applicable"
+    },
+    "task.alerts": {
+      "title": "Timed reminders",
+      "agent": [
+        "tasks_create",
+        "tasks_update"
+      ],
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "ships",
+      "android": "ships",
+      "windows": "planned",
+      "watchos": "not_applicable"
+    },
+    "fade.sweep": {
+      "title": "Fade pass, Faded pile and weekly sweep",
+      "agent": "none",
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "ships",
+      "android": "ships",
+      "windows": "planned",
+      "watchos": "not_applicable"
+    },
+    "capture.quick-add": {
+      "title": "Quick Add sheet",
+      "agent": "none",
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "not_applicable",
+      "web": "ships",
+      "android": "ships",
+      "windows": "not_applicable",
+      "watchos": "not_applicable"
+    },
+    "sharing.projects": {
+      "title": "Share a project with other people (invite link, members, assign)",
+      "agent": "none",
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "planned",
+      "android": "ships",
+      "windows": "planned",
+      "watchos": "not_applicable"
+    },
+    "capture.share-target": {
+      "title": "Share into Inbox",
+      "agent": "none",
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "not_applicable",
+      "web": "ships",
+      "android": "ships",
+      "windows": "planned",
+      "watchos": "not_applicable"
+    },
+    "capture.quick-entry": {
+      "title": "Quick Entry global panel",
+      "agent": "none",
+      "ios": "not_applicable",
+      "ipados": "not_applicable",
+      "macos": "ships",
+      "web": "not_applicable",
+      "android": "not_applicable",
+      "windows": "planned",
+      "watchos": "not_applicable"
+    },
+    "edit.filing-suggestion": {
+      "title": "On-device filing suggestion",
+      "agent": "none",
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "not_applicable",
+      "android": "ships",
+      "windows": "planned",
+      "watchos": "not_applicable"
+    },
+    "edit.undo": {
+      "title": "Shared undo history",
+      "agent": "none",
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "ships",
+      "android": "ships",
+      "windows": "planned",
+      "watchos": "not_applicable"
+    },
+    "edit.multi-select": {
+      "title": "Select multiple tasks",
+      "agent": "none",
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "ships",
+      "android": "ships",
+      "windows": "planned",
+      "watchos": "not_applicable"
+    },
+    "find.quick-find": {
+      "title": "Quick Find",
+      "agent": [
+        "tasks_search"
+      ],
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "ships",
+      "android": "ships",
+      "windows": "planned",
+      "watchos": "not_applicable"
+    },
+    "task.page": {
+      "title": "Task page (ADR 0029)",
+      "agent": [
+        "tasks_get",
+        "tasks_thread_get"
+      ],
+      "ios": "partial",
+      "ipados": "partial",
+      "macos": "partial",
+      "web": "partial",
+      "android": "partial",
+      "windows": "planned",
+      "watchos": "partial"
+    },
+    "mac.keyboard": {
+      "title": "Keyboard-first shortcuts",
+      "agent": "none",
+      "ios": "not_applicable",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "ships",
+      "android": "ships",
+      "windows": "planned",
+      "watchos": "not_applicable"
+    },
+    "mac.updates": {
+      "title": "In-app updates (Sparkle)",
+      "agent": "none",
+      "ios": "not_applicable",
+      "ipados": "not_applicable",
+      "macos": "ships",
+      "web": "not_applicable",
+      "android": "not_applicable",
+      "windows": "planned",
+      "watchos": "not_applicable"
+    },
+    "calendar.events": {
+      "title": "Calendar events in Today and Upcoming",
+      "agent": "none",
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "planned",
+      "android": "ships",
+      "windows": "planned",
+      "watchos": "not_applicable"
+    },
+    "import.reminders": {
+      "title": "Apple Reminders into Inbox",
+      "agent": "none",
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "not_applicable",
+      "android": "not_applicable",
+      "windows": "not_applicable",
+      "watchos": "not_applicable"
+    },
+    "import.things": {
+      "title": "One-time Things import",
+      "agent": "none",
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "not_applicable",
+      "android": "not_applicable",
+      "windows": "not_applicable",
+      "watchos": "not_applicable"
+    },
+    "ai.discuss": {
+      "title": "Discuss: conversation on one task",
+      "agent": [
+        "tasks_thread_get",
+        "tasks_thread_append",
+        "tasks_set_acceptance",
+        "tasks_set_artifact",
+        "tasks_set_handoff"
+      ],
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "ships",
+      "android": "partial",
+      "windows": "planned",
+      "watchos": "not_applicable"
+    },
+    "ai.reach-dial": {
+      "title": "Where AI runs",
+      "agent": "none",
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "ships",
+      "android": "ships",
+      "windows": "planned",
+      "watchos": "not_applicable"
+    },
+    "agents.connector": {
+      "title": "Official MCP connector at api.septena.app/mcp",
+      "agent": [
+        "tasks_orientation"
+      ],
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "ships",
+      "android": "ships",
+      "windows": "planned",
+      "watchos": "not_applicable"
+    },
+    "onboarding.first-run": {
+      "title": "First run: welcome, account, move in, connect Claude",
+      "agent": "none",
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "ships",
+      "android": "ships",
+      "windows": "planned",
+      "watchos": "not_applicable"
+    },
+    "agents.stop-pause": {
+      "title": "Stop one task, pause all agents",
+      "agent": [
+        "tasks_agent_events"
+      ],
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "ships",
+      "android": "ships",
+      "windows": "planned",
+      "watchos": "not_applicable"
+    },
+    "sync.backend": {
+      "title": "Sync through api.septena.app",
+      "agent": "none",
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "ships",
+      "android": "ships",
+      "windows": "planned",
+      "watchos": "planned"
+    },
+    "account.delete": {
+      "title": "Delete account",
+      "agent": "none",
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "ships",
+      "android": "ships",
+      "windows": "planned",
+      "watchos": "not_applicable"
+    },
+    "account.sign-in-apple": {
+      "title": "Sign in with Apple (creates an account)",
+      "agent": "none",
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "planned",
+      "android": "planned",
+      "windows": "planned",
+      "watchos": "not_applicable"
+    },
+    "account.sign-in-google": {
+      "title": "Sign in with Google (creates an account)",
+      "agent": "none",
+      "ios": "planned",
+      "ipados": "planned",
+      "macos": "planned",
+      "web": "planned",
+      "android": "planned",
+      "windows": "planned",
+      "watchos": "not_applicable"
+    },
+    "account.sign-in-microsoft": {
+      "title": "Sign in with Microsoft (creates an account)",
+      "agent": "none",
+      "ios": "planned",
+      "ipados": "planned",
+      "macos": "planned",
+      "web": "planned",
+      "android": "planned",
+      "windows": "planned",
+      "watchos": "not_applicable"
+    },
+    "account.sign-in-email": {
+      "title": "Sign in with an email code (creates an account)",
+      "agent": "none",
+      "ios": "planned",
+      "ipados": "planned",
+      "macos": "planned",
+      "web": "planned",
+      "android": "planned",
+      "windows": "planned",
+      "watchos": "not_applicable"
+    },
+    "account.sign-in-device": {
+      "title": "Sign in by approval from another signed-in device",
+      "agent": "none",
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "ships",
+      "android": "ships",
+      "windows": "planned",
+      "watchos": "not_applicable"
+    },
+    "task.times": {
+      "title": "Start time and duration on a task",
+      "agent": [
+        "tasks_create",
+        "tasks_update"
+      ],
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "ships",
+      "android": "ships",
+      "windows": "planned",
+      "watchos": "not_applicable"
+    },
+    "calendar.feed": {
+      "title": "Private read-only calendar feed (.ics)",
+      "agent": "none",
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "ships",
+      "android": "ships",
+      "windows": "planned",
+      "watchos": "not_applicable"
+    },
+    "widgets.tasks": {
+      "title": "Today and Upcoming widgets",
+      "agent": "none",
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "not_applicable",
+      "android": "ships",
+      "windows": "planned",
+      "watchos": "not_applicable"
+    },
+    "watch.app": {
+      "title": "Apple Watch app",
+      "agent": "none",
+      "ios": "not_applicable",
+      "ipados": "not_applicable",
+      "macos": "not_applicable",
+      "web": "not_applicable",
+      "android": "not_applicable",
+      "windows": "not_applicable",
+      "watchos": "ships"
+    },
+    "data.import-export": {
+      "title": "Export as JSON, Markdown or CSV; import JSON with a preview",
+      "agent": "none",
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "ships",
+      "android": "ships",
+      "windows": "planned",
+      "watchos": "not_applicable"
+    },
+    "agents.list": {
+      "title": "Connected agents: list, name, disconnect",
+      "agent": "none",
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "ships",
+      "android": "ships",
+      "windows": "planned",
+      "watchos": "not_applicable"
+    },
+    "settings.display": {
+      "title": "Display, badge and privacy preferences",
+      "agent": "none",
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "ships",
+      "android": "ships",
+      "windows": "planned",
+      "watchos": "not_applicable"
+    },
+    "support.contact": {
+      "title": "Contact Support: a native form, with replies in the app",
+      "agent": "none",
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "ships",
+      "android": "ships",
+      "windows": "planned",
+      "watchos": "not_applicable"
+    },
+    "appearance.accents": {
+      "title": "Accent colors (Colorful and the fruit accents)",
+      "agent": "none",
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "ships",
+      "android": "ships",
+      "windows": "planned",
+      "watchos": "not_applicable"
+    },
+    "appearance.textures": {
+      "title": "Header textures with intensity and slow drift",
+      "agent": "none",
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "ships",
+      "android": "ships",
+      "windows": "planned",
+      "watchos": "not_applicable"
+    },
+    "appearance.mode": {
+      "title": "Light, dark or system appearance",
+      "agent": "none",
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "ships",
+      "android": "ships",
+      "windows": "planned",
+      "watchos": "not_applicable"
+    },
+    "appearance.text-size": {
+      "title": "Text size",
+      "agent": "none",
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "ships",
+      "android": "ships",
+      "windows": "planned",
+      "watchos": "not_applicable"
+    }
   }
 }

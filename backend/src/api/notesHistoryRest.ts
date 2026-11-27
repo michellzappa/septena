@@ -11,7 +11,7 @@ type Vars = { userId: string; actor: string };
 
 export const notesHistoryRest = new Hono<{ Bindings: Env; Variables: Vars }>();
 
-const zHistoryQuery = z.object({
+export const zHistoryQuery = z.object({
   container: z.enum(["project", "area"]),
   id: zId,
   before: z.coerce.number().int().min(1).optional(),

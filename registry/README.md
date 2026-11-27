@@ -19,6 +19,8 @@ iOS, iPadOS, macOS, Backend/MCP, Web, Android, and Windows. See
 | `registry/tokens.json` | Semantic design tokens, selection washes, 16-color palette, 5-step text scale | R4 (`#145`) |
 | `registry/plans.json` | Plans and pricing: prices, plan limits (the server plan table), pricing-page cards and comparison rows, promises, upsell copy (ADR 0010, ADR 0023). The site's /pricing page and the app's Septena Plus page render it | — |
 | `registry/import-sources.json` | Every app Septena imports from or plans to, with its status. The app's move-in rows and the site read it; no copy names importers by hand | ADR 0021 |
+| `registry/code-map.json` | The code map: each public claim and the file that keeps it. The site's `llms.txt` and open-source section render it; `gen-registries --check` and the site build fail on a missing path. No bindings | AS9 (ADR 0050) |
+| `registry/sign-in.json` | Sign-in methods (Apple, Google, Microsoft, email code, device approval), their flow and order per platform, and the sign-in screen's copy (ADR 0047). The backend's `GET /v1/auth/methods` says which are on | SI0 (`#635`) |
 | `registry/capabilities.json` | Capability parity ledger keyed by Feature ID (ADR 0013) | R4 (`#145`) |
 | `registry/device-frames.json` | Canonical device shapes for marketing visuals (website scenes, App Store panels), and the OS each screen must look like (docs/PLATFORM_CHROME.md) | — |
 | `registry/cast/*.json` | The people whose lists marketing screens show (ADR 0030): content only, checked by `scripts/registry-cast.mjs`, no generated bindings | — |
@@ -33,7 +35,7 @@ Edit the JSON source files here, then regenerate the typed native bindings:
 node scripts/gen-registries.mjs
 ```
 
-Verify that all 10 registries pass cross-file referential integrity checks and
+Verify that all 11 registries pass cross-file referential integrity checks and
 generated files are up to date (also run automatically by `scripts/lint-design.sh`):
 
 ```bash

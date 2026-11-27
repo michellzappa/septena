@@ -8,6 +8,7 @@ import { storeFor } from "../api/session.js";
 import { MAX_REFS_PER_TASK, MAX_TAGS_PER_TASK, TAG_NAME_MAX, zId } from "../store/columns.js";
 import { zPushBody, type Op, type OpResult } from "../store/ops.js";
 import { AGENT_WRITE_RULES, isAgentActor, type Row, type TaskStore } from "../store/TaskStore.js";
+import { Refusal } from "../errors.js";
 import {
   type CreateTaskInput,
   type RecurrenceRuleInput,
@@ -60,12 +61,15 @@ const ORDER_GAP = 1024;
 /// declarations: the generated RPC stub type recurses too deep on JSON rows.
 type StoreMethod =
   | "readTasks" | "readReviewTasks" | "readOpenQuestions" | "readTask" | "readAreas" | "readProjects" | "readConvoCandidates" | "readTaskLinks"
+  | "readAttachments" | "hasAttachment" | "attachmentBytes" | "finishUpload"
   | "readTaskRefs" | "findByRef" | "isDismissed" | "newRefId"
   | "readChecklistItems" | "readChecklistItem" | "readChecklistCounts"
   | "readTags" | "readTagByName"
   | "readOrderTop" | "readSetting" | "push" | "captureTask" | "claim" | "release" | "agentEvents" | "history" | "head"
+  | "readDoing" | "readDoSession" | "readDoSessions"
   | "addUsage" | "connectionName"
-  | "readNote" | "noteRevisions" | "readContainer" | "readContainerTasks";
+  | "readNote" | "noteRevisions" | "readContainer" | "readContainerTasks" | "readHeadings"
+  | "idempotencyBegin" | "idempotencyFinish" | "idempotencyAbandon";
 export type StoreRpc = {
   [K in StoreMethod]: (...a: Parameters<TaskStore[K]>) => Promise<ReturnType<TaskStore[K]>>;
 };
@@ -110,6 +114,7 @@ export const zWriteArgs = {
     due: zDay.optional(),
     area: z.string().optional(),
     project: z.string().optional(),
+    heading: zId.optional(),
     notes: z.string().optional(),
     recurrence: zRecurrence.optional(),
     reminder_at: z.string().nullable().optional(),
@@ -139,6 +144,7 @@ export const zWriteArgs = {
     due: zDayOrClear.optional(),
     area: z.string().nullable().optional(),
     project: z.string().nullable().optional(),
+    heading: z.union([zId, z.literal("")]).nullable().optional(),
     status: z.enum(["open", "cancelled"]).optional(),
     notes: z.string().nullable().optional(),
     notes_append: z.string().min(1).optional(),
@@ -154,6 +160,11 @@ export const zWriteArgs = {
     refs_remove: zRefKeys.optional(),
   }),
   tasks_defer: z.object({ id: zId, until: zDay }),
+  tasks_set_waiting: z.object({
+    id: zId,
+    waiting_on: z.string().trim().min(1).max(80).nullable(),
+    scheduled: zDay.nullable().optional(),
+  }),
   tasks_move_to_today: z.object({ id: zId }),
   tasks_thread_append: z.object({
     id: zId,
@@ -275,6 +286,8 @@ export async function runWriteTool(ctx: WriteContext, name: WriteToolName, args:
       return updateTask(ctx, { id: args.id as string, today: false, scheduled: args.until as string });
     case "tasks_move_to_today":
       return updateTask(ctx, { id: args.id as string, today: true, scheduled: null });
+    case "tasks_set_waiting":
+      return setWaiting(ctx, args as { id: string; waiting_on: string | null; scheduled?: string | null });
     case "tasks_thread_append":
       return threadAppend(ctx, args as { id: string; turn: Omit<ConvoTurn, "seq" | "ts"> & { ts?: string } });
     case "tasks_set_acceptance": {
@@ -316,9 +329,21 @@ export async function runWriteTool(ctx: WriteContext, name: WriteToolName, args:
 /// One push for the whole call. The ops are checked against the same schema
 /// /v1/sync/push uses, so this path can never store what an app push could
 /// not.
-async function push(store: StoreRpc, actor: string | undefined, ops: NewOp[]): Promise<OpResult[]> {
+export async function pushAs(store: StoreRpc, actor: string | undefined, ops: NewOp[]): Promise<OpResult[]> {
   const { result } = await store.push(mintOps(ops), actor ?? MCP_ACTOR);
   return result.results;
+}
+
+/// One push by a person's client. Throws when an op was refused.
+export async function pushOps(ctx: WriteContext, ops: NewOp[]): Promise<void> {
+  const results = await pushAs(ctx.store, ctx.actor, ops);
+  for (const r of results) {
+    if (r.status === "rejected") {
+      if (/unknown_task|missing_required/.test(r.reason)) throw new Refusal("not_found", "Task not found");
+      throw new Refusal(r.reason, r.reason);
+    }
+    if (r.status === "dropped") throw new Refusal("not_found", "Task not found");
+  }
 }
 
 /// The ops with their clientOpIds, checked.
@@ -336,21 +361,22 @@ const applied = (r: OpResult | undefined) => r?.status === "applied";
 
 /// A rejected or dropped op on an existing task means the task is gone (or
 /// never existed): the live connector's error for that.
-function requireApplied(r: OpResult | undefined, id: string): void {
+export function requireApplied(r: OpResult | undefined, id: string): void {
   if (applied(r) || r?.status === "noop") return;
   if (r?.status === "dropped" || (r?.status === "rejected" && /unknown_task|missing_required/.test(r.reason))) {
-    throw new Error(`Task not found: ${id}`);
+    throw new Refusal("not_found", `Task not found: ${id}`);
   }
   if (r?.status === "rejected" && r.reason === "stopped") {
-    throw new Error(`Task ${id} was not changed: the user stopped agent work on it. Only the user can resume it in Septena.`);
+    throw new Refusal("stopped", `Task ${id} was not changed: the user stopped agent work on it. Only the user can resume it in Septena.`);
   }
   if (r?.status === "rejected" && r.reason === "paused") {
-    throw new Error(`Task ${id} was not changed (paused): ${AGENT_WRITE_RULES.paused}`);
+    throw new Refusal("paused", `Task ${id} was not changed (paused): ${AGENT_WRITE_RULES.paused}`);
   }
   if (r?.status === "rejected" && r.reason === "human_accepts") {
-    throw new Error(`Task ${id} was not completed (human_accepts): ${r.rule ?? AGENT_WRITE_RULES.human_accepts}`);
+    throw new Refusal("human_accepts", `Task ${id} was not completed (human_accepts): ${r.rule ?? AGENT_WRITE_RULES.human_accepts}`);
   }
-  throw new Error(`Task ${id} was not changed: ${r?.status === "rejected" ? r.reason : "no result"}`);
+  if (r?.status === "rejected") throw new Refusal(r.reason, `Task ${id} was not changed: ${r.reason}`);
+  throw new Error(`Task ${id} was not changed: no result`);
 }
 
 async function topPosition(store: StoreRpc): Promise<number> {
@@ -367,6 +393,16 @@ async function assertKnownContainer(store: StoreRpc, kind: "area" | "project", i
 /// Resolve human tag names case-insensitively against the store's live tags,
 /// producing `tag` upsert ops for any missing tags (unless `allowCreate` is
 /// false). Deduplicates case-insensitively and caps at `MAX_TAGS_PER_TASK`.
+/// The project of a live heading row, checked against the project the call
+/// names. Throws when the id is not a heading or the projects differ.
+async function headingProject(store: StoreRpc, id: string, project: string | undefined): Promise<string> {
+  const row = (await store.readTask(id))?.task;
+  const home = row && str(row.kind) === "heading" ? str(row.project) : undefined;
+  if (!home) throw new Error(`Heading not found: ${id}. tasks_project_get lists a project's headings.`);
+  if (project && project !== home) throw new Error(`Heading ${id} is in project ${home}, not ${project}.`);
+  return home;
+}
+
 async function resolveTagNames(
   store: StoreRpc,
   rawNames: string[],
@@ -413,7 +449,7 @@ function refInsert(taskId: string, id: string, r: ResolvedRef, position: number,
 }
 
 /// The reference part of a write's result: what is on the task now, and what
-/// the store refused (an agent's reference while agents are paused). Nothing
+/// the store refused (a task with too many references). Nothing
 /// is dropped without a word.
 function refResult(refs: ResolvedRef[], results: (OpResult | undefined)[]) {
   const ok = refs.filter((_, i) => applied(results[i]) || results[i]?.status === "noop");
@@ -429,9 +465,14 @@ function refResult(refs: ResolvedRef[], results: (OpResult | undefined)[]) {
 
 /// Whether an open row with these date fields is on Today: the core's rule
 /// (pinned, or a When date or deadline that has arrived).
-function onToday(t: { today?: unknown; scheduled?: unknown; deadline?: unknown }, today: string): boolean {
+function onToday(
+  t: { today?: unknown; scheduled?: unknown; deadline?: unknown; deferredDeadline?: unknown }, today: string,
+): boolean {
   return taskViewMembership(
-    { status: "open", today: t.today === true, scheduled: str(t.scheduled) ?? null, deadline: str(t.deadline) ?? null },
+    {
+      status: "open", today: t.today === true, scheduled: str(t.scheduled) ?? null,
+      deadline: str(t.deadline) ?? null, deferredDeadline: str(t.deferredDeadline) ?? null,
+    },
     today, new Date().toISOString(),
   ).isOnToday;
 }
@@ -444,6 +485,7 @@ function coreRow(r: Record<string, unknown>): CoreTask {
     area: str(r.area) ?? null, project: str(r.project) ?? null,
     created: str(r.created) ?? null, createdAt: str(r.createdAt) ?? null,
     scheduled: str(r.scheduled) ?? null, deadline: str(r.deadline) ?? null,
+    deferredDeadline: str(r.deferredDeadline) ?? null,
     today: r.today === true, todaySetOn: str(r.todaySetOn) ?? null,
     source: str(r.source) ?? null, acknowledgedAt: str(r.acknowledgedAt) ?? null,
     starred: r.starred === true,
@@ -475,7 +517,8 @@ function planDateEdits(
     actions.push({ type: "putOnToday" });
     if (when) actions.push({ type: "scheduleFor", day: when });
   } else if (p.today === false) {
-    // A day with the unpin is a move to that day (the deadline stays, Q1);
+    // A day with the unpin is a move to that day (the deadline stays, Q1; an
+    // arrived one no longer holds the task on Today, Q8);
     // an unpin alone is Remove from Today (A3, arrived dates go too, Q2).
     if (p.scheduled === undefined) actions.push({ type: "removeFromToday" });
     else actions.push(when ? { type: "scheduleFor", day: when } : { type: "clearWhenDate" });
@@ -529,6 +572,9 @@ function recurrenceColumns(rule: RecurrenceRuleInput | null): Record<string, unk
 
 async function createTask(ctx: WriteContext, input: CreateTaskInput) {
   const { store } = ctx;
+  // A heading names its project: the task goes there, under it.
+  if (input.heading && input.area) throw new Error("A heading is in a project: pass heading or area, not both.");
+  if (input.heading) input = { ...input, project: await headingProject(store, input.heading, input.project), area: undefined };
   await assertKnownContainer(store, "area", input.area);
   await assertKnownContainer(store, "project", input.project);
   // Validate the rule and the references BEFORE creating anything.
@@ -565,6 +611,7 @@ async function createTask(ctx: WriteContext, input: CreateTaskInput) {
   // A project implies its area: the app stores one or the other.
   if (input.project) fields.project = input.project;
   else if (input.area) fields.area = input.area;
+  if (input.heading) fields.heading = input.heading;
   if (input.notes) fields.notes = input.notes;
   if (plan.rule) {
     Object.assign(fields, recurrenceColumns(plan.rule));
@@ -575,7 +622,7 @@ async function createTask(ctx: WriteContext, input: CreateTaskInput) {
     fields.reminderAt = plan.reminder.reminderAt;
     fields.reminderMode = plan.reminder.reminderMode;
   }
-  // The date invariants (I1–I7): a pin with a future When date keeps the
+  // The date invariants (I1–I8): a pin with a future When date keeps the
   // date, a pin with an arrived one keeps the pin.
   Object.assign(fields, normalizeTaskDates(coreRow(fields), today));
   if (onToday(fields, today)) fields.todayPosition = position;
@@ -583,8 +630,7 @@ async function createTask(ctx: WriteContext, input: CreateTaskInput) {
   const ops: NewOp[] = [];
   let resolvedTagNames: string[] = [];
   if (input.tags && input.tags.length > 0) {
-    const paused = (await store.readSetting("agentsPaused")) === true;
-    const resolved = await resolveTagNames(store, input.tags, !paused);
+    const resolved = await resolveTagNames(store, input.tags, true);
     ops.push(...resolved.tagOps);
     if (resolved.tagIds.length > 0) fields.tags = resolved.tagIds;
     resolvedTagNames = resolved.tagNames;
@@ -637,10 +683,13 @@ async function createTask(ctx: WriteContext, input: CreateTaskInput) {
     results = outcome.results;
     followUp = outcome.followUp;
   } else {
-    results = await push(store, ctx.actor, ops);
+    results = await pushAs(store, ctx.actor, ops);
   }
   const r = results[taskOpIdx];
-  if (!applied(r)) throw new Error(`Task was not created: ${r?.status === "rejected" ? r.reason : r?.status ?? "no result"}`);
+  if (!applied(r)) {
+    const message = `Task was not created: ${r?.status === "rejected" ? (r.rule ? `${r.reason}: ${r.rule}` : r.reason) : r?.status ?? "no result"}`;
+    throw r?.status === "rejected" ? new Refusal(r.reason, message) : new Error(message);
+  }
   return {
     id,
     title: input.title,
@@ -661,13 +710,23 @@ async function updateTask(ctx: WriteContext, input: UpdateTaskInput) {
   if (!current) throw new Error(`Task not found: ${input.id}`);
   const old = current.task;
   input = resolveNotesEdit(input, str(old.notes));
+  // A heading names its project. The task moves there only when it is not
+  // in that project yet, so a task already in it keeps its place.
+  const heading = input.heading === "" ? null : input.heading;
+  if (heading !== undefined && str(old.kind) === "heading") throw new Error(`${input.id} is a heading: a heading cannot go under another heading.`);
+  if (heading && input.area) throw new Error("A heading is in a project: pass heading or area, not both.");
+  if (heading) {
+    const project = await headingProject(store, heading, input.project ?? undefined);
+    if (input.project === undefined && str(old.project) !== project) input = { ...input, project };
+  }
   const storedScheduled = updateNeedsStoredSchedule(input) ? (str(old.scheduled) ?? null) : undefined;
   const { fields: p, updated } = planUpdate(input, storedScheduled);
+  if (heading !== undefined) updated.push("heading");
   const hasTagChange = input.tags !== undefined;
   const refOps = await planRefs(store, input);
   if (updated.length === 0 && !hasTagChange) {
     if (refOps.ops.length === 0) return { id: input.id, updated: refOps.updated };
-    const results = await push(store, ctx.actor, refOps.ops);
+    const results = await pushAs(store, ctx.actor, refOps.ops);
     for (const r of results) requireApplied(r, input.id);
     return { id: input.id, updated: refOps.updated };
   }
@@ -688,6 +747,7 @@ async function updateTask(ctx: WriteContext, input: UpdateTaskInput) {
   if (p.area !== undefined) fields.area = clear(p.area);
   if (p.project !== undefined) fields.project = clear(p.project);
   if (p.heading !== undefined) fields.heading = null;
+  if (heading !== undefined) fields.heading = heading;
   if (p.status !== undefined) fields.status = p.status;
   if (p.notes !== undefined) fields.notes = clear(p.notes);
   if (p.recurrence !== undefined) {
@@ -718,9 +778,10 @@ async function updateTask(ctx: WriteContext, input: UpdateTaskInput) {
     if (input.tags === null || input.tags.length === 0) {
       fields.tags = null;
     } else {
-      // Never auto-create tags when the task is stopped or agents are paused;
-      // the task op itself still hits TaskStore so the store refuses cleanly.
-      const allowCreate = !current.convo?.stoppedAt && (await store.readSetting("agentsPaused")) !== true;
+      // Never auto-create tags when the task is stopped; the task op itself
+      // still hits TaskStore so the store refuses cleanly. While agents are
+      // paused the store refuses the tags too.
+      const allowCreate = !current.convo?.stoppedAt;
       const resolved = await resolveTagNames(store, input.tags, allowCreate);
       if (allowCreate) ops.push(...resolved.tagOps);
       fields.tags = resolved.tagIds.length > 0 ? resolved.tagIds : null;
@@ -730,14 +791,33 @@ async function updateTask(ctx: WriteContext, input: UpdateTaskInput) {
   ops.push({ op: "upsert", entity: "task", id: input.id, fields });
   ops.push(...refOps.ops);
 
-  const results = await push(store, ctx.actor, ops);
+  const results = await pushAs(store, ctx.actor, ops);
   requireApplied(results[taskOpIdx], input.id);
-  // The task changed. A refused reference (agents are paused) is named, so
+  // The task changed. A refused reference (the limit) is named, so
   // the caller does not retry the fields that landed.
   const refused = results.slice(taskOpIdx + 1).flatMap((r) =>
     r.status === "rejected" ? [{ reason: r.reason, ...(r.rule ? { rule: r.rule } : {}) }] : []);
   if (refused.length === 0) updated.push(...refOps.updated);
   return { id: input.id, updated, ...(refused.length > 0 ? { refs_refused: refused } : {}), ...(p.notes !== undefined ? { notesRev: notesRev(clear(p.notes)) } : {}) };
+}
+
+/// `tasks_set_waiting` (docs/REVIEW_SPEC.md §6): who the task waits on, and
+/// optionally its When date as the day to chase. The day the wait started is
+/// the user's today. The store refuses an agent that ends a wait.
+async function setWaiting(ctx: WriteContext, input: { id: string; waiting_on: string | null; scheduled?: string | null }) {
+  const current = await ctx.store.readTask(input.id);
+  if (!current || str(current.task.kind) === "heading") throw new Error(`Task not found: ${input.id}`);
+  const old = current.task;
+  const fields: Record<string, unknown> = { waitingOn: input.waiting_on };
+  if (input.waiting_on && !str(old.waitingOn)) fields.waitingSince = todayYMD(ctx.timeZone);
+  const results = await pushAs(ctx.store, ctx.actor, [{ op: "upsert", entity: "task", id: input.id, fields }]);
+  requireApplied(results[0], input.id);
+  const updated = ["waitingOn"];
+  if (input.scheduled !== undefined) {
+    const res = await updateTask(ctx, { id: input.id, today: false, scheduled: input.scheduled } as UpdateTaskInput);
+    updated.push(...((res as { updated?: string[] }).updated ?? []));
+  }
+  return { id: input.id, waitingOn: input.waiting_on, updated };
 }
 
 /// The ops of `refs` (add or update by key) and `refs_remove`. Removals go
@@ -920,7 +1000,7 @@ async function completeTask(ctx: WriteContext, id: string) {
     }
   }
 
-  const results = await push(store, ctx.actor, ops);
+  const results = await pushAs(store, ctx.actor, ops);
   if (results[0]?.status === "rejected" && results[0].reason === "human_accepts") {
     return {
       id,
@@ -967,7 +1047,7 @@ async function checklistAdd(ctx: WriteContext, taskId: string, items: string[]) 
     added.push({ id, title, position: maxPos });
   }
   if (ops.length === 0) return { task_id: taskId, added: [] };
-  const results = await push(store, ctx.actor, ops);
+  const results = await pushAs(store, ctx.actor, ops);
   for (let i = 0; i < results.length; i++) {
     requireApplied(results[i], added[i].id);
   }
@@ -989,7 +1069,7 @@ async function checklistUpdate(
   }
   if (input.position !== undefined) fields.position = input.position;
   if (Object.keys(fields).length === 0) return { id: input.id, updated: [] };
-  const [r] = await push(store, ctx.actor, [{ op: "upsert", entity: "checklistItem", id: input.id, fields }]);
+  const [r] = await pushAs(store, ctx.actor, [{ op: "upsert", entity: "checklistItem", id: input.id, fields }]);
   requireApplied(r, input.id);
   return { id: input.id, updated: Object.keys(fields) };
 }
@@ -998,7 +1078,7 @@ async function checklistDelete(ctx: WriteContext, id: string) {
   const { store } = ctx;
   const current = await store.readChecklistItem(id);
   if (!current) throw new Error(`Checklist item not found: ${id}`);
-  const [r] = await push(store, ctx.actor, [{ op: "delete", entity: "checklistItem", id }]);
+  const [r] = await pushAs(store, ctx.actor, [{ op: "delete", entity: "checklistItem", id }]);
   requireApplied(r, id);
   return { id, deleted: true };
 }
@@ -1028,7 +1108,7 @@ async function threadAppend(
   if (confirmedIntent !== undefined) {
     ops.push({ op: "upsert", entity: "convo", id: input.id, fields: { confirmedIntent } });
   }
-  const results = await push(ctx.store, ctx.actor, ops);
+  const results = await pushAs(ctx.store, ctx.actor, ops);
   requireApplied(results[0], input.id);
   const r = results[0];
   return { id: input.id, seq: r.status === "applied" ? r.seq : undefined };
@@ -1037,7 +1117,7 @@ async function threadAppend(
 /// The app's Send back (`TasksBackend.sendBackConvo`): the user's note as a
 /// turn, the task open again and back with the agent. One push.
 export async function sendBackReview(ctx: WriteContext, id: string, note: string): Promise<{ id: string; seq?: number }> {
-  const results = await push(ctx.store, ctx.actor, [
+  const results = await pushAs(ctx.store, ctx.actor, [
     { op: "appendTurn", taskId: id, turn: { role: "user", step: "work", note, ts: new Date().toISOString() } },
     { op: "upsert", entity: "convo", id, fields: { endState: "open", endStateNote: null, stoppedAt: null, assignee: "claude" } },
   ]);
@@ -1053,13 +1133,13 @@ export async function acceptReview(ctx: WriteContext, id: string): Promise<objec
   const before = await ctx.store.readTask(id);
   const done = await completeTask(ctx, id);
   if (before?.task.source === "mcp" && !before.task.acknowledgedAt) {
-    await push(ctx.store, ctx.actor, [{ op: "upsert", entity: "task", id, fields: { acknowledgedAt: new Date().toISOString() } }]);
+    await pushAs(ctx.store, ctx.actor, [{ op: "upsert", entity: "task", id, fields: { acknowledgedAt: new Date().toISOString() } }]);
   }
   return done;
 }
 
 async function writeConvo(ctx: WriteContext, id: string, fields: Record<string, unknown>): Promise<void> {
-  const [r] = await push(ctx.store, ctx.actor, [{ op: "upsert", entity: "convo", id, fields }]);
+  const [r] = await pushAs(ctx.store, ctx.actor, [{ op: "upsert", entity: "convo", id, fields }]);
   requireApplied(r, id);
 }
 

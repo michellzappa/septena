@@ -51,9 +51,12 @@ APPLE_IAP_ENVIRONMENTS = "Production,Sandbox"
 WEB_ALLOWED_ORIGINS = "https://web.septena.app"
 # The admin page, https://api.septena.app/admin (ADR 0043). 404 until the
 # Access team domain and audience tag are set; only these emails get in.
-ADMIN_EMAILS = "mz@centaur-labs.io,mz@envisioning.com"
-ACCESS_TEAM_DOMAIN = ""
-ACCESS_AUD = ""
+ADMIN_EMAILS = "mz@envisioning.com" # septena-lint:allow contact-email (an access list, not a contact)
+ACCESS_TEAM_DOMAIN = "wispy-tooth-45ec.cloudflareaccess.com"
+ACCESS_AUD = "5154cf50dab7e60f4e49494cd5cafab0e5cd1ebec1f44fdf99fcc0445236a83a"
+# Email sign-in codes (ADR 0016, #169). Off until Terms of Use and the
+# privacy copy ship (#564); then "true".
+EMAIL_SIGNIN = "false"
 
 # Account summaries for the admin page (src/admin/accounts.ts).
 [triggers]
@@ -117,6 +120,21 @@ class_name = "ProjectStore"
 tag = "v4-project-store"
 new_sqlite_classes = ["ProjectStore"]
 
+# Contact Support (ADR 0054, src/support/): one object holds every support
+# conversation and queues messages until Starlings takes them.
+[[durable_objects.bindings]]
+name = "SUPPORT_STORE"
+class_name = "SupportStore"
+
+[[migrations]]
+tag = "v5-support-store"
+new_sqlite_classes = ["SupportStore"]
+
+# Sign-in code mail through Cloudflare Email Service (septena.app is onboarded:
+# `wrangler email sending list`).
+[[send_email]]
+name = "EMAIL"
+
 # Attachment bytes. Create once: wrangler r2 bucket create septena-attachments
 [[r2_buckets]]
 binding = "ATTACHMENTS"
@@ -127,8 +145,23 @@ bucket_name = "septena-attachments"
 #                   task backend's access tokens.
 # ADMIN_TOKEN     — optional, 32-byte base64. Enables POST/DELETE
 #                   /v1/admin/grants (entitlement grant rows). Unset = 404.
+# APP_INTAKE_KEY  — 64 hex; signs the Starlings app channel both ways (ADR 0054).
+#                   The same value is SEPTENA_APP_INTAKE_KEY in the Starlings
+#                   Secrets Store and in mz's keychain (septena-starlings-app-intake).
 # APNS_KEY        — optional, contents of Apple Push Notifications .p8 key file.
 # APNS_KEY_ID     — optional, 10-character APNs Key ID from Apple Developer.
 # APNS_TEAM_ID    — optional, 10-character Apple Developer Team ID.
 # APNS_BUNDLE_ID  — optional, defaults to "com.septena.tasks".
 # APNS_SANDBOX    — optional, "true" forces sandbox host; unset uses per-token flag.
+# REVIEWER_CODE, REVIEWER_ACCOUNT_ID, REVIEWER_MODE_UNTIL — optional. Directory
+#                   reviewer access (ADR 0055): with the first two set, the
+#                   pairing page offers the demo account for the reviewer code.
+#                   Setup: docs/CONNECTOR_DIRECTORY_SUBMISSION.md section 5.
+# OPENAI_APPS_CHALLENGE — optional. The token platform.openai.com/apps-manage
+#                   gives for domain verification, served at
+#                   /.well-known/openai-apps-challenge.
+# OIDC sign-in providers (ADR 0047, #637, #638) — each stays off until set:
+# GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_ANDROID_CLIENT_ID, GOOGLE_IOS_CLIENT_ID
+# MICROSOFT_CLIENT_ID, MICROSOFT_CLIENT_SECRET
+# APPLE_WEB_CLIENT_ID (Services ID), APPLE_SIGNIN_KEY_ID, APPLE_SIGNIN_KEY (.p8 PEM),
+#   APPLE_SIGNIN_TEAM_ID (optional override of APNS_TEAM_ID)

@@ -200,6 +200,8 @@ struct TaskListRowContextMenu: View {
   /// The row chip's filing pick (Inbox rows). When set, the menu leads with
   /// "File in <list>" and the Move submenu drops its Suggested entry.
   var filingChip: SuggestionEngine.Suggestion? = nil
+  /// Do (docs/DO_SPEC.md §4.1). Nil hides it.
+  var onDo: ((SeptenaTask) -> Void)? = nil
   let onDuplicate: (TaskListView.ActionTarget) -> Void
   /// Starts touch multi-select with this row selected (Select). nil hides
   /// it: the Mac, or a list that is already selecting.
@@ -239,6 +241,9 @@ struct TaskListRowContextMenu: View {
   /// Review rows (`needs_verify`) only.
   var onAcceptReview: ((SeptenaTask) -> Void)? = nil
   var onSendBackReview: ((SeptenaTask) -> Void)? = nil
+  /// Waiting On… (one task) and Got It Back (docs/REVIEW_SPEC.md §6). Nil hides them.
+  var onWaitingOn: ((SeptenaTask) -> Void)? = nil
+  var onGotItBack: (([String]) -> Void)? = nil
 
   private var count: Int { target.count }
   private var single: SeptenaTask? {
@@ -269,6 +274,15 @@ struct TaskListRowContextMenu: View {
       guard let task = single, task.conversation.needsHumanReview,
             let onSendBackReview else { return nil }
       return .init { onSendBackReview(task) }
+    case .taskWaitingOn:
+      guard let task = single, task.status == .open, let onWaitingOn else { return nil }
+      return .init { onWaitingOn(task) }
+    case .taskGotItBack:
+      guard tasks.contains(where: \.isWaiting), let onGotItBack else { return nil }
+      return .init { onGotItBack(target.ids) }
+    case .taskDo:
+      guard let task = single, DoFlow.canDo(task), let onDo else { return nil }
+      return .init { onDo(task) }
     case .taskDuplicate:
       return .init(variant: plural) { onDuplicate(target) }
     case .taskSelect:
@@ -334,6 +348,7 @@ struct TaskListRowContextMenu: View {
     case "moveDestinations": return moveDestinations
     case "sectionDestinations": return sectionDestinations
     case "filingSuggestion": return filingSuggestionNodes
+    case "assignees": return SeptaskSharing.assigneeNodes(target.tasks)
     default: return []
     }
   }

@@ -7,11 +7,14 @@ import {
   applyDateAction,
   checkPullPage,
   checklistOccurrenceId,
+  completedLocalDay,
   conversationState,
   deriveConversation,
   ensureCoreReady,
   fadeFill,
   getCoreVersion,
+  localTodayYMD,
+  localWallClockTimestamp,
   nextScheduledDate,
   occurrenceId,
   parseRef,
@@ -29,6 +32,8 @@ import {
   type PushOutcome,
 } from "../src/lib/core/index.ts";
 import { coalesceOutboxOp, pendingFieldsFor } from "../src/lib/store/db.ts";
+import { parseImportJson } from "../src/lib/export.ts";
+import { hexWithAlpha, resolvedWashSeed } from "../src/lib/headerWash.ts";
 import type { OutboxOp, TaskRow } from "../src/lib/types.ts";
 
 function readFixture<T>(name: string): T {
@@ -266,5 +271,47 @@ describe("web offline outbox coalescing", () => {
     });
     assert.equal(outbox.length, 2);
     assert.equal(outbox[1].op, "delete");
+  });
+});
+
+describe("web parity helpers (import preview & header wash seeding)", () => {
+  it("parses Septena JSON backups and counts skipped non-task records", () => {
+    const raw = JSON.stringify({
+      version: 1,
+      areas: [{ id: "a_1", title: "Work", emoji: "💼" }],
+      projects: [{ id: "p_1", title: "Launch", area: "a_1", status: "active" }],
+      tasks: [{ id: "t_1", title: "Ship web", status: "open", today: true, project: "p_1" }],
+      checklistItems: [{ id: "c_1", taskId: "t_1", title: "Check CI", checked: false }],
+      legacySections: [{ id: "s_1" }, { id: "s_2" }],
+    });
+    const preview = parseImportJson(raw);
+    assert.equal(preview.areas.length, 1);
+    assert.equal(preview.projects.length, 1);
+    assert.equal(preview.tasks.length, 1);
+    assert.equal(preview.checklistItems.length, 1);
+    assert.equal(preview.skippedNonTaskCount, 2);
+  });
+
+  it("produces deterministic FNV-1a Header Wash seeds matching Apple platforms", () => {
+    const dailyA = resolvedWashSeed("2026-11-25");
+    const dailyB = resolvedWashSeed("2026-11-25");
+    const projectSeed = resolvedWashSeed("2026-11-25", "proj_1");
+    assert.equal(dailyA, dailyB);
+    assert.ok(dailyA >= 1 && dailyA < 9999);
+    assert.notEqual(dailyA, projectSeed);
+    assert.equal(hexWithAlpha("#007AFF", 0.22), "rgba(0, 122, 255, 0.220)");
+  });
+
+  it("writes local wall-clock completedAt and resolves both zoned and unzoned stamps to local day", () => {
+    const localDate = new Date(2026, 10, 26, 0, 15, 5);
+    const stamp = localWallClockTimestamp(localDate);
+    assert.equal(stamp, "2026-11-26T00:15:05");
+    // Unzoned Apple/Backend wall-clock timestamps keep their local date prefix.
+    assert.equal(completedLocalDay("2026-11-26T00:15:05"), "2026-11-26");
+    assert.equal(completedLocalDay("2026-11-25"), "2026-11-25");
+    // Zoned ISO instants convert to the runtime's local calendar day.
+    const iso = localDate.toISOString();
+    assert.equal(completedLocalDay(iso), localTodayYMD(localDate));
+    assert.equal(completedLocalDay(null), null);
   });
 });

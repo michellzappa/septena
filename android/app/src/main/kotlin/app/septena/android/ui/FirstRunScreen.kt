@@ -14,6 +14,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -31,11 +32,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.septena.android.AndroidAppGraph
+import app.septena.ui.ChevronLeftGlyph
 import app.septena.core.JsonValue
 import app.septena.core.RegistryCatalog
 import app.septena.core.generated.RegistryPlatformIds
@@ -238,7 +242,12 @@ fun FirstRunScreen(graph: AndroidAppGraph) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (canGoBack) {
-                TextButton(onClick = ::goBack) { Text(backTitle) }
+                IconButton(
+                    onClick = ::goBack,
+                    modifier = Modifier.semantics { contentDescription = backTitle },
+                ) {
+                    ChevronLeftGlyph(tint = MaterialTheme.colorScheme.onSurface)
+                }
             }
             Spacer(Modifier.weight(1f))
             // Closing counts as finished, so the first run never traps the user (as on iOS).
@@ -312,10 +321,10 @@ private fun StepContent(
         "account" -> if (checkingAccount) {
             CircularProgressIndicator()
         } else {
-            DeviceSignInPanel(
+            SignInMethodsPanel(
                 graph = graph,
                 languageTag = languageTag,
-                startTitle = step.primary?.title ?: deviceSignInCopy("start", languageTag),
+                deviceStartTitle = step.primary?.title ?: deviceSignInCopy("start", languageTag),
             )
         }
         // The code field is the one on Settings ▸ Connect Claude. Its approval dialog ticks the Get started

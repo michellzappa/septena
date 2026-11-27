@@ -5,7 +5,7 @@ until mz overrules them in §11.
 **Decisions:** [ADR 0006](adr/0006-tasks-fade-by-default.md),
 [ADR 0014](adr/0014-today-rollover-review-or-clean-slate.md) (§6, added
 2026-11-21), [ADR 0039](adr/0039-unanswered-proposals-expire.md) (unanswered
-agent proposals, not built: #499), [ADR 0002](adr/0002-own-backend-replaces-icloud.md).
+agent proposals), [ADR 0002](adr/0002-own-backend-replaces-icloud.md).
 **Builds on:** the triage band (`docs/TRIAGE_BAND_SPEC.md`), the task
 conversation loop (`SeptenaCore/TaskConvo.swift`,
 `docs/TASK_CONVERSATIONS_PLAN.md`), the Next feed
@@ -101,12 +101,55 @@ existing Today tenure clock (`todayTenureFill`, days carried on Today, full
 at a week); P2 moves it to `touchedAt` against the fade window in every list.
 Touching the task restores full strength.
 
-**The Faded pile.** A sidebar smart list, "Faded", with a count. Rows are
+**The Faded pile.** The Faded group of Review (`docs/REVIEW_SPEC.md`), with a count. Rows are
 standard task rows. Opening or editing a faded task keeps it (clears
 `fadedAt`, stamps `touchedAt`).
 
 The fade is not a user gesture, so it is not on the undo stack. Keeping a
 task from the pile is a gesture and is on the undo stack.
+
+### 4.1 What ends a fade (mz, 2026-11-25)
+
+A task with a deadline that the user made or accepted is never faded. An
+unaccepted agent proposal expires after `cueDecayDays` with or without a date
+(ADR 0039); proposals made before 2026-11-26 keep the old rule. The store enforces it for every writer
+(`TaskStore.fadeEnds`), so a deadline that an agent or another member of a
+shared project sets on a faded task brings it back. The store also drops a
+fade that is older than `touchedAt`: an old device cannot push its fade over a
+task the user touched since. The client's fade pass keeps its own check.
+
+The store also refuses a new fade from a device that did not know the newest
+facts (`TaskStore.fadeIsStale`): the task was touched inside the fade window,
+has a When date ahead, waits on the user, or is assigned to Claude. A push that
+carries its own `touchedAt` is trusted. The app waits for a sync before its
+pass, so this is the second guard.
+
+"Fade inactive tasks" is one setting per account (`tasksShowAging`), and so is
+the sweep state (`fadeSweptAt`, `fadeSweepDismissedOn`).
+
+### 4.2 Projects (mz, 2026-11-25: "ask on review")
+
+A project fades because its tasks did. It has no clock of its own.
+
+- **Rule.** An active project fades when it has no open, unfaded task
+  (headings do not count) and nothing happened in it for the fade window.
+  "Happened" is the newest of: the project's `created` day, and any of its
+  tasks' `touchedAt`, `createdAt` and `completedAt`. `fadedAt` is not activity.
+  Dated, recurring and agent-owned tasks do not fade, so one of them holds the
+  project. The rule goes into the shared core.
+- **Look.** The sidebar and list row dims to `fadeMinOpacity` and stays in
+  place. A project never leaves the sidebar by itself.
+- **Question.** The weekly review has one row per fading project: **Keep**,
+  **Done**, **Let go**. Let go sets `cancelled` on the project and drops its
+  faded tasks, as one undo entry. "Let the rest go" never acts on a project.
+  No answer changes nothing.
+- **Keep** stamps `keptAt` on the project (new backend field, written by the
+  app only). A kept project does not fade again until a task in it has newer
+  activity than `keptAt` and the rule holds again.
+- **Never:** areas, and a project younger than the fade window.
+- **Shared projects:** each member's own tasks decide, and `keptAt` is
+  personal. Done and Let go change the project for everyone, so only Keep
+  shows there *(default)*.
 
 ## 5. The weekly sweep
 
@@ -114,8 +157,8 @@ Once a week (Sunday *(default)*), the Inbox band shows one row: "N tasks
 faded this week. Still want any of them?" with a **Review** button. Tapping
 it opens the sweep sheet. The row shows on the sweep day only: if the user
 ignores it, it is gone on Monday and comes back next Sunday. The Faded pile
-opens the same sheet on any day. "Sweep" is the internal name; the UI says
-"Review".
+opens the same sheet on any day. "Sweep" is the internal name. The faded tasks
+themselves are the Faded group of Review (`docs/REVIEW_SPEC.md`).
 
 - The sheet lists the tasks that faded since the last sweep.
 - Each row has one control: **Keep**. Kept tasks go back to their list.
@@ -353,7 +396,8 @@ server (the in-app server was removed on 2026-11-21).
 | Question | Default |
 |---|---|
 | Fade window | 14 days |
-| Do tasks with a `deadline` ever fade? | Never |
+| Do tasks with a `deadline` ever fade? | Never (decided 2026-11-25, §4.1) |
+| Do projects fade? | They dim, and the review asks (decided 2026-11-25, §4.2) |
 | Do tasks inside an active project fade? | Yes, same rule |
 | Sweep day | Sunday |
 | What a dropped task becomes | status `cancelled` + `dropReason`, shown in the logbook |

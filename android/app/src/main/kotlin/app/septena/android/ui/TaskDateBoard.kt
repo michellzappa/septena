@@ -44,16 +44,19 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.septena.core.DateBoardGroups
 import app.septena.core.DateBoardRowKinds
+import app.septena.core.JsonValue
 import app.septena.core.RegistryCatalog
 import app.septena.core.TaskTimeSlot
 import app.septena.core.generated.RegistryDestinationIds
+import app.septena.core.generated.RegistryPromptIds
 import app.septena.core.generated.RegistryTaskDetail
+import app.septena.core.stringValue
+import app.septena.sharedcore.RescheduleMode
 import app.septena.ui.CalendarSmallGlyph
 import app.septena.ui.ClockSmallGlyph
 import app.septena.ui.CloseSmallGlyph
-import app.septena.ui.SeptenaGlyph
-import app.septena.ui.SeptenaIconKind
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
@@ -62,13 +65,83 @@ import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
 
+/**
+ * Registry-driven confirmation prompt when rescheduling a fixed repeating task
+ * (`rescheduleFixedRepeat`, TASK_DATES_SPEC §4, #573): "Only This Task" or
+ * "Update Schedule", plus Cancel.
+ */
+@Composable
+internal fun RescheduleFixedRepeatDialog(
+    languageTag: String,
+    onPickMode: (RescheduleMode) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val copy = remember(languageTag) { rescheduleFixedRepeatCopy(languageTag) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(copy.title) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (copy.message.isNotBlank()) {
+                    Text(copy.message)
+                }
+                TextButton(
+                    onClick = { onPickMode(RescheduleMode.MAKE_EXCEPTION) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(copy.exceptionTitle)
+                }
+                TextButton(
+                    onClick = { onPickMode(RescheduleMode.UPDATE_RULE) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(copy.updateRuleTitle)
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(copy.cancelTitle)
+            }
+        },
+    )
+}
+
+private data class ReschedulePromptCopy(
+    val title: String,
+    val message: String,
+    val exceptionTitle: String,
+    val updateRuleTitle: String,
+    val cancelTitle: String,
+)
+
+private fun rescheduleFixedRepeatCopy(languageTag: String): ReschedulePromptCopy {
+    val prompt = RegistryCatalog.surface(RegistryPromptIds.RESCHEDULE_FIXED_REPEAT)?.fields.orEmpty()
+    val rawTitle = prompt["title"].stringValue().orEmpty()
+    val rawMessage = prompt["message"].stringValue().orEmpty()
+    val optionTitles = (prompt["options"] as? JsonValue.ArrayValue)?.values.orEmpty()
+        .mapNotNull { (it as? JsonValue.ObjectValue)?.fields?.get("title")?.stringValue() }
+    val promptsRoot = RegistryCatalog.document("surfaces").fields["prompts"] as? JsonValue.ObjectValue
+    val rawCancel = promptsRoot?.fields?.get("cancelTitle").stringValue().orEmpty()
+    fun loc(raw: String): String = RegistryCatalog.localizedString(raw, languageTag) ?: raw
+    return ReschedulePromptCopy(
+        title = loc(rawTitle),
+        message = loc(rawMessage),
+        exceptionTitle = loc(optionTitles.getOrNull(0).orEmpty()),
+        updateRuleTitle = loc(optionTitles.getOrNull(1).orEmpty()),
+        cancelTitle = loc(rawCancel),
+    )
+}
+
 /** Today and the next six days: the same window as the Apple strips. */
 private const val STRIP_DAYS = 7L
 
 /**
  * The date board, embedded in its attribute row or sheet: a seven-day strip
- * starting today, then the registry's rows (Tomorrow, Pick another date, Clear,
- * and on When: Add time / inline start-time + duration controls). Every date
+ * starting today, then the registry's rows in three groups with a divider
+ * between them: pick (the strip, Pick another date), refine (on When: Add time /
+ * inline start-time + duration controls) and remove (Clear). Every date
  * pick commits and folds the row through the caller; time-slot edits apply live
  * without closing the board (matching iOS `DatePickerSheet`).
  */
@@ -86,8 +159,17 @@ internal fun TaskDateBoard(
     onTimeSlotChange: ((String?, Int?) -> Unit)? = null,
 ) {
     val current = remember(initialDay) { initialDay?.let { runCatching { LocalDate.parse(it.take(10)) }.getOrNull() } }
-    val rows = remember(attribute, languageTag) {
-        RegistryCatalog.dateBoardRows(attribute, languageTag = languageTag)
+    // Repeat is its own attribute row on the task page, and Add time needs a
+    // time handler. The filter runs before the dividers, so an empty group
+    // draws none.
+    val rows = remember(attribute, languageTag, onTimeSlotChange != null) {
+        RegistryCatalog.dateBoardRows(attribute, languageTag = languageTag).filter { row ->
+            when (row.kind) {
+                DateBoardRowKinds.REPEAT_RULE -> false
+                DateBoardRowKinds.TIME -> onTimeSlotChange != null
+                else -> true
+            }
+        }
     }
     val locale = Locale.forLanguageTag(languageTag)
     val isBeyondStrip = current != null && (current < today || current >= today.plusDays(STRIP_DAYS))
@@ -105,19 +187,18 @@ internal fun TaskDateBoard(
         enabled = enabled,
         onSelect = { onSelect(it.toString()) },
     )
-    HorizontalDivider(
-        modifier = Modifier.padding(horizontal = 14.dp, vertical = 4.dp),
-        thickness = 0.5.dp,
-        color = dividerColor,
-    )
+    // The strip opens the first group; a divider goes where the group changes.
+    var previousGroup = DateBoardGroups.PICK
     rows.forEach { row ->
-        when (row.kind) {
-            DateBoardRowKinds.TOMORROW -> BoardRow(
-                label = row.label,
-                enabled = enabled,
-                icon = { SeptenaGlyph(kind = SeptenaIconKind.Today, tint = mutedInk, size = 15.dp) },
-                onClick = { onSelect(today.plusDays(1).toString()) },
+        if (row.group != previousGroup) {
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 4.dp),
+                thickness = 0.5.dp,
+                color = dividerColor,
             )
+            previousGroup = row.group
+        }
+        when (row.kind) {
             DateBoardRowKinds.CALENDAR -> {
                 // A value past the strip is named on this row, so the board
                 // always shows what the task has now.
@@ -168,7 +249,6 @@ internal fun TaskDateBoard(
                 icon = { CloseSmallGlyph(tint = mutedInk, size = 14.dp) },
                 onClick = onClear,
             )
-            // Repeat is its own attribute row on the task page; skip unknown kinds.
             else -> Unit
         }
     }

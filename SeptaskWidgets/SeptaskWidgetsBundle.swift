@@ -5,5 +5,8 @@ import WidgetKit
 struct SeptaskWidgetsBundle: WidgetBundle {
   var body: some Widget {
     SeptaskTasksWidget()
+    #if os(iOS)
+    SeptaskDoActivity()
+    #endif
   }
 }

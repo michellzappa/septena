@@ -41,7 +41,7 @@ struct TaskDraft: Equatable {
     case .project(let id): projectId = id
     case .area(let id):    areaId = id
     case .starred:         starred = true
-    case .triage, .review, .agent, .unscheduled, .repeating, .logbook, .faded, .recentlyDeleted: break
+    case .triage, .review, .unscheduled, .repeating, .logbook, .faded, .recentlyDeleted: break
     }
   }
 
@@ -162,7 +162,8 @@ struct TaskDraft: Equatable {
     if titleChanged || notesChanged {
       titleWriteLanded = mutator.update(id: id,
                                         title: titleChanged ? trimmedTitle : nil,
-                                        notes: notesChanged ? trimmedNotes : nil)
+                                        notes: notesChanged ? trimmedNotes : nil,
+                                        notesFrom: original.notes ?? "")
       // The undo entry describes a write that happened: skip it when the
       // write did not land.
       if undoContext != nil, titleWriteLanded {
@@ -298,10 +299,18 @@ struct DetectedToken: Identifiable {
     case project(id: String, title: String)
     case area(id: String, title: String)
   }
+
   let id = UUID()
   let kind: Kind
   /// The matched text to remove from the title when this token is applied.
   let phrase: String
+
+  /// True for a token the user typed as syntax (`!today`, `#project`,
+  /// `@area`); false for a date phrase found in ordinary words.
+  var isExplicit: Bool {
+    if case .date = kind { return false }
+    return true
+  }
 
   var displayText: String {
     switch kind {

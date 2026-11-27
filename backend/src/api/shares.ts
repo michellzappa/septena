@@ -22,7 +22,11 @@ const zName = z.string().trim().min(1).max(80);
 // The share id routes the token; the secret after the dot is the credential.
 const TOKEN_RE = /^(sp_[A-Za-z0-9_-]{32})\.[A-Za-z0-9_-]{32}$/;
 const zToken = z.string().regex(TOKEN_RE);
-const zShareId = z.string().regex(SHARE_ID_RE);
+export const zShareId = z.string().regex(SHARE_ID_RE);
+
+export const zShareCreateBody = z.object({ projectId: zId, name: zName }).strict();
+export const zSharePreviewBody = z.object({ token: zToken }).strict();
+export const zShareJoinBody = z.object({ token: zToken, name: zName }).strict();
 
 async function body<T extends z.ZodTypeAny>(c: Ctx, schema: T): Promise<z.infer<T> | null> {
   const parsed = schema.safeParse(await c.req.json().catch(() => null));
@@ -50,7 +54,7 @@ async function plusRefusal(c: Ctx): Promise<Response | null> {
 shares.get("/", async (c) => c.json({ shares: await storeFor(c.env, c.get("userId")).listShares() }));
 
 shares.post("/", async (c) => {
-  const input = await body(c, z.object({ projectId: zId, name: zName }).strict());
+  const input = await body(c, zShareCreateBody);
   if (!input) return bad(c);
   const refusal = await plusRefusal(c);
   if (refusal) return refusal;
@@ -71,14 +75,14 @@ shares.post("/", async (c) => {
 });
 
 shares.post("/preview", async (c) => {
-  const input = await body(c, z.object({ token: zToken }).strict());
+  const input = await body(c, zSharePreviewBody);
   if (!input) return bad(c);
   const found = await projectStoreFor(c.env, shareOf(input.token)).preview(input.token);
   return found ? c.json(found) : notFound(c);
 });
 
 shares.post("/join", async (c) => {
-  const input = await body(c, z.object({ token: zToken, name: zName }).strict());
+  const input = await body(c, zShareJoinBody);
   if (!input) return bad(c);
   const result = await projectStoreFor(c.env, shareOf(input.token)).join(input.token, c.get("userId"), input.name);
   if (!result.ok) return result.reason === "full" ? c.json({ error: "share_full" }, 409) : notFound(c);

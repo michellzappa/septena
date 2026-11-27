@@ -135,6 +135,47 @@ scan vocab-task-not-todo error \
   'Say "task", never "to-do", in user-facing copy and prompts (DesignSpec §6.6).' \
   'Microsoft To Do|[Tt]odoist|TODO|newTodos|"todos? [^"]*", "every '
 
+# Enforce the same "task, not to-do" vocabulary across Android and Web shells.
+cross_vocab=$(
+  {
+    grep -rnE '"[^"]*[Tt]o-?[Dd]os?\b[^"]*"' --include="*.kt" android/app/src/main android/ui/src 2>/dev/null
+    grep -rnE '"[^"]*[Tt]o-?[Dd]os?\b[^"]*"' --include="*.ts" --include="*.tsx" web/src 2>/dev/null | grep -v '/generated/'
+  } | grep -v "septena-lint:allow vocab-task-not-todo" \
+    | grep -vE 'Microsoft To Do|[Tt]odoist|TODO|newTodos'
+)
+if [ -n "$cross_vocab" ]; then
+  count=$(printf '%s\n' "$cross_vocab" | wc -l | tr -d ' ')
+  printf '%s✗ %s%s  (%s)\n' "$RED" "vocab-task-not-todo-cross-platform" "$OFF" "$count"
+  errors=$((errors + 1))
+  printf '  %s\n' 'Say "task", never "to-do", in Android and Web user-facing copy and prompts (DesignSpec §6.6).'
+  printf '%s' "$DIM"; printf '%s\n' "$cross_vocab" | head -8 | sed 's/^/    /'
+  [ "$count" -gt 8 ] && printf '    … and %s more\n' "$((count - 8))"
+  printf '%s\n' "$OFF"
+fi
+
+# ── Android top-bar back button (chevron, not text "Back") ──────────────────
+# Every Android TopAppBar leading navigationIcon uses an IconButton with
+# ChevronLeftGlyph (<) or ic_close (×) and a contentDescription — never a
+# TextButton rendering literal "Back" (#694).
+android_text_back=$(python3 -c '
+import glob, re
+for path in sorted(glob.glob("android/app/src/main/kotlin/**/*.kt", recursive=True)):
+    src = open(path, encoding="utf-8").read()
+    for m in re.finditer(r"navigationIcon\s*=\s*\{[^}]{0,400}TextButton", src, re.S):
+        if "septena-lint:allow android-topbar-text-back" in m.group(0):
+            continue
+        line = src[:m.start()].count("\n") + 1
+        print(f"{path}:{line}: TopAppBar navigationIcon uses TextButton instead of IconButton + ChevronLeftGlyph")
+')
+if [ -n "$android_text_back" ]; then
+  count=$(printf '%s\n' "$android_text_back" | wc -l | tr -d ' ')
+  printf '%s✗ %s%s  (%s)\n' "$RED" "android-topbar-text-back" "$OFF" "$count"
+  errors=$((errors + 1))
+  printf '  %s\n' 'Use IconButton + ChevronLeftGlyph (or ic_close) with contentDescription in TopAppBar.navigationIcon, never TextButton.'
+  printf '%s' "$DIM"; printf '%s\n' "$android_text_back" | sed 's/^/    /'
+  printf '%s\n' "$OFF"
+fi
+
 # ── AppKit transient surfaces (docs/SEPTASK_APPKIT_SURFACES.md) ─────────────
 # Every popover, floating panel and filter list in the Septask AppKit shell is
 # built in Septask/SeptaskKitSurface.swift, so material, corner radius, field
@@ -233,7 +274,7 @@ space_bound=$(grep -rnE '(onKeyPress\(\.space|keyboardShortcut\(\.space)' --incl
 if [ -n "$space_bound" ]; then
   printf '%s✗ %s%s\n' "$RED" "task-space-binding" "$OFF"
   errors=$((errors + 1))
-  printf '  %s\n' 'Do not bind Space on a task surface — it collides with the row checkbox. Use a modifier shortcut (⌘K completes).'
+  printf '  %s\n' 'Do not bind Space on a task surface — it collides with the row checkbox. Use a modifier shortcut (⌘↩ completes).'
   printf '%s' "$DIM"; printf '%s\n' "$space_bound" | sed 's/^/    /'
   printf '%s\n' "$OFF"
 fi
@@ -254,6 +295,29 @@ if [ -n "$reserved_model" ]; then
   printf '  %s\n' 'A @Model property must not reuse an NSManagedObject method name (entity, entityName, objectID, description, …). Rename it.'
   printf '%s' "$DIM"; printf '%s\n' "$reserved_model" | head -8 | sed 's/^/    /'
   printf '%s\n' "$OFF"
+fi
+
+# ── Contact email (ADR 0054) ────────────────────────────────────────────────
+# No email address in copy, code or docs: support is the in-app form and
+# septena.app/support. Scans every tracked file, not only Swift.
+if ! ce_out=$(./scripts/lint-contact-email.sh 2>&1); then
+  printf '%s✗ %s%s\n' "$RED" "contact-email" "$OFF"
+  errors=$((errors + 1))
+  printf '%s' "$DIM"; printf '%s\n' "$ce_out" | sed 's/^/    /'
+  printf '%s\n' "$OFF"
+fi
+
+# ── Platform names in copy (mz, 2026-11-26) ─────────────────────────────────
+# Every platform gets every feature: registry copy, backend/skill.md,
+# backend/onboard.md and TasksSkill.swift never list platforms. JSON
+# exceptions live in the script's ALLOW list (JSON holds no comments).
+if command -v node >/dev/null 2>&1; then
+  if ! pc_out=$(node scripts/lint-platform-copy.mjs 2>&1); then
+    printf '%s✗ %s%s\n' "$RED" "platform-copy" "$OFF"
+    errors=$((errors + 1))
+    printf '%s' "$DIM"; printf '%s\n' "$pc_out" | sed 's/^/    /'
+    printf '%s\n' "$OFF"
+  fi
 fi
 
 # ── Shared cross-platform registries (ADR 0015) ──────────────────────────────

@@ -21,6 +21,46 @@ export const zSessionResponse = z.object({
 });
 export type SessionResponse = z.infer<typeof zSessionResponse>;
 
+// Sign-in methods this server has turned on (GET /v1/auth/methods, ADR 0047).
+export const zAuthMethodEntry = z.object({
+  id: z.string(),
+  web: z.boolean().optional(),
+  native: z.boolean().optional(),
+});
+export type AuthMethodEntry = z.infer<typeof zAuthMethodEntry>;
+
+export const zAuthMethodsResponse = z.object({
+  methods: z.array(zAuthMethodEntry),
+});
+export type AuthMethodsResponse = z.infer<typeof zAuthMethodsResponse>;
+
+// Linked sign-in methods on the signed-in account (GET /v1/auth/identities, #643).
+export const zLinkedIdentity = z.object({
+  id: z.string(),
+  provider: z.string(),
+  label: z.string(),
+  createdAt: z.number(),
+});
+export type LinkedIdentity = z.infer<typeof zLinkedIdentity>;
+
+export const zLinkedIdentitiesResponse = z.object({
+  identities: z.array(zLinkedIdentity),
+  canRemove: z.boolean(),
+});
+export type LinkedIdentitiesResponse = z.infer<typeof zLinkedIdentitiesResponse>;
+
+export type OidcRedeemSignInResult =
+  | { status: "signed_in"; session: SessionResponse }
+  | { status: "account_exists"; email: string; provider: string; linkToken?: string; codeSent?: boolean };
+
+// POST /v1/auth/email/start (202).
+export const zEmailStartResponse = z.object({
+  status: z.literal("sent"),
+  expiresInSeconds: z.number(),
+  codeLength: z.number().int().min(4).max(10).optional(),
+});
+export type EmailStartResponse = z.infer<typeof zEmailStartResponse>;
+
 export const zWsTicketResponse = z.object({
   ticket: z.string(),
   expiresIn: z.number(),
@@ -81,8 +121,35 @@ export const zAccessSummary = z.object({
       active: z.boolean().optional(),
     }),
   ),
+  // The agent count and the plan's agent slots (null = no limit).
+  agents: z.object({ count: z.number(), limit: z.number().nullable().optional() }).optional(),
 });
 export type AccessSummary = z.infer<typeof zAccessSummary>;
+
+// GET /v1/entitlement: the account's plan as the server enforces it
+// (docs/SYNC_SUBSCRIPTION_SPEC.md §6). The app reads it; it never decides.
+export const zEntitlement = z.object({
+  active: z.boolean(),
+  plan: z.enum(["free", "plus", "pro"]).nullable().optional(),
+  trialEndsAt: z.number().nullable().optional(),
+  entitlements: z.array(
+    z.object({
+      source: z.string(),
+      plan: z.string().nullable().optional(),
+      expiresAt: z.number().nullable().optional(),
+      active: z.boolean().optional(),
+    }),
+  ),
+});
+export type Entitlement = z.infer<typeof zEntitlement>;
+
+// POST /v1/access/keys (#86): the key appears in this reply only.
+export const zCreatedAgentKey = z.object({
+  id: z.string(),
+  key: z.string().startsWith("sk1."),
+  name: z.string(),
+  scope: z.string(),
+});
 
 export const zChangeEntry = z.object({
   rev: z.number(),
@@ -99,6 +166,15 @@ export type ChangeEntry = z.infer<typeof zChangeEntry>;
 export const zChangesResponse = z.object({
   changes: z.array(zChangeEntry),
 });
+
+export const zIcalFeedSettings = z.object({
+  enabled: z.boolean(),
+  scope: z.enum(["all", "timed"]),
+  url: z.string().nullable(),
+  webcalUrl: z.string().nullable(),
+  createdAt: z.string().nullable(),
+});
+export type IcalFeedSettings = z.infer<typeof zIcalFeedSettings>;
 
 export interface OrdinalWeekday {
   ordinal: number;
@@ -120,6 +196,7 @@ export interface TaskRow {
   durationMinutes?: number | null;
   timeZone?: string | null;
   deadline?: string | null;
+  deferredDeadline?: string | null;
   today?: boolean;
   starred?: boolean;
   tags?: string[] | null;
@@ -148,6 +225,10 @@ export interface TaskRow {
   deferCount?: number | null;
   fadedAt?: string | null;
   dropReason?: string | null;
+  /** The person the task waits on (ADR 0053), 1 to 80 characters, or null. */
+  waitingOn?: string | null;
+  /** The day the wait began, YYYY-MM-DD, or null. Cleared with `waitingOn`. */
+  waitingSince?: string | null;
   effort?: string | null;
   deletedAt?: string | null;
   updatedAt?: string | null;

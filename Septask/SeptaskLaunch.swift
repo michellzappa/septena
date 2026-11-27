@@ -255,6 +255,9 @@ final class SeptaskMacAppDelegate: NSObject, NSApplicationDelegate {
     // A fresh account gets the first run as a sheet on this window
     // (`SeptaskKitFirstRun.swift`); after it, the Get started checklist and
     // the sign-in notice (`TaskNotices`) hold whatever was skipped.
+    // Before the window: an open Do shows in its first frame, and the menu
+    // bar item with it (SeptaskKitDo.swift).
+    SeptaskKitDo.shared.start()
     SeptaskKitWindowController.show()
     Task { @MainActor in await SeptaskKitFirstRunWindow.presentIfNeeded() }
     // Sparkle starts scheduled checks when the controller is created. Local
@@ -353,7 +356,10 @@ enum SeptaskDeepLinkRouter {
     )).first {
       let task = SeptenaTask(entity)
       if task.status != .open { return .logbook }
-      if task.isFaded { return .faded }
+      if task.isFaded {
+        UserDefaults.standard.set(true, forKey: ReviewGroup.fadedExpandedKey)
+        return .review
+      }
       if task.isOnToday { return .today }
       if let p = task.project { return .project(p) }
       if let a = task.area { return .area(a) }
@@ -431,6 +437,8 @@ enum SeptaskDeepLinkRouter {
       navigation.go(to: route(forListID: id))
     case .task(let taskID):
       openTask(taskID, navigation: navigation, context: context)
+    case .join(let token):
+      SeptaskSharing.presentJoin(link: token)
     }
   }
 
@@ -464,6 +472,8 @@ enum SeptaskDeepLinkRouter {
       shell.go(to: filter(forListID: id))
     case .task(let taskID):
       openTaskMac(taskID)
+    case .join(let token):
+      SeptaskSharing.presentJoin(link: token)
     }
   }
 

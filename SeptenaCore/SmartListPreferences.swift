@@ -10,7 +10,7 @@ import Observation
 //     above and `.bottom` (archive / utility lists) below. Smart lists never
 //     mix into Areas or Projects in the middle.
 //   • Embedded destinations (`todayBand` = `inbox`, `logbookTab` =
-//     `recentlyDeleted`) draw inside their host list and never take part in
+//     `recentlyDeleted`, `reviewGroup` = `faded`) draw inside their host list and never take part in
 //     sidebar ordering, visibility, or placement.
 //   • `order` is ORDERING ONLY, never membership — any destination in
 //     `Self.sidebarDestinations` absent from `order` is appended in its
@@ -22,7 +22,7 @@ import Observation
 //     registry; destinations with `canMoveSection == false` stay in their
 //     registry section.
 //   • Destinations with `visibility == "whenNonEmpty"` (`review`, `agent`,
-//     `starred`, `faded`) still obey progressive disclosure
+//     `starred`) still obey progressive disclosure
 //     when not hidden.
 
 enum SmartListSection: String, CaseIterable, Sendable, Identifiable {
@@ -88,12 +88,13 @@ final class SmartListPreferences {
   // MARK: - Resolution (registry-driven)
 
   /// The destinations that are sidebar rows. Embedded destinations (`todayBand`
-  /// for Inbox, `logbookTab` for Deleted) draw inside their host list and have
+  /// for Inbox, `logbookTab` for Deleted, `reviewGroup` for Faded) draw inside their host list and have
   /// no sidebar row, so they never take part in ordering, placement, or show/hide.
   static let sidebarDestinations: [RegistryDestination] =
     RegistryDestinations.all.filter {
       $0.visibility != "todayBand"
         && $0.visibility != "logbookTab"
+        && $0.visibility != "reviewGroup"
         && $0.applies(to: RegistryPlatform.current)
     }
   static let sidebarById: [RegistryDestinationID: RegistryDestination] =

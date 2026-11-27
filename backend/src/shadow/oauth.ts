@@ -7,7 +7,12 @@ import { isValidTz } from "../tz.js";
 import { registerClient } from "../oauth/register.js";
 import { validateRedirectUri } from "../oauth/redirects.js";
 import { storeFor } from "../api/session.js";
+import { accountStoreFor } from "../store/AccountStore.js";
+import { emailSignInEnabled, verifyEmailAccount, zEmailAddress } from "../api/emailSignIn.js";
+import { enabledOidcWebProviders, pairOidcStart } from "../api/oidc.js";
+import { SIGN_IN } from "../generated/registries.js";
 import { pairApproveUrl, pairQrMatrix, pairQrSvg } from "./pairQr.js";
+import { REVIEWER_MAX_FAILURES, reviewerCodeMatches, reviewerMode } from "./reviewer.js";
 import { AGENT_NAME_MAX, MCP_CLIENT_PREFIX, MCP_GRANT_SCOPE, MCP_SCOPES, issueMcpTokens, redeemMcpRefresh, revokeMcpToken, settleNewAgent } from "./tokens.js";
 
 // OAuth 2.1 for the MCP task connector on api.septena.app (phase 2,
@@ -224,6 +229,8 @@ export async function pairContinue(c: Context<{ Bindings: Env }>) {
     JSON.stringify({
       userId: approval.userId,
       timeZone: approval.timeZone,
+      approvedVia: approval.approvedVia,
+      approvedAt: approval.approvedAt,
       label: approval.label,
       replaces: approval.replaces,
       clientId: pending.clientId,
@@ -251,12 +258,97 @@ export async function pairContinue(c: Context<{ Bindings: Env }>) {
 interface StoredCode {
   userId: string;
   timeZone?: string;
+  approvedVia?: "app" | "email" | "oidc";
+  approvedAt?: number;
   /// The agent's name and the agent it replaces, from the approval.
   label?: string;
   replaces?: string;
   clientId: string;
   redirectUri: string;
   codeChallenge: string;
+}
+
+export { pairOidcStart as pairOidc };
+
+// ---- the page's email path (ADR 0047, issue #636) ----
+
+const zPairEmailBody = z.object({
+  email: zEmailAddress,
+  code: z.string().trim().regex(/^\d{6}$/),
+  timeZone: z.string().max(64).optional(),
+}).strict();
+
+/// POST /oauth/pair/email: the authorize page's own email form. The pairing
+/// cookie proves this browser opened the code; the email code proves the
+/// account. A right code approves the pairing for that account, and the page
+/// then finishes through /oauth/pair/continue as after an app approval.
+export async function pairEmail(c: Context<{ Bindings: Env }>) {
+  const noStore = { "Cache-Control": "no-store" };
+  if (c.req.header("Origin") !== c.env.API_PUBLIC_URL) return c.json({ error: "origin_not_allowed" }, 403, noStore);
+  const cookie = readCookie(c.req.raw, PAIR_COOKIE) ?? "";
+  const [rawCode, pendingId] = cookie.split(".");
+  const code = rawCode ? normalizePairCode(rawCode) : null;
+  if (!code || !pendingId) return c.json({ error: "expired_or_unknown" }, 410, noStore);
+  let raw: unknown;
+  try { raw = await c.req.json(); } catch { return c.json({ error: "invalid_request" }, 400, noStore); }
+  const body = zPairEmailBody.safeParse(raw);
+  if (!body.success) return c.json({ error: "invalid_request" }, 400, noStore);
+
+  const pairing = pairingFor(c.env, code);
+  if ((await pairing.status(pendingId, "connector")).status !== "pending") {
+    return c.json({ error: "expired_or_unknown" }, 410, noStore);
+  }
+  const account = await verifyEmailAccount(c.env, body.data, c.req.header("CF-Connecting-IP"));
+  if (!account.ok) {
+    return c.json({ error: account.error, ...(account.attemptsLeft !== undefined ? { attemptsLeft: account.attemptsLeft } : {}) }, account.status, noStore);
+  }
+  const timeZone = body.data.timeZone && isValidTz(body.data.timeZone) ? body.data.timeZone : undefined;
+  const res = await pairing.approve({ userId: account.userId, timeZone, approvedVia: "email", approvedAt: Date.now() }, "connector");
+  if (res.outcome !== "ok") return c.json({ error: "expired_or_unknown" }, 410, noStore);
+  logEvent("preview_pair_approve", { ok: true, kind: "connector", via: "email", created: account.created });
+  return c.json({ ok: true }, 200, noStore);
+}
+
+// ---- the page's reviewer path (ADR 0055, septena#85) ----
+
+const zPairReviewerBody = z.object({ code: z.string().trim().min(1).max(200) }).strict();
+
+/// POST /oauth/pair/reviewer: a directory reviewer types the reviewer code on
+/// the authorize page. The pairing cookie proves this browser opened the
+/// pairing; a right code approves it for the demo account and nothing else.
+/// Off (404) unless reviewer mode is on. The code is never logged.
+export async function pairReviewer(c: Context<{ Bindings: Env }>) {
+  const noStore = { "Cache-Control": "no-store" };
+  const mode = reviewerMode(c.env);
+  if (!mode) return c.json({ error: "not_found" }, 404, noStore);
+  if (c.req.header("Origin") !== c.env.API_PUBLIC_URL) return c.json({ error: "origin_not_allowed" }, 403, noStore);
+  const cookie = readCookie(c.req.raw, PAIR_COOKIE) ?? "";
+  const [rawCode, pendingId] = cookie.split(".");
+  const code = rawCode ? normalizePairCode(rawCode) : null;
+  if (!code || !pendingId) return c.json({ error: "expired_or_unknown" }, 410, noStore);
+  let raw: unknown;
+  try { raw = await c.req.json(); } catch { return c.json({ error: "invalid_request" }, 400, noStore); }
+  const body = zPairReviewerBody.safeParse(raw);
+  if (!body.success) return c.json({ error: "invalid_request" }, 400, noStore);
+
+  const ip = c.req.header("CF-Connecting-IP") ?? "unknown";
+  if ((await ipRateCount(c.env, "rl:reviewer", ip)) >= REVIEWER_MAX_FAILURES) {
+    logEvent("reviewer_pair", { ok: false, reason: "ip_limited" });
+    return c.json({ error: "too_many_attempts" }, 429, noStore);
+  }
+  const pairing = pairingFor(c.env, code);
+  if ((await pairing.status(pendingId, "connector")).status !== "pending") {
+    return c.json({ error: "expired_or_unknown" }, 410, noStore);
+  }
+  if (!(await reviewerCodeMatches(c.env, body.data.code))) {
+    await noteIpRateEvent(c.env, "rl:reviewer", ip);
+    logEvent("reviewer_pair", { ok: false, reason: "wrong_code" });
+    return c.json({ error: "invalid_code" }, 401, noStore);
+  }
+  const res = await pairing.approve({ userId: mode.userId }, "connector");
+  if (res.outcome !== "ok") return c.json({ error: "expired_or_unknown" }, 410, noStore);
+  logEvent("reviewer_pair", { ok: true });
+  return c.json({ ok: true }, 200, noStore);
 }
 
 // ---- device sign-in by approval (ADR 0016, issue #170) ----
@@ -572,7 +664,21 @@ export async function token(c: Context<{ Bindings: Env }>) {
     return c.json({ error: "invalid_grant" }, 400);
   }
 
-  if (!(await storeFor(c.env, stored.userId).hasAppSession())) {
+  const store = storeFor(c.env, stored.userId);
+  if (stored.approvedVia === "email" || stored.approvedVia === "oidc") {
+    // Email or OIDC approval on the authorize page can create an agent-first
+    // account with no app session yet (ADR 0047, ADR 0056). Refuse only if the
+    // account was deleted after approval or no longer has an identity.
+    const accounts = accountStoreFor(c.env);
+    const [identities, deletedAt] = await Promise.all([
+      accounts ? accounts.listIdentitiesForUser(stored.userId) : Promise.resolve([{ userId: stored.userId }]),
+      store.deletedAt(),
+    ]);
+    if (identities.length === 0 || (stored.approvedAt !== undefined && deletedAt >= stored.approvedAt)) {
+      logEvent("preview_oauth_token", { ok: false, grantType, clientId, reason: "account_deleted" });
+      return c.json({ error: "invalid_grant" }, 400);
+    }
+  } else if (!(await store.hasAppSession())) {
     logEvent("preview_oauth_token", { ok: false, grantType, clientId, reason: "no_app_session" });
     return c.json({ error: "invalid_grant" }, 400);
   }
@@ -625,34 +731,165 @@ export const PAGE_CSS = `
     .small { color: #888; }
   }`;
 
+const EMAIL_FORM_CSS = `
+  .alt { border-top: 1px solid #e5e5e5; margin-top: 18px; padding-top: 18px; }
+  .alt form { display: flex; gap: 8px; margin: 0 0 10px; }
+  .alt input { flex: 1; min-width: 0; font: inherit; font-size: 15px; padding: 9px 11px; border-radius: 9px;
+    border: 1px solid #d0d0d0; background: transparent; color: inherit; }
+  .alt button { font: inherit; font-size: 15px; font-weight: 600; padding: 9px 14px; border-radius: 9px; border: 0;
+    background: #1a1a1a; color: #fff; cursor: pointer; }
+  .alt button:disabled { opacity: 0.5; cursor: default; }
+  .alt .err { color: #c0392b; }
+  .providers { display: flex; flex-direction: column; gap: 8px; margin: 0 0 12px; }
+  .providers a { display: block; text-align: center; text-decoration: none; font: inherit; font-size: 15px; font-weight: 600;
+    padding: 10px 14px; border-radius: 9px; border: 1px solid #d0d0d0; color: inherit; }
+  @media (prefers-color-scheme: dark) {
+    .alt { border-color: #2a2a2a; }
+    .alt input, .providers a { border-color: #3a3a3a; }
+    .alt button { background: #f5f5f5; color: #111; }
+  }`;
+
+function oidcProvidersHtml(env: Env): string {
+  const enabled = enabledOidcWebProviders(env);
+  if (enabled.length === 0) return "";
+  const buttons = enabled.map((id) => {
+    const method = SIGN_IN.methods.find((m) => m.id === id);
+    const title = method?.title ?? `Continue with ${id}`;
+    return `<a href="/oauth/pair/oidc/${id}">${escapeHtml(title)}</a>`;
+  }).join("");
+  return `<section class="alt" id="oidc-providers"><p>${escapeHtml(SIGN_IN.copy.subheading)}</p><div class="providers">${buttons}</div></section>`;
+}
+
+// Email sign-in on the connector page (ADR 0047, issue #636). A person with
+// no signed-in app nearby connects with an email code; a new address starts a
+// new account. Copy comes from registry/sign-in.json.
+const EMAIL_METHOD = SIGN_IN.methods.find((m) => m.id === "email")!;
+const EMAIL_FORM_HTML = `<section class="alt" id="email">
+      <p><b>${escapeHtml(EMAIL_METHOD.title)}</b>. ${escapeHtml(SIGN_IN.copy.subheading)}</p>
+      <form id="email-start"><input id="email-address" type="email" autocomplete="email" placeholder="${escapeHtml(SIGN_IN.email.emailPlaceholder)}" required aria-label="${escapeHtml(SIGN_IN.email.emailLabel)}"><button type="submit">${escapeHtml(SIGN_IN.email.sendCode)}</button></form>
+      <form id="email-verify" hidden><input id="email-code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required aria-label="${escapeHtml(SIGN_IN.email.codeLabel)}"><button type="submit">${escapeHtml(SIGN_IN.email.signIn)}</button></form>
+      <p class="small" id="email-note" role="status"></p>
+    </section>`;
+
+// The reviewer form (ADR 0055): only while reviewer mode is on. Directory
+// reviewers find the code in the submission notes; nobody else has it.
+const REVIEWER_FORM_HTML = `<section class="alt" id="reviewer">
+      <p><b>Directory reviewer?</b> Use the demo account. Type the reviewer code from the submission notes.</p>
+      <form id="reviewer-form"><input id="reviewer-code" type="password" autocomplete="off" required aria-label="Reviewer code"><button type="submit">Use the demo account</button></form>
+      <p class="small" id="reviewer-note" role="status"></p>
+    </section>`;
+
+const REVIEWER_PAGE_JS = `(() => {
+  const form = document.getElementById("reviewer-form");
+  if (!form) return;
+  const note = document.getElementById("reviewer-note");
+  const say = (t) => { note.textContent = t; note.className = "small err"; };
+  const errors = { invalid_code: "That code is not right.", too_many_attempts: "Too many tries. Wait ten minutes and connect again.", expired_or_unknown: "This sign-in expired. Connect again." };
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault(); const b = form.querySelector("button"); b.disabled = true;
+    try {
+      const r = await fetch("/oauth/pair/reviewer", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code: document.getElementById("reviewer-code").value }) });
+      if (r.ok) { location.href = "/oauth/pair/continue"; return; }
+      const j = await r.json().catch(() => null);
+      say((j && errors[j.error]) || "Something went wrong. Try again.");
+    } catch { say("Something went wrong. Try again."); }
+    b.disabled = false;
+  });
+})();`;
+
+// The page script. Strings arrive as JSON, so registry text never meets the
+// script as code.
+const PAIR_PAGE_TEXT = JSON.stringify({ email: SIGN_IN.email, errors: SIGN_IN.errors }).replace(/</g, "\\u003c");
+const PAIR_PAGE_JS = `(() => {
+  const T = ${PAIR_PAGE_TEXT};
+  const go = () => { location.href = "/oauth/pair/continue"; };
+  let busy = false;
+  setInterval(async () => {
+    if (busy) return;
+    try {
+      const r = await fetch("/oauth/pair/continue", { redirect: "manual", credentials: "same-origin" });
+      if (r.type === "opaqueredirect" || r.status !== 200) go();
+    } catch {}
+  }, 3000);
+  const start = document.getElementById("email-start");
+  if (!start) return;
+  const verify = document.getElementById("email-verify");
+  const note = document.getElementById("email-note");
+  const addr = document.getElementById("email-address");
+  const codeIn = document.getElementById("email-code");
+  const say = (t, err) => { note.textContent = t; note.className = err ? "small err" : "small"; };
+  const errors = {
+    invalid_request: T.errors.invalidEmail,
+    too_many_requests: T.errors.rateLimited,
+    too_many_attempts: T.errors.tooManyTries,
+    expired_or_unknown: T.errors.codeExpired,
+  };
+  const fail = (j) => {
+    if (j && j.error === "invalid_code") {
+      const n = j.attemptsLeft;
+      return say((n === 1 ? T.errors.wrongCode.one : T.errors.wrongCode.other).replace("{count}", String(n)), true);
+    }
+    say((j && errors[j.error]) || T.errors.network, true);
+  };
+  start.addEventListener("submit", async (e) => {
+    e.preventDefault(); busy = true; start.querySelector("button").disabled = true;
+    try {
+      const r = await fetch("/v1/auth/email/start", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: addr.value }) });
+      if (r.status === 202) { verify.hidden = false; codeIn.focus(); say(T.email.codeSent.replace("{email}", addr.value.trim())); start.querySelector("button").textContent = T.email.resend; }
+      else fail(await r.json().catch(() => null));
+    } catch { fail(null); }
+    start.querySelector("button").disabled = false; busy = false;
+  });
+  verify.addEventListener("submit", async (e) => {
+    e.preventDefault(); busy = true; verify.querySelector("button").disabled = true;
+    try {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const r = await fetch("/oauth/pair/email", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: addr.value, code: codeIn.value.trim(), timeZone: tz }) });
+      if (r.ok) { go(); return; }
+      fail(await r.json().catch(() => null));
+    } catch { fail(null); }
+    verify.querySelector("button").disabled = false; busy = false;
+  });
+})();`;
+
 function pairPage(
   c: Context<{ Bindings: Env }>,
   opts: { code: string; clientName: string; redirectHost: string; setCookie?: string },
 ) {
   const shown = `${opts.code.slice(0, 4)}-${opts.code.slice(4)}`;
+  const client = escapeHtml(opts.clientName);
   const back = opts.redirectHost
-    ? `<p class="small">After you approve, this page sends you back to <b>${escapeHtml(opts.redirectHost)}</b>. If you did not start this from Claude, close this page.</p>`
-    : `<p class="small">If you did not start this from Claude, close this page.</p>`;
+    ? `<p class="small">After you approve, this page sends you back to <b>${escapeHtml(opts.redirectHost)}</b>. If you did not start this from ${client}, close this page.</p>`
+    : `<p class="small">If you did not start this from ${client}, close this page.</p>`;
+  // The app's row is labelled "Connect Claude" (registry/settings.json
+  // claude_pairing), but it pairs every MCP client. Say so to other clients.
+  const appPath = "Septena &#9656; Settings &#9656; AI &amp; Agents &#9656; Connect Claude";
+  const appPathNote = /^claude\b/i.test(opts.clientName) ? "" : " (it connects every agent)";
   const html = `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta http-equiv="refresh" content="3;url=/oauth/pair/continue">
+<noscript><meta http-equiv="refresh" content="3;url=/oauth/pair/continue"></noscript>
 <title>Connect Septena tasks</title>
-<style>${PAGE_CSS}</style>
+<style>${PAGE_CSS}${EMAIL_FORM_CSS}</style>
 </head>
 <body>
   <main class="card">
-    <h1>Connect ${escapeHtml(opts.clientName)} to your Septena tasks</h1>
-    <p>On your iPhone or iPad, open Septena &#9656; Settings &#9656; Connect Claude, tap Scan Code and point the camera at this QR code:</p>
+    <h1>Connect ${client} to your Septena tasks</h1>
+    <p>On a device where you are signed in, open ${appPath}${appPathNote}, tap Scan Code and point the camera at this QR code:</p>
     <div class="qr">${pairQrSvg(pairApproveUrl(c.env.API_PUBLIC_URL, opts.code), `Sign-in code ${shown}`)}</div>
-    <p>Or enter the code by hand (on Mac: Settings &#9656; AI &amp; Agents):</p>
+    <p>Or enter this code there by hand:</p>
     <div class="code">${escapeHtml(shown)}</div>
-    <p>${escapeHtml(opts.clientName)} will be able to read and change your tasks.</p>
+    <p>${client} will be able to read and change your tasks.</p>
     <p class="small">The code works for 10 minutes. This page checks for your approval every few seconds.</p>
+    ${oidcProvidersHtml(c.env)}
+    ${emailSignInEnabled(c.env) ? EMAIL_FORM_HTML : ""}
+    ${reviewerMode(c.env) ? REVIEWER_FORM_HTML : ""}
     ${back}
   </main>
+  <script>${PAIR_PAGE_JS}</script>
+  ${reviewerMode(c.env) ? `<script>${REVIEWER_PAGE_JS}</script>` : ""}
 </body>
 </html>`;
   const headers: Record<string, string> = {

@@ -1,5 +1,6 @@
 import type { Env } from "../env.js";
-import { logEvent, randomId, sha256Base64Url } from "../util.js";
+import { base64url, fromBase64Url, logEvent, randomId, sha256Base64Url } from "../util.js";
+import { AGENT_KEY_CLIENT } from "../store/sessions.js";
 import { getClient } from "../storage.js";
 import { issuesSignedTokens, logRenewal, mintRefresh, readRefresh, signAccessToken, storeFor, verifyAccessToken, type MintedRefresh } from "../api/session.js";
 import type { SessionGrant } from "../store/sessions.js";
@@ -15,6 +16,7 @@ import { planFor } from "../entitlement/entitlement.js";
 // Distinct prefixes keep the token kinds apart, and the signature covers them:
 //   sa1.  / sr2.   app session (session.ts)       — never accepted here
 //   sm2.  / smr2.  MCP task connector (this file) — accepted by /mcp and /v1/agent/events/stream only
+//   sk1.           agent key (#86, this file)     — accepted where sm2. is
 // Tokens from before ADR 0040 (`sm1.`, `smr1.`) lived in KV under `v2:`. They
 // still work. Until SIGNED_SESSIONS they are also still issued; after it an
 // `smr1.` moves into the store on its next renewal. Remove both paths 31 days
@@ -87,7 +89,72 @@ export interface McpTokenResponse {
 }
 
 export function isMcpAccessToken(token: string): boolean {
-  return token.startsWith(`${ACCESS_PREFIX}.`) || token.startsWith(LEGACY_ACCESS_PREFIX);
+  return token.startsWith(`${ACCESS_PREFIX}.`) || token.startsWith(LEGACY_ACCESS_PREFIX) || isAgentKey(token);
+}
+
+// ---- agent keys (#86) ----
+// For agents that cannot hold an OAuth sign-in: scripts, cron, n8n, a CLI.
+// `sk1.<user id, base64url>.<key id>.<secret>`. The user id routes the call
+// to the user's store, and the store alone says if the key is good: it holds
+// the hash of the secret, as an agent session (store/sessions.ts). A key
+// never expires. The user revokes it in the Agents list.
+
+const KEY_PREFIX = "sk1.";
+
+export function isAgentKey(token: string): boolean {
+  return token.startsWith(KEY_PREFIX);
+}
+
+export interface CreatedAgentKey {
+  /// The key's id: the agent's row in the Agents list.
+  id: string;
+  /// Shown once. Never stored.
+  key: string;
+  name: string;
+  scope: string;
+}
+
+export async function createAgentKey(
+  env: Env,
+  userId: string,
+  name: string,
+  scope: string,
+  timeZone?: string,
+): Promise<CreatedAgentKey> {
+  const id = randomId(16);
+  const secret = randomId(32);
+  const key = `${KEY_PREFIX}${base64url(new TextEncoder().encode(userId))}.${id}.${secret}`;
+  const store = storeFor(env, userId);
+  await store.createAgentKey(id, await sha256Base64Url(secret), name, scope, Date.now(), timeZone);
+  try {
+    const count = await store.connectedAgentCount();
+    const limit = (await planFor(env, userId)).limits.connectedAgents;
+    if (limit !== null && count > limit) logEvent("agent_limit_over", { userId, count, limit, enforced: false });
+  } catch (e) {
+    logEvent("agent_key_settle_failed", { error: String(e) });
+  }
+  return { id, key, name, scope };
+}
+
+function parseAgentKey(raw: string): { userId: string; id: string; secret: string } | null {
+  if (!isAgentKey(raw) || raw.length > MAX_TOKEN_LENGTH) return null;
+  const parts = raw.slice(KEY_PREFIX.length).split(".");
+  if (parts.length !== 3 || parts.some((p) => !/^[A-Za-z0-9_-]+$/.test(p))) return null;
+  let userId: string;
+  try {
+    userId = new TextDecoder("utf-8", { fatal: true }).decode(fromBase64Url(parts[0]));
+  } catch {
+    return null;
+  }
+  return userId ? { userId, id: parts[1], secret: parts[2] } : null;
+}
+
+async function verifyAgentKey(env: Env, raw: string): Promise<McpGrant | null> {
+  const parsed = parseAgentKey(raw);
+  if (!parsed) return null;
+  const grant = await storeFor(env, parsed.userId).authorizeAgentKey(parsed.id, await sha256Base64Url(parsed.secret));
+  if (!grant || grant.clientId !== AGENT_KEY_CLIENT) return null;
+  return { userId: parsed.userId, clientId: grant.clientId, scope: grant.scope, timeZone: grant.timeZone, familyId: parsed.id };
 }
 
 async function tokenResponse(env: Env, userId: string, familyId: string, scope: string, refresh: MintedRefresh): Promise<McpTokenResponse> {
@@ -149,6 +216,7 @@ export async function issueMcpTokens(env: Env, grant: McpGrant, familyId = rando
 /// prefix, signature, expiry or ended session.
 export async function verifyMcpAccess(env: Env, raw: string): Promise<McpGrant | null> {
   if (raw.length > MAX_TOKEN_LENGTH) return null;
+  if (isAgentKey(raw)) return verifyAgentKey(env, raw);
   if (raw.startsWith(LEGACY_ACCESS_PREFIX)) return verifyLegacyAccess(env, raw);
   const claims = await verifyAccessToken(env, raw, ACCESS_PREFIX);
   if (!claims?.rt) return null;
@@ -304,6 +372,13 @@ export async function redeemMcpRefresh(env: Env, raw: string, clientId: string):
 /// Unknown tokens are not an error.
 export async function revokeMcpToken(env: Env, raw: string): Promise<"access" | "refresh" | "none"> {
   if (raw.length > MAX_TOKEN_LENGTH) return "none";
+  if (isAgentKey(raw)) {
+    // A key is its own refresh token: revoking it ends the agent.
+    const grant = await verifyAgentKey(env, raw);
+    if (!grant?.familyId) return "none";
+    await endFamily(env, grant.userId, grant.familyId);
+    return "refresh";
+  }
   const claims = await verifyAccessToken(env, raw, ACCESS_PREFIX);
   if (claims?.rt) return (await storeFor(env, claims.userId).revokeSessionAccess(claims.sid, claims.rt)) ? "access" : "none";
   if (raw.startsWith(LEGACY_ACCESS_PREFIX)) {

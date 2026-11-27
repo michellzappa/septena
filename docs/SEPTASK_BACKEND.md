@@ -87,7 +87,10 @@ iOS / Mac / Watch apps                 Claude (web, mobile, Code, agents)
   /v1/attachments/:id`), not signed URLs: no S3 credentials to manage, and
   the 25 MB limit is under the Worker's request-body cap. The client pushes
   the attachment row first, then uploads bytes whose length must equal its
-  `byteCount`.
+  `byteCount`. An agent adds a file (10 MB at most) with
+  `tasks_attachment_add`, in the call or with a one-time signed token on
+  `PUT /v1/agent/upload`; it cannot read or delete files
+  (`backend/src/shadow/attachments.ts`).
 - **Stack:** Workers + Hono + Durable Objects (SQLite) + R2, Zod at every
   boundary. Matches the gateway, which is already a Worker.
 
@@ -109,13 +112,13 @@ iOS / Mac / Watch apps                 Claude (web, mobile, Code, agents)
   retired 2026-11-21; the column stays on the wire only so older clients'
   pushes still validate.)
 - Dates keep their current shapes (`YYYY-MM-DD` strings for `created`,
-  `scheduled`, `deadline`, `todaySetOn`; the existing `completedAt` string).
+  `scheduled`, `deadline`, `deferredDeadline`, `todaySetOn`; the existing `completedAt` string).
   Changing them is a separate decision, not part of the move.
 
 ### 5.2 Tables
 
 **tasks:** id, title, status, kind, heading, area, project, created,
-scheduled, deadline, today, todaySetOn, completedAt, notes, position,
+scheduled, deadline, deferredDeadline, today, todaySetOn, completedAt, notes, position,
 todayPosition, recurrenceUnit, recurrenceInterval, recurrenceAfterCompletion,
 recurrencePaused, recurrenceSeriesID, recurrenceAnchorDate, source,
 sourceClient, acknowledgedAt, createdAt, rev, updatedAt, deletedAt.
@@ -170,6 +173,10 @@ seeded from that row, and a seeded value is pushed only for a key the first
 pull did not bring, so a value another device pushed wins. Device-only
 preferences stay in local defaults.
 
+**do_sessions** (entity `doSession`, pull flag `doSessions=1`): one row for each
+Do. The columns are in `backend/src/store/columns.ts`. The rules, the REST verbs
+and what agents may do are in `docs/DO_SPEC.md`.
+
 **changes:** rev, entity, id, op (`upsert` / `delete` / `dropped`), fields (JSON of the
 changed field names), clientOpId, actor (`app:<device>` / `mcp:<client>`),
 at. This is the sync log and the audit log.
@@ -190,7 +197,9 @@ appends never overwrite each other.
 
 `POST /v1/sync/push` with a batch of ops:
 
-- `{ clientOpId, entity, id, op: "upsert", fields: { … only changed fields … } }`
+- `{ clientOpId, entity, id, op: "upsert", fields: { … only changed fields … }, base? }`.
+  `base: { notes }` (task and project) is the notes the edit started from. The
+  DO merges when the row changed meanwhile, and the client pulls the result.
 - `{ clientOpId, entity, id, op: "delete" }`
 - `{ clientOpId, op: "appendTurn", taskId, turn }`
 
@@ -396,6 +405,28 @@ tasks through CloudKit.
   named in `replaces` on the approval, so one agent stays one row.
   `GET /v1/access` returns `agents: {count, limit}`; the plan limit
   `connectedAgents` only logs (`agent_limit_over`), it never blocks.
+- **Agent keys (2026-11-26, #86).** For agents that cannot hold an OAuth
+  sign-in (scripts, cron, n8n, a CLI). `POST /v1/access/keys
+  {name, access: "read"|"write"}` (an app session only; default `write`)
+  returns `{id, key, name, scope}` once. The key is
+  `sk1.<user id, base64url>.<id>.<secret>`; the store keeps only the hash
+  of the secret, as an agent session with client `septena-agent-key` and
+  a connection row named `name` (client name "Agent key"). So the key is
+  one row in the Agents list, and rename, disconnect
+  (`DELETE /v1/access/connections/:id`), Stop, Pause all agents and
+  account deletion cover it. It is accepted wherever an `sm2.` token is:
+  `Authorization: Bearer sk1.…` on `/mcp` and
+  `/v1/agent/events/stream`. A key never expires and stays in the list
+  while unused. `POST /oauth/revoke` with the key ends it. It does not
+  reach the app routes under `/v1` (the public REST API is #90). Keys
+  count toward `connectedAgents` (log-only). Writes and claims use the key's
+  name.
+- **Waiting (2026-11-26, ADR 0053, #669).** Task fields `waitingOn` (who,
+  ≤80 chars) and `waitingSince` (day). A write that sets `waitingOn` without
+  `waitingSince` gets today (UTC); clearing `waitingOn` clears both. A
+  waiting task never fades (`fadeEnds`, `fadeIsStale`). An agent may set a
+  wait but not clear it, nor complete, cancel or delete a waiting task
+  (`in_review`). MCP `tasks_set_waiting`, `tasks_list view=waiting`.
 - Attachment limits: **25 MB per file, 2 GB per user.** The Worker checks
   both before it mints an upload URL, and the app checks the file size before
   upload so the user sees the error at once.

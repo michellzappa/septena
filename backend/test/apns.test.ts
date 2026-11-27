@@ -14,7 +14,7 @@ const {
   mintApnsJwt,
   parsePkcs8Pem,
   readApnsConfig,
-  sendAgentQuestionPushes,
+  sendAgentPushes,
   setApnsFetchForTests,
 } = await import("../src/api/apns.ts");
 
@@ -175,7 +175,7 @@ describe("APNs push delivery, missing secrets no-op, and 410/BadDeviceToken prun
     assert.equal(readApnsConfig({ APNS_KEY: "abc", APNS_KEY_ID: "kid" }), null);
 
     let fetchCalled = false;
-    const res = await sendAgentQuestionPushes(
+    const res = await sendAgentPushes(
       {},
       {
         taskId: "t-1",
@@ -216,7 +216,7 @@ describe("APNs push delivery, missing secrets no-op, and 410/BadDeviceToken prun
       return new Response(null, { status: 500 });
     };
 
-    const res = await sendAgentQuestionPushes(
+    const res = await sendAgentPushes(
       { APNS_KEY: pem, APNS_KEY_ID: "KID9999999", APNS_TEAM_ID: "TEAM999999" },
       {
         taskId: "t-prune",

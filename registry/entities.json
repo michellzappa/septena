@@ -26,7 +26,7 @@
     "attachmentPointerMax": 4000,
     "stampMax": 40,
     "maxAttachmentBytes": 26214400,
-    "maxUserAttachmentBytes": 2147483648,
+    "maxUserAttachmentBytes": 53687091200,
     "maxOpsPerPush": 500,
     "maxPull": 1000,
     "maxChecklistItemsPerTask": 200,
@@ -36,6 +36,8 @@
     "maxRefsPerTask": 20,
     "refKeyMax": 1000,
     "refSnapshotMax": 2048,
+    "doPlannedMinutesMax": 240,
+    "doNoteMax": 500,
     "maxArtifactRefs": 100,
     "turnProviderMax": 32,
     "turnQuestionMax": 10000,
@@ -94,6 +96,7 @@
         "durationMinutes": { "kind": "int", "min": 5, "max": 1440, "nullable": true },
         "timeZone": { "kind": "text", "max": 64, "nullable": true },
         "deadline": { "kind": "text", "format": "day", "nullable": true },
+        "deferredDeadline": { "kind": "text", "format": "day", "nullable": true },
         "today": { "kind": "bool", "default": 0 },
         "starred": { "kind": "bool", "default": 0 },
         "tags": { "kind": "json", "maxJsonLength": 4000, "nullable": true },
@@ -122,6 +125,8 @@
         "touchedAt": { "kind": "text", "format": "stamp", "max": 40, "nullable": true },
         "deferCount": { "kind": "int", "min": 0, "default": 0 },
         "fadedAt": { "kind": "text", "format": "stamp", "max": 40, "nullable": true },
+        "waitingOn": { "kind": "text", "max": 80, "nullable": true },
+        "waitingSince": { "kind": "text", "format": "day", "nullable": true },
         "dropReason": { "kind": "text", "max": 16, "nullable": true },
         "effort": { "kind": "text", "max": 16, "nullable": true },
         "assignedTo": { "kind": "text", "max": 64, "nullable": true }
@@ -216,6 +221,23 @@
         "name": { "kind": "text", "max": 64, "nullable": false },
         "color": { "kind": "text", "max": 32, "nullable": true },
         "position": { "kind": "int", "nullable": true }
+      }
+    },
+    "doSession": {
+      "table": "do_sessions",
+      "deletable": true,
+      "requiredOnInsert": ["taskId", "startedAt"],
+      "updatable": ["plannedMinutes", "confirmedAt", "endedAt", "exit", "lapsed", "note"],
+      "columns": {
+        "taskId": { "kind": "text", "format": "id", "nullable": false },
+        "startedAt": { "kind": "text", "format": "stamp", "max": 40, "nullable": false },
+        "plannedMinutes": { "kind": "int", "min": 1, "max": 240, "nullable": true },
+        "confirmedAt": { "kind": "text", "format": "stamp", "max": 40, "nullable": true },
+        "endedAt": { "kind": "text", "format": "stamp", "max": 40, "nullable": true },
+        "exit": { "kind": "text", "enum": "doExit", "nullable": true },
+        "lapsed": { "kind": "bool", "default": 0 },
+        "note": { "kind": "text", "max": 500, "nullable": true },
+        "sourceClient": { "kind": "text", "max": 64, "nullable": true }
       }
     },
     "convo": {

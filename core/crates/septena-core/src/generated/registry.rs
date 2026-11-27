@@ -31,7 +31,7 @@ pub mod limits {
     pub const ATTACHMENT_POINTER_MAX: i64 = 4000;
     pub const STAMP_MAX: i64 = 40;
     pub const MAX_ATTACHMENT_BYTES: i64 = 26214400;
-    pub const MAX_USER_ATTACHMENT_BYTES: i64 = 2147483648;
+    pub const MAX_USER_ATTACHMENT_BYTES: i64 = 53687091200;
     pub const MAX_OPS_PER_PUSH: i64 = 500;
     pub const MAX_PULL: i64 = 1000;
     pub const MAX_CHECKLIST_ITEMS_PER_TASK: i64 = 200;
@@ -41,6 +41,8 @@ pub mod limits {
     pub const MAX_REFS_PER_TASK: i64 = 20;
     pub const REF_KEY_MAX: i64 = 1000;
     pub const REF_SNAPSHOT_MAX: i64 = 2048;
+    pub const DO_PLANNED_MINUTES_MAX: i64 = 240;
+    pub const DO_NOTE_MAX: i64 = 500;
     pub const MAX_ARTIFACT_REFS: i64 = 100;
     pub const TURN_PROVIDER_MAX: i64 = 32;
     pub const TURN_QUESTION_MAX: i64 = 10000;
@@ -222,6 +224,7 @@ pub mod entity_names {
     pub const CHECKLIST_ITEM: &str = "checklistItem";
     pub const TASK_REF: &str = "taskRef";
     pub const TAG: &str = "tag";
+    pub const DO_SESSION: &str = "doSession";
     pub const CONVO: &str = "convo";
     pub const SETTING: &str = "setting";
 }

@@ -50,6 +50,19 @@ final class AgentRoster {
     await refresh()
   }
 
+  /// Creates an agent key (#86). Returns the key to show once, or nil.
+  func createKey(name: String) async -> String? {
+    defer { Task { await refresh() } }
+    do {
+      let created = try await TaskBackendClient.shared.createAgentKey(name: name)
+      lastError = nil
+      return created.key
+    } catch {
+      lastError = error.localizedDescription
+      return nil
+    }
+  }
+
   func disconnect(_ agent: BackendAccess.Connection) async {
     do {
       try await TaskBackendClient.shared.disconnect(connectionID: agent.id)
@@ -75,28 +88,73 @@ struct SeptaskAgentsPane: View {
   }
 }
 
-/// The agent list, with rename and disconnect. The Mac AI & Agents tab shows
+/// The agent list, with rename and disconnect, and New Agent Key for an
+/// agent that cannot sign in (#86). The Mac AI & Agents tab shows
 /// it inline; `SeptaskAgentsPane` wraps it as a page.
 struct SeptaskAgentsSections: View {
   private var roster: AgentRoster { .shared }
   private static let section = RegistrySettings.section("agents", page: RegistrySettings.PageID.agents)
   private static let renamePrompt = RegistryPrompts.text[.renameAgent]
+  private static let newKeyPrompt = RegistryPrompts.text[.newAgentKey]
+  private static let keyCreatedPrompt = RegistryPrompts.fixed[.agentKeyCreated]
 
   @State private var renaming: BackendAccess.Connection?
   @State private var draftName = ""
   @State private var pendingDisconnect: BackendAccess.Connection?
+  @State private var naming = false
+  @State private var keyName = ""
+  /// The new key, shown once.
+  @State private var createdKey: String?
+  /// The plan sheet, opened from the full-list line, with the moment it
+  /// opened for.
+  @State private var showingPlans = false
+  @State private var plansMoment: String?
 
   var body: some View {
     Section {
       summaryRow
+        .sheet(isPresented: $showingPlans) { SeptaskPlusSheet(upsellID: plansMoment) }
       ForEach(roster.agents) { agent in
         agentRow(agent)
       }
+      agentsFullRow
+      newKeyRow
       if let error = roster.lastError {
         Text(error).font(.caption).foregroundStyle(.red)
       }
     } footer: {
       if let footer = Self.section?.footer { Text(footer) }
+    }
+  }
+
+  /// Every agent slot of the plan is in use: one line that says so and
+  /// what the next plan connects, with the plan sheet one tap away. Free
+  /// opens on Plus, Plus and the trial on Pro (`upsells[].plan`). The server
+  /// only logs past the limit today (#445); the line is the honest state.
+  private var agentsFullMoment: RegistryPlanNote? {
+    guard let access = roster.access, let limit = access.agents?.limit,
+          access.agentCount >= limit, !PlanStatus.shared.isPro else { return nil }
+    return RegistryPlans.upsell(PlanStatus.shared.isPlus ? "agents_full_plus" : "agents_full")
+  }
+
+  @ViewBuilder
+  private var agentsFullRow: some View {
+    if let moment = agentsFullMoment {
+      VStack(alignment: .leading, spacing: 6) {
+        HStack(alignment: .top, spacing: 12) {
+          PlanMark(tier: moment.plan == "pro" ? .pro : .plus, size: 30)
+          VStack(alignment: .leading, spacing: 2) {
+            Text(moment.title).font(.body.weight(.semibold))
+            Text(moment.detail).font(.subheadline).foregroundStyle(.secondary)
+          }
+          .fixedSize(horizontal: false, vertical: true)
+        }
+        Button(moment.plan == "pro" ? RegistryPlans.Paywall.seePro : RegistryPlans.Paywall.seePlus) {
+          plansMoment = moment.id
+          showingPlans = true
+        }
+      }
+      .padding(.vertical, 2)
     }
   }
 
@@ -141,6 +199,35 @@ struct SeptaskAgentsSections: View {
       Button(RegistryPrompts.cancelTitle, role: .cancel) {}
     } message: { agent in
       Text(RegistryPrompts.disconnectAgent(name: agent.displayName).message)
+    }
+  }
+
+  /// New Agent Key: name it, then the key shows once with Copy Key.
+  private var newKeyRow: some View {
+    Button(Self.newKeyPrompt?.title ?? "") {
+      keyName = ""
+      naming = true
+    }
+    .alert(Self.newKeyPrompt?.title ?? "", isPresented: $naming) {
+      TextField(Self.newKeyPrompt?.placeholder ?? "", text: $keyName)
+      Button(Self.newKeyPrompt?.confirmTitle ?? "") {
+        let name = keyName
+        Task { createdKey = await roster.createKey(name: name) }
+      }
+      .disabled(keyName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+      Button(RegistryPrompts.cancelTitle, role: .cancel) {}
+    }
+    .alert(
+      Self.keyCreatedPrompt?.title ?? "",
+      isPresented: Binding(get: { createdKey != nil }, set: { if !$0 { createdKey = nil } }),
+      presenting: createdKey
+    ) { key in
+      Button(Self.keyCreatedPrompt?.confirmTitle ?? "") {
+        SeptenaPasteboard.copy(key)
+        createdKey = nil
+      }
+    } message: { key in
+      Text("\(Self.keyCreatedPrompt?.message ?? "")\n\n\(key)")
     }
   }
 

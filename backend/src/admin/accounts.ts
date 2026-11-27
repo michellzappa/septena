@@ -1,6 +1,6 @@
 import type { Env } from "../env.js";
 import { logEvent } from "../util.js";
-import { isRowActive } from "../entitlement/entitlement.js";
+import { isRowActive, type PaidPlanId } from "../entitlement/entitlement.js";
 import { storeFor } from "../api/session.js";
 import { accountStoreFor, type AccountIndexRow } from "../store/AccountStore.js";
 import type { AccountSummary } from "../store/TaskStore.js";
@@ -59,6 +59,9 @@ export async function sweepAccounts(env: Env, olderThanMs = REFRESH_AFTER_MS, no
 
 // ---- what the page says about an account ----
 
+/// The grant row the admin page writes: one per account.
+export const ADMIN_GRANT_ID = "grant:admin";
+
 export type PlanWord = "paid" | "granted" | "trial" | "lapsed" | "trial over" | "free";
 
 const PAID = new Set(["apple", "stripe", "google"]);
@@ -69,6 +72,10 @@ const isCustomerRow = (e: AccountSummary["entitlements"][number]) =>
 
 export interface PlanView {
   word: PlanWord;
+  /// The plan the account is on now; null on the free account.
+  plan: PaidPlanId | null;
+  /// mz gave this account a plan on the admin page.
+  adminGrant: boolean;
   /// When the active row ends; null = no end or nothing active.
   until: number | null;
   period: "year" | "month" | null;
@@ -83,7 +90,8 @@ export function planView(summary: AccountSummary | null, now = Date.now()): Plan
   const paid = pick((r) => PAID.has(r.source));
   const granted = pick((r) => r.source === "grant");
   const trial = pick((r) => r.source === "trial");
-  const best = paid.length ? paid : granted.length ? granted : trial;
+  const pro = pick((r) => r.plan === "pro");
+  const best = pro.length ? pro : paid.length ? paid : granted.length ? granted : trial;
   const customer = rows.some(isCustomerRow);
   const hadTrial = rows.some((r) => r.source === "trial");
   const word: PlanWord = paid.length ? "paid" : granted.length ? "granted" : trial.length ? "trial"
@@ -91,6 +99,8 @@ export function planView(summary: AccountSummary | null, now = Date.now()): Plan
   const product = paid[0]?.productId ?? "";
   return {
     word,
+    plan: pro.length ? "pro" : active.length ? "plus" : null,
+    adminGrant: rows.some((r) => r.id === ADMIN_GRANT_ID),
     until: best.length && best.every((r) => r.expiresAt !== null) ? Math.max(...best.map((r) => r.expiresAt!)) : null,
     period: /annual|year/.test(product) ? "year" : /month/.test(product) ? "month" : null,
     hadTrial,
@@ -98,7 +108,11 @@ export function planView(summary: AccountSummary | null, now = Date.now()): Plan
   };
 }
 
-const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const WEEK_MS = 7 * DAY_MS;
+
+/// An account that used Septena for real: it completed a task (ADR 0059).
+export const isActivated = (summary: AccountSummary | null) => (summary?.closedTasks ?? 0) >= 1;
 
 /// The funnel counts of docs/SYNC_SUBSCRIPTION_SPEC.md §3.3, from server data.
 export function overview(rows: AccountIndexRow[], now = Date.now()) {
@@ -109,7 +123,10 @@ export function overview(rows: AccountIndexRow[], now = Date.now()) {
   return {
     accounts: rows.length,
     newThisWeek: count((r) => now - r.createdAt < WEEK_MS),
+    activeToday: count((r) => now - (seen(r) ?? 0) < DAY_MS),
     activeThisWeek: count((r) => now - (seen(r) ?? 0) < WEEK_MS),
+    activeThisMonth: count((r) => now - (seen(r) ?? 0) < 30 * DAY_MS),
+    activated: count((r) => isActivated(r.summary)),
     twoDevices: count((r) => (r.summary?.devices.length ?? 0) >= 2),
     withAgent: count((r) => (r.summary?.agents.length ?? 0) > 0),
     agentChangesWeek: rows.reduce((n, r) => n + (r.summary?.agentChangesWeek ?? 0), 0),
@@ -120,6 +137,7 @@ export function overview(rows: AccountIndexRow[], now = Date.now()) {
     paidYear: plans.filter((p) => p.word === "paid" && p.period === "year").length,
     paidMonth: plans.filter((p) => p.word === "paid" && p.period === "month").length,
     granted: plan("granted"),
+    pro: plans.filter((p) => p.plan === "pro").length,
     lapsed: plan("lapsed"),
     openTasks: rows.reduce((n, r) => n + (r.summary?.openTasks ?? 0), 0),
     closedTasks: rows.reduce((n, r) => n + (r.summary?.closedTasks ?? 0), 0),
@@ -134,10 +152,29 @@ export function lastSeen(summary: AccountSummary | null): number | null {
   return times.length ? Math.max(...times) : null;
 }
 
-/// "septask-ios" with its version header; Android puts the version in the name.
+/// The platform behind an `X-Septena-Client` name, in words. Android and web
+/// once put their version in the name (`android 0.9.0`), so those match by prefix.
+export function platformName(client: string | null): string {
+  const c = client ?? "";
+  if (c === "septask-ios") return "iPhone or iPad";
+  if (c === "septask-mac") return "Mac";
+  if (c === "septask-watch") return "Watch";
+  if (/android/i.test(c)) return "Android";
+  if (/web/i.test(c)) return "Web";
+  return c || "unknown";
+}
+
+/// The version a device runs: `X-Septena-Version`, else the version an older
+/// Android or web build put in its client name. Null: a build from before
+/// either.
+export function deviceVersion(d: { client: string | null; version: string | null }): string | null {
+  return d.version ?? /^(?:android|web) (\S.*)$/.exec(d.client ?? "")?.[1] ?? null;
+}
+
+/// "0.9.0" from "0.9.0 (2935)".
+export const marketingVersion = (v: string) => v.replace(/\s*\(.*\)$/, "");
+
 export function deviceLabel(d: { client: string | null; version: string | null }): string {
-  const client = d.client ?? "unknown";
-  const name = client === "septask-ios" ? "iPhone or iPad" : client === "septask-mac" ? "Mac" : client === "septask-watch" ? "Watch"
-    : client.replace(/^android\b/, "Android");
-  return d.version ? `${name} ${d.version}` : name;
+  const v = deviceVersion(d);
+  return v ? `${platformName(d.client)} ${v}` : `${platformName(d.client)}, older build`;
 }

@@ -2,7 +2,6 @@ package app.septena.android.widgets
 
 import app.septena.android.ui.formatShortLocalDay
 import app.septena.core.DayClock
-import app.septena.core.DateBoardRowKinds
 import app.septena.core.JsonValue
 import app.septena.core.RegistryCatalog
 import app.septena.core.TaskFadeRules
@@ -15,7 +14,6 @@ import app.septena.core.generated.RegistryDestinationIds
 import app.septena.core.generated.RegistryEntityEnums
 import app.septena.core.generated.RegistryEntityFields
 import app.septena.core.generated.RegistryEntityNames
-import app.septena.core.generated.RegistryTaskAttributeIds
 import java.time.Instant
 import java.time.LocalDate
 import java.util.Locale
@@ -112,10 +110,7 @@ internal object SeptenaWidgetLoader {
             ?.takeIf(String::isNotBlank).orEmpty()
         val todayLabel = RegistryCatalog.destinationTitle(RegistryDestinationIds.TODAY, languageTag)
             ?.takeIf(String::isNotBlank).orEmpty()
-        val tomorrowLabel = RegistryCatalog.dateBoardRows(
-            RegistryTaskAttributeIds.WHEN,
-            languageTag = languageTag,
-        ).firstOrNull { it.kind == DateBoardRowKinds.TOMORROW }?.label?.takeIf(String::isNotBlank).orEmpty()
+        val tomorrowLabel = RegistryCatalog.tomorrowLabel(languageTag)
         val emptyLabel = RegistryCatalog.destinationEmptyTitle(RegistryDestinationIds.UPCOMING, languageTag)
             ?.takeIf(String::isNotBlank) ?: "Nothing scheduled"
 

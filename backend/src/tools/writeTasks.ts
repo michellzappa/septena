@@ -135,6 +135,7 @@ export const createTaskJsonSchema = {
     deadline: { type: "string", description: "YYYY-MM-DD (hard deadline)" },
     area: { type: "string", description: "Area id (e.g. 'envisioning')" },
     project: { type: "string", description: "Project id (e.g. 'septena')" },
+    heading: { type: "string", description: "Heading id in a project (from tasks_project_get `headings`). Files the task under that heading, in the heading's project." },
     notes: { type: "string", description: "Free-text note body for the task." },
     recurrence: recurrenceJsonSchema,
     reminder_at: {
@@ -199,6 +200,7 @@ export const updateTaskJsonSchema = {
     deadline: { type: ["string", "null"], description: "YYYY-MM-DD, or null to clear" },
     area: { type: ["string", "null"] },
     project: { type: ["string", "null"] },
+    heading: { type: ["string", "null"], description: "Heading id in a project (from tasks_project_get `headings`): files the task under it, in the heading's project. null or \"\" takes it out of its heading. A move to another project or an area without a heading clears it." },
     status: { type: "string", enum: ["open", "cancelled"] },
     notes: { type: ["string", "null"], description: 'Replace the whole note body, or null/"" to clear. To add or change one part, use notes_append or notes_section instead, so you never overwrite edits made since your read.' },
     notes_append: { type: "string", minLength: 1, description: "Add this text on a new line at the end of the notes. Cannot be combined with notes or notes_section." },
@@ -244,6 +246,16 @@ export const deferTaskJsonSchema = {
   properties: { id: { type: "string" }, until: { type: "string", description: "YYYY-MM-DD" } },
 } as const;
 
+export const setWaitingJsonSchema = {
+  type: "object",
+  required: ["id", "waiting_on"],
+  properties: {
+    id: { type: "string" },
+    waiting_on: { type: ["string", "null"], minLength: 1, maxLength: 80, description: "Who the task waits on, as the user says it (\"Anna\", \"the lawyer\"). null ends the wait: only the user may, an agent is refused (in_review)." },
+    scheduled: { type: ["string", "null"], description: "YYYY-MM-DD: the day to chase, the task's When date. null clears it. Omit to keep the date." },
+  },
+} as const;
+
 export const moveToTodayJsonSchema = {
   type: "object",
   required: ["id"],
@@ -266,6 +278,8 @@ export interface CreateTaskInput {
   due?: string;
   area?: string;
   project?: string;
+  /** A heading row's id; the task goes into that heading's project. */
+  heading?: string;
   notes?: string;
   recurrence?: RecurrenceInput | null;
   reminder_at?: string | null;
@@ -302,6 +316,8 @@ export interface UpdateTaskInput {
   due?: string | null;
   area?: string | null;
   project?: string | null;
+  /** A heading row's id, or null / "" to take the task out of its heading. */
+  heading?: string | null;
   status?: "open" | "cancelled";
   notes?: string | null;
   notes_append?: string;
@@ -669,9 +685,10 @@ export const setEndStateJsonSchema = {
     id: { type: "string" },
     endState: {
       type: "string",
-      enum: ["agent_done", "human_done", "agent_assisted_done", "needs_verify", "decomposed", "reminder_set", "promoted_to_today", "wont_do", "open"],
+      enum: ["needs_verify", "decomposed", "open"],
+      description: "needs_verify hands the task to the user's Review. decomposed: the work goes on as an issue or smaller tasks. open undoes decomposed.",
     },
-    note: { type: "string", description: "e.g. needs_verify: what to verify" },
+    note: { type: "string", description: "Required for needs_verify: what the user must check." },
   },
 } as const;
 

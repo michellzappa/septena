@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.sp
@@ -25,6 +26,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -40,6 +42,8 @@ data class CalendarAgendaRow(
     val timeLabel: String? = null,
     val isAllDay: Boolean = false,
     val dayLabel: String? = null,
+    /** ISO day (`YYYY-MM-DD`) used to weave Upcoming events into chronological date buckets. */
+    val dayIso: String? = null,
 )
 
 /**
@@ -52,11 +56,21 @@ data class TaskListItem(
     val id: String,
     val title: String,
     val agentName: String? = null,
+    /** The task is in a shared project, so its row menu offers Assign To. */
+    val canAssign: Boolean = false,
+    /** Who does the task, when that is another member of its shared project. */
+    val assigneeName: String? = null,
+    /** The task waits on a person (docs/REVIEW_SPEC.md §6), so its row menu offers Got It Back. */
+    val isWaiting: Boolean = false,
+    /** "Waiting on Anna · 5 days" (registry copy), or null. */
+    val waitingText: String? = null,
     val subtitle: String? = null,
     val isCompleted: Boolean = false,
     val isOnToday: Boolean = false,
     val isStarred: Boolean = false,
     val isFaded: Boolean = false,
+    /** An agent handed the task over for the user to check, so its row menu offers Accept. */
+    val isInReview: Boolean = false,
     /** Row opacity from the fade fill (1 = full strength), as on iOS. */
     val opacity: Float = 1f,
     /** Structured group header (area/project/agent stage); separates icon/emoji from title for alignment. */
@@ -90,7 +104,7 @@ data class TaskListItem(
     val hasAttachments: Boolean = false,
     /** On-device filing suggestion target title shown as a one-tap capsule on Inbox rows (#368). */
     val filingSuggestionLabel: String? = null,
-    /** Full untruncated agent review note (`endStateNote` or fallback) for Review list rows (#412). */
+    /** Full untruncated agent review note (`endStateNote` or fallback) for Review's Finished work rows (#412). */
     val reviewNote: String? = null,
     /** Single-line Review metadata (`Area › Project · asked {ago} · artifact`). */
     val reviewMeta: String? = null,
@@ -134,6 +148,7 @@ const val SELECTION_WASH_ALPHA = 0.14f
 /** Icon kind for task row context-menu items (matches iOS `UIContextMenu` trailing symbols). */
 enum class TaskMenuActionIcon {
     None,
+    Do,
     When,
     Move,
     Tags,
@@ -148,6 +163,7 @@ enum class TaskMenuActionIcon {
     Restore,
     Check,
     Cancel,
+    Assign,
 }
 
 data class TaskRowMenuAction(
@@ -156,7 +172,29 @@ data class TaskRowMenuAction(
     val isDestructive: Boolean = false,
     val selectedTitle: String? = null,
     val unselectedTitle: String? = null,
+    /** Shows only on a task that can be assigned ([TaskListItem.canAssign]). */
+    val needsAssignees: Boolean = false,
+    /** Shows only on a task handed over for review ([TaskListItem.isInReview]). */
+    val needsReview: Boolean = false,
+    /** Shows only on a faded task ([TaskListItem.isFaded]). */
+    val needsFaded: Boolean = false,
+    /** Shows only on a task that waits on a person ([TaskListItem.isWaiting]). */
+    val needsWaiting: Boolean = false,
     val icon: TaskMenuActionIcon = TaskMenuActionIcon.None,
+) {
+    fun appliesTo(task: TaskListItem): Boolean =
+        (task.canAssign || !needsAssignees) && (task.isInReview || !needsReview) && (task.isFaded || !needsFaded) &&
+            (task.isWaiting || !needsWaiting)
+}
+
+/** The last group of a list, which the user folds (Review's Faded). Its rows carry no group header. */
+data class CollapsibleTaskGroup(
+    val header: TaskGroupHeader,
+    val tasks: List<TaskListItem>,
+    val isExpanded: Boolean,
+    val onToggle: () -> Unit,
+    /** Shown above the rows while the group is open. */
+    val banner: (@Composable () -> Unit)? = null,
 )
 
 /** Portable task-list surface. Platform hosts provide registry copy and bind actions to their mutators. */
@@ -170,6 +208,8 @@ fun TaskHomeContent(
     todayTint: Color,
     hasLoaded: Boolean,
     isToday: Boolean,
+    isUpcoming: Boolean = false,
+    upcomingDayLabelForIso: ((String) -> String)? = null,
     inboxTasks: List<TaskListItem>,
     tasks: List<TaskListItem>,
     calendarEvents: List<CalendarAgendaRow> = emptyList(),
@@ -179,6 +219,8 @@ fun TaskHomeContent(
     rowMenuGroups: List<List<TaskRowMenuAction>>,
     rowMenuAccessibilityLabel: String,
     modifier: Modifier = Modifier,
+    /** Identifies the list on screen. */
+    listKey: Any = Unit,
     fadedTitle: String = "",
     showFadedIndicator: Boolean = false,
     isDarkTheme: Boolean = false,
@@ -199,11 +241,14 @@ fun TaskHomeContent(
     onReorderTaskRow: ((ids: List<String>, index: Int, before: Boolean) -> Unit)? = null,
     onReorderGroupHeader: ((ids: List<String>, targetLocationKey: String) -> Unit)? = null,
     onApplyFilingSuggestion: ((String) -> Unit)? = null,
-    isReviewList: Boolean = false,
     reviewAcceptTitle: String = "",
     reviewSendBackTitle: String = "",
     onAcceptReview: ((String) -> Unit)? = null,
     onSendBackReview: ((String) -> Unit)? = null,
+    collapsibleGroup: CollapsibleTaskGroup? = null,
+    onOpenCollapsibleTask: ((String) -> Unit)? = null,
+    expandedTaskId: String? = null,
+    expandedTaskContent: (@Composable (task: TaskListItem, position: TaskCardPosition, modifier: Modifier) -> Unit)? = null,
 ) {
     val orderedSelectionIds = if (selection.isActive) {
         (inboxTasks + tasks).map(TaskListItem::id).filter { it in selection.selectedIds }
@@ -222,7 +267,10 @@ fun TaskHomeContent(
             )
         }
 
+        // A new list starts with fresh row positions: rows never slide from one list into another.
+        val listState = key(listKey) { rememberLazyListState() }
         LazyColumn(
+            state = listState,
             modifier = Modifier.weight(1f).fillMaxWidth(),
             contentPadding = PaddingValues(bottom = 96.dp),
         ) {
@@ -232,7 +280,7 @@ fun TaskHomeContent(
                 }
             }
 
-            if (calendarEvents.isNotEmpty()) {
+            if (!isUpcoming && calendarEvents.isNotEmpty()) {
                 itemsIndexed(calendarEvents, key = { _, event -> "cal:${event.id}" }) { index, event ->
                     val prevDay = calendarEvents.getOrNull(index - 1)?.dayLabel
                     val showDayHeader = event.dayLabel != null && event.dayLabel != prevDay
@@ -251,51 +299,12 @@ fun TaskHomeContent(
                             ),
                         )
                     }
-                    TaskCardSlice(
+                    CalendarAgendaCardRow(
+                        event = event,
                         position = slicePos,
-                        isSelected = false,
                         isDark = isDarkTheme,
                         hasActiveTexture = hasActiveTexture,
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = TaskCardMetrics.ContentInset, vertical = 6.dp),
-                        ) {
-                            Box(
-                                contentAlignment = Alignment.Center,
-                                modifier = Modifier.width(TaskCardMetrics.LeadingColumnWidth + 14.dp),
-                            ) {
-                                if (event.timeLabel != null) {
-                                    Text(
-                                        text = event.timeLabel,
-                                        style = TextStyle(
-                                            fontSize = 11.sp,
-                                            lineHeight = 14.sp,
-                                            fontFeatureSettings = "tnum",
-                                        ),
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1,
-                                    )
-                                }
-                            }
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = event.title,
-                                fontSize = 13.5.sp,
-                                lineHeight = 18.sp,
-                                color = if (event.isAllDay) {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                } else {
-                                    MaterialTheme.colorScheme.onSurface
-                                },
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f),
-                            )
-                        }
-                    }
+                    )
                 }
             }
 
@@ -307,7 +316,7 @@ fun TaskHomeContent(
                             title = inboxBandTitle,
                             iconKind = SeptenaIconKind.Inbox,
                         ),
-                        modifier = Modifier
+                        modifier = taskListMotion()
                             .magicPlusSectionDrop(
                                 id = "mp-inbox-header",
                                 enabled = onDropInboxHeader != null,
@@ -345,13 +354,18 @@ fun TaskHomeContent(
                     onReorderRow = onReorderInboxRow,
                     onReorderGroupHeader = null,
                     onApplyFilingSuggestion = onApplyFilingSuggestion,
+                    expandedTaskId = expandedTaskId,
+                    expandedTaskContent = expandedTaskContent,
                 )
             }
 
-            if (hasLoaded && tasks.isEmpty() && inboxTasks.isEmpty() && emptyTitle.isNotBlank()) {
+            val hasUpcomingAgenda = isUpcoming && calendarEvents.isNotEmpty()
+            if (hasLoaded && tasks.isEmpty() && inboxTasks.isEmpty() && collapsibleGroup == null &&
+                !hasUpcomingAgenda && emptyTitle.isNotBlank()
+            ) {
                 item(key = "empty-state") {
                     Column(
-                        modifier = Modifier
+                        modifier = taskListMotion()
                             .fillMaxWidth()
                             .padding(horizontal = 32.dp, vertical = 48.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -374,38 +388,193 @@ fun TaskHomeContent(
                 }
             }
 
-            taskCardRows(
-                tasks = tasks,
-                keyPrefix = "task",
-                completeTitle = completeTitle,
-                canComplete = canComplete,
-                todayTitle = todayTitle,
-                todayTint = todayTint,
-                fadedTitle = fadedTitle,
-                showTodayIndicator = !isToday,
-                showFadedIndicator = showFadedIndicator,
-                isDark = isDarkTheme,
-                hasActiveTexture = hasActiveTexture,
-                onComplete = onComplete,
-                onOpenTask = onOpenTask,
-                rowMenuGroups = rowMenuGroups,
-                rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
-                selection = selection,
-                onTaskAction = onTaskAction,
-                onOpenGroupTarget = onOpenGroupTarget,
-                onDropRow = onDropTaskRow,
-                onDropGroupHeader = onDropGroupHeader,
-                canReorder = canReorder && onReorderTaskRow != null,
-                orderedDragIds = orderedSelectionIds,
-                onReorderRow = onReorderTaskRow,
-                onReorderGroupHeader = onReorderGroupHeader,
-                onApplyFilingSuggestion = onApplyFilingSuggestion,
-                isReviewList = isReviewList,
-                reviewAcceptTitle = reviewAcceptTitle,
-                reviewSendBackTitle = reviewSendBackTitle,
-                onAcceptReview = onAcceptReview,
-                onSendBackReview = onSendBackReview,
-            )
+            if (isUpcoming) {
+                // Chronological date buckets merging the union of task days and calendar event days
+                // (mirrors Apple `TaskListView.groupedUpcomingItems` and `SeptaskKitTaskList.upcomingBuckets`).
+                val tasksByDay = linkedMapOf<String, MutableList<Pair<Int, TaskListItem>>>()
+                tasks.forEachIndexed { index, task ->
+                    val iso = task.resolvedGroup()?.key?.removePrefix("day:") ?: return@forEachIndexed
+                    tasksByDay.getOrPut(iso) { mutableListOf() }.add(index to task)
+                }
+                val eventsByDay = linkedMapOf<String, MutableList<CalendarAgendaRow>>()
+                calendarEvents.forEach { event ->
+                    val iso = event.dayIso ?: return@forEach
+                    eventsByDay.getOrPut(iso) { mutableListOf() }.add(event)
+                }
+                val sortedDays = (tasksByDay.keys + eventsByDay.keys).sorted()
+                for (dayIso in sortedDays) {
+                    val dayTasks = tasksByDay[dayIso].orEmpty()
+                    val dayEvents = eventsByDay[dayIso].orEmpty()
+                    val targetKey = "day:$dayIso"
+                    val headerLabel = dayTasks.firstOrNull()?.second?.resolvedGroup()?.title
+                        ?: upcomingDayLabelForIso?.invoke(dayIso)
+                        ?: dayEvents.firstOrNull()?.dayLabel
+                        ?: dayIso
+                    val dayHeader = TaskGroupHeader(
+                        key = targetKey,
+                        title = headerLabel,
+                        iconKind = SeptenaIconKind.Upcoming,
+                        targetLocationKey = targetKey,
+                    )
+                    item(key = "upcoming-header:$dayIso") {
+                        val headerModifier = taskListMotion()
+                            .then(
+                                if (onDropGroupHeader != null) {
+                                    Modifier.magicPlusSectionDrop(
+                                        id = "mp-group-upcoming-$targetKey",
+                                        enabled = true,
+                                        onDrop = { onDropGroupHeader(targetKey) },
+                                    )
+                                } else {
+                                    Modifier
+                                },
+                            )
+                            .then(
+                                if (canReorder && onReorderGroupHeader != null) {
+                                    Modifier.taskReorderSectionDrop(
+                                        id = "reorder-group-upcoming-$targetKey",
+                                        enabled = true,
+                                        onDrop = { ids -> onReorderGroupHeader(ids, targetKey) },
+                                    )
+                                } else {
+                                    Modifier
+                                },
+                            )
+                        // Date headers are non-tappable (matching Apple `groupedUpcomingItems`).
+                        TaskGroupHeaderRow(
+                            header = dayHeader,
+                            modifier = headerModifier,
+                            onClick = null,
+                        )
+                    }
+                    if (dayEvents.isNotEmpty()) {
+                        itemsIndexed(dayEvents, key = { _, event -> "cal:$dayIso:${event.id}" }) { idx, event ->
+                            CalendarAgendaCardRow(
+                                event = event,
+                                position = cardPosition(idx, dayEvents.size),
+                                isDark = isDarkTheme,
+                                hasActiveTexture = hasActiveTexture,
+                                modifier = taskListMotion(),
+                            )
+                        }
+                    }
+                    if (dayTasks.isNotEmpty()) {
+                        val slicePositions = List(dayTasks.size) { i -> cardPosition(i, dayTasks.size) }
+                        itemsIndexed(dayTasks, key = { _, (_, task) -> "task:${task.id}" }) { localIdx, (globalIdx, task) ->
+                            if (expandedTaskId == task.id && expandedTaskContent != null) {
+                                expandedTaskContent(task, slicePositions[localIdx], taskListMotion())
+                            } else {
+                                TaskCardRow(
+                                    task = task,
+                                    position = slicePositions[localIdx],
+                                    completeTitle = completeTitle,
+                                    canComplete = canComplete,
+                                    todayTitle = todayTitle,
+                                    todayTint = todayTint,
+                                    fadedTitle = fadedTitle,
+                                    showTodayIndicator = false,
+                                    showFadedIndicator = showFadedIndicator,
+                                    isDark = isDarkTheme,
+                                    hasActiveTexture = hasActiveTexture,
+                                    onComplete = onComplete,
+                                    onOpenTask = onOpenTask,
+                                    rowMenuGroups = rowMenuGroups,
+                                    rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
+                                    selection = selection,
+                                    onTaskAction = onTaskAction,
+                                    canReorder = canReorder && onReorderTaskRow != null,
+                                    orderedDragIds = orderedSelectionIds,
+                                    onApplyFilingSuggestion = onApplyFilingSuggestion,
+                                    dropModifier = taskListMotion()
+                                        .magicPlusRowDrop(
+                                            id = "mp-task-${task.id}",
+                                            enabled = onDropTaskRow != null,
+                                            onDrop = { before -> onDropTaskRow?.invoke(globalIdx, before) },
+                                        )
+                                        .taskReorderRowDrop(
+                                            id = "reorder-task-${task.id}",
+                                            taskId = task.id,
+                                            enabled = canReorder && onReorderTaskRow != null,
+                                            onDrop = { ids, before -> onReorderTaskRow?.invoke(ids, globalIdx, before) },
+                                        ),
+                                )
+                            }
+                        }
+                    }
+                }
+            } else {
+                taskCardRows(
+                    tasks = tasks,
+                    keyPrefix = "task",
+                    completeTitle = completeTitle,
+                    canComplete = canComplete,
+                    todayTitle = todayTitle,
+                    todayTint = todayTint,
+                    fadedTitle = fadedTitle,
+                    showTodayIndicator = !isToday,
+                    showFadedIndicator = showFadedIndicator,
+                    isDark = isDarkTheme,
+                    hasActiveTexture = hasActiveTexture,
+                    onComplete = onComplete,
+                    onOpenTask = onOpenTask,
+                    rowMenuGroups = rowMenuGroups,
+                    rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
+                    selection = selection,
+                    onTaskAction = onTaskAction,
+                    onOpenGroupTarget = onOpenGroupTarget,
+                    onDropRow = onDropTaskRow,
+                    onDropGroupHeader = onDropGroupHeader,
+                    canReorder = canReorder && onReorderTaskRow != null,
+                    orderedDragIds = orderedSelectionIds,
+                    onReorderRow = onReorderTaskRow,
+                    onReorderGroupHeader = onReorderGroupHeader,
+                    onApplyFilingSuggestion = onApplyFilingSuggestion,
+                    reviewAcceptTitle = reviewAcceptTitle,
+                    reviewSendBackTitle = reviewSendBackTitle,
+                    onAcceptReview = onAcceptReview,
+                    onSendBackReview = onSendBackReview,
+                    expandedTaskId = expandedTaskId,
+                    expandedTaskContent = expandedTaskContent,
+                )
+            }
+
+            collapsibleGroup?.let { group ->
+                item(key = "collapsible-header:${group.header.key}") {
+                    TaskGroupHeaderRow(
+                        header = group.header,
+                        isExpanded = group.isExpanded,
+                        onClick = group.onToggle,
+                    )
+                }
+                if (group.isExpanded) {
+                    group.banner?.let { banner ->
+                        item(key = "collapsible-banner:${group.header.key}") { banner() }
+                    }
+                    taskCardRows(
+                        tasks = group.tasks,
+                        keyPrefix = group.header.key,
+                        completeTitle = completeTitle,
+                        canComplete = canComplete,
+                        todayTitle = todayTitle,
+                        todayTint = todayTint,
+                        fadedTitle = fadedTitle,
+                        showTodayIndicator = !isToday,
+                        showFadedIndicator = showFadedIndicator,
+                        isDark = isDarkTheme,
+                        hasActiveTexture = hasActiveTexture,
+                        onComplete = onComplete,
+                        onOpenTask = onOpenCollapsibleTask ?: onOpenTask,
+                        rowMenuGroups = rowMenuGroups,
+                        rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
+                        selection = selection,
+                        onTaskAction = onTaskAction,
+                        onOpenGroupTarget = null,
+                        onDropRow = null,
+                        expandedTaskId = expandedTaskId,
+                        expandedTaskContent = expandedTaskContent,
+                    )
+                }
+            }
         }
     }
 }
@@ -439,101 +608,177 @@ private fun LazyListScope.taskCardRows(
     onReorderRow: ((ids: List<String>, index: Int, before: Boolean) -> Unit)? = null,
     onReorderGroupHeader: ((ids: List<String>, targetLocationKey: String) -> Unit)? = null,
     onApplyFilingSuggestion: ((String) -> Unit)? = null,
-    isReviewList: Boolean = false,
     reviewAcceptTitle: String = "",
     reviewSendBackTitle: String = "",
     onAcceptReview: ((String) -> Unit)? = null,
     onSendBackReview: ((String) -> Unit)? = null,
+    expandedTaskId: String? = null,
+    expandedTaskContent: (@Composable (task: TaskListItem, position: TaskCardPosition, modifier: Modifier) -> Unit)? = null,
 ) {
     // Compute contiguous card runs so each group paints continuous rounded glass card slices.
     val positions = computeCardPositions(tasks)
 
-    itemsIndexed(tasks, key = { _, task -> "$keyPrefix:${task.id}" }) { index, task ->
-        val header = task.resolvedGroup()
-        val prevHeader = tasks.getOrNull(index - 1)?.resolvedGroup()
-        if (header != null && header.key != prevHeader?.key) {
-            val target = header.targetLocationKey
-            val headerModifier = Modifier
-                .then(
-                    if (target != null && onDropGroupHeader != null) {
-                        Modifier.magicPlusSectionDrop(
-                            id = "mp-group-$keyPrefix-${header.key}",
-                            enabled = true,
-                            onDrop = { onDropGroupHeader(target) },
-                        )
-                    } else {
-                        Modifier
-                    },
-                )
-                .then(
-                    if (target != null && canReorder && onReorderGroupHeader != null) {
-                        Modifier.taskReorderSectionDrop(
-                            id = "reorder-group-$keyPrefix-${header.key}",
-                            enabled = true,
-                            onDrop = { ids -> onReorderGroupHeader(ids, target) },
-                        )
-                    } else {
-                        Modifier
-                    },
-                )
-            TaskGroupHeaderRow(
-                header = header,
-                modifier = headerModifier,
-                onClick = if (target != null && onOpenGroupTarget != null) {
-                    { onOpenGroupTarget(target) }
-                } else null,
-            )
-        }
-        if (isReviewList && onAcceptReview != null && onSendBackReview != null) {
-            ReviewTaskCardRow(
-                task = task,
-                position = positions[index],
-                acceptTitle = reviewAcceptTitle,
-                sendBackTitle = reviewSendBackTitle,
-                isDark = isDark,
-                hasActiveTexture = hasActiveTexture,
-                rowMenuGroups = rowMenuGroups,
-                rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
-                selection = selection,
-                onOpenTask = onOpenTask,
-                onAccept = onAcceptReview,
-                onSendBack = onSendBackReview,
-                onTaskAction = onTaskAction,
-            )
-        } else {
-            TaskCardRow(
-                task = task,
-                position = positions[index],
-                completeTitle = completeTitle,
-                canComplete = canComplete,
-                todayTitle = todayTitle,
-                todayTint = todayTint,
-                fadedTitle = fadedTitle,
-                showTodayIndicator = showTodayIndicator,
-                showFadedIndicator = showFadedIndicator,
-                isDark = isDark,
-                hasActiveTexture = hasActiveTexture,
-                onComplete = onComplete,
-                onOpenTask = onOpenTask,
-                rowMenuGroups = rowMenuGroups,
-                rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
-                selection = selection,
-                onTaskAction = onTaskAction,
-                canReorder = canReorder,
-                orderedDragIds = orderedDragIds,
-                onApplyFilingSuggestion = onApplyFilingSuggestion,
-                dropModifier = Modifier
-                    .magicPlusRowDrop(
-                        id = "mp-$keyPrefix-${task.id}",
-                        enabled = onDropRow != null,
-                        onDrop = { before -> onDropRow?.invoke(index, before) },
+    // A group header is its own item. Inside the group's first row it left and arrived with that row,
+    // so completing the first task moved the header and the rows apart.
+    val headerRuns = mutableMapOf<String, Int>()
+    var runStart = 0
+    while (runStart < tasks.size) {
+        val start = runStart
+        val header = tasks[start].resolvedGroup()
+        var end = start + 1
+        while (end < tasks.size && tasks[end].resolvedGroup()?.key == header?.key) end += 1
+        runStart = end
+
+        if (header != null) {
+            val run = headerRuns.getOrElse(header.key) { 0 }
+            headerRuns[header.key] = run + 1
+            item(key = "$keyPrefix-group:${header.key}:$run") {
+                val target = header.targetLocationKey
+                val headerModifier = taskListMotion()
+                    .then(
+                        if (target != null && onDropGroupHeader != null) {
+                            Modifier.magicPlusSectionDrop(
+                                id = "mp-group-$keyPrefix-${header.key}",
+                                enabled = true,
+                                onDrop = { onDropGroupHeader(target) },
+                            )
+                        } else {
+                            Modifier
+                        },
                     )
-                    .taskReorderRowDrop(
-                        id = "reorder-$keyPrefix-${task.id}",
-                        taskId = task.id,
-                        enabled = canReorder && onReorderRow != null,
-                        onDrop = { ids, before -> onReorderRow?.invoke(ids, index, before) },
-                    ),
+                    .then(
+                        if (target != null && canReorder && onReorderGroupHeader != null) {
+                            Modifier.taskReorderSectionDrop(
+                                id = "reorder-group-$keyPrefix-${header.key}",
+                                enabled = true,
+                                onDrop = { ids -> onReorderGroupHeader(ids, target) },
+                            )
+                        } else {
+                            Modifier
+                        },
+                    )
+                TaskGroupHeaderRow(
+                    header = header,
+                    modifier = headerModifier,
+                    onClick = if (target != null && onOpenGroupTarget != null) {
+                        { onOpenGroupTarget(target) }
+                    } else null,
+                )
+            }
+        }
+        itemsIndexed(tasks.subList(start, end), key = { _, task -> "$keyPrefix:${task.id}" }) { offset, task ->
+            val index = start + offset
+            if (task.reviewNote != null && onAcceptReview != null && onSendBackReview != null) {
+                ReviewTaskCardRow(
+                    task = task,
+                    position = positions[index],
+                    acceptTitle = reviewAcceptTitle,
+                    sendBackTitle = reviewSendBackTitle,
+                    isDark = isDark,
+                    hasActiveTexture = hasActiveTexture,
+                    rowMenuGroups = rowMenuGroups,
+                    rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
+                    selection = selection,
+                    onOpenTask = onOpenTask,
+                    onAccept = onAcceptReview,
+                    onSendBack = onSendBackReview,
+                    onTaskAction = onTaskAction,
+                    modifier = taskListMotion(),
+                )
+            } else if (expandedTaskId == task.id && expandedTaskContent != null) {
+                expandedTaskContent(task, positions[index], taskListMotion())
+            } else {
+                TaskCardRow(
+                    task = task,
+                    position = positions[index],
+                    completeTitle = completeTitle,
+                    canComplete = canComplete,
+                    todayTitle = todayTitle,
+                    todayTint = todayTint,
+                    fadedTitle = fadedTitle,
+                    showTodayIndicator = showTodayIndicator,
+                    showFadedIndicator = showFadedIndicator,
+                    isDark = isDark,
+                    hasActiveTexture = hasActiveTexture,
+                    onComplete = onComplete,
+                    onOpenTask = onOpenTask,
+                    rowMenuGroups = rowMenuGroups,
+                    rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
+                    selection = selection,
+                    onTaskAction = onTaskAction,
+                    canReorder = canReorder,
+                    orderedDragIds = orderedDragIds,
+                    onApplyFilingSuggestion = onApplyFilingSuggestion,
+                    dropModifier = taskListMotion()
+                        .magicPlusRowDrop(
+                            id = "mp-$keyPrefix-${task.id}",
+                            enabled = onDropRow != null,
+                            onDrop = { before -> onDropRow?.invoke(index, before) },
+                        )
+                        .taskReorderRowDrop(
+                            id = "reorder-$keyPrefix-${task.id}",
+                            taskId = task.id,
+                            enabled = canReorder && onReorderRow != null,
+                            onDrop = { ids, before -> onReorderRow?.invoke(ids, index, before) },
+                        ),
+                )
+            }
+        }
+    }
+}
+
+/** Single read-only calendar agenda row framed inside a glass card slice (Today & Upcoming). */
+@Composable
+private fun CalendarAgendaCardRow(
+    event: CalendarAgendaRow,
+    position: TaskCardPosition,
+    isDark: Boolean,
+    hasActiveTexture: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    TaskCardSlice(
+        position = position,
+        isSelected = false,
+        isDark = isDark,
+        hasActiveTexture = hasActiveTexture,
+        modifier = modifier,
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = TaskCardMetrics.ContentInset, vertical = 6.dp),
+        ) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.width(TaskCardMetrics.LeadingColumnWidth + 14.dp),
+            ) {
+                if (event.timeLabel != null) {
+                    Text(
+                        text = event.timeLabel,
+                        style = TextStyle(
+                            fontSize = 11.sp,
+                            lineHeight = 14.sp,
+                            fontFeatureSettings = "tnum",
+                        ),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = event.title,
+                fontSize = 13.5.sp,
+                lineHeight = 18.sp,
+                color = if (event.isAllDay) {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                },
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
             )
         }
     }

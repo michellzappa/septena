@@ -2,6 +2,7 @@ import type { Context } from "hono";
 import pkg from "../package.json";
 import type { Env } from "./env.js";
 import { logEvent } from "./util.js";
+import { errorEnvelope } from "./errors.js";
 import {
   type Era,
   SUPPORTED_VERSIONS,
@@ -227,7 +228,9 @@ export function unauthorized(reason: string | undefined, resourceMetadata: strin
     `resource_metadata="${resourceMetadata}"`,
   ];
   if (reason) logEvent("unauthorized", { reason });
-  return new Response("Unauthorized", {
+  // The body is the one error envelope (ADR 0050 §3); clients act on the
+  // status and the header, as before.
+  return Response.json({ error: errorEnvelope("unauthorized", "Unauthorized: send a valid Bearer token.") }, {
     status: 401,
     headers: { "WWW-Authenticate": params.join(", ") },
   });

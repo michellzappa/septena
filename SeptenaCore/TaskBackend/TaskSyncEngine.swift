@@ -43,6 +43,11 @@ import SwiftData
 final class TaskSyncEngine {
   static let shared = TaskSyncEngine()
 
+  /// Notes a pull replaced on this device, per row, since launch.
+  @ObservationIgnored private var replacedNotes: [String: [String]] = [:]
+  /// The base of a notes write that is saved but not captured yet.
+  @ObservationIgnored private var editedNotes: [String: String] = [:]
+
   // MARK: Status (observable, for the settings pane)
 
   private(set) var signedIn: Bool = TaskBackendClient.hasSession
@@ -120,6 +125,8 @@ final class TaskSyncEngine {
   static let settingsReadyKey = "septena.taskSync.settingsReady"
   /// True once a pull that asked for references finished.
   static let taskRefsReadyKey = "septena.taskSync.taskRefsReady"
+  /// True once a pull that asked for Do sessions finished.
+  static let doSessionsReadyKey = "septena.taskSync.doSessionsReady"
   /// Backend user id of the last sign-in, compared on the next sign-in.
   static let lastUserKey = "septena.taskSync.lastUserID"
   @ObservationIgnored private static let issueCap = 200
@@ -128,6 +135,34 @@ final class TaskSyncEngine {
   /// (`SeptaskPushNotifications`), keeping `SeptenaCore` decoupled from app targets.
   static var onSignInHook: (@MainActor () -> Void)?
   static var beforeSignOutHook: (@MainActor () async -> Void)?
+
+  /// What a sign-in with another account would remove from this device (#575).
+  struct AccountSwitchSummary: Sendable {
+    /// Tasks on this device, finished and deleted ones included.
+    let tasks: Int
+    /// Changes in the outbox that the previous account never received.
+    let unsent: Int
+  }
+
+  /// The user's answer to `confirmAccountSwitch`.
+  enum AccountSwitchChoice: Sendable {
+    /// Remove this device's tasks and take the new account's.
+    case replace
+    /// Keep this device's tasks and sign out of the new account.
+    case cancel
+    /// As `cancel`, then open Import & Export so the user can save a backup
+    /// and sign in again.
+    case exportFirst
+  }
+
+  /// Thrown by `signIn` when the user kept the other account's tasks. Not an
+  /// error to show: the sign-in did what the user chose.
+  struct AccountSwitchDeclined: Error {}
+
+  /// Asks the user before a sign-in with another account replaces the tasks on
+  /// this device. The app sets it (`SeptaskAccountSwitchPrompt`). When it is
+  /// nil the sign-in keeps the tasks and signs out: it fails closed.
+  static var confirmAccountSwitch: (@MainActor (AccountSwitchSummary) async -> AccountSwitchChoice)?
 
   private init() {}
 
@@ -163,8 +198,8 @@ final class TaskSyncEngine {
   func start() {
     guard !isRunning, !DemoSeedMode.isOn else { return }
     guard let store = store() else { return }
-    if !settingsReady || !taskRefsReady {
-      // Pulls before this build skipped setting and reference rows, and
+    if !settingsReady || !taskRefsReady || !doSessionsReady {
+      // Pulls before this build skipped setting, reference and Do rows, and
       // `since` moved past them. Read everything once, so the rows another
       // device or an agent wrote arrive.
       since = 0
@@ -355,6 +390,7 @@ final class TaskSyncEngine {
     case .attachment: captureAttachment(id, row: fetchAttachment(id), store: store, lookup: lookup)
     case .checklistItem: captureChecklistItem(id, row: fetchChecklistItem(id), store: store, lookup: lookup)
     case .taskRef: captureTaskRef(id, row: fetchTaskRef(id), store: store, lookup: lookup)
+    case .doSession: captureDoSession(id, row: fetchDoSession(id), store: store, lookup: lookup)
     case .tag: captureTag(id, row: fetchTag(id), store: store, lookup: lookup)
     case .convo, .turn, .setting: break
     }
@@ -417,6 +453,7 @@ final class TaskSyncEngine {
     let attachments = (try? main.fetch(FetchDescriptor<TaskAttachmentEntity>())) ?? []
     let checklistItems = (try? main.fetch(FetchDescriptor<TaskChecklistItemEntity>())) ?? []
     let taskRefs = (try? main.fetch(FetchDescriptor<TaskRefEntity>())) ?? []
+    let doSessions = (try? main.fetch(FetchDescriptor<DoSessionEntity>())) ?? []
     let tags = (try? main.fetch(FetchDescriptor<TagEntity>())) ?? []
     for a in areas { captureArea(a.id, row: a, store: store, lookup: lookup) }
     for p in projects { captureProject(p.id, row: p, store: store, lookup: lookup) }
@@ -428,13 +465,14 @@ final class TaskSyncEngine {
     for a in attachments { captureAttachment(a.id, row: a, store: store, lookup: lookup) }
     for item in checklistItems { captureChecklistItem(item.id, row: item, store: store, lookup: lookup) }
     for ref in taskRefs { captureTaskRef(ref.id, row: ref, store: store, lookup: lookup) }
+    for s in doSessions { captureDoSession(s.id, row: s, store: store, lookup: lookup) }
 
     // Rows the backend has that are gone here: hard-deleted without a capture.
     let present: [String: Set<String>] = [
       "task": Set(tasks.map(\.id)), "area": Set(areas.map(\.id)),
       "project": Set(projects.map(\.id)), "attachment": Set(attachments.map(\.id)),
       "checklistItem": Set(checklistItems.map(\.id)), "taskRef": Set(taskRefs.map(\.id)),
-      "tag": Set(tags.map(\.id)),
+      "doSession": Set(doSessions.map(\.id)), "tag": Set(tags.map(\.id)),
     ]
     for (key, shadow) in shadows where !shadow.gone {
       guard let colon = key.firstIndex(of: ":") else { continue }
@@ -448,6 +486,7 @@ final class TaskSyncEngine {
       case "attachment": captureAttachment(id, row: nil, store: store, lookup: lookup)
       case "checklistItem": captureChecklistItem(id, row: nil, store: store, lookup: lookup)
       case "taskRef": captureTaskRef(id, row: nil, store: store, lookup: lookup)
+      case "doSession": captureDoSession(id, row: nil, store: store, lookup: lookup)
       case "tag": captureTag(id, row: nil, store: store, lookup: lookup)
       default: break
       }
@@ -533,7 +572,7 @@ final class TaskSyncEngine {
     } else {
       for (k, v) in mapped where (old[k] ?? .null).canonical != v.canonical { patch[k] = v }
     }
-    if !patch.isEmpty { enqueueUpsert(.task, id, patch, store: store) }
+    if !patch.isEmpty { enqueueUpsert(.task, id, withNotesBase(patch, key: key, old: old), store: store) }
     for (k, v) in mapped { base[k] = v }
     base["_deleted"] = .bool(false)
     writeShadow(shadow, key, old: old, new: base, store: store)
@@ -607,6 +646,12 @@ final class TaskSyncEngine {
     // Refused this launch: keep the row, except where it takes back a delete.
     if taskRefsRefused, row != nil, lookup("taskRef:\(id)")?.gone != true { return }
     captureSimple(.taskRef, id, plan: row.map { TaskBackendMapping.taskRef($0) },
+                  store: store, lookup: lookup)
+  }
+
+  private func captureDoSession(_ id: String, row: DoSessionEntity?, store: TaskSyncStore,
+                                lookup: (String) -> TaskSyncShadow?) {
+    captureSimple(.doSession, id, plan: row.map { TaskBackendMapping.doSession($0) },
                   store: store, lookup: lookup)
   }
 
@@ -685,7 +730,12 @@ final class TaskSyncEngine {
       // Task and key are fixed at insert (registry/entities.json, `updatable`).
       patch = patch.filter { $0.key == "role" || $0.key == "snapshot" || $0.key == "position" }
     }
-    if !patch.isEmpty { enqueueUpsert(entity, id, patch, store: store) }
+    if entity == .doSession {
+      patch = patch.filter { !["taskId", "startedAt", "sourceClient"].contains($0.key) }
+    }
+    if !patch.isEmpty {
+      enqueueUpsert(entity, id, entity == .project ? withNotesBase(patch, key: key, old: old) : patch, store: store)
+    }
     var nextShadow = mapped
     if entity == .attachment {
       // Preserve local-only / server-upload state stored alongside the shadow.
@@ -705,12 +755,48 @@ final class TaskSyncEngine {
     if let last = store.lastRowOp(entity: entity.rawValue, rowID: id),
        last.kind == TaskSyncOpKind.upsert, !last.sent {
       var merged = TaskSyncJSON.decode(last.payload)
+      // The op still starts from the text its first edit started from.
+      let base = merged[Self.notesBaseKey]
       for (k, v) in fields { merged[k] = v }
+      if let base { merged[Self.notesBaseKey] = base }
       last.payload = TaskSyncJSON.encode(merged)
       store.saveSoon()
     } else {
       store.append(kind: TaskSyncOpKind.upsert, entity: entity.rawValue, rowID: id, payload: fields)
     }
+  }
+
+  // MARK: Notes base
+
+  /// Beside the fields of a queued upsert: the notes that edit started from.
+  /// The backend merges when somebody else changed them meanwhile
+  /// (docs/PROJECT_SHARING_SPEC.md §5a).
+  static let notesBaseKey = "_notesBase"
+
+  private func withNotesBase(_ patch: [String: BackendJSON], key: String,
+                             old: [String: BackendJSON]) -> [String: BackendJSON] {
+    guard patch["notes"] != nil else { return patch }
+    var out = patch
+    out[Self.notesBaseKey] = editedNotes.removeValue(forKey: key).map { $0.isEmpty ? .null : .string($0) }
+      ?? old["notes"] ?? .null
+    return out
+  }
+
+  /// A pull replaced these notes. An editor that was open then still holds
+  /// them as the text it started from.
+  func noteReplacedNotes(_ key: String, old: String?, new: String?) {
+    guard (old ?? "") != (new ?? "") else { return }
+    replacedNotes[key, default: []].append(old ?? "")
+  }
+
+  /// An editor saves notes it opened as `text`. Only a text that a pull has
+  /// replaced since counts; otherwise the last synced notes are the base.
+  func noteEditedNotes(_ entity: BackendEntity, _ id: String, from text: String?) {
+    guard let text else { return }
+    let key = "\(entity.rawValue):\(id)"
+    func plain(_ s: String) -> String { s.trimmingCharacters(in: .whitespacesAndNewlines) }
+    guard let index = replacedNotes[key]?.lastIndex(where: { plain($0) == plain(text) }) else { return }
+    editedNotes[key] = replacedNotes[key]?.remove(at: index)
   }
 
   private func queueDeleteIfNeeded(_ entity: BackendEntity, _ id: String, hold: Bool = false,
@@ -782,6 +868,12 @@ final class TaskSyncEngine {
 
   func fetchChecklistItem(_ id: String) -> TaskChecklistItemEntity? {
     var d = FetchDescriptor<TaskChecklistItemEntity>(predicate: #Predicate { $0.id == id })
+    d.fetchLimit = 1
+    return try? main.fetch(d).first
+  }
+
+  func fetchDoSession(_ id: String) -> DoSessionEntity? {
+    var d = FetchDescriptor<DoSessionEntity>(predicate: #Predicate { $0.id == id })
     d.fetchLimit = 1
     return try? main.fetch(d).first
   }
@@ -868,6 +960,7 @@ final class TaskSyncEngine {
         }
         if !settingsReady { settingsReady = true }
         if !taskRefsReady { taskRefsReady = true }
+        if !doSessionsReady { doSessionsReady = true }
         if reconcileSettings(store: store) { syncAgain = true }
         if reconcileFirst, Date().timeIntervalSince(lastReconcile) > 60 {
           reconcile(store: store)
@@ -885,6 +978,22 @@ final class TaskSyncEngine {
     // a deleted area / project to Recently Deleted (the receiver half of the
     // delete cascade; `AreasMutator.sweepDeletedContainerOrphans`).
     await SeptenaServices.shared.areasMutator.sweepDeletedContainerOrphans()
+    lastSyncAt = Date()
+    SeptenaServices.shared.runFadePassIfDue()
+  }
+
+  /// When this process last finished a push and a pull.
+  private var lastSyncAt: Date?
+
+  /// True when the local store was up to date a short time ago.
+  var syncedRecently: Bool {
+    lastSyncAt.map { Date().timeIntervalSince($0) < 5 * 60 } ?? false
+  }
+
+  /// True for a device that syncs and has not done so recently. A signed-out
+  /// device, and one the plan does not sync, has only its own data.
+  var needsSyncFirst: Bool {
+    TaskBackendClient.hasSession && !deviceNotSyncing && !syncedRecently
   }
 
   private func handleSyncError(_ error: Error) {
@@ -990,7 +1099,9 @@ final class TaskSyncEngine {
     default:
       body["entity"] = .string(op.opEntity)
       body["id"] = .string(op.rowID)
-      body["fields"] = .object(TaskSyncJSON.decode(op.payload))
+      var fields = TaskSyncJSON.decode(op.payload)
+      if let base = fields.removeValue(forKey: Self.notesBaseKey) { body["base"] = .object(["notes": base]) }
+      body["fields"] = .object(fields)
     }
     return BackendOp(clientOpId: op.clientOpId, body: .object(body), entity: entity, id: op.rowID)
   }
@@ -1082,6 +1193,11 @@ final class TaskSyncEngine {
           }
         }
         store.remove(op)
+        if result.reason?.hasPrefix("shared_") == true {
+          // A rule of a shared project, not a fault: the pull puts the row back.
+          noteRejected(entity, id: op.rowID, store: store)
+          continue
+        }
         addIssue(entity, op.rowID, "rejected by the backend: \(result.reason ?? "no reason")")
         if entity == .attachment, op.kind == TaskSyncOpKind.upsert {
           for upload in store.ops(entity: op.opEntity, rowID: op.rowID) where upload.kind == TaskSyncOpKind.upload {
@@ -1491,6 +1607,22 @@ final class TaskSyncEngine {
     try await signIn { try await $0.adoptDeviceSession(session) }
   }
 
+  /// The same, with the code mailed to `email` (ADR 0047). A new address
+  /// creates an account.
+  func signIn(email: String, code: String) async throws {
+    try await signIn { try await $0.verifyEmailSignIn(email: email, code: code) }
+  }
+
+  /// The same, with a one-time OIDC callback code (`POST /v1/auth/oidc/redeem`).
+  func signIn(oidcCode: String) async throws {
+    try await signIn { try await $0.redeemOidcSignIn(code: oidcCode) }
+  }
+
+  /// The same, finishing a no-silent-linking email collision step (`POST /v1/auth/link/complete`).
+  func signIn(linkToken: String, code: String) async throws {
+    try await signIn { try await $0.completeCollisionLink(linkToken: linkToken, code: code) }
+  }
+
   private func signIn(_ authenticate: (TaskBackendClient) async throws -> String) async throws {
     let wasRunning = await pauseSync()
     defer { if wasRunning { start() } }
@@ -1498,6 +1630,18 @@ final class TaskSyncEngine {
     // No stored id (the first sign-in on this device, or a session from a
     // build before this check): keep the local data, as before.
     if let last = lastUserID, last != userID {
+      // Another account: the tasks here are the previous account's. Ask
+      // before removing them, unless there is nothing to remove (#575).
+      let summary = accountSwitchSummary()
+      if summary.tasks > 0 || summary.unsent > 0 {
+        let choice = await Self.confirmAccountSwitch?(summary) ?? .cancel
+        guard choice == .replace else {
+          await client.signOut()
+          signedIn = TaskBackendClient.hasSession
+          SeptenaLog.info("[TaskSync] another account signed in; the user kept this device's tasks")
+          throw AccountSwitchDeclined()
+        }
+      }
       wipeLocalTaskData()
       SeptenaLog.info("[TaskSync] signed in as another account; local task data wiped")
     }
@@ -1536,6 +1680,16 @@ final class TaskSyncEngine {
     #if os(iOS)
     WatchBridge.shared.accountChanged()
     #endif
+  }
+
+  /// Backend user id of the active session on this device, for Settings ▸ Account (#565).
+  var accountID: String? { signedIn ? lastUserID : nil }
+
+  /// Counts what `wipeLocalTaskData` would remove that the user can lose:
+  /// the tasks on this device and the changes not sent yet.
+  private func accountSwitchSummary() -> AccountSwitchSummary {
+    let tasks = (try? main.fetchCount(FetchDescriptor<TaskEntity>())) ?? 0
+    return AccountSwitchSummary(tasks: tasks, unsent: store()?.opCount() ?? pendingOps)
   }
 
   /// Backend user id of the last sign-in on this device.
@@ -1590,6 +1744,7 @@ final class TaskSyncEngine {
     }
     for c in (try? context.fetch(FetchDescriptor<TaskChecklistItemEntity>())) ?? [] { context.delete(c) }
     for r in (try? context.fetch(FetchDescriptor<TaskRefEntity>())) ?? [] { context.delete(r) }
+    for s in (try? context.fetch(FetchDescriptor<DoSessionEntity>())) ?? [] { context.delete(s) }
     for t in (try? context.fetch(FetchDescriptor<TaskEntity>())) ?? [] { context.delete(t) }
     for p in (try? context.fetch(FetchDescriptor<ProjectEntity>())) ?? [] { context.delete(p) }
     for a in (try? context.fetch(FetchDescriptor<AreaEntity>())) ?? [] { context.delete(a) }
@@ -1634,6 +1789,11 @@ final class TaskSyncEngine {
   var taskRefsReady: Bool {
     get { UserDefaults.standard.bool(forKey: Self.taskRefsReadyKey) }
     set { UserDefaults.standard.set(newValue, forKey: Self.taskRefsReadyKey) }
+  }
+
+  var doSessionsReady: Bool {
+    get { UserDefaults.standard.bool(forKey: Self.doSessionsReadyKey) }
+    set { UserDefaults.standard.set(newValue, forKey: Self.doSessionsReadyKey) }
   }
 
   /// `SettingsMirror.upsert` changed a synced setting. Queues it when the

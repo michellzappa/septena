@@ -6,6 +6,7 @@ import {
   completeTaskJsonSchema,
   createTaskJsonSchema,
   deferTaskJsonSchema,
+  setWaitingJsonSchema,
   getTaskJsonSchema,
   moveToTodayJsonSchema,
   pendingReasoningJsonSchema,
@@ -32,7 +33,7 @@ export const listTasksJsonSchema = {
       enum: ["today", "inbox", "review", "anytime", "upcoming", "completed", "faded"],
       default: "today",
       description:
-        "Which task list to read. 'today' = the whole Today page as the app shows it: the Inbox section first, then every task on Today. 'inbox' = only the Inbox section: tasks the user has not filed yet (no area or project) and your proposals they have not accepted. 'review' = open tasks awaiting the user's verification (`endState = needs_verify`). 'anytime' is the single home for open, dateless tasks. 'faded' = the Faded pile: open tasks nobody touched for the fade window, which no other list shows (an agent edit does not bring one back: the user keeps or drops it in the app). Rows carry `inbox: true` when they sit in the Inbox, and `daysOnToday: N` when they have carried over on Today undone for N days (the app darkens their checkbox; 7+ is long overdue for a decision).",
+        "Which task list to read. 'today' = the whole Today page as the app shows it: the Inbox section first, then every task on Today. 'inbox' = only the Inbox section: tasks the user has not filed yet (no area or project) and your proposals they have not accepted. 'review' = open tasks awaiting the user's verification (`endState = needs_verify`). 'anytime' is the single home for open, dateless tasks. 'faded' = the Faded pile: open tasks nobody touched for the fade window, which no other list shows (an agent edit does not bring one back, except a deadline: the user keeps or drops it in the app). Rows carry `inbox: true` when they sit in the Inbox, and `daysOnToday: N` when they have carried over on Today undone for N days (7+ is long overdue for a decision).",
     },
     limit: {
       type: "integer",
@@ -97,7 +98,7 @@ export const TASK_TOOLS: Tool[] = [
     name: "tasks_list",
     title: "List tasks",
     description:
-      "New here? Call tasks_orientation first. List Septena tasks for a given view (today, inbox, review, upcoming, anytime, completed, faded). 'today' is the whole Today page the user sees: the Inbox section first, then the filed tasks on Today. 'inbox' is that Inbox section alone: unfiled tasks (no area or project) plus your proposals the user has not accepted. 'review' lists open tasks waiting for the user to check and accept (`needs_verify`). The user sees ONE Inbox; never describe it as two piles. Each row carries `inbox: true` when it sits in the Inbox, and `daysOnToday: N` when it has carried over on Today undone for N days (the app darkens its checkbox; flag rows at 7+ as stuck). A row carries `refCount` when it has references (tasks_get lists them), `issue` ({url, repo, number, kind}) from its newest GitHub issue or PR reference, and `endState` when the conversation has ended (for example `decomposed`: already tracked elsewhere). Returns {tasks, total, truncated}; truncated=true means more rows exist beyond limit.",
+      "New here? Call tasks_orientation first. List Septena tasks for a given view (today, inbox, review, upcoming, anytime, completed, faded). 'today' is the whole Today page the user sees: the Inbox section first, then the filed tasks on Today. 'inbox' is that Inbox section alone: unfiled tasks (no area or project) plus your proposals the user has not accepted. 'review' lists open tasks waiting for the user to check and accept (`needs_verify`). The user sees ONE Inbox; never describe it as two piles. Each row carries `inbox: true` when it sits in the Inbox, and `daysOnToday: N` when it has carried over on Today undone for N days (flag rows at 7+ as stuck). A row carries `refCount` when it has references (tasks_get lists them), `issue` ({url, repo, number, kind}) from its newest GitHub issue or PR reference, and `endState` when the conversation has ended (for example `decomposed`: already tracked elsewhere). Returns {tasks, total, truncated}; truncated=true means more rows exist beyond limit.",
     inputSchema: listTasksJsonSchema,
     annotations: { title: "List tasks", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
@@ -126,7 +127,7 @@ export const TASK_TOOLS: Tool[] = [
     name: "tasks_get",
     title: "Get task",
     description:
-      "Inspect a single task by id: title, status, area, project, scheduled, deadline, today, completedAt, source, `refs` (what it points at: key, kind, role, snapshot), `backlinks` (the tasks that point at it), a compact conversation summary, and the read-only fade fields when set (touchedAt, deferCount, fadedAt, dropReason, effort: only the app writes them). One call answers 'where is this task and what's its state?' regardless of view or status. Pass include_notes for the project and area notes: the context to read before deciding anything about the task.",
+      "Inspect a single task by id: title, status, area, project, scheduled, deadline, today, completedAt, source, `refs` (what it points at: key, kind, role, snapshot), `backlinks` (the tasks that point at it), `attachments` (its files: filename, contentType, byteCount, and `uploaded: false` when the bytes are only on one device; the bytes are not readable here), a compact conversation summary, and the read-only fade fields when set (touchedAt, deferCount, fadedAt, dropReason, effort: only the app writes them). One call answers 'where is this task and what's its state?' regardless of view or status. Pass include_notes for the project and area notes: the context to read before deciding anything about the task.",
     inputSchema: getTaskJsonSchema,
     annotations: { title: "Get task", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
@@ -154,7 +155,7 @@ export const TASK_TOOLS: Tool[] = [
   {
     name: "tasks_create",
     title: "Create task",
-    description: "Create a new Septena task. Call tasks_search first so you do not create a duplicate. Returns the new id and its placement. Pass `refs` to point the task at the email, issue, event or page it is about or comes from. With a `from` reference that an active task already has, nothing is created: the result is that task with placement `existing` (pass `allow_duplicate: true` to create it anyway). When only a closed task has it, the new task gets a `follow_up` reference to that one. A suggestion from an item whose proposal the user turned down is not created: placement `dismissed`. Do not propose it again. Set `origin` to declare provenance: `user_request` when the user explicitly asked (lands committed, placed where specified) or `agent_suggestion` when you surfaced it yourself (lands as a PROPOSAL in the user's inbox to review). Omit → Septena files it as a proposal (secure by default). Septena sets no limit on parallel calls, but some hosts do: for many tasks, create them in sequence or small groups and tasks_search before you retry a refused create.",
+    description: "Create a new Septena task. Call tasks_search first so you do not create a duplicate. Returns the new id and its placement. Pass `refs` to point the task at the email, issue, event or page it is about or comes from. With a `from` reference that an active task already has, nothing is created: the result is that task with placement `existing` (pass `allow_duplicate: true` to create it anyway). When only a closed task has it, the new task gets a `follow_up` reference to that one. A suggestion from an item whose proposal the user turned down is not created: placement `dismissed`. Do not propose it again. Set `origin` to declare provenance: `user_request` when the user explicitly asked (lands committed, placed where specified) or `agent_suggestion` when you surfaced it yourself (lands as a PROPOSAL in the user's inbox to review). Omit → Septena files it as a proposal (secure by default). Septena sets no limit on parallel calls, but some hosts do: for many tasks, create them in sequence or small groups, and pass an `idempotency_key` so a retry of the same create returns the first result instead of a second task.",
     inputSchema: createTaskJsonSchema,
     annotations: { title: "Create task", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
   },
@@ -168,16 +169,23 @@ export const TASK_TOOLS: Tool[] = [
   {
     name: "tasks_update",
     title: "Update task",
-    description: "Update fields on an existing task. Any subset of title, today, scheduled, deadline, area, project, status (cancelled), notes, refs (add or update by key) and refs_remove. To add to the notes, prefer notes_append (one new line at the end) or notes_section (replace the text under one heading) over resending the whole body, and pass notes_rev from tasks_get so an edit made since your read is refused, not overwritten.",
+    description: "Update fields on an existing task. Any subset of title, today, scheduled, deadline, area, project, heading, status (cancelled), notes, refs (add or update by key) and refs_remove. To add to the notes, prefer notes_append (one new line at the end) or notes_section (replace the text under one heading) over resending the whole body, and pass notes_rev from tasks_get so an edit made since your read is refused, not overwritten.",
     inputSchema: updateTaskJsonSchema,
     annotations: { title: "Update task", readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
   },
   {
     name: "tasks_defer",
     title: "Defer task",
-    description: "Set a task’s When to a future date (sets scheduled, clears today).",
+    description: "Set a task’s When to a future date (sets scheduled, clears today). The task leaves Today until that date. Its deadline does not change: a task that is due or overdue stays marked so in Upcoming.",
     inputSchema: deferTaskJsonSchema,
     annotations: { title: "Defer task", readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  {
+    name: "tasks_set_waiting",
+    title: "Set waiting on a person",
+    description: "Mark a task as waiting on a person (docs/REVIEW_SPEC.md §6): the user handed it to someone and waits for it to come back. Pass who as waiting_on, and the day to chase as scheduled (the task's When date). Use it when the user says they asked someone, or when you make a task from a message the user sent. It shows in Review ▸ Waiting with how many days it has waited, and never fades. Only the user ends a wait: completing, cancelling or clearing a waiting task is refused as in_review. When the thread the task points at has a reply, ask with tasks_thread_append (a provider turn with options \"Got It Back\" and \"Still Waiting\").",
+    inputSchema: setWaitingJsonSchema,
+    annotations: { title: "Set waiting on a person", readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   {
     name: "tasks_move_to_today",
@@ -210,14 +218,14 @@ export const TASK_TOOLS: Tool[] = [
   {
     name: "tasks_set_endstate",
     title: "Set task conversation end state",
-    description: "Record the conversation's terminal end-state.",
+    description: "Hand the task to the user's Review (needs_verify, with a note that says what to check), or record that the work goes on elsewhere (decomposed). Only the user takes a task out of Review: they accept it or send it back. You may hand over again with a new note. Every other end state follows from what the user does (refused as human_ends).",
     inputSchema: setEndStateJsonSchema,
     annotations: { title: "Set task conversation end state", readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   {
     name: "tasks_set_assignee",
     title: "Set task assignee",
-    description: "Route a task: me | local | claude, or null to let the router decide. Setting claude marks it for the reasoning queue.",
+    description: "Route a task: me | local | claude, or null to let the router decide. Setting claude marks it for the reasoning queue and makes it agent work: from then on only the user ends it or takes it back (refused as human_accepts, human_only:assignee).",
     inputSchema: setAssigneeJsonSchema,
     annotations: { title: "Set task assignee", readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },

@@ -1,7 +1,6 @@
 package app.septena.android.ui
 
 import android.content.Context
-import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -32,6 +31,7 @@ import app.septena.core.JsonValue
 import app.septena.core.RegistryCatalog
 import app.septena.core.RejectedSyncOperation
 import app.septena.core.SyncOperation
+import app.septena.core.generated.RegistryLinks
 import app.septena.core.generated.RegistrySettingKeys
 import app.septena.core.generated.RegistryTaskPageBlockIds
 import app.septena.core.stringValue
@@ -50,9 +50,9 @@ internal class SettingsSurfaceEnv(
 
 /** The custom surfaces this file renders; the others stay in SettingsScreen or their own files. */
 internal val SETTINGS_SURFACES = setOf(
-    "about_header", "open_source", "send_feedback", "privacy_explainer", "ai_explainer",
+    "about_header", "open_source", "open_help", CONTACT_SUPPORT, "privacy_explainer", "ai_explainer",
     "mcp_skills", "sync_diagnostics", "smart_lists_editor", "plus_offer", "calendar_detail",
-    "reset_first_run", DELETE_ACCOUNT,
+    "reset_get_started", "reset_first_run", DELETE_ACCOUNT,
     "sign_in_approval", "claude_connector", "import_export",
 )
 
@@ -68,15 +68,15 @@ internal fun SettingsCustomSurface(
     when (surface) {
         "about_header" -> AboutHeader(label, detail, context)
         "open_source" -> OpenSourceRow(label, detail) { openUrl(context, REPO_URL) }
-        "send_feedback" -> ActionRow(label) {
-            if (!openUrl(context, FEEDBACK_URL)) {
-                copyToClipboard(context, label.orEmpty(), FEEDBACK_EMAIL)
-                Toast.makeText(context, FEEDBACK_EMAIL, Toast.LENGTH_SHORT).show()
-            }
-        }
+        "open_help" -> ActionRow(label) { openUrl(context, RegistryLinks.HELP) }
+        CONTACT_SUPPORT -> ContactSupportRow(label, env, languageTag)
         "privacy_explainer" -> detail?.let { Text(it, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
         "ai_explainer" -> ExpandableRow(label) { AiExplainer(appName(context), languageTag) }
-        // `reset_get_started` is omitted on Android until Android renders the Get Started notice.
+        // Clears synced Get Started dismissal and completed steps (as Apple `SettingsMirror.resetGetStarted`).
+        "reset_get_started" -> ActionRow(label) {
+            env.onValueChange(RegistrySettingKeys.GET_STARTED_DISMISSED, JsonValue.Null)
+            env.onValueChange(RegistrySettingKeys.GET_STARTED_STEPS, JsonValue.Null)
+        }
         // This device only: the synced `onboardedAt` stays, so other devices are not asked again (as on iOS).
         "reset_first_run" -> ActionRow(label) { env.graph.firstRun.showAgain() }
         DELETE_ACCOUNT -> DeleteAccountRow(env.graph, env.signedIn, languageTag)
@@ -85,7 +85,7 @@ internal fun SettingsCustomSurface(
         "smart_lists_editor" -> SmartListsEditor(env.values, languageTag, env.onValueChange)
         "plus_offer" -> {
             LaunchedEffect(env.signedIn) { env.plans.refresh(env.signedIn) }
-            PlusOffer(env.plans, languageTag)
+            PlusOffer(env.plans, languageTag, env.syncState)
         }
         "calendar_detail" -> CalendarFeedSection(env.graph, env.signedIn, env.values, env.onValueChange, languageTag)
         "sign_in_approval" -> SignInApprovalSection(env.graph, env.signedIn, languageTag)
@@ -263,6 +263,4 @@ private const val AI_EXPLAINER = "ai_explainer"
 private const val MCP_SKILLS = "mcp_skills"
 private const val SYNC_DIAGNOSTICS = "sync_diagnostics"
 private const val MAX_ISSUES = 20
-private const val FEEDBACK_EMAIL = "mz@envisioning.com"
-private const val FEEDBACK_URL = "mailto:mz@envisioning.com?subject=Septena%20feedback"
 private const val REPO_URL = "https://github.com/michellzappa/septena"

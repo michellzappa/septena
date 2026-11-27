@@ -9,7 +9,8 @@ import SwiftData
 protocol ProjectsBackend: AnyObject {
   func create(title: String, area: String?) async throws -> Project
   func rename(id: String, to title: String) async throws
-  func setNotes(id: String, notes: String?) async throws
+  /// `from`: the notes the editor opened with (`TaskMutator.update`).
+  func setNotes(id: String, notes: String?, from: String?) async throws
   func acceptNotesProposal(id: String) async throws
   func rejectNotesProposal(id: String) async throws
   func restoreNotesState(id: String, notes: String?, proposal: NotesProposal?) async throws
@@ -58,8 +59,8 @@ final class ProjectsMutator: ProjectsBackend {
   func rename(id: String, to title: String) async throws {
     try await requireBackend().rename(id: id, to: title)
   }
-  func setNotes(id: String, notes: String?) async throws {
-    try await requireBackend().setNotes(id: id, notes: notes)
+  func setNotes(id: String, notes: String?, from: String? = nil) async throws {
+    try await requireBackend().setNotes(id: id, notes: notes, from: from)
   }
   func acceptNotesProposal(id: String) async throws {
     try await requireBackend().acceptNotesProposal(id: id)
@@ -86,6 +87,12 @@ final class ProjectsMutator: ProjectsBackend {
   /// (`TaskUndo.recordProjectDelete`), never here.
   func delete(id: String) async throws {
     let backend = try requireBackend()
+    // A shared project is never deleted: its owner stops sharing first, and a
+    // member leaves. An area delete puts it outside the area.
+    if SharedProjects.share(ofProject: id, in: context) != nil {
+      try await backend.setArea(id: id, area: nil)
+      return
+    }
     DeletedContainerLedger.record(.project, id)
     let trashed = trashTasks(inProject: id)
     if trashed > 0 {
@@ -256,9 +263,10 @@ final class CloudKitProjectsBackend: ProjectsBackend {
     commitAndPush(entity, op: "rename")
   }
 
-  func setNotes(id: String, notes: String?) async throws {
+  func setNotes(id: String, notes: String?, from: String?) async throws {
     guard let entity = fetch(id: id) else { return }
     entity.notes = (notes?.isEmpty == true) ? nil : notes
+    TaskSyncEngine.shared.noteEditedNotes(.project, id, from: from)
     commitAndPush(entity, op: "setNotes")
   }
 

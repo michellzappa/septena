@@ -15,13 +15,13 @@ This packet holds the copy-pasteable listing fields, authentication walkthrough,
 
 Complete these checks before clicking Submit in either portal:
 
-- [x] **Tool annotations verified in code and tests.** All 36 live tools on `api.septena.app/mcp` carry top-level `title` and explicit MCP `annotations` (`title`, `readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`), verified 1:1 against every handler by `backend/test/annotations.test.mjs`. (`tasks_update` is marked `idempotentHint: false` because `notes_append` appends on repeat calls without `notes_rev`.)
+- [x] **Tool annotations verified in code and tests.** All 40 live tools on `api.septena.app/mcp` carry top-level `title` and explicit MCP `annotations` (`title`, `readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`), verified 1:1 against every handler by `backend/test/annotations.test.mjs`. (`tasks_update` is marked `idempotentHint: false` because `notes_append` appends on repeat calls without `notes_rev`.)
 - [x] **OAuth redirect hosts pinned for both directories.** `backend/src/oauth/redirects.ts` allows `claude.ai`, `claude.com`, `chatgpt.com`, and loopback hosts.
-- [ ] **Deploy latest backend to `api.septena.app`.** Ensure the `tasks_update` `idempotentHint: false` fix and `skill.md` update are live in production before triggering portal rescans.
-- [ ] **Check canonical web URLs.** Confirm that `https://www.septena.app/privacy`, `https://www.septena.app/support`, and `https://www.septena.app/agents` load cleanly (HTTP 200 or clean redirect to `https://septena.app/...`; paste the final canonical URL in the portal forms).
-- [ ] **Prepare reviewer test access (see Section 5).** Both Anthropic and OpenAI reviewers need a frictionless way to authenticate without getting blocked by MFA or an unavailable second device. Because Septena pairs via an 8-character code approved in the signed-in app, fill in Section 5 before submitting.
-- [ ] **ChatGPT pairing page wording (small polish before OpenAI submission).** `backend/src/shadow/oauth.ts` currently renders "If you did not start this from Claude, close this page" and "Settings ▸ Connect Claude" on the pairing HTML page even when `clientName` is ChatGPT. Worth generalizing to `opts.clientName` before submitting to OpenAI so reviewers do not see another vendor's name during OAuth.
-- [ ] **OpenAI domain verification.** After creating the draft in `platform.openai.com/apps-manage`, serve the portal's verification token at `https://api.septena.app/.well-known/openai-apps-challenge`.
+- [x] **Deploy latest backend to `api.septena.app`.** CI (`backend.yml`) deploys every push to `main`; the 2026-11-26 deploy carries these fixes. Ensure the `tasks_update` `idempotentHint: false` fix and `skill.md` update are live in production before triggering portal rescans.
+- [x] **Check canonical web URLs.** Checked 2026-11-26: `https://www.septena.app/privacy`, `/support` and `/agents` answer 301 to `https://septena.app/...`. The fields below use the `https://septena.app` URLs.
+- [ ] **Prepare reviewer test access (see Section 5, ADR 0055).** Both Anthropic and OpenAI reviewers need a frictionless way to authenticate without getting blocked by MFA or an unavailable second device. Because Septena pairs via an 8-character code approved in the signed-in app, fill in Section 5 before submitting.
+- [x] **ChatGPT pairing page wording.** Fixed 2026-11-26: the pairing page in `backend/src/shadow/oauth.ts` names the connecting client (`opts.clientName`) in "If you did not start this from …", and gives the full app path (Settings ▸ AI & Agents ▸ Connect Claude). For a client that is not Claude, it adds that the same screen connects every agent.
+- [ ] **OpenAI domain verification.** Set the token with `wrangler secret put OPENAI_APPS_CHALLENGE`; the Worker serves it at the path below. After creating the draft in `platform.openai.com/apps-manage`, serve the portal's verification token at `https://api.septena.app/.well-known/openai-apps-challenge`.
 - [ ] **Optional tool-surface decision.** `tasks_list_tags` and `tasks_checklist_*` are currently live in `tools/list` and included in Section 6 below. If you hide them before the app UI renders tags and checklists, update Section 6 and trigger a portal rescan.
 
 ---
@@ -75,19 +75,19 @@ Complete these checks before clicking Submit in either portal:
 
 ### Links and company details
 
-- **Website URL**: `https://www.septena.app`
-- **Documentation URL**: `https://www.septena.app/agents`
+- **Website URL**: `https://septena.app`
+- **Documentation URL**: `https://septena.app/agents`
 - **Machine-readable Agent Guide**: `https://api.septena.app/skill.md`
 - **Onboarding Guide**: `https://api.septena.app/onboard.md` (also exposed as MCP prompt `onboard_septena`)
-- **Privacy Policy URL**: `https://www.septena.app/privacy`
-- **Support URL**: `https://www.septena.app/support`
-- **Support Contact**: `[mz: fill in support email, e.g. support@septena.app]`
+- **Privacy Policy URL**: `https://septena.app/privacy`
+- **Support URL**: `https://septena.app/support`
+- **Support Contact**: `https://septena.app/support`
 - **Developer / Publisher Name**: `Michell Zappa` (or `Septena`)
 - **Open-Source Repository (MIT)**: `https://github.com/michellzappa/septena`
 
 ### Data handling and compliance notes (for portal questionnaire)
 
-- **Data accessed**: Only the authenticated user's private Septena store (tasks, checklists, tags, references, areas, projects, notes, task conversations, and change history). No third-party accounts or public web resources are queried by the server (`openWorldHint: false` on all 36 tools).
+- **Data accessed**: Only the authenticated user's private Septena store (tasks, checklists, tags, references, areas, projects, notes, task conversations, and change history). No third-party accounts or public web resources are queried by the server (`openWorldHint: false` on all 40 tools).
 - **Isolation**: Each user has an isolated Cloudflare Durable Object (`TaskStore`). OAuth access tokens (`sm2.`, 1-hour TTL) are signed and checked against the user's Durable Object on every request. Rotating refresh tokens (`smr2.`, 30-day sliding TTL) are stored hashed (`SHA-256`) there; refresh replay revokes the entire token family at once.
 - **No training / no ads**: User task data is never used to train models, sold, or shared with advertisers.
 - **User revocation & deletion**: Users can disconnect any agent in Settings (immediately revoking its token family) or delete their entire account in one step.
@@ -135,16 +135,16 @@ Complete these checks before clicking Submit in either portal:
   ```
 - **OAuth Redirect URI Allowed**: `https://chatgpt.com/connector_platform_oauth_redirect` (already pinned in `backend/src/oauth/redirects.ts`).
 - **Domain Verification**: Serve OpenAI's challenge token at `https://api.septena.app/.well-known/openai-apps-challenge` once generated in the portal.
-- **Privacy Policy URL**: `https://www.septena.app/privacy`
-- **Support URL**: `https://www.septena.app/support`
-- **Documentation URL**: `https://www.septena.app/agents`
+- **Privacy Policy URL**: `https://septena.app/privacy`
+- **Support URL**: `https://septena.app/support`
+- **Documentation URL**: `https://septena.app/agents`
 
 ### Tool annotations and safety justification (for OpenAI reviewer notes)
 
-- Every one of the 36 tools returned by `tools/list` defines `title`, `readOnlyHint`, `destructiveHint`, `idempotentHint`, and `openWorldHint` directly on the server.
+- Every one of the 40 tools returned by `tools/list` defines `title`, `readOnlyHint`, `destructiveHint`, `idempotentHint`, and `openWorldHint` directly on the server.
 - All 15 read tools are strictly side-effect-free (`readOnlyHint: true`, `destructiveHint: false`, `idempotentHint: true`, `openWorldHint: false`).
-- All 3 tools that can close, overwrite/cancel, or delete user data (`tasks_complete`, `tasks_update`, `tasks_checklist_delete`) declare `destructiveHint: true` so ChatGPT can prompt for confirmation.
-- All 36 tools operate strictly on the authenticated user's private Septena store (`openWorldHint: false`).
+- All 5 tools that can close, overwrite/cancel, or delete user data (`tasks_complete`, `tasks_update`, `tasks_checklist_delete`, `tasks_project_update`, `tasks_area_update`) declare `destructiveHint: true` so ChatGPT can prompt for confirmation.
+- All 40 tools operate strictly on the authenticated user's private Septena store (`openWorldHint: false`).
 - Annotations are paired with server-side enforcement in `TaskStore`: agent writes respect per-task `Stop`, global `Pause all agents`, `human_accepts` (agents cannot close assigned or claimed tasks), `brief_is_users` (agents cannot overwrite an existing project or area brief), and optimistic concurrency (`baseNoteRev` / `notes_rev`).
 
 ---
@@ -166,41 +166,42 @@ Septena uses standard **OAuth 2.1 + PKCE (`S256`) + Dynamic Client Registration*
 
 ---
 
-## 5. Test account instructions (template for mz to fill in)
+## 5. Test account instructions (reviewer notes, ADR 0055)
 
-> **Action required before submission:** Replace every `[FILL IN]` placeholder below before pasting into the Claude or OpenAI reviewer notes fields. Both directories reject submissions when reviewers cannot complete OAuth or see populated sample data.
+Reviewers use a demo account with invented sample data. The pairing page offers it only while reviewer mode is on (secrets `REVIEWER_CODE` and `REVIEWER_ACCOUNT_ID`), and only after the reviewer types the reviewer code. Paste this block into the reviewer notes field of each portal, with the code filled in. Never commit the code.
 
 ```text
-REVIEWER ACCESS INSTRUCTIONS: SEPTENA MCP CONNECTOR
+REVIEWER ACCESS: SEPTENA CONNECTOR
 
 Server URL: https://api.septena.app/mcp
-Auth flow: OAuth 2.1 (DCR + PKCE S256) with in-app 8-character pairing code approval.
+Auth: OAuth 2.1 (dynamic client registration, PKCE S256). You do not need the Septena app or an Apple ID.
 
-1. App access for pairing:
-   - TestFlight (iOS/iPadOS): [FILL IN: public or reviewer TestFlight link]
-   - Direct macOS build (DMG): [FILL IN: signed macOS DMG download URL]
-   - Test account sign-in: [FILL IN: reviewer Sign in with Apple / test account details, or pre-approved pairing workflow]
-   - Note on MFA / second-device approval: [FILL IN: confirm how reviewer can approve the 8-character pairing code without hitting personal 2FA, e.g., dedicated test account signed in on TestFlight/macOS or pre-issued test bearer / pairing helper if required by portal]
+1. Add the connector with the server URL above and start connecting.
+2. The Septena page that opens shows a pairing code and, below it, "Directory reviewer? Use the demo account".
+3. Type this reviewer code there and press "Use the demo account":
+   [reviewer code: from mz]
+4. The page sends you back to the client and the connection completes.
 
-2. How to pair during review:
-   a. Start adding https://api.septena.app/mcp in the client; the OAuth window displays an 8-character code (e.g. ABCD-EFGH).
-   b. In the signed-in Septena app, open Settings > AI & Agents, enter the 8-character code, verify the client name shown, and tap Approve.
-   c. The OAuth browser tab automatically redirects back within ~3 seconds and completes the connection.
+The demo account holds sample data you may read and change:
+- Areas "Studio" and "Home", each with a brief above "## Log".
+- Projects "New studio website" and "Spring garden", with notes.
+- Today: four tasks, one of them unfiled (the Inbox at the top of Today) and one repeating.
+- Upcoming: two scheduled tasks. Anytime: two tasks with no date.
+- A task with a web reference (try tasks_find_by_ref with https://septena.app/compare).
+- A task assigned to Claude (try tasks_pending_reasoning, then tasks_claim).
+- A task waiting in Review (tasks_list view "review"). Completing an agent's task is refused as human_accepts, by design.
 
-3. Pre-populated test data in this account:
-   - Areas: [FILL IN: e.g. "Work", "Home", "Studio"] (at least one with a context brief above "## Log")
-   - Projects: [FILL IN: e.g. "Website launch", "Q4 planning"] (at least one with notes and an existing "## Log")
-   - Tasks:
-     - 3-5 open tasks on Today (including 1 unfiled Inbox item and 1 recurring task)
-     - 2 Upcoming scheduled tasks and 2 Anytime tasks
-     - 1 task with an external reference (URL or GitHub issue) for testing tasks_find_by_ref
-     - 1 task assigned to Claude for testing tasks_pending_reasoning and human_accepts refusal
-     - 1 task in Review (endState = needs_verify)
-   - Reviewers are welcome to create, update, defer, log notes on, or complete sample tasks during testing.
-
-4. Reviewer support contact during review:
-   - Email: [FILL IN: support@septena.app or mz's direct review email]
+Support during review: mz@centaur-labs.io <!-- septena-lint:allow contact-email: the reviewer form needs an address -->
 ```
+
+**Setup before submitting (mz, once):** set the two secrets and fill the account, in this order, from `backend/`:
+
+1. `security add-generic-password -a septena -s "Septena reviewer code" -w "$(openssl rand -base64 24)"` (the code lives in the keychain; paste it into the portals from there).
+2. `security find-generic-password -s "Septena reviewer code" -w | tr -d '\n' | npx wrangler secret put REVIEWER_CODE`
+3. `printf 'u_reviewer_%s' "$(openssl rand -hex 12)" | npx wrangler secret put REVIEWER_ACCOUNT_ID`
+4. `node scripts/reviewer-seed.mjs` (reads ADMIN_TOKEN from the keychain; writes nothing on a second run).
+
+Optional: `npx wrangler secret put REVIEWER_MODE_UNTIL` with a date (YYYY-MM-DD) to end reviewer mode on its own. To end it now: `npx wrangler secret delete REVIEWER_CODE`.
 
 ---
 
@@ -208,7 +209,7 @@ Auth flow: OAuth 2.1 (DCR + PKCE S256) with in-app 8-character pairing code appr
 
 Audited directly from `backend/src/shadow/mcp.ts`, `backend/src/tools/taskTools.ts`, `backend/src/shadow/agent.ts`, `backend/src/shadow/notes.ts`, and `backend/test/annotations.test.mjs`.
 
-- **Total tools exposed by `tools/list`:** 36 (15 read-only, 21 write; 3 destructive; 0 open-world).
+- **Total tools exposed by `tools/list`:** 40 (15 read-only, 25 write; 5 destructive; 0 open-world).
 - **Scopes:** Read tools require `tasks:read`; write tools require `tasks:write` (in addition to `tasks:read` at `/mcp`).
 - Every tool sets `openWorldHint: false` and matches top-level `title` to `annotations.title`.
 
@@ -232,17 +233,18 @@ Audited directly from `backend/src/shadow/mcp.ts`, `backend/src/tools/taskTools.
 | `tasks_project_get` | Get project | `tasks:read` | `true` | `false` | `true` | `false` | Reads one project with its notes, `noteRev`, parent area notes, open tasks, pending proposal, and last 10 changes. |
 | `tasks_notes_history` | Get notes history | `tasks:read` | `true` | `false` | `true` | `false` | Lists saved revisions of a project's or area's notes, with optional full revision body. |
 
-### Write tools: tasks and checklists (8)
+### Write tools: tasks, checklists and files (9)
 
 | Tool name | Title | Scope | `readOnly` | `destructive` | `idempotent` | `openWorld` | Purpose and annotation rationale |
 |---|---|---|---|---|---|---|---|
 | `tasks_create` | Create task | `tasks:write` | `false` | `false` | `false` | `false` | Creates a new task (committed for `origin: "user_request"`, Inbox proposal by default). Creates a new record each call (`idempotentHint: false`). |
 | `tasks_complete` | Complete task | `tasks:write` | `false` | `true` | `true` | `false` | Marks a task done and spawns the next occurrence for recurring tasks. Marked `destructiveHint: true` because it closes a task out of active views; repeat calls return `alreadyComplete: true` (`idempotentHint: true`). Refused with `human_accepts` on agent-assigned or claimed tasks. |
-| `tasks_update` | Update task | `tasks:write` | `false` | `true` | `false` | `false` | Updates any subset of fields on an existing task, including notes, references, tags, dates, or `status: "cancelled"`. Marked `destructiveHint: true` because it can cancel a task, overwrite/clear notes, or remove references, and `idempotentHint: false` because `notes_append` appends on repeated calls without `notes_rev`. |
+| `tasks_update` | Update task | `tasks:write` | `false` | `true` | `false` | `false` | Updates any subset of fields on an existing task, including notes, references, tags, dates, the project heading, or `status: "cancelled"`. Marked `destructiveHint: true` because it can cancel a task, overwrite/clear notes, or remove references, and `idempotentHint: false` because `notes_append` appends on repeated calls without `notes_rev`. |
 | `tasks_defer` | Defer task | `tasks:write` | `false` | `false` | `true` | `false` | Moves a task's When date to a future day (`YYYY-MM-DD`) and clears Today. |
 | `tasks_move_to_today` | Move task to Today | `tasks:write` | `false` | `false` | `true` | `false` | Pins a task to Today and clears a future When date. |
 | `tasks_checklist_add` | Add checklist items | `tasks:write` | `false` | `false` | `false` | `false` | Appends 1-level checklist items to a task. Creates new items each call (`idempotentHint: false`). |
 | `tasks_checklist_update` | Update checklist item | `tasks:write` | `false` | `false` | `true` | `false` | Renames, checks/unchecks, or reorders a checklist item without auto-completing the parent task. |
+| `tasks_attachment_add` | Attach a file | `tasks:write` | `false` | `false` | `false` | `false` | Adds a file of up to 10 MB to a task, from the call or through a one-time upload token. Adds a new file each call (`idempotentHint: false`). It cannot read or remove files and fetches no URL. |
 | `tasks_checklist_delete` | Delete checklist item | `tasks:write` | `false` | `true` | `true` | `false` | Permanently deletes a checklist item (`destructiveHint: true`). |
 
 ### Write tools: task conversations (6)
@@ -263,7 +265,7 @@ Audited directly from `backend/src/shadow/mcp.ts`, `backend/src/tools/taskTools.
 | `tasks_claim` | Claim task | `tasks:write` | `false` | `false` | `false` | `false` | Acquires or renews a time-limited lease (default 30 min, max 240 min) and returns project/area notes. Extends lease and counts new runs (`idempotentHint: false`). |
 | `tasks_release` | Release task claim | `tasks:write` | `false` | `false` | `true` | `false` | Ends an agent's lease and records a one-line summary in activity. |
 
-### Write tools: areas, projects, and notes (5)
+### Write tools: areas, projects, headings, and notes (8)
 
 | Tool name | Title | Scope | `readOnly` | `destructive` | `idempotent` | `openWorld` | Purpose and annotation rationale |
 |---|---|---|---|---|---|---|---|
@@ -272,6 +274,9 @@ Audited directly from `backend/src/shadow/mcp.ts`, `backend/src/tools/taskTools.
 | `tasks_notes_propose` | Propose notes brief | `tasks:write` | `false` | `false` | `true` | `false` | Saves one pending brief proposal for the user to accept or reject in the app without changing the live brief. |
 | `tasks_area_create` | Create area | `tasks:write` | `false` | `false` | `false` | `false` | Creates a new top-level area with optional emoji and notes (`idempotentHint: false`). |
 | `tasks_project_create` | Create project | `tasks:write` | `false` | `false` | `false` | `false` | Creates a new project with optional area, notes, and GitHub repo (`idempotentHint: false`). |
+| `tasks_project_update` | Update project | `tasks:write` | `false` | `true` | `true` | `false` | Renames a project, moves it to another area, sets its GitHub repo, or sets its status (active, done, cancelled). Marked `destructiveHint: true` because it overwrites the old values and can end the project. |
+| `tasks_area_update` | Update area | `tasks:write` | `false` | `true` | `true` | `false` | Renames an area or sets its emoji. Marked `destructiveHint: true` because it overwrites the old values. |
+| `tasks_heading_create` | Create heading | `tasks:write` | `false` | `false` | `false` | `false` | Adds a heading (a section divider) at the end of a project. Creates a new heading each call (`idempotentHint: false`). |
 
 ### MCP prompts (1)
 

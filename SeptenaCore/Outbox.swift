@@ -135,6 +135,11 @@ final class TaskMutator {
 
   // MARK: - Conversation (Task Conversations — docs/TASK_CONVERSATIONS_PHASE0.md)
 
+  /// True when the last completion of this task here took it out of Review.
+  func completedFromReview(id: String) -> Bool {
+    cloudBackend?.completedFromReview.contains(id) ?? false
+  }
+
   func conversation(id: String) -> TaskConvo? {
     cloudBackend?.conversation(id: id)
   }
@@ -237,6 +242,50 @@ final class TaskMutator {
     cloudBackend.setDeadline(id: id, date: date)
   }
 
+  /// Put back a deferral exactly as it was (undo, duplicate). The date
+  /// actions decide it in every other case.
+  func setDeferredDeadline(id: String, day: String?) {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] setDeferredDeadline called before CK bound — dropping", nil)
+      return
+    }
+    cloudBackend.setDeferredDeadline(id: id, day: day)
+  }
+
+  /// Waiting On… and Got It Back (docs/REVIEW_SPEC.md §6). A name sets the
+  /// wait, trimmed; `waitingSince` becomes today when the task had no wait
+  /// and stays when the name changes. nil or an empty name clears both.
+  /// `scheduled` is the check-back day: nil leaves When alone, `.some(date)`
+  /// sets it through the When path, and `.some(nil)` clears the When date.
+  /// Undo is recorded at the gesture, not here.
+  @discardableResult
+  func setWaiting(id: String, on name: String?, scheduled: Date?? = nil,
+                  mode: RecurrenceRescheduleMode = .makeException) -> Bool {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] setWaiting called before CK bound — dropping", nil)
+      return false
+    }
+    let name = TaskWaiting.normalizedName(name)
+    let current = LocalCache.task(id: id, in: context)
+    let since: String? = name == nil ? nil
+      : (current?.isWaiting == true ? current?.waitingSince : nil) ?? DayClock.appToday
+    let saved = cloudBackend.setWaiting(id: id, on: name, since: since)
+    if case .some(let day) = scheduled {
+      if let day {
+        apply(.scheduleFor(day), to: id, mode: mode)
+      } else {
+        apply(.clearWhenDate, to: id)
+      }
+    }
+    return saved
+  }
+
+  /// Put back a wait exactly as it was (undo).
+  func restoreWaiting(id: String, on name: String?, since: String?) {
+    guard let cloudBackend else { return }
+    cloudBackend.setWaiting(id: id, on: name, since: since)
+  }
+
   func setReminder(id: String, reminder: TaskReminder?) {
     guard let cloudBackend else {
       SeptenaLog.error("[TaskMutator] setReminder called before CK bound — dropping", nil)
@@ -267,6 +316,14 @@ final class TaskMutator {
       return
     }
     cloudBackend.dismissReminder(id: id, at: date)
+  }
+
+  func setAssignee(id: String, memberID: String?) {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] setAssignee called before CK bound — dropping", nil)
+      return
+    }
+    cloudBackend.setAssignee(id: id, memberID: memberID)
   }
 
   func setStarred(id: String, starred: Bool) {
@@ -569,6 +626,7 @@ final class TaskMutator {
       notes: task.notes,
       source: source
     )
+    if let deferred = task.deferredDeadline { setDeferredDeadline(id: copy.id, day: deferred) }
     if let heading = task.heading { setHeading(id: copy.id, heading: heading) }
     if task.starred { setStarred(id: copy.id, starred: true) }
     if !task.tags.isEmpty { setTaskTags(id: copy.id, tagIDs: task.tags) }
@@ -591,17 +649,19 @@ final class TaskMutator {
   }
 
   /// False when the write did not land (CK not bound yet, the row is gone, or
-  /// the save was rolled back). Every caller that would DESTROY the row on the
+  /// the save was rolled back). `notesFrom`: the notes the editor opened with,
+  /// so that an edit made elsewhere meanwhile is merged, not overwritten. Every
+  /// caller that would DESTROY the row on the
   /// strength of this write must check the result — see `lastWriteFailed(id:)`
   /// for the paths that can only consult it later.
   @discardableResult
-  func update(id: String, title: String? = nil, notes: String? = nil) -> Bool {
+  func update(id: String, title: String? = nil, notes: String? = nil, notesFrom: String? = nil) -> Bool {
     guard let cloudBackend else {
       SeptenaLog.error("[TaskMutator] update called before CK bound — dropping", nil)
       noteWriteFailed(id)
       return false
     }
-    let ok = cloudBackend.update(id: id, title: title, notes: notes)
+    let ok = cloudBackend.update(id: id, title: title, notes: notes, notesFrom: notesFrom)
     if ok { failedWriteIDs.remove(id) } else { noteWriteFailed(id) }
     return ok
   }
@@ -638,14 +698,15 @@ final class TaskMutator {
   /// Callers must only invoke this on a real disposition (file / when /
   /// today / complete) — never on peek/select. Stack is logged so a stray
   /// call that still evacuates a row is diagnosable in Console.
-  func acknowledge(id: String) {
+  @discardableResult
+  func acknowledge(id: String) -> Bool {
     guard let cloudBackend else {
       SeptenaLog.error("[TaskMutator] acknowledge called before CK bound — dropping", nil)
-      return
+      return false
     }
     let stack = Thread.callStackSymbols.prefix(8).joined(separator: " ← ")
     SeptenaLog.info("[TaskMutator] acknowledge id=\(id) via \(stack)")
-    cloudBackend.acknowledge(id: id)
+    return cloudBackend.acknowledge(id: id)
   }
 
   /// Restore an accidentally peek-acked MCP proposal (clears `acknowledgedAt`).

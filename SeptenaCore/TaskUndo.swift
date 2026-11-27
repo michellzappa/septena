@@ -122,6 +122,10 @@ enum TaskUndo {
     let today: Bool
     let starred: Bool
     let deadline: Date?
+    let deferredDeadline: String?
+    /// The wait (docs/REVIEW_SPEC.md §6): Waiting On… changes it with When.
+    let waitingOn: String?
+    let waitingSince: String?
     let recurrence: Recurrence?
     let recurrencePaused: Bool
     let reminder: TaskReminder?
@@ -135,6 +139,9 @@ enum TaskUndo {
       today = task.today
       starred = task.starred
       deadline = SeptenaDate.parse(task.deadline)
+      deferredDeadline = task.deferredDeadline
+      waitingOn = task.waitingOn
+      waitingSince = task.waitingSince
       recurrence = task.recurrence
       recurrencePaused = task.recurrencePaused
       reminder = task.reminder
@@ -164,6 +171,8 @@ enum TaskUndo {
                           durationMinutes: snapshot.durationMinutes,
                           timeZone: snapshot.timeZone)
       mutator.setDeadline(id: snapshot.id, date: snapshot.deadline)
+      mutator.setDeferredDeadline(id: snapshot.id, day: snapshot.deferredDeadline)
+      mutator.restoreWaiting(id: snapshot.id, on: snapshot.waitingOn, since: snapshot.waitingSince)
       mutator.setRecurrence(id: snapshot.id, recurrence: snapshot.recurrence)
       if snapshot.recurrence != nil {
         mutator.setRecurrencePaused(id: snapshot.id, paused: snapshot.recurrencePaused)
@@ -205,6 +214,7 @@ enum TaskUndo {
   /// not a defer.
   private static func isDefer(from b: ScheduleSnapshot, to a: ScheduleSnapshot) -> Bool {
     if b.today && !a.today { return true }
+    if let deferred = a.deferredDeadline, deferred != b.deferredDeadline { return true }
     if let was = b.scheduled, let now = a.scheduled,
        Calendar.current.startOfDay(for: now) > Calendar.current.startOfDay(for: was) {
       return true
@@ -266,29 +276,60 @@ enum TaskUndo {
     let name = wasDone
       ? String(localized: "Reopen Task", comment: "Undo action name")
       : String(localized: "Complete Task", comment: "Undo action name")
+    // A plain completion of a task in Review is an Accept (docs/REVIEW_SPEC.md §4).
+    let fromReview = wasDone ? [] : ids.filter(mutator.completedFromReview)
     record(name: name,
            undo: {
              for id in ids { wasDone ? mutator.complete(id: id) : mutator.uncomplete(id: id) }
+             for id in fromReview {
+               mutator.setConvoEndState(id: id, .needsVerify, note: mutator.conversation(id: id)?.endStateNote)
+             }
            },
            redo: {
              for id in ids { wasDone ? mutator.uncomplete(id: id) : mutator.complete(id: id) }
            })
   }
 
-  /// Accept a task in Review (`needs_verify` → done + `agent_assisted_done`).
+  /// Accepts a task in Review (docs/REVIEW_SPEC.md §4), the one path every
+  /// Accept control calls: done + `agent_assisted_done`, acknowledged, touched.
   /// Undoing reopens the task AND puts it back in Review with its check note.
-  static func recordAcceptReview(id: String,
-                                 previousNote: String?,
-                                 mutator: TaskMutator) {
+  static func acceptReview(id: String, mutator: TaskMutator) {
+    let previousNote = mutator.conversation(id: id)?.endStateNote
+    mutator.complete(id: id)
+    let acknowledged = mutator.acknowledge(id: id)
     mutator.touch(id: id)
     record(name: String(localized: "Accept Review", comment: "Undo action name"),
            undo: {
              mutator.uncomplete(id: id)
              mutator.setConvoEndState(id: id, .needsVerify, note: previousNote)
+             if acknowledged { mutator.unacknowledge(id: id) }
            },
            redo: {
              mutator.complete(id: id)
+             mutator.acknowledge(id: id)
            })
+  }
+
+  /// Waiting On… (docs/REVIEW_SPEC.md §6), the one path every Save calls:
+  /// writes the wait and, when `scheduled` is set, the check-back When date.
+  /// One undo step puts back both.
+  static func setWaiting(id: String, on name: String?, scheduled: Date??,
+                         context: ModelContext, mutator: TaskMutator) {
+    let before = LocalCache.liveTasks(ids: [id], in: context).map(ScheduleSnapshot.init)
+    mutator.setWaiting(id: id, on: name, scheduled: scheduled)
+    recordScheduleChange(name: RegistryWaiting.sheetTitle,
+                         before: before, context: context, mutator: mutator)
+  }
+
+  /// Got It Back (docs/REVIEW_SPEC.md §6): ends the wait on every waiting task
+  /// in `ids`; the tasks stay open where they are. One undo step.
+  static func gotItBack(ids: [String], context: ModelContext, mutator: TaskMutator) {
+    let before = LocalCache.liveTasks(ids: Set(ids), in: context)
+      .filter(\.isWaiting).map(ScheduleSnapshot.init)
+    guard !before.isEmpty else { return }
+    for snapshot in before { mutator.setWaiting(id: snapshot.id, on: nil) }
+    recordScheduleChange(name: RegistryActions.title(.taskGotItBack),
+                         before: before, context: context, mutator: mutator)
   }
 
   /// Send a task in Review back to the agent with a note. Undoing restores
@@ -337,6 +378,7 @@ enum TaskUndo {
     let fadedAt: Date?
     let touchedAt: Date?
     let deferCount: Int
+    let acknowledgedAt: Date?
 
     init(_ task: SeptenaTask) {
       id = task.id
@@ -346,6 +388,7 @@ enum TaskUndo {
       fadedAt = task.fadedAt
       touchedAt = task.touchedAt
       deferCount = task.deferCount
+      acknowledgedAt = task.acknowledgedAt
     }
   }
 
@@ -399,14 +442,15 @@ enum TaskUndo {
       return
     }
     mutator.touch(id: id)
-    func apply(title: String, notes: String?) {
+    func apply(title: String, notes: String?, from: String?) {
       mutator.update(id: id,
                      title: titleChanged ? title : nil,
-                     notes: notesChanged ? (notes ?? "") : nil)
+                     notes: notesChanged ? (notes ?? "") : nil,
+                     notesFrom: from ?? "")
     }
     record(name: String(localized: "Edit Task", comment: "Undo action name"),
-           undo: { apply(title: beforeTitle, notes: beforeNotes) },
-           redo: { apply(title: afterTitle, notes: afterNotes) })
+           undo: { apply(title: beforeTitle, notes: beforeNotes, from: afterNotes) },
+           redo: { apply(title: afterTitle, notes: afterNotes, from: beforeNotes) })
   }
 
   /// Move between area / project / heading. Captured together because the
@@ -826,8 +870,8 @@ enum TaskUndo {
                                         projects: ProjectsMutator) {
     guard (before ?? "") != (after ?? "") else { return }
     record(name: ContainerNotesCopy.undoRestoreName,
-           undo: { Task { @MainActor in try? await projects.setNotes(id: id, notes: before) } },
-           redo: { Task { @MainActor in try? await projects.setNotes(id: id, notes: after) } })
+           undo: { Task { @MainActor in try? await projects.setNotes(id: id, notes: before, from: after ?? "") } },
+           redo: { Task { @MainActor in try? await projects.setNotes(id: id, notes: after, from: before ?? "") } })
   }
 
   static func recordAreaNotesRestore(id: String,

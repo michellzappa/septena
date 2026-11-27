@@ -55,46 +55,22 @@ machine.
 |---|---|
 | **Queued** | `assignee = claude`, no live claim, not terminal. |
 | **Working** | A live claim (§5). |
-| **Your turn** | Last provider turn has `options` and no user turn answers it. |
-| **Review** | `endState = needs_verify`, or an approval card waits (§6). |
+| **Your turn** | Last provider turn has `options` and no user turn answers it. In Review ▸ Questions. |
+| **Stopped** | The user stopped the agent on this task. |
+| **Review** | `endState = needs_verify`. In Review ▸ Finished work. |
 | **Done** | Terminal `endState`. The task `status` stays mz's: it closes when mz accepts or finishes the handoff. |
 
-Septask gets one smart list, **Agent**, grouped by these stages
-*(default)*. The Today list shows only **Your turn** and **Review** items, as
+Every stage except Done is a group of **Review** (§3.1, ADR 0046): Your turn
+is Questions, Review is Finished work, and Working, Queued and Stopped keep
+their names. There is no separate Agent list. Done is in the Logbook. The Today list shows only **Your turn** and **Review** items, as
 today's ball-in-court dot already does.
 
-### 3.1 Review — canonical contract (shipped, `#87`)
+### 3.1 Review
 
-**Review** is the ONE surface by this name across the app, backend, MCP tools,
-and docs (Today rollover's default mode was renamed to **Ask** in ADR 0014, and
-the Faded sweep uses **Sweep**).
-
-- **Membership (single source of truth):** Open, non-heading, non-faded tasks
-  with `conversation.endState == "needs_verify"` (`TaskConvo.needsHumanReview`
-  in `SeptenaCore/ConvoDerived.swift`, mirrored by `TaskStore.readReviewTasks`
-  and MCP `tasks_list(view: "review")`).
-- **Sidebar visibility:** Progressive disclosure (`visibility: "whenNonEmpty"` in
-  `registry/destinations.json`). Appears right below **Today** when non-empty
-  (or while selected); always reachable via **Go ▸ Review** and **Quick Find**.
-- **Store enforcement (`human_accepts`, `TaskStore.ts`):** Agents cannot set
-  `status = "done"` on a task assigned to an agent (`claude`), already in
-  Review (`needs_verify`), or held under a live claim. The store rejects with
-  `human_accepts` and instructs the agent to call
-  `tasks_set_endstate("needs_verify", note)`. Setting `needs_verify`
-  automatically releases the agent's active claim. Plain tasks with no agent
-  assignment/claim stay completable by agents; humans can always complete any
-  task.
-- **Human actions:** Each Review row shows title, `endStateNote`, linked
-  issue/PR or artifact title, and two actions — **Accept** (completes task,
-  transitions `endState` to `agent_assisted_done` so reopening later does not
-  snap back into Review, with lossless `⌘Z` undo back to `needs_verify`) and
-  **Send back** (appends a user turn with a note, reopens `endState` to `open`,
-  assigns to `claude`, with lossless `⌘Z` undo).
-- **Fade exemption:** Tasks awaiting human review (`needs_verify`) or an open
-  choice card (`awaitsHuman`) never fade (`TaskFade.isEligible`).
-- **Explanation & Settings:** Zero toggles. Explained in-place via the empty
-  state (*"Work an agent finished appears here so you can check and accept
-  it."*) and one footer sentence under **Settings ▸ AI & Agents**.
+Review is one list for everything that waits on the user and for agent work
+in progress. Its contract, the
+store rules for agents, Accept and Send back are in
+[`docs/REVIEW_SPEC.md`](REVIEW_SPEC.md) (ADR 0044, ADR 0046).
 
 ## 4. Runner
 
@@ -143,7 +119,7 @@ handles `research`-shaped work only.
 Two LaunchAgent templates live under `docs/agents/`:
 
 - `docs/agents/app.septena.task-runner.plist` — scheduled 15-minute pass (`scripts/task-runner.sh --max 2`).
-- `docs/agents/app.septena.task-runner-wake.plist` — persistent SSE wake listener (`scripts/task-runner-wake.mjs`) subscribed to `GET https://api.septena.app/v1/agent/events/stream`, triggering `scripts/task-runner.sh --max 2` immediately on `assigned`, `user_turn`, and `resumed` events.
+- `docs/agents/app.septena.task-runner-wake.plist` — persistent SSE wake listener (`scripts/task-runner-wake.mjs`) subscribed to `GET https://api.septena.app/v1/agent/events/stream`, triggering `scripts/task-runner.sh --max 2` immediately on `assigned`, `user_turn`, `resumed` and `unpaused` events.
 
 `scripts/task-runner.sh` guards against overlap with an atomic `mkdir` lock (`/tmp/septena-task-runner.lock.d`, with stale-lock recovery), runs `--max 2` as two bounded parallel worker slots (`<agent>:w1` / `<agent>:w2`) with per-slot log isolation, and rotates logs in `~/Library/Logs/septena-runner/` (keeping the newest 100 by default).
 
@@ -165,7 +141,7 @@ Two LaunchAgent templates live under `docs/agents/`:
      launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/$f"
    done
    ```
-4. **Outbound webhooks (optional, for cloud routines / OpenClaw / n8n):** register an `https://` URL via `POST /v1/agent/webhooks` (`{ "url": "https://...", "secret": "..." }`, authenticated with a user bearer token). Every wake event (`assigned`, `user_turn`, `resumed`) sends a pointer-only JSON POST signed with `X-Septena-Signature: sha256=<hex>` over `${X-Septena-Timestamp}.${rawBody}` using HMAC-SHA256.
+4. **Outbound webhooks (optional, for cloud routines / OpenClaw / n8n):** register an `https://` URL via `POST /v1/agent/webhooks` (`{ "url": "https://...", "secret": "..." }`, authenticated with a user bearer token). Every wake event (`assigned`, `user_turn`, `resumed`, `unpaused`) sends a pointer-only JSON POST signed with `X-Septena-Signature: sha256=<hex>` over `${X-Septena-Timestamp}.${rawBody}` using HMAC-SHA256. A failed POST (network error, timeout, 408, 425, 429, 5xx) is sent again after 1 s and 5 s; each webhook's `failureCount` counts deliveries that gave up. Audit of the whole loop: `docs/AGENT_LOOP_AUDIT.md`.
 
 ## 5. Claims
 
@@ -186,7 +162,7 @@ MCP tools, on the api.septena.app connector only (ADR 0008):
 |---|---|
 | `tasks_claim(id, agent, ttlMinutes?, why?)` | Takes or renews the claim. Refuses with a rule: `paused`, `stopped`, `your_turn`, `held`, `budget`, `terminal`, `closed`, `not_found`. The DO serializes, so two agents cannot both win. |
 | `tasks_release(id, agent, why)` | Clears the agent's own claim. `why` goes to the activity log. |
-| `tasks_agent_events(since?, limit?)` | Pointer events since a cursor: `assigned`, `user_turn`, `stopped`, `resumed`, `paused`, `unpaused`. |
+| `tasks_agent_events(since?, limit?)` | Pointer events since a cursor: `assigned`, `user_turn`, `stopped`, `resumed`, `paused`, `unpaused`, `do_started`, `do_ended`. |
 | `tasks_activity(id?, limit?)` | The change log in words, with reasons. |
 
 Rules the store enforces:
@@ -196,7 +172,8 @@ Rules the store enforces:
 - A human turn sets `runsSinceUser` to 0. The 6th fresh claim without one is
   refused (`budget`): the agent must ask.
 - While `stoppedAt` is set, every agent write to the task is refused.
-- While `agentsPaused` is true, every claim is refused and
+- While `agentsPaused` is true, every claim and every other agent write is
+  refused (`paused`; a release still works), and
   `tasks_pending_reasoning` returns no tasks.
 - A turn written by a non-holder while a claim is live is accepted (mz can
   always write), but the runner re-reads the thread before its next write.
@@ -289,7 +266,7 @@ queue for team work)*. Then all of mz's agent questions are in one app.
 - **Wake (multi-user transport, decided 2026-11-21):** the wake plumbing on
   `api.septena.app` is built multi-user from day one, with `mz-mini` as the
   first runner and Settings UI added later. Two transports share the same
-  `tasks_agent_events` event stream (`assigned`, `user_turn`, `resumed`):
+  `tasks_agent_events` event stream (`assigned`, `user_turn`, `resumed`, `unpaused`):
   1. **Outbound webhook URL** attached to an agent key or pairing (HMAC-signed
      POST with event payload) — works for cloud routines, OpenClaw, n8n, and
      tunneled hosts.
@@ -335,7 +312,7 @@ links (issue, PR, commit).
 - **Least privilege:** the runner uses a per-user API token with the `tasks`
   scope (backend spec §8), and GitHub access only through the repo links of
   its profile.
-- **Kill switch:** one setting, "Pause all agents", stops claims at once.
+- **Kill switch:** one setting, "Pause all agents", stops claims and agent writes at once.
   Built: synced setting `agentsPaused`, toggle in Septask ▸ Settings ▸
   Connections & AI. Per task: **Stop** / **Resume** in the conversation.
 

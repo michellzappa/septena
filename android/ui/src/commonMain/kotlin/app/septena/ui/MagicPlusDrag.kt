@@ -21,6 +21,13 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.abs
 import kotlin.math.hypot
 
+/** Insertion edge for a homepage/sidebar list-insert target (mirrors iOS `MagicPlusInsertEdge`). */
+sealed interface MagicPlusInsertEdge {
+    data object Top : MagicPlusInsertEdge
+    data object Bottom : MagicPlusInsertEdge
+    data class BelowGap(val gapDp: Float) : MagicPlusInsertEdge
+}
+
 /** What kind of drop target the dragged Magic Plus orb is hovering. Matches iOS `MagicPlusDropKind`. */
 sealed interface MagicPlusDropKind {
     /** Between two rows in a list (offers both top and bottom edges). */
@@ -31,12 +38,21 @@ sealed interface MagicPlusDropKind {
 
     /** A full container target (e.g. a Lists Homepage smart-list pill, Area, or Project row). */
     data object Container : MagicPlusDropKind
+
+    /** A homepage/sidebar insertion point that creates an Area (at Area level) or a Project (inside an Area or loose). */
+    data class ListInsert(
+        val edge: MagicPlusInsertEdge,
+        val isArea: Boolean,
+        val label: String,
+    ) : MagicPlusDropKind
 }
 
 data class MagicPlusActiveTarget(
     val id: String,
     val kind: MagicPlusDropKind,
     val before: Boolean,
+    val isArea: Boolean = false,
+    val label: String = "",
 )
 
 /**
@@ -199,26 +215,54 @@ class MagicPlusDragState {
         }
         if (openIndex != null && openIndex != bestIndex) {
             val openDistance = abs(gaps[openIndex].y - probeY)
-            if (openDistance - bestDistance < HYSTERESIS_DP * density) return
+            val hysteresisDp = if (
+                gaps[openIndex].kind is MagicPlusDropKind.ListInsert ||
+                gaps[bestIndex].kind is MagicPlusDropKind.ListInsert
+            ) {
+                LIST_INSERT_HYSTERESIS_DP
+            } else {
+                HYSTERESIS_DP
+            }
+            if (openDistance - bestDistance < hysteresisDp * density) return
         }
         if (bestIndex == openIndex) return
         val winner = gaps[bestIndex]
         onHapticTick()
-        activeTarget = MagicPlusActiveTarget(winner.id, winner.kind, winner.before)
+        val listInsert = winner.kind as? MagicPlusDropKind.ListInsert
+        activeTarget = MagicPlusActiveTarget(
+            id = winner.id,
+            kind = winner.kind,
+            before = winner.before,
+            isArea = listInsert?.isArea ?: false,
+            label = listInsert?.label ?: "",
+        )
     }
 
     private fun insertionPoints(density: Float): List<Gap> {
         val points = mutableListOf<Gap>()
+        val listPoints = mutableListOf<Gap>()
         for (zone in zones.values) {
-            when (zone.kind) {
+            when (val kind = zone.kind) {
                 MagicPlusDropKind.TaskRow -> {
-                    points += Gap(zone.topY, zone.id, zone.kind, before = true, rank = 0)
-                    points += Gap(zone.bottomY, zone.id, zone.kind, before = false, rank = 2)
+                    points += Gap(zone.topY, zone.id, kind, before = true, rank = 0)
+                    points += Gap(zone.bottomY, zone.id, kind, before = false, rank = 2)
                 }
                 MagicPlusDropKind.TaskSection -> {
-                    points += Gap(zone.bottomY, zone.id, zone.kind, before = true, rank = 1)
+                    points += Gap(zone.bottomY, zone.id, kind, before = true, rank = 1)
                 }
                 MagicPlusDropKind.Container -> Unit
+                is MagicPlusDropKind.ListInsert -> {
+                    // Homepage list-insert slots never merge: pull Bottom 6 dp inward and Top 4 dp inward
+                    // so "end of Area A (Project)" and "New Area before B" stay ~24 dp apart across the card gap.
+                    when (val edge = kind.edge) {
+                        MagicPlusInsertEdge.Top ->
+                            listPoints += Gap(zone.topY + 4f * density, zone.id, kind, before = true, rank = 0)
+                        MagicPlusInsertEdge.Bottom ->
+                            listPoints += Gap(zone.bottomY - 6f * density, zone.id, kind, before = false, rank = 2)
+                        is MagicPlusInsertEdge.BelowGap ->
+                            listPoints += Gap(zone.bottomY + edge.gapDp * density, zone.id, kind, before = false, rank = 2)
+                    }
+                }
             }
         }
         points.sortBy(Gap::y)
@@ -234,7 +278,7 @@ class MagicPlusDragState {
                 clusterStart = point.y
             }
         }
-        return merged
+        return (merged + listPoints).sortedBy(Gap::y)
     }
 
     private companion object {
@@ -242,6 +286,7 @@ class MagicPlusDragState {
         const val HOME_RADIUS_DP = 40f
         const val MERGE_CLUSTER_DP = 16f
         const val HYSTERESIS_DP = 10f
+        const val LIST_INSERT_HYSTERESIS_DP = 4f
     }
 }
 
@@ -344,6 +389,41 @@ fun rememberMagicPlusContainerDrop(
         drag.register(
             id = id,
             kind = MagicPlusDropKind.Container,
+            topY = rect.top,
+            bottomY = rect.bottom,
+            leftX = rect.left,
+            rightX = rect.right,
+        ) { _ -> onDrop() }
+    }
+    return mod to isTargeted
+}
+
+/**
+ * Registers a homepage/sidebar row edge as a Magic Plus Area/Project insert target and returns
+ * the bounds-tracking modifier together with whether this exact zone is currently hovered.
+ */
+@androidx.compose.runtime.Composable
+fun rememberMagicPlusListInsert(
+    id: String,
+    edge: MagicPlusInsertEdge,
+    isArea: Boolean,
+    label: String,
+    enabled: Boolean,
+    onDrop: () -> Unit,
+): Pair<Modifier, Boolean> {
+    val drag = LocalMagicPlusDrag.current
+    if (drag == null || !enabled) return Modifier to false
+
+    DisposableEffect(drag, id) {
+        onDispose { drag.unregister(id) }
+    }
+    val isTargeted = drag.isDragging && drag.activeTarget?.id == id
+    val kind = MagicPlusDropKind.ListInsert(edge = edge, isArea = isArea, label = label)
+    val mod = Modifier.onGloballyPositioned { coords ->
+        val rect = coords.boundsInRoot()
+        drag.register(
+            id = id,
+            kind = kind,
             topY = rect.top,
             bottomY = rect.bottom,
             leftX = rect.left,

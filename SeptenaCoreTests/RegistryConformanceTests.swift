@@ -164,6 +164,8 @@ import Testing
         let hasRecurrence: Bool
         let isAgentTurn: Bool
         let isAssignedToClaude: Bool
+        let isAwaitingHuman: Bool?
+        let isProposal: Bool?
         let touchedAt: Date?
         let createdAt: Date
         let created: String?
@@ -196,6 +198,8 @@ import Testing
         hasRecurrence: i.hasRecurrence,
         isAgentTurn: i.isAgentTurn,
         isAssignedToClaude: i.isAssignedToClaude,
+        isAwaitingHuman: i.isAwaitingHuman ?? false,
+        isProposal: i.isProposal ?? false,
         touchedAt: i.touchedAt,
         createdAt: i.createdAt,
         created: i.created,

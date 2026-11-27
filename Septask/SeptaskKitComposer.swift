@@ -66,7 +66,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
   var onAction: ((Action) -> Void)?
   /// Title + notes as they stand; the controller writes them through the
   /// mutator. Notes is nil when the field was never shown or is empty.
-  var onCommit: ((String, String?) -> Void)?
+  var onCommit: ((_ title: String, _ notes: String?, _ from: (title: String, notes: String?)) -> Void)?
   /// Fold the row shut (Return, ⌘↩, or Esc).
   var onCollapse: (() -> Void)?
   /// The notes band appeared or disappeared — the controller animates the
@@ -673,11 +673,13 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
   /// to silently revert an in-progress title edit the moment any OTHER pill
   /// was touched.
   func refreshPills(with task: SeptenaTask, listName: String?) {
-    checkbox.isDone = task.status != .open
-    checkbox.isDashed = task.status == .open && task.isInTriageBand
+    let done = task.status != .open
+    let isProposal = task.isInTriageBand && task.source == TaskSource.mcp
+    checkbox.isDone = done
+    checkbox.isDashed = !done && isProposal
     checkbox.isToday = task.isOnToday
     checkbox.tenureFill = TaskRowFlags.agingEnabled ? task.fadeFill() : nil
-    checkbox.cornerDot = task.conversation.hasStarted && !task.isInTriageBand
+    checkbox.cornerDot = !done && !isProposal && task.conversation.hasStarted && deriveConvo(task.conversation).badge != nil
     checkbox.agentCue = task.showsAgentCue()
 
     // A pill shows its registry label when empty and its value when set; the
@@ -917,9 +919,10 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     let title = pendingTitle
     let notes = pendingNotes
     guard title != committedTitle || notes != committedNotes else { return }
+    let from = (title: committedTitle, notes: committedNotes)
     committedTitle = title
     committedNotes = notes
-    onCommit?(title, notes)
+    onCommit?(title, notes, from)
   }
 
   // MARK: - Keyboard
@@ -1239,6 +1242,20 @@ final class KitPillButton: NSButton {
     setAccessibilityLabel(summary)
   }
   private let glass = KitPassthroughGlassView()
+  /// The leading symbol, drawn by our own image view ABOVE the glass, the
+  /// way `KitChipView` draws its icon. The button's own `image` stays nil:
+  /// AppKit draws it in an internal image view that it creates late and puts
+  /// under the `NSGlassEffectView`, so the glass blurred the icon into a
+  /// dark smudge in dark mode (reported again on 26.11 after 6e69c481).
+  private let iconView = KitPillIconView()
+  /// The pill's leading symbol (nil: a text-only pill).
+  fileprivate var icon: NSImage? {
+    didSet {
+      iconView.image = icon
+      iconView.isHidden = icon == nil
+      needsLayout = true
+    }
+  }
   /// Text stadiums stay 24pt (popovers, conversation options); an attribute
   /// pill is taller, inside the rail height (room for the focus ring).
   private static let textHeight: CGFloat = 24
@@ -1287,6 +1304,9 @@ final class KitPillButton: NSButton {
     glass.style = .regular
     glass.translatesAutoresizingMaskIntoConstraints = false
     addSubview(glass, positioned: .below, relativeTo: nil)
+    iconView.imageScaling = .scaleNone
+    iconView.isHidden = true
+    addSubview(iconView, positioned: .above, relativeTo: glass)
     NSLayoutConstraint.activate([
       glass.leadingAnchor.constraint(equalTo: leadingAnchor),
       glass.trailingAnchor.constraint(equalTo: trailingAnchor),
@@ -1303,8 +1323,8 @@ final class KitPillButton: NSButton {
 
   override var intrinsicContentSize: NSSize {
     let text = attributedTitle.size()
-    let icon = image.map { $0.size.width + Self.iconGap } ?? 0
-    let width = ceil(text.width + icon) + Self.horizontalPadding * 2
+    let iconWidth = icon.map { $0.size.width + Self.iconGap } ?? 0
+    let width = ceil(text.width + iconWidth) + Self.horizontalPadding * 2
     if attribute != nil {
       return NSSize(width: min(width, Self.maxAttributeWidth), height: Self.attributeHeight)
     }
@@ -1314,12 +1334,16 @@ final class KitPillButton: NSButton {
   override func layout() {
     super.layout()
     keepGlassAtBack()
+    if let size = icon?.size {
+      iconView.frame = NSRect(x: Self.horizontalPadding, y: ((bounds.height - size.height) / 2).rounded(),
+                              width: size.width, height: size.height)
+    }
     applyCapsule()
   }
 
-  /// AppKit makes the button's image view after `init` and puts it at the
-  /// back, under the glass, where the icon cannot be seen. `sortSubviews`
-  /// moves the glass without dropping its constraints.
+  /// AppKit makes the button's title view after `init` and can put it at the
+  /// back, under the glass, where it cannot be seen. `sortSubviews` moves the
+  /// glass without dropping its constraints.
   private func keepGlassAtBack() {
     guard subviews.first !== glass else { return }
     sortSubviews({ a, b, glass in
@@ -1355,9 +1379,9 @@ final class KitPillButton: NSButton {
     // unless a dynamic icon override (such as an area emoji or project ring)
     // supplies the pill's leading glyph.
     if let iconProvider {
-      image = iconProvider(contentTintColor ?? .labelColor)
+      icon = iconProvider(contentTintColor ?? .labelColor)
     } else if let attribute {
-      image = symbolImage(attribute.sfSymbol(on: isOn), ink: contentTintColor ?? .labelColor)
+      icon = symbolImage(attribute.sfSymbol(on: isOn), ink: contentTintColor ?? .labelColor)
     }
     isRestyling = false
     applyCapsule()
@@ -1410,17 +1434,24 @@ final class KitPillButton: NSButton {
   fileprivate static let iconGap: CGFloat = 4
 }
 
-/// Icon, gap, label, in the padding that `intrinsicContentSize` counts. Left
-/// to itself, AppKit draws the icon on the pill's edge, away from the label.
+/// The pill's icon view. Clicks pass through to the button.
+private final class KitPillIconView: NSImageView {
+  override func hitTest(_ point: NSPoint) -> NSView? { nil }
+}
+
+/// Icon, gap, label, in the padding that `intrinsicContentSize` counts. The
+/// icon view sits at the leading padding; the title starts after it.
 private final class KitPillButtonCell: NSButtonCell {
-  override func imageRect(forBounds rect: NSRect) -> NSRect {
-    guard let size = image?.size else { return super.imageRect(forBounds: rect) }
-    return NSRect(x: rect.minX + KitPillButton.horizontalPadding, y: rect.midY - size.height / 2,
-                  width: size.width, height: size.height)
+  override func drawTitle(_ title: NSAttributedString, withFrame frame: NSRect,
+                          in controlView: NSView) -> NSRect {
+    guard (controlView as? KitPillButton)?.icon != nil else {
+      return super.drawTitle(title, withFrame: frame, in: controlView)
+    }
+    return super.drawTitle(title, withFrame: titleRect(forBounds: controlView.bounds), in: controlView)
   }
 
   override func titleRect(forBounds rect: NSRect) -> NSRect {
-    guard let size = image?.size else { return super.titleRect(forBounds: rect) }
+    guard let size = (controlView as? KitPillButton)?.icon?.size else { return super.titleRect(forBounds: rect) }
     let x = rect.minX + KitPillButton.horizontalPadding + size.width + KitPillButton.iconGap
     let height = ceil(attributedTitle.size().height)
     return NSRect(x: x, y: rect.midY - height / 2,
@@ -1990,17 +2021,28 @@ final class KitAttachmentsView: NSView {
     items.contains { TaskSyncEngine.shared.isAttachmentElsewhere($0) }
   }
 
+  /// The Plus upsell only for an account whose plan has no file sync. A
+  /// Plus or Pro account whose file has not arrived yet sees the syncing line.
   private var activeUpsell: RegistryPlanNote? {
     if let explicitUpsell { return explicitUpsell }
+    guard PlanStatus.shared.showsFileSyncUpsell else { return nil }
     if hasElsewhereItems || hasLocalOnlyItems { return RegistryPlans.upsell("file_elsewhere") }
     return nil
+  }
+
+  /// Opening a file found it on another device, and the plan syncs files.
+  private var fileStillSyncing = false
+
+  /// Files are on their way between devices and the plan syncs them.
+  private var showsSyncingLine: Bool {
+    activeUpsell == nil && (hasElsewhereItems || hasLocalOnlyItems || fileStillSyncing)
   }
 
   var preferredHeight: CGFloat {
     guard !items.isEmpty else { return 0 }
     var h = CGFloat(items.count) * Self.chipHeight
       + CGFloat(max(0, items.count - 1)) * Self.rowSpacing
-    if activeUpsell != nil {
+    if activeUpsell != nil || showsSyncingLine {
       h += Self.rowSpacing + Self.upsellHeight
     }
     return h
@@ -2028,7 +2070,7 @@ final class KitAttachmentsView: NSView {
   required init?(coder: NSCoder) { fatalError("KitAttachmentsView is code-only") }
 
   func configure(taskID: String) {
-    if self.taskID != taskID { explicitUpsell = nil }
+    if self.taskID != taskID { explicitUpsell = nil; fileStillSyncing = false }
     self.taskID = taskID
     reload()
   }
@@ -2094,6 +2136,15 @@ final class KitAttachmentsView: NSView {
       stack.addArrangedSubview(row)
       row.widthAnchor.constraint(lessThanOrEqualTo: stack.widthAnchor).isActive = true
       row.heightAnchor.constraint(equalToConstant: Self.upsellHeight).isActive = true
+    } else if showsSyncingLine {
+      let label = NSTextField(labelWithString: RegistryPlans.Status.filesSyncing)
+      label.font = SeptaskKitTheme.meta
+      label.textColor = SeptaskKitTheme.inkSecondary
+      label.lineBreakMode = .byTruncatingTail
+      label.maximumNumberOfLines = 1
+      stack.addArrangedSubview(label)
+      label.widthAnchor.constraint(lessThanOrEqualTo: stack.widthAnchor).isActive = true
+      label.heightAnchor.constraint(equalToConstant: Self.upsellHeight).isActive = true
     }
   }
 
@@ -2142,6 +2193,10 @@ final class KitAttachmentsView: NSView {
         if let downloaded = try await self.store.localFile(for: target) {
           self.reload()
           KitQuickLookCoordinator.shared.preview(urls: [downloaded], startingAt: 0)
+        } else if TaskSyncEngine.shared.isAttachmentElsewhere(target), !PlanStatus.shared.showsFileSyncUpsell {
+          self.fileStillSyncing = true
+          self.rebuild()
+          self.onChanged?()
         } else if TaskSyncEngine.shared.isAttachmentElsewhere(target),
                   let moment = RegistryPlans.upsell("file_elsewhere") {
           self.explicitUpsell = moment
@@ -2154,7 +2209,12 @@ final class KitAttachmentsView: NSView {
         self.rebuild()
         self.onChanged?()
       } catch TaskBackendError.http(let status, _) where status == 404 {
-        if !PlanStatus.shared.attachmentsAllowed || TaskSyncEngine.shared.isAttachmentElsewhere(target),
+        if PlanStatus.shared.attachmentsAllowed, !PlanStatus.shared.showsFileSyncUpsell,
+           TaskSyncEngine.shared.isAttachmentElsewhere(target) {
+          self.fileStillSyncing = true
+          self.rebuild()
+          self.onChanged?()
+        } else if !PlanStatus.shared.attachmentsAllowed || TaskSyncEngine.shared.isAttachmentElsewhere(target),
            let moment = RegistryPlans.upsell("file_elsewhere") {
           self.explicitUpsell = moment
           self.rebuild()

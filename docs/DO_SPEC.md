@@ -1,6 +1,6 @@
 # Do: one task now
 
-Status: building (2026-11-25; D0 to D2, #515 to #517).
+Status: building (2026-11-25; D0 to D2 and the float of §4.2 are on `main`. Open: D3 to D8, see §10).
 **Decision:** [ADR 0041](adr/0041-do-is-one-task-now-on-every-screen.md).
 **Builds on:** [ADR 0006](adr/0006-tasks-fade-by-default.md) (no guilt, stuck
 question), [ADR 0008](adr/0008-agent-loop-rules-live-in-the-store.md) (rules in
@@ -163,14 +163,28 @@ saves and closes the open row. Quick Entry gets **Add and Do** for work that is
 not on the list yet. Starting while another Do is open replaces it without a
 dialog.
 
+### 4.2 Floating
+
+When the user leaves the app on the device that shows the Do screen, the Do
+floats: the title and the time, small, over the other apps. A tap returns to the
+Do screen. There is no button and no setting. Other devices keep the notice.
+
+| Platform | How |
+|---|---|
+| Android | Picture-in-picture, entered when the user leaves the app |
+| iPhone, iPad | A local Live Activity (Lock Screen, Dynamic Island). It counts up, also with a length set. System picture-in-picture is for video. An end on another device clears it when the app next runs: the push is D5 |
+| Mac | A small panel while Septena is not the active app. A drag moves it, a right click has the Do menu |
+
+Show the list turns it off: the Do is then a notice here too.
+
 ## 5. The notice
 
 Every signed-in device that does not show the Do screen.
 
 | Surface | What it shows |
 |---|---|
-| iPhone, iPad, Android | One line at the top of the list root: "Doing *title*" and the time |
-| Mac | The same line in the window, and a menu bar item while a Do is open. The menu bar item also shows on the Mac with the Do screen |
+| iPhone, iPad, Android | One line at the top of every list: "Doing *title*" and the time |
+| Mac | The same line at the top of every list, and a menu bar item while a Do is open. The menu bar item also shows on the Mac with the Do screen |
 | Watch | One row at the top of Today and the complication. No takeover |
 | Web, Windows | Built with the client's own first version of Do |
 | Locked iPhone (D5) | Live Activity |
@@ -186,7 +200,7 @@ That is accepted.
 ## 6. Agents
 
 - `tasks_orientation` and `tasks_list` show which task is being done
-  (`doing: true`). `tasks_agent_events` gets `do_started` and `do_ended`, as
+  (`doing: true`). `tasks_get` shows it too. `tasks_agent_events` gets `do_started` and `do_ended`, as
   pointers.
 - `tasks_claim` on that task is refused with the new reason `doing`. A start
   ends a live claim, in the same transaction, with the reason "the user does
@@ -210,10 +224,11 @@ device can correct its clock. No task notes.
 
 | Verb | Effect |
 |---|---|
-| `POST /v1/tasks/:id/do` with optional `plannedMinutes` | Start. The client sends the session id, so a retry starts nothing new |
-| `POST /v1/do/:sessionId/stop` with optional `note` | Stop for now |
-| `POST /v1/do/:sessionId/confirm` | Still on it |
-| `complete`, `defer` and the others | As today. They end the Do by rule 5, or by `later` when the request names the session |
+| `POST /v1/tasks/:id/do` with `sessionId` and optional `plannedMinutes` | Start. The client makes the session id, so a retry starts nothing new |
+| `POST /v1/tasks/do/:sessionId/stop` with optional `note` | Stop for now |
+| `POST /v1/tasks/do/:sessionId/confirm` | Still on it |
+| `complete` and the others | As today. They end the Do by rule 5 |
+| `defer` with `session` | Later: the Do ends with exit `later` |
 
 These routes are on the companion scope's list when CD2 (#358) builds it. Each
 one needs a deliberate gesture on the device (ADR 0034). The watch queues them

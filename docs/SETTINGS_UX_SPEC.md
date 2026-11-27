@@ -59,7 +59,7 @@ Every setting and custom surface currently in `Septask/` and shared `Septena/She
 | `todayShowCompleted` | `setting` (`bool`) | `device` | Inline toggle in **Lists** | `general` | all | `always` | Mirrors macOS `View` menu |
 | `tasksShowAging` | `setting` (`bool`) | `device` | Inline toggle in **Lists** | `general` | all | `always` | Update registry label/detail to match P2 (`c1ad4b76`): *"Fade untouched tasks"* |
 | `tasksFilingSuggestions` | `setting` (`bool`) | `device` | Inline toggle in **Lists** | `general` | `ios`, `ipados`, `macos`, `android`, `windows` | `always` | On-device classifier toggle |
-| `badgeShowOverdue` | `setting` (`bool`) | `device` (`sharedAppGroup`) | Inline toggle in **Lists** | `general` | `ios`, `ipados`, `macos`, `android`, `windows` | `always` | Device-local overdue badge |
+| `badgeShowOverdue` | `setting` (`bool`) | `device` (`sharedAppGroup`) | Inline toggle in **Lists** | `general` | `macos` | `always` | Dot on the Dock icon. Other platforms have no badge (#550) |
 | `accent_color` | `customSurface` | device/local *(future synced)* | Inline swatch row in **Appearance** | `general` (Appearance section, from the `appearance` page) | all | `always` | Remove *"shared with Septena Life"* footer copy for task-app users |
 | `textSizeStep` | `setting` (`int`, `-2…+2`) | `device` | Inline slider in **Appearance** | `general` (Appearance section, from the `appearance` page) | all | `always` | Mirrors macOS `View ▸ Text Size` |
 | `tasksTitleLines` | `setting` (`int`, `1…3`) | `device` | Inline picker in **Appearance** | `general` (hidden on desktop) | `ios`, `ipados`, `android` | `always` | Mobile-only row wrap limit |
@@ -71,7 +71,7 @@ Every setting and custom surface currently in `Septask/` and shared `Septena/She
 |---|---|---|
 | **`account`** | `welcomeName` (`synced` string), `sync_account_status` (Sign in / live status / Sign out), `delete_account` (`signedIn` only) | Removes duplicate Sync from `Task backend`; moves `store_health` to Depth 2 (still surfaces inline banner only if failures > 0, or inside Advanced diagnostics). Future home for `#46` Sync subscription & ADR 0016 sign-in methods |
 | **`privacy`** | Concise 1-section `privacy_summary` (accurate `api.septena.app` + Claude copy, no `"Task backend"` reference) | The usage-data picker was removed on 2026-11-25 (#436): the app sends no usage data. Moves `diagnosticsEnabled` / Community Pulse to Depth 2 *(default)* |
-| **`about`** | `about_header` (icon, name, tagline, version/build), `check_updates` (`macos`, `windows`), `send_feedback`, `reset_get_started`, `septena_life_link`, **Advanced →** (`advanced` subpage) | Trims multi-paragraph marketing prose; removes `"Task backend"` row in favor of unified `Advanced` |
+| **`about`** | `about_header` (icon, name, tagline, version/build), `open_help` (opens `helpURL`), `check_updates` (`macos`, `windows`), `send_feedback`, `reset_get_started`, `septena_life_link`, **Advanced →** (`advanced` subpage) | Trims multi-paragraph marketing prose; removes `"Task backend"` row in favor of unified `Advanced` |
 
 ### Depth 2 — `About ▸ Advanced` (diagnostics, power-user & beta tools)
 
@@ -180,7 +180,7 @@ Replace the flat 6-page legacy `pages` array with an explicit two-surface projec
         { "kind": "setting", "key": "todayShowCompleted", "label": "Show completed tasks" },
         { "kind": "setting", "key": "tasksShowAging", "label": "Fade untouched tasks", "detail": "Tasks untouched for 14 days fade out and move to Faded." },
         { "kind": "setting", "key": "tasksFilingSuggestions", "label": "Suggest where to file", "detail": "Learn where you usually file similar tasks." },
-        { "kind": "setting", "key": "badgeShowOverdue", "label": "Overdue app icon badge" }
+        { "kind": "setting", "key": "badgeShowOverdue", "label": "Overdue app icon badge", "platforms": ["macos"] }
       ]
     },
     {

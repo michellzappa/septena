@@ -79,6 +79,7 @@ struct SeptaskRootView: View {
       // Same as RootTabView: resolve the push-vs-sheet rule once at the
       // shell root and publish `\.usesPushNavigation` to every surface.
       .resolvesAdaptiveNavigation()
+      .doFlowSheets()
       // The app-global modals, one `.sheet(item:)` like RootTabView — the
       // subset with a Septask surface. The mood check-in and new-meal sheets
       // left with the Next page (2026-11-19). Anything else ever set shows
@@ -136,15 +137,30 @@ struct SeptaskRootView: View {
       #endif
   }
 
-  @ViewBuilder
+  /// The lists, or the Do screen in their place (docs/DO_SPEC.md §4): no list
+  /// is behind it, so no list command can run. A ZStack always exists, so the
+  /// root's lifecycle modifiers do not run again when the two change places.
   private var rootLayout: some View {
-    #if os(iOS)
-    Group {
-      if usesSplitLayout {
-        ContentView()
+    ZStack {
+      if DoFlow.isAvailable, DoStore.shared.isFullHere, let doing = DoStore.shared.current {
+        DoScreen(doing: doing)
+          .id(doing.sessionID)
+          .transition(.opacity)
       } else {
-        compactStack
+        lists
+          .transition(.opacity)
       }
+    }
+    .a11yAnimation(.easeInOut(duration: 0.25), value: DoStore.shared.isFullHere)
+  }
+
+  @ViewBuilder
+  private var lists: some View {
+    #if os(iOS)
+    if usesSplitLayout {
+      ContentView()
+    } else {
+      compactStack
     }
     #else
     ContentView()
@@ -188,11 +204,13 @@ struct SeptaskRootView: View {
       MagicPlusOrb(
         drag: magicPlusDrag,
         isViewingProject: isViewingProject,
+        isViewingArea: isViewingArea,
         isViewingHome: isViewingHome,
         onNewTask: { triggerInlineNewTask() },
         onNewSection: { nav.shouldCreateHeading = true },
         onNewProject: { nav.shouldCreateProject = true },
-        onNewArea: { nav.shouldCreateArea = true }
+        onNewArea: { nav.shouldCreateArea = true },
+        onJoinShared: { SeptaskSharing.presentJoin() }
       )
       .padding(.trailing, 16)
       .padding(.bottom, 8)
@@ -230,208 +248,19 @@ struct SeptaskRootView: View {
   private var isViewingHome: Bool { nav.path.isEmpty }
 
   /// The orb only makes tasks on a list. On a project it also makes a
-  /// section, so its tap there opens a two-row menu; everywhere else the tap
-  /// makes a task.
+  /// section; on an area it also makes a project in that area; everywhere
+  /// else the tap makes a task.
   private var isViewingProject: Bool {
     if case .project = nav.path.last { return true }
     return false
   }
+
+  private var isViewingArea: Bool {
+    if case .area = nav.path.last { return true }
+    return false
+  }
   #endif
 }
-
-#if os(iOS)
-/// Separate floating circular Magic Plus orb anchored at the bottom-right of
-/// the iPhone navigation stack:
-/// - Solid accent circle + subtle 6-dot grip beneath `+` communicates a
-///   grabbable object rather than a flat tap-only tab icon.
-/// - Tap makes a task. On a project it opens a popover with `New Task` and
-///   `New Section`. On the list root it opens `New Project` and `New Area`
-///   only.
-/// - Instant drag (no hold delay) hides the orb and shows the insertion line
-///   at the row gap, heading, Today/Anytime group or Upcoming day under the
-///   finger, or between Projects and Areas on the list root. No floating
-///   card (decided 2026-11-23).
-private struct MagicPlusOrb: View {
-  let drag: MagicPlusDragState
-  @State private var showingMenu = false
-  /// Finger-down state: the orb sinks while touched, so the press reads as
-  /// received before the tap even ends.
-  @GestureState private var isPressed = false
-  /// Bumped on each tap: drives the release pop (grow, then settle back).
-  @State private var popTick = 0
-  @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-  let isViewingProject: Bool
-  let isViewingHome: Bool
-  let onNewTask: () -> Void
-  let onNewSection: () -> Void
-  let onNewProject: () -> Void
-  let onNewArea: () -> Void
-
-  var body: some View {
-    let appearance = AppearancePreferences.shared
-    let accent = appearance.magicPlusSwiftUIColor
-    let ink = appearance.magicPlusInkSwiftUIColor
-
-    // Keep both the resting "+" orb and the cancel socket inside one stable
-    // ZStack (toggling opacity/scale, never swapping container identity) so
-    // SwiftUI's active DragGesture never drops mid-drag.
-    ZStack {
-      // Resting "+" orb — hidden completely while dragging. Renders in the
-      // brand Persimmon under Colorful, else the user's fruit accent
-      // (`AppearancePreferences.magicPlusSwiftUIColor`), never per-section.
-      ZStack {
-        Circle()
-          .fill(accent.gradient)
-          .overlay(
-            Circle()
-              .strokeBorder(ink.opacity(0.22), lineWidth: 0.75)
-          )
-          .shadow(color: .black.opacity(0.28), radius: 10, y: 4)
-        VStack(spacing: 4) {
-          Image(systemName: "plus")
-            .scaledFont(size: 21, weight: .bold)
-            .foregroundStyle(ink)
-          gripDots(ink: ink)
-        }
-        .offset(y: 2)
-      }
-      .scaleEffect(isPressed && !drag.isDragging ? 0.88 : 1)
-      .a11yAnimation(.spring(response: 0.22, dampingFraction: 0.6), value: isPressed)
-      // Release pop: overshoot past rest, then spring back. Reduce Motion never
-      // bumps `popTick`, so the keyframes never play there.
-      .keyframeAnimator(initialValue: CGFloat(1), trigger: popTick) { content, scale in
-        content.scaleEffect(scale)
-      } keyframes: { _ in
-        SpringKeyframe(1.14, duration: 0.12, spring: .snappy)
-        SpringKeyframe(1, duration: 0.32, spring: .bouncy)
-      }
-      .opacity(drag.isDragging ? 0 : 1)
-      .scaleEffect(drag.isDragging ? 0.75 : 1)
-
-      // Cancel drop socket — appears in the bottom-right spot during drag so
-      // dragging back here unmistakably cancels the action.
-      // Plain glass, like the toolbar circles: no dashed ring (decided
-      // 2026-11-23). It turns red glass while the finger is over it.
-      ZStack {
-        Color.clear
-        Image(systemName: "xmark")
-          .scaledFont(size: 18, weight: .semibold)
-          .foregroundStyle(drag.isOverCancelSocket ? Color.red : Color.secondary)
-      }
-      .glassCircle(tint: drag.isOverCancelSocket ? .red : nil)
-      .opacity(drag.isDragging ? 1 : 0)
-      .scaleEffect(drag.isDragging ? (drag.isOverCancelSocket ? 1.08 : 0.94) : 0.75)
-    }
-    .frame(width: 58, height: 58)
-    .contentShape(Circle())
-    .a11yAnimation(.snappy(duration: 0.2), value: drag.isDragging)
-    .a11yAnimation(.snappy(duration: 0.18), value: drag.isOverCancelSocket)
-    .onGeometryChange(for: CGRect.self, of: { $0.frame(in: .global) }) { rect in
-      drag.homeCenter = CGPoint(x: rect.midX, y: rect.midY)
-    }
-    .onTapGesture {
-      guard !drag.isDragging else { return }
-      Haptics.press()
-      if !reduceMotion { popTick += 1 }
-      if isViewingProject || isViewingHome { showingMenu = true } else { onNewTask() }
-    }
-    .simultaneousGesture(
-      DragGesture(minimumDistance: 0)
-        .updating($isPressed) { _, pressed, _ in pressed = true }
-    )
-    .simultaneousGesture(
-      DragGesture(minimumDistance: 8, coordinateSpace: .global)
-        .onChanged { value in
-          if !drag.isDragging {
-            showingMenu = false
-            drag.beginDrag(at: value.location)
-          } else {
-            drag.updateDrag(at: value.location)
-          }
-        }
-        .onEnded { value in
-          drag.endDrag(at: value.location)
-        }
-    )
-    .accessibilityAddTraits(.isButton)
-    .accessibilityLabel("New")
-    .accessibilityHint(isViewingHome
-      ? Text("Tap for a new project or area, or drag onto a list position.")
-      : isViewingProject
-        ? Text("Tap for a new task or section, or drag onto a list position.")
-        : Text("Tap for a new task, or drag onto a list position."))
-    .popover(isPresented: $showingMenu, attachmentAnchor: .rect(.bounds), arrowEdge: .bottom) {
-      quickMenu
-        .presentationCompactAdaptation(.popover)
-    }
-  }
-
-  /// Subtle 3×2 tactile grip dots beneath `+` signaling the orb can be dragged.
-  private func gripDots(ink: Color) -> some View {
-    VStack(spacing: 2.5) {
-      ForEach(0..<2, id: \.self) { _ in
-        HStack(spacing: 3) {
-          ForEach(0..<3, id: \.self) { _ in
-            Circle()
-              .fill(ink.opacity(0.55))
-              .frame(width: 2.5, height: 2.5)
-          }
-        }
-      }
-    }
-    .accessibilityHidden(true)
-  }
-
-  private var quickMenu: some View {
-    VStack(alignment: .leading, spacing: 2) {
-      if isViewingHome {
-        menuRow(title: RegistryActions.title(.sidebarNewProject), icon: "number") {
-          showingMenu = false
-          onNewProject()
-        }
-        menuRow(title: RegistryActions.title(.sidebarNewArea), icon: "square.stack.3d.up") {
-          showingMenu = false
-          onNewArea()
-        }
-      } else {
-        menuRow(title: RegistryActions.title(.appNewTask), icon: "checkmark.circle") {
-          showingMenu = false
-          onNewTask()
-        }
-      }
-      if isViewingProject {
-        menuRow(title: RegistryActions.title(.sectionNew), icon: "rectangle.split.1x2") {
-          showingMenu = false
-          onNewSection()
-        }
-      }
-    }
-    .padding(.vertical, 8)
-    .padding(.horizontal, 6)
-    .frame(minWidth: 196)
-  }
-
-  private func menuRow(title: String, icon: String, action: @escaping () -> Void) -> some View {
-    Button(action: action) {
-      HStack(spacing: 12) {
-        Image(systemName: icon)
-          .scaledFont(size: 16, weight: .medium)
-          .foregroundStyle(AppearancePreferences.shared.accentSwiftUIColor)
-          .frame(width: 22)
-        Text(title)
-          .font(.septenaSidebarRow)
-          .foregroundStyle(.primary)
-        Spacer(minLength: 8)
-      }
-      .padding(.horizontal, 12)
-      .padding(.vertical, 10)
-      .contentShape(Rectangle())
-    }
-    .buttonStyle(.plain)
-  }
-}
-#endif
 
 /// Quick-add sheet: a fresh router per presentation so the draft never
 /// leaks between opens. Sizing comes from the host's `septenaModalSheet`.

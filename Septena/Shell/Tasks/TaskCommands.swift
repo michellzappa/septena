@@ -13,17 +13,31 @@ struct TaskActions {
   var openWhen: (() -> Void)?
   var openDeadline: (() -> Void)?
   var openMove: (() -> Void)?
-  /// Toggles done/open on the selected row(s) — invoked by the explicit ⌘K
+  /// Toggles done/open on the selected row(s) — invoked by the explicit ⌘↩
   /// Task-menu command.
   var toggleComplete: (() -> Void)?
-  /// Retires the selected row(s) as cancelled — ⌥⌘K. Distinct from complete:
+  /// Retires the selected row(s) as cancelled — ⌥⌘↩. Distinct from complete:
   /// the work didn't happen, and the Logbook records that difference.
   var cancel: (() -> Void)?
   var delete: (() -> Void)?
   var clearSchedule: (() -> Void)?
   var editDetails: (() -> Void)?
+  /// Do: exactly one selected open task.
+  var doTask: (() -> Void)?
   var duplicate: (() -> Void)?
   var copy: (() -> Void)?
+  /// Favorite / unfavorite the selected row(s) — ⌥⌘S.
+  var toggleStar: (() -> Void)? = nil
+  /// Open the tag picker for the selected row(s) — ⇧⌘T.
+  var openTags: (() -> Void)? = nil
+  /// Open the reminder picker for one selected row — ⌥⌘R.
+  var openReminder: (() -> Void)? = nil
+  /// File one selected row into its suggested project or area — ⌥⌘M.
+  var moveSuggested: (() -> Void)? = nil
+  /// Waiting On… for one selected open row (docs/REVIEW_SPEC.md §6).
+  var openWaiting: (() -> Void)? = nil
+  /// Got It Back for the selected waiting rows.
+  var gotItBack: (() -> Void)? = nil
 
   /// The registry actions this type can serve, in shortcuts-sheet order. The
   /// iPad hidden shortcut buttons render these.
@@ -50,6 +64,7 @@ struct TaskActions {
   private static func slot(for actionId: RegistryActionID) -> KeyPath<TaskActions, (() -> Void)?>? {
     switch actionId {
     case .taskEditDetails: return \.editDetails
+    case .taskDo: return \.doTask
     case .taskCopy: return \.copy
     case .taskDuplicate: return \.duplicate
     case .taskToggleComplete: return \.toggleComplete
@@ -59,6 +74,12 @@ struct TaskActions {
     case .taskDeadline: return \.openDeadline
     case .taskMove: return \.openMove
     case .taskClearSchedule: return \.clearSchedule
+    case .taskToggleStar: return \.toggleStar
+    case .taskTags: return \.openTags
+    case .taskReminder: return \.openReminder
+    case .taskMoveSuggested: return \.moveSuggested
+    case .taskWaitingOn: return \.openWaiting
+    case .taskGotItBack: return \.gotItBack
     case .taskDelete: return \.delete
     default: return nil
     }
@@ -76,11 +97,35 @@ extension FocusedValues {
   }
 }
 
+/// Plain main-actor hook exposing the frontmost SwiftUI `TaskListView`'s live
+/// actions to the ⌘K Command Bar without touching `FocusedValues` (which
+/// SIGKILLs iPad when published from a split-view detail) or `@Observable`.
+@MainActor
+enum ActiveTaskCommandBridge {
+  private static var ownerID: UUID?
+  private static var provider: (() -> TaskActions)?
+
+  static func register(owner: UUID, provider: @escaping () -> TaskActions) {
+    ownerID = owner
+    self.provider = provider
+  }
+
+  static func unregister(owner: UUID) {
+    guard ownerID == owner else { return }
+    ownerID = nil
+    provider = nil
+  }
+
+  static func current() -> TaskActions? {
+    provider?()
+  }
+}
+
 /// Row actions published by `NextView` while the Next checklist is focused.
 /// Only checklist-toggle is exposed here — the rest of the Task menu stays
 /// task-list-only so ⌘T / ⌘S / … don't silently no-op on a habit row.
 struct NextListActions {
-  /// Toggles done/open on the selected row — invoked by ⌘K.
+  /// Toggles done/open on the selected row — invoked by ⌘↩.
   var toggleComplete: (() -> Void)?
 }
 

@@ -11,9 +11,11 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -41,15 +43,19 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -61,12 +67,15 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.septena.android.AndroidAppGraph
 import app.septena.core.JsonValue
+import app.septena.core.NotesBase
 import app.septena.core.RegistryCatalog
+import app.septena.core.StructureOrder
 import app.septena.core.SyncRecord
 import app.septena.core.TaskConversation
 import app.septena.core.TaskPageBlockKinds
@@ -95,6 +104,8 @@ import app.septena.ui.ChevronLeftGlyph
 import app.septena.ui.ChevronRightGlyph
 import app.septena.ui.CloseSmallGlyph
 import app.septena.ui.DeadlineFlagGlyph
+import app.septena.ui.DoGlyph
+import app.septena.ui.DoShowListGlyph
 import app.septena.ui.PlusSmallGlyph
 import app.septena.ui.RepeatSmallGlyph
 import app.septena.ui.SeptenaGlyph
@@ -116,35 +127,36 @@ import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.Locale
 
-private data class DetailListItem(
+internal data class DetailListItem(
     val id: String,
     val title: String,
     val parentAreaId: String? = null,
 )
 
-private data class ChecklistLine(
+internal data class ChecklistLine(
     val id: String,
     val title: String,
     val checked: Boolean,
     val position: Double,
 )
 
-private data class TagLine(val id: String, val name: String)
+internal data class TagLine(val id: String, val name: String)
 
-private data class TaskDetailData(
+internal data class TaskDetailData(
     val task: SyncRecord,
     val areas: List<DetailListItem>,
     val projects: List<DetailListItem>,
     val checklist: List<ChecklistLine>,
     val tags: List<TagLine>,
+    val attachmentCount: Int = 0,
     /** The task's conversation hands it to the user for review (`needs_verify`). */
     val needsReview: Boolean = false,
 )
 
-private data class RepeatUnitOption(val value: String, val title: String)
-private data class RepeatChoice(val value: Int, val title: String, val shortTitle: String? = null)
+internal data class RepeatUnitOption(val value: String, val title: String)
+internal data class RepeatChoice(val value: Int, val title: String, val shortTitle: String? = null)
 
-private val CHECKLIST_TITLE_MAX_LENGTH = RegistryEntities.all
+internal val CHECKLIST_TITLE_MAX_LENGTH = RegistryEntities.all
     .getValue(RegistryEntityNames.CHECKLIST_ITEM)
     .columns
     .getValue(RegistryEntityFields.ChecklistItem.TITLE)
@@ -159,6 +171,35 @@ private val SUPPORTED_DETAIL_ATTRIBUTES = setOf(
     RegistryTaskAttributeIds.REPEAT,
 )
 
+/** What the Do screen knows about the task it draws around. */
+class DoPageTask(
+    val hasNotesOrChecklist: Boolean,
+    val durationMinutes: Int?,
+    val isOpen: Boolean,
+    val canWrite: Boolean,
+)
+
+/**
+ * The Do screen (docs/DO_SPEC.md §4) is the task page with the blocks the user
+ * needs to work, and these parts around them. The page keeps the one renderer
+ * of each block and the one save path.
+ */
+class DoPage(
+    val showListTitle: String,
+    val actions: @Composable RowScope.() -> Unit,
+    val aboveTitle: @Composable () -> Unit,
+    val belowTitle: @Composable (DoPageTask) -> Unit,
+    /** Each exit calls `save` first, so typed text is never lost. */
+    val exits: @Composable (save: (then: () -> Unit) -> Unit) -> Unit,
+)
+
+private val DO_PAGE_BLOCKS = setOf(
+    TaskPageBlockKinds.NOTES,
+    TaskPageBlockKinds.CHECKLIST,
+    TaskPageBlockKinds.ATTACHMENTS,
+    TaskPageBlockKinds.REFERENCES,
+)
+
 /** Standalone task-detail surface styled with iOS-aligned translucent glass cards. */
 @Composable
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -170,6 +211,7 @@ fun TaskDetailScreen(
     initialAttribute: String? = null,
     onOpenTask: (String) -> Unit = {},
     openSendBackInitially: Boolean = false,
+    doPage: DoPage? = null,
 ) {
     val languageTag = LocalConfiguration.current.locales[0].toLanguageTag()
     val isDark = LocalSeptenaDarkTheme.current
@@ -186,13 +228,19 @@ fun TaskDetailScreen(
     var hasLoaded by remember(taskId) { mutableStateOf(false) }
     var titleDraft by remember(taskId) { mutableStateOf("") }
     var notesDraft by remember(taskId) { mutableStateOf("") }
+    // What the drafts were loaded from: an edit another member made meanwhile is not a change here.
+    var titleBase by remember(taskId) { mutableStateOf("") }
+    var notesBase by remember(taskId) { mutableStateOf("") }
     var textIsDirty by remember(taskId) { mutableStateOf(false) }
+    var pendingRescheduleDay by remember(taskId) { mutableStateOf<String?>(null) }
     var saving by remember(taskId) { mutableStateOf(false) }
     var saveFailed by remember(taskId) { mutableStateOf(false) }
     // The attribute whose picker is folded open in its row on the page. One at a time.
     var openPicker by remember(taskId, initialAttribute) { mutableStateOf(initialAttribute) }
     var tagFilterDraft by remember(taskId) { mutableStateOf("") }
     var showAddReferenceDialog by remember(taskId) { mutableStateOf(false) }
+    var doTitleEditing by remember(taskId) { mutableStateOf(false) }
+    var waitingSheetOpen by remember(taskId) { mutableStateOf(false) }
 
     LaunchedEffect(graph, taskId, dataVersion) {
         val loaded = withContext(Dispatchers.IO) { loadTaskDetail(graph, taskId) }
@@ -201,12 +249,26 @@ fun TaskDetailScreen(
         if (loaded != null && !textIsDirty) {
             titleDraft = loaded.task.fields[RegistryEntityFields.Task.TITLE].stringValue().orEmpty()
             notesDraft = loaded.task.fields[RegistryEntityFields.Task.NOTES].stringValue().orEmpty()
+            titleBase = titleDraft
+            notesBase = notesDraft
         }
         if (loaded != null) {
             loaded.checklist.forEach { item ->
                 if (item.id != focusedChecklistId) checklistDrafts[item.id] = item.title
             }
             checklistDrafts.keys.retainAll(loaded.checklist.map(ChecklistLine::id).toSet())
+        }
+    }
+
+    // Opening a faded task keeps it, once per visit: a rotation after Undo must not keep it again.
+    var keptOnOpen by rememberSaveable(taskId) { mutableStateOf(false) }
+    LaunchedEffect(graph, taskId) {
+        if (keptOnOpen) return@LaunchedEffect
+        keptOnOpen = true
+        val kept = withContext(Dispatchers.IO) { runCatching { graph.keepFadedOnOpen(taskId) }.getOrDefault(false) }
+        if (kept) {
+            graph.sync.noteLocalChange()
+            graph.sync.requestSync()
         }
     }
 
@@ -224,8 +286,8 @@ fun TaskDetailScreen(
         val currentTitle = current.task.fields[RegistryEntityFields.Task.TITLE].stringValue().orEmpty()
         val currentNotes = current.task.fields[RegistryEntityFields.Task.NOTES].stringValue().orEmpty()
         val notes = notesDraft.trim()
-        val titleChanged = title != currentTitle
-        val notesChanged = notes != currentNotes
+        val titleChanged = title != currentTitle && title != titleBase.trim()
+        val notesChanged = notes != currentNotes && notes != notesBase.trim()
         if (!titleChanged && !notesChanged) {
             textIsDirty = false
             saveFailed = false
@@ -237,9 +299,15 @@ fun TaskDetailScreen(
         }
         withContext(Dispatchers.IO) {
             graph.captureTaskEdit(taskId) {
-                check(graph.taskMutator.updateFields(taskId, changes) != null)
+                check(
+                    graph.taskMutator.updateFields(
+                        taskId, changes, notesBase = NotesBase(notesBase.ifEmpty { null }),
+                    ) != null,
+                )
             }
         }
+        titleBase = title
+        notesBase = notes
         textIsDirty = false
         saveFailed = false
         graph.sync.noteLocalChange()
@@ -247,18 +315,24 @@ fun TaskDetailScreen(
         return true
     }
 
-    fun saveAndLeave() {
+    fun saveThen(then: () -> Unit) {
+        if (data == null) return then()
         if (saving) return
         scope.launch {
             saving = true
             val saved = runCatching { saveTextFields() }.getOrElse { false }
             saving = false
-            if (saved) onBack() else saveFailed = true
+            if (saved) then() else saveFailed = true
         }
     }
 
-    fun handleBack() {
-        if (data == null) onBack() else saveAndLeave()
+    fun handleBack() = saveThen(onBack)
+
+    if (doPage != null) {
+        // Another device can end the Do while the user types here.
+        DisposableEffect(taskId) {
+            onDispose { if (textIsDirty) graph.launch { saveTextFields() } }
+        }
     }
 
     BackHandler(enabled = true, onBack = ::handleBack)
@@ -348,12 +422,16 @@ fun TaskDetailScreen(
     val canEdit = savedTask != null && !deleted && !saving
     val isTaskOpen = status == RegistryEntityEnums.TaskStatus.OPEN && !deleted
     val isReviewDepth = isTaskOpen && data?.needsReview == true
-    val pageBlocks = remember(languageTag, isReviewDepth) {
+    val isDoPage = doPage != null
+    val pageBlocks = remember(languageTag, isReviewDepth, isDoPage) {
         RegistryCatalog.taskPageBlocks(
-            if (isReviewDepth) TaskPageDepths.REVIEW else TaskPageDepths.PAGE,
+            if (isReviewDepth && !isDoPage) TaskPageDepths.REVIEW else TaskPageDepths.PAGE,
             languageTag = languageTag,
-        )
+        ).filter { !isDoPage || it.kind in DO_PAGE_BLOCKS }
     }
+    val doAction = RegistryCatalog.actionTitle(RegistryActionIds.TASK_DO, languageTag = languageTag).orEmpty()
+    val offersDo = !isDoPage && isTaskOpen && graph.doing.isAvailable &&
+        taskFields[RegistryEntityFields.Task.KIND].stringValue() != RegistryEntityEnums.TaskKind.HEADING
     val repeatSummary = labels.repeatUnits.firstOrNull { it.value == repeatUnit }?.title?.let { unitTitle ->
         if (repeatInterval > 1L) "$repeatInterval × $unitTitle" else unitTitle
     }
@@ -367,15 +445,14 @@ fun TaskDetailScreen(
     val discussHeading = attributes.firstOrNull { it.id == RegistryTaskAttributeIds.DISCUSS }?.label
         ?: conversationBlock?.let { RegistryCatalog.taskPageBlockHeading(it, languageTag) }
 
-    fun write(block: suspend () -> Unit) {
+    /** Runs one user gesture that records its own undo step. */
+    fun save(gesture: suspend () -> Unit) {
         if (!canEdit) return
         scope.launch {
             saving = true
             saveFailed = false
             runCatching {
-                withContext(Dispatchers.IO) {
-                    graph.captureTaskEdit(taskId, block)
-                }
+                withContext(Dispatchers.IO) { gesture() }
             }.onSuccess {
                 graph.sync.noteLocalChange()
                 graph.sync.requestSync()
@@ -384,6 +461,14 @@ fun TaskDetailScreen(
             }
             saving = false
         }
+    }
+
+    fun write(block: suspend () -> Unit) = save { graph.captureTaskEdit(taskId, mutation = block) }
+
+    /** A checklist edit: the task row does not change, and Android has no undo for it. */
+    fun writeChecklist(block: suspend () -> Unit) = save {
+        block()
+        graph.touchTask(taskId)
     }
 
     fun toggleComplete() {
@@ -401,7 +486,7 @@ fun TaskDetailScreen(
                 )
             }
         } else {
-            write { check(graph.taskMutator.complete(taskId) != null) }
+            save { check(graph.completeTask(taskId)) }
         }
     }
 
@@ -409,8 +494,22 @@ fun TaskDetailScreen(
         write { check(graph.taskMutator.setStarred(taskId, !isStarred) != null) }
     }
 
-    fun setWhen(day: String?) {
-        write { check(graph.taskMutator.setWhen(taskId, day) != null) }
+    fun setWhen(
+        day: String?,
+        mode: app.septena.sharedcore.RescheduleMode = app.septena.sharedcore.RescheduleMode.MAKE_EXCEPTION,
+    ) {
+        write { check(graph.taskMutator.setWhen(taskId, day, mode) != null) }
+    }
+
+    pendingRescheduleDay?.let { day ->
+        RescheduleFixedRepeatDialog(
+            languageTag = languageTag,
+            onPickMode = { mode ->
+                pendingRescheduleDay = null
+                setWhen(day, mode)
+            },
+            onDismiss = { pendingRescheduleDay = null },
+        )
     }
 
     fun setTimeSlot(start: String?, duration: Int?) {
@@ -597,7 +696,7 @@ fun TaskDetailScreen(
     fun saveChecklistTitle(item: ChecklistLine) {
         val title = checklistDrafts[item.id]?.trim().orEmpty()
         if (title == item.title) return
-        write {
+        writeChecklist {
             check(
                 graph.registryEntityMutator.update(
                     RegistryEntityNames.CHECKLIST_ITEM,
@@ -628,6 +727,20 @@ fun TaskDetailScreen(
     val mutedInk = MaterialTheme.colorScheme.onSurfaceVariant
     val overdueRed = if (isDark) Color(0xFFFF453A) else Color(0xFFFF3B30)
 
+    if (waitingSheetOpen) {
+        WaitingOnDialog(
+            initialName = taskFields[RegistryEntityFields.Task.WAITING_ON].stringValue().orEmpty(),
+            initialWhen = taskFields[RegistryEntityFields.Task.SCHEDULED].stringValue(),
+            today = todayDate,
+            languageTag = languageTag,
+            onDismiss = { waitingSheetOpen = false },
+            onConfirm = { name, checkBack ->
+                waitingSheetOpen = false
+                write { check(graph.taskMutator.setWaiting(taskId, name, checkBack, changesWhen = true) != null) }
+            },
+        )
+    }
+
     Box(modifier = modifier.fillMaxSize().background(canvasBackground)) {
         HeaderWashBackdrop()
         Scaffold(
@@ -643,13 +756,27 @@ fun TaskDetailScreen(
                         IconButton(
                             onClick = ::handleBack,
                             enabled = !saving,
-                            modifier = Modifier.semantics { contentDescription = labels.back },
+                            modifier = Modifier.semantics { contentDescription = doPage?.showListTitle ?: labels.back },
                         ) {
-                            ChevronLeftGlyph(tint = MaterialTheme.colorScheme.onSurface)
+                            if (isDoPage) {
+                                DoShowListGlyph(tint = MaterialTheme.colorScheme.onSurface)
+                            } else {
+                                ChevronLeftGlyph(tint = MaterialTheme.colorScheme.onSurface)
+                            }
                         }
                     },
                     actions = {
-                        if (savedTask != null && !deleted) {
+                        doPage?.actions?.invoke(this)
+                        if (offersDo) {
+                            IconButton(
+                                onClick = { saveThen { graph.doing.begin(taskId, onStarted = onBack) } },
+                                enabled = canEdit,
+                                modifier = Modifier.semantics { contentDescription = doAction },
+                            ) {
+                                DoGlyph(tint = MaterialTheme.colorScheme.onSurface, size = 21.dp)
+                            }
+                        }
+                        if (savedTask != null && !deleted && !isDoPage) {
                             IconButton(
                                 onClick = ::toggleStarred,
                                 enabled = canEdit,
@@ -673,6 +800,7 @@ fun TaskDetailScreen(
                     },
                 )
             },
+            bottomBar = { doPage?.exits?.invoke(::saveThen) },
         ) { padding ->
             if (!hasLoaded) {
                 Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
@@ -691,8 +819,31 @@ fun TaskDetailScreen(
                             .align(Alignment.TopCenter)
                             .verticalScroll(rememberScrollState())
                             .navigationBarsPadding()
+                            .imePadding()
                             .padding(top = 4.dp, bottom = 48.dp),
                     ) {
+                        if (doPage != null) {
+                            doPage.aboveTitle()
+                            DoPageTitle(
+                                title = titleDraft,
+                                label = labels.field(RegistryTaskDetail.Fields.TITLE),
+                                editing = doTitleEditing && canEdit,
+                                onEdit = { doTitleEditing = true },
+                                onTitleChange = {
+                                    titleDraft = it.take(RegistryEntityLimits.TEXT_MAX.toInt())
+                                    textIsDirty = true
+                                    saveFailed = false
+                                },
+                            )
+                            doPage.belowTitle(
+                                DoPageTask(
+                                    hasNotesOrChecklist = notesDraft.isNotBlank() || data?.checklist.orEmpty().isNotEmpty(),
+                                    durationMinutes = durationMinutes,
+                                    isOpen = isTaskOpen,
+                                    canWrite = canEdit,
+                                ),
+                            )
+                        }
                         pageBlocks.forEachIndexed { blockIndex, block ->
                             val heading = RegistryCatalog.taskPageBlockHeading(block, languageTag)
                             val prevKind = pageBlocks.getOrNull(blockIndex - 1)?.kind
@@ -763,6 +914,54 @@ fun TaskDetailScreen(
                                                             .fillMaxWidth()
                                                             .semantics { contentDescription = labels.field(RegistryTaskDetail.Fields.TITLE) },
                                                     )
+                                                }
+                                            }
+
+                                            // Waiting On… / Got It Back (docs/REVIEW_SPEC.md §6).
+                                            if (isTaskOpen && !isDoPage) {
+                                                val waitingOn = taskFields[RegistryEntityFields.Task.WAITING_ON]
+                                                    .stringValue()?.trim()?.takeIf(String::isNotEmpty)
+                                                FlowRow(
+                                                    verticalArrangement = Arrangement.Center,
+                                                    modifier = Modifier.padding(
+                                                        start = TaskCardMetrics.LeadingColumnWidth + TaskCardMetrics.IconTextGap,
+                                                        top = 4.dp,
+                                                    ),
+                                                ) {
+                                                    if (waitingOn != null) {
+                                                        Text(
+                                                            text = WaitingCopy.label(
+                                                                waitingOn,
+                                                                taskFields[RegistryEntityFields.Task.WAITING_SINCE].stringValue(),
+                                                                todayDate,
+                                                                languageTag,
+                                                            ),
+                                                            fontSize = 13.sp,
+                                                            color = mutedInk,
+                                                            modifier = Modifier.align(Alignment.CenterVertically),
+                                                        )
+                                                    }
+                                                    TextButton(onClick = { waitingSheetOpen = true }, enabled = canEdit) {
+                                                        Text(
+                                                            RegistryCatalog.actionTitle(
+                                                                RegistryActionIds.TASK_WAITING_ON,
+                                                                languageTag = languageTag,
+                                                            ).orEmpty(),
+                                                        )
+                                                    }
+                                                    if (waitingOn != null) {
+                                                        TextButton(
+                                                            onClick = { write { check(graph.taskMutator.setWaiting(taskId, null) != null) } },
+                                                            enabled = canEdit,
+                                                        ) {
+                                                            Text(
+                                                                RegistryCatalog.actionTitle(
+                                                                    RegistryActionIds.TASK_GOT_IT_BACK,
+                                                                    languageTag = languageTag,
+                                                                ).orEmpty(),
+                                                            )
+                                                        }
+                                                    }
                                                 }
                                             }
 
@@ -891,7 +1090,14 @@ fun TaskDetailScreen(
                                                         today = todayDate,
                                                         languageTag = languageTag,
                                                         enabled = canEdit,
-                                                        onSelect = { day -> openPicker = null; setWhen(day) },
+                                                        onSelect = { day ->
+                                                            openPicker = null
+                                                            if (app.septena.core.TaskMutator.needsFixedRepeatReschedulePrompt(taskFields, day)) {
+                                                                pendingRescheduleDay = day
+                                                            } else {
+                                                                setWhen(day)
+                                                            }
+                                                        },
                                                         onClear = { openPicker = null; setWhen(null) },
                                                         startTime = startTime,
                                                         durationMinutes = durationMinutes,
@@ -1202,7 +1408,7 @@ fun TaskDetailScreen(
                                                 onCommitTitle = { saveChecklistTitle(item) },
                                                 onToggle = { checked ->
                                                     val checkedAt = if (checked) WireTimestamp.format(graph.clock.now()) else null
-                                                    write {
+                                                    writeChecklist {
                                                         check(
                                                             graph.registryEntityMutator.update(
                                                                 RegistryEntityNames.CHECKLIST_ITEM,
@@ -1216,7 +1422,7 @@ fun TaskDetailScreen(
                                                     }
                                                 },
                                                 onDelete = {
-                                                    write { check(graph.registryEntityMutator.delete(RegistryEntityNames.CHECKLIST_ITEM, item.id) != null) }
+                                                    writeChecklist { check(graph.registryEntityMutator.delete(RegistryEntityNames.CHECKLIST_ITEM, item.id) != null) }
                                                 },
                                             )
                                         }
@@ -1234,7 +1440,7 @@ fun TaskDetailScreen(
                                                     .fillMaxWidth()
                                                     .clickable(enabled = canEdit) {
                                                         val nextPosition = checklistItems.maxOfOrNull(ChecklistLine::position)?.plus(1.0) ?: 0.0
-                                                        write {
+                                                        writeChecklist {
                                                             val item = graph.registryEntityMutator.create(
                                                                 RegistryEntityNames.CHECKLIST_ITEM,
                                                                 mapOf(
@@ -1393,6 +1599,40 @@ fun TaskDetailScreen(
     }
 }
 
+/** The Do screen's title: large, and a text field only after a tap. */
+@Composable
+private fun DoPageTitle(
+    title: String,
+    label: String,
+    editing: Boolean,
+    onEdit: () -> Unit,
+    onTitleChange: (String) -> Unit,
+) {
+    val style = MaterialTheme.typography.headlineMedium.copy(
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.onSurface,
+    )
+    val modifier = Modifier
+        .fillMaxWidth()
+        .padding(horizontal = TaskCardMetrics.HeaderLeading, vertical = 8.dp)
+    if (!editing) {
+        Text(text = title, style = style, modifier = Modifier.clickable(onClick = onEdit).then(modifier))
+        return
+    }
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
+    BasicTextField(
+        value = title,
+        onValueChange = onTitleChange,
+        textStyle = style,
+        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+        maxLines = 4,
+        modifier = modifier
+            .focusRequester(focus)
+            .semantics { contentDescription = label },
+    )
+}
+
 @Composable
 private fun DetailSectionHeader(title: String) {
     Text(
@@ -1492,7 +1732,7 @@ private fun AttributeFoldRow(
 
 /** One choice in an embedded list picker. Clean iOS checkmark row; a tap commits it. */
 @Composable
-private fun ChoiceRow(
+internal fun ChoiceRow(
     title: String,
     selected: Boolean,
     enabled: Boolean,
@@ -1523,7 +1763,7 @@ private fun ChoiceRow(
 }
 
 @Composable
-private fun RepeatEditor(
+internal fun RepeatEditor(
     labels: TaskDetailLabels,
     units: List<RepeatUnitOption>,
     selectedUnit: String?,
@@ -1759,7 +1999,7 @@ private fun RepeatEditor(
 }
 
 @Composable
-private fun ChecklistRow(
+internal fun ChecklistRow(
     item: ChecklistLine,
     title: String,
     emptyTitle: String,
@@ -1772,6 +2012,7 @@ private fun ChecklistRow(
     onCommitTitle: () -> Unit,
     onToggle: (Boolean) -> Unit,
     onDelete: () -> Unit,
+    horizontalPadding: Dp = TaskCardMetrics.ContentInset,
 ) {
     var wasFocused by remember(item.id) { mutableStateOf(false) }
     val mutedInk = MaterialTheme.colorScheme.onSurfaceVariant
@@ -1780,7 +2021,7 @@ private fun ChecklistRow(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = TaskCardMetrics.ContentInset, vertical = 6.dp),
+            .padding(horizontal = horizontalPadding, vertical = 6.dp),
     ) {
         SeptenaTaskCheckbox(
             checked = item.checked,
@@ -1835,14 +2076,14 @@ private fun ChecklistRow(
     }
 }
 
-private data class TaskTagPickerLabels(
+internal data class TaskTagPickerLabels(
     val filterPlaceholder: String,
     val addTitle: String,
     val emptyTitle: String,
     val emptyDetail: String,
 )
 
-private fun taskTagPickerLabels(languageTag: String): TaskTagPickerLabels {
+internal fun taskTagPickerLabels(languageTag: String): TaskTagPickerLabels {
     val surface = RegistryCatalog.surface(RegistrySurfaceIds.TASK_TAGS_PICKER)
     fun label(field: String): String {
         val key = surface?.fields?.get(field).stringValue().orEmpty()
@@ -1856,7 +2097,7 @@ private fun taskTagPickerLabels(languageTag: String): TaskTagPickerLabels {
     )
 }
 
-private data class TaskDetailLabels(
+internal data class TaskDetailLabels(
     val title: String,
     val back: String,
     val cancel: String,
@@ -1939,27 +2180,39 @@ private data class TaskDetailLabels(
     }
 }
 
-private suspend fun loadTaskDetail(graph: AndroidAppGraph, taskId: String): TaskDetailData? {
+internal suspend fun loadTaskDetail(graph: AndroidAppGraph, taskId: String): TaskDetailData? {
     val task = graph.taskStore.record(RegistryEntityNames.TASK, taskId) ?: return null
-    val areas = graph.taskStore.records(RegistryEntityNames.AREA)
-        .filter { it.deletedAt == null }
-        .mapNotNull { row ->
-            row.fields[RegistryEntityFields.Area.TITLE].stringValue()?.let { title ->
-                DetailListItem(row.id, title)
+    val selectedProjectId = task.fields[RegistryEntityFields.Task.PROJECT].stringValue()
+    val areas = StructureOrder.orderByPosition(
+        items = graph.taskStore.records(RegistryEntityNames.AREA)
+            .filter { it.deletedAt == null }
+            .mapNotNull { row ->
+                row.fields[RegistryEntityFields.Area.TITLE].stringValue()?.let { title ->
+                    row to DetailListItem(row.id, title)
+                }
+            },
+        position = { it.first.fields[RegistryEntityFields.Area.POSITION].numberValue() },
+        label = { it.second.title },
+    ).map { it.second }
+    val projects = StructureOrder.orderByPosition(
+        items = graph.taskStore.records(RegistryEntityNames.PROJECT)
+            .filter { it.deletedAt == null }
+            .filter { row ->
+                val status = row.fields[RegistryEntityFields.Project.STATUS].stringValue()
+                status == null || status == RegistryEntityEnums.ProjectStatus.ACTIVE || row.id == selectedProjectId
             }
-        }
-        .sortedBy { it.title.lowercase() }
-    val projects = graph.taskStore.records(RegistryEntityNames.PROJECT)
-        .filter { it.deletedAt == null }
-        .mapNotNull { row ->
-            row.fields[RegistryEntityFields.Project.TITLE].stringValue()?.let { title ->
-                DetailListItem(
-                    row.id,
-                    title,
-                    row.fields[RegistryEntityFields.Project.AREA].stringValue(),
-                )
-            }
-        }
+            .mapNotNull { row ->
+                row.fields[RegistryEntityFields.Project.TITLE].stringValue()?.let { title ->
+                    row to DetailListItem(
+                        row.id,
+                        title,
+                        row.fields[RegistryEntityFields.Project.AREA].stringValue(),
+                    )
+                }
+            },
+        position = { it.first.fields[RegistryEntityFields.Project.POSITION].numberValue() },
+        label = { it.second.title },
+    ).map { it.second }
     val checklist = graph.taskStore.records(RegistryEntityNames.CHECKLIST_ITEM)
         .asSequence()
         .filter { it.deletedAt == null }
@@ -1975,16 +2228,29 @@ private suspend fun loadTaskDetail(graph: AndroidAppGraph, taskId: String): Task
         .sortedBy { it.title.lowercase() }
         .sortedBy(ChecklistLine::position)
         .toList()
-    val tags = graph.taskStore.records(RegistryEntityNames.TAG)
-        .filter { it.deletedAt == null }
-        .mapNotNull { row ->
-            row.fields[RegistryEntityFields.Tag.NAME].stringValue()?.let { name -> TagLine(row.id, name) }
-        }
-        .sortedBy { it.name.lowercase() }
+    val tags = StructureOrder.orderByPosition(
+        items = graph.taskStore.records(RegistryEntityNames.TAG)
+            .filter { it.deletedAt == null }
+            .mapNotNull { row ->
+                row.fields[RegistryEntityFields.Tag.NAME].stringValue()?.let { name -> row to TagLine(row.id, name) }
+            },
+        position = { it.first.fields[RegistryEntityFields.Tag.POSITION].numberValue() },
+        label = { it.second.name },
+    ).map { it.second }
+    val attachmentCount = graph.taskStore.records(RegistryEntityNames.ATTACHMENT)
+        .count { it.deletedAt == null && it.fields[RegistryEntityFields.Attachment.TASK_ID].stringValue() == taskId }
     val conversation = graph.taskStore.record(RegistryEntityNames.CONVO, taskId)?.let { record ->
         TaskConversation.from(record, graph.taskStore.turns(taskId))
     }
-    return TaskDetailData(task, areas, projects, checklist, tags, needsReview = conversation?.needsHumanReview == true)
+    return TaskDetailData(
+        task = task,
+        areas = areas,
+        projects = projects,
+        checklist = checklist,
+        tags = tags,
+        attachmentCount = attachmentCount,
+        needsReview = conversation?.needsHumanReview == true,
+    )
 }
 
 /** When the task was added: the creation instant in the device zone, else its creation day. */

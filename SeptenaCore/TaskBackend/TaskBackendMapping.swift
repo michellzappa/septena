@@ -171,6 +171,9 @@ enum TaskBackendMapping {
       "durationMinutes": t.durationMinutes.map { .int(Int64($0)) } ?? .null,
       "timeZone": c.text("timeZone", t.timeZone, max: 64),
       "deadline": c.day("deadline", t.deadline),
+      "deferredDeadline": c.day("deferredDeadline", t.deferredDeadline),
+      "waitingOn": c.text("waitingOn", t.waitingOn, max: TaskWaiting.maxNameLength),
+      "waitingSince": c.day("waitingSince", t.waitingSince),
       "today": .bool(t.today),
       "starred": .bool(t.starred),
       "tags": t.tagIDs.isEmpty ? .null : .array(t.tagIDs.map { .string($0) }),
@@ -212,6 +215,7 @@ enum TaskBackendMapping {
       "fadedAt": t.fadedAt.map { .string(stamp($0)) } ?? .null,
       "dropReason": c.text("dropReason", t.dropReason, max: 16),
       "effort": c.text("effort", t.effort, max: 16),
+      "assignedTo": c.text("assignedTo", t.assignedTo, max: 64),
     ]
     return finish(.task, t.id, c, fields, deleted: t.deletedAt != nil)
   }
@@ -276,6 +280,27 @@ enum TaskBackendMapping {
       "createdAt": ref.createdAt == .distantPast ? .null : .string(stamp(ref.createdAt)),
     ]
     return finish(.taskRef, ref.id, c, fields, deleted: false)
+  }
+
+  /// Every stamp is text already, with its zone (docs/DO_SPEC.md §2).
+  @MainActor
+  static func doSession(_ s: DoSessionEntity) -> Result<BackendRowPlan, TaskBackendIssue> {
+    var c = Checker()
+    c.rowID(s.id)
+    func text(_ value: String?) -> BackendJSON { value.map { .string($0) } ?? .null }
+    if DoStamp.date(s.startedAt) == nil { c.problems.append("startedAt is not a time") }
+    let fields: [String: BackendJSON] = [
+      "taskId": c.id("taskId", s.taskID),
+      "startedAt": .string(s.startedAt),
+      "plannedMinutes": s.plannedMinutes.map { .int(Int64($0)) } ?? .null,
+      "confirmedAt": text(s.confirmedAt),
+      "endedAt": text(s.endedAt),
+      "exit": text(s.exit),
+      "lapsed": .bool(s.lapsed),
+      "note": text(s.note),
+      "sourceClient": text(s.sourceClient),
+    ]
+    return finish(.doSession, s.id, c, fields, deleted: false)
   }
 
   @MainActor

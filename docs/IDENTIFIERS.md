@@ -170,6 +170,38 @@ Tool responses always return both `id` and `title`. The agent learns to
 use the id for subsequent calls (faster, unambiguous) but can present
 the title to the user.
 
+### Error codes and idempotency keys (ADR 0050 §3, §4)
+
+- A refusal's `code` (`paused`, `held`, `human_accepts`, `stale`,
+  `human_only:assignee`, …) is a stable wire name, like an id. It is never
+  renamed. The one table of codes, with `retryable` and `hint`, is
+  `backend/src/errors.ts` (`REFUSALS`). A new code is added there.
+- `idempotency_key` is an optional argument on every MCP write tool (every
+  tool with `readOnlyHint: false`) and on the `/v1/tasks` writes (the
+  `Idempotency-Key` header or the body field). The caller makes it; it is
+  not an entity id. The TaskStore keeps it per account for 24 hours, with a
+  hash of the call's body and the first result.
+- On `/v1` the envelope replaces the old `error` string only when the
+  request sends `X-Septena-Errors: envelope`: the app clients decode `error`
+  as a string.
+
+## Support wire (ADR 0054, `backend/src/support/`)
+
+- **Sender ref:** `user:<userId>` when signed in; `install:<sha256 base64url
+  of the support key>` when signed out. The app makes the support key once
+  (32 random bytes, base64url, 43 characters) and sends it as
+  `X-Septena-Support-Key`. The backend keeps only the hash. The same ref is
+  `reporter.ref` on the Starlings app channel, which keys its thread by it.
+- **Message id:** a client-made UUID, the idempotency key on
+  `POST /v1/support/messages` and the `message_id` sent to Starlings. An id
+  that another sender used answers 409.
+- **Body:** `{ message_id, text (1..4000), email?, name?, diagnostics? }`,
+  strict. `diagnostics.platform` is `ios`, `ipados`, `macos`, `android` or
+  `web`.
+- **Read:** `GET /v1/support/messages` → `{ messages: [{ id, direction
+  ("in"|"out"), text, authorName, createdAt, readAt, state }], unread }`.
+  `POST /v1/support/read` marks replies read (204).
+
 ## What this design doesn't try to do
 
 - **URL-safe handles for deeplinks**. If you later need them, derive

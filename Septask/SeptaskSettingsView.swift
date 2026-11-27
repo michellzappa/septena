@@ -357,7 +357,7 @@ struct SeptaskSettingsView: View {
           .foregroundStyle(.primary)
         HStack(spacing: 6) {
           if TaskSyncEngine.shared.signedIn {
-            if PlanStatus.shared.isPlus { SeptenaPlusBadge() } else { FreeAccountBadge() }
+            if PlanStatus.shared.isPlus { SeptenaPlusBadge(isPro: PlanStatus.shared.isPro) } else { FreeAccountBadge() }
             Text("·")
               .font(.caption)
               .foregroundStyle(.tertiary)
@@ -461,7 +461,10 @@ struct SeptaskSettingsView: View {
     case "todayShowCompleted":
       Toggle(label, isOn: TaskViewOptions.announcing($todayShowCompleted))
     case "tasksShowAging":
-      Toggle(isOn: TaskViewOptions.announcing($showAging)) {
+      Toggle(isOn: TaskViewOptions.announcing(Binding(
+        get: { showAging },
+        set: { SettingsMirror.setFadeEnabled($0) }
+      ))) {
         rowLabel(label, detail: item.detail)
       }
     case "tasksShowFaded":
@@ -643,6 +646,8 @@ struct SeptaskSettingsView: View {
   @ViewBuilder
   private func page(_ pageID: String) -> some View {
     switch pageID {
+    case SupportView.surfaceID:
+      SupportView()
     case RegistrySettings.PageID.account:
       SeptaskAccountPane()
     case RegistrySettings.PageID.claudePairing:
@@ -718,7 +723,7 @@ private struct SeptaskAccountPane: View {
               }
             if TaskSyncEngine.shared.signedIn {
               if PlanStatus.shared.isPlus {
-                SeptenaPlusBadge()
+                SeptenaPlusBadge(isPro: PlanStatus.shared.isPro)
               } else {
                 FreeAccountBadge()
               }
@@ -741,8 +746,8 @@ private struct SeptaskAccountPane: View {
           LabeledContent {
             if let line = PlanStatus.shared.statusLine { Text(line) }
           } label: {
-            Label(RegistrySettings.pageById[RegistrySettings.PageID.plus]?.title ?? RegistryPlans.name,
-                  systemImage: RegistryIcons.sfSymbols["settings.plus"] ?? "plus.circle.fill")
+            Label(PlanStatus.shared.title,
+                  systemImage: RegistryIcons.sfSymbols[PlanStatus.shared.isPro ? RegistryPlans.proCard.icon : "settings.plus"] ?? "plus.circle.fill")
           }
         }
       }
@@ -755,6 +760,7 @@ private struct SeptaskAccountPane: View {
       }
 
       SeptaskSyncAccountSection()
+      SeptaskSignInMethodsSection()
       SeptaskSignInApprovalSection()
       SeptaskDeleteAccountSection()
     }
@@ -937,10 +943,25 @@ private struct SeptaskAboutPane: View {
       } label: {
         label(item)
       }
-    case "send_feedback":
-      Link(destination: URL(string: "mailto:mz@envisioning.com?subject=Septena%20feedback")!) {
+    case "open_help":
+      Link(destination: RegistrySettings.helpURL) {
         label(item)
       }
+    case SupportView.surfaceID:
+      // Contact Support (ADR 0054): a page in Settings on every platform.
+      NavigationLink(value: SupportView.surfaceID) {
+        HStack {
+          label(item)
+          if SupportCenter.shared.unread > 0 {
+            Spacer()
+            Circle()
+              .fill(Color.accentColor)
+              .frame(width: 8, height: 8)
+              .accessibilityLabel(RegistrySupport.unreadReply)
+          }
+        }
+      }
+      .task { await SupportCenter.shared.refresh() }
     default:
       EmptyView()
     }

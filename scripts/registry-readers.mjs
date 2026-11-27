@@ -19,17 +19,16 @@
 // wildcard entry fails once every member under it has a reader.
 //
 // Ships claims (ADR 0028, #285): for each feature that `registry/capabilities.json`
-// marks `ships` or `partial` on ios, ipados, macos (Swift) or android
-// (Kotlin), the platform's app sources must read at least one registry entry
-// that carries that `featureId` (actions, destinations, settings, surfaces,
-// plans). An entry counts as read when the sources name its ID as a string
-// (`"task.share"`), as a Swift case or member (`.weeklySweep`), or through a
-// read generated Kotlin constant whose value is the ID. An entry with its own
-// `platforms` (or `availability.platforms`) counts only on those platforms.
-// A feature with no entry for a platform is not checked: there is nothing to
-// read. Exceptions go in the allowlist's `ships` lane, keyed
-// `<platform>:<featureId>`; they shrink like the other lanes. `web` waits for
-// the web client (#21).
+// marks `ships` or `partial` on ios, ipados, macos (Swift), android (Kotlin), or
+// web (TypeScript/React), the platform's app sources must read at least one
+// registry entry that carries that `featureId` (actions, destinations, settings,
+// surfaces, plans). An entry counts as read when the sources name its ID as a
+// string (`"task.share"`), as a Swift case or member (`.weeklySweep`), through
+// a read generated Kotlin constant whose value is the ID, or as a quoted/member
+// Web reference. An entry with its own `platforms` (or `availability.platforms`)
+// counts only on those platforms. A feature with no entry for a platform is not
+// checked: there is nothing to read. Exceptions go in the allowlist's `ships`
+// lane, keyed `<platform>:<featureId>`; they shrink like the other lanes.
 
 import fs from "node:fs";
 import path from "node:path";
@@ -168,10 +167,28 @@ export function checkReaders(repo) {
     ["ts", tsExports(tsGen), (m) => tsIsRead(m, tsHand, tsGen)],
     ["kotlin", kotlinMembers(ktGen), (m) => kotlinIsRead(m, ktHand, ktGen)],
   ];
+  const ALLOWED_KOTLIN_WILDCARDS = new Set([
+    "RegistryTaskPageBlockIds.*",
+    "RegistryCapabilityIds.*",
+    "RegistryIconIds.*",
+    "RegistryPlatformIds.*",
+    "RegistryEntityEnums.AccentColor.*",
+    "RegistryEntityEnums.AppIconFinish.*",
+    "RegistryEntityEnums.AppearanceMode.*",
+    "RegistryEntityEnums.CanvasTexture.*",
+    "RegistryEntityEnums.TextureMotion.*",
+    "RegistryEntityEnums.TelemetryLevel.*",
+  ]);
   const unread = { swift: [], ts: [], kotlin: [] };
   for (const [lane, members, isRead] of lanes) {
     const allowed = allow[lane] ?? {};
-    const wildcards = Object.keys(allowed).filter((k) => k.endsWith(".*")).map((k) => k.slice(0, -1));
+    const rawWildcards = Object.keys(allowed).filter((k) => k.endsWith(".*"));
+    for (const w of rawWildcards) {
+      if (lane !== "kotlin" || !ALLOWED_KOTLIN_WILDCARDS.has(w)) {
+        problems.push(`${lane}: wildcard "${w}" is not permitted in registry/readers-allowlist.json — allowlist individual members with a reason and issue instead`);
+      }
+    }
+    const wildcards = rawWildcards.map((k) => k.slice(0, -1));
     const seen = new Set();
     const wildcardUnread = new Map(wildcards.map((w) => [w, 0]));
     for (const m of members) {
@@ -238,16 +255,18 @@ function checkShipsClaims(repo, allowed) {
   const ktGen = fs.readFileSync(path.join(repo, "android/core/src/main/kotlin/app/septena/core/generated/RegistryConstants.kt"), "utf8");
   const ktConstants = {};
   for (const m of ktGen.matchAll(/val (\w+)(?::[^=]+)? = "([^"]+)"/g)) (ktConstants[m[2]] ??= []).push(m[1]);
-  const quoted = (src, id) => src.includes(`"${id}"`);
+  const webApp = readAll(walk(path.join(repo, "web/src"), [".ts", ".tsx"]));
+  const quoted = (src, id) => src.includes(`"${id}"`) || src.includes(`'${id}'`);
   const readers = {
     swift: (id) => quoted(swiftApp, id)
       || (/^\w+$/.test(id) && new RegExp(`(?:\\bcase |\\.)${id}\\b`).test(swiftApp))
       || (swiftCases[id] ?? []).some((n) => new RegExp(`\\.${esc(n)}\\b`).test(swiftApp)),
     kotlin: (id) => quoted(ktApp, id) || (ktConstants[id] ?? []).some((n) => new RegExp(`\\.${esc(n)}\\b`).test(ktApp)),
+    web: (id) => quoted(webApp, id) || (/^\w+$/.test(id) && new RegExp(`\\.${id}\\b`).test(webApp)),
   };
   const seen = new Set();
   for (const [featureId, claim] of Object.entries(capabilities)) {
-    for (const platform of [...SWIFT_PLATFORMS, "android"]) {
+    for (const platform of [...SWIFT_PLATFORMS, "android", "web"]) {
       if (claim[platform] !== "ships" && claim[platform] !== "partial") continue;
       const ids = (entries[featureId] ?? [])
         .filter((e) => e.platforms.length === 0 || e.platforms.includes(platform))
@@ -255,7 +274,8 @@ function checkShipsClaims(repo, allowed) {
       if (ids.length === 0) continue;
       const key = `${platform}:${featureId}`;
       seen.add(key);
-      const read = ids.some(platform === "android" ? readers.kotlin : readers.swift);
+      const reader = platform === "android" ? readers.kotlin : platform === "web" ? readers.web : readers.swift;
+      const read = ids.some(reader);
       if (!read && !(key in allowed)) {
         problems.push(`ships: ${featureId} is "${claim[platform]}" on ${platform}, but no ${platform} source reads any of its registry entries (${ids.slice(0, 5).join(", ")}${ids.length > 5 ? ", …" : ""}). Read one, change the claim in registry/capabilities.json, or allowlist ${key} with a reason and issue`);
       }

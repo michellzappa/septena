@@ -60,6 +60,25 @@ async function verified(env: Env, token: string): Promise<string | null> {
   return null;
 }
 
+/// A signed, expiring token of another kind. The signature covers the prefix,
+/// so one kind never passes as another.
+export async function signClaims(env: Env, prefix: string, claims: Record<string, unknown> & { exp: number }): Promise<string> {
+  return sign(env, `${prefix}.${base64url(new TextEncoder().encode(JSON.stringify(claims)))}`);
+}
+
+/// The claims of a correctly signed, unexpired token of this kind, or null.
+export async function verifyClaims(env: Env, prefix: string, token: string): Promise<Record<string, unknown> | null> {
+  if (!token.startsWith(`${prefix}.`) || token.length > 4_000) return null;
+  const message = await verified(env, token);
+  if (!message) return null;
+  try {
+    const claims = JSON.parse(new TextDecoder().decode(fromBase64Url(message.slice(prefix.length + 1)))) as Record<string, unknown>;
+    return typeof claims.exp === "number" && claims.exp >= Math.floor(Date.now() / 1000) ? claims : null;
+  } catch {
+    return null;
+  }
+}
+
 /// `rt` is null only in an access token from before ADR 0040.
 export async function signAccessToken(env: Env, userId: string, sid: string, rt: string | null = null, prefix = ACCESS_PREFIX): Promise<string> {
   const claims = { sub: userId, sid, exp: Math.floor(Date.now() / 1000) + ACCESS_TTL_S, ...(rt ? { rt } : {}) };

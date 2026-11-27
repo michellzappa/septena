@@ -35,6 +35,8 @@ struct RemindersInboxSection: View {
   @State private var pairs: [(reminder: EKReminder, view: ImportedReminder)] = []
   @State private var importingID: String?
   @State private var bulkImporting = false
+  /// The task list's snackbar: a done line after an import, with Undo.
+  @Environment(\.septenaToast) private var toast
 
   /// Matches `TaskRow`: honor Settings ▸ Tasks ▸ Rows ▸ "Title lines" on iOS.
   @AppStorage(SettingsKey.tasksTitleLines) private var titleLinesSetting: Int = 2
@@ -303,7 +305,20 @@ struct RemindersInboxSection: View {
                         deadline: pair.view.dueDate,
                         notes: pair.view.notes).id]
       })
+    showDone(ids: [created.id])
     onImported()
+  }
+
+  /// One done line after an import: how many reminders arrived, with Undo.
+  /// Same ticket pattern as the task list's delete toast, so the toast and
+  /// ⌘Z take back the same batch.
+  private func showDone(ids: [String]) {
+    guard !ids.isEmpty else { return }
+    let ticket = TaskUndoTicket()
+    toast?.show(RegistryToasts.importedReminders(count: ids.count)) { [mutator] in
+      ticket.undo { for id in ids { mutator.delete(id: id) } }
+      onImported()
+    }
   }
 
   private func importAll() async {
@@ -337,6 +352,7 @@ struct RemindersInboxSection: View {
                            notes: pair.view.notes).id
           }
         })
+      showDone(ids: createdIDs)
       onImported()
     }
   }

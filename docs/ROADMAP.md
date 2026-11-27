@@ -5,7 +5,7 @@ milestone has a matching GitHub milestone on `michellzappa/septena`; each phase
 is one issue there. Update this file when the order changes. Rules:
 `docs/README.md`.
 
-**Last updated:** 2026-11-21 (reconciled with Starlings Docs `/strategy/product-roadmap`, ADR 0011, the GitHub milestones, and the site work of 2026-11-21).
+**Last updated:** 2026-11-26 (added the Agent surface track, ADR 0050).
 
 **Public roadmap.** An issue labelled `roadmap` appears on
 `septena.app/roadmap`. Its public copy and feature ID live in the site repo,
@@ -29,6 +29,7 @@ on a listed issue without the label). Feature IDs: Starlings Docs
 | Do (one task now) | `docs/DO_SPEC.md`, ADR 0041 | `track:clients` |
 | Project notes as agent context | `docs/PROJECT_NOTES_SPEC.md`, ADR 0012 | `track:factory` |
 | Launch — Septena name, free tier, paid sync, rate lock | `docs/SYNC_SUBSCRIPTION_SPEC.md`, ADR 0007, ADR 0010 | `track:launch` |
+| Agent surface — what agents read and call | `docs/AGENT_SURFACE_SPEC.md`, ADR 0050 | `track:agent-surface` |
 | Engineering foundation — CI as the gate, the shared core, deploys | `docs/ENGINEERING_PLAN.md`, ADR 0025, ADR 0027 | `track:foundation` |
 
 ## Milestones
@@ -61,6 +62,9 @@ GitHub milestone: `"Launch Septena (iPhone, iPad, Mac)"`, label `track:launch`.
 The task app ships as **Septena** (ADR 0007). Needs M1. Runs before M2
 *(default: ship first, agents and switchers next; mz can overrule)*.
 
+- Support (ADR 0054, `docs/SUPPORT_SPEC.md`): #675 backend routes, #676
+  native Contact Support on every client, Starlings envisioning/starlings#1430,
+  site septena-site#41 and #42; #677 later.
 - #32 done: App Store records "Septena" (`com.septena.tasks`) and
   "Septena Life" (`com.septena.cloud`) exist (ADR 0007).
 - #80, #81, #82 done: faster cold launch (Today draws first).
@@ -146,6 +150,16 @@ Alongside the features:
 Exit: a switcher brings their lists over with clear loss disclosure, connects
 Claude on first run, assigns a task, answers a question from the phone, and
 accepts the result with no device awake in between.
+
+### AS — Agent surface (`Next`)
+
+GitHub milestone: `"AS Agent surface"`. Spec: `docs/AGENT_SURFACE_SPEC.md`.
+Contract phases (AS3 to AS7) are issues on this repo. Site phases are issues
+on `michellzappa/septena-site`; the spec lists both. Order: AS1 first, AS3
+before AS5, AS7 before AS12.
+
+Exit: every public page answers as Markdown, the agent spec with schema and
+vectors is public, a retried write is safe, and `/v1` has an OpenAPI file.
 
 ### M3 — The factory ships code, Web client & Source adapters (`Later`)
 

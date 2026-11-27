@@ -33,10 +33,12 @@
 - A delivery never overwrites a field with a write still in the outbox. Such a
   row is marked and fetched again after the outbox is empty, so all stores end
   with the same value.
-- An object that cannot be reached is tried again by an alarm. Nothing is lost.
+- An object that cannot be reached is tried again by an alarm. The alarm is
+  set before the work, so an object that stops in the middle sends the rest.
 
 Code: `backend/src/store/ProjectStore.ts`, `store/shares.ts`,
-`store/TaskStore.ts` ("shared projects"), `api/shares.ts`.
+`store/TaskStore.ts` ("shared projects"), `store/mergeText.ts`,
+`api/shares.ts`.
 
 ## 3. Fields
 
@@ -44,7 +46,7 @@ Code: `backend/src/store/ProjectStore.ts`, `store/shares.ts`,
 |---|---|
 | project title, status, notes, created, completed | the area the member files it under, sidebar order |
 | task title, status, notes, deadline, section, order | Today, When, start time |
-| who does it (`assignedTo`, a member id) | reminders, star, tags |
+| who does it (`assignedTo`, a member id), plus server-stamped `assignedBy` and `assignedAt` | reminders, star, tags, `waitingOn` / `waitingSince` |
 | repeat rule and its series | fade, defer count, acknowledged |
 | checklist items | files, references |
 | | conversations and agent state |
@@ -91,6 +93,26 @@ therefore valid for its own account only.
   only. The owner keeps editing, nothing is deleted, and a Plus member can take
   over. Not built yet: S1b. New shares and invites stop at once.
 
+### 5a. Never lose data
+
+- **Notes merge** (task and project). Changes in different places combine.
+  Where two members changed one place, both versions stay, the stored one
+  first. A client sends the notes its edit started from (`base` on the op);
+  a store sends the same to the ProjectStore.
+- **Every other field** is last writer wins. The change log keeps the value
+  that lost, uncut for a shared row.
+- **A deleted task stays with a member who has something on it that exists
+  nowhere else**: words that did not reach the project, files, references or a
+  conversation. It becomes a private task in their Inbox.
+- **Leaving, removal and Stop sharing** keep such tasks the same way, in the
+  project, which becomes private.
+- **No store deletes on a guess.** A membership that ended says whether the
+  copy stays, and an answer that does not know says keep.
+- A project that ended for everyone is removed from its store after a day.
+- `backend/test/shares.test.ts` runs random edits by three members over a
+  network that loses calls and answers, with restarts: every store must end
+  equal, and no word may be lost.
+
 ## 6. Agents
 
 - MCP reads and writes the replica like any project.
@@ -111,7 +133,25 @@ therefore valid for its own account only.
 - Project menu ▸ Share Project…: name and start; then members, invites, Stop
   Sharing or Leave.
 - New menu ▸ Join a Shared Project…, and the invite link.
-- Task row menu ▸ Assign To; a row shows the assignee when it is not you.
+- A shared project has a people mark (`project.shared`) in the project list and
+  the sidebar. Its page shows the members' initials (3, then "+n") at the end of
+  the title; they open Share Project…, which is also in the page's menu.
+- Task row menu ▸ Assign To, and an inline Assign To control on the task page
+  for tasks in a shared project. Inside a shared project, rows show an assignee
+  pill for every assigned task (including your own, so Mine vs. Unassigned is
+  scannable); outside the project, rows show the assignee only when it is not
+  you. Shared project pages also offer a person filter (All / Mine / Unassigned
+  / member).
+- **Personal list filtering** (mz, 2026-11-27): a shared task assigned to
+  *another* member stays out of your personal Anytime list, and its shared
+  deadline does not pull it into your Today or Upcoming (your own personal
+  `When` or `Today` still brings it in if you schedule a chase). Tasks assigned
+  to you or unassigned behave like any task in your personal lists.
+- **Waiting handoff** (`REVIEW_SPEC.md` §6, #672): `ProjectStore` stamps
+  `assignedBy` and `assignedAt` (server-owned) when `assignedTo` changes and
+  clears them when unassigned. A shared task where `assignedBy == me` and
+  `assignedTo != me` shows in Review ▸ Waiting; tapping Got It Back takes
+  ownership back (`assignedTo = me`).
 - Delete is hidden on a shared project. An area delete moves it out.
 - Copy, actions and icons: `registry/` (`sharing`, `project.share`,
   `sidebar.joinShared`).
@@ -141,3 +181,7 @@ therefore valid for its own account only.
 | Order | Ahead of the rest of M4 (mz) |
 | Conversations | Private, agent turns too *(default)* |
 | Files | Private for now *(default)* |
+| Ownership per task | One owner (`assignedTo`, 0 or 1 member) (mz, 2026-11-27) |
+| Others' tasks in personal lists | Hidden from Anytime; shared deadline suppressed from Today/Upcoming unless personal When/Today is set (mz, 2026-11-27) |
+| Incoming assignment | Stays simple (project + Anytime; push in S2) (mz, 2026-11-27) |
+| Got It Back on shared wait | Takes task back (`assignedTo = me`) (mz, 2026-11-27) |

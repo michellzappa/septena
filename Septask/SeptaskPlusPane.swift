@@ -2,31 +2,33 @@
 //
 // Renders `registry/plans.json` through `RegistryPlans`, the same source as
 // the site's /pricing page, so the two never disagree. The pane shows the
-// account's plan as the server reports it (`PlanStatus`), then what Plus
-// adds. It sells nothing itself: its button opens the Plus sheet
-// (`SeptaskPlusSheet`, spec §7.1), the one place that sells Plus.
+// account's plan as the server reports it (`PlanStatus`) and what it
+// includes, then each plan above it, in the premium language
+// (docs/PREMIUM_LANGUAGE.md). It sells nothing itself: each plan's button
+// opens the plan sheet (`SeptaskPlusSheet`, spec §7.1) on that plan.
 
 import SwiftUI
 
 struct SeptaskPlusPane: View {
   private var status: PlanStatus { .shared }
   @State private var showingSheet = false
+  /// The plan the sheet opens on, from the card whose button opened it.
+  @State private var sheetTier: PlanTier?
 
   var body: some View {
     Form {
       Section {
-        VStack(alignment: .leading, spacing: 8) {
-          Text(RegistryPlans.headline)
-            .font(.title2.weight(.semibold))
-          Text(RegistryPlans.subhead)
-            .foregroundStyle(.secondary)
-        }
-        .padding(.vertical, 4)
-        if let line = status.statusLine {
-          LabeledContent {
-            Text(line).foregroundStyle(.secondary)
-          } label: {
-            Label(RegistryPlans.Copy.yourPlan, systemImage: Self.cardSymbol(status.isPlus ? "plus" : "free"))
+        if let current = currentTier {
+          PlanHead(tier: current, line: headLine(current))
+            .padding(.vertical, 6)
+        } else {
+          VStack(alignment: .leading, spacing: 6) {
+            Text(RegistryPlans.headline).font(.title2.weight(.bold))
+            Text(RegistryPlans.subhead).foregroundStyle(.secondary)
+          }
+          .padding(.vertical, 4)
+          if let line = status.statusLine {
+            LabeledContent(RegistryPlans.Copy.yourPlan) { Text(line).foregroundStyle(.secondary) }
           }
         }
         // The second-device moment's quiet line (spec §3.2, §7.1): it stays
@@ -37,26 +39,37 @@ struct SeptaskPlusPane: View {
             SyncThisDeviceButton()
           }
         }
-        if status.plan != nil {
-          Button(sheetButtonTitle) { showingSheet = true }
+        if status.hasAppleSubscription {
+          ManageSubscriptionButton()
         }
       }
 
-      Section {
-        ForEach(RegistryPlans.prices) { price in
-          LabeledContent {
-            if price.highlighted {
-              Image(systemName: "checkmark.circle.fill").foregroundStyle(.tint)
-            }
-          } label: {
-            Text(price.label).font(.body.weight(price.highlighted ? .semibold : .regular))
-            Text(price.detail)
+      // What the account has: its plan's benefits, the same rows the sheet
+      // and onboarding draw (docs/PREMIUM_LANGUAGE.md).
+      if let current = currentTier {
+        Section(RegistryPlans.Paywall.yourPlanIncludes) {
+          ForEach(current.benefits) { PlanBenefitRow(benefit: $0).padding(.vertical, 2) }
+        }
+      }
+
+      // Each plan above the account's: Plus and Pro, or only Pro on Plus
+      // (ADR 0059). Head, benefits, price, one button into the sheet.
+      ForEach(tiersAbove) { tier in
+        Section {
+          PlanHead(tier: tier, line: tier.card?.detail, markSize: 44)
+            .padding(.vertical, 4)
+          ForEach(tier.benefits) { PlanBenefitRow(benefit: $0).padding(.vertical, 2) }
+          PlanPriceLine(tier: tier)
+          Button(tier == .pro ? RegistryPlans.Paywall.seePro : RegistryPlans.Paywall.seePlus) {
+            sheetTier = tier
+            showingSheet = true
+          }
+          .fontWeight(.semibold)
+        } footer: {
+          if tier == tiersAbove.last {
+            Text(RegistryPlans.checkoutOpen ? RegistryPlans.priceFootnote : RegistryPlans.checkoutNotice)
           }
         }
-      } header: {
-        Text(RegistryPlans.name)
-      } footer: {
-        Text(RegistryPlans.checkoutOpen ? RegistryPlans.priceFootnote : RegistryPlans.checkoutNotice)
       }
 
       if status.plan == .device {
@@ -65,87 +78,74 @@ struct SeptaskPlusPane: View {
             Text(RegistryPlans.trialTitle)
             Text(RegistryPlans.trialDetail)
           } icon: {
-            Image(systemName: RegistryIcons.sfSymbols["onboarding.welcome"] ?? "sparkles")
+            PlanMark(tier: .plus, size: 28)
           }
         }
       }
 
-      ForEach(RegistryPlans.outcomes) { outcome in
-        Section {
-          Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 10) {
-            GridRow {
-              Color.clear.gridCellUnsizedAxes([.horizontal, .vertical])
-              Label(RegistryPlans.card("free")?.title ?? "", systemImage: Self.cardSymbol("free"))
-                .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-              Label(RegistryPlans.shortName, systemImage: Self.cardSymbol("plus"))
-                .font(.caption.weight(.semibold)).foregroundStyle(.tint)
-            }
-            ForEach(outcome.rows) { row in
-              GridRow(alignment: .firstTextBaseline) {
-                VStack(alignment: .leading, spacing: 2) {
-                  Text(row.label)
-                  if row.planned {
-                    Text(RegistryPlans.Copy.planned).font(.caption).foregroundStyle(.secondary)
-                  }
-                }
-                PlanCellView(cell: row.free)
-                PlanCellView(cell: row.plus)
-              }
-            }
-          }
-          .padding(.vertical, 4)
-        } header: {
-          Label(outcome.title, systemImage: RegistryIcons.sfSymbols[outcome.icon] ?? "circle")
-        } footer: {
-          Text(outcome.detail)
-        }
-      }
-
+      // The full table lives on the website, where it has room; the app
+      // shows benefits, never a truncated grid.
       Section {
-        ForEach(RegistryPlans.promises) { promise in
-          VStack(alignment: .leading, spacing: 2) {
-            Text(promise.title).font(.body.weight(.medium))
-            Text(promise.detail).font(.subheadline).foregroundStyle(.secondary)
+        Link(RegistryPlans.Paywall.compareAll, destination: RegistryPlans.compareURL)
+      } footer: {
+        VStack(alignment: .leading, spacing: 6) {
+          ForEach(RegistryPlans.promises) { promise in
+            Label(promise.title, systemImage: "checkmark")
           }
-          .padding(.vertical, 2)
         }
+        .padding(.top, 8)
       }
     }
     .formStyle(.grouped)
-    .navigationTitle(RegistryPlans.name)
+    .navigationTitle(status.title)
     #if os(iOS)
     .navigationBarTitleDisplayMode(.inline)
     #endif
     .task { await PlanStatus.shared.refresh() }
-    .sheet(isPresented: $showingSheet) { SeptaskPlusSheet() }
+    .sheet(isPresented: $showingSheet) { SeptaskPlusSheet(initialTier: sheetTier) }
   }
 
-  /// "Manage Subscription" once the account pays, "See Plus" before.
-  private var sheetButtonTitle: String {
-    if case .plus = status.plan { return RegistryPlans.Action.manage }
-    return RegistryPlans.Paywall.seePlus
+  /// The line under the account's wordmark: its date ("Pro through …",
+  /// "Plus trial until …"), or the plan's card line when the status would
+  /// only repeat the plan's name.
+  private func headLine(_ tier: PlanTier) -> String? {
+    guard let line = status.statusLine, line != tier.title else { return tier.card?.detail }
+    return line
   }
 
-  /// SF Symbol of a plan card's registry icon (plans.json `cards[].icon`).
-  private static func cardSymbol(_ id: String) -> String {
-    RegistryIcons.sfSymbols[RegistryPlans.card(id)?.icon ?? ""] ?? "circle"
+  /// The account's paid plan: Pro, Plus (bought, given or the trial), else nil.
+  private var currentTier: PlanTier? {
+    if status.isPro { return .pro }
+    switch status.plan {
+    case .plus, .trial: return .plus
+    default: return nil
+    }
+  }
+
+  /// The plans above the account's: none on Pro, Pro on Plus, else both.
+  private var tiersAbove: [PlanTier] {
+    if status.isPro { return [] }
+    if case .plus = status.plan { return [.pro] }
+    return PlanTier.allCases
   }
 }
 
-/// One comparison cell: a check, a dash, or the registry's text.
-private struct PlanCellView: View {
-  let cell: RegistryPlanCell
+/// The plan's price in one line: the highlighted price strong, the other
+/// after it.
+private struct PlanPriceLine: View {
+  let tier: PlanTier
 
   var body: some View {
-    switch cell {
-    case .included:
-      Image(systemName: "checkmark").foregroundStyle(.secondary)
-        .accessibilityLabel(Text(RegistryPlans.Copy.included))
-    case .notIncluded:
-      Image(systemName: "minus").foregroundStyle(.tertiary)
-        .accessibilityLabel(Text(RegistryPlans.Copy.notIncluded))
-    case .text(let text):
-      Text(text).font(.subheadline).foregroundStyle(.secondary)
+    let main = tier.prices.first(where: \.highlighted) ?? tier.prices.first
+    VStack(alignment: .leading, spacing: 2) {
+      if let main {
+        Text(main.label).font(.headline)
+        Text(main.detail).font(.subheadline).foregroundStyle(.secondary)
+      }
+      ForEach(tier.prices.filter { $0.id != main?.id }) { other in
+        Text(other.label).font(.subheadline).foregroundStyle(.secondary)
+      }
     }
+    .fixedSize(horizontal: false, vertical: true)
   }
 }

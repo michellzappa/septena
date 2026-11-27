@@ -79,6 +79,14 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
   /// data but with auto-pinning behavior baked in; the server still emits
   /// `due` as a mirror for the transition window, so we read either.
   var deadline: String?
+  /// The deadline the user planned past (`TaskEntity.deferredDeadline`).
+  /// Populated from the entity, not the wire.
+  var deferredDeadline: String? = nil
+  /// Who the task waits on (`TaskEntity.waitingOn`, docs/REVIEW_SPEC.md §6).
+  /// Populated from the entity, not the wire.
+  var waitingOn: String? = nil
+  /// The day the wait started, `YYYY-MM-DD` (`TaskEntity.waitingSince`).
+  var waitingSince: String? = nil
   var today: Bool
   var starred: Bool = false
   /// Canonical `TagEntity.id` values assigned to this task (max 20, flat tags, docs/TAGS_SPEC.md).
@@ -135,6 +143,8 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
   var fadedAt: Date? = nil
   var dropReason: String? = nil
   var effort: String? = nil
+  /// Shared projects: the member who does this task (`TaskEntity.assignedTo`).
+  var assignedTo: String? = nil
   /// Row shape (`TaskKind`). `""`/absent = task, `"heading"` = a project
   /// section divider. Rides alongside the entity, not the wire. Read `isHeading`.
   var kind: String = ""
@@ -151,6 +161,32 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
   /// count, Next, and the badge.
   var isFaded: Bool { status == .open && fadedAt != nil }
 
+  /// The one Review group an open task shows in, or nil. The conversation's
+  /// group (Questions, Finished work) wins, then Waiting, then the agent
+  /// stage, then Faded (docs/REVIEW_SPEC.md §1, §6).
+  var reviewGroup: ReviewGroup? {
+    guard status == .open, deletedAt == nil, !isHeading else { return nil }
+    return conversation.reviewGroup(waiting: isWaiting) ?? (isFaded ? .faded : nil)
+  }
+
+  /// True when the task waits on a person (`waitingOn` is set).
+  var isWaiting: Bool { TaskWaiting.isWaiting(waitingOn) }
+
+  /// "Waiting on Anna · 5 days" for the row, or nil when the task does not
+  /// wait (docs/REVIEW_SPEC.md §6).
+  func waitingLabel(today: String = SeptenaDate.today) -> String? {
+    TaskWaiting.label(on: waitingOn, since: waitingSince, today: today)
+  }
+
+  /// True when the task sits in a Review group about agent work (every group
+  /// but Faded). Opening such a row opens the task page, where the
+  /// conversation is: a question, finished work or work in progress is read
+  /// in its conversation, never in the inline editor.
+  var opensConversationInReview: Bool {
+    guard let group = reviewGroup else { return false }
+    return group != .faded
+  }
+
   /// Countdown progress (0…1) toward the 14-day fade window (`TaskFade.fadeFill`).
   /// Drives whole-row opacity in every open task list.
   func fadeFill(today: String = SeptenaDate.today, now: Date = Date()) -> Double? {
@@ -162,10 +198,11 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
       deadline: deadline,
       scheduled: scheduled,
       hasRecurrence: recurrence != nil,
-      isAgentTurn: deriveConvo(conversation).badge == .working,
+      isAgentTurn: conversation.isAgentTurn(at: Date()),
       isAssignedToClaude: conversation.assignee == .claude,
       isAwaitingHuman: conversation.awaitsHuman,
       showsAgentCue: showsAgentCue(now: now),
+      isProposal: isUnacceptedProposal,
       touchedAt: touchedAt,
       createdAt: createdAt,
       created: created,
@@ -216,6 +253,9 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     return "\(label) \(addedByName)"
   }
 
+  /// An agent added the task and the user has not accepted it (ADR 0039).
+  var isUnacceptedProposal: Bool { isAgentAuthored && acknowledgedAt == nil }
+
   /// True while this row should glow as a freshly agent-created item the
   /// user hasn't engaged yet. Provenance (`source`) is permanent; this cue
   /// is transient — it clears on `acknowledgedAt` and auto-decays after
@@ -237,13 +277,7 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
   ///
   /// `docs/TASK_DATES_SPEC.md` R8 (decision Q7): this is the ONE "arrived on
   /// its own" rule. The row dot and the rolled-into-Today notice both read it.
-  func showsArrivedToday() -> Bool {
-    guard status == .open, !isHeading, fadedAt == nil, deletedAt == nil, !today,
-          source != TaskSource.mcp,
-          let created, created < SeptenaDate.today else { return false }
-    let today = SeptenaDate.today
-    return scheduled == today || deadline == today
-  }
+  func showsArrivedToday() -> Bool { listMembership()?.arrivedOnOwn ?? false }
 
   /// "Carry-age": how many whole days this open task has sat on the Today list
   /// without being completed — the *self-deferral* signal, deliberately
@@ -389,6 +423,9 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     durationMinutes: Int? = nil,
     timeZone: String? = nil,
     deadline: String?,
+    deferredDeadline: String? = nil,
+    waitingOn: String? = nil,
+    waitingSince: String? = nil,
     today: Bool,
     starred: Bool = false,
     tags: [String] = [],
@@ -414,6 +451,7 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     fadedAt: Date? = nil,
     dropReason: String? = nil,
     effort: String? = nil,
+    assignedTo: String? = nil,
     kind: String = "",
     heading: String? = nil,
     conversation: TaskConvo = TaskConvo()
@@ -427,6 +465,9 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     self.durationMinutes = durationMinutes
     self.timeZone = timeZone
     self.deadline = deadline
+    self.deferredDeadline = deferredDeadline
+    self.waitingOn = waitingOn
+    self.waitingSince = waitingSince
     self.today = today
     self.starred = starred
     self.tags = tags
@@ -452,6 +493,7 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     self.fadedAt = fadedAt
     self.dropReason = dropReason
     self.effort = effort
+    self.assignedTo = assignedTo
     self.kind = kind
     self.heading = heading
     self.conversation = conversation
@@ -887,6 +929,8 @@ struct Project: Identifiable, Codable, Hashable {
   /// Optional "owner/repo" pointer. Source of truth for agentic tooling that
   /// needs to know which GitHub repo a project's tasks live against.
   var githubRepo: String?
+  /// Who shares this project (from `ProjectEntity.share`). nil = private.
+  var share: ProjectShare?
   /// Sidebar sort order (synced, from `ProjectEntity.position`). Populated by
   /// the entity init only — intentionally NOT a `CodingKey`, so the MCP/wire
   /// JSON stays unchanged. See `docs/DRAG_AND_DROP.md` §5 gap #2.
@@ -906,12 +950,13 @@ struct Project: Identifiable, Codable, Hashable {
        area: String? = nil, created: String? = nil, completedAt: String? = nil,
        notes: String? = nil, context: String? = nil, noteRev: Int = 0,
        notesProposal: NotesProposal? = nil, githubRepo: String? = nil,
-       position: Int = 0,
+       share: ProjectShare? = nil, position: Int = 0,
        updatedAt: String? = nil, deletedAt: String? = nil) {
     self.id = id; self.title = title; self.status = status
     self.area = area; self.created = created; self.completedAt = completedAt
     self.notes = notes; self.context = context; self.noteRev = noteRev
     self.notesProposal = notesProposal; self.githubRepo = githubRepo
+    self.share = share
     self.position = position
     self.updatedAt = updatedAt; self.deletedAt = deletedAt
   }
@@ -929,6 +974,7 @@ struct Project: Identifiable, Codable, Hashable {
     noteRev = 0
     notesProposal = nil
     githubRepo = try c.decodeIfPresent(String.self, forKey: .githubRepo)
+    share = nil
     position = 0   // not on the wire; set via ProjectEntity init
     updatedAt = try c.decodeIfPresent(String.self, forKey: .updatedAt)
     deletedAt = try c.decodeIfPresent(String.self, forKey: .deletedAt)
@@ -1073,17 +1119,17 @@ enum TaskFilter: Equatable, Hashable {
   /// This is the only home for loose captures; the standalone Inbox page was
   /// retired when the triage band absorbed it.
   case triage
-  /// Agent-worked tasks waiting for the human to verify and accept (`endState == .needsVerify`).
+  /// Everything about your agent and what waits on you, grouped by
+  /// `ReviewGroup` (docs/REVIEW_SPEC.md). Agent work in progress is a group
+  /// here, not its own list (ADR 0046).
   case review
-  /// Every open task an agent owns or worked, grouped by `AgentStage`
-  /// (docs/TASK_FACTORY_SPEC.md §3).
-  case agent
   case upcoming
   case repeating
   case unscheduled
   case starred
   case logbook
-  /// Tasks that faded untouched (`docs/TASK_FADE_SPEC.md` §4).
+  /// Tasks that faded untouched (`docs/TASK_FADE_SPEC.md` §4). A read filter:
+  /// the list that shows them is the Faded group of Review.
   case faded
   case recentlyDeleted
   case project(String)
@@ -1094,7 +1140,6 @@ enum TaskFilter: Equatable, Hashable {
     case .today: return "today"
     case .triage: return "triage"
     case .review: return "all"
-    case .agent: return "all"
     case .upcoming: return "upcoming"
     case .repeating: return "all"
     case .unscheduled: return "unscheduled"
@@ -1113,7 +1158,6 @@ enum TaskFilter: Equatable, Hashable {
     case .today: return "today"
     case .triage: return "triage"
     case .review: return "review"
-    case .agent: return "agent"
     case .upcoming: return "upcoming"
     case .repeating: return "repeating"
     case .unscheduled: return "unscheduled"
@@ -1132,7 +1176,6 @@ enum TaskFilter: Equatable, Hashable {
     switch self {
     case .today: return .today
     case .review: return .review
-    case .agent: return .agent
     case .upcoming: return .upcoming
     case .repeating: return .repeating
     case .unscheduled: return .anytime
@@ -1149,13 +1192,13 @@ enum TaskFilter: Equatable, Hashable {
     switch destinationID {
     case .today: self = .today
     case .review: self = .review
-    case .agent: self = .agent
+    case .agent: self = .review // its Working, Queued and Stopped groups (ADR 0046)
     case .upcoming: self = .upcoming
     case .repeating: self = .repeating
     case .anytime: self = .unscheduled
     case .logbook: self = .logbook
     case .starred: self = .starred
-    case .faded: self = .faded
+    case .faded: self = .review // its group there
     case .recentlyDeleted: self = .recentlyDeleted
     case .inbox: return nil
     }

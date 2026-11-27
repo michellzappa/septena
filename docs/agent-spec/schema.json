@@ -1,0 +1,1573 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://septena.app/spec/schema.json",
+  "title": "Septena records",
+  "description": "Agent spec v0, unstable until Septena 1.0 (https://septena.app/spec.md). Generated from registry/entities.json by backend/scripts/gen-contract.ts. Do not edit by hand.",
+  "x-septena-spec-version": "v0",
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+    },
+    "clientOpId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{8,64}$"
+    },
+    "day": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+    },
+    "time24": {
+      "type": "string",
+      "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+    },
+    "stamp": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}"
+    },
+    "taskStatus": {
+      "type": "string",
+      "enum": [
+        "open",
+        "done",
+        "cancelled"
+      ]
+    },
+    "taskSource": {
+      "type": "string",
+      "enum": [
+        "app",
+        "mcp"
+      ]
+    },
+    "projectStatus": {
+      "type": "string",
+      "enum": [
+        "active",
+        "done",
+        "cancelled"
+      ]
+    },
+    "taskKind": {
+      "type": "string",
+      "enum": [
+        "heading"
+      ]
+    },
+    "recurrenceUnit": {
+      "type": "string",
+      "enum": [
+        "day",
+        "week",
+        "month",
+        "year"
+      ]
+    },
+    "reminderMode": {
+      "type": "string",
+      "enum": [
+        "floating",
+        "fixed"
+      ]
+    },
+    "convoAssignee": {
+      "type": "string",
+      "enum": [
+        "me",
+        "local",
+        "claude"
+      ]
+    },
+    "convoEndState": {
+      "type": "string",
+      "enum": [
+        "agent_done",
+        "human_done",
+        "agent_assisted_done",
+        "needs_verify",
+        "decomposed",
+        "reminder_set",
+        "promoted_to_today",
+        "wont_do",
+        "open"
+      ]
+    },
+    "convoHandoffActionType": {
+      "type": "string",
+      "enum": [
+        "open_url",
+        "compose",
+        "call",
+        "none"
+      ]
+    },
+    "convoTurnRole": {
+      "type": "string",
+      "enum": [
+        "user",
+        "provider"
+      ]
+    },
+    "convoTurnStep": {
+      "type": "string",
+      "enum": [
+        "confirm",
+        "ground",
+        "scope",
+        "decide",
+        "work"
+      ]
+    },
+    "doExit": {
+      "type": "string",
+      "enum": [
+        "done",
+        "stopped",
+        "later",
+        "replaced",
+        "closed"
+      ]
+    },
+    "taskRefRole": {
+      "type": "string",
+      "enum": [
+        "about",
+        "from",
+        "blocked_by",
+        "follow_up"
+      ]
+    },
+    "telemetryLevel": {
+      "type": "string",
+      "enum": [
+        "none",
+        "minimal",
+        "balanced",
+        "full"
+      ]
+    },
+    "appearanceMode": {
+      "type": "string",
+      "enum": [
+        "system",
+        "light",
+        "dark"
+      ]
+    },
+    "accentColor": {
+      "type": "string",
+      "enum": [
+        "colorful",
+        "tamarillo",
+        "persimmon",
+        "yuzu",
+        "carambola",
+        "haskap",
+        "acai",
+        "pitaya",
+        "jabuticaba"
+      ]
+    },
+    "appIconFinish": {
+      "type": "string",
+      "enum": [
+        "obsidian",
+        "ceramic",
+        "framed"
+      ]
+    },
+    "canvasTexture": {
+      "type": "string",
+      "enum": [
+        "none",
+        "topography",
+        "fieldMatrix",
+        "stippleDrift",
+        "ridges",
+        "washiPaper"
+      ]
+    },
+    "textureMotion": {
+      "type": "string",
+      "enum": [
+        "still",
+        "slowDrift"
+      ]
+    },
+    "task": {
+      "type": "object",
+      "description": "The `task` record (table `tasks`). It can be deleted.",
+      "required": [
+        "id",
+        "title",
+        "status"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 2000
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 32
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "kind": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 32
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "heading": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "area": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "project": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "created": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/day"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "scheduled": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/day"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "startTime": {
+          "anyOf": [
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/time24"
+                },
+                {
+                  "maxLength": 5
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "durationMinutes": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 5,
+              "maximum": 1440
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "timeZone": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 64
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "deadline": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/day"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "deferredDeadline": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/day"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "today": {
+          "type": "boolean",
+          "default": false
+        },
+        "starred": {
+          "type": "boolean",
+          "default": false
+        },
+        "tags": {
+          "anyOf": [
+            {
+              "description": "JSON, at most 4000 characters when serialized."
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "todaySetOn": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/day"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "completedAt": {
+          "anyOf": [
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/stamp"
+                },
+                {
+                  "maxLength": 40
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 100000
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "position": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "todayPosition": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "recurrenceUnit": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 16
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "recurrenceInterval": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "recurrenceAfterCompletion": {
+          "type": "boolean",
+          "default": false
+        },
+        "recurrencePaused": {
+          "type": "boolean",
+          "default": false
+        },
+        "recurrenceSeriesID": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 128
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "recurrenceAnchorDate": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/day"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "recurrenceWeekdays": {
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "recurrenceMonthDay": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": -1,
+              "maximum": 31
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "recurrenceOrdinalWeekday": {
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reminderAt": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 32
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reminderMode": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/reminderMode"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reminderSnoozedUntil": {
+          "anyOf": [
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/stamp"
+                },
+                {
+                  "maxLength": 40
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reminderDismissedAt": {
+          "anyOf": [
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/stamp"
+                },
+                {
+                  "maxLength": 40
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "source": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 64
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sourceClient": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 64
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "acknowledgedAt": {
+          "anyOf": [
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/stamp"
+                },
+                {
+                  "maxLength": 40
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "createdAt": {
+          "anyOf": [
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/stamp"
+                },
+                {
+                  "maxLength": 40
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "touchedAt": {
+          "anyOf": [
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/stamp"
+                },
+                {
+                  "maxLength": 40
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "deferCount": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0
+        },
+        "fadedAt": {
+          "anyOf": [
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/stamp"
+                },
+                {
+                  "maxLength": 40
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "waitingOn": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 80
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "waitingSince": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/day"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "dropReason": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 16
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "effort": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 16
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "assignedTo": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 64
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "area": {
+      "type": "object",
+      "description": "The `area` record (table `areas`). It can be deleted.",
+      "required": [
+        "id",
+        "title"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 2000
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "context": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 100000
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "noteRev": {
+          "type": "integer",
+          "readOnly": true
+        },
+        "notesProposal": {
+          "anyOf": [
+            {
+              "description": "JSON, at most 101000 characters when serialized."
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "emoji": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 16
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "attachment": {
+          "anyOf": [
+            {
+              "description": "JSON, at most 4000 characters when serialized."
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "position": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "project": {
+      "type": "object",
+      "description": "The `project` record (table `projects`). It can be deleted.",
+      "required": [
+        "id",
+        "title",
+        "status"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 2000
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 32
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "area": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "created": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/day"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "completedAt": {
+          "anyOf": [
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/stamp"
+                },
+                {
+                  "maxLength": 40
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 100000
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "context": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 100000
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "noteRev": {
+          "type": "integer",
+          "readOnly": true
+        },
+        "notesProposal": {
+          "anyOf": [
+            {
+              "description": "JSON, at most 101000 characters when serialized."
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "githubRepo": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 200
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "attachment": {
+          "anyOf": [
+            {
+              "description": "JSON, at most 4000 characters when serialized."
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "position": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "share": {
+          "readOnly": true
+        }
+      }
+    },
+    "attachment": {
+      "type": "object",
+      "description": "The `attachment` record (table `attachments`). It can be deleted. Fields that change after create: filename, position.",
+      "required": [
+        "id",
+        "taskId",
+        "filename",
+        "contentType",
+        "byteCount"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "taskId": {
+          "$ref": "#/$defs/id"
+        },
+        "filename": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 512
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "contentType": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 200
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "byteCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 26214400
+        },
+        "position": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "createdAt": {
+          "anyOf": [
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/stamp"
+                },
+                {
+                  "maxLength": 40
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "uploadedAt": {
+          "type": "string",
+          "readOnly": true
+        }
+      }
+    },
+    "checklistItem": {
+      "type": "object",
+      "description": "The `checklistItem` record (table `checklist_items`). It can be deleted. Fields that change after create: title, checked, checkedAt, position.",
+      "required": [
+        "id",
+        "taskId",
+        "title"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "taskId": {
+          "$ref": "#/$defs/id"
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 2000
+        },
+        "checked": {
+          "type": "boolean",
+          "default": false
+        },
+        "checkedAt": {
+          "anyOf": [
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/stamp"
+                },
+                {
+                  "maxLength": 40
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "position": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "createdAt": {
+          "anyOf": [
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/stamp"
+                },
+                {
+                  "maxLength": 40
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "taskRef": {
+      "type": "object",
+      "description": "The `taskRef` record (table `task_refs`). It can be deleted. Fields that change after create: role, snapshot, position.",
+      "required": [
+        "id",
+        "taskId",
+        "key"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "taskId": {
+          "$ref": "#/$defs/id"
+        },
+        "key": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "kind": {
+          "type": "string",
+          "maxLength": 32,
+          "readOnly": true
+        },
+        "role": {
+          "$ref": "#/$defs/taskRefRole",
+          "default": "about"
+        },
+        "snapshot": {
+          "anyOf": [
+            {
+              "description": "JSON, at most 2048 characters when serialized."
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "position": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "createdBy": {
+          "type": "string",
+          "readOnly": true
+        },
+        "lastSeenAt": {
+          "type": "string",
+          "readOnly": true
+        },
+        "createdAt": {
+          "anyOf": [
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/stamp"
+                },
+                {
+                  "maxLength": 40
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "tag": {
+      "type": "object",
+      "description": "The `tag` record (table `tags`). It can be deleted. Fields that change after create: name, color, position.",
+      "required": [
+        "id",
+        "name"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "color": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 32
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "position": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "doSession": {
+      "type": "object",
+      "description": "The `doSession` record (table `do_sessions`). It can be deleted. Fields that change after create: plannedMinutes, confirmedAt, endedAt, exit, lapsed, note.",
+      "required": [
+        "id",
+        "taskId",
+        "startedAt"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "taskId": {
+          "$ref": "#/$defs/id"
+        },
+        "startedAt": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/stamp"
+            },
+            {
+              "maxLength": 40
+            }
+          ]
+        },
+        "plannedMinutes": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 240
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "confirmedAt": {
+          "anyOf": [
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/stamp"
+                },
+                {
+                  "maxLength": 40
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "endedAt": {
+          "anyOf": [
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/stamp"
+                },
+                {
+                  "maxLength": 40
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "exit": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/doExit"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lapsed": {
+          "type": "boolean",
+          "default": false
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 500
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sourceClient": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 64
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "convo": {
+      "type": "object",
+      "description": "The `convo` record (table `convos`). It is never deleted on its own.",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "confirmedIntent": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 100000
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "acceptance": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 100000
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "subtasks": {
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "artifact": {
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "handoff": {
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "endState": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 32
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "endStateNote": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 100000
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "assignee": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/convoAssignee"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "stoppedAt": {
+          "anyOf": [
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/stamp"
+                },
+                {
+                  "maxLength": 40
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "claimedBy": {
+          "type": "string",
+          "readOnly": true
+        },
+        "claimUntil": {
+          "type": "string",
+          "readOnly": true
+        },
+        "endStateAt": {
+          "type": "string",
+          "readOnly": true
+        },
+        "runsSinceUser": {
+          "type": "integer",
+          "readOnly": true
+        }
+      }
+    },
+    "setting": {
+      "type": "object",
+      "description": "The `setting` record (table `settings`). It is never deleted on its own.",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "value": {
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "turn": {
+      "type": "object",
+      "properties": {
+        "role": {
+          "type": "string",
+          "enum": [
+            "user",
+            "provider"
+          ]
+        },
+        "step": {
+          "type": "string",
+          "enum": [
+            "confirm",
+            "ground",
+            "scope",
+            "decide",
+            "work"
+          ]
+        },
+        "provider": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 32
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "confidence": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "question": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 10000
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "options": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 500
+              },
+              "maxItems": 20
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "chosen": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 500
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "otherText": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 10000
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "inReplyTo": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 100000
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "ts": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "role",
+        "step",
+        "ts"
+      ],
+      "additionalProperties": false,
+      "description": "One step of a task's conversation. Turns are appended, never changed."
+    }
+  }
+}

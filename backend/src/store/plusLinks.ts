@@ -1,6 +1,7 @@
+import type { PaidPlanId } from "../entitlement/entitlement.js";
 import { randomId } from "../util.js";
 
-// Plus links (ADR 0043): mz gives Plus to people with a link. The link is a
+// Plus links (ADR 0043, ADR 0045): mz gives Plus or Pro to people with a link. The link is a
 // secret, stored hashed. A signed-in account claims it once; the claim writes
 // the `grant:<link id>` entitlement row in that account's own store
 // (src/api/plusLinks.ts). The two controls copy the list-sharing links people
@@ -11,7 +12,8 @@ export const PLUS_LINK_MAX_MONTHS = 60;
 
 export interface PlusLinkInput {
   label: string;
-  /// How long Plus lasts from the claim; null = no end.
+  plan: PaidPlanId;
+  /// How long the plan lasts from the claim; null = no end.
   months: number | null;
   maxUses: number;
 }
@@ -33,11 +35,11 @@ export interface PlusLinkUse {
 }
 
 export type PlusLinkClaim =
-  | { ok: true; linkId: string; label: string; expiresAt: number | null }
+  | { ok: true; linkId: string; label: string; plan: PaidPlanId; expiresAt: number | null }
   | { ok: false };
 
 /// The entitlement row a claim writes: one per link and account.
-export const plusLinkGrantId = (linkId: string) => `grant:${linkId}`;
+export const plusLinkGrantId = (linkId: string) => `grant:${linkId}` as const;
 
 export function addMonths(at: number, months: number): number {
   const d = new Date(at);
@@ -48,7 +50,7 @@ export function addMonths(at: number, months: number): number {
   return d.getTime();
 }
 
-const LINK_COLS = "id, label, months, maxUses, useCount, createdAt, closedAt, revokedAt";
+const LINK_COLS = "id, label, plan, months, maxUses, useCount, createdAt, closedAt, revokedAt";
 const USE_COLS = "linkId, userId, at, expiresAt, revokedAt";
 
 export class PlusLinks {
@@ -72,6 +74,8 @@ export class PlusLinks {
       );
       CREATE INDEX IF NOT EXISTS plus_link_uses_user ON plus_link_uses(userId);
     `);
+    const cols = this.sql.exec<{ name: string }>("PRAGMA table_info(plus_links)").toArray().map((r) => r.name);
+    if (!cols.includes("plan")) this.sql.exec("ALTER TABLE plus_links ADD COLUMN plan TEXT NOT NULL DEFAULT 'plus'");
   }
 
   private row(column: "id" | "tokenHash", value: string): PlusLink | null {
@@ -88,8 +92,8 @@ export class PlusLinks {
     // Lowercase: the id is part of the grant's entitlement row id.
     const id = `link-${randomId(12).toLowerCase().replace(/[^a-z0-9]/g, "0")}`;
     this.sql.exec(
-      "INSERT INTO plus_links (id, tokenHash, label, months, maxUses, createdAt) VALUES (?, ?, ?, ?, ?, ?)",
-      id, tokenHash, input.label, input.months, input.maxUses, now,
+      "INSERT INTO plus_links (id, tokenHash, label, plan, months, maxUses, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      id, tokenHash, input.label, input.plan, input.months, input.maxUses, now,
     );
     return this.row("id", id)!;
   }
@@ -118,14 +122,14 @@ export class PlusLinks {
     const had = this.use(link.id, userId);
     if (had) {
       return had.revokedAt === null
-        ? { ok: true, linkId: link.id, label: link.label, expiresAt: had.expiresAt }
+        ? { ok: true, linkId: link.id, label: link.label, plan: link.plan, expiresAt: had.expiresAt }
         : { ok: false };
     }
     if (!this.open(tokenHash)) return { ok: false };
     const expiresAt = link.months === null ? null : addMonths(now, link.months);
     this.sql.exec("INSERT INTO plus_link_uses (linkId, userId, at, expiresAt) VALUES (?, ?, ?, ?)", link.id, userId, now, expiresAt);
     this.sql.exec("UPDATE plus_links SET useCount = useCount + 1 WHERE id = ?", link.id);
-    return { ok: true, linkId: link.id, label: link.label, expiresAt };
+    return { ok: true, linkId: link.id, label: link.label, plan: link.plan, expiresAt };
   }
 
   /// False when the claim was revoked while its grant was on the way.

@@ -17,6 +17,9 @@ internal data class HttpResponse(val statusCode: Int, val body: String)
 
 /** One blocking HTTP request on a background executor. Shared by the sync, auth and task backend clients. */
 internal object JsonHttp {
+    /** `X-Septena-Client`. The version travels in `X-Septena-Version`. */
+    const val CLIENT_NAME = "septena-android"
+
     const val DEFAULT_BASE_URL = "https://api.septena.app"
     private const val CONNECT_TIMEOUT_MS = 15_000
     private const val READ_TIMEOUT_MS = 30_000
@@ -33,8 +36,9 @@ internal object JsonHttp {
         clientVersion: String,
         bearer: String? = null,
         pool: ExecutorService = executor,
+        headers: Map<String, String> = emptyMap(),
     ): HttpResponse = perform(pool) { onOpened ->
-        execute(baseUrl, path, method, clientVersion, bearer, accept = "application/json", onOpened) { connection ->
+        execute(baseUrl, path, method, clientVersion, bearer, accept = "application/json", onOpened, headers) { connection ->
             if (body != null) {
                 connection.doOutput = true
                 connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
@@ -125,6 +129,7 @@ internal object JsonHttp {
         bearer: String?,
         accept: String,
         onConnectionOpened: (HttpURLConnection) -> Unit,
+        headers: Map<String, String> = emptyMap(),
         exchange: (HttpURLConnection) -> HttpResponse,
     ): HttpResponse {
         val connection = URL(baseUrl.trimEnd('/') + path).openConnection() as HttpURLConnection
@@ -135,8 +140,10 @@ internal object JsonHttp {
             connection.readTimeout = READ_TIMEOUT_MS
             connection.instanceFollowRedirects = false
             connection.setRequestProperty("Accept", accept)
-            connection.setRequestProperty("X-Septena-Client", "android $clientVersion")
+            connection.setRequestProperty("X-Septena-Client", CLIENT_NAME)
+            connection.setRequestProperty("X-Septena-Version", clientVersion)
             if (bearer != null) connection.setRequestProperty("Authorization", "Bearer $bearer")
+            for ((name, value) in headers) connection.setRequestProperty(name, value)
             return exchange(connection)
         } finally {
             connection.disconnect()

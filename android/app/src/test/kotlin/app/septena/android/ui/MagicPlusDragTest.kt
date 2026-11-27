@@ -3,6 +3,7 @@ package app.septena.android.ui
 import androidx.compose.ui.geometry.Offset
 import app.septena.ui.MagicPlusDragState
 import app.septena.ui.MagicPlusDropKind
+import app.septena.ui.MagicPlusInsertEdge
 import app.septena.ui.insertionPosition
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -64,5 +65,50 @@ class MagicPlusDragTest {
         drag.beginDrag(Offset(150f, 300f), density = 1f, onHapticTick = {})
         drag.endDrag(Offset(150f, 300f), density = 1f)
         assertEquals(1, fallbackCalls)
+    }
+
+    @Test
+    fun homepageListInsertSeparatesAreaAndProjectSlots() {
+        val drag = MagicPlusDragState()
+        drag.homeCenter = Offset(300f, 900f)
+        val hits = mutableListOf<String>()
+        drag.register(
+            id = "proj-end",
+            kind = MagicPlusDropKind.ListInsert(MagicPlusInsertEdge.Bottom, isArea = false, label = "New Project in Admin"),
+            topY = 100f,
+            bottomY = 144f,
+        ) { hits += "proj-end" }
+        drag.register(
+            id = "area-before-home",
+            kind = MagicPlusDropKind.ListInsert(MagicPlusInsertEdge.Top, isArea = true, label = "New Area"),
+            topY = 158f,
+            bottomY = 202f,
+        ) { hits += "area-before-home" }
+        drag.register(
+            id = "home-first-proj",
+            kind = MagicPlusDropKind.ListInsert(MagicPlusInsertEdge.Bottom, isArea = false, label = "New Project in Home"),
+            topY = 158f,
+            bottomY = 202f,
+        ) { hits += "home-first-proj" }
+
+        // Near bottom of Admin's last project → Project in Admin.
+        drag.beginDrag(Offset(150f, 138f), density = 1f, onHapticTick = {})
+        assertEquals("proj-end", drag.activeTarget?.id)
+        assertEquals(false, drag.activeTarget?.isArea)
+        assertEquals("New Project in Admin", drag.activeTarget?.label)
+
+        // Move across the 14dp card gap to the top of Home → New Area.
+        drag.updateDrag(Offset(150f, 162f), density = 1f, onHapticTick = {})
+        assertEquals("area-before-home", drag.activeTarget?.id)
+        assertEquals(true, drag.activeTarget?.isArea)
+        assertEquals("New Area", drag.activeTarget?.label)
+
+        // Move down into Home → New Project in Home.
+        drag.updateDrag(Offset(150f, 196f), density = 1f, onHapticTick = {})
+        assertEquals("home-first-proj", drag.activeTarget?.id)
+        assertEquals(false, drag.activeTarget?.isArea)
+
+        drag.endDrag(Offset(150f, 196f), density = 1f)
+        assertEquals(listOf("home-first-proj"), hits)
     }
 }

@@ -50,6 +50,11 @@ enum BackendJSON: Codable, Hashable, Sendable {
 
   var stringValue: String? { if case .string(let s) = self { return s }; return nil }
   var isNull: Bool { self == .null }
+  /// The value as JSON text; nil for null.
+  var jsonText: String? {
+    guard !isNull, let data = try? JSONEncoder().encode(self) else { return nil }
+    return String(data: data, encoding: .utf8)
+  }
 
   /// A stable text form: object keys sorted, and a number prints the same
   /// whether it arrived as `1` or `1.0`. Two values with equal canonical text
@@ -74,7 +79,7 @@ enum BackendJSON: Codable, Hashable, Sendable {
 // MARK: - Entities
 
 enum BackendEntity: String, Codable, Sendable, CaseIterable {
-  case task, area, project, attachment, checklistItem, taskRef, tag, convo, turn
+  case task, area, project, attachment, checklistItem, taskRef, doSession, tag, convo, turn
   /// Septask's synced settings, one row per key (TaskSyncSettings.swift).
   case setting
 }
@@ -198,6 +203,99 @@ enum BackendDevicePoll: Sendable {
   case pending
   case expired
   case approved(BackendSession)
+}
+
+/// `GET /v1/auth/methods`: the sign-in methods this server has on
+/// (docs/SIGN_IN_SURFACES_SPEC.md §3). Ids this build does not know are kept
+/// as strings; the screen shows only the ones it implements.
+struct BackendAuthMethods: Decodable, Sendable {
+  struct Method: Decodable, Sendable, Equatable {
+    let id: String
+    let web: Bool?
+    let native: Bool?
+  }
+  let methods: [Method]
+}
+
+/// One linked sign-in method on the signed-in account (`GET /v1/auth/identities`, #643).
+struct BackendLinkedIdentity: Decodable, Sendable, Equatable, Identifiable {
+  let id: String
+  let provider: String
+  let label: String
+  let createdAt: Double
+}
+
+struct BackendLinkedIdentities: Decodable, Sendable, Equatable {
+  let identities: [BackendLinkedIdentity]
+  let canRemove: Bool
+}
+
+/// 409 `account_exists` (ADR 0047 decision 5): a new provider sign-in whose
+/// verified email already belongs to an existing account.
+struct BackendAccountExistsError: Error, Sendable, Equatable, Identifiable {
+  let email: String
+  let provider: String
+  let linkToken: String?
+  let codeSent: Bool
+
+  var id: String { "\(provider):\(email):\(linkToken ?? "")" }
+}
+
+struct BackendAccountExistsBody: Decodable, Sendable {
+  let error: String
+  let email: String?
+  let provider: String?
+  let linkToken: String?
+  let codeSent: Bool?
+}
+
+enum BackendAuthLinkError: Error, Equatable, Sendable {
+  case alreadyLinked
+  case lastMethod
+  case notFound
+  case providerOff
+}
+
+/// `POST /v1/auth/email/start` answered 202: a code went to the address.
+struct BackendEmailCodeSent: Decodable, Sendable, Equatable {
+  let status: String
+  let expiresInSeconds: Int
+  let codeLength: Int
+
+  init(from decoder: Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    status = try c.decode(String.self, forKey: .status)
+    expiresInSeconds = try c.decode(Int.self, forKey: .expiresInSeconds)
+    codeLength = try c.decode(Int.self, forKey: .codeLength)
+    guard status == "sent", expiresInSeconds > 0, (4...12).contains(codeLength) else {
+      throw DecodingError.dataCorruptedError(forKey: .status, in: c, debugDescription: "unexpected email start reply")
+    }
+  }
+
+  private enum CodingKeys: String, CodingKey { case status, expiresInSeconds, codeLength }
+}
+
+/// The refusals of `/v1/auth/email/start` and `/verify`, from their error
+/// bodies (`{ error, attemptsLeft?, retryAfterSeconds? }`).
+enum BackendEmailSignInError: Error, Equatable, Sendable {
+  /// 400: the server did not accept the address or the code shape.
+  case invalidRequest
+  /// 401 `invalid_code`.
+  case wrongCode(attemptsLeft: Int)
+  /// 410 `expired_or_unknown`: no live code for this address.
+  case expired
+  /// 429 `too_many_attempts` on verify: the code is spent.
+  case tooManyAttempts
+  /// 429 `too_many_requests` on start.
+  case rateLimited(retryAfterSeconds: Int?)
+  /// 503 `email_signin_off` or `email_send_failed`.
+  case unavailable
+}
+
+struct BackendEmailErrorBody: Decodable, Sendable {
+  let error: String
+  let attemptsLeft: Int?
+  let retryAfterSeconds: Int?
 }
 
 // MARK: - iCal Feed (IC1)

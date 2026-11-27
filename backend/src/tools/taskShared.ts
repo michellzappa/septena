@@ -8,7 +8,7 @@ import { deriveConversation, taskViewMembership, type CoreConversation, type Cor
 // disagree on what "Today" or "pending reasoning" means.
 
 export type TaskView =
-  | "today" | "inbox" | "review" | "anytime" | "upcoming" | "completed" | "faded";
+  | "today" | "inbox" | "review" | "anytime" | "upcoming" | "completed" | "faded" | "waiting";
 
 export interface TaskOut {
   id: string;
@@ -16,14 +16,23 @@ export interface TaskOut {
   status: string;
   today: boolean;
   starred?: boolean;
+  /// The user does this task now (docs/DO_SPEC.md §6).
+  doing?: true;
   tags?: string[];
   scheduled?: string;
   startTime?: string;
   durationMinutes?: number;
   timeZone?: string;
   deadline?: string;
+  // The deadline the user planned past (docs/TASK_DATES_SPEC.md I8).
+  deferredDeadline?: string;
+  // Who the task waits on, and since which day (docs/REVIEW_SPEC.md §6).
+  waitingOn?: string;
+  waitingSince?: string;
   area?: string;
   project?: string;
+  // The id of the project heading the task is filed under (a heading row).
+  heading?: string;
   completedAt?: string;
   notes?: string;
   // Day stamps (YYYY-MM-DD) that date a task's arrival on Today — the inputs
@@ -58,8 +67,7 @@ export interface TaskOut {
   checklistDoneCount?: number;
   // Derived on output by `annotate` (absent = false / 0):
   // `inbox` = the row sits in Today's Inbox section in the app.
-  // `daysOnToday` = days the row has carried over on Today undone; the app
-  // darkens the checkbox one seventh per day (SeptenaCore todayTenureFill).
+  // `daysOnToday` = days the row has carried over on Today undone.
   inbox?: true;
   daysOnToday?: number;
   reviewNote?: string;
@@ -140,6 +148,7 @@ export function coreTask(t: TaskOut): CoreTask {
     createdAt: t.createdAt !== undefined ? new Date(t.createdAt).toISOString() : null,
     scheduled: t.scheduled ?? null,
     deadline: t.deadline ?? null,
+    deferredDeadline: t.deferredDeadline ?? null,
     today: t.today,
     todaySetOn: t.todaySetOn ?? null,
     source: t.source ?? null,

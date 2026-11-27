@@ -155,7 +155,9 @@ private struct TaskCardChrome: ViewModifier {
   func body(content: Content) -> some View {
     let shape = effectiveShape
     content
-      .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+      // Top, not center: while the row's height animates, its content stays on
+      // the top edge instead of drifting with the middle (`geometryGroup`).
+      .frame(minWidth: 0, maxWidth: .infinity, alignment: .topLeading)
       .clipShape(shape)
       .environment(\.rowHInset, TaskCardMetrics.contentInset)
       .background(alignment: .bottom) {
@@ -222,6 +224,10 @@ private struct TaskCardChrome: ViewModifier {
       }
       .padding(.horizontal, TaskCardMetrics.margin)
       .padding(.bottom, position.trailingGap)
+      // Title, checkbox and card surface move as ONE piece when the list
+      // shifts. Without it every leaf animates its own position, and the
+      // titles drift away from their rows.
+      .geometryGroup()
       #if os(macOS)
       .onHover { hovered = $0 }
       #endif
@@ -286,7 +292,8 @@ extension View {
   /// footer spacing. A custom `SelectableScrollList` needs no native List
   /// separator/inset overrides.
   func asListRow() -> some View {
-    frame(maxWidth: .infinity, alignment: .leading)
+    frame(maxWidth: .infinity, alignment: .topLeading)
+      .geometryGroup()
   }
 
   /// Selectable task-row chrome and interaction routing.
@@ -296,7 +303,47 @@ extension View {
 
   /// Non-interactive decorative content within a task list.
   func plainListChrome() -> some View {
-    frame(maxWidth: .infinity, alignment: .leading)
+    frame(maxWidth: .infinity, alignment: .topLeading)
+      .geometryGroup()
+  }
+}
+
+// MARK: - Row exit
+
+/// How a row (or a group header) leaves a task list. The rows below slide up on
+/// the same transaction, and the leaving row's bottom edge rises on that same
+/// curve, so the two edges stay together: no gap opens in the card, and the old
+/// title never shows through the row that slides over it.
+///
+/// A row that is alone in its card, and a header, also fade: nothing slides
+/// over them from the same card. Arrivals fade in.
+struct TaskListRowExit: Transition {
+  var fades = false
+
+  func body(content: Content, phase: TransitionPhase) -> some View {
+    content
+      .clipShape(TaskListRowExitClip(remaining: phase == .didDisappear ? 0 : 1))
+      .opacity(phase == .willAppear || (fades && phase == .didDisappear) ? 0 : 1)
+  }
+}
+
+/// Clips the bottom edge only. The other edges sit far outside the row, so the
+/// insertion mark and the open editor's shadow are never cut.
+private struct TaskListRowExitClip: Shape {
+  var remaining: CGFloat
+  private static let outset: CGFloat = 200
+
+  var animatableData: CGFloat {
+    get { remaining }
+    set { remaining = newValue }
+  }
+
+  func path(in rect: CGRect) -> Path {
+    let bottom = remaining >= 1 ? rect.height + Self.outset : rect.height * max(0, remaining)
+    return Path(CGRect(x: rect.minX - Self.outset,
+                       y: rect.minY - Self.outset,
+                       width: rect.width + Self.outset * 2,
+                       height: bottom + Self.outset))
   }
 }
 
@@ -311,8 +358,9 @@ enum MagicPlusDropKind: Equatable {
   /// makes a new task.
   case taskSection(label: String)
   /// A place on the Tasks index (list root), where the orb makes only
-  /// Projects and Areas. `edge` says which insertion points the zone offers.
-  case listInsert(edge: MagicPlusInsertEdge)
+  /// Projects and Areas. `edge` says which insertion points the zone offers;
+  /// `isArea` and `label` tell the user live what releasing here will create.
+  case listInsert(edge: MagicPlusInsertEdge, isArea: Bool, label: String)
 }
 
 /// The insertion points a Tasks index zone offers (`MagicPlusDropKind.listInsert`).
@@ -476,9 +524,21 @@ final class MagicPlusDragState {
       let d = abs(gaps[k].y - probeY)
       if d < bestDistance { bestDistance = d; bestIndex = k }
     }
-    if let open, open != bestIndex,
-       abs(gaps[open].y - probeY) - bestDistance < 10 {
-      return
+    if let open, open != bestIndex {
+      // Homepage list-insert slots sit ~24pt apart across the 14pt card gap
+      // (last project in Area A vs. New Area before Area B), so use a tighter
+      // 4pt hysteresis there while keeping 10pt for task lists.
+      let hysteresis: CGFloat
+      if case .listInsert = gaps[open].kind {
+        hysteresis = 4
+      } else if case .listInsert = gaps[bestIndex].kind {
+        hysteresis = 4
+      } else {
+        hysteresis = 10
+      }
+      if abs(gaps[open].y - probeY) - bestDistance < hysteresis {
+        return
+      }
     }
     let g = gaps[bestIndex]
     if bestIndex == open { return }
@@ -521,10 +581,12 @@ final class MagicPlusDragState {
       case .taskSection:
         points.append(Gap(y: frame.maxY, id: zone.id, kind: zone.kind,
                           before: true, frame: frame, rank: 1))
-      case .listInsert(let edge):
+      case .listInsert(let edge, _, _):
         // Tasks index points never merge: the card gap between "end of this
-        // area" and "new Area" is 14pt, under the 16pt merge distance, and
-        // both are real places. The line's inset tells them apart.
+        // area" and "new Area before next card" is 14pt, under the 16pt merge
+        // distance, and both are real places. Pull `.bottom` 6pt inside the
+        // row and `.top` 4pt inside the next card so the two hit targets sit
+        // ~24pt apart and feel distinct under a fingertip.
         switch edge {
         case .both:
           listPoints.append(Gap(y: frame.minY, id: zone.id, kind: zone.kind,
@@ -532,10 +594,10 @@ final class MagicPlusDragState {
           listPoints.append(Gap(y: frame.maxY, id: zone.id, kind: zone.kind,
                                 before: false, frame: frame, rank: 2))
         case .top:
-          listPoints.append(Gap(y: frame.minY, id: zone.id, kind: zone.kind,
+          listPoints.append(Gap(y: frame.minY + 4, id: zone.id, kind: zone.kind,
                                 before: true, frame: frame, rank: 0))
         case .bottom:
-          listPoints.append(Gap(y: frame.maxY, id: zone.id, kind: zone.kind,
+          listPoints.append(Gap(y: frame.maxY - 6, id: zone.id, kind: zone.kind,
                                 before: false, frame: frame, rank: 2))
         case .belowGap(let gap):
           listPoints.append(Gap(y: frame.maxY + gap, id: zone.id, kind: zone.kind,
@@ -718,6 +780,11 @@ struct MagicPlusListInsertModifier: ViewModifier {
   @State private var box = FrameBox()
   let id: String
   let edge: MagicPlusInsertEdge
+  /// Whether releasing here creates an Area (`true`) or a Project (`false`).
+  let isArea: Bool
+  /// Self-explanatory live label shown on the insertion mark (e.g. "New Area",
+  /// "New Project in Home").
+  let label: String
   /// Leading inset of the line: a Project line starts past the icon column,
   /// an Area line spans the card.
   let lineInset: CGFloat
@@ -733,7 +800,7 @@ struct MagicPlusListInsertModifier: ViewModifier {
 
   private func register() {
     guard let drag, active, box.rect != .zero else { return }
-    drag.register(id: id, kind: .listInsert(edge: edge), priority: 2,
+    drag.register(id: id, kind: .listInsert(edge: edge, isArea: isArea, label: label), priority: 2,
                   frame: box.rect, onDrop: onDrop)
   }
 
@@ -760,15 +827,57 @@ struct MagicPlusListInsertModifier: ViewModifier {
         .onDisappear { drag.unregister(id: id) }
         .overlay(alignment: hoverBefore == true ? .top : .bottom) {
           if hoverBefore != nil {
-            TaskInsertionMark()
-              .padding(.leading, lineInset)
-              .offset(y: lineOffset)
+            ZStack(alignment: .leading) {
+              TaskInsertionMark()
+                .padding(.leading, lineInset)
+              if !label.isEmpty {
+                MagicPlusInsertBadge(isArea: isArea, label: label)
+                  .padding(.leading, max(TaskCardMetrics.margin, lineInset))
+              }
+            }
+            .offset(y: lineOffset)
+            .allowsHitTesting(false)
           }
         }
+        .zIndex(hoverBefore != nil ? 10 : 0)
         .a11yAnimation(.snappy(duration: 0.15), value: hoverBefore)
     } else {
       content
     }
+  }
+}
+
+/// Compact pill drawn on a Tasks index insertion bar while dragging Magic Plus
+/// so the user can tell at a glance whether releasing here creates an Area or a
+/// Project (and inside which Area).
+private struct MagicPlusInsertBadge: View {
+  let isArea: Bool
+  let label: String
+
+  var body: some View {
+    let appearance = AppearancePreferences.shared
+    let fill = appearance.magicPlusSwiftUIColor
+    let ink = appearance.magicPlusInkSwiftUIColor
+    HStack(spacing: 5) {
+      if isArea {
+        Circle()
+          .fill(ink)
+          .frame(width: 5.5, height: 5.5)
+      } else {
+        Circle()
+          .stroke(ink, lineWidth: 1.5)
+          .frame(width: 8, height: 8)
+      }
+      Text(label)
+        .scaledFont(size: 11, weight: .semibold)
+        .foregroundStyle(ink)
+        .lineLimit(1)
+    }
+    .padding(.horizontal, 8)
+    .padding(.vertical, 3)
+    .background(Capsule().fill(fill))
+    .shadow(color: .black.opacity(0.16), radius: 4, y: 1)
+    .allowsHitTesting(false)
   }
 }
 
@@ -782,14 +891,228 @@ extension View {
   func magicPlusListInsert(
     id: String,
     edge: MagicPlusInsertEdge,
+    isArea: Bool = false,
+    label: String = "",
     lineInset: CGFloat = 0,
     active: Bool,
     onDrop: @escaping (_ before: Bool) -> Void
   ) -> some View {
-    modifier(MagicPlusListInsertModifier(id: id, edge: edge, lineInset: lineInset,
-                                         active: active, onDrop: onDrop))
+    modifier(MagicPlusListInsertModifier(id: id, edge: edge, isArea: isArea, label: label,
+                                         lineInset: lineInset, active: active, onDrop: onDrop))
   }
 }
+
+#if os(iOS)
+/// Floating circular Magic Plus orb shared by the iPhone root stack and the
+/// iPad split sidebar:
+/// - Solid accent circle + subtle 3×2 grip dots beneath `+` communicates a
+///   grabbable object rather than a flat tap-only button.
+/// - Tap makes a task on a task list, opens `New Task` / `New Section` on a
+///   Project, `New Task` / `New Project` on an Area, or `New Project` /
+///   `New Area` / `Join a Shared Project…` on the homepage/sidebar.
+/// - Instant drag (no hold delay) hides the orb, reveals a cancel socket (`×`),
+///   and shows the insertion line (with live `New Area` / `New Project` badge
+///   on the homepage/sidebar).
+struct MagicPlusOrb: View {
+  let drag: MagicPlusDragState
+  @State private var showingMenu = false
+  /// New Task was picked in the menu. The task starts when the popover is gone:
+  /// a popover that closes takes the keyboard away from the new title field.
+  @State private var newTaskAfterMenu = false
+  /// Finger-down state: the orb sinks while touched, so the press reads as
+  /// received before the tap even ends.
+  @GestureState private var isPressed = false
+  /// Bumped on each tap: drives the release pop (grow, then settle back).
+  @State private var popTick = 0
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+  let isViewingProject: Bool
+  var isViewingArea: Bool = false
+  let isViewingHome: Bool
+  let onNewTask: () -> Void
+  let onNewSection: () -> Void
+  let onNewProject: () -> Void
+  let onNewArea: () -> Void
+  var onJoinShared: (() -> Void)? = nil
+
+  private var opensQuickMenuOnTap: Bool {
+    isViewingHome || isViewingProject || isViewingArea
+  }
+
+  var body: some View {
+    let appearance = AppearancePreferences.shared
+    let accent = appearance.magicPlusSwiftUIColor
+    let ink = appearance.magicPlusInkSwiftUIColor
+
+    // Keep both the resting "+" orb and the cancel socket inside one stable
+    // ZStack (toggling opacity/scale, never swapping container identity) so
+    // SwiftUI's active DragGesture never drops mid-drag.
+    ZStack {
+      ZStack {
+        Circle()
+          .fill(accent.gradient)
+          .overlay(
+            Circle()
+              .strokeBorder(ink.opacity(0.22), lineWidth: 0.75)
+          )
+          .shadow(color: .black.opacity(0.28), radius: 10, y: 4)
+        VStack(spacing: 4) {
+          Image(systemName: "plus")
+            .scaledFont(size: 21, weight: .bold)
+            .foregroundStyle(ink)
+          gripDots(ink: ink)
+        }
+        .offset(y: 2)
+      }
+      .scaleEffect(isPressed && !drag.isDragging ? 0.88 : 1)
+      .a11yAnimation(.spring(response: 0.22, dampingFraction: 0.6), value: isPressed)
+      .keyframeAnimator(initialValue: CGFloat(1), trigger: popTick) { content, scale in
+        content.scaleEffect(scale)
+      } keyframes: { _ in
+        SpringKeyframe(1.14, duration: 0.12, spring: .snappy)
+        SpringKeyframe(1, duration: 0.32, spring: .bouncy)
+      }
+      .opacity(drag.isDragging ? 0 : 1)
+      .scaleEffect(drag.isDragging ? 0.75 : 1)
+
+      ZStack {
+        Color.clear
+        Image(systemName: "xmark")
+          .scaledFont(size: 18, weight: .semibold)
+          .foregroundStyle(drag.isOverCancelSocket ? Color.red : Color.secondary)
+      }
+      .glassCircle(tint: drag.isOverCancelSocket ? .red : nil)
+      .opacity(drag.isDragging ? 1 : 0)
+      .scaleEffect(drag.isDragging ? (drag.isOverCancelSocket ? 1.08 : 0.94) : 0.75)
+    }
+    .frame(width: 58, height: 58)
+    .contentShape(Circle())
+    .a11yAnimation(.snappy(duration: 0.2), value: drag.isDragging)
+    .a11yAnimation(.snappy(duration: 0.18), value: drag.isOverCancelSocket)
+    .onGeometryChange(for: CGRect.self, of: { $0.frame(in: .global) }) { rect in
+      drag.homeCenter = CGPoint(x: rect.midX, y: rect.midY)
+    }
+    .onTapGesture {
+      guard !drag.isDragging else { return }
+      Haptics.press()
+      if !reduceMotion { popTick += 1 }
+      if opensQuickMenuOnTap { showingMenu = true } else { onNewTask() }
+    }
+    .simultaneousGesture(
+      DragGesture(minimumDistance: 0)
+        .updating($isPressed) { _, pressed, _ in pressed = true }
+    )
+    .simultaneousGesture(
+      DragGesture(minimumDistance: 8, coordinateSpace: .global)
+        .onChanged { value in
+          if !drag.isDragging {
+            showingMenu = false
+            drag.beginDrag(at: value.location)
+          } else {
+            drag.updateDrag(at: value.location)
+          }
+        }
+        .onEnded { value in
+          drag.endDrag(at: value.location)
+        }
+    )
+    .accessibilityAddTraits(.isButton)
+    .accessibilityLabel("New")
+    .accessibilityHint(isViewingHome
+      ? Text("Tap for a new project or area, or drag onto a list position.")
+      : isViewingProject
+        ? Text("Tap for a new task or section, or drag onto a list position.")
+        : isViewingArea
+          ? Text("Tap for a new task or project, or drag onto a list position.")
+          : Text("Tap for a new task, or drag onto a list position."))
+    .popover(isPresented: $showingMenu, attachmentAnchor: .rect(.bounds), arrowEdge: .bottom) {
+      quickMenu
+        .presentationCompactAdaptation(.popover)
+        .onDisappear {
+          guard newTaskAfterMenu else { return }
+          newTaskAfterMenu = false
+          onNewTask()
+        }
+    }
+  }
+
+  /// Subtle 3×2 tactile grip dots beneath `+` signaling the orb can be dragged.
+  private func gripDots(ink: Color) -> some View {
+    VStack(spacing: 2.5) {
+      ForEach(0..<2, id: \.self) { _ in
+        HStack(spacing: 3) {
+          ForEach(0..<3, id: \.self) { _ in
+            Circle()
+              .fill(ink.opacity(0.55))
+              .frame(width: 2.5, height: 2.5)
+          }
+        }
+      }
+    }
+    .accessibilityHidden(true)
+  }
+
+  private var quickMenu: some View {
+    VStack(alignment: .leading, spacing: 2) {
+      if isViewingHome {
+        menuRow(title: RegistryActions.title(.sidebarNewProject), icon: "number") {
+          showingMenu = false
+          onNewProject()
+        }
+        menuRow(title: RegistryActions.title(.sidebarNewArea), icon: "square.stack.3d.up") {
+          showingMenu = false
+          onNewArea()
+        }
+        if let onJoinShared {
+          menuRow(title: RegistryActions.title(.sidebarJoinShared),
+                  icon: RegistryIcons.sfSymbol(for: "action.share_project")) {
+            showingMenu = false
+            onJoinShared()
+          }
+        }
+      } else {
+        menuRow(title: RegistryActions.title(.appNewTask), icon: "checkmark.circle") {
+          newTaskAfterMenu = true
+          showingMenu = false
+        }
+        if isViewingProject {
+          menuRow(title: RegistryActions.title(.sectionNew), icon: "rectangle.split.1x2") {
+            showingMenu = false
+            onNewSection()
+          }
+        } else if isViewingArea {
+          menuRow(title: RegistryActions.title(.areaNewProject), icon: "number") {
+            showingMenu = false
+            onNewProject()
+          }
+        }
+      }
+    }
+    .padding(.vertical, 8)
+    .padding(.horizontal, 6)
+    .frame(minWidth: 196)
+  }
+
+  private func menuRow(title: String, icon: String, action: @escaping () -> Void) -> some View {
+    Button(action: action) {
+      HStack(spacing: 12) {
+        Image(systemName: icon)
+          .scaledFont(size: 16, weight: .medium)
+          .foregroundStyle(AppearancePreferences.shared.accentSwiftUIColor)
+          .frame(width: 22)
+        Text(title)
+          .font(.septenaSidebarRow)
+          .foregroundStyle(.primary)
+        Spacer(minLength: 8)
+      }
+      .padding(.horizontal, 12)
+      .padding(.vertical, 10)
+      .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+  }
+}
+#endif
 
 /// Pass-through wrapper that registers a `magicPlusSectionDrop` only when a
 /// non-nil `onDropIDs` closure is supplied.

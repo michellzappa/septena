@@ -16,23 +16,25 @@ import {
   type EntitySpec,
   type RefSnapshot,
 } from "./columns.js";
-import { CoreInputError, findIssueRefs, parseRef, taskRefId, type CoreRef } from "../core/index.js";
+import { CoreInputError, doEndWins, findIssueRefs, parseRef, resolveDoSessions, taskRefId, type CoreDoSession, type CoreRef } from "../core/index.js";
 import type { Op, OpResult, PullResult, PushResult, Turn } from "./ops.js";
 import type { EntitlementRow } from "../entitlement/entitlement.js";
 import type { IcalTask } from "../ical.js";
 import { DOMAIN_RULES, ENTITY_LIMITS, TURN_FIELDS } from "../generated/registries.js";
 import { MCP_REFRESH_TTL_S } from "../shadow/tokens.js";
 import { logEvent, randomId } from "../util.js";
+import { REFUSALS, type RefusalCode } from "../errors.js";
 import {
-  sendAgentQuestionPushes,
-  type AgentQuestionPush,
+  sendAgentPushes,
+  type AgentPush,
   type PushPlatform,
   type PushTokenRow,
 } from "../api/apns.js";
 import {
   MAX_AGENT_WEBHOOKS,
   SSE_HEARTBEAT_MS,
-  deliverWebhookEvent,
+  deliverWebhookWithRetry,
+  WEBHOOK_RETRY_DELAYS_MS,
   formatSseEvent,
   formatSseKeepalive,
   formatSseReady,
@@ -45,6 +47,7 @@ import {
   SHARED_FIELDS,
   SHARED_PROJECT_ROW,
   ShareBook,
+  isSharedEntity,
   newSharedRowId,
   sharedColumn,
   type ShareDelivery,
@@ -54,7 +57,8 @@ import {
   type ShareValue,
   type SharedEntity,
 } from "./shares.js";
-import { SESSION_HEADER, SessionBook, type RenewResult, type SessionGrant } from "./sessions.js";
+import { mergeNotes } from "./mergeText.js";
+import { AGENT_KEY_CLIENT, AGENT_KEY_CLIENT_NAME, AGENT_KEY_EXPIRES_AT, SESSION_HEADER, SessionBook, type RenewResult, type SessionGrant } from "./sessions.js";
 
 /// Task fields only the app writes (docs/TASK_FADE_SPEC.md §3): the fade
 /// clock and its outcome. An agent cannot keep a task alive by touching it.
@@ -77,11 +81,14 @@ export interface AccountSummary {
   files: number;
   fileBytes: number;
   devices: { client: string | null; version: string | null; firstSeen: number; lastSeen: number }[];
+  /// Each version a device ran in the last 90 days, one row per device and
+  /// version (`device_versions`). Optional: summaries from before it lack it.
+  versions?: { client: string | null; version: string; firstSeen: number; lastSeen: number }[];
   agents: { client: string; since: number; lastUsed: number }[];
   agentChangesWeek: number;
   webhooks: number;
   failingWebhooks: number;
-  entitlements: Pick<EntitlementRow, "id" | "source" | "productId" | "expiresAt" | "status" | "environment" | "signedAt">[];
+  entitlements: Pick<EntitlementRow, "id" | "source" | "productId" | "expiresAt" | "status" | "plan" | "environment" | "signedAt">[];
 }
 
 /// `GET /v1/access`: every place the account is signed in.
@@ -112,18 +119,30 @@ export interface ChangeEntry {
 /// not a transient error to retry.
 export type ClaimRefusal =
   | "not_found" | "closed" | "terminal" | "stopped" | "paused"
-  | "your_turn" | "held" | "budget";
+  | "your_turn" | "held" | "budget" | "doing";
 
 export type ClaimResult =
   | { ok: true; holder: string; claimUntil: string; renewed: boolean; runsSinceUser: number }
   | { ok: false; reason: ClaimRefusal; holder?: string; claimUntil?: string };
+
+/// What the user does now (docs/DO_SPEC.md §7). A stale Do is still here.
+export interface Doing {
+  sessionId: string;
+  taskId: string;
+  title: string;
+  startedAt: string;
+  plannedMinutes: number | null;
+  confirmedAt: string | null;
+  staleAt: string;
+  isStale: boolean;
+}
 
 /// One thing an agent may need to react to. A pointer, never content: the
 /// agent reads the task itself, so text in a task can never arrive as an
 /// order through this feed.
 export interface AgentEvent {
   rev: number;
-  kind: "assigned" | "user_turn" | "stopped" | "resumed" | "paused" | "unpaused";
+  kind: "assigned" | "user_turn" | "stopped" | "resumed" | "paused" | "unpaused" | "do_started" | "do_ended";
   taskId: string | null;
   at: string;
 }
@@ -149,18 +168,16 @@ export interface AgentWebhookCreated extends AgentWebhookPublic {
 export const isAgentActor = (actor: string) => actor.startsWith("mcp:");
 
 /// Guidance attached to agent write refusals, so any connector or runner knows
-/// the rule instead of retrying (ADR 0008).
-export const AGENT_WRITE_RULES: Record<string, string> = {
-  stopped: "The user stopped agent work on this task. Do not write to it; only the user can resume it.",
-  stale:
-    "The notes changed since you read them. Read `current`, then write again on top of it with its noteRev as baseNoteRev.",
-  brief_is_users:
-    "The text above `## Log` is the user's brief. Append a dated entry under `## Log`, or propose a new brief for the user to accept.",
-  paused: "The user paused all agents. Do not write; only the user can unpause.",
-  "retired:context": "Project context is retired (ADR 0012). Write the project's notes instead.",
-  human_accepts:
-    "Only the user marks an agent-worked task done. Call tasks_set_endstate with endState \"needs_verify\" and a note describing what to check.",
-};
+/// the rule instead of retrying (ADR 0008). The text is the hint of the one
+/// refusal table (src/errors.ts).
+const AGENT_WRITE_CODES = [
+  "stopped", "stale", "brief_is_users", "paused", "retired:context", "human_only_do", "human_accepts",
+  "human_ends", "in_review", "note_required", "closed", "human_only:assignee",
+  "human_only:stoppedAt", "human_only:agentsPaused",
+] as const satisfies readonly RefusalCode[];
+export const AGENT_WRITE_RULES: Record<string, string> = Object.fromEntries(
+  AGENT_WRITE_CODES.map((code) => [code, REFUSALS[code].hint]),
+);
 
 /// Lease bounds for a claim. An agent that stops writing loses the task when
 /// the lease ends; the maximum keeps a crashed run from holding it for long.
@@ -243,8 +260,25 @@ export const DEVICE_SLOT_INACTIVE_MS = 14 * DAY_MS;
 export const DEVICE_SLOT_MOVE_COOLDOWN_MS = DAY_MS;
 const TOMBSTONE_TTL_MS = DOMAIN_RULES.tombstoneTtlDays * DAY_MS;
 const CLIENT_OP_TTL_MS = DOMAIN_RULES.clientOpTtlDays * DAY_MS;
+/// Idempotency keys (ADR 0050 §4): a key and its first result live 24 hours
+/// per account. A key whose call has not finished (no result) is taken over
+/// after IDEMPOTENCY_PENDING_MS, so a crashed call does not block its retry.
+/// At most IDEMPOTENCY_MAX_KEYS rows; the oldest go first.
+export const IDEMPOTENCY_TTL_MS = DAY_MS;
+export const IDEMPOTENCY_PENDING_MS = 2 * 60_000;
+export const IDEMPOTENCY_MAX_KEYS = 5_000;
+/// A result larger than this is not kept: a repeat runs the call again.
+export const IDEMPOTENCY_MAX_RESULT_BYTES = 512 * 1024;
+
+export type IdempotencyStart =
+  | { state: "new" }
+  | { state: "replay"; result: string }
+  | { state: "conflict" }
+  | { state: "in_progress" };
 /// A connection unused this long has an expired refresh token (src/shadow/tokens.ts).
 const CONNECTION_TTL_MS = MCP_REFRESH_TTL_S * 1000;
+/// How often a key in use moves its "last used".
+const AGENT_KEY_TOUCH_MS = 60 * 60 * 1000;
 /// How long the store remembers an item whose proposal the user turned down (#497).
 const DISMISSED_REF_TTL_MS = 365 * DAY_MS;
 const CHANGE_LOG_TTL_MS = DOMAIN_RULES.changeLogTtlDays * DAY_MS;
@@ -371,7 +405,23 @@ export class TaskStore extends DurableObject<Env> {
     );
     if (!changeCols.has("diff")) this.sql.exec("ALTER TABLE changes ADD COLUMN diff TEXT");
     if (!changeCols.has("reason")) this.sql.exec("ALTER TABLE changes ADD COLUMN reason TEXT");
+    const convoCols = new Set(
+      this.sql.exec<{ name: string }>("PRAGMA table_info(convos)").toArray().map((r) => r.name),
+    );
+    if (!convoCols.has("agentWorkAt")) this.sql.exec("ALTER TABLE convos ADD COLUMN agentWorkAt TEXT");
+    if (this.meta("reviewUnfadeV1") === 0) {
+      this.ctx.storage.transactionSync(() => {
+        this.unfadeWaiting();
+        this.setMeta("reviewUnfadeV1", 1);
+      });
+    }
     if (this.meta("notesV1") === 0) this.ctx.storage.transactionSync(() => this.migrateNotesV1());
+    if (this.meta("staleFadesV1") === 0) {
+      this.ctx.storage.transactionSync(() => {
+        this.endStaleFades();
+        this.setMeta("staleFadesV1", 1);
+      });
+    }
     if (this.meta("issueRefsV1") === 0) {
       // A store must open even when this fails. The next start tries again.
       try {
@@ -383,6 +433,73 @@ export class TaskStore extends DurableObject<Env> {
         logEvent("issue_refs_backfill_failed", { error: e instanceof CoreInputError ? e.message : "unexpected" });
       }
     }
+  }
+
+  /// Waiting (docs/REVIEW_SPEC.md §6): a write that starts a wait without a
+  /// day gets today's (UTC; clients send their own local day), and a write
+  /// that ends the wait clears its day. A change of who keeps the first day.
+  private stampWaiting(row: Record<string, unknown> | null, fields: Record<string, unknown>, names: string[]): void {
+    const who = typeof fields.waitingOn === "string" ? fields.waitingOn.trim() : "";
+    const add = (f: string) => { if (!names.includes(f)) names.push(f); };
+    if (!who) {
+      fields.waitingOn = null;
+      fields.waitingSince = null;
+      add("waitingSince");
+      return;
+    }
+    fields.waitingOn = who;
+    if (row?.waitingOn && row.waitingSince && !("waitingSince" in fields)) return;
+    if (typeof fields.waitingSince !== "string") {
+      fields.waitingSince = new Date().toISOString().slice(0, 10);
+      add("waitingSince");
+    }
+  }
+
+  /// True when an open row is marked faded and may not be
+  /// (docs/TASK_FADE_SPEC.md §4.1): it has a deadline, or a touch is newer
+  /// than the fade. The second case is a device that pushes an old fade over
+  /// a task the human touched since.
+  private fadeEnds(task: Record<string, unknown>): boolean {
+    if (!task.fadedAt || task.status !== "open") return false;
+    // A task that waits on a person never fades (ADR 0053).
+    if (task.waitingOn) return true;
+    // An unaccepted proposal expires with or without a date (ADR 0039).
+    if (task.deadline && !(task.source === "mcp" && !task.acknowledgedAt)) return true;
+    return !!task.touchedAt && Date.parse(task.touchedAt as string) > Date.parse(task.fadedAt as string);
+  }
+
+  /// True when a push fades a task that its device did not know well enough to
+  /// fade (docs/TASK_FADE_SPEC.md §4.1): the task was touched inside the fade
+  /// window, has a date ahead, or waits on the user or an agent. A push that
+  /// carries its own `touchedAt` knew the touch.
+  private fadeIsStale(taskId: string, row: Record<string, unknown>, fields: Record<string, unknown>): boolean {
+    if (typeof fields.fadedAt !== "string" || row.fadedAt) return false;
+    const at = Date.parse(fields.fadedAt);
+    if (!("touchedAt" in fields)) {
+      const touched = row.touchedAt as string | null;
+      if (touched && at - Date.parse(touched) < DOMAIN_RULES.fadeWindowDays * DAY_MS) return true;
+      const proposal = row.source === "mcp" && !row.acknowledgedAt && !touched;
+      const scheduled = row.scheduled as string | null;
+      if (scheduled && !proposal && scheduled > fields.fadedAt.slice(0, 10)) return true;
+    }
+    const convo = this.sql.exec<{ assignee: string | null; endState: string | null }>(
+      "SELECT assignee, endState FROM convos WHERE id = ? AND deletedAt IS NULL", taskId,
+    ).toArray()[0];
+    return !!row.waitingOn || convo?.assignee === "claude" || convo?.endState === "needs_verify" || this.awaitsHuman(taskId);
+  }
+
+  /// One time: ends the fade of every row `fadeEnds` is true for, so rows
+  /// written before the rule come back on every device.
+  endStaleFades(): number {
+    const now = new Date().toISOString();
+    const rows = this.sql.exec("SELECT * FROM tasks WHERE fadedAt IS NOT NULL AND deletedAt IS NULL").toArray()
+      .filter((r) => this.fadeEnds(r));
+    for (const r of rows) {
+      const rev = this.nextRev();
+      this.sql.exec("UPDATE tasks SET fadedAt = NULL, rev = ?, updatedAt = ? WHERE id = ?", rev, now, r.id);
+      this.log(rev, "task", r.id as string, "upsert", ["fadedAt"], null, "system:migration", now, { fadedAt: [r.fadedAt, null] });
+    }
+    return rows.length;
   }
 
   /// One time (docs/TASK_REFERENCES_SPEC.md §6.6, ADR 0033): every task whose
@@ -473,7 +590,6 @@ export class TaskStore extends DurableObject<Env> {
   ): { reason: string; current?: { notes: string | null; noteRev: number } } | null {
     const field = NOTE_FIELD[container];
     if (!(field in op.fields)) return null;
-    if (this.readSetting("agentsPaused") === true) return { reason: "paused" };
     if (!row) return null; // A new container has nothing to overwrite.
     const before = (row[field] as string | null) ?? null;
     const noteRev = (row.noteRev as number | null) ?? 0;
@@ -511,6 +627,10 @@ export class TaskStore extends DurableObject<Env> {
       CREATE TABLE IF NOT EXISTS client_ops (
         clientOpId TEXT PRIMARY KEY, result TEXT NOT NULL, at INTEGER NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS idempotency_keys (
+        key TEXT PRIMARY KEY, hash TEXT NOT NULL, result TEXT, at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idempotency_keys_at ON idempotency_keys(at);
       CREATE TABLE IF NOT EXISTS sessions (
         hash TEXT PRIMARY KEY, createdAt INTEGER NOT NULL, expiresAt INTEGER NOT NULL
       );
@@ -544,6 +664,11 @@ export class TaskStore extends DurableObject<Env> {
         sid TEXT PRIMARY KEY, client TEXT, firstSeen INTEGER NOT NULL,
         lastSeen INTEGER NOT NULL, slotAt INTEGER
       );
+      CREATE TABLE IF NOT EXISTS device_versions (
+        sid TEXT NOT NULL, client TEXT, version TEXT NOT NULL,
+        firstSeen INTEGER NOT NULL, lastSeen INTEGER NOT NULL,
+        PRIMARY KEY (sid, version)
+      );
       CREATE TABLE IF NOT EXISTS usage (
         key TEXT PRIMARY KEY, count INTEGER NOT NULL, updatedAt INTEGER NOT NULL
       );
@@ -575,6 +700,9 @@ export class TaskStore extends DurableObject<Env> {
     // The name the user gave an agent (pairing or Settings rename). Null =
     // the client's registered name.
     const connectionCols = this.sql.exec<{ name: string }>("PRAGMA table_info(connections)").toArray().map((r) => r.name);
+    // The plan a grant gives (ADR 0045); null = Plus.
+    const entitlementCols = this.sql.exec<{ name: string }>("PRAGMA table_info(entitlements)").toArray().map((r) => r.name);
+    if (!entitlementCols.includes("plan")) this.sql.exec("ALTER TABLE entitlements ADD COLUMN plan TEXT");
     // The app version a device last sent (`X-Septena-Version`).
     const deviceCols = this.sql.exec<{ name: string }>("PRAGMA table_info(devices)").toArray().map((r) => r.name);
     if (!deviceCols.includes("version")) this.sql.exec("ALTER TABLE devices ADD COLUMN version TEXT");
@@ -615,12 +743,15 @@ export class TaskStore extends DurableObject<Env> {
   /// Before/after per field for the change log. `before` is the decoded row
   /// (or null for an insert), `after` the pushed values. Only fields whose
   /// value actually changed are kept; long text is cut to keep the log small.
-  private diffFor(before: Record<string, unknown> | null, after: Record<string, unknown>): ChangeDiff {
+  /// `whole` keeps it: what a member of a shared project overwrote can be read
+  /// back here.
+  private diffFor(before: Record<string, unknown> | null, after: Record<string, unknown>, whole = false): ChangeDiff {
+    const keep = whole ? (v: unknown) => v : clipForLog;
     const out: ChangeDiff = {};
     for (const [name, next] of Object.entries(after)) {
       const prev = before ? (before[name] ?? null) : null;
       if (JSON.stringify(prev) === JSON.stringify(next ?? null)) continue;
-      out[name] = [clipForLog(prev), clipForLog(next ?? null)];
+      out[name] = [keep(prev), keep(next ?? null)];
     }
     return out;
   }
@@ -666,7 +797,7 @@ export class TaskStore extends DurableObject<Env> {
 
   push(ops: Op[], actor: string, reason: string | null = null): PushOutcome {
     const purgedAttachmentIds: string[] = [];
-    const agentQuestions: AgentQuestionPush[] = [];
+    const agentPushes: AgentPush[] = [];
     const prevRev = this.meta("rev");
     this.reason = reason;
     const sharing = this.shares.any();
@@ -678,7 +809,7 @@ export class TaskStore extends DurableObject<Env> {
       results = this.ctx.storage.transactionSync(() => ops.map((op) => {
         const seen = this.sql.exec<{ result: string }>("SELECT result FROM client_ops WHERE clientOpId = ?", op.clientOpId).toArray()[0];
         if (seen) return JSON.parse(seen.result) as OpResult;
-        const result = this.apply(op, actor, purgedAttachmentIds, agentQuestions);
+        const result = this.apply(op, actor, purgedAttachmentIds, agentPushes);
         this.sql.exec("INSERT INTO client_ops (clientOpId, result, at) VALUES (?, ?, ?)", op.clientOpId, JSON.stringify(result), Date.now());
         return result;
       }));
@@ -695,10 +826,13 @@ export class TaskStore extends DurableObject<Env> {
         if (events.length > 0) this.dispatchAgentEvents(events);
       }
     }
-    if (agentQuestions.length > 0) {
+    // During a Do the question or hand-off is in the lists and counts. Its push is not sent
+    // (docs/DO_SPEC.md §6).
+    const doing = agentPushes.length > 0 ? this.readDoing() : null;
+    if (agentPushes.length > 0 && (!doing || doing.isStale)) {
       const tokens = this.listPushTokens();
       if (tokens.length > 0) {
-        const delivery = this.dispatchAgentQuestionPushes(agentQuestions, tokens);
+        const delivery = this.dispatchAgentPushes(agentPushes, tokens);
         if (typeof this.ctx.waitUntil === "function") {
           this.ctx.waitUntil(delivery);
         } else {
@@ -713,7 +847,7 @@ export class TaskStore extends DurableObject<Env> {
     op: Op,
     actor: string,
     purgedAttachmentIds: string[],
-    agentQuestions: AgentQuestionPush[],
+    agentPushes: AgentPush[],
   ): OpResult {
     const now = new Date().toISOString();
     if (isAgentActor(actor)) {
@@ -725,7 +859,7 @@ export class TaskStore extends DurableObject<Env> {
           : { clientOpId: op.clientOpId, status: "rejected", reason: refusal };
       }
     }
-    if (op.op === "appendTurn") return this.appendTurn(op.clientOpId, op.taskId, op.turn, actor, now, agentQuestions);
+    if (op.op === "appendTurn") return this.appendTurn(op.clientOpId, op.taskId, op.turn, actor, now, agentPushes);
 
     const spec: EntitySpec = ENTITIES[op.entity];
     const row = this.sql.exec(`SELECT * FROM ${spec.table} WHERE id = ?`, op.id).toArray()[0];
@@ -758,6 +892,7 @@ export class TaskStore extends DurableObject<Env> {
         purgedAttachmentIds.push(...this.tombstoneAttachments(op.id, now));
         this.tombstoneChecklistItems(op.id, now);
         this.tombstoneTaskRefs(op.id, now);
+        this.tombstoneDoSessions(op.id, now);
       }
       if (op.entity === "taskRef" && !isAgentActor(actor)) {
         // A user's own removal wins over every automatic add (§6.6).
@@ -788,6 +923,10 @@ export class TaskStore extends DurableObject<Env> {
       return { clientOpId: op.clientOpId, status: "dropped", rev, reason: "deleted" };
     }
     if (names.length === 0) return { clientOpId: op.clientOpId, status: "noop" };
+    if (op.entity === "doSession") {
+      const settled = this.settleDoFields(op.fields, row as Record<string, unknown> | undefined, now);
+      names.splice(0, names.length, ...settled);
+    }
 
     if (!row) {
       const missing = spec.requiredOnInsert.filter((f) => op.fields[f] === undefined || op.fields[f] === null);
@@ -807,6 +946,12 @@ export class TaskStore extends DurableObject<Env> {
         if (count >= MAX_CHECKLIST_ITEMS_PER_TASK) {
           return { clientOpId: op.clientOpId, status: "rejected", reason: "checklist_limit_exceeded" };
         }
+      }
+      if (op.entity === "doSession") {
+        const task = this.sql.exec<{ kind: string | null }>(
+          "SELECT kind FROM tasks WHERE id = ? AND deletedAt IS NULL", op.fields.taskId as string,
+        ).toArray()[0];
+        if (!task || task.kind === "heading") return { clientOpId: op.clientOpId, status: "rejected", reason: "unknown_task" };
       }
       if (op.entity === "taskRef") {
         const taskId = op.fields.taskId as string;
@@ -858,13 +1003,29 @@ export class TaskStore extends DurableObject<Env> {
     }
 
     // `endStateAt` (server-owned) records when `endState` last changed, so
-    // Review can show how long a hand-off has waited.
-    if (op.entity === "convo" && "endState" in op.fields) {
+    // Review can show how long a hand-off has waited. An agent that changes
+    // what it handed over moves it too: an Accept of the earlier one is stale.
+    if (op.entity === "convo") {
       const previous = (row?.endState as string | null | undefined) ?? null;
-      if (((op.fields.endState as string | null | undefined) ?? null) !== previous) {
+      const changed = "endState" in op.fields && ((op.fields.endState as string | null | undefined) ?? null) !== previous;
+      const revised = isAgentActor(actor) && previous === "needs_verify" && this.handoffChanges(row as Record<string, unknown>, op.fields);
+      if (changed || revised) {
         op.fields.endStateAt = now;
         names.push("endStateAt");
       }
+    }
+
+    // Another device or member changed the notes since this writer read them.
+    if (op.base && row && "notes" in op.fields) {
+      op.fields.notes = mergeNotes(
+        op.base.notes, (row.notes as string | null) ?? null, (op.fields.notes as string | null) ?? null, ENTITY_LIMITS.notesMax,
+      );
+    }
+    if (op.entity === "task" && "waitingOn" in op.fields) this.stampWaiting(row as Record<string, unknown> | null, op.fields, names);
+    if (op.entity === "task"
+      && ((row && this.fadeIsStale(op.id, row as Record<string, unknown>, op.fields)) || this.fadeEnds({ ...row, ...op.fields }))) {
+      if (!names.includes("fadedAt")) names.push("fadedAt");
+      op.fields.fadedAt = null;
     }
 
     const rev = this.nextRev();
@@ -886,7 +1047,8 @@ export class TaskStore extends DurableObject<Env> {
       if (op.fields.status === "open") this.forgetTurnDown(op.id);
     }
     const before = row ? decodeRow(spec, row as Record<string, unknown>) : null;
-    this.log(rev, op.entity, op.id, "upsert", names, op.clientOpId, actor, now, this.diffFor(before, op.fields));
+    this.log(rev, op.entity, op.id, "upsert", names, op.clientOpId, actor, now,
+      this.diffFor(before, op.fields, sharing && this.isShared(op.entity, op.id)));
     if (noteContainer) {
       const field = NOTE_FIELD[noteContainer];
       const next = (op.fields[field] as string | null | undefined) ?? null;
@@ -904,11 +1066,28 @@ export class TaskStore extends DurableObject<Env> {
         ...(artifact?.refs ?? []), artifact?.body, artifact?.title, handoff?.payload, handoff?.instruction, endStateNote,
       ], actor, now);
     }
+    if (op.entity === "doSession" || (op.entity === "task" && ("status" in op.fields || "fadedAt" in op.fields))) {
+      this.resolveDo(actor, now, op.entity === "doSession" && !row ? op.id : null);
+    }
     if (isAgentActor(actor) && op.entity === "convo" && op.fields.endState === "needs_verify") {
       // Handing off to Review puts the ball in the human's court, so the claim ends.
       this.writeConvoServerFields(op.id, { claimedBy: null, claimUntil: null }, "release", actor, now, true);
     }
-    if (sharing) this.shareOut(op.entity, op.id, names);
+    if (isAgentActor(actor) && op.entity === "convo" && op.fields.endStateAt && op.fields.endStateNote
+      && (op.fields.endState ?? row?.endState) === "needs_verify") {
+      const title = this.sql.exec<{ title: string | null }>("SELECT title FROM tasks WHERE id = ?", op.id).toArray()[0]?.title;
+      agentPushes.push({ taskId: op.id, taskTitle: title ?? "", note: op.fields.endStateNote as string });
+    }
+    if (op.entity === "convo" && op.fields.endState === "needs_verify") this.unfadeForReview(op.id, actor, now);
+    if (op.entity === "convo" && (op.fields.assignee === "claude" || (isAgentActor(actor) && op.fields.endState === "needs_verify"))) {
+      this.setAgentWork(op.id, now);
+    } else if (op.entity === "convo" && "assignee" in op.fields && !isAgentActor(actor)) {
+      this.setAgentWork(op.id, null);
+    }
+    if (op.entity === "task" && !isAgentActor(actor) && op.fields.status === "done") {
+      this.endReview(op.id, actor, now);
+    }
+    if (sharing) this.shareOut(op.entity, op.id, names, before);
     return { clientOpId: op.clientOpId, status: "applied", rev };
   }
 
@@ -926,6 +1105,10 @@ export class TaskStore extends DurableObject<Env> {
     if (from && this.doomedShares.has(from) && (op.op === "delete" || moves)) return "shared_project";
     if (moves && this.shares.shared("task", op.id) && this.shares.forProject(from)?.role !== "owner") return "shared_move_out";
     return null;
+  }
+
+  private isShared(entity: string, id: string): boolean {
+    return isSharedEntity(entity) && this.shares.shared(entity, id) !== null;
   }
 
   private rowOf(entity: SharedEntity, id: string): Record<string, unknown> | null {
@@ -946,22 +1129,23 @@ export class TaskStore extends DurableObject<Env> {
   }
 
   /// Queues one applied local write for the ProjectStore. `names`: the
-  /// changed fields, or null for a delete.
-  private shareOut(entity: string, id: string, names: string[] | null): void {
+  /// changed fields, or null for a delete. `before`: the row it changed.
+  private shareOut(entity: string, id: string, names: string[] | null, before: Record<string, unknown> | null = null): void {
+    const baseNotes = before && names?.includes("notes") ? ((before.notes as string | null) ?? null) : undefined;
     if (entity === "project") {
       const share = this.shares.forProject(id);
       const fields = (names ?? []).filter((n) => SHARED_FIELDS.project.includes(n));
       if (share && fields.length) {
-        this.shares.enqueue(share.id, "project", SHARED_PROJECT_ROW, false, this.outFields("project", this.rowOf("project", id)!, fields));
+        this.shares.enqueue(share.id, "project", SHARED_PROJECT_ROW, false, this.outFields("project", this.rowOf("project", id)!, fields), baseNotes);
       }
     } else if (entity === "task") {
-      this.shareOutTask(id, names);
+      this.shareOutTask(id, names, baseNotes);
     } else if (entity === "checklistItem") {
       this.shareOutItem(id, names);
     }
   }
 
-  private shareOutTask(id: string, names: string[] | null): void {
+  private shareOutTask(id: string, names: string[] | null, baseNotes?: string | null): void {
     const mapping = this.shares.shared("task", id);
     if (names === null) {
       if (mapping) this.shares.enqueue(mapping.shareId, "task", mapping.sharedId, true, {});
@@ -973,7 +1157,7 @@ export class TaskStore extends DurableObject<Env> {
     if (!share) return;
     if (mapping && mapping.shareId === share.id) {
       const fields = names.filter((n) => SHARED_FIELDS.task.includes(n));
-      if (fields.length) this.shares.enqueue(share.id, "task", mapping.sharedId, false, this.outFields("task", row, fields));
+      if (fields.length) this.shares.enqueue(share.id, "task", mapping.sharedId, false, this.outFields("task", row, fields), baseNotes);
       return;
     }
     this.shareTaskIn(share.id, id, row);
@@ -1088,11 +1272,30 @@ export class TaskStore extends DurableObject<Env> {
     this.ctx.waitUntil(this.drainShares());
   }
 
+  /// The alarm before the work: an object that stops in the middle sends the
+  /// rest when it fires. `housekeepAt` keeps the daily run where it was.
+  private async armShareAlarm(): Promise<void> {
+    const at = await this.ctx.storage.getAlarm();
+    const retry = Date.now() + SHARE_RETRY_MS;
+    if (at !== null && at <= retry) return;
+    if (at !== null) this.setMeta("housekeepAt", at);
+    await this.ctx.storage.setAlarm(retry);
+  }
+
+  /// Nothing is left to send.
+  private async disarmShareAlarm(): Promise<void> {
+    const at = this.meta("housekeepAt");
+    if (!at) return;
+    this.setMeta("housekeepAt", 0);
+    await this.ctx.storage.setAlarm(Math.max(at, Date.now()));
+  }
+
   async drainShares(): Promise<void> {
-    if (this.drainingShares) return;
+    if (this.drainingShares || !this.shares.pendingShares().length) return;
     this.drainingShares = true;
     let failed = false;
     try {
+      await this.armShareAlarm();
       for (const shareId of this.shares.pendingShares()) {
         const share = this.shares.get(shareId);
         if (!share) { this.shares.remove(shareId); continue; }
@@ -1101,25 +1304,24 @@ export class TaskStore extends DurableObject<Env> {
             const res = await projectStoreFor(this.env, shareId).push(share.userId, batch.ops);
             if (!res.ok) {
               // The membership ended. Its notice may still be on the way.
-              await this.receiveShare({ shareId, userId: share.userId, state: "ended", keepCopy: share.role === "owner" });
+              await this.receiveShare({ shareId, userId: share.userId, state: "ended", keepCopy: res.keepCopy || share.role === "owner" });
               break;
             }
             this.shares.sent(shareId, batch.through);
           }
           for (let ids = this.shares.maskedRows(shareId); ids.length; ids = this.shares.maskedRows(shareId)) {
-            const rows = await projectStoreFor(this.env, shareId).rows(share.userId, ids);
-            if (!rows) {
-              await this.receiveShare({ shareId, userId: share.userId, state: "ended", keepCopy: share.role === "owner" });
+            const found = await projectStoreFor(this.env, shareId).rows(share.userId, ids);
+            if (!found.ok) {
+              await this.receiveShare({ shareId, userId: share.userId, state: "ended", keepCopy: found.keepCopy || share.role === "owner" });
               break;
             }
-            for (const { entity, id } of ids) {
-              if (!rows.some((r) => r.entity === entity && r.id === id)) this.shares.took(shareId, entity, id, 0, false);
-            }
+            const { rows } = found;
             // Deliver them like any other rows. A write that came in
             // meanwhile masks its row again; it is sent first, next round.
             const before = this.meta("rev");
             const purged: string[] = [];
             this.ctx.storage.transactionSync(() => {
+              this.shares.unmask(shareId, ids);
               for (const row of rows) this.applyShared(shareId, share.localProjectId, row, purged);
             });
             if (this.meta("rev") > before) this.broadcast(this.meta("rev"));
@@ -1134,8 +1336,9 @@ export class TaskStore extends DurableObject<Env> {
     } finally {
       this.drainingShares = false;
     }
-    if (failed) await this.ctx.storage.setAlarm(Date.now() + SHARE_RETRY_MS);
-    else this.kickShares();
+    if (failed) return;
+    if (this.shares.pendingShares().length) this.kickShares();
+    else await this.disarmShareAlarm();
   }
 
   /// Takes a delivery from a ProjectStore. Only a ProjectStore calls it, and
@@ -1193,7 +1396,9 @@ export class TaskStore extends DurableObject<Env> {
     if (row.rev < this.shares.revOf(shareId, entity, row.id)) return;
     const known = this.shares.localId(shareId, entity, row.id);
     if (row.deleted) {
-      if (known) purged.push(...this.tombstoneReplica(entity, known, new Date().toISOString(), row.by));
+      if (!known) return;
+      if (entity === "task" && this.keepsOwnCopy(shareId, known, row.id)) this.keepAsPrivate(shareId, known, row.id, row.by);
+      else purged.push(...this.tombstoneReplica(entity, known, new Date().toISOString(), row.by));
       return;
     }
     const id = this.localFor(shareId, entity, row.id);
@@ -1215,11 +1420,17 @@ export class TaskStore extends DurableObject<Env> {
     }
     if (!before) {
       if (typeof next.title !== "string") return;
+      // An item of a task that is gone here. (A task that is not here yet is
+      // on its way: rows come in the order of their last change.)
+      if (entity === "checklistItem" && typeof next.taskId === "string"
+        && (ShareBook.isRetired(next.taskId) || this.rowOf("task", next.taskId)?.deletedAt)) return;
       if (entity === "task") {
         // Not a proposal, not filed yet, and its fade clock starts today.
         Object.assign(next, { project: projectId, source: "app", acknowledgedAt: now, touchedAt: now, status: next.status ?? "open" });
       }
     }
+    // Another member's deadline ends the fade here too.
+    if (entity === "task" && before && this.fadeEnds({ ...before, ...next })) next.fadedAt = null;
     const names = Object.keys(next);
     if (!names.length) return;
     const rev = this.nextRev();
@@ -1237,7 +1448,10 @@ export class TaskStore extends DurableObject<Env> {
       );
     }
     const actor = `member:${row.by}`;
-    this.log(rev, entity, id, "upsert", names, null, actor, now, this.diffFor(before, next));
+    this.log(rev, entity, id, "upsert", names, null, actor, now, this.diffFor(before, next, true));
+    // Another member closed the task: the Do of it here ends too (docs/DO_SPEC.md §2.1).
+    if (entity === "task" && "status" in next) this.resolveDo(actor, now);
+    if (entity === "task" && next.status === "done") this.endReview(id, actor, now);
     if (entity === "project" && "notes" in next) {
       this.recordNoteRevision("project", id, (next.notes as string | null) ?? null, actor, now, (before?.noteRev as number | null) ?? 0, null);
     }
@@ -1250,12 +1464,15 @@ export class TaskStore extends DurableObject<Env> {
     if (!before || before.deletedAt) return [];
     const rev = this.nextRev();
     this.sql.exec(`UPDATE ${ENTITIES[entity].table} SET deletedAt = ?, rev = ?, updatedAt = ? WHERE id = ?`, now, rev, now, id);
-    this.log(rev, entity, id, "delete", null, null, by ? `member:${by}` : "system:share", now);
+    const snapshot: ChangeDiff = {};
+    for (const name of SHARED_FIELDS[entity]) if (before[name] !== null && before[name] !== undefined) snapshot[name] = [before[name], null];
+    this.log(rev, entity, id, "delete", null, null, by ? `member:${by}` : "system:share", now, snapshot);
     if (entity !== "task") return [];
     this.tombstoneConvo(id, now);
     const purged = this.tombstoneAttachments(id, now);
     this.tombstoneChecklistItems(id, now);
     this.tombstoneTaskRefs(id, now);
+    this.tombstoneDoSessions(id, now);
     return purged;
   }
 
@@ -1263,24 +1480,74 @@ export class TaskStore extends DurableObject<Env> {
     const share = this.shares.get(shareId);
     if (!share) return;
     const rows = this.shares.mapped(shareId);
-    this.shares.remove(shareId);
     if (keepCopy) {
+      this.shares.remove(shareId);
       this.setProjectShare(share.localProjectId, null);
       return;
     }
-    const now = new Date().toISOString();
-    for (const entity of ["checklistItem", "task", "project"] as const) {
-      for (const r of rows) if (r.entity === entity) purged.push(...this.tombstoneReplica(entity, r.localId, now));
+    // Tasks that hold something only this account has stay, in the project,
+    // which becomes private. Their sections stay with them.
+    const own = new Set(rows.filter((r) => r.entity === "task" && this.keepsOwnCopy(shareId, r.localId, r.sharedId)).map((r) => r.localId));
+    for (const id of [...own]) {
+      const heading = this.rowOf("task", id)?.heading;
+      if (typeof heading === "string") own.add(heading);
     }
+    this.shares.remove(shareId);
+    const now = new Date().toISOString();
+    for (const r of rows) {
+      if (r.entity === "task" && !own.has(r.localId)) purged.push(...this.tombstoneReplica("task", r.localId, now));
+      if (r.entity === "checklistItem" && !own.has((this.rowOf("checklistItem", r.localId)?.taskId as string | undefined) ?? "")) {
+        purged.push(...this.tombstoneReplica("checklistItem", r.localId, now));
+      }
+    }
+    if (own.size) this.setProjectShare(share.localProjectId, null);
+    else purged.push(...this.tombstoneReplica("project", share.localProjectId, now));
+  }
+
+  /// Whether deleting this replica would delete something that exists nowhere
+  /// else: words that did not reach the project, or this account's own files,
+  /// conversation and references.
+  private keepsOwnCopy(shareId: string, taskId: string, sharedId: string): boolean {
+    const row = this.rowOf("task", taskId);
+    if (!row || row.deletedAt) return false;
+    if (this.shares.hasUnsentText(shareId, sharedId) || this.shares.revOf(shareId, "task", sharedId) === 0) return true;
+    const items = this.sql.exec<{ id: string }>("SELECT id FROM checklist_items WHERE taskId = ? AND deletedAt IS NULL", taskId).toArray();
+    for (const { id } of items) {
+      const item = this.shares.shared("checklistItem", id);
+      if (item && this.shares.hasUnsentText(shareId, item.sharedId, "checklistItem")) return true;
+    }
+    return ["attachments", "task_refs"].some((table) =>
+      this.sql.exec(`SELECT 1 FROM ${table} WHERE taskId = ? AND deletedAt IS NULL LIMIT 1`, taskId).toArray().length > 0)
+      || this.sql.exec("SELECT 1 FROM turns WHERE taskId = ? LIMIT 1", taskId).toArray().length > 0;
+  }
+
+  /// Another member deleted the task. It stays here as a private one, in the
+  /// Inbox, with what this account had on it.
+  private keepAsPrivate(shareId: string, taskId: string, sharedId: string, by: string): void {
+    for (const { id } of this.sql.exec<{ id: string }>("SELECT id FROM checklist_items WHERE taskId = ?", taskId).toArray()) {
+      const item = this.shares.shared("checklistItem", id);
+      if (item) this.shares.retire(shareId, "checklistItem", item.sharedId);
+    }
+    this.shares.retire(shareId, "task", sharedId);
+    const before = this.rowOf("task", taskId)!;
+    const now = new Date().toISOString();
+    const rev = this.nextRev();
+    const next = { project: null, heading: null, assignedTo: null };
+    this.sql.exec("UPDATE tasks SET project = NULL, heading = NULL, assignedTo = NULL, rev = ?, updatedAt = ? WHERE id = ?", rev, now, taskId);
+    this.log(rev, "task", taskId, "upsert", Object.keys(next), null, `member:${by}`, now, this.diffFor(before, next));
   }
 
   /// The rules an agent write must pass, enforced here so no connector can
-  /// skip them: the stop is the human's alone, a stopped task takes no agent
-  /// writes at all, and an agent cannot mark an agent-worked task done —
-  /// only the human accepts it after review (`human_accepts`).
+  /// skip them: the stop and the pause are the human's alone, a paused account
+  /// takes no agent writes at all, nor does a stopped task, and an agent cannot
+  /// mark an agent-worked task done — only the human accepts it after review
+  /// (`human_accepts`). Ending a claim (`release`) is not an op, so an agent
+  /// can still let go of a task.
   private agentRefusal(op: Op): string | null {
+    if (op.op !== "appendTurn" && op.entity === "doSession") return "human_only_do";
     if (op.op === "upsert" && op.entity === "convo" && "stoppedAt" in op.fields) return "human_only:stoppedAt";
     if (op.op === "upsert" && op.entity === "setting" && op.id === "agentsPaused") return "human_only:agentsPaused";
+    if (this.readSetting("agentsPaused") === true) return "paused";
     if (op.op === "upsert" && op.entity === "project" && "context" in op.fields) return "retired:context";
     if (op.op === "upsert" && op.entity === "task") {
       const appOnly = APP_ONLY_TASK_FIELDS.find((f) => f in op.fields);
@@ -1293,11 +1560,57 @@ export class TaskStore extends DurableObject<Env> {
       : op.entity === "taskRef" ? this.taskRefTaskId(op)
       : null;
     if (taskId && this.convoStopped(taskId)) return "stopped";
-    if (op.op !== "appendTurn" && op.entity === "taskRef" && this.readSetting("agentsPaused") === true) return "paused";
-    if (op.op === "upsert" && op.entity === "task" && op.fields.status === "done" && this.convoRequiresHumanAccept(op.id)) {
-      return "human_accepts";
+    if (op.op !== "appendTurn" && op.entity === "task") {
+      const ends = op.op === "delete" || op.fields.status === "done" || op.fields.status === "cancelled";
+      if (ends && this.convoRequiresHumanAccept(op.id)) return "human_accepts";
+      // Only the user ends a wait (ADR 0053): an agent may set one, never
+      // clear it or close the task while it waits.
+      if (this.isWaiting(op.id)) {
+        const clears = op.op === "upsert" && "waitingOn" in op.fields
+          && !(typeof op.fields.waitingOn === "string" && op.fields.waitingOn.trim());
+        if (ends || clears) return "in_review";
+      }
     }
+    if (op.op === "upsert" && op.entity === "convo") return this.agentHandoffRefusal(op.id, op.fields);
     return null;
+  }
+
+  /// The hand-off rules of an agent write (docs/REVIEW_SPEC.md): an agent puts
+  /// work into Review, and never takes it out or ends it.
+  private agentHandoffRefusal(taskId: string, fields: Record<string, unknown>): string | null {
+    const row = this.sql.exec<{ endState: string | null; endStateNote: string | null; assignee: string | null }>(
+      "SELECT endState, endStateNote, assignee FROM convos WHERE id = ? AND deletedAt IS NULL", taskId,
+    ).toArray()[0];
+    if ("assignee" in fields && row?.assignee === "claude" && fields.assignee !== "claude") return "human_only:assignee";
+    const inReview = row?.endState === "needs_verify";
+    const next = "endState" in fields ? (fields.endState as string | null) ?? "open" : row?.endState ?? "open";
+    if (next !== "needs_verify") {
+      if (inReview) return "in_review";
+      // `decomposed` ends no work: the task goes on as an issue or smaller tasks.
+      const free = ["open", "decomposed"];
+      const current = row?.endState ?? "open";
+      return next === current || (free.includes(next) && free.includes(current)) ? null : "human_ends";
+    }
+    if (!("endState" in fields) && !("endStateNote" in fields)) return null;
+    const note = "endStateNote" in fields ? fields.endStateNote : row?.endStateNote;
+    if (typeof note !== "string" || !note.trim()) return "note_required";
+    const status = this.sql.exec<{ status: string }>("SELECT status FROM tasks WHERE id = ?", taskId).toArray()[0]?.status;
+    return status && status !== "open" ? "closed" : null;
+  }
+
+  /// True when an agent write changes the note, the artifact or the handoff
+  /// action of work that is in Review.
+  private handoffChanges(row: Record<string, unknown>, fields: Record<string, unknown>): boolean {
+    const before = decodeRow(ENTITIES.convo, row) as Record<string, unknown>;
+    return ["endStateNote", "artifact", "handoff"].some(
+      (f) => f in fields && JSON.stringify(fields[f] ?? null) !== JSON.stringify(before[f] ?? null),
+    );
+  }
+
+  private isWaiting(taskId: string): boolean {
+    return this.sql.exec(
+      "SELECT 1 FROM tasks WHERE id = ? AND deletedAt IS NULL AND status = 'open' AND waitingOn IS NOT NULL", taskId,
+    ).toArray().length > 0;
   }
 
   private convoStopped(taskId: string): boolean {
@@ -1305,18 +1618,57 @@ export class TaskStore extends DurableObject<Env> {
   }
 
   /// True when an agent must hand the task to Review (`needs_verify`) rather
-  /// than closing it directly: assigned to an agent (`claude`), already waiting
-  /// in Review (`needs_verify`), or currently held under a live agent claim.
+  /// than ending it: assigned to an agent (`claude`), waiting in Review, or
+  /// agent work since a claim. `agentWorkAt` outlives the claim, so an agent
+  /// cannot release the task and then close it.
   private convoRequiresHumanAccept(taskId: string): boolean {
-    const row = this.sql.exec<{
-      assignee: string | null; endState: string | null; claimedBy: string | null; claimUntil: string | null;
-    }>(
-      "SELECT assignee, endState, claimedBy, claimUntil FROM convos WHERE id = ? AND deletedAt IS NULL",
+    const row = this.sql.exec<{ assignee: string | null; endState: string | null; agentWorkAt: string | null }>(
+      "SELECT assignee, endState, agentWorkAt FROM convos WHERE id = ? AND deletedAt IS NULL",
       taskId,
     ).toArray()[0];
-    if (!row) return false;
-    if (row.assignee === "claude" || row.endState === "needs_verify") return true;
-    return !!row.claimedBy && !!row.claimUntil && Date.parse(row.claimUntil) > Date.now();
+    return !!row && (row.assignee === "claude" || row.endState === "needs_verify" || !!row.agentWorkAt);
+  }
+
+  /// Marks a task as agent work, or ends that mark. A store column, never
+  /// synced: no client can set it.
+  private setAgentWork(taskId: string, at: string | null): void {
+    this.sql.exec("UPDATE convos SET agentWorkAt = ? WHERE id = ? AND deletedAt IS NULL", at, taskId);
+  }
+
+  /// A task that waits for the user is never in the Faded pile: an agent may
+  /// hand over, or ask about, a task that faded before.
+  private unfadeForReview(taskId: string, actor: string, now: string): void {
+    const row = this.sql.exec<{ fadedAt: string | null }>(
+      "SELECT fadedAt FROM tasks WHERE id = ? AND deletedAt IS NULL AND status = 'open'", taskId,
+    ).toArray()[0];
+    if (!row?.fadedAt) return;
+    const rev = this.nextRev();
+    this.sql.exec("UPDATE tasks SET fadedAt = NULL, rev = ?, updatedAt = ? WHERE id = ?", rev, now, taskId);
+    this.log(rev, "task", taskId, "upsert", ["fadedAt"], null, actor, now, { fadedAt: [row.fadedAt, null] });
+  }
+
+  /// One time: every faded task that waits for the user comes back.
+  private unfadeWaiting(): void {
+    const now = new Date().toISOString();
+    const rows = this.sql.exec<{ id: string; endState: string | null }>(
+      `SELECT t.id AS id, c.endState AS endState FROM tasks t LEFT JOIN convos c ON c.id = t.id AND c.deletedAt IS NULL
+       WHERE t.fadedAt IS NOT NULL AND t.deletedAt IS NULL AND t.status = 'open'`,
+    ).toArray();
+    for (const r of rows) {
+      if (r.endState === "needs_verify" || this.awaitsHuman(r.id)) this.unfadeForReview(r.id, "system:migration", now);
+    }
+  }
+
+  /// A task the user finished leaves Review, whichever button finished it, so
+  /// opening it again does not put it back. A cancelled one keeps its
+  /// hand-off: it is in no list, and undo brings it back as it was.
+  private endReview(taskId: string, actor: string, now: string): void {
+    this.setAgentWork(taskId, null);
+    const row = this.sql.exec<{ endState: string | null }>(
+      "SELECT endState FROM convos WHERE id = ? AND deletedAt IS NULL", taskId,
+    ).toArray()[0];
+    if (row?.endState !== "needs_verify") return;
+    this.writeConvoServerFields(taskId, { endState: "agent_assisted_done", endStateAt: now }, "upsert", actor, now);
   }
 
   private liveTask(id: string): boolean {
@@ -1363,6 +1715,127 @@ export class TaskStore extends DurableObject<Env> {
       return row?.taskId ?? null;
     }
     return null;
+  }
+
+  // ---- Do (docs/DO_SPEC.md, ADR 0041) ----
+
+  /// A permanently deleted task takes its Do history with it.
+  private tombstoneDoSessions(taskId: string, now: string): void {
+    const ids = this.sql.exec<{ id: string }>(
+      "SELECT id FROM do_sessions WHERE taskId = ? AND deletedAt IS NULL", taskId,
+    ).toArray().map((r) => r.id);
+    for (const id of ids) {
+      const rev = this.nextRev();
+      this.sql.exec("UPDATE do_sessions SET deletedAt = ?, rev = ?, updatedAt = ? WHERE id = ?", now, rev, now, id);
+    }
+  }
+
+  /// Keeps §2.1 rules 2 and 4 on one push, in place, and returns the fields
+  /// that are left to write. A closed row only takes an earlier end or a new
+  /// note. A push that loses still moves the row's rev, so its device pulls
+  /// what the store kept.
+  private settleDoFields(fields: Record<string, unknown>, row: Record<string, unknown> | undefined, now: string): string[] {
+    const startedAt = (row?.startedAt as string | undefined) ?? (fields.startedAt as string | undefined) ?? now;
+    if (!row && typeof fields.startedAt === "string" && Date.parse(fields.startedAt) > Date.parse(now)) fields.startedAt = now;
+    if (typeof fields.endedAt === "string" && Date.parse(fields.endedAt) < Date.parse(startedAt)) fields.endedAt = startedAt;
+    const drop = (...keys: string[]) => { for (const k of keys) delete fields[k]; };
+    const current = (row?.endedAt as string | null | undefined) ?? null;
+    if (typeof fields.endedAt === "string" && doEndWins(current, fields.endedAt)) {
+      fields.exit ??= "stopped";
+      if (current) fields.lapsed ??= false;
+    } else {
+      drop("endedAt", "exit", "lapsed");
+    }
+    if (current) drop("plannedMinutes", "confirmedAt");
+    return Object.keys(fields);
+  }
+
+  /// The rows the core needs: the open ones and every row that started after
+  /// the oldest of them.
+  private doRows(): { rows: CoreDoSession[]; taskIds: Map<string, string> } {
+    const open = this.sql.exec<{ startedAt: string }>(
+      "SELECT startedAt FROM do_sessions WHERE endedAt IS NULL AND deletedAt IS NULL",
+    ).toArray();
+    const taskIds = new Map<string, string>();
+    if (open.length === 0) return { rows: [], taskIds };
+    // Stamps keep their zone, so the instants are compared here, not in SQL.
+    const oldest = Math.min(...open.map((r) => Date.parse(r.startedAt)));
+    const rows = this.sql.exec<{
+      id: string; taskId: string; startedAt: string; plannedMinutes: number | null; confirmedAt: string | null;
+      endedAt: string | null; status: string | null; gone: number;
+    }>(
+      `SELECT s.id, s.taskId, s.startedAt, s.plannedMinutes, s.confirmedAt, s.endedAt, t.status,
+              (t.id IS NULL OR t.deletedAt IS NOT NULL OR t.fadedAt IS NOT NULL) AS gone
+       FROM do_sessions s LEFT JOIN tasks t ON t.id = s.taskId WHERE s.deletedAt IS NULL AND s.startedAt >= ?`,
+      new Date(oldest - DAY_MS).toISOString().slice(0, 10),
+    ).toArray().filter((r) => Date.parse(r.startedAt) >= oldest);
+    for (const r of rows) taskIds.set(r.id, r.taskId);
+    return {
+      rows: rows.map((r) => ({
+        id: r.id, startedAt: r.startedAt, plannedMinutes: r.plannedMinutes, confirmedAt: r.confirmedAt,
+        endedAt: r.endedAt, taskStatus: r.gone ? null : r.status,
+      })),
+      taskIds,
+    };
+  }
+
+  /// Ends every open Do that the rules end. `startedId` is a Do that this
+  /// write started: when it stays open, a live agent claim on its task ends,
+  /// because the user does that task now (§6).
+  private resolveDo(actor: string, now: string, startedId: string | null = null): void {
+    const { rows, taskIds } = this.doRows();
+    if (rows.length === 0) return;
+    const { ends, current } = resolveDoSessions(rows, now);
+    for (const end of ends) {
+      const fields = { endedAt: end.endedAt, exit: end.exit, lapsed: end.lapsed };
+      const rev = this.nextRev();
+      this.sql.exec(
+        "UPDATE do_sessions SET endedAt = ?, exit = ?, lapsed = ?, rev = ?, updatedAt = ? WHERE id = ?",
+        end.endedAt, end.exit, end.lapsed ? 1 : 0, rev, now, end.id,
+      );
+      this.log(rev, "doSession", end.id, "upsert", Object.keys(fields), null, actor, now, this.diffFor(null, fields));
+    }
+    if (!startedId || current?.id !== startedId) return;
+    const taskId = taskIds.get(startedId)!;
+    const claim = this.sql.exec<{ claimedBy: string | null; claimUntil: string | null }>(
+      "SELECT claimedBy, claimUntil FROM convos WHERE id = ? AND deletedAt IS NULL", taskId,
+    ).toArray()[0];
+    if (!claim?.claimedBy || !claim.claimUntil || Date.parse(claim.claimUntil) <= Date.parse(now)) return;
+    const reason = this.reason;
+    this.reason = "The user does this task now.";
+    try {
+      this.writeConvoServerFields(taskId, { claimedBy: null, claimUntil: null }, "release", actor, now, true);
+    } finally {
+      this.reason = reason;
+    }
+  }
+
+  /// The current Do, or null. `staleAt`, `startedAt` and the rest are stamps.
+  readDoing(): Doing | null {
+    const { rows, taskIds } = this.doRows();
+    if (rows.length === 0) return null;
+    const { current } = resolveDoSessions(rows, new Date().toISOString());
+    if (!current) return null;
+    const row = rows.find((r) => r.id === current.id)!;
+    const taskId = taskIds.get(current.id)!;
+    const title = this.sql.exec<{ title: string | null }>("SELECT title FROM tasks WHERE id = ?", taskId).toArray()[0]?.title ?? "";
+    return {
+      sessionId: current.id, taskId, title, startedAt: row.startedAt, plannedMinutes: row.plannedMinutes ?? null,
+      confirmedAt: row.confirmedAt ?? null, staleAt: new Date(current.staleAtMs).toISOString(), isStale: current.isStale,
+    };
+  }
+
+  /// One Do, open or closed, or null.
+  readDoSession(id: string): Row | null {
+    const raw = this.sql.exec("SELECT * FROM do_sessions WHERE id = ? AND deletedAt IS NULL", id).toArray()[0];
+    return raw ? (decodeRow(ENTITIES.doSession, raw) as Row) : null;
+  }
+
+  /// The Do history of one task, newest first.
+  readDoSessions(taskId: string): Row[] {
+    return this.sql.exec("SELECT * FROM do_sessions WHERE taskId = ? AND deletedAt IS NULL", taskId).toArray()
+      .map((r) => decodeRow(ENTITIES.doSession, r) as Row)
+      .sort((a, b) => Date.parse(b.startedAt as string) - Date.parse(a.startedAt as string));
   }
 
   // ---- task references (docs/TASK_REFERENCES_SPEC.md, ADR 0031) ----
@@ -1487,7 +1960,7 @@ export class TaskStore extends DurableObject<Env> {
     turn: Turn,
     actor: string,
     now: string,
-    agentQuestions: AgentQuestionPush[],
+    agentPushes: AgentPush[],
   ): OpResult {
     const task = this.sql.exec<{ title: string | null; deletedAt: string | null }>(
       "SELECT title, deletedAt FROM tasks WHERE id = ?",
@@ -1519,7 +1992,8 @@ export class TaskStore extends DurableObject<Env> {
       // The agent asked: the ball is in the human's court, so the claim ends
       // and we alert the user's Apple devices via APNs (F1b #213).
       this.writeConvoServerFields(taskId, { claimedBy: null, claimUntil: null }, "release", actor, now, true);
-      agentQuestions.push({
+      this.unfadeForReview(taskId, actor, now);
+      agentPushes.push({
         taskId,
         taskTitle: task.title ?? "",
         turnSeq: seq,
@@ -1577,6 +2051,8 @@ export class TaskStore extends DurableObject<Env> {
         claimUntil: string | null; runsSinceUser: number | null;
       }>("SELECT endState, stoppedAt, claimedBy, claimUntil, runsSinceUser FROM convos WHERE id = ? AND deletedAt IS NULL", taskId).toArray()[0];
       if (convo?.stoppedAt) return { ok: false, reason: "stopped" };
+      const doing = this.readDoing();
+      if (doing && !doing.isStale && doing.taskId === taskId) return { ok: false, reason: "doing" };
       if (convo?.endState && convo.endState !== "open") return { ok: false, reason: "terminal" };
       if (this.awaitsHuman(taskId)) return { ok: false, reason: "your_turn" };
       const nowMs = Date.now();
@@ -1591,6 +2067,7 @@ export class TaskStore extends DurableObject<Env> {
       this.reason = reason;
       try {
         this.writeConvoServerFields(taskId, { claimedBy: holder, claimUntil, runsSinceUser: runs }, renewed ? "renew" : "claim", actor, new Date(nowMs).toISOString());
+        this.setAgentWork(taskId, new Date(nowMs).toISOString());
       } finally {
         this.reason = null;
       }
@@ -1628,6 +2105,45 @@ export class TaskStore extends DurableObject<Env> {
   }
 
   /// The newest rev: the cursor for an agent that starts listening now.
+  /// Reserve an idempotency key for one call (ADR 0050 §4). `hash` is the
+  /// call's body. A finished key with the same body replays its result; a
+  /// different body is a conflict; a key whose call still runs is
+  /// in_progress. One object per account, so two calls never both get "new".
+  idempotencyBegin(key: string, hash: string, now = Date.now()): IdempotencyStart {
+    const row = this.sql.exec<{ hash: string; result: string | null; at: number }>(
+      "SELECT hash, result, at FROM idempotency_keys WHERE key = ?", key,
+    ).toArray()[0];
+    if (row && row.at >= now - IDEMPOTENCY_TTL_MS) {
+      if (row.hash !== hash) return { state: "conflict" };
+      if (row.result !== null) return { state: "replay", result: row.result };
+      if (row.at >= now - IDEMPOTENCY_PENDING_MS) return { state: "in_progress" };
+    }
+    this.sql.exec(
+      "INSERT INTO idempotency_keys (key, hash, result, at) VALUES (?, ?, NULL, ?) " +
+        "ON CONFLICT(key) DO UPDATE SET hash = excluded.hash, result = NULL, at = excluded.at",
+      key, hash, now,
+    );
+    this.sql.exec("DELETE FROM idempotency_keys WHERE at < ?", now - IDEMPOTENCY_TTL_MS);
+    this.sql.exec(
+      "DELETE FROM idempotency_keys WHERE key IN (SELECT key FROM idempotency_keys ORDER BY at DESC LIMIT -1 OFFSET ?)",
+      IDEMPOTENCY_MAX_KEYS,
+    );
+    return { state: "new" };
+  }
+
+  /// Keep the result of the call that holds `key`. Too large a result is
+  /// not kept: the key is let go, so a repeat runs again.
+  idempotencyFinish(key: string, hash: string, result: string): void {
+    if (result.length > IDEMPOTENCY_MAX_RESULT_BYTES) return this.idempotencyAbandon(key, hash);
+    this.sql.exec("UPDATE idempotency_keys SET result = ? WHERE key = ? AND hash = ? AND result IS NULL", result, key, hash);
+  }
+
+  /// Let go of a key whose call was refused or failed: nothing was kept, so
+  /// the same call may run again.
+  idempotencyAbandon(key: string, hash: string): void {
+    this.sql.exec("DELETE FROM idempotency_keys WHERE key = ? AND hash = ? AND result IS NULL", key, hash);
+  }
+
   head(): number {
     return this.meta("rev");
   }
@@ -1638,11 +2154,16 @@ export class TaskStore extends DurableObject<Env> {
     const n = Math.min(Math.max(limit, 1), 500);
     const events: AgentEvent[] = [];
     let cursor = since;
+    // The scan reached the end of the log. Only then may the cursor jump to
+    // the head: a scan cut short by the page cap must resume where it
+    // stopped, or the next call skips every row it did not read.
+    let reachedEnd = false;
     // Scan in pages so a long run of agent-only writes cannot starve the feed.
     for (let page = 0; page < 10 && events.length < n; page++) {
       const rows = this.sql.exec<{ rev: number; entity: string; id: string; op: string; diff: string | null; actor: string; at: string }>(
         "SELECT rev, entity, id, op, diff, actor, at FROM changes WHERE rev > ? ORDER BY rev LIMIT 500", cursor,
       ).toArray();
+      if (rows.length < 500) reachedEnd = true;
       if (!rows.length) break;
       for (const r of rows) {
         cursor = r.rev;
@@ -1657,11 +2178,16 @@ export class TaskStore extends DurableObject<Env> {
         }
         else if (r.entity === "convo" && diff.assignee?.[1] === "claude") push("assigned", r.id);
         else if (r.entity === "convo" && diff.stoppedAt) push(diff.stoppedAt[1] ? "stopped" : "resumed", r.id);
+        else if (r.entity === "doSession" && (diff.taskId || diff.endedAt)) {
+          const row = this.sql.exec<{ taskId: string }>("SELECT taskId FROM do_sessions WHERE id = ?", r.id).toArray()[0];
+          if (row) push(diff.endedAt ? "do_ended" : "do_started", row.taskId);
+        }
         else if (r.entity === "setting" && r.id === "agentsPaused" && diff.value) push(diff.value[1] === true ? "paused" : "unpaused", null);
         if (events.length >= n) break;
       }
     }
-    return { events, nextSince: events.length >= n ? cursor : Math.max(cursor, this.meta("rev")) };
+    const full = events.length >= n;
+    return { events, nextSince: full || !reachedEnd ? cursor : Math.max(cursor, this.meta("rev")) };
   }
 
   // ---- pull ----
@@ -1672,7 +2198,7 @@ export class TaskStore extends DurableObject<Env> {
   /// The other flags do the same for entities that came later.
   pull(
     since: number, limit: number, includeSettings = false, includeChecklists = false, includeTags = false,
-    includeRefs = false,
+    includeRefs = false, includeDoSessions = false,
   ): PullResult {
     const n = Math.min(Math.max(limit, 1), MAX_PULL);
     if (since > 0 && since < this.meta("purgedThrough")) {
@@ -1686,6 +2212,7 @@ export class TaskStore extends DurableObject<Env> {
       if (name === "checklistItem" && !includeChecklists) continue;
       if (name === "tag" && !includeTags) continue;
       if (name === "taskRef" && !includeRefs) continue;
+      if (name === "doSession" && !includeDoSessions) continue;
       const spec: EntitySpec = ENTITIES[name];
       for (const raw of this.sql.exec(`SELECT * FROM ${spec.table} WHERE rev > ? ORDER BY rev LIMIT ?`, since, n)) {
         merged.push({ rev: raw.rev as number, entity: name, row: decodeRow(spec, raw) });
@@ -1893,6 +2420,17 @@ export class TaskStore extends DurableObject<Env> {
     ).toArray().map((r) => decodeRow(ENTITIES.taskRef, r) as Row);
   }
 
+  readAttachments(taskId: string): Row[] {
+    return this.sql.exec(
+      "SELECT * FROM attachments WHERE taskId = ? AND deletedAt IS NULL ORDER BY position IS NULL, position, createdAt, id", taskId,
+    ).toArray().map((r) => decodeRow(ENTITIES.attachment, r) as Row);
+  }
+
+  /// Whether the id was ever used, also by a file that is now deleted.
+  hasAttachment(id: string): boolean {
+    return this.sql.exec("SELECT 1 FROM attachments WHERE id = ?", id).toArray().length > 0;
+  }
+
   /// The tasks that point at a key, active first, then the newest write
   /// first. `key` is in normal form.
   findByRef(key: string, limit: number): { tasks: RefHit[]; total: number } {
@@ -2058,6 +2596,14 @@ export class TaskStore extends DurableObject<Env> {
     return raw ? (decodeRow(spec, raw as Record<string, unknown>) as Row) : null;
   }
 
+  /// A project's live headings (section dividers), in list order.
+  readHeadings(projectId: string): Row[] {
+    const raws = this.sql.exec(
+      "SELECT * FROM tasks WHERE project = ? AND deletedAt IS NULL AND kind = 'heading' ORDER BY position, id", projectId,
+    ).toArray();
+    return raws.map((r) => decodeRow(ENTITIES.task, r as Record<string, unknown>) as Row);
+  }
+
   /// Open tasks filed directly in a project or an area (headings excluded),
   /// in list order.
   readContainerTasks(container: NoteContainer, id: string, limit: number): Row[] {
@@ -2211,6 +2757,39 @@ export class TaskStore extends DurableObject<Env> {
     return true;
   }
 
+  // ---- agent keys (#86) ----
+  // A key is an agent session: the same row in `sessions` and `connections`
+  // as an OAuth agent, so the Agents list, disconnect, Stop, Pause and
+  // account deletion cover it with no code of their own. Only the hash of
+  // the key's secret is stored.
+
+  createAgentKey(sid: string, hash: string, name: string, scope: string, now = Date.now(), timeZone?: string): void {
+    this.ctx.storage.transactionSync(() => {
+      this.sessions.create(
+        hash,
+        AGENT_KEY_EXPIRES_AT,
+        sid,
+        { clientId: AGENT_KEY_CLIENT, scope, ...(timeZone ? { timeZone } : {}) },
+        now,
+      );
+      this.recordConnection(sid, AGENT_KEY_CLIENT, AGENT_KEY_CLIENT_NAME, scope, now, name);
+    });
+  }
+
+  /// The grant behind a key, or null. Moves the key's "last used" at most
+  /// once an hour, so a busy key does not write on every call.
+  authorizeAgentKey(sid: string, hash: string, now = Date.now()): SessionGrant | null {
+    return this.ctx.storage.transactionSync(() => {
+      const res = this.sessions.authorize(sid, hash, now);
+      if (res?.grant?.clientId !== AGENT_KEY_CLIENT) return null;
+      this.sql.exec(
+        "UPDATE connections SET lastUsed = ? WHERE familyId = ? AND lastUsed < ?",
+        now, sid, now - AGENT_KEY_TOUCH_MS,
+      );
+      return res.grant;
+    });
+  }
+
   /// `recordConnection` for an agent whose session is here. A disconnect that
   /// lands in the middle of a renewal wins.
   noteAgent(familyId: string, clientId: string, clientName: string, scope: string, now = Date.now(), label: string | null = null): void {
@@ -2325,15 +2904,15 @@ export class TaskStore extends DurableObject<Env> {
     });
   }
 
-  private async dispatchAgentQuestionPushes(
-    questions: AgentQuestionPush[],
+  private async dispatchAgentPushes(
+    questions: AgentPush[],
     initialTokens: PushTokenRow[],
   ): Promise<void> {
     let activeTokens = initialTokens;
     for (const q of questions) {
       if (activeTokens.length === 0) break;
       try {
-        const res = await sendAgentQuestionPushes(this.env, q, activeTokens);
+        const res = await sendAgentPushes(this.env, q, activeTokens);
         if (res.pruned.length > 0) {
           this.prunePushTokens(res.pruned);
           const dead = new Set(res.pruned);
@@ -2391,9 +2970,10 @@ export class TaskStore extends DurableObject<Env> {
     ).toArray().map((r) => r.familyId);
   }
 
-  /// The agent count: connections used within their refresh lifetime.
+  /// The agent count: connections used within their refresh lifetime, and
+  /// every agent key.
   connectedAgentCount(now = Date.now()): number {
-    return this.sql.exec<{ n: number }>("SELECT COUNT(*) AS n FROM connections WHERE lastUsed > ?", now - CONNECTION_TTL_MS).one().n;
+    return this.sql.exec<{ n: number }>("SELECT COUNT(*) AS n FROM connections WHERE lastUsed > ? OR clientId = ?", now - CONNECTION_TTL_MS, AGENT_KEY_CLIENT).one().n;
   }
 
   /// Every place this account is signed in: app sessions (devices) and MCP
@@ -2403,7 +2983,7 @@ export class TaskStore extends DurableObject<Env> {
     const devices = this.deviceSummary(cap, now);
     const firstSeen = new Map(this.sql.exec<{ sid: string; firstSeen: number }>("SELECT sid, firstSeen FROM devices").toArray().map((r) => [r.sid, r.firstSeen]));
     const connections = this.sql.exec<{ familyId: string; name: string; clientName: string; scope: string; createdAt: number; lastUsed: number }>(
-      "SELECT familyId, COALESCE(label, clientName) AS name, clientName, scope, createdAt, lastUsed FROM connections WHERE lastUsed > ? ORDER BY lastUsed DESC", now - CONNECTION_TTL_MS,
+      "SELECT familyId, COALESCE(label, clientName) AS name, clientName, scope, createdAt, lastUsed FROM connections WHERE lastUsed > ? OR clientId = ? ORDER BY lastUsed DESC", now - CONNECTION_TTL_MS, AGENT_KEY_CLIENT,
     ).toArray();
     return {
       devices: devices.map((d) => ({
@@ -2487,6 +3067,13 @@ export class TaskStore extends DurableObject<Env> {
       "INSERT INTO devices (sid, client, firstSeen, lastSeen, version) VALUES (?, ?, ?, ?, ?) ON CONFLICT(sid) DO UPDATE SET lastSeen = excluded.lastSeen, client = COALESCE(excluded.client, devices.client), version = COALESCE(excluded.version, devices.version)",
       sid, client, now, now, version,
     );
+    // Every version a device ran, for release adoption on the admin page.
+    if (version !== null) {
+      this.sql.exec(
+        "INSERT INTO device_versions (sid, client, version, firstSeen, lastSeen) VALUES (?, ?, ?, ?, ?) ON CONFLICT(sid, version) DO UPDATE SET lastSeen = excluded.lastSeen, client = COALESCE(excluded.client, device_versions.client)",
+        sid, client, version, now, now,
+      );
+    }
   }
 
   /// Strictly increasing, so two calls in the same millisecond still order.
@@ -2553,14 +3140,14 @@ export class TaskStore extends DurableObject<Env> {
         }
       }
       this.sql.exec(
-        `INSERT INTO entitlements (id, source, productId, expiresAt, originalTransactionId, status, environment, note, signedAt, updatedAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `INSERT INTO entitlements (id, source, productId, expiresAt, originalTransactionId, status, plan, environment, note, signedAt, updatedAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET source = excluded.source, productId = excluded.productId,
            expiresAt = excluded.expiresAt, originalTransactionId = excluded.originalTransactionId,
-           status = excluded.status, environment = excluded.environment, note = excluded.note,
+           status = excluded.status, plan = excluded.plan, environment = excluded.environment, note = excluded.note,
            signedAt = excluded.signedAt, updatedAt = excluded.updatedAt`,
         row.id, row.source, row.productId, row.expiresAt, row.originalTransactionId, row.status,
-        row.environment, row.note, row.signedAt, Date.now(),
+        row.plan ?? null, row.environment, row.note, row.signedAt, Date.now(),
       );
       return true;
     });
@@ -2594,20 +3181,24 @@ export class TaskStore extends DurableObject<Env> {
       "SELECT client, version, firstSeen, lastSeen FROM devices d WHERE EXISTS (SELECT 1 FROM sessions s WHERE s.sid = d.sid) ORDER BY lastSeen DESC",
     ).toArray().map((r) => ({ ...r }));
     const agents = this.sql.exec<{ client: string; since: number; lastUsed: number }>(
-      "SELECT clientName AS client, createdAt AS since, lastUsed FROM connections WHERE lastUsed > ? ORDER BY lastUsed DESC", now - CONNECTION_TTL_MS,
+      "SELECT clientName AS client, createdAt AS since, lastUsed FROM connections WHERE lastUsed > ? OR clientId = ? ORDER BY lastUsed DESC", now - CONNECTION_TTL_MS, AGENT_KEY_CLIENT,
     ).toArray().map((r) => ({ ...r }));
     const entitlements = this.entitlements().map((r) => ({
       id: r.id, source: r.source, productId: r.productId, expiresAt: r.expiresAt, status: r.status,
-      environment: r.environment, signedAt: r.signedAt,
+      plan: r.plan ?? null, environment: r.environment, signedAt: r.signedAt,
     }));
     const openTasks = count(`${tasks} = 'open'`);
     const closedTasks = count(`${tasks} != 'open'`);
     const signedIn = this.hasAppSession();
-    if (!signedIn && openTasks + closedTasks === 0 && entitlements.length === 0) return null;
+    if (!signedIn && openTasks + closedTasks === 0 && entitlements.length === 0 && agents.length === 0) return null;
     const first = this.sql.exec<{ at: string | null }>("SELECT MIN(at) AS at FROM changes").one().at;
     const last = this.sql.exec<{ at: string }>("SELECT at FROM changes ORDER BY rev DESC LIMIT 1").toArray()[0]?.at ?? null;
-    const starts = [first ? Date.parse(first) : 0, ...devices.map((d) => d.firstSeen), ...entitlements.filter((e) => e.source === "trial").map((e) => e.signedAt)]
-      .filter((t) => t > 0);
+    const starts = [
+      first ? Date.parse(first) : 0,
+      ...devices.map((d) => d.firstSeen),
+      ...agents.map((a) => a.since),
+      ...entitlements.filter((e) => e.source === "trial").map((e) => e.signedAt),
+    ].filter((t) => t > 0);
     return {
       firstSeen: starts.length ? Math.min(...starts) : null,
       lastChangeAt: last ? Date.parse(last) : null,
@@ -2620,6 +3211,9 @@ export class TaskStore extends DurableObject<Env> {
       files: count("SELECT COUNT(*) AS n FROM attachments WHERE deletedAt IS NULL AND uploadedAt IS NOT NULL"),
       fileBytes: this.attachmentBytes(),
       devices,
+      versions: this.sql.exec<{ client: string | null; version: string; firstSeen: number; lastSeen: number }>(
+        "SELECT client, version, firstSeen, lastSeen FROM device_versions WHERE lastSeen > ? ORDER BY firstSeen", now - 90 * DAY_MS,
+      ).toArray().map((r) => ({ ...r })),
       agents,
       agentChangesWeek: count("SELECT COUNT(*) AS n FROM changes WHERE actor LIKE 'mcp:%' AND at > ?", new Date(now - 7 * DAY_MS).toISOString()),
       webhooks: count("SELECT COUNT(*) AS n FROM agent_webhooks WHERE enabled = 1"),
@@ -2920,7 +3514,7 @@ export class TaskStore extends DurableObject<Env> {
       }
     }
 
-    // 3. Outbound signed webhooks for wake-worthy events (assigned, user_turn, resumed)
+    // 3. Outbound signed webhooks for wake-worthy events (WAKE_EVENT_KINDS)
     const wakeEvents = events.filter((ev) => isWakeEventKind(ev.kind));
     if (wakeEvents.length === 0) return;
     const targets: AgentWebhookTarget[] = this.sql.exec<{ id: string; url: string; secret: string }>(
@@ -2936,11 +3530,14 @@ export class TaskStore extends DurableObject<Env> {
     }
   }
 
+  /// The waits between webhook attempts. Tests set it to zeros.
+  private webhookRetryDelaysMs: readonly number[] = WEBHOOK_RETRY_DELAYS_MS;
+
   private async deliverAgentWebhooks(targets: AgentWebhookTarget[], events: AgentEvent[]): Promise<void> {
     await Promise.allSettled(
       targets.flatMap((target) =>
         events.map(async (ev) => {
-          const res = await deliverWebhookEvent(target, ev);
+          const res = await deliverWebhookWithRetry(target, ev, this.webhookRetryDelaysMs);
           try {
             this.recordAgentWebhookDelivery(target.id, res.status, res.ok, res.deliveredAt);
           } catch {
@@ -3119,7 +3716,18 @@ export class TaskStore extends DurableObject<Env> {
   override async alarm(): Promise<void> {
     const now = Date.now();
     const tombstoneCutoff = new Date(now - TOMBSTONE_TTL_MS).toISOString();
+    const revBefore = this.meta("rev");
+    // Only a share retry, and the daily run is not due.
+    const housekeepAt = this.meta("housekeepAt");
+    if (housekeepAt > now) {
+      await this.ctx.storage.setAlarm(housekeepAt);
+      await this.drainShares();
+      return;
+    }
+    this.setMeta("housekeepAt", 0);
     this.ctx.storage.transactionSync(() => {
+      // A Do nobody ended (docs/DO_SPEC.md §2.2).
+      this.resolveDo("system:housekeeping", new Date(now).toISOString());
       let purged = this.meta("purgedThrough");
       for (const name of ENTITY_NAMES) {
         const table = ENTITIES[name].table;
@@ -3136,15 +3744,19 @@ export class TaskStore extends DurableObject<Env> {
       this.setMeta("purgedThrough", purged);
       this.sql.exec("DELETE FROM dismissed_refs WHERE at < ?", new Date(now - DISMISSED_REF_TTL_MS).toISOString());
       this.sql.exec("DELETE FROM client_ops WHERE at < ?", now - CLIENT_OP_TTL_MS);
+      this.sql.exec("DELETE FROM idempotency_keys WHERE at < ?", now - IDEMPOTENCY_TTL_MS);
       this.sql.exec("DELETE FROM changes WHERE at < ?", new Date(now - CHANGE_LOG_TTL_MS).toISOString());
       this.sessions.purge(now);
       this.sql.exec("DELETE FROM devices WHERE sid NOT IN (SELECT sid FROM sessions WHERE sid IS NOT NULL)");
-      this.sql.exec("DELETE FROM connections WHERE lastUsed < ?", now - CONNECTION_TTL_MS);
+      this.sql.exec("DELETE FROM device_versions WHERE lastSeen < ?", now - 90 * DAY_MS);
+      // A key never expires: its row stays until the user revokes it.
+      this.sql.exec("DELETE FROM connections WHERE lastUsed < ? AND clientId != ?", now - CONNECTION_TTL_MS, AGENT_KEY_CLIENT);
       // Day and month counters: two months covers the current month.
       this.sql.exec("DELETE FROM usage WHERE updatedAt < ?", now - 62 * DAY_MS);
     });
+    if (this.meta("rev") > revBefore) this.broadcast(this.meta("rev"));
     await this.ctx.storage.setAlarm(now + DAY_MS);
-    // A failed drain sets its own, earlier alarm.
+    // It sets its own, earlier alarm.
     await this.drainShares();
   }
 }

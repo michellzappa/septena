@@ -1,7 +1,28 @@
 package app.septena.core
 
+import app.septena.core.generated.RegistryEntityFields
+import app.septena.core.generated.RegistryEntityNames
 import java.io.IOException
 import java.time.Instant
+
+/**
+ * The notes an edit started from. The server merges when the row changed meanwhile, so nobody's
+ * words are lost (docs/PROJECT_SHARING_SPEC.md §5a).
+ */
+data class NotesBase(val notes: String?) {
+    companion object {
+        /** The base of a write of [changes], or null when the write carries none. */
+        fun of(entity: String, changes: Map<String, JsonValue>, stored: Map<String, JsonValue>, edited: NotesBase?): NotesBase? {
+            val field = when (entity) {
+                RegistryEntityNames.TASK -> RegistryEntityFields.Task.NOTES
+                RegistryEntityNames.PROJECT -> RegistryEntityFields.Project.NOTES
+                else -> return null
+            }
+            if (field !in changes) return null
+            return edited ?: NotesBase(stored[field].stringValue())
+        }
+    }
+}
 
 sealed interface SyncOperation {
     val clientOpId: String
@@ -11,6 +32,8 @@ sealed interface SyncOperation {
         val entity: String,
         val id: String,
         val fields: Map<String, JsonValue>,
+        /** The notes this write was made from. Task and project only. */
+        val base: NotesBase? = null,
     ) : SyncOperation
 
     data class Delete(
@@ -95,6 +118,7 @@ interface SyncTransport {
         includeChecklists: Boolean = true,
         includeTags: Boolean = true,
         includeRefs: Boolean = true,
+        includeDoSessions: Boolean = true,
     ): SyncPullPage
 }
 
@@ -143,6 +167,17 @@ interface TaskStore {
     suspend fun applyPullPage(page: SyncPullPage, at: Instant)
 
     suspend fun syncCursor(): Long
+
+    /**
+     * True once a pull that asked for [entity] rows finished here. Pulls before
+     * this build skipped them, and the cursor moved past them.
+     */
+    suspend fun hasPulled(entity: String): Boolean = true
+
+    suspend fun markPulled(entity: String) {}
+
+    /** Puts the cursor at the start, so the next pull reads every row again. Local rows and shadows stay. */
+    suspend fun rewindCursor() {}
 
     /** Clears the remote cache and cursor while preserving local rows and pending writes. */
     suspend fun resetForFullPull()

@@ -13,8 +13,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
@@ -64,6 +65,7 @@ import app.septena.ui.TaskCardMetrics
 import app.septena.ui.TaskCardPosition
 import app.septena.ui.TaskCardRow
 import app.septena.ui.TaskCardSlice
+import app.septena.ui.TaskListItem
 import app.septena.ui.TaskRowMenuAction
 import app.septena.ui.TaskSelection
 import app.septena.ui.cardPosition
@@ -72,6 +74,7 @@ import app.septena.ui.magicPlusRowDrop
 import app.septena.ui.magicPlusSectionDrop
 import app.septena.ui.rememberTaskContainerDropTarget
 import app.septena.ui.reorderPositions
+import app.septena.ui.taskListMotion
 import app.septena.ui.taskReorderRowDrop
 import app.septena.ui.taskReorderSectionDrop
 
@@ -94,7 +97,10 @@ fun AreasProjectsScreen(
     onTaskAction: (String, String) -> Unit = { _, _ -> },
     selection: TaskSelection = TaskSelection(),
     newSectionTrigger: Int = 0,
+    onLeftProject: () -> Unit = {},
     onMagicPlusDrop: ((QuickAddDraft) -> Unit)? = null,
+    expandedTaskId: String? = null,
+    expandedTaskContent: (@Composable (task: TaskListItem, position: TaskCardPosition, modifier: Modifier) -> Unit)? = null,
 ) {
     val factory = remember(graph) { AreasProjectsViewModel.Factory(graph) }
     val viewModel: AreasProjectsViewModel = viewModel(key = destination.key, factory = factory)
@@ -106,13 +112,19 @@ fun AreasProjectsScreen(
     val mutedInk = MaterialTheme.colorScheme.onSurfaceVariant
     val accent = MaterialTheme.colorScheme.primary
     var dialog by remember { mutableStateOf<PlacesDialog?>(null) }
+    var shareOpen by rememberSaveable(destination.key) { mutableStateOf(false) }
     var emojiPickerOpen by rememberSaveable(destination.key) { mutableStateOf(false) }
     var notesDraft by rememberSaveable(destination.key) { mutableStateOf("") }
+    // The text the draft was loaded from: what a save was made from (§5a of the sharing spec).
+    var notesBase by rememberSaveable(destination.key) { mutableStateOf("") }
     var notesFocused by remember(destination.key) { mutableStateOf(false) }
 
     LaunchedEffect(destination) { viewModel.select(destination) }
     LaunchedEffect(state.destination, state.notes) {
-        if (!notesFocused) notesDraft = state.notes
+        if (!notesFocused) {
+            notesDraft = state.notes
+            notesBase = state.notes
+        }
     }
     LaunchedEffect(newSectionTrigger) {
         if (newSectionTrigger > 0 && destination is AreasProjectsDestination.Project) {
@@ -121,11 +133,11 @@ fun AreasProjectsScreen(
     }
 
     val latestNotesDraft by rememberUpdatedState(notesDraft)
-    val latestSavedNotes by rememberUpdatedState(state.notes)
+    val latestNotesBase by rememberUpdatedState(notesBase)
     DisposableEffect(destination.key) {
         onDispose {
-            if (latestNotesDraft != latestSavedNotes) {
-                viewModel.saveNotes(latestNotesDraft)
+            if (latestNotesDraft != latestNotesBase) {
+                viewModel.saveNotes(latestNotesDraft, latestNotesBase)
             }
         }
     }
@@ -155,7 +167,10 @@ fun AreasProjectsScreen(
             headerContent?.invoke()
             CircularProgressIndicator(modifier = Modifier.padding(24.dp))
         } else {
+            // A new place starts with fresh row positions (see TaskHomeContent).
+            val listState = key(destination.key) { rememberLazyListState() }
             LazyColumn(
+                state = listState,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(bottom = 96.dp),
             ) {
@@ -168,7 +183,11 @@ fun AreasProjectsScreen(
                 // Borderless glass Notes card (auto-saves on blur & leave, quiet Save link while dirty).
                 item(key = "place-notes") {
                     val notesLabel = surfaceText(RegistryTaskAttributeIds.NOTES, "label", languageTag)
-                    val notesDirty = notesDraft != state.notes
+                    val notesDirty = notesDraft != notesBase
+                    val saveNotes = {
+                        viewModel.saveNotes(notesDraft, notesBase)
+                        notesBase = notesDraft
+                    }
                     TaskCardSlice(
                         position = TaskCardPosition.Solo,
                         isSelected = false,
@@ -188,8 +207,14 @@ fun AreasProjectsScreen(
                                     languageTag = languageTag,
                                     focused = notesFocused,
                                     onFocusedChange = { focused ->
-                                        if (notesFocused && !focused && notesDraft != state.notes) {
-                                            viewModel.saveNotes(notesDraft)
+                                        if (notesFocused && !focused) {
+                                            if (notesDraft != notesBase) {
+                                                saveNotes()
+                                            } else {
+                                                // Nothing typed: show what came in meanwhile.
+                                                notesDraft = state.notes
+                                                notesBase = state.notes
+                                            }
                                         }
                                         notesFocused = focused
                                     },
@@ -207,7 +232,7 @@ fun AreasProjectsScreen(
                                         color = accent,
                                         modifier = Modifier
                                             .clip(RoundedCornerShape(6.dp))
-                                            .clickable { viewModel.saveNotes(notesDraft) }
+                                            .clickable { saveNotes() }
                                             .padding(horizontal = 6.dp, vertical = 2.dp),
                                     )
                                 }
@@ -216,7 +241,7 @@ fun AreasProjectsScreen(
                     }
                 }
 
-                // Emoji, then the page's ⋯ menu (New Project or New Section, Rename), as on iPhone and Mac.
+                // Emoji, then the page's ⋯ menu (New Project or New Section, Rename, Share Project), as on iPhone and Mac.
                 item(key = "place-actions") {
                     var menuOpen by remember(destination.key) { mutableStateOf(false) }
                     Row(
@@ -278,6 +303,22 @@ fun AreasProjectsScreen(
                                         dialog = PlacesDialog.RenamePlace(state.title)
                                     },
                                 )
+                                if (destination is AreasProjectsDestination.Project) {
+                                    PlaceMenuItem(
+                                        title = RegistryCatalog.submenuTitle("sidebar.project", "moveToArea", languageTag).orEmpty(),
+                                        onClick = {
+                                            menuOpen = false
+                                            dialog = PlacesDialog.MoveToArea
+                                        },
+                                    )
+                                    PlaceMenuItem(
+                                        title = actionTitle(RegistryActionIds.PROJECT_SHARE, languageTag),
+                                        onClick = {
+                                            menuOpen = false
+                                            shareOpen = true
+                                        },
+                                    )
+                                }
                             }
                         }
                     }
@@ -290,7 +331,7 @@ fun AreasProjectsScreen(
                             fontSize = 18.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier
+                            modifier = taskListMotion()
                                 .fillMaxWidth()
                                 .padding(
                                     start = TaskCardMetrics.HeaderLeading,
@@ -306,7 +347,7 @@ fun AreasProjectsScreen(
                                 text = surfaceText(RegistryPlacesScreenIds.EMPTY_AREA_PROJECTS, "title", languageTag),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = mutedInk,
-                                modifier = Modifier.padding(horizontal = TaskCardMetrics.HeaderLeading, vertical = 4.dp),
+                                modifier = taskListMotion().padding(horizontal = TaskCardMetrics.HeaderLeading, vertical = 4.dp),
                             )
                         }
                     } else {
@@ -321,7 +362,7 @@ fun AreasProjectsScreen(
                                 isSelected = isDropTargeted,
                                 isDark = isDark,
                                 hasActiveTexture = hasActiveTexture,
-                                modifier = dropMod,
+                                modifier = taskListMotion().then(dropMod),
                             ) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
@@ -351,6 +392,7 @@ fun AreasProjectsScreen(
                                         overflow = TextOverflow.Ellipsis,
                                         modifier = Modifier.weight(1f),
                                     )
+                                    project.share?.let { SharedProjectMark(it, languageTag, tint = mutedInk.copy(alpha = 0.7f)) }
                                     if (project.openCount > 0) {
                                         Text(
                                             text = project.openCount.toString(),
@@ -373,7 +415,7 @@ fun AreasProjectsScreen(
                             fontSize = 18.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier
+                            modifier = taskListMotion()
                                 .fillMaxWidth()
                                 .magicPlusSectionDrop(
                                     id = "mp-area-tasks-${destination.id}",
@@ -410,52 +452,57 @@ fun AreasProjectsScreen(
                                 text = surfaceText(RegistryPlacesScreenIds.EMPTY_AREA_TASKS, "title", languageTag),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = mutedInk,
-                                modifier = Modifier.padding(horizontal = TaskCardMetrics.HeaderLeading, vertical = 4.dp),
+                                modifier = taskListMotion().padding(horizontal = TaskCardMetrics.HeaderLeading, vertical = 4.dp),
                             )
                         }
                     } else {
                         val areaPositions = visibleAreaTasks.map(PlaceTaskRow::position)
                         itemsIndexed(visibleAreaTasks, key = { _, it -> "task:${it.id}" }) { index, task ->
-                            PlaceTaskItem(
-                                task = task,
-                                position = cardPosition(index, visibleAreaTasks.size),
-                                completeTitle = completeTitle,
-                                todayTitle = todayTitle,
-                                todayTint = todayTint,
-                                fadedTitle = fadedTitle,
-                                isDark = isDark,
-                                hasActiveTexture = hasActiveTexture,
-                                rowMenuGroups = rowMenuGroups,
-                                rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
-                                selection = selection,
-                                onComplete = onComplete,
-                                onOpenTask = onOpenTask,
-                                onTaskAction = onTaskAction,
-                                canReorder = true,
-                                orderedDragIds = orderedPlaceDragIds,
-                                dropModifier = Modifier
-                                    .magicPlusRowDrop(
-                                        id = "mp-area-row-${task.id}",
-                                        enabled = onMagicPlusDrop != null,
-                                        onDrop = { before ->
-                                            onMagicPlusDrop?.invoke(
-                                                QuickAddDraft(
-                                                    areaId = destination.id,
-                                                    position = insertionPosition(areaPositions, index, before),
-                                                ),
-                                            )
-                                        },
-                                    )
-                                    .taskReorderRowDrop(
-                                        id = "reorder-area-row-${task.id}",
-                                        taskId = task.id,
-                                        enabled = true,
-                                        onDrop = { ids, before ->
-                                            val newPositions = reorderPositions(areaPositions, index, before, ids.size)
-                                            viewModel.reorderTasks(ids, newPositions)
-                                        },
-                                    ),
-                            )
+                            val slicePosition = cardPosition(index, visibleAreaTasks.size)
+                            if (expandedTaskId == task.id && expandedTaskContent != null) {
+                                expandedTaskContent(task.item, slicePosition, taskListMotion())
+                            } else {
+                                PlaceTaskItem(
+                                    task = task,
+                                    position = slicePosition,
+                                    completeTitle = completeTitle,
+                                    todayTitle = todayTitle,
+                                    todayTint = todayTint,
+                                    fadedTitle = fadedTitle,
+                                    isDark = isDark,
+                                    hasActiveTexture = hasActiveTexture,
+                                    rowMenuGroups = rowMenuGroups,
+                                    rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
+                                    selection = selection,
+                                    onComplete = onComplete,
+                                    onOpenTask = onOpenTask,
+                                    onTaskAction = onTaskAction,
+                                    canReorder = true,
+                                    orderedDragIds = orderedPlaceDragIds,
+                                    dropModifier = taskListMotion()
+                                        .magicPlusRowDrop(
+                                            id = "mp-area-row-${task.id}",
+                                            enabled = onMagicPlusDrop != null,
+                                            onDrop = { before ->
+                                                onMagicPlusDrop?.invoke(
+                                                    QuickAddDraft(
+                                                        areaId = destination.id,
+                                                        position = insertionPosition(areaPositions, index, before),
+                                                    ),
+                                                )
+                                            },
+                                        )
+                                        .taskReorderRowDrop(
+                                            id = "reorder-area-row-${task.id}",
+                                            taskId = task.id,
+                                            enabled = true,
+                                            onDrop = { ids, before ->
+                                                val newPositions = reorderPositions(areaPositions, index, before, ids.size)
+                                                viewModel.reorderTasks(ids, newPositions)
+                                            },
+                                        ),
+                                )
+                            }
                         }
                     }
                 }
@@ -467,7 +514,7 @@ fun AreasProjectsScreen(
                             fontSize = 18.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier
+                            modifier = taskListMotion()
                                 .fillMaxWidth()
                                 .magicPlusSectionDrop(
                                     id = "mp-project-tasks-${destination.id}",
@@ -504,53 +551,58 @@ fun AreasProjectsScreen(
                                 text = surfaceText(RegistryPlacesScreenIds.EMPTY_PROJECT_TASKS, "title", languageTag),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = mutedInk,
-                                modifier = Modifier.padding(horizontal = TaskCardMetrics.HeaderLeading, vertical = 4.dp),
+                                modifier = taskListMotion().padding(horizontal = TaskCardMetrics.HeaderLeading, vertical = 4.dp),
                             )
                         }
                     }
                     if (visibleUnsectioned.isNotEmpty()) {
                         val projectPositions = visibleUnsectioned.map(PlaceTaskRow::position)
                         itemsIndexed(visibleUnsectioned, key = { _, it -> "task:${it.id}" }) { index, task ->
-                            PlaceTaskItem(
-                                task = task,
-                                position = cardPosition(index, visibleUnsectioned.size),
-                                completeTitle = completeTitle,
-                                todayTitle = todayTitle,
-                                todayTint = todayTint,
-                                fadedTitle = fadedTitle,
-                                isDark = isDark,
-                                hasActiveTexture = hasActiveTexture,
-                                rowMenuGroups = rowMenuGroups,
-                                rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
-                                selection = selection,
-                                onComplete = onComplete,
-                                onOpenTask = onOpenTask,
-                                onTaskAction = onTaskAction,
-                                canReorder = true,
-                                orderedDragIds = orderedPlaceDragIds,
-                                dropModifier = Modifier
-                                    .magicPlusRowDrop(
-                                        id = "mp-project-row-${task.id}",
-                                        enabled = onMagicPlusDrop != null,
-                                        onDrop = { before ->
-                                            onMagicPlusDrop?.invoke(
-                                                QuickAddDraft(
-                                                    projectId = destination.id,
-                                                    position = insertionPosition(projectPositions, index, before),
-                                                ),
-                                            )
-                                        },
-                                    )
-                                    .taskReorderRowDrop(
-                                        id = "reorder-project-row-${task.id}",
-                                        taskId = task.id,
-                                        enabled = true,
-                                        onDrop = { ids, before ->
-                                            val newPositions = reorderPositions(projectPositions, index, before, ids.size)
-                                            viewModel.reorderTasks(ids, newPositions, targetHeadingId = null, updateHeading = true)
-                                        },
-                                    ),
-                            )
+                            val slicePosition = cardPosition(index, visibleUnsectioned.size)
+                            if (expandedTaskId == task.id && expandedTaskContent != null) {
+                                expandedTaskContent(task.item, slicePosition, taskListMotion())
+                            } else {
+                                PlaceTaskItem(
+                                    task = task,
+                                    position = slicePosition,
+                                    completeTitle = completeTitle,
+                                    todayTitle = todayTitle,
+                                    todayTint = todayTint,
+                                    fadedTitle = fadedTitle,
+                                    isDark = isDark,
+                                    hasActiveTexture = hasActiveTexture,
+                                    rowMenuGroups = rowMenuGroups,
+                                    rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
+                                    selection = selection,
+                                    onComplete = onComplete,
+                                    onOpenTask = onOpenTask,
+                                    onTaskAction = onTaskAction,
+                                    canReorder = true,
+                                    orderedDragIds = orderedPlaceDragIds,
+                                    dropModifier = taskListMotion()
+                                        .magicPlusRowDrop(
+                                            id = "mp-project-row-${task.id}",
+                                            enabled = onMagicPlusDrop != null,
+                                            onDrop = { before ->
+                                                onMagicPlusDrop?.invoke(
+                                                    QuickAddDraft(
+                                                        projectId = destination.id,
+                                                        position = insertionPosition(projectPositions, index, before),
+                                                    ),
+                                                )
+                                            },
+                                        )
+                                        .taskReorderRowDrop(
+                                            id = "reorder-project-row-${task.id}",
+                                            taskId = task.id,
+                                            enabled = true,
+                                            onDrop = { ids, before ->
+                                                val newPositions = reorderPositions(projectPositions, index, before, ids.size)
+                                                viewModel.reorderTasks(ids, newPositions, targetHeadingId = null, updateHeading = true)
+                                            },
+                                        ),
+                                )
+                            }
                         }
                     }
                     item(key = "sections-heading") {
@@ -559,7 +611,7 @@ fun AreasProjectsScreen(
                             fontSize = 18.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.padding(
+                            modifier = taskListMotion().padding(
                                 start = TaskCardMetrics.HeaderLeading,
                                 end = TaskCardMetrics.Margin,
                                 top = 14.dp,
@@ -573,12 +625,12 @@ fun AreasProjectsScreen(
                                 text = surfaceText(RegistryPlacesScreenIds.EMPTY_PROJECT_SECTIONS, "title", languageTag),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = mutedInk,
-                                modifier = Modifier.padding(horizontal = TaskCardMetrics.HeaderLeading, vertical = 4.dp),
+                                modifier = taskListMotion().padding(horizontal = TaskCardMetrics.HeaderLeading, vertical = 4.dp),
                             )
                         }
                     } else {
-                        items(visibleSections, key = { "section:${it.id}" }) { section ->
-                            PlaceSectionBlock(
+                        visibleSections.forEach { section ->
+                            placeSection(
                                 projectId = destination.id,
                                 section = section,
                                 languageTag = languageTag,
@@ -601,6 +653,8 @@ fun AreasProjectsScreen(
                                 onReorderToSection = { ids, newPositions ->
                                     viewModel.reorderTasks(ids, newPositions, targetHeadingId = section.id, updateHeading = true)
                                 },
+                                expandedTaskId = expandedTaskId,
+                                expandedTaskContent = expandedTaskContent,
                             )
                         }
                     }
@@ -615,6 +669,16 @@ fun AreasProjectsScreen(
             languageTag = languageTag,
             onDismissRequest = { emojiPickerOpen = false },
             onSelect = viewModel::setAreaEmoji,
+        )
+    }
+
+    if (shareOpen && destination is AreasProjectsDestination.Project) {
+        ShareProjectDialog(
+            graph = graph,
+            projectId = destination.id,
+            languageTag = languageTag,
+            onDismiss = { shareOpen = false },
+            onEnded = onLeftProject,
         )
     }
 
@@ -661,6 +725,18 @@ fun AreasProjectsScreen(
             languageTag = languageTag,
             onDismiss = { dialog = null },
             onConfirm = { viewModel.deleteSection(active.id); dialog = null },
+        )
+        PlacesDialog.MoveToArea -> MoveProjectToAreaDialog(
+            areas = state.availableAreas,
+            currentAreaId = state.currentAreaId,
+            languageTag = languageTag,
+            onDismiss = { dialog = null },
+            onPick = { areaId ->
+                dialog = null
+                if (areaId != state.currentAreaId) {
+                    viewModel.moveProjectToArea(areaId)
+                }
+            },
         )
     }
 }
@@ -727,8 +803,8 @@ private fun PlaceTaskItem(
     )
 }
 
-@Composable
-private fun PlaceSectionBlock(
+/** A section's header and its task rows, each its own list item, so a completed task moves only the rows below it. */
+private fun LazyListScope.placeSection(
     projectId: String,
     section: PlaceSectionRow,
     languageTag: String,
@@ -749,132 +825,41 @@ private fun PlaceSectionBlock(
     onMagicPlusDrop: ((QuickAddDraft) -> Unit)? = null,
     orderedDragIds: List<String> = emptyList(),
     onReorderToSection: (ids: List<String>, positions: List<Double>) -> Unit = { _, _ -> },
+    expandedTaskId: String? = null,
+    expandedTaskContent: (@Composable (task: TaskListItem, position: TaskCardPosition, modifier: Modifier) -> Unit)? = null,
 ) {
-    var menuOpen by remember(section.id) { mutableStateOf(false) }
-    val mutedInk = MaterialTheme.colorScheme.onSurfaceVariant
-    val destructiveRed = if (isDark) Color(0xFFFF453A) else Color(0xFFFF3B30)
-    val menuBg = if (isDark) MaterialTheme.colorScheme.surfaceContainerHigh else Color(0xF7FFFFFF)
-
-    Column {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .fillMaxWidth()
-                .magicPlusSectionDrop(
-                    id = "mp-heading-${section.id}",
-                    enabled = onMagicPlusDrop != null,
-                    onDrop = {
-                        onMagicPlusDrop?.invoke(
-                            QuickAddDraft(
-                                projectId = projectId,
-                                headingId = section.id,
-                                position = section.tasks.firstOrNull()?.position?.let { it - 1.0 },
-                            ),
-                        )
-                    },
-                )
-                .taskReorderSectionDrop(
-                    id = "reorder-heading-${section.id}",
-                    enabled = true,
-                    onDrop = { ids ->
-                        val topPos = section.tasks.firstOrNull()?.position ?: 0.0
-                        val positions = List(ids.size) { i -> topPos - (ids.size - i).toDouble() }
-                        onReorderToSection(ids, positions)
-                    },
-                )
-                .padding(
-                    start = TaskCardMetrics.HeaderLeading,
-                    end = TaskCardMetrics.Margin,
-                    top = 14.dp,
-                    bottom = 4.dp,
-                ),
-        ) {
-            Text(
-                text = section.title,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
-            Box {
-                IconButton(
-                    onClick = { menuOpen = true },
-                    modifier = Modifier.size(32.dp),
-                ) {
-                    MoreDotsGlyph(tint = mutedInk.copy(alpha = 0.72f), size = 16.dp)
-                }
-                DropdownMenu(
-                    expanded = menuOpen,
-                    onDismissRequest = { menuOpen = false },
-                    shape = RoundedCornerShape(14.dp),
-                    containerColor = menuBg,
-                    tonalElevation = 0.dp,
-                    shadowElevation = 10.dp,
-                    modifier = Modifier.width(210.dp),
-                ) {
-                    if (onMagicPlusDrop != null) {
-                        PlaceMenuItem(
-                            title = actionTitle(RegistryActionIds.SECTION_NEW_TASK, languageTag),
-                            onClick = {
-                                menuOpen = false
-                                onMagicPlusDrop(QuickAddDraft(projectId = projectId, headingId = section.id))
-                            },
-                        )
-                    }
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                menuOpen = false
-                                onRename()
-                            }
-                            .padding(horizontal = 16.dp, vertical = 10.dp),
-                    ) {
-                        Text(
-                            text = actionTitle(RegistryActionIds.SECTION_RENAME, languageTag),
-                            fontSize = 15.sp,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                    }
-                    HorizontalDivider(
-                        thickness = 0.5.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
-                    )
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                menuOpen = false
-                                onDelete()
-                            }
-                            .padding(horizontal = 16.dp, vertical = 10.dp),
-                    ) {
-                        Text(
-                            text = actionTitle(RegistryActionIds.SECTION_DELETE, languageTag),
-                            fontSize = 15.sp,
-                            color = destructiveRed,
-                        )
-                    }
-                }
-            }
-        }
-        if (section.tasks.isEmpty()) {
+    item(key = "section:${section.id}") {
+        PlaceSectionHeader(
+            projectId = projectId,
+            section = section,
+            languageTag = languageTag,
+            isDark = isDark,
+            onRename = onRename,
+            onDelete = onDelete,
+            onMagicPlusDrop = onMagicPlusDrop,
+            onReorderToSection = onReorderToSection,
+            modifier = taskListMotion(),
+        )
+    }
+    if (section.tasks.isEmpty()) {
+        item(key = "section-empty:${section.id}") {
             Text(
                 text = surfaceText(RegistryPlacesScreenIds.EMPTY_SECTION_TASKS, "title", languageTag),
                 style = MaterialTheme.typography.bodyMedium,
-                color = mutedInk,
-                modifier = Modifier.padding(horizontal = TaskCardMetrics.HeaderLeading, vertical = 4.dp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = taskListMotion().padding(horizontal = TaskCardMetrics.HeaderLeading, vertical = 4.dp),
             )
-        } else {
-            val sectionPositions = section.tasks.map(PlaceTaskRow::position)
-            section.tasks.forEachIndexed { index, task ->
+        }
+    } else {
+        val sectionPositions = section.tasks.map(PlaceTaskRow::position)
+        itemsIndexed(section.tasks, key = { _, it -> "task:${it.id}" }) { index, task ->
+            val slicePosition = cardPosition(index, section.tasks.size)
+            if (expandedTaskId == task.id && expandedTaskContent != null) {
+                expandedTaskContent(task.item, slicePosition, taskListMotion())
+            } else {
                 PlaceTaskItem(
                     task = task,
-                    position = cardPosition(index, section.tasks.size),
+                    position = slicePosition,
                     completeTitle = completeTitle,
                     todayTitle = todayTitle,
                     todayTint = todayTint,
@@ -889,7 +874,7 @@ private fun PlaceSectionBlock(
                     onTaskAction = onTaskAction,
                     canReorder = true,
                     orderedDragIds = orderedDragIds,
-                    dropModifier = Modifier
+                    dropModifier = taskListMotion()
                         .magicPlusRowDrop(
                             id = "mp-section-row-${task.id}",
                             enabled = onMagicPlusDrop != null,
@@ -913,6 +898,131 @@ private fun PlaceSectionBlock(
                             },
                         ),
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlaceSectionHeader(
+    projectId: String,
+    section: PlaceSectionRow,
+    languageTag: String,
+    isDark: Boolean,
+    onRename: () -> Unit,
+    onDelete: () -> Unit,
+    onMagicPlusDrop: ((QuickAddDraft) -> Unit)?,
+    onReorderToSection: (ids: List<String>, positions: List<Double>) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var menuOpen by remember(section.id) { mutableStateOf(false) }
+    val mutedInk = MaterialTheme.colorScheme.onSurfaceVariant
+    val destructiveRed = if (isDark) Color(0xFFFF453A) else Color(0xFFFF3B30)
+    val menuBg = if (isDark) MaterialTheme.colorScheme.surfaceContainerHigh else Color(0xF7FFFFFF)
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier
+            .fillMaxWidth()
+            .magicPlusSectionDrop(
+                id = "mp-heading-${section.id}",
+                enabled = onMagicPlusDrop != null,
+                onDrop = {
+                    onMagicPlusDrop?.invoke(
+                        QuickAddDraft(
+                            projectId = projectId,
+                            headingId = section.id,
+                            position = section.tasks.firstOrNull()?.position?.let { it - 1.0 },
+                        ),
+                    )
+                },
+            )
+            .taskReorderSectionDrop(
+                id = "reorder-heading-${section.id}",
+                enabled = true,
+                onDrop = { ids ->
+                    val topPos = section.tasks.firstOrNull()?.position ?: 0.0
+                    val positions = List(ids.size) { i -> topPos - (ids.size - i).toDouble() }
+                    onReorderToSection(ids, positions)
+                },
+            )
+            .padding(
+                start = TaskCardMetrics.HeaderLeading,
+                end = TaskCardMetrics.Margin,
+                top = 14.dp,
+                bottom = 4.dp,
+            ),
+    ) {
+        Text(
+            text = section.title,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        Box {
+            IconButton(
+                onClick = { menuOpen = true },
+                modifier = Modifier.size(32.dp),
+            ) {
+                MoreDotsGlyph(tint = mutedInk.copy(alpha = 0.72f), size = 16.dp)
+            }
+            DropdownMenu(
+                expanded = menuOpen,
+                onDismissRequest = { menuOpen = false },
+                shape = RoundedCornerShape(14.dp),
+                containerColor = menuBg,
+                tonalElevation = 0.dp,
+                shadowElevation = 10.dp,
+                modifier = Modifier.width(210.dp),
+            ) {
+                if (onMagicPlusDrop != null) {
+                    PlaceMenuItem(
+                        title = actionTitle(RegistryActionIds.SECTION_NEW_TASK, languageTag),
+                        onClick = {
+                            menuOpen = false
+                            onMagicPlusDrop(QuickAddDraft(projectId = projectId, headingId = section.id))
+                        },
+                    )
+                }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            menuOpen = false
+                            onRename()
+                        }
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                ) {
+                    Text(
+                        text = actionTitle(RegistryActionIds.SECTION_RENAME, languageTag),
+                        fontSize = 15.sp,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+                HorizontalDivider(
+                    thickness = 0.5.dp,
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            menuOpen = false
+                            onDelete()
+                        }
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                ) {
+                    Text(
+                        text = actionTitle(RegistryActionIds.SECTION_DELETE, languageTag),
+                        fontSize = 15.sp,
+                        color = destructiveRed,
+                    )
+                }
             }
         }
     }
@@ -973,6 +1083,7 @@ private fun DeleteSectionDialog(
 private sealed interface PlacesDialog {
     data object CreateProject : PlacesDialog
     data object CreateSection : PlacesDialog
+    data object MoveToArea : PlacesDialog
     data class RenamePlace(val title: String) : PlacesDialog
     data class RenameSection(val id: String, val title: String) : PlacesDialog
     data class DeleteSection(val id: String) : PlacesDialog

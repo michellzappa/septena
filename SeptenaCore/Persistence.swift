@@ -38,6 +38,14 @@ final class TaskEntity {
   /// Optional IANA time zone (nil = floating local time).
   var timeZone: String? = nil
   @Attribute(originalName: "due") var deadline: String?
+  /// The deadline the user planned past (docs/TASK_DATES_SPEC.md I8). Written
+  /// by the core's date actions; that deadline does not hold the task on Today.
+  var deferredDeadline: String? = nil
+  /// Who the task waits on, 1 to 80 characters, or nil (docs/REVIEW_SPEC.md
+  /// §6). Synced. Default `= nil` for lightweight SwiftData migration.
+  var waitingOn: String? = nil
+  /// The day the wait started (`YYYY-MM-DD`), cleared with `waitingOn`.
+  var waitingSince: String? = nil
   var today: Bool
   /// Simple boolean Important / Star marker (docs/STAR_PRIORITY_SPEC.md, ST0).
   /// Default `= false` required for lightweight SwiftData migration.
@@ -125,6 +133,8 @@ final class TaskEntity {
   var dropReason: String?
   /// `"light"` / `"heavy"`. nil = unknown.
   var effort: String?
+  /// Shared projects: the member id of the person who does this task.
+  var assignedTo: String?
   /// Legacy FastAPI-era optimistic-write guard; no longer consulted on the
   /// CloudKit path. Retained as a schema field pending Phase-2 cleanup.
   var pendingSync: Bool = false
@@ -309,6 +319,9 @@ final class TaskEntity {
   /// count, Next, and the badge.
   var isFaded: Bool { status == .open && fadedAt != nil }
 
+  /// True when the task waits on a person (docs/REVIEW_SPEC.md §6).
+  var isWaiting: Bool { TaskWaiting.isWaiting(waitingOn) }
+
   var isOnToday: Bool { listMembership()?.isOnToday ?? false }
 
   /// `docs/TASK_DATES_SPEC.md` R5: open, not on Today, and a When date or
@@ -409,6 +422,8 @@ final class ProjectEntity {
   /// Encoded `NotesProposal` JSON when an agent has suggested a new brief.
   var notesProposalJSON: String?
   var githubRepo: String?
+  /// Encoded `ProjectShare` when the project is shared. Pulled only, never pushed.
+  var shareJSON: String?
   /// Sidebar sort order (synced). `0` = unset (falls back to legacy device
   /// order / title); a reorder renumbers the whole group 1…N. Rides the
   /// reserved `reservedInt1` CK slot — additive in Prod, no record-type bump.
@@ -460,6 +475,8 @@ final class ProjectEntity {
     get { ProjectStatus(rawValue: statusRaw) ?? .active }
     set { statusRaw = newValue.rawValue }
   }
+
+  var share: ProjectShare? { ProjectShare.decode(shareJSON) }
 
   var notesProposal: NotesProposal? {
     get {
@@ -611,6 +628,9 @@ extension SeptenaTask {
       durationMinutes: e.durationMinutes,
       timeZone: e.timeZone,
       deadline: e.deadline,
+      deferredDeadline: e.deferredDeadline,
+      waitingOn: e.waitingOn,
+      waitingSince: e.waitingSince,
       today: e.today,
       starred: e.starred,
       tags: e.tagIDs,
@@ -645,6 +665,7 @@ extension SeptenaTask {
       fadedAt: e.fadedAt,
       dropReason: e.dropReason,
       effort: e.effort,
+      assignedTo: e.assignedTo,
       kind: e.kind,
       heading: e.heading,
       conversation: conversation
@@ -802,6 +823,7 @@ extension Project {
               noteRev: e.noteRev,
               notesProposal: e.notesProposal,
               githubRepo: e.githubRepo,
+              share: e.share,
               position: e.position,
               updatedAt: e.updatedAt,
               deletedAt: e.deletedAt)
@@ -924,6 +946,7 @@ final class LocalStore {
                          TaskAttachmentEntity.self,
                          TaskChecklistItemEntity.self,
                          TaskRefEntity.self,
+                         DoSessionEntity.self,
                          TagEntity.self,
                          ProjectEntity.self,
                          AreaEntity.self,
@@ -1318,7 +1341,7 @@ enum LocalCache {
           e.deletedAt == nil && !e.pendingDeletion && e.area == areaId
         }
       ))
-    case .today, .triage, .review, .agent, .upcoming, .repeating, .unscheduled, .starred, .faded:
+    case .today, .triage, .review, .upcoming, .repeating, .unscheduled, .starred, .faded:
       return StoreHealth.fetch(context, FetchDescriptor<TaskEntity>(
         predicate: #Predicate { e in
           e.deletedAt == nil && !e.pendingDeletion && e.statusRaw == "open"
@@ -1380,7 +1403,7 @@ enum LocalCache {
     if case .logbook = filter {
       return result.sorted { ($0.completedAt ?? "") > ($1.completedAt ?? "") }
     }
-    if case .faded = filter {
+    if filter == .faded || filter == .review {
       return result.sorted {
         let a = $0.fadedAt ?? .distantPast
         let b = $1.fadedAt ?? .distantPast
@@ -1481,6 +1504,15 @@ enum LocalCache {
     if filter == .faded {
       return e.isFaded ? SeptenaTask(e) : nil
     }
+    if filter == .review {
+      // What waits on the user and agent work in progress
+      // (docs/REVIEW_SPEC.md §1), faded rows included.
+      // Only rows that carry conversation JSON decode it.
+      guard e.status == .open, !e.isHeading,
+            e.isFaded || e.conversationJSON != nil || e.isWaiting else { return nil }
+      let task = SeptenaTask(e)
+      return task.reviewGroup == nil ? nil : task
+    }
     if e.isFaded { return nil }
     switch filter {
     case .today:
@@ -1493,17 +1525,7 @@ enum LocalCache {
       // Unratified layer above Today — see `TaskEntity.isInTriageBand`.
       return e.isInTriageBand ? SeptenaTask(e) : nil
     case .review:
-      // Agent-worked tasks awaiting the human's verification and acceptance (#87).
-      guard e.status == .open, e.conversation.needsHumanReview else { return nil }
-      return SeptenaTask(e)
-    case .agent:
-      // Agent work by stage (docs/TASK_FACTORY_SPEC.md §3). Only rows that
-      // carry conversation JSON decode it. A claim lease is backend wall-clock
-      // time, not the app's day, so this reads the real clock (as
-      // `deriveConvo` does).
-      guard e.status == .open, e.conversationJSON != nil,
-            e.conversation.agentStage(at: Date()) != nil else { return nil }
-      return SeptenaTask(e)
+      return nil // handled above, before the faded rows leave
     case .upcoming:
       return e.isUpcoming ? SeptenaTask(e) : nil
     case .repeating:
@@ -1652,20 +1674,16 @@ enum LocalCache {
     }
   }
 
-  /// Count of open tasks whose hard deadline is today or in the past.
-  /// Drives the Today sidebar's red badge — matches the in-list red date
-  /// treatment exactly (only `due ≤ today` counts as overdue; scheduled-past
-  /// is residence, not lateness).
+  /// Count of tasks on Today whose hard deadline is today or in the past
+  /// (docs/TASK_DATES_SPEC.md R3, R10): the red rows of the Today list. A row
+  /// the user planned past (I8) is not on Today, so it does not count.
   @MainActor
   static func overdueCount(in context: ModelContext) -> Int {
-    // Must match `SeptenaTask.isOverdue` exactly: open + deadline <= today
-    // (a deadline of today counts as overdue), and scheduled dates never
-    // count. Keep these two definitions in lockstep.
     let today = SeptenaDate.today
     let rows = StoreHealth.fetch(context, FetchDescriptor<TaskEntity>())
     return rows.reduce(0) { acc, e in
       guard e.deletedAt == nil, !e.pendingDeletion, !e.isHeading,
-            e.status == .open, !e.isFaded, let d = e.deadline, d <= today else { return acc }
+            e.status == .open, !e.isFaded, let d = e.deadline, d <= today, e.isOnToday else { return acc }
       return acc + 1
     }
   }

@@ -361,11 +361,11 @@ enum ImportPlanner {
     case "checklist":
       return options.checklistIntoNotes
         ? (.transformed, String(localized: "Written into notes as a checklist."))
-        : (.preserved, String(localized: "Kept with the import. Checklists come to Septena later."))
+        : (.preserved, String(localized: "Kept with the import record, not added to the task. Turn on Write checklists into notes to keep them on the task."))
     case "tags":
       return options.tagsIntoNotes
         ? (.transformed, String(localized: "Written into notes as #tags."))
-        : (.preserved, String(localized: "Kept with the import. Tags come to Septena later."))
+        : (.preserved, String(localized: "Kept with the import record, not added to the task. Turn on Write tags into notes to keep them on the task."))
     case "starred":
       return (.preserved, String(localized: "Kept with the import. A star marker comes to Septena later."))
     case "sourceURL":

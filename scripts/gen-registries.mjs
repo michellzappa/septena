@@ -14,6 +14,7 @@ import { fileURLToPath } from "node:url";
 import * as L10N from "./registry-l10n.mjs";
 import { checkReaders } from "./registry-readers.mjs";
 import { validateCast } from "./registry-cast.mjs";
+import { mcpToolNames } from "./lib/mcp-tools.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(__dirname, "..");
@@ -175,11 +176,50 @@ function validateCapabilities(caps) {
     for (const p of caps.platforms) {
       assert(validStatuses.has(entry[p]), `capabilities.json: ${id}.${p} has invalid status "${entry[p]}"`);
     }
+    // The agent door (ADR 0050, AS7 #628): the MCP tools that reach the
+    // capability, or "none". Every name must be a tool the backend registers.
+    const agent = entry.agent;
+    assert(agent === "none" || (Array.isArray(agent) && agent.length > 0), `capabilities.json: ${id} needs "agent": a list of MCP tool names, or "none"`);
+    if (Array.isArray(agent)) {
+      assert(new Set(agent).size === agent.length, `capabilities.json: ${id}.agent names a tool twice`);
+      for (const tool of agent) assert(MCP_TOOLS.has(tool), `capabilities.json: ${id}.agent names "${tool}", which the backend does not register (scripts/lib/mcp-tools.mjs)`);
+    }
+    const known = new Set(["title", "agent", ...caps.platforms]);
+    for (const key of Object.keys(entry)) assert(known.has(key), `capabilities.json: ${id} has unknown field "${key}"`);
+  }
+}
+
+// skills/<name>/SKILL.md (ADR 0050 §6, AS6 #627): one procedure per skill, the
+// site serves each at septena.app/skills/<name>/SKILL.md. The frontmatter has
+// `name` (the folder) and `description`. Every tool a skill names must be one
+// the backend registers, and backend/skill.md (the full brief) links each one.
+function validateSkills() {
+  const dir = path.join(REPO, "skills");
+  const names = fs.readdirSync(dir, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name).sort();
+  assert(names.length > 0, "skills/: no skills");
+  const brief = fs.readFileSync(path.join(REPO, "backend/skill.md"), "utf8");
+  for (const name of names) {
+    const rel = `skills/${name}/SKILL.md`;
+    assert(/^[a-z0-9]+(-[a-z0-9]+)*$/.test(name), `${rel}: the folder name must be lowercase words joined by hyphens`);
+    assert(fs.existsSync(path.join(REPO, rel)), `${rel}: missing`);
+    const text = fs.readFileSync(path.join(REPO, rel), "utf8");
+    const fm = text.match(/^---\n([\s\S]*?)\n---\n/);
+    assert(fm, `${rel}: needs YAML frontmatter with name and description`);
+    const field = (key) => fm[1].match(new RegExp(`^${key}: (.+)$`, "m"))?.[1]?.trim();
+    assert(field("name") === name, `${rel}: frontmatter name must be "${name}"`);
+    const description = field("description");
+    assert(description && description.length <= 1024, `${rel}: frontmatter needs a description of at most 1024 characters`);
+    assert(!/[\u2013\u2014]/.test(text), `${rel}: no em or en dashes`);
+    for (const [tool] of text.matchAll(/\btasks_[a-z_]+\b/g)) {
+      assert(MCP_TOOLS.has(tool), `${rel}: names "${tool}", which the backend does not register (scripts/lib/mcp-tools.mjs)`);
+    }
+    assert(brief.includes(`https://septena.app/skills/${name}/SKILL.md`), `backend/skill.md: link the skill ${name} (https://septena.app/skills/${name}/SKILL.md)`);
   }
 }
 
 function validateSettings(settings, entities, icons, caps) {
   assert(settings.version === 2, "settings.json: version must be 2");
+  assert(/^https:\/\/[^\s]+[^/\s]$/.test(settings.helpURL ?? ""), "settings.json: helpURL must be an https URL with no trailing slash");
   const validTypes = new Set(["bool", "int", "enum", "string", "string[]", "record"]);
   const validScopes = new Set(["synced", "device"]);
   const validPlatforms = new Set(caps.platforms);
@@ -346,8 +386,8 @@ function validateDestinations(dests, icons, caps) {
   for (const d of dests.destinations) {
     assert(!seenIds.has(d.id), `destinations.json: duplicate id "${d.id}"`);
     seenIds.add(d.id);
-    // Embedded destinations (Inbox on Today, Deleted inside Logbook) have no sidebar row.
-    if (d.visibility === "todayBand" || d.visibility === "logbookTab") {
+    // Embedded destinations (Inbox on Today, Deleted inside Logbook, Faded inside Review) have no sidebar row.
+    if (d.visibility === "todayBand" || d.visibility === "logbookTab" || d.visibility === "reviewGroup") {
       assert(d.sidebarOrder === undefined, `destinations.json: ${d.id} is ${d.visibility} and cannot have a sidebarOrder`);
       assert(d.sidebarSection === undefined, `destinations.json: ${d.id} is ${d.visibility} and cannot have a sidebarSection`);
     } else {
@@ -588,9 +628,33 @@ function validatePlaceNotes(surfaces, caps) {
   }
 }
 
+// Do (docs/DO_SPEC.md §3 to §5): the copy of the screen, the notice and the
+// history, and the lengths it offers.
+function validateDoing(surfaces, caps, entities) {
+  const d = surfaces.doing;
+  assert(d && d.featureId in caps.capabilities, "surfaces.json: doing needs a known featureId");
+  assert(d.lengths.length > 0 && d.lengths.every((m) => Number.isInteger(m) && m > 0 && m <= entities.limits.doPlannedMinutesMax), "surfaces.json: doing.lengths are minutes up to doPlannedMinutesMax");
+  assert(JSON.stringify(Object.keys(d.exits)) === JSON.stringify(entities.enums.doExit), "surfaces.json: doing.exits has one label per doExit, in order");
+  for (const [p, v] of stringsOf(d, "doing")) assert(!/[–—]/.test(v), `surfaces.json: ${p} contains an em or en dash`);
+}
+
 // References (docs/TASK_REFERENCES_SPEC.md §8): a label and an icon per key
 // kind, the fallback for a kind this build does not know, the labels of the
 // roles that show one, and the copy of Add Reference.
+// Waiting (docs/REVIEW_SPEC.md §6): the row label, the sheet copy and the
+// check-back date the sheet offers.
+function validateWaiting(surfaces, caps) {
+  const w = surfaces.waiting;
+  assert(w && w.featureId in caps.capabilities, "surfaces.json: waiting needs a known featureId");
+  assert(typeof w.label?.format === "string" && w.label.format.includes("{name}"), "surfaces.json: waiting.label.format needs {name}");
+  for (const [f, v] of [["title", w.sheet?.title], ["placeholder", w.sheet?.placeholder], ["confirmTitle", w.sheet?.confirmTitle],
+    ["checkBack.title", w.sheet?.checkBack?.title], ["noCheckBack.title", w.sheet?.noCheckBack?.title]]) {
+    assert(typeof v === "string" && v.length > 0, `surfaces.json: waiting.sheet.${f} is missing`);
+  }
+  assert(Number.isInteger(w.defaultCheckBackDays) && w.defaultCheckBackDays > 0, "surfaces.json: waiting.defaultCheckBackDays is not a positive integer");
+  for (const [p, v] of stringsOf(w, "waiting")) assert(!/[–—]/.test(v), `surfaces.json: ${p} contains an em or en dash`);
+}
+
 function validateTaskReferences(surfaces, icons, caps, entities) {
   const t = surfaces.taskReferences;
   assert(t && t.featureId in caps.capabilities, "surfaces.json: taskReferences needs a known featureId");
@@ -608,9 +672,22 @@ function validateTaskReferences(surfaces, icons, caps, entities) {
 }
 
 // The date board (docs/TASK_ROW_MENU_SPEC.md): the rows under the day strip of
-// the When and Deadline pickers, from a closed set of kinds in one order.
+// the When and Deadline pickers, from a closed set of kinds in one order. Each
+// row names its group; a group is contiguous and the groups keep the order of
+// `groups`. Platforms draw one divider where the group changes, and the day
+// strip opens the first group.
 function checkTaskDateBoard({ surfaces, icons, caps, actions }) {
   const rows = surfaces.taskDateBoard?.rows ?? [];
+  const groups = surfaces.taskDateBoard?.groups ?? [];
+  assert(groups.length === DATE_BOARD_GROUPS.length && groups.every((g, i) => g === DATE_BOARD_GROUPS[i]), `surfaces.json: taskDateBoard.groups must be ${JSON.stringify(DATE_BOARD_GROUPS)}`);
+  assert(typeof surfaces.taskDateBoard?.tomorrow?.label === "string", "surfaces.json: taskDateBoard.tomorrow.label is missing");
+  let lastGroup = 0;
+  for (const r of rows) {
+    const g = groups.indexOf(r.group);
+    assert(g >= 0, `surfaces.json: taskDateBoard row ${r.id} unknown group "${r.group}"`);
+    assert(g >= lastGroup, `surfaces.json: taskDateBoard row ${r.id} breaks the group order (groups are contiguous, in taskDateBoard.groups order)`);
+    lastGroup = g;
+  }
   const attrIds = new Set(surfaces.taskAttributes.map((a) => a.id));
   for (const kind of DATE_BOARD_ROW_KINDS) {
     assert(rows.filter((r) => r.kind === kind).length === 1, `surfaces.json: taskDateBoard needs exactly one "${kind}" row`);
@@ -626,7 +703,8 @@ function checkTaskDateBoard({ surfaces, icons, caps, actions }) {
     }
   }
 }
-const DATE_BOARD_ROW_KINDS = new Set(["tomorrow", "calendar", "clear", "repeatRule", "time"]);
+const DATE_BOARD_ROW_KINDS = new Set(["calendar", "time", "repeatRule", "clear"]);
+const DATE_BOARD_GROUPS = ["pick", "refine", "remove"];
 const DATE_BOARD_ATTRIBUTES = new Set(["when", "deadline"]);
 
 // One picker per attribute (ADR 0029): every popover attribute is opened by
@@ -650,9 +728,11 @@ const TASK_PAGE_BLOCK_KINDS = new Set(["header", "notes", "attributes", "checkli
 const TASK_PAGE_DEPTHS = new Set(["inline", "page", "review"]);
 
 // ---- plans.json (ADR 0010, ADR 0023) ----
-// Pro is planned: the site shows it, the apps and the server do not (ADR 0037).
+// Pro is a real plan (ADR 0045, ADR 0052) that sells like Plus (ADR 0059):
+// the site shows it, the server applies it from a grant or a Pro product, and
+// the apps name it on an account that has it. The app paywalls offer it in #719.
 const PLAN_LEVELS = ["free", "plus", "pro"];
-const PLAN_LIMIT_PLANS = ["account", "plus"];
+const PLAN_LIMIT_PLANS = ["account", "plus", "pro"];
 
 /** Every string in a JSON value, with its path. */
 function stringsOf(node, p, out = []) {
@@ -689,7 +769,7 @@ function validateImportSources(file, caps) {
 function validatePlans(plans, icons, caps, importSources) {
   assert(plans.version === 1, "plans.json: version must be 1");
   assert(plans.featureId in caps.capabilities, `plans.json: unknown featureId "${plans.featureId}"`);
-  for (const f of ["name", "shortName", "headline", "subhead", "ladderHeadline", "accountNote", "agentNote"]) assert(typeof plans[f] === "string" && plans[f].length > 0, `plans.json: ${f} missing`);
+  for (const f of ["name", "shortName", "proName", "headline", "subhead", "ladderHeadline", "accountNote", "agentNote"]) assert(typeof plans[f] === "string" && plans[f].length > 0, `plans.json: ${f} missing`);
   // House rule: rendered copy has no em or en dashes.
   for (const [p, v] of stringsOf(plans, "plans")) assert(!/[–—]/.test(v), `plans.json: ${p} contains an em or en dash`);
   assert(typeof plans.checkout?.open === "boolean", "plans.json: checkout.open must be a boolean");
@@ -709,12 +789,81 @@ function validatePlans(plans, icons, caps, importSources) {
     assert(pr.label.includes(whole), `plans.json: price ${pr.id} label must state ${whole}`);
   }
   assert(plans.prices.filter((x) => x.highlighted).length === 1, "plans.json: exactly one price must be highlighted");
+  // Benefits (docs/PREMIUM_LANGUAGE.md): each states its plan's value, so the
+  // words cannot drift from the server's plan table.
+  const WORDS = { 1: "one", 2: "two", 3: "three", 365: "year" };
+  for (const tier of ["plus", "pro"]) {
+    const list = plans.benefits?.[tier];
+    assert(Array.isArray(list) && list.length > 0, `plans.json: benefits.${tier} missing`);
+    for (const b of list) {
+      assert(b.id && b.icon && b.title && b.detail, `plans.json: benefits.${tier}.${b.id} needs id, icon, title, detail`);
+      assert(b.icon in icons.icons, `plans.json: benefits.${tier}.${b.id} unknown icon "${b.icon}"`);
+      if (!b.limit) continue;
+      assert(b.limit in plans.limits[tier], `plans.json: benefits.${tier}.${b.id} unknown limit "${b.limit}"`);
+      const v = plans.limits[tier][b.limit];
+      const t = b.title.toLowerCase();
+      if (v === null) assert(/no limit|every|all/.test(t), `plans.json: benefits.${tier}.${b.id} must say there is no limit`);
+      else assert(t.includes(String(v)) || (WORDS[v] && t.includes(WORDS[v])), `plans.json: benefits.${tier}.${b.id} must state ${v}`);
+    }
+  }
+  assert(/^https:\/\//.test(plans.compareURL ?? ""), "plans.json: compareURL must be an https URL");
+  // An upsell moment names the plan that answers it, so the paywall opens on that plan.
+  for (const u of plans.upsells) assert(["plus", "pro"].includes(u.plan), `plans.json: upsell ${u.id} needs plan "plus" or "pro"`);
+  // ADR 0059: Pro sells like Plus, in the same subscription group. Its prices
+  // must state the Pro level's amounts, and its products sit under .sync.pro.
+  const proLevel = plans.levels.find((l) => l.id === "pro");
+  for (const pr of plans.proPrices ?? []) {
+    assert(!priceIds.has(pr.id), `plans.json: duplicate price "${pr.id}"`);
+    priceIds.add(pr.id);
+    assert(/^com\.septena\.tasks\.sync\.pro\.[a-z]+$/.test(pr.productId), `plans.json: pro price ${pr.id} productId must start com.septena.tasks.sync.pro.`);
+    assert(Number.isInteger(pr.amountMinor) && pr.amountMinor > 0, `plans.json: pro price ${pr.id} amountMinor must be a positive integer`);
+    assert(pr.currency === "EUR", `plans.json: pro price ${pr.id} currency must be EUR`);
+    assert(["year", "month"].includes(pr.interval), `plans.json: pro price ${pr.id} unknown interval "${pr.interval}"`);
+    const whole = String(pr.amountMinor / 100);
+    assert(pr.label.includes(whole), `plans.json: pro price ${pr.id} label must state ${whole}`);
+    assert(proLevel.detail.includes(whole), `plans.json: the pro level detail must state ${whole}`);
+  }
+  assert(Array.isArray(plans.proPrices) && plans.proPrices.length > 0, "plans.json: proPrices missing (ADR 0059)");
+
+  // ADR 0060: pinned currencies (EUR baseline + USD, GBP, BRL) for the pricing
+  // page and web checkout. EUR amounts must stay in lockstep with prices/proPrices.
+  assert(plans.defaultCurrency === "EUR", "plans.json: defaultCurrency must be EUR (ADR 0060)");
+  assert(Array.isArray(plans.currencies) && plans.currencies.length > 0, "plans.json: currencies missing (ADR 0060)");
+  const curCodes = new Set();
+  const curCountries = new Set();
+  for (const cur of plans.currencies) {
+    assert(/^[A-Z]{3}$/.test(cur.code) && !curCodes.has(cur.code), `plans.json: bad or duplicate currency "${cur.code}"`);
+    curCodes.add(cur.code);
+    assert(typeof cur.symbol === "string" && cur.symbol.length > 0, `plans.json: currency ${cur.code} needs symbol`);
+    assert(typeof cur.taxInclusive === "boolean", `plans.json: currency ${cur.code} needs taxInclusive boolean`);
+    assert(typeof cur.freeLabel === "string" && cur.freeLabel.includes("0"), `plans.json: currency ${cur.code} needs freeLabel`);
+    assert(typeof cur.footnote === "string" && cur.footnote.length > 0, `plans.json: currency ${cur.code} needs footnote`);
+    assert(Array.isArray(cur.countries), `plans.json: currency ${cur.code} countries must be an array`);
+    for (const cc of cur.countries) {
+      assert(/^[A-Z]{2}$/.test(cc) && !curCountries.has(cc), `plans.json: currency ${cur.code} bad or duplicate country "${cc}"`);
+      curCountries.add(cc);
+    }
+    for (const tier of ["plus", "pro"]) {
+      for (const iv of ["year", "month"]) {
+        const entry = cur[tier]?.[iv];
+        assert(entry && Number.isInteger(entry.amountMinor) && entry.amountMinor > 0, `plans.json: currency ${cur.code}.${tier}.${iv} needs positive integer amountMinor`);
+        const whole = String(entry.amountMinor / 100);
+        assert(typeof entry.label === "string" && entry.label.includes(whole), `plans.json: currency ${cur.code}.${tier}.${iv} label must state ${whole}`);
+        assert(typeof entry.detail === "string" && entry.detail.length > 0, `plans.json: currency ${cur.code}.${tier}.${iv} needs detail`);
+      }
+    }
+  }
+  const eurCur = plans.currencies.find((c) => c.code === plans.defaultCurrency);
+  assert(eurCur, "plans.json: defaultCurrency must exist in currencies");
+  for (const pr of plans.prices) assert(eurCur.plus[pr.interval].amountMinor === pr.amountMinor, `plans.json: EUR plus.${pr.interval} must match prices.${pr.id}`);
+  for (const pr of plans.proPrices) assert(eurCur.pro[pr.interval].amountMinor === pr.amountMinor, `plans.json: EUR pro.${pr.interval} must match proPrices.${pr.id}`);
 
   assert(JSON.stringify(plans.levels.map((l) => l.id)) === JSON.stringify(PLAN_LEVELS), `plans.json: levels must be ${PLAN_LEVELS.join(", ")}`);
   assert(JSON.stringify(plans.cards.map((c) => c.id)) === JSON.stringify(PLAN_LEVELS), `plans.json: cards must be ${PLAN_LEVELS.join(", ")}`);
-  assert(plans.cards.find((c) => c.id === "pro").status === "planned", "plans.json: the pro card must be planned");
+  // ADR 0059: Pro sells like Plus, so no card carries a status: every card is on sale.
+  assert(plans.cards.every((c) => c.status === undefined), "plans.json: plan cards carry no status (ADR 0059: every plan is on sale)");
   assert(plans.cards.filter((c) => c.highlighted).length === 1, "plans.json: exactly one card must be highlighted");
-  for (const k of ["seePlus", "startTrial", "trialStarted", "trialBilling", "success", "pending", "serverRetry", "failed", "ownedApple", "ownedWeb", "ownedGoogle", "ownedGrant", "ownedOtherAccount", "done"]) {
+  for (const k of ["seePlus", "startTrial", "trialStarted", "trialBilling", "success", "pending", "serverRetry", "failed", "ownedApple", "ownedWeb", "ownedGoogle", "ownedGrant", "ownedGrantPro", "ownedOtherAccount", "done"]) {
     assert(typeof plans.paywall?.[k] === "string" && plans.paywall[k].length > 0, `plans.json: paywall.${k} missing`);
   }
   assert(plans.paywall.startTrial.includes(String(plans.trial.days)), `plans.json: paywall.startTrial must state ${plans.trial.days} days`);
@@ -771,6 +920,74 @@ function validatePlans(plans, icons, caps, importSources) {
   }
 }
 
+// ---- sign-in.json (ADR 0047, docs/SIGN_IN_SURFACES_SPEC.md §3) ----
+const SIGN_IN_FLOWS = new Set(["native", "web", "none"]);
+const SIGN_IN_KINDS = ["provider", "email", "device"];
+
+function validateSignIn(signIn, icons, caps, plans) {
+  assert(signIn.version === 1, "sign-in.json: version must be 1");
+  for (const [p, v] of stringsOf(signIn, "signIn")) assert(!/[–—]/.test(v), `sign-in.json: ${p} contains an em or en dash`);
+  assert(Array.isArray(signIn.platforms) && signIn.platforms.length > 0, "sign-in.json: missing platforms");
+  for (const p of signIn.platforms) assert(caps.platforms.includes(p), `sign-in.json: unknown platform "${p}"`);
+  const ids = new Set();
+  for (const m of signIn.methods) {
+    assert(/^[a-z]+$/.test(m.id) && !ids.has(m.id), `sign-in.json: bad or duplicate method id "${m.id}"`);
+    ids.add(m.id);
+    assert(SIGN_IN_KINDS.includes(m.kind), `sign-in.json: method ${m.id} unknown kind "${m.kind}"`);
+    assert(m.kind !== "provider" || (typeof m.name === "string" && m.name.length > 0), `sign-in.json: provider ${m.id} needs a name`);
+    assert(typeof m.title === "string" && m.title.length > 0, `sign-in.json: method ${m.id} needs a title`);
+    assert(m.icon in icons.icons, `sign-in.json: method ${m.id} icon "${m.icon}" is not in icons.json`);
+    assert(typeof m.createsAccount === "boolean", `sign-in.json: method ${m.id} createsAccount must be a boolean`);
+    // ADR 0047: device approval needs a signed-in device; every other method creates an account.
+    assert(m.createsAccount === (m.kind !== "device"), `sign-in.json: method ${m.id} createsAccount must be ${m.kind !== "device"}`);
+    assert(m.featureId in caps.capabilities, `sign-in.json: method ${m.id} unknown featureId "${m.featureId}"`);
+    assert(JSON.stringify(Object.keys(m.flows ?? {}).sort()) === JSON.stringify([...signIn.platforms].sort()), `sign-in.json: method ${m.id} needs a flow for exactly ${signIn.platforms.join(", ")}`);
+    for (const [p, f] of Object.entries(m.flows)) {
+      assert(SIGN_IN_FLOWS.has(f), `sign-in.json: method ${m.id} flow on ${p} must be native, web or none`);
+      assert(f !== "none" || (typeof m.notes === "string" && m.notes.length > 0), `sign-in.json: method ${m.id} is none on ${p}; say why in notes`);
+    }
+  }
+  const byId = Object.fromEntries(signIn.methods.map((m) => [m.id, m]));
+  assert(JSON.stringify(Object.keys(signIn.order ?? {}).sort()) === JSON.stringify([...signIn.platforms].sort()), `sign-in.json: order needs exactly ${signIn.platforms.join(", ")}`);
+  for (const [p, list] of Object.entries(signIn.order)) {
+    const want = signIn.methods.filter((m) => m.flows[p] !== "none").map((m) => m.id).sort();
+    assert(new Set(list).size === list.length && JSON.stringify([...list].sort()) === JSON.stringify(want), `sign-in.json: order.${p} must list exactly the methods that are not none on ${p} (${want.join(", ")})`);
+    // Providers, then email, then device approval; the platform's native provider first.
+    const ranks = list.map((id) => SIGN_IN_KINDS.indexOf(byId[id].kind));
+    assert(ranks.every((r, i) => i === 0 || ranks[i - 1] <= r), `sign-in.json: order.${p} must list providers, then email, then device`);
+    const native = list.filter((id) => byId[id].kind === "provider" && byId[id].flows[p] === "native");
+    assert(native.length <= 1, `sign-in.json: order.${p} has more than one native provider`);
+    assert(native.length === 0 || list[0] === native[0], `sign-in.json: order.${p} must start with its native provider "${native[0]}"`);
+  }
+  assert(signIn.copy.terms.includes("{terms}") && signIn.copy.terms.includes("{privacy}"), "sign-in.json: copy.terms needs {terms} and {privacy}");
+  assert(signIn.email.codeSent.includes("{email}"), "sign-in.json: email.codeSent needs {email}");
+  assert(signIn.existingAccount.detail.includes("{email}") && signIn.existingAccount.detail.includes("{provider}"), "sign-in.json: existingAccount.detail needs {email} and {provider}");
+  assert(signIn.existingAccount.manualDetail.includes("{email}") && signIn.existingAccount.manualDetail.includes("{provider}"), "sign-in.json: existingAccount.manualDetail needs {email} and {provider}");
+  assert(signIn.manage?.addProvider?.includes("{provider}"), "sign-in.json: manage.addProvider needs {provider}");
+  assert(signIn.errors.wrongCode?.other?.includes("{count}"), "sign-in.json: errors.wrongCode must be a plural with {count}");
+  assert(plans.legal?.terms && plans.legal?.privacy, "sign-in.json: the Terms and Privacy URLs come from plans.json legal");
+}
+
+// The code map (ADR 0050, AS9): public claims and the file that keeps each.
+// No bindings: septena.app renders it. Every path must exist in this repo, so
+// a rename here fails before the site's own check does.
+function validateCodeMap(map, caps) {
+  assert(map.repo === "michellzappa/septena" && map.branch === "main", "code-map.json: repo must be michellzappa/septena on main");
+  assert(Array.isArray(map.entries) && map.entries.length > 0, "code-map.json: entries must be a non-empty array");
+  const ids = new Set();
+  for (const e of map.entries) {
+    assert(typeof e.id === "string" && /^[a-z0-9-]+$/.test(e.id), `code-map.json: bad id ${JSON.stringify(e.id)}`);
+    assert(!ids.has(e.id), `code-map.json: duplicate id ${e.id}`);
+    ids.add(e.id);
+    assert(typeof e.label === "string" && e.label.trim() && !/[\u2013\u2014]/.test(e.label), `code-map.json: ${e.id} needs a label without en or em dashes`);
+    assert(typeof e.path === "string" && !e.path.startsWith("/") && !e.path.includes(".."), `code-map.json: ${e.id} path must be relative to the repo`);
+    const full = path.join(REPO, e.path);
+    assert(fs.existsSync(full), `code-map.json: ${e.id} path ${e.path} does not exist`);
+    assert(fs.statSync(full).isDirectory() === e.path.endsWith("/"), `code-map.json: ${e.id} path ${e.path}: a folder ends in /, a file does not`);
+    if (e.feature !== undefined) assert(caps.capabilities[e.feature], `code-map.json: ${e.id} feature ${e.feature} is not in capabilities.json`);
+  }
+}
+
 function validateConformance() {
   const dir = path.join(REPO, "registry/conformance");
   const files = fs.readdirSync(dir).filter((f) => f.endsWith(".json")).sort();
@@ -819,7 +1036,7 @@ function appleKeycaps(sc) {
   if (sc.modifiers.includes("alt")) caps.push("⌥");
   if (sc.modifiers.includes("shift")) caps.push("⇧");
   if (sc.modifiers.includes("primary")) caps.push("⌘");
-  const keyMap = { delete: "⌫", escape: "esc", return: "return", space: "space", tab: "tab" };
+  const keyMap = { delete: "⌫", escape: "esc", return: "↩", space: "space", tab: "tab" };
   caps.push(keyMap[sc.key] ?? sc.key.toUpperCase());
   return caps;
 }
@@ -1085,6 +1302,8 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("");
   lines.push("/// Unified task-app settings keys, defaults, synced-key list, and taxonomy (`registry/settings.json`).");
   lines.push("enum RegistrySettings {");
+  lines.push("  /// The help center. Help rows and menu items open it or a page below it.");
+  lines.push(`  static let helpURL = URL(string: ${swiftStr(settings.helpURL)})!`);
   lines.push(`  static let syncedKeys: [String] = [${syncedKeys.map(swiftStr).join(", ")}]`);
   lines.push("");
   lines.push("  enum StorageKey {");
@@ -1671,7 +1890,7 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
     const action = actions.actions[r.action];
     const label = action ? L(action.title, action, "title") : L(r.label, r, "label");
     const own = (r.attributeLabels ?? []).map((l) => `.${l.attribute}: ${L(l.label, l, "label")}`).join(", ");
-    lines.push(`    RegistryDateBoardRow(id: ${swiftStr(r.id)}, kind: .${r.kind}, label: ${label}, attributeLabels: [${own || ":"}], sfSymbol: ${swiftStr(icons.icons[r.icon].sfSymbol)}, attributes: [${r.attributes.map((a) => "." + a).join(", ")}], featureId: ${swiftStr(r.featureId)}),`);
+    lines.push(`    RegistryDateBoardRow(id: ${swiftStr(r.id)}, kind: .${r.kind}, group: .${r.group}, label: ${label}, attributeLabels: [${own || ":"}], sfSymbol: ${swiftStr(icons.icons[r.icon].sfSymbol)}, attributes: [${r.attributes.map((a) => "." + a).join(", ")}], featureId: ${swiftStr(r.featureId)}),`);
   }
   lines.push("  ]");
   lines.push("  static func dateBoardRows(for attribute: RegistryDateBoardAttribute, on platform: String) -> [RegistryDateBoardRow] {");
@@ -1681,8 +1900,8 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   const cal = surfaces.taskDateBoard.rows.find((r) => r.kind === "calendar");
   lines.push("  /// The calendar row when the task has a date past the day strip.");
   lines.push(tmplFn("dateBoardCalendarLabel", tmplKey(cal.valueLabel, cal, "valueLabel")));
-  const tmrw = surfaces.taskDateBoard.rows.find((r) => r.kind === "tomorrow");
-  lines.push("  /// The word for the day after today, in the date board and in date labels.");
+  const tmrw = surfaces.taskDateBoard.tomorrow;
+  lines.push("  /// The word for the day after today, in date labels.");
   lines.push(`  static let tomorrowLabel: String = ${L(tmrw.label, tmrw, "label")}`);
   const prov = surfaces.taskPage.blocks.find((b) => b.kind === "provenance");
   lines.push("  /// Provenance block (`taskPage.provenance`): the name a task you added shows as,");
@@ -1700,6 +1919,7 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   const qf = surfaces.quickFind;
   lines.push("  /// Quick Find copy (`surfaces.json` `quickFind`).");
   lines.push(`  static let quickFindPlaceholder: String = ${L(qf.placeholder, qf, "placeholder")}`);
+  lines.push(`  static let quickFindCommandPlaceholder: String = ${L(qf.commandPlaceholder, qf, "commandPlaceholder")}`);
   lines.push(`  static let quickFindEmptyTitle: String = ${L(qf.emptyState.title, qf.emptyState, "title")}`);
   lines.push(`  static let quickFindEmptyDetail: String = ${L(qf.emptyState.detail, qf.emptyState, "detail")}`);
   lines.push(`  static let quickFindCompletedLabel: String = ${L(qf.completed.label, qf.completed, "label")}`);
@@ -1720,10 +1940,16 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   for (const k of DATE_BOARD_ROW_KINDS) lines.push(`  case ${k}`);
   lines.push("}");
   lines.push("");
+  lines.push("/// The date board's row groups, in order. The day strip opens `pick`; a divider separates groups.");
+  lines.push("enum RegistryDateBoardGroup: String, Sendable, Hashable {");
+  for (const g of DATE_BOARD_GROUPS) lines.push(`  case ${g}`);
+  lines.push("}");
+  lines.push("");
   lines.push("/// One row under the date board's day strip (`surfaces.json` `taskDateBoard.rows`).");
   lines.push("struct RegistryDateBoardRow: Sendable, Hashable, Identifiable {");
   lines.push("  let id: String");
   lines.push("  let kind: RegistryDateBoardRowKind");
+  lines.push("  let group: RegistryDateBoardGroup");
   lines.push("  let label: String");
   lines.push("  /// Attribute → label that replaces `label` in that attribute's picker.");
   lines.push("  let attributeLabels: [RegistryDateBoardAttribute: String]");
@@ -1797,6 +2023,48 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("}");
   lines.push("");
 
+  // 8a. Do (surfaces.json `doing`, docs/DO_SPEC.md)
+  const doing = surfaces.doing;
+  lines.push("/// Do: one task now (`registry/surfaces.json` `doing`, docs/DO_SPEC.md §3 to §5).");
+  lines.push("enum RegistryDoing {");
+  lines.push("  /// The lengths offered, in minutes.");
+  lines.push(`  static let lengths: [Int] = [${doing.lengths.join(", ")}]`);
+  for (const [name, node, field] of [
+    ["lastTimeTitle", doing.screen.lastTime, "title"], ["firstStepTitle", doing.screen.firstStep, "title"],
+    ["lengthTitle", doing.screen.length, "title"], ["noLengthTitle", doing.screen.length.noneTitle, "title"],
+    ["stopNoteTitle", doing.stopNote, "title"], ["stopNoteSaveTitle", doing.stopNote, "confirmTitle"],
+    ["stopNoteSkipTitle", doing.stopNote, "dismissTitle"], ["openExitLabel", doing.openExit, "label"],
+  ]) lines.push(`  static let ${name}: String = ${L(node[field], node, field)}`);
+  for (const [name, node] of [
+    ["lengthOption", doing.screen.length.option], ["notice", doing.notice], ["stale", doing.stale],
+    ["plannedEnd", doing.plannedEnd], ["needsYou", doing.needsYou],
+  ]) {
+    const t = L10N.swiftTemplate(BY_KEY, tmplKey(node.format, node, "format"));
+    lines.push(`  static func ${name}(${t.params}) -> String { ${t.body} }`);
+  }
+  lines.push("  /// The label of an exit (`doExit`) in the history.");
+  lines.push(`  static let exitLabels: [String: String] = [${Object.entries(doing.exits).map(([id, e]) => `${swiftStr(id)}: ${L(e.label, e, "label")}`).join(", ")}]`);
+  lines.push("}");
+  lines.push("");
+
+  // 8a. Waiting (surfaces.json `waiting`, docs/REVIEW_SPEC.md §6)
+  const waiting = surfaces.waiting;
+  lines.push("/// Waiting on a person (`registry/surfaces.json` `waiting`, docs/REVIEW_SPEC.md §6).");
+  lines.push("enum RegistryWaiting {");
+  {
+    const t = L10N.swiftTemplate(BY_KEY, tmplKey(waiting.label.format, waiting.label, "format"));
+    lines.push(`  static func label(${t.params}) -> String { ${t.body} }`);
+  }
+  for (const [name, node, field] of [
+    ["sheetTitle", waiting.sheet, "title"], ["namePlaceholder", waiting.sheet, "placeholder"],
+    ["confirmTitle", waiting.sheet, "confirmTitle"], ["checkBackTitle", waiting.sheet.checkBack, "title"],
+    ["noCheckBackTitle", waiting.sheet.noCheckBack, "title"],
+  ]) lines.push(`  static let ${name}: String = ${L(node[field], node, field)}`);
+  lines.push("  /// The check-back date Waiting On… offers, in days from today.");
+  lines.push(`  static let defaultCheckBackDays = ${waiting.defaultCheckBackDays}`);
+  lines.push("}");
+  lines.push("");
+
   // 8a. Project and area notes (surfaces.json `placeNotes`)
   const placeNotes = surfaces.placeNotes;
   lines.push("/// The notes on a project's or an area's page (`registry/surfaces.json` `placeNotes`).");
@@ -1809,12 +2077,39 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("}");
   lines.push("");
 
+  // 8a. Shared projects (surfaces.json `sharing`, docs/PROJECT_SHARING_SPEC.md)
+  const sharing = surfaces.sharing;
+  lines.push("/// Shared projects (`registry/surfaces.json` `sharing`).");
+  lines.push("enum RegistrySharing {");
+  lines.push(`  static let title: String = ${L(sharing.title, sharing, "title")}`);
+  for (const e of sharing.copy) lines.push(`  static let ${e.id}: String = ${L(e.label, e, "label")}`);
+  lines.push("}");
+  lines.push("");
+
   // 8a. Sign-in by device approval (surfaces.json `deviceSignIn`, ADR 0016)
   const deviceSignIn = surfaces.deviceSignIn;
   lines.push("/// Sign-in by device approval (`registry/surfaces.json` `deviceSignIn`).");
   lines.push("enum RegistryDeviceSignIn {");
   lines.push(`  static let title: String = ${L(deviceSignIn.title, deviceSignIn, "title")}`);
   for (const e of deviceSignIn.copy) lines.push(`  static let ${e.id}: String = ${L(e.label, e, "label")}`);
+  lines.push("}");
+  lines.push("");
+
+  // 8a'. Signing in with another account (surfaces.json `accountSwitch`, #575)
+  const accountSwitch = surfaces.accountSwitch;
+  lines.push("/// The question before a sign-in replaces another account's tasks (`registry/surfaces.json` `accountSwitch`).");
+  lines.push("enum RegistryAccountSwitch {");
+  lines.push(`  static let title: String = ${L(accountSwitch.title, accountSwitch, "title")}`);
+  for (const e of accountSwitch.copy) lines.push(`  static let ${e.id}: String = ${L(e.label, e, "label")}`);
+  lines.push("}");
+  lines.push("");
+
+  // 8a''. Contact Support (surfaces.json `support`, ADR 0054)
+  const supportCopy = surfaces.support;
+  lines.push("/// Contact Support's screen (`registry/surfaces.json` `support`, ADR 0054).");
+  lines.push("enum RegistrySupport {");
+  lines.push(`  static let title: String = ${L(supportCopy.title, supportCopy, "title")}`);
+  for (const e of supportCopy.copy) lines.push(`  static let ${e.id}: String = ${L(e.label, e, "label")}`);
   lines.push("}");
   lines.push("");
 
@@ -1924,6 +2219,7 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  let planned: Bool");
   lines.push("  let free: RegistryPlanCell");
   lines.push("  let plus: RegistryPlanCell");
+  lines.push("  let pro: RegistryPlanCell");
   lines.push("}");
   lines.push("");
   lines.push("struct RegistryPlanOutcome: Sendable, Hashable, Identifiable {");
@@ -1934,15 +2230,26 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  let rows: [RegistryPlanRow]");
   lines.push("}");
   lines.push("");
-  lines.push("struct RegistryPlanNote: Sendable, Hashable, Identifiable {");
+  lines.push("/// One benefit of a paid plan (`benefits` in plans.json, docs/PREMIUM_LANGUAGE.md).");
+  lines.push("struct RegistryPlanBenefit: Sendable, Hashable, Identifiable {");
   lines.push("  let id: String");
+  lines.push("  /// Registry icon id (icons.json); its tile color is `AppearancePreferences.glyphSwiftUIColor`.");
+  lines.push("  let icon: String");
   lines.push("  let title: String");
   lines.push("  let detail: String");
   lines.push("}");
   lines.push("");
+  lines.push("struct RegistryPlanNote: Sendable, Hashable, Identifiable {");
+  lines.push("  let id: String");
+  lines.push("  let title: String");
+  lines.push("  let detail: String");
+  lines.push("  /// For an upsell moment: the plan that answers it (`plus` or `pro`). The paywall opens on it.");
+  lines.push("  var plan: String? = nil");
+  lines.push("}");
+  lines.push("");
   lines.push("/// Plans and pricing (`registry/plans.json`). The site's /pricing page reads the same file.");
   lines.push("enum RegistryPlans {");
-  for (const f of ["name", "shortName", "headline", "subhead"]) lines.push(`  static var ${f}: String { ${L(P[f], P, f)} }`);
+  for (const f of ["name", "shortName", "proName", "headline", "subhead"]) lines.push(`  static var ${f}: String { ${L(P[f], P, f)} }`);
   lines.push(`  static let checkoutOpen = ${P.checkout.open}`);
   lines.push(`  static var checkoutNotice: String { ${L(P.checkout.notice, P.checkout, "notice")} }`);
   lines.push(`  static let trialDays = ${P.trial.days}`);
@@ -1952,18 +2259,34 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  static var prices: [RegistryPlanPrice] { [");
   for (const pr of P.prices) lines.push(`    RegistryPlanPrice(id: ${swiftStr(pr.id)}, productId: ${swiftStr(pr.productId)}, amountMinor: ${pr.amountMinor}, currency: ${swiftStr(pr.currency)}, interval: ${swiftStr(pr.interval)}, highlighted: ${pr.highlighted}, label: ${L(pr.label, pr, "label")}, detail: ${L(pr.detail, pr, "detail")}),`);
   lines.push("  ] }");
-  lines.push("  static var cards: [RegistryPlanCard] { [");
-  for (const c of P.cards.filter((c) => c.status !== "planned")) lines.push(`    RegistryPlanCard(id: ${swiftStr(c.id)}, title: ${L(c.title, c, "title")}, icon: ${swiftStr(c.icon)}, detail: ${L(c.detail, c, "detail")}, footnote: ${LOpt(c.footnote, c, "footnote")}, highlighted: ${c.highlighted === true}),`);
+  lines.push("  /// What Pro costs (ADR 0059): the higher level of the same subscription group.");
+  lines.push("  static var proPrices: [RegistryPlanPrice] { [");
+  for (const pr of P.proPrices) lines.push(`    RegistryPlanPrice(id: ${swiftStr(pr.id)}, productId: ${swiftStr(pr.productId)}, amountMinor: ${pr.amountMinor}, currency: ${swiftStr(pr.currency)}, interval: ${swiftStr(pr.interval)}, highlighted: ${pr.highlighted}, label: ${L(pr.label, pr, "label")}, detail: ${L(pr.detail, pr, "detail")}),`);
   lines.push("  ] }");
+  for (const tier of ["plus", "pro"]) {
+    lines.push(`  static var ${tier}Benefits: [RegistryPlanBenefit] { [`);
+    for (const b of P.benefits[tier]) lines.push(`    RegistryPlanBenefit(id: ${swiftStr(b.id)}, icon: ${swiftStr(b.icon)}, title: ${L(b.title, b, "title")}, detail: ${L(b.detail, b, "detail")}),`);
+    lines.push("  ] }");
+  }
+  lines.push("  /// The full comparison of every plan, on the website.");
+  lines.push(`  static let compareURL = URL(string: ${swiftStr(P.compareURL)})!`);
+  lines.push("  /// The rows every plan card lists (`cardRows`), in order.");
+  lines.push(`  static let cardRowIDs: [String] = [${P.cardRows.map(swiftStr).join(", ")}]`);
+  lines.push("  static var cards: [RegistryPlanCard] { [");
+  const cardSwift = (c) => `RegistryPlanCard(id: ${swiftStr(c.id)}, title: ${L(c.title, c, "title")}, icon: ${swiftStr(c.icon)}, detail: ${L(c.detail, c, "detail")}, footnote: ${LOpt(c.footnote, c, "footnote")}, highlighted: ${c.highlighted === true})`;
+  for (const c of P.cards.filter((c) => c.status === undefined)) lines.push(`    ${cardSwift(c)},`);
+  lines.push("  ] }");
+  lines.push("  /// The Pro card, for an account that has Pro. The paywalls offer it in #719 (ADR 0059).");
+  lines.push(`  static var proCard: RegistryPlanCard { ${cardSwift(P.cards.find((c) => c.id === "pro"))} }`);
   lines.push("  static var outcomes: [RegistryPlanOutcome] { [");
   for (const o of P.outcomes) {
-    const rows = o.rows.map((r) => `RegistryPlanRow(id: ${swiftStr(r.id)}, label: ${L(r.label, r, "label")}, planned: ${r.status === "planned"}, free: ${cellSwift(r.cells.free, r, "free")}, plus: ${cellSwift(r.cells.plus, r, "plus")})`).join(",\n      ");
+    const rows = o.rows.map((r) => `RegistryPlanRow(id: ${swiftStr(r.id)}, label: ${L(r.label, r, "label")}, planned: ${r.status === "planned"}, free: ${cellSwift(r.cells.free, r, "free")}, plus: ${cellSwift(r.cells.plus, r, "plus")}, pro: ${cellSwift(r.cells.pro, r, "pro")})`).join(",\n      ");
     lines.push(`    RegistryPlanOutcome(id: ${swiftStr(o.id)}, icon: ${swiftStr(o.icon)}, title: ${L(o.title, o, "title")}, detail: ${L(o.detail, o, "detail")}, rows: [\n      ${rows},\n    ]),`);
   }
   lines.push("  ] }");
   for (const list of ["promises", "upsells"]) {
     lines.push(`  static var ${list}: [RegistryPlanNote] { [`);
-    for (const n of P[list]) lines.push(`    RegistryPlanNote(id: ${swiftStr(n.id)}, title: ${L(n.title, n, "title")}, detail: ${L(n.detail, n, "detail")}),`);
+    for (const n of P[list]) lines.push(`    RegistryPlanNote(id: ${swiftStr(n.id)}, title: ${L(n.title, n, "title")}, detail: ${L(n.detail, n, "detail")}${n.plan ? `, plan: ${swiftStr(n.plan)}` : ""}),`);
     lines.push("  ] }");
   }
   lines.push("  static func card(_ id: String) -> RegistryPlanCard? { cards.first { $0.id == id } }");
@@ -1995,6 +2318,82 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
     }
     lines.push("  }");
     if (name === "Status") lines.push("");
+  }
+  lines.push("}");
+  lines.push("");
+
+  // 11. Sign-in methods and the sign-in screen (sign-in.json, ADR 0047).
+  const SI = bundle.signIn;
+  const swiftBlock = (block, indent = "    ") => {
+    for (const [k, v] of Object.entries(block)) {
+      if (k === "l10nKeys") continue;
+      const isPl = typeof v === "object";
+      if (isPl || /\{[a-zA-Z]/.test(v)) {
+        const t = L10N.swiftTemplate(BY_KEY, block.l10nKeys?.[k] ?? (isPl ? v.other : v));
+        lines.push(`${indent}static func ${k}(${t.params}) -> String { ${t.body} }`);
+      } else {
+        lines.push(`${indent}static var ${k}: String { ${L(v, block, k)} }`);
+      }
+    }
+  };
+  lines.push("/// How a platform offers a sign-in method (`registry/sign-in.json`).");
+  lines.push("enum RegistrySignInFlow: String, Sendable {");
+  lines.push("  /// The platform's own flow. For email and device, the client draws the form.");
+  lines.push("  case native");
+  lines.push("  /// A redirect through api.septena.app in the system browser sheet.");
+  lines.push("  case web");
+  lines.push("  /// The platform cannot offer the method.");
+  lines.push('  case unavailable = "none"');
+  lines.push("}");
+  lines.push("");
+  lines.push("enum RegistrySignInMethodId: String, Sendable, CaseIterable {");
+  for (const m of SI.methods) lines.push(`  case ${swiftCaseDecl(m.id)} = ${swiftStr(m.id)}`);
+  lines.push("}");
+  lines.push("");
+  lines.push("struct RegistrySignInMethod: Sendable, Hashable, Identifiable {");
+  lines.push("  let id: RegistrySignInMethodId");
+  lines.push("  /// `provider`, `email` or `device`.");
+  lines.push("  let kind: String");
+  lines.push("  /// The provider's name for copy (`{provider}`); nil for email and device.");
+  lines.push("  let name: String?");
+  lines.push("  let title: String");
+  lines.push("  /// Registry icon id (icons.json).");
+  lines.push("  let icon: String");
+  lines.push("  /// False only for device approval: it needs an account that exists.");
+  lines.push("  let createsAccount: Bool");
+  lines.push("  let featureId: String");
+  lines.push("  /// Flow by platform id (`ios`, `ipados`, `macos`, ...).");
+  lines.push("  let flows: [String: RegistrySignInFlow]");
+  lines.push("}");
+  lines.push("");
+  lines.push("/// The sign-in screen (`registry/sign-in.json`, ADR 0047). It is also the");
+  lines.push("/// create-account screen. The backend's GET /v1/auth/methods says which");
+  lines.push("/// methods are on; hide the others.");
+  lines.push("enum RegistrySignIn {");
+  lines.push("  static var methods: [RegistrySignInMethod] { [");
+  for (const m of SI.methods) {
+    const flows = SI.platforms.map((p) => `${swiftStr(p)}: .${m.flows[p] === "none" ? "unavailable" : m.flows[p]}`).join(", ");
+    lines.push(`    RegistrySignInMethod(id: ${swiftCaseRef(m.id)}, kind: ${swiftStr(m.kind)}, name: ${swiftOptStr(m.name)}, title: ${L(m.title, m, "title")}, icon: ${swiftStr(m.icon)}, createsAccount: ${m.createsAccount}, featureId: ${swiftStr(m.featureId)}, flows: [${flows}]),`);
+  }
+  lines.push("  ] }");
+  lines.push("  /// Method order by platform id: the platform's provider, the other providers, email, device.");
+  lines.push("  static let order: [String: [RegistrySignInMethodId]] = [");
+  for (const p of SI.platforms) lines.push(`    ${swiftStr(p)}: [${SI.order[p].map(swiftCaseRef).join(", ")}],`);
+  lines.push("  ]");
+  lines.push("  static func method(_ id: RegistrySignInMethodId) -> RegistrySignInMethod? { methods.first { $0.id == id } }");
+  lines.push("  /// The methods `platform` offers, in screen order.");
+  lines.push("  static func methods(on platform: String) -> [RegistrySignInMethod] {");
+  lines.push("    let all = methods");
+  lines.push("    return (order[platform] ?? []).compactMap { id in all.first { $0.id == id } }");
+  lines.push("  }");
+  lines.push("  /// The Terms line's links (plans.json `legal`).");
+  lines.push("  static var termsURL: URL { RegistryPlans.termsURL }");
+  lines.push("  static var privacyURL: URL { RegistryPlans.privacyURL }");
+  lines.push("");
+  for (const [name, block] of [["Copy", SI.copy], ["Email", SI.email], ["Errors", SI.errors], ["ExistingAccount", SI.existingAccount], ["Manage", SI.manage]]) {
+    lines.push(`  enum ${name} {`);
+    swiftBlock(block);
+    lines.push("  }");
   }
   lines.push("}");
   lines.push("");
@@ -2083,7 +2482,8 @@ function generateTS({ entities, rules, icons, tokens, caps, settings, dests, act
   lines.push("");
   const syncedKeys = Object.entries(settings.keys).filter(([, v]) => v.scope === "synced").map(([k]) => k);
   lines.push(`export const SYNCED_SETTING_KEYS = ${JSON.stringify(syncedKeys)} as const;`);
-  lines.push(`export const SETTINGS_REGISTRY = ${JSON.stringify({ version: settings.version, keys: settings.keys, desktopTabs: settings.desktopTabs, rootGroups: settings.rootGroups, pages: settings.pages })} as const;`);
+  lines.push(`export const HELP_URL = ${JSON.stringify(settings.helpURL)};`);
+  lines.push(`export const SETTINGS_REGISTRY = ${JSON.stringify({ version: settings.version, keys: settings.keys, copy: settings.copy, desktopTabs: settings.desktopTabs, rootGroups: settings.rootGroups, pages: settings.pages })} as const;`);
   lines.push(`export const VIEW_ALIASES = ${JSON.stringify(dests.viewAliases)} as const;`);
   lines.push(`export const DESTINATIONS = ${JSON.stringify(dests.destinations)} as const;`);
   lines.push(`export const GENERIC_EMPTY_STATE = ${JSON.stringify(dests.genericEmptyState)} as const;`);
@@ -2091,14 +2491,20 @@ function generateTS({ entities, rules, icons, tokens, caps, settings, dests, act
   lines.push(`export const DESIGN_TOKENS = ${JSON.stringify({ accentPolicy: tokens.accentPolicy, fruitAccents: tokens.fruitAccents ?? [], textures: tokens.textures ?? [], selection: tokens.selection, colors: tokens.colors, multicolorGlyphs: tokens.multicolorGlyphs?.glyphs ?? {}, accentPalette: tokens.accentPalette, radii: tokens.radii, spacing: tokens.spacing, desktopColumn: tokens.desktopColumn, textScale: tokens.textScale })} as const;`);
   lines.push(`export const CAPABILITIES = ${JSON.stringify(caps.capabilities)} as const;`);
   lines.push(`export const ACTIONS_CATALOG = ${JSON.stringify({ actions: actions.actions, contextMenus: actions.contextMenus, menuBar: actions.menuBar, shortcutsSheet: actions.shortcutsSheet })} as const;`);
-  lines.push(`export const SURFACES_CATALOG = ${JSON.stringify({ notices: surfaces.notices, prompts: surfaces.prompts, toasts: surfaces.toasts, taskAttributes: surfaces.taskAttributes, taskPage: surfaces.taskPage })} as const;`);
+  lines.push(`export const SURFACES_CATALOG = ${JSON.stringify({ notices: surfaces.notices, prompts: surfaces.prompts, toasts: surfaces.toasts, taskAttributes: surfaces.taskAttributes, taskDateBoard: surfaces.taskDateBoard, taskPage: surfaces.taskPage, waiting: surfaces.waiting, accountSwitch: surfaces.accountSwitch, deviceSignIn: surfaces.deviceSignIn, quickFind: surfaces.quickFind, support: surfaces.support })} as const;`);
   lines.push(`export const FIRST_RUN = ${JSON.stringify(surfaces.firstRun)} as const;`);
   lines.push("/** Plan limits (registry/plans.json). The server's plan table: every gate reads these, never a plan name. */");
   lines.push(`export const PLAN_LIMITS = ${JSON.stringify(plans.limits)} as const;`);
   lines.push(`export const PLAN_TRIAL_DAYS = ${plans.trial.days};`);
   lines.push(`export const PLAN_PRODUCTS = ${JSON.stringify(plans.prices.map((p) => p.productId))} as const;`);
+  lines.push("/** The plan each store product gives (ADR 0059). A product not listed gives nothing. */");
+  lines.push(`export const PLAN_PRODUCT_PLANS = ${JSON.stringify(Object.fromEntries([...plans.prices.map((p) => [p.productId, "plus"]), ...plans.proPrices.map((p) => [p.productId, "pro"])]))} as const;`);
+  lines.push("/** The plan page and the plan sheet's words, prices and benefits (registry/plans.json, docs/PREMIUM_LANGUAGE.md). English; localize with registryText(). */");
+  lines.push(`export const PLAN_UI = ${JSON.stringify({ name: plans.name, shortName: plans.shortName, proName: plans.proName, headline: plans.headline, subhead: plans.subhead, checkout: plans.checkout, trial: { title: plans.trial.title, detail: plans.trial.detail }, priceFootnote: plans.priceFootnote, prices: plans.prices, proPrices: plans.proPrices, cards: plans.cards, benefits: { plus: plans.benefits.plus, pro: plans.benefits.pro }, upsells: plans.upsells, promises: plans.promises, paywall: plans.paywall, status: plans.status, compareURL: plans.compareURL })} as const;`);
   lines.push("/** Upsell copy by moment id (registry/plans.json `upsells`). Server refusals quote it, so the words match the app. */");
   lines.push(`export const PLAN_UPSELLS = ${JSON.stringify(Object.fromEntries(plans.upsells.map((u) => [u.id, { title: u.title, detail: u.detail }])))} as const;`);
+  lines.push("/** Sign-in methods, order per platform and screen copy (registry/sign-in.json, ADR 0047). Copy is English; localize with registryText(). GET /v1/auth/methods says which methods are on. */");
+  lines.push(`export const SIGN_IN = ${JSON.stringify({ platforms: bundle.signIn.platforms, methods: bundle.signIn.methods.map(({ notes, ...m }) => m), order: bundle.signIn.order, copy: bundle.signIn.copy, email: bundle.signIn.email, errors: bundle.signIn.errors, existingAccount: bundle.signIn.existingAccount, manage: bundle.signIn.manage, legal: plans.legal })} as const;`);
   lines.push("");
   lines.push("// Localized registry copy (ADR 0020). Keys are the English text.");
   lines.push(L10N.tsTables(BY_KEY, TRANSLATIONS));
@@ -2277,11 +2683,17 @@ function generateKotlinCore(bundle) {
   };
 
   emitIdObject("RegistrySettingKeys", Object.keys(settings.keys));
+  lines.push("object RegistryLinks {");
+  lines.push("    /** The help center (`settings.json` `helpURL`). */");
+  lines.push(`    const val HELP: String = ${JSON.stringify(settings.helpURL)}`);
+  lines.push("}");
+  lines.push("");
   emitIdObject("RegistryDestinationIds", dests.destinations.map((destination) => destination.id));
   emitIdObject("RegistryActionIds", Object.keys(actions.actions));
   emitIdObject("RegistryCapabilityIds", Object.keys(caps.capabilities));
   emitIdObject("RegistryIconIds", Object.keys(icons.icons));
   emitIdObject("RegistryPlatformIds", caps.platforms);
+  emitIdObject("RegistrySignInMethodIds", bundle.signIn.methods.map((m) => m.id));
 
   // Surface IDs (#283, ADR 0028). `RegistryCatalog.surface(id)` finds an
   // object by its `id` anywhere in surfaces.json, so a UI that names these
@@ -2315,6 +2727,9 @@ function generateKotlinCore(bundle) {
     }
     emitIdObject(objectName, ids);
   }
+  // Count phrase IDs (`prompts.countPhrases`): `countPhrase(id, …)` looks them
+  // up in that list alone, so they need not be unique in the whole document.
+  emitIdObject("RegistryCountPhraseIds", surfaces.prompts.countPhrases.map((p) => p.id));
   if (surfaces.taskDetail) {
     const detail = surfaces.taskDetail;
     assert(idCounts.get(detail.id) === 1, `surfaces.json: id "${detail.id}" must be unique in the document`);
@@ -2337,9 +2752,8 @@ function generateKotlinCore(bundle) {
   lines.push("    val statusByFeatureAndPlatform: Map<String, Map<String, String>> = linkedMapOf(");
   for (const [featureId, capability] of Object.entries(caps.capabilities)) {
     lines.push(`        ${kotlinStr(featureId)} to linkedMapOf(`);
-    for (const [platform, status] of Object.entries(capability)) {
-      if (platform === "title") continue;
-      lines.push(`            ${kotlinStr(platform)} to ${kotlinStr(status)},`);
+    for (const platform of caps.platforms) {
+      lines.push(`            ${kotlinStr(platform)} to ${kotlinStr(capability[platform])},`);
     }
     lines.push("        ),");
   }
@@ -2364,6 +2778,7 @@ function generateKotlinCore(bundle) {
     actions: bundle.actions,
     surfaces: bundle.surfaces,
     plans: bundle.plans,
+    signIn: bundle.signIn,
     conformance: bundle.conformance,
     localizations: bundle.translations,
   })) {
@@ -2485,12 +2900,14 @@ const rules = readJSON("registry/rules.json");
 const icons = readJSON("registry/icons.json");
 const tokens = readJSON("registry/tokens.json");
 const caps = readJSON("registry/capabilities.json");
+const MCP_TOOLS = new Set(mcpToolNames(REPO));
 const settings = readJSON("registry/settings.json");
 const dests = readJSON("registry/destinations.json");
 const actions = readJSON("registry/actions.json");
 const surfaces = readJSON("registry/surfaces.json");
 const plans = readJSON("registry/plans.json");
 const importSources = readJSON("registry/import-sources.json");
+const signIn = readJSON("registry/sign-in.json");
 
 validateEntities(entities);
 validateRules(rules);
@@ -2502,13 +2919,18 @@ const destIds = validateDestinations(dests, icons, caps);
 validateActions(actions, icons, caps, destIds);
 validateSurfaces(surfaces, icons, caps, plans);
 validateTaskReferences(surfaces, icons, caps, entities);
+validateWaiting(surfaces, caps);
 validatePlaceNotes(surfaces, caps);
+validateDoing(surfaces, caps, entities);
 checkOpensAttribute({ actions, surfaces });
 checkTaskDateBoard({ surfaces, icons, caps, actions });
 validateFirstRun(surfaces, icons, caps, settings);
 validateImportSources(importSources, caps);
 validatePlans(plans, icons, caps, importSources);
+validateSignIn(signIn, icons, caps, plans);
 validateConformance();
+validateCodeMap(readJSON("registry/code-map.json"), caps);
+validateSkills();
 // Marketing content only: no generated bindings, no localized strings (ADR 0030).
 validateCast(
   fs.readdirSync(path.join(REPO, "registry/cast")).filter((name) => name.endsWith(".json")).sort()
@@ -2517,7 +2939,7 @@ validateCast(
   assert,
 );
 
-BY_KEY = L10N.collectStrings({ settings, destinations: dests, actions, surfaces, tokens, plans, importSources }, assert);
+BY_KEY = L10N.collectStrings({ settings, destinations: dests, actions, surfaces, tokens, plans, importSources, signIn }, assert);
 
 const CATALOG_PATH = "Septena/Localizable.xcstrings";
 const catalog = readJSON(CATALOG_PATH);
@@ -2540,7 +2962,7 @@ const conformance = Object.fromEntries(
     .map((name) => [name.replace(/\.json$/, ""), readJSON(`registry/conformance/${name}`)]),
 );
 const bundle = {
-  entities, rules, icons, tokens, caps, settings, dests, actions, surfaces, plans, importSources, conformance,
+  entities, rules, icons, tokens, caps, settings, dests, actions, surfaces, plans, importSources, signIn, conformance,
   translations: { en: JSON.parse(L10N.englishFile(BY_KEY)), ...TRANSLATIONS },
 };
 /**
@@ -2567,9 +2989,11 @@ function generateFeatureMap({ caps }) {
     `|---|${caps.platforms.map(() => "---").join("|")}|`,
     ...caps.statuses.map((st) => `| ${CODES[st] ?? st} | ${caps.platforms.map((p) => rows.filter(([, c]) => c[p] === st).length).join(" | ")} |`),
     "",
-    `| ID | Feature | ${caps.platforms.map((p) => LABELS[p] ?? p).join(" | ")} |`,
-    `|---|---|${caps.platforms.map(() => "---").join("|")}|`,
-    ...rows.map(([id, c]) => `| \`${id}\` | ${cell(c.title)} | ${caps.platforms.map((p) => CODES[c[p]] ?? c[p]).join(" | ")} |`),
+    "**Agent** lists the MCP tools at `api.septena.app/mcp` that reach the feature; **none** means an agent cannot reach it.",
+    "",
+    `| ID | Feature | ${caps.platforms.map((p) => LABELS[p] ?? p).join(" | ")} | Agent |`,
+    `|---|---|${caps.platforms.map(() => "---").join("|")}|---|`,
+    ...rows.map(([id, c]) => `| \`${id}\` | ${cell(c.title)} | ${caps.platforms.map((p) => CODES[c[p]] ?? c[p]).join(" | ")} | ${c.agent === "none" ? "none" : c.agent.map((t) => `\`${t}\``).join(", ")} |`),
     "",
   ];
   return lines.join("\n");
@@ -2615,7 +3039,7 @@ if (CHECK) {
   if (problems.length) {
     throw new Error(`generated registry code without a reader:\n  ${problems.join("\n  ")}`);
   }
-  console.log("registries: ok (all 10 registries valid and generated files up to date)");
+  console.log("registries: ok (all 11 registries valid and generated files up to date)");
 } else if (changed === 0) {
   console.log("registries: already up to date");
 }

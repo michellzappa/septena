@@ -103,9 +103,13 @@ struct SidebarRootView: View {
 
   /// Magic Plus on the homepage offers task / project / area creation.
   @State private var showingCreateMenu = false
-  @State private var showingNewProject = false
+  @State private var newProjectRequest: NewProjectRequest?
   @State private var showingNewArea = false
   @State private var newAreaName = ""
+  #if os(iOS)
+  /// Dedicated Magic Plus drag coordinator for the iPad split sidebar column.
+  @State private var sidebarMagicPlusDrag = MagicPlusDragState()
+  #endif
 
   /// Right-click → Rename. One pair of state per kind keeps the alert
   /// presentation simple (alert(isPresented:) reads `target != nil`).
@@ -120,11 +124,7 @@ struct SidebarRootView: View {
   @State private var deleteProjectTarget: Project?
   @State private var deleteAreaTarget: Area?
 
-  /// Right-click on an area → "New Project here". Pre-selects the area so the
-  /// existing NewProjectSheet shows it as the target.
-  @State private var newProjectInArea: String?
-
-  /// The inline row a Magic Plus drop opens on the iPhone Tasks index: the
+  /// The inline row a Magic Plus drop opens on the iPhone/iPad Tasks index: the
   /// insert line turns into this row, and its title creates the Project or
   /// Area at that position.
   @State private var magicDraft: SidebarMagicDraft?
@@ -222,15 +222,105 @@ struct SidebarRootView: View {
   }
 
   private func moveProject(_ project: Project, to areaId: String?) {
-    guard project.area != areaId else { return }
+    let oldAreaId = project.area
+    guard oldAreaId != areaId else { return }
+    if let areaId, collapsedAreas.contains(areaId) {
+      toggleAreaCollapsed(areaId)
+    }
     Haptics.commit()
+    let mutator = projectsMutator
+    let projectId = project.id
     Task {
       do {
-        try await projectsMutator.setArea(id: project.id, area: areaId)
+        try await mutator.setArea(id: projectId, area: areaId)
+        TaskUndo.record(
+          name: String(localized: "Move Project", comment: "Sidebar: undo action"),
+          undo: { Task { try? await mutator.setArea(id: projectId, area: oldAreaId) } },
+          redo: { Task { try? await mutator.setArea(id: projectId, area: areaId) } }
+        )
         await load()
       } catch {
         errorMessage = error.localizedDescription
       }
+    }
+  }
+
+  /// Move a project into `targetAreaId` (if different) and place it right
+  /// before `targetProjectId`, all in one undoable step.
+  private func moveAndReorderProject(_ movedId: String, before targetProjectId: String,
+                                     inArea targetAreaId: String?) {
+    guard movedId != targetProjectId,
+          let project = projects.first(where: { $0.id == movedId }) else { return }
+    let oldAreaId = project.area
+    let oldSiblings = projects.filter { $0.area == oldAreaId && $0.status == .active }.map(\.id)
+    let targetSiblings = projects.filter { $0.area == targetAreaId && $0.status == .active }.map(\.id)
+    var nextTarget = targetSiblings.filter { $0 != movedId }
+    let insertAt = nextTarget.firstIndex(of: targetProjectId) ?? nextTarget.count
+    nextTarget.insert(movedId, at: insertAt)
+
+    let reparent = oldAreaId != targetAreaId
+    guard reparent || nextTarget != targetSiblings else { return }
+    let nextOld = oldSiblings.filter { $0 != movedId }
+    if let targetAreaId, collapsedAreas.contains(targetAreaId) {
+      toggleAreaCollapsed(targetAreaId)
+    }
+    Haptics.commit()
+    let mutator = projectsMutator
+    let forwardOrders: [[String]] = reparent ? [nextOld, nextTarget] : [nextTarget]
+    let backwardOrders: [[String]] = reparent ? [targetSiblings, oldSiblings] : [oldSiblings]
+    Task {
+      do {
+        if reparent { try await mutator.setArea(id: movedId, area: targetAreaId) }
+        for order in forwardOrders { try await mutator.reorder(orderedIDs: order) }
+        TaskUndo.record(
+          name: reparent
+            ? String(localized: "Move Project", comment: "Sidebar: undo action")
+            : String(localized: "Reorder Projects", comment: "Sidebar: undo action"),
+          undo: {
+            Task {
+              if reparent { try? await mutator.setArea(id: movedId, area: oldAreaId) }
+              for order in backwardOrders { try? await mutator.reorder(orderedIDs: order) }
+            }
+          },
+          redo: {
+            Task {
+              if reparent { try? await mutator.setArea(id: movedId, area: targetAreaId) }
+              for order in forwardOrders { try? await mutator.reorder(orderedIDs: order) }
+            }
+          }
+        )
+        await load()
+      } catch {
+        errorMessage = error.localizedDescription
+      }
+    }
+  }
+
+  /// Handles dragging an Area or Project row onto another Area, Project, or the
+  /// top No-Area zone in the iOS/iPadOS sidebar.
+  private func handleStructureDrop(_ item: SidebarStructureDragItem,
+                                   onto target: SidebarStructureDropTarget) -> Bool {
+    switch (item, target) {
+    case (.area(let movedId), .area(let targetId)):
+      guard movedId != targetId else { return false }
+      reorderArea(movedId, before: targetId)
+      return true
+    case (.project(let movedId), .area(let areaId)):
+      guard let project = projects.first(where: { $0.id == movedId }),
+            project.area != areaId else { return false }
+      moveProject(project, to: areaId)
+      return true
+    case (.project(let movedId), .project(let targetId, let parent)):
+      guard movedId != targetId else { return false }
+      moveAndReorderProject(movedId, before: targetId, inArea: parent)
+      return true
+    case (.project(let movedId), .noArea):
+      guard let project = projects.first(where: { $0.id == movedId }),
+            project.area != nil else { return false }
+      moveProject(project, to: nil)
+      return true
+    default:
+      return false
     }
   }
 
@@ -306,16 +396,49 @@ struct SidebarRootView: View {
   /// iPad regular / foldable widescreen: the NavigationSplitView sidebar
   /// column. Same insetGrouped "bubble card" home as iPhone (the surface the
   /// user preferred), but on a slightly recessed `sidebarPanelBackground` so the
-  /// column reads as a distinct panel against the detail pane.
+  /// column reads as a distinct panel against the detail pane — plus a
+  /// draggable Magic Plus orb at the bottom-trailing corner to drop new Areas
+  /// and Projects directly into place.
   @ViewBuilder
   private var sidebarSplit: some View {
-    sidebarListContent()
-    .background(Theme.sidebarPanelBackground)
-    .navigationTitle("")
     #if os(iOS)
+    ZStack(alignment: .bottomTrailing) {
+      sidebarListContent()
+        .background(Theme.sidebarPanelBackground)
+
+      let hideOrb = magicDraft != nil || SeptenaToastActivity.shared.hasActiveToast
+      MagicPlusOrb(
+        drag: sidebarMagicPlusDrag,
+        isViewingProject: false,
+        isViewingArea: false,
+        isViewingHome: true,
+        onNewTask: {},
+        onNewSection: {},
+        onNewProject: { newProjectRequest = NewProjectRequest(initialAreaId: activeAreaId) },
+        onNewArea: { newAreaName = ""; showingNewArea = true },
+        onJoinShared: { SeptaskSharing.presentJoin() }
+      )
+      .padding(.trailing, 16)
+      .padding(.bottom, 12)
+      .opacity(hideOrb ? 0 : 1)
+      .allowsHitTesting(!hideOrb)
+      .a11yAnimation(.easeInOut(duration: 0.2), value: hideOrb)
+    }
+    .environment(\.magicPlusDrag, sidebarMagicPlusDrag)
+    .onAppear {
+      sidebarMagicPlusDrag.fallbackDrop = {
+        openMagicDraft(.area(index: areas.count))
+      }
+    }
+    .navigationTitle("")
     .navigationBarTitleDisplayMode(.inline)
-    #endif
     .modifier(sidebarBehavior)
+    #else
+    sidebarListContent()
+      .background(Theme.sidebarPanelBackground)
+      .navigationTitle("")
+      .modifier(sidebarBehavior)
+    #endif
   }
 
   /// iPhone compact: scrolling list with a standard navigation bar and
@@ -408,13 +531,34 @@ struct SidebarRootView: View {
     }
     .onAppear { reconcileSidebarSelection() }
     .onChange(of: usesPushNavigation) { _, _ in reconcileSidebarSelection() }
-    // macOS menu bar → sidebar sheets. The Task menu's New Project / New Area
-    // set these one-shots (macOS has no toolbar "···"); consume + reset here.
+    // macOS menu bar & Magic Plus → sidebar sheets. Pre-select the Area in
+    // view (open Area page, or the owning Area of the open Project page).
     .onChange(of: nav.shouldCreateProject) { _, want in
-      if want { showingNewProject = true; nav.shouldCreateProject = false }
+      if want {
+        newProjectRequest = NewProjectRequest(initialAreaId: activeAreaId)
+        nav.shouldCreateProject = false
+      }
     }
     .onChange(of: nav.shouldCreateArea) { _, want in
-      if want { showingNewArea = true; nav.shouldCreateArea = false }
+      if want {
+        newAreaName = ""
+        showingNewArea = true
+        nav.shouldCreateArea = false
+      }
+    }
+  }
+
+  /// The Area currently in view — either the open Area page, or the owning
+  /// Area of the open Project page.
+  private var activeAreaId: String? {
+    guard let route = nav.path.last else { return nil }
+    switch route {
+    case .area(let id):
+      return id
+    case .project(let id):
+      return projects.first(where: { $0.id == id })?.area
+    default:
+      return nil
     }
   }
 
@@ -428,30 +572,36 @@ struct SidebarRootView: View {
     Section {
       ForEach(smartListSpecs, id: \.title) { spec in
         #if os(iOS)
-        compactRow { smartListRow(for: spec, position: .solo) }
+        compactRow { smartListRow(for: spec) }
         #else
-        compactRow(route: spec.route) { smartListRow(for: spec, position: .solo) }
+        compactRow(route: spec.route) { smartListRow(for: spec) }
         #endif
       }
     }
   }
 
   @ViewBuilder
-  private func smartListRow(for spec: SmartListSpec, position: TaskCardPosition) -> some View {
+  /// `inBottomSection`: rows below Areas & Projects draw their title in
+  /// secondary ink (docs/DesignSpec.md, "Sidebar ink"), the same rule as the AppKit sidebar.
+  private func smartListRow(for spec: SmartListSpec,
+                            inBottomSection: Bool = false) -> some View {
+    let titleInk: Color = inBottomSection ? Theme.inkSecondary : .primary
     #if os(macOS)
     navRow(spec.route) {
       SmartListRow(icon: spec.icon,
                    iconColor: spec.color,
                    title: spec.title,
+                   titleInk: titleInk,
                    count: spec.count)
     }
     .contextMenu { smartListContextMenu(for: spec) }
     .modifier(SmartListTaskDrop(route: spec.route, mutator: taskMutator))
     #else
-    cardRow(spec.route, position: position) {
+    cardRow(spec.route) {
       SmartListRow(icon: spec.icon,
                    iconColor: spec.color,
                    title: spec.title,
+                   titleInk: titleInk,
                    count: spec.count)
     } menu: {
       smartListContextMenu(for: spec)
@@ -550,6 +700,9 @@ struct SidebarRootView: View {
     // Give it a top margin matching its own left/right inset (the insetGrouped
     // gutter) so the grid is symmetric. iPhone/compact keeps its nav-bar spacing.
     .padding(.top, usesPushNavigation ? Theme.pageGutter : 0)
+    // Dropping a dragged Project onto the top grid un-parents it to No Area
+    // even when there are no loose projects yet.
+    .modifier(SidebarStructureDrop(target: .noArea, onDrop: handleStructureDrop))
   }
   #endif
 
@@ -570,9 +723,14 @@ struct SidebarRootView: View {
       Label(RegistryActions.title(.sidebarNewArea), systemImage: "square.stack.3d.up")
     }
     Button {
-      showingNewProject = true
+      newProjectRequest = NewProjectRequest(initialAreaId: activeAreaId)
     } label: {
       Label(RegistryActions.title(.sidebarNewProject), systemImage: "number")
+    }
+    Button {
+      SeptaskSharing.presentJoin()
+    } label: {
+      Label(RegistryActions.title(.sidebarJoinShared), systemImage: RegistryIcons.sfSymbol(for: "action.share_project"))
     }
     Divider()
     Button {
@@ -590,12 +748,12 @@ struct SidebarRootView: View {
   private var sidebarBehavior: some ViewModifier {
     SidebarBehaviorModifier(
       showingCreateMenu: $showingCreateMenu,
-      showingNewProject: $showingNewProject,
+      newProjectRequest: $newProjectRequest,
       showingNewArea: $showingNewArea,
       newAreaName: $newAreaName,
       errorMessage: $errorMessage,
-      newProjectInArea: $newProjectInArea,
       areas: areas,
+      activeAreaId: activeAreaId,
       onNewTodo: {
         // Land on Today (where the triage band lives) instead of a separate
         // Inbox page (retired). The composer seeds from the Today filter.
@@ -654,12 +812,11 @@ struct SidebarRootView: View {
 
   private var nonEmptySmartListIDs: Set<RegistryDestinationID> {
     var ids = Set<RegistryDestinationID>()
-    // Review and Agent also stay while selected, so accepting the last item
-    // does not pull the row out from under the user.
-    if reviewCount > 0 || isSelected(.filter(.review)) { ids.insert(.review) }
-    if agentCount > 0 || isSelected(.filter(.agent)) { ids.insert(.agent) }
+    // Review also stays while selected, so accepting the last item does not
+    // pull the row out from under the user. Agent work in progress is a
+    // Review group (ADR 0046).
+    if reviewCount + agentCount + fadedCount > 0 || isSelected(.filter(.review)) { ids.insert(.review) }
     if starredCount > 0 { ids.insert(.starred) }
-    if fadedCount > 0 { ids.insert(.faded) }
     return ids
   }
 
@@ -711,13 +868,11 @@ struct SidebarRootView: View {
     // on Today, so the user-facing count is the sum.
     case .filter(.today):           return counts.map { $0.todayCount + $0.reviewCount }
     case .filter(.review):          return reviewCount > 0 ? reviewCount : nil
-    case .filter(.agent):           return agentCount > 0 ? agentCount : nil
     case .filter(.upcoming):        return counts?.upcomingCount
     case .filter(.repeating):       return repeatingCount
     case .filter(.unscheduled):     return counts?.unscheduledCount
     case .filter(.logbook):         return doneTodayCount > 0 ? doneTodayCount : nil
     case .filter(.starred):         return starredCount > 0 ? starredCount : nil
-    case .filter(.faded):           return fadedCount > 0 ? fadedCount : nil
     default:                        return nil
     }
   }
@@ -746,19 +901,24 @@ struct SidebarRootView: View {
   }
 
   #if os(iOS)
-  /// An iOS sidebar row as one slice of its section's card — the same model
-  /// as a task row (`taskCardContextMenu`). The row paints its own fill
-  /// across the whole cell, and the context menu sits on that painted row
-  /// with the card-slice preview shape, so a long-press lifts the row as it
-  /// looks in place: same width, same corners, same fill. It used to lift a
-  /// separate padded preview, which the system drew as a floating pill.
+  /// An iOS sidebar row. The row paints its own fill across the whole cell,
+  /// and the context menu sits on that painted row, so a long-press lifts
+  /// what the cell shows, at the cell's width and height.
+  ///
+  /// Three rules keep the lift free of distortion:
+  ///  - The row is as tall as the cell. `List` stretches a cell to its
+  ///    minimum row height, so a shorter row lifts as a strip of the cell.
+  ///  - The base fill is opaque. The selection fill is a wash, and the cell
+  ///    background under it does not lift with the row.
+  ///  - The lift has the same corners on every row. A card slice (round top,
+  ///    square bottom) does not match the corners the system clips the cell
+  ///    to, so an area row changed shape as it lifted.
   ///
   /// The fill is the one selection token: selected, or pressed from
   /// touch-down (`NavigationPressStyle`).
   @ViewBuilder
   private func cardRow<Content: View, Menu: View>(
     _ route: Route,
-    position: TaskCardPosition,
     @ViewBuilder content: () -> Content,
     @ViewBuilder menu: @escaping () -> Menu
   ) -> some View {
@@ -768,11 +928,15 @@ struct SidebarRootView: View {
       navRow(route) {
         label
           .padding(.horizontal, 16)
-          .frame(maxWidth: .infinity, alignment: .leading)
+          .modifier(FillListCell())
           .contentShape(Rectangle())
       }
-      .background(SelectableListRowBackground(isSelected: selected || pressed))
-      .contentShape(.contextMenuPreview, position.cardShape)
+      .background {
+        Theme.cardSurface
+        SelectableListRowBackground(isSelected: selected || pressed)
+      }
+      .contentShape(.contextMenuPreview,
+                    RoundedRectangle(cornerRadius: TaskCardMetrics.radius, style: .continuous))
       .contextMenu(menuItems: menu)
     }
   }
@@ -869,16 +1033,14 @@ struct SidebarRootView: View {
 
   @ViewBuilder
   private func areaProjectSections() -> some View {
-    // Each row knows its slice of the section's card, so a long-press lifts
-    // exactly that slice (`cardRow`).
     // A Magic Plus draft row is spliced in as a slot (`projectSlots` /
-    // `areaSlots`) and takes its own slice of the card.
+    // `areaSlots`).
     let looseRows = projectSlots(topLevelProjects, area: nil)
     if !looseRows.isEmpty {
       Section {
         ForEach(Array(looseRows.enumerated()), id: \.element.id) { idx, slot in
-          projectSlotRow(slot, parent: nil,
-                         position: TaskCardPosition(index: idx, count: looseRows.count),
+          projectSlotRow(slot, parent: nil, parentTitle: nil,
+                         isFirstLoose: idx == 0,
                          isLastInLastCard: areas.isEmpty && magicDraft == nil
                            && idx == looseRows.count - 1)
         }
@@ -894,17 +1056,15 @@ struct SidebarRootView: View {
         let areaProjects = projects.filter { $0.area == area.id && $0.status == .active }
         let collapsed = collapsedAreas.contains(area.id)
         let rows = collapsed ? [] : projectSlots(areaProjects, area: area.id)
-        let rowCount = 1 + rows.count
         let isLastArea = index == areas.count - 1 && !magicDraftIsAreaAtEnd
         Section {
           compactRow(route: .area(id: area.id)) {
-            areaRow(area, hasProjects: !areaProjects.isEmpty, collapsed: collapsed,
-                    position: TaskCardPosition(index: 0, count: rowCount),
+            areaRow(area, areaIndex: index, hasProjects: !areaProjects.isEmpty, collapsed: collapsed,
                     isLastInLastCard: isLastArea && rows.isEmpty)
           }
           ForEach(Array(rows.enumerated()), id: \.element.id) { idx, row in
-            projectSlotRow(row, parent: area.id,
-                           position: TaskCardPosition(index: idx + 1, count: rowCount),
+            projectSlotRow(row, parent: area.id, parentTitle: area.title,
+                           isFirstLoose: false,
                            isLastInLastCard: isLastArea && idx == rows.count - 1)
           }
         }
@@ -913,10 +1073,8 @@ struct SidebarRootView: View {
     let bottomSpecs = bottomSmartListSpecs
     if !bottomSpecs.isEmpty {
       Section {
-        ForEach(Array(bottomSpecs.enumerated()), id: \.element.route.id) { idx, spec in
-          compactRow(route: spec.route) {
-            smartListRow(for: spec, position: TaskCardPosition(index: idx, count: bottomSpecs.count))
-          }
+        ForEach(bottomSpecs, id: \.route.id) { spec in
+          compactRow(route: spec.route) { smartListRow(for: spec, inBottomSection: true) }
         }
       }
     }
@@ -953,9 +1111,9 @@ struct SidebarRootView: View {
 
   /// The tappable row and its context menu; `areaRow` adds the drop targets.
   @ViewBuilder
-  private func areaRowBase(_ area: Area, hasProjects: Bool, collapsed: Bool, position: TaskCardPosition) -> some View {
+  private func areaRowBase(_ area: Area, hasProjects: Bool, collapsed: Bool) -> some View {
     #if os(iOS)
-    cardRow(.area(id: area.id), position: position) {
+    cardRow(.area(id: area.id)) {
       SidebarAreaRow(name: area.title, emoji: area.emoji, count: areaOpenCount[area.id] ?? 0,
                      isCollapsed: hasProjects ? collapsed : nil,
                      onToggleCollapse: hasProjects ? { toggleAreaCollapsed(area.id) } : nil)
@@ -973,22 +1131,30 @@ struct SidebarRootView: View {
   }
 
   /// The area's own row — tappable to its detail, with rename / reorder / delete
-  /// in the context menu (and, on macOS, a task drop target). Sits at the top of
-  /// its section's grouped card, projects underneath.
+  /// in the context menu, draggable to reorder, and a drop target for projects
+  /// and tasks. Sits at the top of its section's grouped card, projects underneath.
   @ViewBuilder
-  private func areaRow(_ area: Area, hasProjects: Bool, collapsed: Bool,
-                       position: TaskCardPosition, isLastInLastCard: Bool) -> some View {
-    areaRowBase(area, hasProjects: hasProjects, collapsed: collapsed, position: position)
+  private func areaRow(_ area: Area, areaIndex: Int, hasProjects: Bool, collapsed: Bool,
+                       isLastInLastCard: Bool) -> some View {
+    let projectInAreaLabel = String(localized: "New Project in \(area.title)",
+                                    comment: "Magic Plus: drop inside an area")
+    areaRowBase(area, hasProjects: hasProjects, collapsed: collapsed)
+    .draggable(SidebarStructureDragItem.area(area.id))
+    .modifier(SidebarStructureDrop(target: .area(area.id), onDrop: handleStructureDrop))
     // Drag-a-task-here re-home on co-visible sidebar+list (iPad/Mac).
     .modifier(SidebarTaskDrop(kind: .area(area.id), mutator: taskMutator) {
-      newProjectInArea = area.id
-      showingNewProject = true
+      newProjectRequest = NewProjectRequest(initialAreaId: area.id)
     })
-    // Magic Plus on the Tasks index makes Projects and Areas, never tasks
-    // (decided 2026-11-23). One insertion point per row, under it (decided
-    // 2026-11-23): under the area row a new Project goes first in the area.
-    // The only Area point is under the last card (a new Area at the end).
+    // Magic Plus on the Tasks index makes Areas at Area level (gap above any
+    // Area card, or below the last card) and Projects inside an Area (under
+    // the Area row or any Project row).
+    .magicPlusListInsert(id: "mp-sidebar-area-top-\(area.id)", edge: .top,
+                         isArea: true, label: RegistryActions.title(.sidebarNewArea),
+                         lineInset: 0, active: magicZonesActive) { _ in
+      openMagicDraft(.area(index: areaIndex))
+    }
     .magicPlusListInsert(id: "mp-sidebar-area-\(area.id)", edge: .bottom,
+                         isArea: false, label: projectInAreaLabel,
                          lineInset: Self.projectLineInset, active: magicZonesActive) { _ in
       if collapsedAreas.contains(area.id) { toggleAreaCollapsed(area.id) }
       openMagicDraft(.project(area: area.id, index: 0))
@@ -1000,12 +1166,13 @@ struct SidebarRootView: View {
 
   /// The tappable row and its context menu; `projectRow` adds the drop targets.
   @ViewBuilder
-  private func projectRowBase(_ project: Project, position: TaskCardPosition) -> some View {
+  private func projectRowBase(_ project: Project) -> some View {
     #if os(iOS)
-    cardRow(.project(id: project.id), position: position) {
+    cardRow(.project(id: project.id)) {
       SidebarProjectRow(name: project.title,
                         progress: projectProgress[project.id] ?? 0,
-                        count: projectOpenCount[project.id] ?? 0)
+                        count: projectOpenCount[project.id] ?? 0,
+                        share: project.share)
     } menu: {
       projectMenu(project)
     }
@@ -1013,24 +1180,46 @@ struct SidebarRootView: View {
     navRow(.project(id: project.id)) {
       SidebarProjectRow(name: project.title,
                         progress: projectProgress[project.id] ?? 0,
-                        count: projectOpenCount[project.id] ?? 0)
+                        count: projectOpenCount[project.id] ?? 0,
+                        share: project.share)
     }
     .contextMenu { projectMenu(project) }
     #endif
   }
 
   @ViewBuilder
-  private func projectRow(_ project: Project, parent: String?, index: Int,
-                          position: TaskCardPosition, isLastInLastCard: Bool) -> some View {
-    projectRowBase(project, position: position)
+  private func projectRow(_ project: Project, parent: String?, parentTitle: String?,
+                          index: Int, isFirstLoose: Bool,
+                          isLastInLastCard: Bool) -> some View {
+    let projectLabel: String = {
+      if let parentTitle {
+        return String(localized: "New Project in \(parentTitle)",
+                      comment: "Magic Plus: drop inside an area")
+      }
+      return RegistryActions.title(.sidebarNewProject)
+    }()
+    projectRowBase(project)
+    .draggable(SidebarStructureDragItem.project(project.id))
+    .modifier(SidebarStructureDrop(target: .project(project.id, parent: parent),
+                                   onDrop: handleStructureDrop))
     // Drag-a-task-here re-home on co-visible sidebar+list (iPad/Mac).
     .modifier(SidebarTaskDrop(kind: .project(project.id), mutator: taskMutator) {
-      newProjectInArea = parent
-      showingNewProject = true
+      newProjectRequest = NewProjectRequest(initialAreaId: parent)
+    })
+    // Top of the loose projects card allows inserting a standalone Project at index 0.
+    .modifier(MagicPlusOptionalTopInsert(
+      enabled: isFirstLoose,
+      id: "mp-sidebar-loose-top",
+      label: RegistryActions.title(.sidebarNewProject),
+      lineInset: Self.projectLineInset,
+      active: magicZonesActive
+    ) {
+      openMagicDraft(.project(area: nil, index: 0))
     })
     // Magic Plus under a Project puts a new Project after it, in the same
-    // area.
+    // area (or standalone if loose).
     .magicPlusListInsert(id: "mp-sidebar-proj-\(project.id)", edge: .bottom,
+                         isArea: false, label: projectLabel,
                          lineInset: Self.projectLineInset, active: magicZonesActive) { _ in
       openMagicDraft(.project(area: parent, index: index + 1))
     }
@@ -1039,17 +1228,22 @@ struct SidebarRootView: View {
     })
   }
 
-  // MARK: - Magic Plus drafts (iPhone Tasks index)
+  // MARK: - Magic Plus drafts (iPhone & iPad Tasks index)
 
   /// Leading inset of a Project insert line: it starts past the icon column,
   /// so it reads as "inside this card". An Area line spans the whole gap.
   private static let projectLineInset: CGFloat = Theme.sidebarIconSize + 4
 
-  /// Insert zones live only while the index is the visible root of the
-  /// iPhone stack. The index stays mounted under every pushed list, and its
-  /// zones must never catch a drop made there.
+  /// Insert zones live whenever the sidebar index is visible on iOS/iPadOS:
+  /// on iPad split (`usesPushNavigation`) the sidebar is always visible with
+  /// its own orb; on iPhone compact it is active only at the root (`path.isEmpty`)
+  /// so it never intercepts drops on pushed task lists.
   private var magicZonesActive: Bool {
-    !usesPushNavigation && nav.path.isEmpty
+    #if os(iOS)
+    usesPushNavigation || nav.path.isEmpty
+    #else
+    false
+    #endif
   }
 
   private var magicDraftIsAreaAtEnd: Bool {
@@ -1077,15 +1271,15 @@ struct SidebarRootView: View {
   }
 
   @ViewBuilder
-  private func projectSlotRow(_ slot: SidebarProjectSlot, parent: String?,
-                              position: TaskCardPosition,
-                              isLastInLastCard: Bool) -> some View {
+  private func projectSlotRow(_ slot: SidebarProjectSlot, parent: String?, parentTitle: String?,
+                              isFirstLoose: Bool, isLastInLastCard: Bool) -> some View {
     switch slot {
     case .draft:
       compactRow { magicDraftRow(isArea: false) }
     case .project(let project, let index):
       compactRow(route: .project(id: project.id)) {
-        projectRow(project, parent: parent, index: index, position: position,
+        projectRow(project, parent: parent, parentTitle: parentTitle,
+                   index: index, isFirstLoose: isFirstLoose,
                    isLastInLastCard: isLastInLastCard)
       }
     }
@@ -1170,7 +1364,9 @@ struct SidebarRootView: View {
           })
         case .projectMarkDone: return .init { setProjectStatus(project, to: .done) }
         case .projectCancel: return .init { setProjectStatus(project, to: .cancelled) }
-        case .projectDelete: return .init { deleteProjectTarget = project }
+        case .projectShare: return .init { SeptaskSharing.present(projectID: project.id) }
+        // A shared project ends from its Share screen.
+        case .projectDelete: return project.share == nil ? .init { deleteProjectTarget = project } : nil
         default: return nil
         }
       },
@@ -1206,8 +1402,7 @@ struct SidebarRootView: View {
         switch id {
         case .areaNewProject:
           return .init {
-            newProjectInArea = area.id
-            showingNewProject = true
+            newProjectRequest = NewProjectRequest(initialAreaId: area.id)
           }
         case .areaRename:
           return .init {
@@ -1248,10 +1443,20 @@ struct SidebarRootView: View {
   }
 
   private func commitAreaOrder(_ next: [Area]) {
+    let before = areas.map(\.id)
+    let after = next.map(\.id)
+    guard before != after else { return }
     Haptics.commit()
     areas = next   // optimistic; the reorder re-posts .septenaStructureChanged → load() re-sorts by position
-    let ids = next.map(\.id)
-    Task { try? await areasMutator.reorder(orderedIDs: ids) }
+    let mutator = areasMutator
+    Task {
+      try? await mutator.reorder(orderedIDs: after)
+      TaskUndo.record(
+        name: String(localized: "Reorder Areas", comment: "Sidebar: undo action"),
+        undo: { Task { try? await mutator.reorder(orderedIDs: before) } },
+        redo: { Task { try? await mutator.reorder(orderedIDs: after) } }
+      )
+    }
   }
 
   /// Reorder a project within its parent group (top-level when parent is
@@ -1405,10 +1610,13 @@ struct SidebarRootView: View {
       if t.starred { starred += 1 }
       // Check the raw columns first so only rows that carry JSON decode it.
       if t.recurrenceUnit != nil, t.recurrence != nil { repeating += 1 }
-      if t.conversationJSON != nil {
+      if t.conversationJSON != nil || t.isWaiting {
         let convo = t.conversation
-        if convo.needsHumanReview { review += 1 }
-        if convo.agentStage(at: now) != nil { agent += 1 }
+        // Review shows both; only what waits on the user counts in its badge.
+        // Waiting (docs/REVIEW_SPEC.md §6) shows but does not count.
+        if let group = convo.reviewGroup(at: now, waiting: t.isWaiting) {
+          if group.countsInBadge { review += 1 } else { agent += 1 }
+        }
       }
       if t.isInInbox { inbox += 1 }
       // The triage band (unratified) sits above Today and is excluded from it.
@@ -1476,6 +1684,10 @@ struct SmartListRow: View {
   /// Bare symbol tint — active accent on Today, quiet secondary on other special lists.
   var iconColor: Color = .secondary
   let title: String
+  /// Title ink. `.primary` (not a fixed Theme ink) so the native `.sidebar`
+  /// selection inverts the title to white over the focused accent. Bottom
+  /// smart lists pass `Theme.inkSecondary`, which adapts the same way.
+  var titleInk: Color = .primary
   /// Muted gray count — neutral signal for total rows on this list.
   var count: Int? = nil
 
@@ -1490,9 +1702,7 @@ struct SmartListRow: View {
         .frame(width: Theme.sidebarIconSize + 4, height: Theme.sidebarIconSize + 4)
       Text(title)
         .scaledFont(size: Theme.sidebarAreaTitleSize)
-        // `.primary` (not a fixed Theme ink) so the native `.sidebar`
-        // selection inverts the title to white over the focused accent.
-        .foregroundStyle(.primary)
+        .foregroundStyle(titleInk)
       Spacer()
       if let n = count { SidebarCount(count: n) }
     }
@@ -1507,6 +1717,16 @@ struct SmartListRow: View {
 /// The card gap is the Magic Plus line's gap too (`MagicPlusListMetrics`).
 private enum IOSSidebarListMetrics {
   static let sectionSpacing: CGFloat = MagicPlusListMetrics.cardGap
+}
+
+/// Sizes a row to the whole list cell. It reads the minimum row height inside
+/// the cell, where `List` sets it.
+private struct FillListCell: ViewModifier {
+  @Environment(\.defaultMinListRowHeight) private var minRowHeight
+
+  func body(content: Content) -> some View {
+    content.frame(maxWidth: .infinity, minHeight: minRowHeight, alignment: .leading)
+  }
 }
 
 /// iPhone + iPad share the insetGrouped "bubble card" Tasks home — the same
@@ -1534,13 +1754,13 @@ private struct IOSSidebarListChrome: ViewModifier {
 
 private struct SidebarBehaviorModifier: ViewModifier {
   @Binding var showingCreateMenu: Bool
-  @Binding var showingNewProject: Bool
+  @Binding var newProjectRequest: NewProjectRequest?
   @Binding var showingNewArea: Bool
   @Binding var newAreaName: String
   @Binding var errorMessage: String?
-  @Binding var newProjectInArea: String?
 
   let areas: [Area]
+  let activeAreaId: String?
   let onNewTodo: () -> Void
   let onCreateProject: (String, String?) -> Void
   let onCreateArea: () -> Void
@@ -1562,12 +1782,12 @@ private struct SidebarBehaviorModifier: ViewModifier {
     content
       .modifier(SidebarSheets(
         showingCreateMenu: $showingCreateMenu,
-        showingNewProject: $showingNewProject,
+        newProjectRequest: $newProjectRequest,
         showingNewArea: $showingNewArea,
         newAreaName: $newAreaName,
         errorMessage: $errorMessage,
-        newProjectInArea: $newProjectInArea,
         areas: areas,
+        activeAreaId: activeAreaId,
         onNewTodo: onNewTodo,
         onCreateProject: onCreateProject,
         onCreateArea: onCreateArea
@@ -1748,6 +1968,7 @@ struct SidebarProjectRow: View {
   var tint: Color = Theme.inkSecondary
   /// Open task count — muted gray, right-aligned alongside the pie.
   var count: Int = 0
+  var share: ProjectShare? = nil
 
   var body: some View {
     HStack(spacing: Theme.sidebarRowSpacing) {
@@ -1758,6 +1979,12 @@ struct SidebarProjectRow: View {
       Text(name)
         .scaledFont(size: Theme.sidebarTitleSize, weight: Theme.sidebarTitleWeight)
         .foregroundStyle(SidebarRowTitleStyle.color)
+      if let share {
+        Image(systemName: RegistryIcons.sfSymbol(for: "project.shared"))
+          .scaledFont(size: 11)
+          .foregroundStyle(Theme.inkSecondary)
+          .accessibilityLabel(share.membersLabel)
+      }
       Spacer()
       SidebarCount(count: count)
     }
@@ -1824,15 +2051,25 @@ struct ProjectProgressIcon: View {
 
 // MARK: - New project sheet (used by ProjectDetailView / create flow)
 
+/// Identifies a single presentation of `NewProjectSheet` together with its
+/// pre-selected Area so `.sheet(item:)` always delivers the exact area ID
+/// atomically (avoiding SwiftUI's stale-capture trap with `.sheet(isPresented:)`).
+struct NewProjectRequest: Identifiable {
+  let id = UUID()
+  let initialAreaId: String?
+}
+
 struct NewProjectSheet: View {
   let areas: [Area]
-  /// Pre-selected area when invoked from an area's right-click menu.
+  /// Pre-selected area when invoked from an area's context menu, an open Area
+  /// page, or a Project inside an Area.
   var initialAreaId: String? = nil
   let onCreate: (String, String?) -> Void
 
   @Environment(\.dismiss) private var dismiss
   @State private var title = ""
   @State private var selectedAreaId: String?
+  @FocusState private var titleFocused: Bool
 
   init(areas: [Area], initialAreaId: String? = nil, onCreate: @escaping (String, String?) -> Void) {
     self.areas = areas
@@ -1841,22 +2078,38 @@ struct NewProjectSheet: View {
     _selectedAreaId = State(initialValue: initialAreaId)
   }
 
+  private var canCreate: Bool {
+    !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+  }
+
+  private func submit() {
+    guard canCreate else { return }
+    onCreate(title, selectedAreaId)
+    dismiss()
+  }
+
   var body: some View {
     NavigationStack {
       Form {
         Section {
           TextField(RegistryPrompts.textPrompt(.newProject).placeholder, text: $title)
+            .focused($titleFocused)
+            .submitLabel(.done)
+            .onSubmit { submit() }
         }
         Section("Area") {
           Button { selectedAreaId = nil } label: {
             areaOptionRow(title: nil, emoji: nil, selected: selectedAreaId == nil)
           }
           .buttonStyle(PlainHoverRowButtonStyle())
+          .listRowBackground(SelectableListRowBackground(isSelected: selectedAreaId == nil))
           ForEach(areas) { area in
+            let isSelected = selectedAreaId == area.id
             Button { selectedAreaId = area.id } label: {
-              areaOptionRow(title: area.title, emoji: area.emoji, selected: selectedAreaId == area.id)
+              areaOptionRow(title: area.title, emoji: area.emoji, selected: isSelected)
             }
             .buttonStyle(PlainHoverRowButtonStyle())
+            .listRowBackground(SelectableListRowBackground(isSelected: isSelected))
           }
         }
       }
@@ -1866,16 +2119,19 @@ struct NewProjectSheet: View {
       .formStyle(.grouped)
       .navigationTitle(RegistryPrompts.textPrompt(.newProject).title)
       .septenaInlineTitle()
+      .onAppear {
+        selectedAreaId = initialAreaId
+        DispatchQueue.main.async { titleFocused = true }
+      }
       .toolbar {
         ToolbarItem(placement: .cancellationAction) {
           DrawerCloseButton { dismiss() }
         }
         ToolbarItem(placement: .confirmationAction) {
           Button(RegistryPrompts.textPrompt(.newProject).confirmTitle) {
-            onCreate(title, selectedAreaId)
-            dismiss()
+            submit()
           }
-          .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty)
+          .disabled(!canCreate)
         }
       }
     }
@@ -1887,19 +2143,23 @@ struct NewProjectSheet: View {
       if let title {
         AreaIcon(diameter: 15, emoji: emoji)
           .frame(width: 22)
-        Text(title).foregroundStyle(Theme.inkPrimary)
+        Text(title)
+          .fontWeight(selected ? .semibold : .regular)
+          .foregroundStyle(Theme.inkPrimary)
       } else {
         Image(systemName: "tray")
           .scaledFont(size: 15)
           .foregroundStyle(Theme.iconMuted)
           .frame(width: 22)
-        Text("None").foregroundStyle(Theme.inkPrimary)
+        Text("No Area")
+          .fontWeight(selected ? .semibold : .regular)
+          .foregroundStyle(Theme.inkPrimary)
       }
       Spacer()
       if selected {
         Image(systemName: "checkmark")
           .scaledFont(size: 13, weight: .semibold)
-          .foregroundStyle(Theme.inkSecondary)
+          .foregroundStyle(AppearancePreferences.shared.accentSwiftUIColor)
       }
     }
     .contentShape(Rectangle())
@@ -1985,14 +2245,12 @@ private struct RightClickAlerts: ViewModifier {
 
 private struct SidebarSheets: ViewModifier {
   @Binding var showingCreateMenu: Bool
-  @Binding var showingNewProject: Bool
+  @Binding var newProjectRequest: NewProjectRequest?
   @Binding var showingNewArea: Bool
   @Binding var newAreaName: String
   @Binding var errorMessage: String?
-  /// Pre-selected area for "New Project" — set when the user invokes it from
-  /// an area's right-click menu. Cleared on sheet dismiss.
-  @Binding var newProjectInArea: String?
   let areas: [Area]
+  let activeAreaId: String?
   let onNewTodo: () -> Void
   let onCreateProject: (String, String?) -> Void
   let onCreateArea: () -> Void
@@ -2001,13 +2259,15 @@ private struct SidebarSheets: ViewModifier {
     content
       .confirmationDialog("Create", isPresented: $showingCreateMenu, titleVisibility: .hidden) {
         Button(RegistryActions.title(.appNewTask))   { onNewTodo() }
-        Button(RegistryActions.title(.sidebarNewProject)) { showingNewProject = true }
+        Button(RegistryActions.title(.sidebarNewProject)) {
+          newProjectRequest = NewProjectRequest(initialAreaId: activeAreaId)
+        }
         Button(RegistryActions.title(.sidebarNewArea))    { newAreaName = ""; showingNewArea = true }
         Button(RegistryPrompts.cancelTitle, role: .cancel) {}
       }
-      .sheet(isPresented: $showingNewProject, onDismiss: { newProjectInArea = nil }) {
+      .sheet(item: $newProjectRequest) { request in
         NewProjectSheet(areas: areas,
-                        initialAreaId: newProjectInArea,
+                        initialAreaId: request.initialAreaId,
                         onCreate: onCreateProject)
           .presentationDetents([.medium])
           .septenaSheetChrome()
@@ -2240,6 +2500,25 @@ private enum SidebarProjectSlot: Identifiable {
   }
 }
 
+/// Top insertion point on the first loose project row (inserts at index 0).
+private struct MagicPlusOptionalTopInsert: ViewModifier {
+  let enabled: Bool
+  let id: String
+  let label: String
+  let lineInset: CGFloat
+  let active: Bool
+  let onDrop: () -> Void
+
+  func body(content: Content) -> some View {
+    if enabled {
+      content.magicPlusListInsert(id: id, edge: .top, isArea: false, label: label,
+                                  lineInset: lineInset, active: active) { _ in onDrop() }
+    } else {
+      content
+    }
+  }
+}
+
 /// The gap under the last card on the Tasks index: a drop there makes a new
 /// Area at the end. Registered only by the last row of the last card.
 private struct MagicPlusTrailingAreaGap: ViewModifier {
@@ -2251,10 +2530,72 @@ private struct MagicPlusTrailingAreaGap: ViewModifier {
     if enabled {
       content.magicPlusListInsert(id: "mp-sidebar-area-gap-end",
                                   edge: .belowGap(MagicPlusListMetrics.cardGap),
+                                  isArea: true,
+                                  label: RegistryActions.title(.sidebarNewArea),
                                   active: active) { _ in onDrop() }
     } else {
       content
     }
+  }
+}
+
+// MARK: - Drag-to-move & reorder Areas / Projects in the SwiftUI sidebar
+
+private enum SidebarStructureDropTarget {
+  case area(String)
+  case project(String, parent: String?)
+  case noArea
+}
+
+/// Drop target for dragging an Area or Project onto another Area, Project, or
+/// the top No-Area zone. Highlights using the ONE canonical selection wash
+/// (`Theme.listSelectionFill`).
+private struct SidebarStructureDrop: ViewModifier {
+  let target: SidebarStructureDropTarget
+  let onDrop: (SidebarStructureDragItem, SidebarStructureDropTarget) -> Bool
+  @State private var isTargeted = false
+
+  func body(content: Content) -> some View {
+    content
+      .background(
+        RoundedRectangle(cornerRadius: 8, style: .continuous)
+          .fill(isTargeted ? Theme.listSelectionFill : Color.clear)
+          .a11yAnimation(.easeOut(duration: 0.12), value: isTargeted)
+      )
+      .onDrop(of: [.septenaStructureDragItem],
+              delegate: SidebarStructureDropDelegate(isTargeted: $isTargeted) { item in
+                onDrop(item, target)
+              })
+  }
+}
+
+private struct SidebarStructureDropDelegate: DropDelegate {
+  @Binding var isTargeted: Bool
+  let perform: (SidebarStructureDragItem) -> Bool
+
+  func validateDrop(info: DropInfo) -> Bool {
+    info.hasItemsConforming(to: [.septenaStructureDragItem])
+  }
+
+  func dropEntered(info: DropInfo) { isTargeted = true }
+
+  func dropUpdated(info: DropInfo) -> DropProposal? {
+    isTargeted = true
+    return DropProposal(operation: .move)
+  }
+
+  func dropExited(info: DropInfo) { isTargeted = false }
+
+  func performDrop(info: DropInfo) -> Bool {
+    isTargeted = false
+    guard let provider = info.itemProviders(for: [.septenaStructureDragItem]).first else { return false }
+    provider.loadDataRepresentation(forTypeIdentifier: UTType.septenaStructureDragItem.identifier) { data, _ in
+      guard let data,
+            let item = try? JSONDecoder().decode(SidebarStructureDragItem.self, from: data)
+      else { return }
+      DispatchQueue.main.async { _ = perform(item) }
+    }
+    return true
   }
 }
 

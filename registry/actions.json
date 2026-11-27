@@ -67,12 +67,27 @@
       "availability": { "selection": "any", "excludeDestinations": ["recentlyDeleted"] },
       "featureId": "lists.today"
     },
+    "task.do": {
+      "title": "Do",
+      "icon": "action.do",
+      "role": "default",
+      "shortcut": { "key": "j", "modifiers": ["primary"] },
+      "availability": { "selection": "single", "excludeDestinations": ["recentlyDeleted", "logbook"] },
+      "featureId": "task.do"
+    },
+    "do.done": { "title": "Done", "icon": "action.complete", "role": "default", "availability": { "selection": "none" }, "featureId": "task.do" },
+    "do.stop": { "title": "Stop for Now", "icon": "action.do_stop", "role": "default", "availability": { "selection": "none" }, "featureId": "task.do" },
+    "do.later": { "title": "Later…", "icon": "action.when", "role": "default", "availability": { "selection": "none" }, "featureId": "task.do" },
+    "do.here": { "title": "Do Here", "icon": "action.do_here", "role": "default", "availability": { "selection": "none" }, "featureId": "task.do" },
+    "do.showList": { "title": "Show List", "icon": "action.do_show_list", "role": "default", "availability": { "selection": "none" }, "featureId": "task.do" },
+    "do.confirm": { "title": "Still on It", "icon": "action.do", "role": "default", "availability": { "selection": "none" }, "featureId": "task.do" },
+    "do.addAndDo": { "title": "Add and Do", "icon": "action.do", "role": "default", "availability": { "selection": "none" }, "featureId": "task.do" },
     "task.toggleComplete": {
       "title": "Mark as Complete",
       "shortTitle": "Complete",
       "icon": "action.complete",
       "role": "default",
-      "shortcut": { "key": "k", "modifiers": ["primary"] },
+      "shortcut": { "key": "return", "modifiers": ["primary"] },
       "availability": { "selection": "any", "excludeDestinations": ["recentlyDeleted"] },
       "featureId": "lists.today"
     },
@@ -81,7 +96,7 @@
       "pluralTitle": "Cancel Tasks",
       "icon": "action.cancel",
       "role": "default",
-      "shortcut": { "key": "k", "modifiers": ["primary", "alt"] },
+      "shortcut": { "key": "return", "modifiers": ["primary", "alt"] },
       "availability": { "selection": "any", "excludeDestinations": ["recentlyDeleted"] },
       "featureId": "lists.today"
     },
@@ -119,7 +134,7 @@
       "title": "Add Checklist Item",
       "icon": "action.checklist",
       "role": "default",
-      "shortcut": { "key": "c", "modifiers": ["primary", "shift"] },
+      "shortcut": { "key": "c", "modifiers": ["primary", "shift"], "excludePlatforms": ["ios", "ipados"] },
       "availability": { "selection": "single", "excludeDestinations": ["recentlyDeleted"] },
       "featureId": "task.checklists"
     },
@@ -165,6 +180,8 @@
       "availability": { "selection": "any", "excludeDestinations": ["recentlyDeleted"] },
       "featureId": "task.when-deadline"
     },
+    "task.waitingOn": { "title": "Waiting On…", "icon": "action.waiting", "role": "default", "availability": { "selection": "single", "excludeDestinations": ["recentlyDeleted"] }, "featureId": "review.waiting" },
+    "task.gotItBack": { "title": "Got It Back", "icon": "action.got_it_back", "role": "default", "availability": { "selection": "any", "excludeDestinations": ["recentlyDeleted"] }, "featureId": "review.waiting" },
     "task.deadline": {
       "opensAttribute": "deadline",
       "title": "Deadline…",
@@ -265,8 +282,8 @@
       "availability": { "selection": "none", "onlyDestinations": ["recentlyDeleted"] },
       "featureId": "lists.recently-deleted"
     },
-    "task.keepFaded": { "title": "Keep", "icon": "action.restore", "role": "default", "availability": { "selection": "any", "onlyDestinations": ["faded"] }, "featureId": "fade.sweep" },
-    "task.letGoFaded": { "title": "Let Go", "icon": "action.let_go", "role": "default", "availability": { "selection": "any", "onlyDestinations": ["faded"] }, "featureId": "fade.sweep" },
+    "task.keepFaded": { "title": "Keep", "icon": "action.restore", "role": "default", "availability": { "selection": "any", "onlyDestinations": ["faded", "review"] }, "featureId": "fade.sweep" },
+    "task.letGoFaded": { "title": "Let Go", "icon": "action.let_go", "role": "default", "availability": { "selection": "any", "onlyDestinations": ["faded", "review"] }, "featureId": "fade.sweep" },
     "place.saveNotes": {
       "title": "Save Notes",
       "icon": "action.notes",
@@ -328,6 +345,13 @@
       "availability": { "selection": "single" },
       "featureId": "places.projects"
     },
+    "project.share": {
+      "title": "Share Project…",
+      "icon": "action.share_project",
+      "role": "default",
+      "availability": { "selection": "single" },
+      "featureId": "sharing.projects"
+    },
     "logged.clear": {
       "title": "Clear Logged…",
       "icon": "action.delete",
@@ -336,6 +360,7 @@
       "featureId": "lists.logbook"
     },
     "sidebar.newArea": { "title": "New Area", "icon": "action.add", "role": "default", "availability": { "selection": "none" }, "featureId": "places.areas" },
+    "sidebar.joinShared": { "title": "Join a Shared Project…", "icon": "action.share_project", "role": "default", "availability": { "selection": "none" }, "featureId": "sharing.projects" },
     "sidebar.newProject": { "title": "New Project", "icon": "action.add", "role": "default", "availability": { "selection": "none" }, "featureId": "places.projects" },
     "section.new": { "title": "New Section", "icon": "action.add", "role": "default", "availability": { "selection": "none" }, "featureId": "places.sections" },
     "section.newTask": {
@@ -366,7 +391,7 @@
       "activeTitle": "Mark as Not Done",
       "icon": "action.complete",
       "role": "default",
-      "shortcut": { "key": "k", "modifiers": ["primary"] },
+      "shortcut": { "key": "return", "modifiers": ["primary"] },
       "availability": { "selection": "any" },
       "featureId": "lists.today"
     },
@@ -405,9 +430,10 @@
     },
     "app.quickFind": {
       "title": "Quick Find…",
+      "desktopTitle": "Command Bar…",
       "icon": "action.search",
       "role": "default",
-      "shortcut": { "key": "f", "modifiers": ["primary", "shift"] },
+      "shortcut": { "key": "k", "modifiers": ["primary"], "alternates": [{ "key": "f", "modifiers": ["primary", "shift"] }] },
       "availability": { "selection": "none" },
       "featureId": "find.quick-find"
     },
@@ -488,6 +514,20 @@
       "availability": { "selection": "none", "platforms": ["android"] },
       "featureId": "settings.display"
     },
+    "app.help": {
+      "title": "Septena Help",
+      "icon": "settings.help",
+      "role": "default",
+      "availability": { "selection": "none", "platforms": ["macos", "ipados", "web", "windows"] },
+      "featureId": "settings.display"
+    },
+    "app.contactSupport": {
+      "title": "Contact Support…",
+      "icon": "settings.feedback",
+      "role": "default",
+      "availability": { "selection": "none", "platforms": ["macos", "ipados", "web", "windows"] },
+      "featureId": "support.contact"
+    },
     "app.keyboardShortcuts": {
       "title": "Keyboard Shortcuts",
       "icon": "settings.about",
@@ -547,8 +587,10 @@
     "task.row": [
       { "kind": "action", "id": "task.acceptReview" },
       { "kind": "action", "id": "task.sendBackReview" },
+      { "kind": "action", "id": "task.gotItBack" },
       { "kind": "slot", "slot": "filingSuggestion" },
       { "kind": "divider" },
+      { "kind": "action", "id": "task.do" },
       { "kind": "action", "id": "task.when" },
       {
         "kind": "submenu",
@@ -563,8 +605,16 @@
           { "kind": "action", "id": "task.move" }
         ]
       },
+      {
+        "kind": "submenu",
+        "id": "assign",
+        "title": "Assign To",
+        "icon": "action.assign",
+        "items": [{ "kind": "slot", "slot": "assignees" }]
+      },
       { "kind": "action", "id": "task.tags" },
       { "kind": "action", "id": "task.deadline" },
+      { "kind": "action", "id": "task.waitingOn" },
       { "kind": "action", "id": "task.toggleStar" },
       { "kind": "divider" },
       { "kind": "action", "id": "task.open" },
@@ -612,13 +662,14 @@
         "icon": "action.move",
         "items": [{ "kind": "slot", "slot": "moveToAreaDestinations" }]
       },
+      { "kind": "action", "id": "project.share" },
       { "kind": "divider" },
       { "kind": "action", "id": "project.markDone" },
       { "kind": "action", "id": "project.cancel" },
       { "kind": "divider" },
       { "kind": "action", "id": "project.delete" }
     ],
-    "sidebar.empty": [{ "kind": "action", "id": "sidebar.newArea" }, { "kind": "action", "id": "sidebar.newProject" }],
+    "sidebar.empty": [{ "kind": "action", "id": "sidebar.newArea" }, { "kind": "action", "id": "sidebar.newProject" }, { "kind": "action", "id": "sidebar.joinShared" }],
     "project.heading": [
       { "kind": "action", "id": "section.rename" },
       { "kind": "action", "id": "section.newTask" },
@@ -684,8 +735,10 @@
       "title": "Task",
       "items": [
         { "kind": "action", "id": "sidebar.newProject" },
+        { "kind": "action", "id": "sidebar.joinShared" },
         { "kind": "action", "id": "sidebar.newArea" },
         { "kind": "divider" },
+        { "kind": "action", "id": "task.do" },
         { "kind": "action", "id": "task.toggleToday" },
         { "kind": "action", "id": "task.when" },
         { "kind": "action", "id": "task.clearSchedule" },
@@ -696,6 +749,8 @@
         { "kind": "action", "id": "task.tags" },
         { "kind": "action", "id": "task.deadline" },
         { "kind": "action", "id": "task.reminder" },
+        { "kind": "action", "id": "task.waitingOn" },
+        { "kind": "action", "id": "task.gotItBack" },
         { "kind": "action", "id": "task.toggleStar" },
         { "kind": "divider" },
         { "kind": "action", "id": "task.editDetails", "titleField": "desktopTitle" },
@@ -709,7 +764,7 @@
         { "kind": "action", "id": "task.delete" }
       ]
     },
-    { "id": "help", "title": "Help", "system": "help", "items": [{ "kind": "action", "id": "app.keyboardShortcuts" }] }
+    { "id": "help", "title": "Help", "system": "help", "items": [{ "kind": "action", "id": "app.help" }, { "kind": "action", "id": "app.contactSupport" }, { "kind": "action", "id": "app.keyboardShortcuts" }] }
   ],
   "shortcutsSheet": [
     {
@@ -722,6 +777,7 @@
       "title": "Task list",
       "actionIds": [
         "task.editDetails",
+        "task.do",
         "task.toggleInfo",
         "task.copy",
         "task.duplicate",

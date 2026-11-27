@@ -33,6 +33,8 @@ data class AccountAccess(
     val connections: List<AgentConnection>,
     /** `agents.count`; an old server leaves it out, so it falls back to the number of connections. */
     val agentCount: Int,
+    /** `agents.limit`: the plan's agent slots, null for no limit (Pro) or an old server. */
+    val agentLimit: Int? = null,
 )
 
 /** One row of `GET /v1/entitlement` `entitlements` (ADR 0026). */
@@ -42,6 +44,8 @@ data class EntitlementRow(
     /** ms since 1970; null means no expiry (a grant). */
     val expiresAtMs: Long?,
     val active: Boolean,
+    /** The plan the row gives; null means Plus (ADR 0045). */
+    val plan: String? = null,
 )
 
 /**
@@ -50,6 +54,8 @@ data class EntitlementRow(
  */
 data class AccountEntitlement(
     val active: Boolean,
+    /** The plan the account is on: `free`, `plus` or `pro`. */
+    val plan: String?,
     val rows: List<EntitlementRow>,
     /** ms since 1970: the reverse trial's end while it is the only active row. */
     val trialEndsAtMs: Long?,
@@ -63,6 +69,19 @@ data class IcalFeed(
     val enabled: Boolean,
     val scope: String,
     val webcalUrl: String?,
+)
+
+/** One linked sign-in method on the signed-in account (`GET /v1/auth/identities`, #643). */
+data class LinkedIdentity(
+    val id: String,
+    val provider: String,
+    val label: String,
+    val createdAtMs: Long,
+)
+
+data class LinkedIdentities(
+    val identities: List<LinkedIdentity>,
+    val canRemove: Boolean,
 )
 
 /** What a sign-in code asks for (`POST /v1/pair/inspect`), shown before the user approves it. */
@@ -124,7 +143,8 @@ object PairCode {
 /**
  * Devices and agents that can reach the account (docs/SEPTASK_BACKEND.md §10).
  * Routes: `GET /v1/access`, `DELETE /v1/access/devices/:sid`,
- * `DELETE /v1/access/connections/:id`, `PATCH /v1/access/connections/:id`.
+ * `DELETE /v1/access/connections/:id`, `PATCH /v1/access/connections/:id`,
+ * `POST /v1/access/keys`.
  * Same bearer and refresh-on-401 rule as [UrlConnectionSyncTransport].
  */
 class SeptenaAccessClient(
@@ -163,6 +183,7 @@ class SeptenaAccessClient(
             devices = devices,
             connections = connections,
             agentCount = agents?.fields?.get("count").longValue()?.toInt() ?: connections.size,
+            agentLimit = agents?.fields?.get("limit").longValue()?.toInt(),
         )
     }
 
@@ -180,6 +201,22 @@ class SeptenaAccessClient(
         val trimmed = name?.trim()?.take(MAX_AGENT_NAME)?.takeIf(String::isNotEmpty)
         val body = JsonValue.ObjectValue(mapOf("name" to JsonValue.stringOrNull(trimmed))).canonicalJson()
         request("/v1/access/connections/${connectionId.pathSegment()}", "PATCH", body)
+    }
+
+    /**
+     * Creates an agent key with read and write access (`POST /v1/access/keys`, #86).
+     * Returns the key, which the server sends in this reply only.
+     */
+    suspend fun createAgentKey(name: String): String {
+        val trimmed = name.trim().take(MAX_AGENT_NAME)
+        require(trimmed.isNotEmpty()) { "An agent key needs a name" }
+        val body = JsonValue.ObjectValue(
+            mapOf("name" to JsonValue.StringValue(trimmed), "access" to JsonValue.StringValue("write")),
+        ).canonicalJson()
+        val json = JsonValue.parse(request("/v1/access/keys", "POST", body)) as? JsonValue.ObjectValue
+            ?: error("Expected a JSON object")
+        return json.fields["key"].stringValue()?.takeIf { it.startsWith("sk1.") }
+            ?: error("The server sent no agent key")
     }
 
     /** What a sign-in code asks for. Throws [AccessHttpException] with `invalid_code` and the like. */
@@ -222,11 +259,13 @@ class SeptenaAccessClient(
                 source = row.fields["source"].stringValue() ?: return@mapNotNull null,
                 expiresAtMs = row.fields["expiresAt"].longValue(),
                 active = row.fields["active"].booleanValue() ?: false,
+                plan = row.fields["plan"].stringValue(),
             )
         }
         val device = json.fields["device"] as? JsonValue.ObjectValue
         return AccountEntitlement(
             active = json.fields["active"].booleanValue() ?: false,
+            plan = json.fields["plan"].stringValue(),
             rows = rows,
             trialEndsAtMs = json.fields["trialEndsAt"].longValue(),
             enforced = json.fields["enforced"].booleanValue() ?: false,
@@ -246,6 +285,60 @@ class SeptenaAccessClient(
         return parseIcal(request("/v1/ical/settings", "POST", JsonValue.ObjectValue(fields).canonicalJson()))
     }
 
+    /** Lists linked sign-in methods on the signed-in account (`GET /v1/auth/identities`, #643). */
+    suspend fun listIdentities(): LinkedIdentities = parseIdentities(request("/v1/auth/identities", "GET", body = null))
+
+    /** Removes one sign-in method (`DELETE /v1/auth/identities/:id`); refuses the last one (409 `last_method`). */
+    suspend fun unlinkIdentity(id: String): LinkedIdentities =
+        parseIdentities(request("/v1/auth/identities/${id.pathSegment()}", "DELETE", body = null))
+
+    /** Sends a 6-digit verification code to add an email address to the signed-in account. */
+    suspend fun startLinkEmail(email: String) {
+        val body = JsonValue.ObjectValue(mapOf("email" to JsonValue.StringValue(email))).canonicalJson()
+        request("/v1/auth/link/email/start", "POST", body)
+    }
+
+    /** Verifies the emailed 6-digit code and links the email to the signed-in account. */
+    suspend fun verifyLinkEmail(email: String, code: String): LinkedIdentities {
+        val body = JsonValue.ObjectValue(
+            mapOf("email" to JsonValue.StringValue(email), "code" to JsonValue.StringValue(code)),
+        ).canonicalJson()
+        return parseIdentities(request("/v1/auth/link/email/verify", "POST", body))
+    }
+
+    /** Starts an OIDC redirect URL to link Apple, Google or Microsoft to the signed-in account. */
+    suspend fun startLinkOidc(provider: String, returnTo: String): String {
+        val body = JsonValue.ObjectValue(
+            mapOf("provider" to JsonValue.StringValue(provider), "returnTo" to JsonValue.StringValue(returnTo)),
+        ).canonicalJson()
+        val json = JsonValue.parse(request("/v1/auth/link/oidc/start", "POST", body)) as? JsonValue.ObjectValue
+            ?: error("Expected a JSON object")
+        return json.fields["url"].stringValue() ?: error("Link start response is missing url")
+    }
+
+    /** Completes an OIDC link callback (`POST /v1/auth/oidc/redeem` with Bearer). */
+    suspend fun redeemOidcLink(code: String): LinkedIdentities {
+        val body = JsonValue.ObjectValue(mapOf("code" to JsonValue.StringValue(code))).canonicalJson()
+        return parseIdentities(request("/v1/auth/oidc/redeem", "POST", body))
+    }
+
+    private fun parseIdentities(body: String): LinkedIdentities {
+        val json = JsonValue.parse(body) as? JsonValue.ObjectValue ?: error("Expected a JSON object")
+        val list = json.array("identities").mapNotNull { raw ->
+            val obj = raw as? JsonValue.ObjectValue ?: return@mapNotNull null
+            LinkedIdentity(
+                id = obj.fields["id"].stringValue() ?: return@mapNotNull null,
+                provider = obj.fields["provider"].stringValue() ?: return@mapNotNull null,
+                label = obj.fields["label"].stringValue().orEmpty(),
+                createdAtMs = obj.fields["createdAt"].longValue() ?: 0L,
+            )
+        }
+        return LinkedIdentities(
+            identities = list,
+            canRemove = json.fields["canRemove"].booleanValue() ?: (list.size > 1),
+        )
+    }
+
     /** The agent brief for the task tools (`GET /skill.md`, public, markdown). */
     suspend fun skillBrief(): String {
         val response = JsonHttp.send(baseUrl, "/skill.md", "GET", body = null, clientVersion = clientVersion)
@@ -262,7 +355,8 @@ class SeptenaAccessClient(
         )
     }
 
-    private suspend fun request(path: String, method: String, body: String?): String {
+    /** Also the transport of [SeptenaShareClient]. */
+    internal suspend fun request(path: String, method: String, body: String?): String {
         val firstToken = credentials.accessToken() ?: throw SyncAuthenticationException()
         val first = JsonHttp.send(baseUrl, path, method, body, clientVersion, bearer = firstToken)
         val final = if (first.statusCode == HttpURLConnection.HTTP_UNAUTHORIZED) {

@@ -31,7 +31,7 @@ a new ADR and set the old one to `superseded by NNNN`.
 | [0023](0023-sync-across-devices-is-plus.md) | Make sync across devices the paid line (amends 0010) | accepted, amended by 0036 (agents) |
 | [0024](0024-no-iphone-tab-bar.md) | No tab bar on iPhone: the list is the root of one navigation stack | accepted |
 | [0025](0025-shared-rust-core.md) | Put task rules and sync decisions in one shared Rust core | accepted (amends 0013 W0, 0015) |
-| [0026](0026-plus-on-any-store-stripe-for-web.md) | Sell Plus on any store, one account entitlement, Stripe for web | accepted |
+| [0026](0026-plus-on-any-store-stripe-for-web.md) | Sell Plus on any store, one account entitlement, Stripe for web | accepted, amended by 0060 |
 | [0027](0027-task-date-rules-are-core-actions.md) | Task date rules are actions in the shared core | accepted |
 | [0028](0028-registry-owns-vocabulary-platforms-own-interaction.md) | The registry owns vocabulary; each platform owns layout and interaction | accepted |
 | [0029](0029-one-task-page-two-depths.md) | One task page with two depths; one picker per attribute | accepted |
@@ -48,6 +48,23 @@ a new ADR and set the old one to `superseded by NNNN`.
 | [0041](0041-do-is-one-task-now-on-every-screen.md) | Do is one task now, and every screen shows it (extends 0034) | accepted |
 | [0042](0042-members-keep-replicas-of-a-shared-project.md) | Members keep replicas of a shared project (amends 0004) | accepted |
 | [0043](0043-plus-links-and-a-counts-only-admin-page.md) | Plus is given by link, and the admin page sees counts only (amends 0016) | accepted |
+| [0044](0044-review-is-one-place.md) | Review is the one place for everything that waits on you (amends 0006, 0008) | accepted |
+| [0045](0045-pro-is-a-real-plan-that-is-only-given.md) | Pro is a real plan that is only given, never sold yet (amends 0037, 0043) | accepted |
+| [0046](0046-agent-work-is-a-review-group.md) | Agent work in progress is a group of Review, not its own list (amends 0044) | accepted |
+| [0047](0047-every-way-in-creates-an-account.md) | Every way into Septena creates an account and offers every sign-in method it can (amends 0016) | accepted |
+| [0048](0048-decisions-and-questions-are-typed-log-entries.md) | Decisions and open questions are typed entries in the notes log | proposed |
+| [0049](0049-templates-are-a-versioned-json-file.md) | A template is a versioned JSON file of structure and briefs, never of private data | proposed |
+| [0050](0050-septena-publishes-its-agent-contract.md) | Septena publishes its agent contract: Markdown twins, a versioned spec, one error envelope, idempotency, OpenAPI, skills | accepted |
+| [0051](0051-clients-in-other-apps-are-septena-surfaces.md) | A Septena client inside another app (CLI, Raycast) is a Septena surface, not a source integration | accepted |
+| [0052](0052-the-site-shows-pro-as-a-real-plan.md) | The website shows Pro as a real plan (amends 0045) | accepted |
+| [0053](0053-waiting-on-people-is-a-review-group.md) | Work handed to a person is a Waiting group in Review (amends 0046) | accepted |
+| [0054](0054-support-lands-in-starlings.md) | Support goes to Starlings, through a native form (supersedes feedback.md) | accepted |
+| [0055](0055-directory-reviewers-use-a-demo-account.md) | Directory reviewers use a demo account behind a reviewer code | accepted |
+| [0056](0056-agents-create-accounts-with-email-confirmation.md) | Agents can create and connect Septena accounts with human email confirmation | accepted |
+| [0057](0057-agent-responses-stay-typed-data-not-generative-ui.md) | Agent responses and hooks stay typed data, not generative UI (A2UI review) | proposed |
+| [0058](0058-admin-growth-from-daily-snapshots-then-an-event-stream.md) | Admin growth comes from daily snapshots now, and from an event stream at scale (amends 0043) | accepted |
+| [0059](0059-pro-sells-like-plus.md) | Pro sells like Plus, one subscription group (amends 0045, 0052) | accepted |
+| [0060](0060-revenuecat-subscriptions-and-pinned-currencies.md) | Standardize on RevenueCat across stores and pin EUR, USD and GBP currencies (amends 0026) | accepted |
 
 ## Template
 

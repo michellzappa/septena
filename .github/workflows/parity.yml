@@ -1,0 +1,38 @@
+name: Parity & Design Lint
+
+# Fast cross-platform parity gate on every PR and push to main:
+# - `gen-registries.mjs --check` validates all 11 registries, generated Swift /
+#   Kotlin / TypeScript / Rust outputs, reader coverage across every shell, and
+#   `capabilities.json` ships claims on Apple, Android, and Web.
+# - `lint-design.sh` enforces cross-platform design-system, copy, tap-target,
+#   and shell guardrails.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: parity-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+jobs:
+  parity:
+    name: Registry parity & design lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Check registries, readers, and cross-platform ships claims
+        run: node scripts/gen-registries.mjs --check
+
+      - name: Run design-system & cross-platform lint
+        run: ./scripts/lint-design.sh

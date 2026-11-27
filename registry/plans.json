@@ -1,9 +1,10 @@
 {
   "version": 1,
-  "description": "Plans and pricing for Septena, the task app (ADR 0010, ADR 0023, ADR 0036, ADR 0037). One source for the pricing page, the in-app Septena Plus page and the upsell moments. `limits` holds the machine values per plan; the server plan table reads the same values. `cells` is the copy for each level, and the generator checks that every numeric limit appears in its cell.",
+  "description": "Plans and pricing for Septena, the task app (ADR 0010, ADR 0023, ADR 0036, ADR 0037, ADR 0045, ADR 0052, ADR 0059). One source for the pricing page, the in-app Septena Plus page and the upsell moments. `limits` holds the machine values per plan; the server plan table reads the same values. `cells` is the copy for each level, and the generator checks that every numeric limit appears in its cell. `prices` sell Plus and `proPrices` sell Pro (ADR 0059): both sit in one store subscription group, with Pro the higher level.",
   "featureId": "sync.backend",
   "name": "Septena Plus",
   "shortName": "Plus",
+  "proName": "Pro",
   "headline": "Free on one device. Plus on all of them.",
   "subhead": "Every task feature is free on the device you use. A free account adds a backup and lets you connect one agent. Plus covers all your devices, three agents, synced files and a longer history.",
   "checkout": {
@@ -38,14 +39,118 @@
       "detail": "Cancel at any time."
     }
   ],
+  "proPrices": [
+    {
+      "id": "pro_annual",
+      "productId": "com.septena.tasks.sync.pro.annual",
+      "amountMinor": 12000,
+      "currency": "EUR",
+      "interval": "year",
+      "highlighted": true,
+      "label": "€120 a year",
+      "detail": "€10 a month. You save €48 against paying monthly."
+    },
+    {
+      "id": "pro_monthly",
+      "productId": "com.septena.tasks.sync.pro.monthly",
+      "amountMinor": 1400,
+      "currency": "EUR",
+      "interval": "month",
+      "highlighted": false,
+      "label": "€14 a month",
+      "detail": "Cancel at any time."
+    }
+  ],
   "priceFootnote": "Prices include VAT where it applies. Outside the euro area, the App Store charges its matching local price.",
+  "defaultCurrency": "EUR",
+  "currencies": [
+    {
+      "code": "EUR",
+      "symbol": "€",
+      "countries": [],
+      "taxInclusive": true,
+      "freeLabel": "€0",
+      "plus": {
+        "year": { "amountMinor": 6000, "label": "€60 a year", "detail": "€5 a month. You save €24 against paying monthly." },
+        "month": { "amountMinor": 700, "label": "€7 a month", "detail": "Cancel at any time." }
+      },
+      "pro": {
+        "year": { "amountMinor": 12000, "label": "€120 a year", "detail": "€10 a month. You save €48 against paying monthly." },
+        "month": { "amountMinor": 1400, "label": "€14 a month", "detail": "Cancel at any time." }
+      },
+      "footnote": "Prices include VAT where it applies. Outside EUR, USD, GBP and BRL, the App Store and Google Play charge their matching local price."
+    },
+    {
+      "code": "USD",
+      "symbol": "$",
+      "countries": ["US"],
+      "taxInclusive": false,
+      "freeLabel": "$0",
+      "plus": {
+        "year": { "amountMinor": 6000, "label": "$60 a year", "detail": "$5 a month. You save $24 against paying monthly." },
+        "month": { "amountMinor": 700, "label": "$7 a month", "detail": "Cancel at any time." }
+      },
+      "pro": {
+        "year": { "amountMinor": 12000, "label": "$120 a year", "detail": "$10 a month. You save $48 against paying monthly." },
+        "month": { "amountMinor": 1400, "label": "$14 a month", "detail": "Cancel at any time." }
+      },
+      "footnote": "Prices exclude applicable local sales tax. Outside EUR, USD, GBP and BRL, the App Store and Google Play charge their matching local price."
+    },
+    {
+      "code": "GBP",
+      "symbol": "£",
+      "countries": ["GB"],
+      "taxInclusive": true,
+      "freeLabel": "£0",
+      "plus": {
+        "year": { "amountMinor": 5000, "label": "£50 a year", "detail": "£4.17 a month. You save £22 against paying monthly." },
+        "month": { "amountMinor": 600, "label": "£6 a month", "detail": "Cancel at any time." }
+      },
+      "pro": {
+        "year": { "amountMinor": 10000, "label": "£100 a year", "detail": "£8.33 a month. You save £44 against paying monthly." },
+        "month": { "amountMinor": 1200, "label": "£12 a month", "detail": "Cancel at any time." }
+      },
+      "footnote": "Prices include UK VAT. Outside EUR, USD, GBP and BRL, the App Store and Google Play charge their matching local price."
+    },
+    {
+      "code": "BRL",
+      "symbol": "R$",
+      "countries": ["BR"],
+      "taxInclusive": true,
+      "freeLabel": "R$ 0",
+      "plus": {
+        "year": { "amountMinor": 24000, "label": "R$ 240 a year", "detail": "R$ 20 a month. You save R$ 108 against paying monthly." },
+        "month": { "amountMinor": 2900, "label": "R$ 29 a month", "detail": "Cancel at any time." }
+      },
+      "pro": {
+        "year": { "amountMinor": 48000, "label": "R$ 480 a year", "detail": "R$ 40 a month. You save R$ 216 against paying monthly." },
+        "month": { "amountMinor": 5800, "label": "R$ 58 a month", "detail": "Cancel at any time." }
+      },
+      "footnote": "Prices include applicable local taxes. Outside EUR, USD, GBP and BRL, the App Store and Google Play charge their matching local price."
+    }
+  ],
   "levels": [
     { "id": "free", "title": "Free", "detail": "€0" },
     { "id": "plus", "title": "Plus", "detail": "€60 a year or €7 a month" },
-    { "id": "pro", "title": "Pro", "detail": "Planned: €120 a year or €14 a month" }
+    { "id": "pro", "title": "Pro", "detail": "€120 a year or €14 a month" }
   ],
-  "ladderHeadline": "One device, all devices or all your agents.",
+  "ladderHeadline": "One device free. All devices on Plus. All your agents on Pro.",
   "cardRows": ["devices", "connected", "files", "history"],
+  "compareURL": "https://septena.app/pricing",
+  "benefits": {
+    "description": "What each paid plan gives, one line per benefit, for the plan page, the plan sheet and onboarding (docs/PREMIUM_LANGUAGE.md). A benefit with a limit must state that plan's value. Pro lists only what it adds, then Everything in Plus.",
+    "plus": [
+      { "id": "devices", "icon": "plans.devices", "limit": "devices", "title": "Every device, always current", "detail": "Your list on all your devices, updated as you type." },
+      { "id": "agents", "icon": "plans.agents", "limit": "connectedAgents", "title": "Three agents at work", "detail": "Connect Claude and two more. Each one asks before it acts." },
+      { "id": "files", "icon": "plans.files", "limit": "attachmentsGB", "title": "10 GB of synced files", "detail": "Attach a file once and it opens on every device." },
+      { "id": "history", "icon": "plans.history", "limit": "changeLogDays", "title": "A year of history", "detail": "See who changed what, and bring back what you deleted." }
+    ],
+    "pro": [
+      { "id": "agents", "icon": "plans.agents", "limit": "connectedAgents", "title": "No limit on agents", "detail": "Run as many agents on your list as your work needs." },
+      { "id": "files", "icon": "plans.files", "limit": "attachmentsGB", "title": "50 GB of synced files", "detail": "Room for scans, screenshots and long documents." },
+      { "id": "everything", "icon": "plans.plus", "title": "Everything in Plus", "detail": "Every device, a year of history and shared projects." }
+    ]
+  },
   "accountNote": "Backup, history and your agent need a free account. The app does not.",
   "agentNote": "An agent is an AI you connect to your list, such as Claude.",
   "fullApp": {
@@ -79,7 +184,6 @@
       "id": "pro",
       "title": "Septena Pro",
       "icon": "plans.pro",
-      "status": "planned",
       "priceLabel": "€120 a year",
       "priceDetail": "Or €14 a month.",
       "detail": "For people who run many agents on one list.",
@@ -91,7 +195,7 @@
       "id": "everywhere",
       "icon": "onboarding.devices",
       "title": "Your list everywhere",
-      "detail": "The same tasks on your phone, tablet and Mac, updated as you type.",
+      "detail": "The same tasks on every device, updated as you type.",
       "rows": [
         { "id": "devices", "label": "Devices", "limit": "devices", "featureId": "sync.backend", "cells": { "free": "1", "plus": "All your devices", "pro": "All your devices" } },
         { "id": "backup", "label": "Backup on our server", "featureId": "sync.backend", "cells": { "free": true, "plus": true, "pro": true } },
@@ -118,7 +222,7 @@
       "detail": "Connect Claude or another agent to your list. It asks before it acts, and you can stop it at any time.",
       "rows": [
         { "id": "connected", "label": "Agents", "limit": "connectedAgents", "featureId": "agents.connector", "cells": { "free": "1", "plus": "3", "pro": "No limit" } },
-        { "id": "share", "label": "Shared projects", "limit": "createShares", "status": "planned", "cells": { "free": "Join", "plus": "Create and invite", "pro": "Create and invite" } }
+        { "id": "share", "label": "Shared projects", "limit": "createShares", "cells": { "free": "Join", "plus": "Create and invite", "pro": "Create and invite" } }
       ]
     }
   ],
@@ -144,6 +248,17 @@
       "connectedAgents": 3,
       "createShares": true,
       "linkedProjects": null
+    },
+    "pro": {
+      "devices": null,
+      "liveSync": true,
+      "changeLogDays": 365,
+      "recentlyDeletedDays": 30,
+      "attachmentsGB": 50,
+      "connectorWritesPerDay": null,
+      "connectedAgents": null,
+      "createShares": true,
+      "linkedProjects": null
     }
   },
   "promises": [
@@ -153,12 +268,14 @@
     { "id": "own_ai", "title": "You pay your AI provider, not us", "detail": "Septena runs the sync server and the connector. When you connect Claude or another agent, its bill stays with that provider." }
   ],
   "upsells": [
-    { "id": "second_device", "title": "This device is not syncing", "detail": "A free account syncs one device. Plus syncs all of them. You can also move your free account to this device." },
-    { "id": "history_edge", "title": "Older changes are hidden", "detail": "A free account shows 30 days of history. Plus shows a full year." },
-    { "id": "file_elsewhere", "title": "This file is on another device", "detail": "Plus syncs files and images to all your devices." },
-    { "id": "connector_cap", "title": "Daily change limit reached", "detail": "A free account allows 500 agent changes a day. Your agent can make changes again tomorrow. Plus has no daily limit." },
-    { "id": "share_create", "title": "Sharing a project needs Plus", "detail": "Anyone can join a shared project for free. Plus lets you create one and invite people." },
-    { "id": "trial_end", "title": "Your 14 days of Plus have ended", "detail": "Your account is now a free account. One device keeps syncing. Your tasks on every device stay where they are." }
+    { "id": "second_device", "plan": "plus", "title": "This device is not syncing", "detail": "A free account syncs one device. Plus syncs all of them. You can also move your free account to this device." },
+    { "id": "history_edge", "plan": "plus", "title": "Older changes are hidden", "detail": "A free account shows 30 days of history. Plus shows a full year." },
+    { "id": "file_elsewhere", "plan": "plus", "title": "This file is on another device", "detail": "Plus syncs files and images to all your devices." },
+    { "id": "connector_cap", "plan": "plus", "title": "Daily change limit reached", "detail": "Agents on this account made 500 changes today. They can make changes again tomorrow." },
+    { "id": "share_create", "plan": "plus", "title": "Sharing a project needs Plus", "detail": "Anyone can join a shared project for free. Plus lets you create one and invite people." },
+    { "id": "trial_end", "plan": "plus", "title": "Your 14 days of Plus have ended", "detail": "Your account is now a free account. One device keeps syncing. Your tasks on every device stay where they are." },
+    { "id": "agents_full", "plan": "plus", "title": "Your agent slot is in use", "detail": "A free account connects one agent. Plus connects three. Pro has no limit." },
+    { "id": "agents_full_plus", "plan": "pro", "title": "All three agent slots are in use", "detail": "Plus connects three agents. Pro connects as many as you run, and holds 50 GB of files." }
   ],
   "actions": {
     "subscribe": "Subscribe",
@@ -175,7 +292,7 @@
     "notIncluded": "Not included"
   },
   "legal": {
-    "terms": "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/",
+    "terms": "https://septena.app/terms",
     "privacy": "https://septena.app/privacy"
   },
   "paywall": {
@@ -193,9 +310,18 @@
     "ownedWeb": "You have Plus through the web. Manage it at septena.app.",
     "ownedGoogle": "You have Plus through Google Play. Manage it in Google Play.",
     "ownedGrant": "Plus is on for this account.",
+    "ownedGrantPro": "Pro is on for this account.",
     "ownedOtherAccount": "This Apple ID's Plus belongs to another Septena account. Sign in to that account to use it.",
     "syncThisDeviceFailed": "Septena could not reach the server. Try again in a moment.",
-    "done": "Done"
+    "done": "Done",
+    "seePro": "See Pro",
+    "choosePlan": "Choose a plan",
+    "youGet": "With {plan}",
+    "upgradeNote": "Pro starts right away. The App Store refunds the unused part of your Plus.",
+    "upgradeElsewhere": "To move to Pro, change your plan in the store where you bought Plus.",
+    "yourPlanIncludes": "Your plan includes",
+    "compareAll": "Compare every plan",
+    "buyElsewhere": "This copy of Septena does not sell plans. Buy Plus or Pro in the App Store version on any device. It turns on here when you sign in to the same account."
   },
   "status": {
     "device": "On this device",
@@ -203,6 +329,8 @@
     "trial": "Plus trial",
     "plus": "Plus",
     "trialEnds": "Plus trial until {date}",
-    "paidThrough": "Plus through {date}"
+    "paidThrough": "Plus through {date}",
+    "proThrough": "Pro through {date}",
+    "filesSyncing": "Files are still syncing between your devices."
   }
 }

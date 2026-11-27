@@ -3,7 +3,7 @@
 //!
 //! A shell names an action; the core returns the date fields after it. The
 //! host writes the changed fields in one save. Every result meets invariants
-//! I1–I7. The core never reads a clock: the host passes `today` and `now`.
+//! I1–I8. The core never reads a clock: the host passes `today` and `now`.
 
 use serde::{Deserialize, Serialize};
 
@@ -12,7 +12,7 @@ use crate::error::CoreError;
 use crate::fade::{day, instant};
 use crate::registry::enums;
 use crate::reminders::{shift_reminder_for_recurrence, shift_reminder_on_reschedule};
-use crate::views::{TaskSnapshot, date_facts, parse_day};
+use crate::views::{TaskSnapshot, date_facts, is_deferred, parse_day};
 
 /// The answer to "this occurrence or the whole series" for a fixed repeat.
 /// Other tasks ignore it.
@@ -81,6 +81,7 @@ pub enum DateAction {
 pub struct TaskDateFields {
     pub scheduled: Option<String>,
     pub deadline: Option<String>,
+    pub deferred_deadline: Option<String>,
     pub today: bool,
     pub today_set_on: Option<String>,
     pub start_time: Option<String>,
@@ -136,7 +137,7 @@ pub fn apply_date_action(
     Ok(patch(&before, after))
 }
 
-/// A12 and restore: the task's fields brought to invariants I1–I7. A pin
+/// A12 and restore: the task's fields brought to invariants I1–I8. A pin
 /// with a future When date loses the pin; a pin with an arrived When date
 /// loses the date. An empty or invalid day becomes none.
 #[cfg_attr(feature = "ffi", uniffi::export)]
@@ -173,6 +174,7 @@ pub fn next_occurrence_dates(
     Ok(TaskDateFields {
         scheduled: Some(next.clone()),
         deadline: None,
+        deferred_deadline: None,
         today: false,
         today_set_on: None,
         start_time: task.start_time.clone(),
@@ -257,7 +259,9 @@ impl Ctx<'_> {
         self.pin();
     }
 
-    /// A2 for a day after today. The deadline stays (decision Q1).
+    /// A2 for a day after today. The deadline stays (decision Q1). An arrived
+    /// one no longer holds the task on Today: the user planned past it
+    /// (decision Q8).
     fn schedule_for(&mut self, target: Day, mode: RescheduleMode) {
         if let Some(old) = parse_day(&self.f.scheduled) {
             self.record_slot(old, target, mode);
@@ -266,17 +270,24 @@ impl Ctx<'_> {
             self.f.recurrence_anchor_date = Some(target.to_string());
         }
         self.f.scheduled = Some(target.to_string());
+        if parse_day(&self.f.deadline).is_some_and(|d| d <= self.today) {
+            self.f.deferred_deadline = self.f.deadline.clone();
+        }
         self.unpin();
     }
 
     /// A3. Membership is a union (pin, arrived When, arrived deadline), so
-    /// the arrived dates go too, or the row would bounce straight back.
+    /// the arrived dates go too, or the row would bounce straight back. A
+    /// deadline the user planned past does not hold the row, so it stays.
     fn remove_from_today(&mut self) {
         self.unpin();
-        if parse_day(&self.f.scheduled).is_some_and(|d| d <= self.today) {
+        let facts = date_facts(self.task, self.today);
+        let when_arrived = facts.scheduled.is_some_and(|d| d <= self.today);
+        let deadline_arrived = facts.deadline.is_some_and(|d| d <= self.today);
+        if when_arrived {
             self.f.scheduled = None;
         }
-        if parse_day(&self.f.deadline).is_some_and(|d| d <= self.today) {
+        if !self.task.assigned_to_other && deadline_arrived && (when_arrived || facts.holding_deadline.is_some()) {
             self.f.deadline = None;
         }
         if self.f.scheduled.is_none() && !self.f.today {
@@ -368,12 +379,13 @@ impl Ctx<'_> {
     }
 }
 
-/// Brings fields to invariants I1–I7.
+/// Brings fields to invariants I1–I8.
 fn normalize(f: &mut TaskDateFields, today: Day) {
     // I3, I4: a day is a valid date or none.
     for value in [
         &mut f.scheduled,
         &mut f.deadline,
+        &mut f.deferred_deadline,
         &mut f.today_set_on,
         &mut f.recurrence_anchor_date,
     ] {
@@ -408,6 +420,15 @@ fn normalize(f: &mut TaskDateFields, today: Day) {
     } else if f.today_set_on.is_none() {
         f.today_set_on = Some(today.to_string());
     }
+    // I8: a deferral lasts as long as the deadline it names and the When date
+    // that brings the task back.
+    if !is_deferred(
+        parse_day(&f.deferred_deadline),
+        parse_day(&f.scheduled),
+        parse_day(&f.deadline),
+    ) {
+        f.deferred_deadline = None;
+    }
     // I6: a time slot needs a day (a When date, a pin or an arrived deadline).
     let held = f.scheduled.is_some() || f.today || parse_day(&f.deadline).is_some_and(|d| d <= today);
     if !held {
@@ -424,6 +445,7 @@ fn fields_of(task: &TaskSnapshot) -> TaskDateFields {
     TaskDateFields {
         scheduled: task.scheduled.clone(),
         deadline: task.deadline.clone(),
+        deferred_deadline: task.deferred_deadline.clone(),
         today: task.today,
         today_set_on: task.today_set_on.clone(),
         start_time: task.start_time.clone(),
@@ -437,34 +459,45 @@ fn fields_of(task: &TaskSnapshot) -> TaskDateFields {
     }
 }
 
+/// One loop, not one comparison per field: the native slices are close to
+/// their size budget.
 fn patch(before: &TaskDateFields, after: TaskDateFields) -> TaskDatePatch {
-    let mut changed = Vec::new();
-    let mut note = |name: &str, differs: bool| {
-        if differs {
-            changed.push(name.to_string());
-        }
-    };
-    note("scheduled", before.scheduled != after.scheduled);
-    note("deadline", before.deadline != after.deadline);
-    note("today", before.today != after.today);
-    note("todaySetOn", before.today_set_on != after.today_set_on);
-    note("startTime", before.start_time != after.start_time);
-    note("durationMinutes", before.duration_minutes != after.duration_minutes);
-    note("timeZone", before.time_zone != after.time_zone);
-    note("reminderAt", before.reminder_at != after.reminder_at);
-    note(
-        "reminderSnoozedUntil",
-        before.reminder_snoozed_until != after.reminder_snoozed_until,
-    );
-    note(
-        "reminderDismissedAt",
-        before.reminder_dismissed_at != after.reminder_dismissed_at,
-    );
-    note(
-        "recurrenceAnchorDate",
-        before.recurrence_anchor_date != after.recurrence_anchor_date,
-    );
-    note("acknowledgedAt", before.acknowledged_at != after.acknowledged_at);
+    let texts = [
+        ("scheduled", &before.scheduled, &after.scheduled),
+        ("deadline", &before.deadline, &after.deadline),
+        ("deferredDeadline", &before.deferred_deadline, &after.deferred_deadline),
+        ("todaySetOn", &before.today_set_on, &after.today_set_on),
+        ("startTime", &before.start_time, &after.start_time),
+        ("timeZone", &before.time_zone, &after.time_zone),
+        ("reminderAt", &before.reminder_at, &after.reminder_at),
+        (
+            "reminderSnoozedUntil",
+            &before.reminder_snoozed_until,
+            &after.reminder_snoozed_until,
+        ),
+        (
+            "reminderDismissedAt",
+            &before.reminder_dismissed_at,
+            &after.reminder_dismissed_at,
+        ),
+        (
+            "recurrenceAnchorDate",
+            &before.recurrence_anchor_date,
+            &after.recurrence_anchor_date,
+        ),
+        ("acknowledgedAt", &before.acknowledged_at, &after.acknowledged_at),
+    ];
+    let mut changed: Vec<String> = texts
+        .iter()
+        .filter(|(_, old, new)| old != new)
+        .map(|(name, _, _)| name.to_string())
+        .collect();
+    if before.today != after.today {
+        changed.push("today".to_string());
+    }
+    if before.duration_minutes != after.duration_minutes {
+        changed.push("durationMinutes".to_string());
+    }
     TaskDatePatch { fields: after, changed }
 }
 

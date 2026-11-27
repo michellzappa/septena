@@ -3,13 +3,19 @@ import SwiftUI
 import AppKit
 #endif
 
-// A `ScrollView { LazyVStack }` that behaves like a native selectable `List`,
+// A `ScrollView` + stack that behaves like a native selectable `List`,
 // minus the one thing native `List(selection:)` can't do on macOS: host an
 // inline-editable `TextField` in a *selectable* row without corrupting the
 // List's focus/selection (the documented "no inline TextField in a selectable
 // macOS List" trap). By owning the container ourselves we get Things-style
 // expand-in-place editing — a row that grows to reveal its full editor inline —
 // while re-earning the handful of behaviors `List` gave for free.
+//
+// Eager `VStack` by default (with a `LazyVStack` fallback only for very large
+// lists): `LazyVStack` estimates unmaterialized row heights, which makes iOS's
+// `UIScrollView.contentSize` fluctuate as rows enter/leave the viewport and
+// visibly shrinks/grows the scroll indicator while scrolling up and down.
+// Measuring normal lists eagerly gives an exact, stable content height.
 //
 // What we deliberately reproduce (so a migrated surface looks/behaves identical):
 //   • Selection — click / ⌘-click (toggle) / ⇧-click (range), a `Set<String>`
@@ -80,6 +86,13 @@ private struct SelectableScrollViewportHeightKey: PreferenceKey {
 
 private enum SelectableScrollListMetrics {
   static let coordinateSpace = "selectableScrollList"
+  /// Thresholds (with hysteresis) for switching between eager `VStack` and
+  /// `LazyVStack`. Lists under `lazyEnterThreshold` measure every row upfront so
+  /// `UIScrollView.contentSize` is exact and the scrollbar never shrinks/grows
+  /// mid-scroll; very large lists (e.g. deep Logbook / Anytime) switch to
+  /// `LazyVStack` to avoid layout hitches.
+  static let lazyEnterThreshold = 250
+  static let lazyExitThreshold = 150
 }
 
 /// How a row sits relative to the scroll view's visible clip.
@@ -306,13 +319,71 @@ struct SelectableScrollList<Content: View>: View {
   @State private var viewportHeight: CGFloat = 0
   @State private var frameStore = SelectableRowFrameStore()
   @State private var scrollRequest: SelectableScrollRequest?
+  @State private var useLazyStack: Bool
+
+  init(
+    selection: Binding<Set<String>>,
+    orderedIDs: [String],
+    inputActive: Bool = false,
+    isActive: Bool = true,
+    selectable: Bool = true,
+    toggleOnTap: Bool = false,
+    onActivate: @escaping (String) -> Void = { _ in },
+    onClear: @escaping () -> Void = {},
+    onMoveShortcut: @escaping () -> Void = {},
+    scrollToTick: Int = 0,
+    scrollToID: String? = nil,
+    canvasFill: Color = Theme.paperBackground,
+    iPadTabBarInsetOwnPadding: CGFloat? = nil,
+    wideContentGutter: CGFloat = 0,
+    @ViewBuilder content: @escaping () -> Content
+  ) {
+    self._selection = selection
+    self.orderedIDs = orderedIDs
+    self.inputActive = inputActive
+    self.isActive = isActive
+    self.selectable = selectable
+    self.toggleOnTap = toggleOnTap
+    self.onActivate = onActivate
+    self.onClear = onClear
+    self.onMoveShortcut = onMoveShortcut
+    self.scrollToTick = scrollToTick
+    self.scrollToID = scrollToID
+    self.canvasFill = canvasFill
+    self.iPadTabBarInsetOwnPadding = iPadTabBarInsetOwnPadding
+    self.wideContentGutter = wideContentGutter
+    self.content = content
+    self._useLazyStack = State(
+      initialValue: orderedIDs.count >= SelectableScrollListMetrics.lazyEnterThreshold
+    )
+  }
+
+  @ViewBuilder
+  private var scrollStack: some View {
+    if useLazyStack {
+      LazyVStack(alignment: .leading, spacing: 0) {
+        content()
+      }
+    } else {
+      VStack(alignment: .leading, spacing: 0) {
+        content()
+      }
+    }
+  }
+
+  private func syncStackLaziness(for count: Int) {
+    guard !inputActive else { return }
+    if !useLazyStack && count >= SelectableScrollListMetrics.lazyEnterThreshold {
+      useLazyStack = true
+    } else if useLazyStack && count <= SelectableScrollListMetrics.lazyExitThreshold {
+      useLazyStack = false
+    }
+  }
 
   var body: some View {
     ScrollViewReader { proxy in
       ScrollView {
-        LazyVStack(alignment: .leading, spacing: 0) {
-          content()
-        }
+        scrollStack
         #if os(iOS)
         .frame(maxWidth: .infinity,
                minHeight: inputActive && viewportHeight > 0 ? viewportHeight : nil,
@@ -363,6 +434,9 @@ struct SelectableScrollList<Content: View>: View {
         guard scrollToTick > 0, let id = scrollToID else { return }
         scrollRequest = SelectableScrollRequest(id: id, scrollDown: true, force: true)
       }
+      .onChange(of: orderedIDs.count) { _, count in
+        syncStackLaziness(for: count)
+      }
       // Fill the detail pane edge-to-edge on macOS (click-to-clear on empty
       // paper). On iOS let the ScrollView size naturally so content scrolls
       // under the nav bar like Week — `.frame(maxHeight: .infinity)` pinned
@@ -395,6 +469,7 @@ struct SelectableScrollList<Content: View>: View {
       .focusEffectDisabled()
       .onAppear { if isActive && selectable { focused = true } }
       .onChange(of: inputActive) { _, active in
+        if !active { syncStackLaziness(for: orderedIDs.count) }
         guard !active, isActive, selectable else { return }
         DispatchQueue.main.async { focused = true }
       }

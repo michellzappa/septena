@@ -5,7 +5,7 @@
 const PERSON_KEYS = { required: ["version", "id", "who", "people", "areas", "projects", "moments"], optional: ["look", "legacy"] };
 const MOMENT_KEYS = { required: ["id", "plot", "project", "order", "tasks", "capture", "anytime", "picked", "open", "file", "dated", "repeating", "attachments", "upcoming", "agent", "discuss", "review", "faded"], optional: ["rolledIn"] };
 const TASK_KEYS = { required: ["id", "title", "group"], optional: ["today", "done", "proposal", "unread", "muted", "notes", "due", "repeat", "files"] };
-const CONVERSATION = ["title", "notes", "question", "options", "artifact", "bodies", "otherBody", "handoff", "acceptance"];
+const CONVERSATION = ["title", "notes", "question", "options", "artifact", "bodies", "otherBody", "otherAnswer", "handoff", "acceptance"];
 const KEYS = {
   look: { required: ["accent", "texture", "appearance"] },
   area: { required: ["title", "emoji"] },
@@ -133,6 +133,7 @@ export function validateCast(people, { tokens, caps, inboxTitle }, assert) {
         keys(talk, KEYS[name], name);
         assert(talk.options.length === 2 && talk.bodies.length === 2 && talk.bodies[0] !== talk.bodies[1], `${where}: ${name} needs two options, each with its own draft`);
         assert(talk.otherBody.includes("{answer}"), `${where}: ${name}.otherBody needs {answer}`);
+        assert(!talk.options.includes(talk.otherAnswer), `${where}: ${name}.otherAnswer is a typed answer, not one of the options`);
       }
       place(moment.discuss.group, "discuss"); onToday(moment.discuss.with, "discuss.with", 3);
       list(moment.review, "review", 2);

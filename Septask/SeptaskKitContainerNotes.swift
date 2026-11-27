@@ -20,8 +20,8 @@ enum KitContainerNotes {
   static let toggleGap: CGFloat = 4
   static var toggleHeight: CGFloat { ceil(SeptaskKitTheme.meta.boundingRectForFont.height) }
 
-  static var bodyFont: NSFont { .systemFont(ofSize: SeptaskKitTheme.notesFontSize) }
-  private static var headingFont: NSFont { .systemFont(ofSize: SeptaskKitTheme.notesFontSize, weight: .semibold) }
+  static var bodyFont: NSFont { .systemFont(ofSize: SeptaskKitTheme.pageNotesFontSize) }
+  private static var headingFont: NSFont { .systemFont(ofSize: SeptaskKitTheme.pageNotesFontSize, weight: .semibold) }
 
   /// Notes as the page shows them (`ContainerNotes.previewLines`): `#`/`##`
   /// lines as headings, `###` lines (how an agent log entry starts:
@@ -76,7 +76,7 @@ enum KitContainerNotes {
     let style = NSMutableParagraphStyle()
     style.lineBreakMode = .byWordWrapping
     if case .item(let depth, let marker, _) = line {
-      let step = SeptaskKitTheme.notesFontSize
+      let step = SeptaskKitTheme.pageNotesFontSize
       let markerWidth = (marker + " " as NSString).size(withAttributes: [.font: bodyFont]).width
       let lead = CGFloat(depth) * step
       let textStart = lead + max(step, ceil(markerWidth) + 2)
@@ -181,10 +181,19 @@ final class KitContainerNotesCell: NSTableCellView {
   var onEdit: ((NSView) -> Void)?
   /// Opens the notes history sheet (available when signed in to the backend).
   var onHistory: (() -> Void)?
+  /// The row is not as tall as the notes need at this cell's width. Passes
+  /// the width, so the list measures the row at the width the cell draws.
+  var onHeightMismatch: ((CGFloat) -> Void)?
+  /// The last (width, height) reported, so a mismatch reports once.
+  private var reportedMismatch: NSSize?
 
   init(identifier: NSUserInterfaceItemIdentifier) {
     super.init(frame: .zero)
     self.identifier = identifier
+    // Long notes never draw past the row into the task card below it. If the
+    // row is ever shorter than the text, the text is cut here and
+    // `layout()` asks the list for the right height.
+    clipsToBounds = true
 
     label.translatesAutoresizingMaskIntoConstraints = false
     KitContainerNotes.style(label)
@@ -262,6 +271,26 @@ final class KitContainerNotesCell: NSTableCellView {
     hitPin.update(width: bounds.width)
     toggle.isHidden = !hasToggle
     super.layout()
+    reportHeightMismatch()
+  }
+
+  /// Notes that unfold, sync in or rewrap must never sit under the next row.
+  /// The list measures the row ahead of layout; when that height is not the
+  /// one the text needs at this cell's real width, the cell says so once.
+  private func reportHeightMismatch() {
+    guard bounds.width > 1, onHeightMismatch != nil else { return }
+    let needed = KitContainerNotes.height(text: text, placeholder: placeholder,
+                                          rowWidth: bounds.width, expanded: expanded)
+    guard abs(needed - bounds.height) > 1 else {
+      reportedMismatch = nil
+      return
+    }
+    let key = NSSize(width: bounds.width, height: bounds.height)
+    guard reportedMismatch != key else { return }
+    reportedMismatch = key
+    let width = bounds.width
+    // Not inside this layout pass: the list re-notes row heights.
+    DispatchQueue.main.async { [weak self] in self?.onHeightMismatch?(width) }
   }
 
   private var hasToggle: Bool {
@@ -582,20 +611,17 @@ final class KitContainerNotesPopover: NSObject {
   private let handle = KitPopoverHandle()
   private let original: String
   private let onCommit: (String) -> Void
-  private let onHistory: (() -> Void)?
 
-  private init(original: String, onCommit: @escaping (String) -> Void, onHistory: (() -> Void)?) {
+  private init(original: String, onCommit: @escaping (String) -> Void) {
     self.original = original
     self.onCommit = onCommit
-    self.onHistory = onHistory
   }
 
   /// The popover retains its content, and the content's close handler keeps
   /// this presenter alive until it has committed.
   static func present(isArea: Bool, notes: String, relativeTo anchor: NSView,
-                      onHistory: (() -> Void)? = nil,
                       onCommit: @escaping (String) -> Void) {
-    let presenter = KitContainerNotesPopover(original: notes, onCommit: onCommit, onHistory: onHistory)
+    let presenter = KitContainerNotesPopover(original: notes, onCommit: onCommit)
     presenter.show(isArea: isArea, relativeTo: anchor)
   }
 
@@ -610,15 +636,6 @@ final class KitContainerNotesPopover: NSObject {
     headerRow.orientation = .horizontal
     headerRow.alignment = .centerY
     headerRow.spacing = 8
-    if onHistory != nil, TaskHistory.isAvailable {
-      let historyBtn = NSButton(title: ContainerNotesCopy.historyButtonTitle,
-                                target: self, action: #selector(openHistory))
-      historyBtn.bezelStyle = .inline
-      historyBtn.controlSize = .small
-      historyBtn.font = SeptaskKitTheme.meta
-      historyBtn.refusesFirstResponder = true
-      headerRow.addArrangedSubview(historyBtn)
-    }
 
     textView.isRichText = false
     textView.importsGraphics = false
@@ -673,12 +690,6 @@ final class KitContainerNotesPopover: NSObject {
                        focus: textView,
                        handle: handle,
                        onClose: { [self] in commit() })
-  }
-
-  @objc private func openHistory() {
-    let callback = onHistory
-    handle.close()
-    DispatchQueue.main.async { callback?() }
   }
 
   private func commit() {

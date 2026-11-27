@@ -69,6 +69,7 @@ function toCoreTask(task: TaskRow) {
     createdAt: task.createdAt ?? null,
     scheduled: task.scheduled ?? null,
     deadline: task.deadline ?? null,
+    deferredDeadline: task.deferredDeadline ?? null,
     today: Boolean(task.today),
     todaySetOn: task.todaySetOn ?? null,
     source: task.source ?? null,
@@ -235,6 +236,8 @@ export interface CoreFadeInput {
   isAssignedToClaude: boolean;
   isAwaitingHuman?: boolean;
   showsAgentCue?: boolean;
+  /** An agent added the task and the user has not accepted it (ADR 0039). */
+  isProposal?: boolean;
   touchedAt?: string | null;
   createdAt?: string | null;
   created?: string | null;
@@ -283,7 +286,7 @@ export interface CoreProjection {
   pendingReasoning: boolean;
 }
 
-export type AgentStage = "queued" | "working" | "yourTurn" | "review" | "done" | null;
+export type AgentStage = "queued" | "working" | "yourTurn" | "stopped" | "review" | "done" | null;
 
 export interface CoreConversationState {
   isTerminal: boolean;
@@ -293,6 +296,8 @@ export interface CoreConversationState {
   hasStarted: boolean;
   isClaimed: boolean;
   agentStage: AgentStage;
+  /** The Review group this conversation puts an open task in (docs/REVIEW_SPEC.md §1). */
+  reviewGroup: "questions" | "finished" | null;
 }
 
 export function deriveConversation(conversation: CoreConversation, now: string): CoreProjection {
@@ -407,6 +412,38 @@ export function localTodayYMD(date = new Date()): string {
   const m = String(date.getMonth() + 1).padStart(2, "0");
   const d = String(date.getDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
+}
+
+/**
+ * Local wall-clock completion timestamp (`YYYY-MM-DDTHH:mm:ss`, no timezone),
+ * matching Apple (`ckTimestampFormatter`) and Backend (`localServerTimestamp`).
+ */
+export function localWallClockTimestamp(date = new Date()): string {
+  const hh = String(date.getHours()).padStart(2, "0");
+  const mm = String(date.getMinutes()).padStart(2, "0");
+  const ss = String(date.getSeconds()).padStart(2, "0");
+  return `${localTodayYMD(date)}T${hh}:${mm}:${ss}`;
+}
+
+/**
+ * Resolve a task's `completedAt` stamp to the user's local calendar day
+ * (`YYYY-MM-DD`). Matches Android (`TaskHomeViewModel.kt`) and Apple:
+ * - Zoned ISO instants (`...Z` or `...+01:00`) convert to local calendar day.
+ * - Unzoned wall-clock stamps (`YYYY-MM-DDTHH:mm:ss`) or plain dates use their
+ *   leading `YYYY-MM-DD` directly.
+ */
+export function completedLocalDay(stamp: string | null | undefined): string | null {
+  if (!stamp) return null;
+  const trimmed = stamp.trim();
+  if (!trimmed) return null;
+  if (/(Z|[+-]\d{2}:?\d{2})$/i.test(trimmed)) {
+    const parsed = new Date(trimmed);
+    if (!Number.isNaN(parsed.getTime())) {
+      return localTodayYMD(parsed);
+    }
+  }
+  const m = /^(\d{4}-\d{2}-\d{2})/.exec(trimmed);
+  return m ? m[1] : null;
 }
 
 export function localUtcOffsetSeconds(date = new Date()): number {

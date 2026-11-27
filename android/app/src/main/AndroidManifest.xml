@@ -17,11 +17,27 @@
         android:theme="@style/Theme.Septena">
         <activity
             android:name=".MainActivity"
+            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation"
             android:exported="true"
-            android:launchMode="singleTop">
+            android:launchMode="singleTop"
+            android:supportsPictureInPicture="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- An invite to a shared project, from its page at api.septena.app/join. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="septask" android:host="join" />
+            </intent-filter>
+            <!-- OIDC sign-in & link return (ADR 0047, #640, #643). -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="septask" android:host="auth" android:pathPrefix="/callback" />
             </intent-filter>
             <meta-data
                 android:name="android.app.shortcuts"

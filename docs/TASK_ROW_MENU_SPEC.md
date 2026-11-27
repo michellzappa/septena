@@ -48,6 +48,9 @@ only), the filing suggestion (only when the top group does not already show
 it), Inbox, areas and top-level projects, then Move… for the full picker.
 It replaces the two old submenus, Move and Move to Section.
 
+Assign To ▸ is the one exception to rule 1 *(default)*: it shows only for tasks
+in a shared project, and lists its members (docs/PROJECT_SHARING_SPEC.md §8).
+
 Open opens the task page (ADR 0029, `docs/TASK_PAGE_SPEC.md`), never the
 inline editor: a row tap is inline, Open is the page. On the Mac it shows
 the inspector pane. On iPhone it pushes the page; on iPad it shows the
@@ -74,20 +77,30 @@ copies. The text comes from `TaskShareText` in `SeptenaCore/Models.swift`.
 
 ## The When picker
 
-The When picker answers "when, and how often". It shows the seven-day
-strip with Today first, then one list of rows: Tomorrow, Pick another date,
-Clear, Repeat and Add time. Every row has the same shape on a platform.
-The rows, their order and their words are in `registry/surfaces.json`
-`taskDateBoard`. Tomorrow has a strip cell and a row (decided 2026-11-24).
-Android has no Repeat row (Repeat is the next row of its task page) and no
-time editor yet.
+The When picker answers "when, and how often". It has three groups, with
+one divider between two groups (decided 2026-11-26):
+
+1. **Pick:** the seven-day strip with Today first, then Pick another date.
+   On the Mac, the typed-date line ("Type a date: …") opens this group.
+2. **Refine:** Add time, then Repeat.
+3. **Remove:** Clear, last.
+
+Every row has the same shape on a platform. The rows, their groups, their
+order and their words are in `registry/surfaces.json` `taskDateBoard`; the
+generator refuses a row out of group order. A group with no rows draws no
+divider (the Deadline picker shows Pick and Remove only). Tomorrow is a
+strip cell only: the Tomorrow row duplicated it and was removed on
+2026-11-26. Its word for date labels is `taskDateBoard.tomorrow`.
+iPhone, iPad, Mac, Android and web all render them. The watch stays reduced
+(decided 2026-11-25): it offers Tomorrow and no board.
+Android has no Repeat row (Repeat is the next row of its task page).
 
 The Repeat row reads "Repeat…", or "Repeat: &lt;rule&gt;" when the task
 already repeats. It closes the When picker and opens the Repeat editor,
 which also holds Pause.
 
-On iPhone and iPad the Repeat row shows for one task only, because the
-Repeat sheet edits one task. The Mac Repeat editor edits a selection, so
+On iPhone, iPad and web the Repeat row shows for one task only, because
+their Repeat editor edits one task. The Mac Repeat editor edits a selection, so
 the Mac shows the row for several tasks too. The Deadline picker has no
 Repeat row.
 

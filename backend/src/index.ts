@@ -5,10 +5,14 @@ import { plusContinue, plusLanding, plusStart } from "./api/plusLinks.js";
 import { joinLanding } from "./api/shares.js";
 import { admin } from "./admin/routes.js";
 import { sweepAccounts } from "./admin/accounts.js";
+import { recordMetrics } from "./admin/metrics.js";
+import { sweepSupport } from "./support/routes.js";
 import * as oauth from "./shadow/oauth.js";
+import * as agentSignup from "./shadow/agentSignup.js";
 import { previewMcpHandler } from "./shadow/mcp.js";
 import { ONBOARD_MARKDOWN } from "./shadow/prompts.js";
 import SKILL_MARKDOWN from "../skill.md";
+import OPENAPI from "./generated/openapi.json";
 import coreWasm from "./core/wasm/septena_core_wasm_bg.wasm";
 import { initCore } from "./core/index.js";
 
@@ -20,6 +24,7 @@ export { TaskStore } from "./store/TaskStore.js";
 export { ProjectStore } from "./store/ProjectStore.js";
 export { AccountStore } from "./store/AccountStore.js";
 export { PairingStore } from "./shadow/PairingStore.js";
+export { SupportStore } from "./support/store.js";
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -55,6 +60,15 @@ app.get("/skill.md", (c) =>
   }),
 );
 
+// The OpenAPI 3.1 document for /v1 (ADR 0050 §5). Generated from the route
+// validators by scripts/gen-contract.ts; CI fails when it is stale.
+app.get("/openapi.json", (c) =>
+  c.json(OPENAPI, 200, {
+    "Cache-Control": "public, max-age=300",
+    "Access-Control-Allow-Origin": "*",
+  }),
+);
+
 // The onboarding script for bootstrapping areas, projects, notes and tasks (#124).
 app.get("/onboard.md", (c) =>
   c.text(ONBOARD_MARKDOWN, 200, {
@@ -67,11 +81,23 @@ app.get("/onboard.md", (c) =>
 // client registration, and the app-pairing authorize flow (src/shadow/oauth.ts).
 app.get("/.well-known/oauth-authorization-server", oauth.authServerMetadata);
 app.get("/.well-known/oauth-protected-resource", oauth.protectedResourceMetadata);
+// OpenAI apps directory domain verification (docs/CONNECTOR_DIRECTORY_SUBMISSION.md).
+app.get("/.well-known/openai-apps-challenge", (c) =>
+  c.env.OPENAI_APPS_CHALLENGE
+    ? c.text(c.env.OPENAI_APPS_CHALLENGE.trim(), 200, { "Cache-Control": "no-store" })
+    : c.text("Not found", 404),
+);
 app.post("/oauth/register", oauth.register);
 app.get("/oauth/authorize", oauth.authorize);
 app.get("/oauth/pair/continue", oauth.pairContinue);
+app.post("/oauth/pair/email", oauth.pairEmail);
+app.get("/oauth/pair/oidc/:provider", oauth.pairOidc);
+app.post("/oauth/pair/reviewer", oauth.pairReviewer);
 // Where a sign-in QR lands when a system camera opens it (src/shadow/pairQr.ts).
 app.get("/pair/:code", oauth.pairLanding);
+// Where a human confirms a headless agent account creation/connection (ADR 0056).
+app.get("/agent/confirm/:token", agentSignup.confirmPage);
+app.post("/agent/confirm/:token", agentSignup.confirmSubmit);
 // Where an invite to a shared project opens (src/api/shares.ts).
 app.get("/join/:token", joinLanding);
 // Where a Plus link opens (src/api/plusLinks.ts).
@@ -101,6 +127,10 @@ app.route("/admin", admin);
 export default {
   fetch: app.fetch,
   async scheduled(_event, env) {
-    if (env.MAINTENANCE !== "true") await sweepAccounts(env);
+    if (env.MAINTENANCE !== "true") {
+      await sweepAccounts(env);
+      await recordMetrics(env);
+      await sweepSupport(env);
+    }
   },
 } satisfies ExportedHandler<Env>;

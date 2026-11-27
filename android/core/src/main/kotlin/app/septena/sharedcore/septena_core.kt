@@ -1062,7 +1062,7 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if (lib.uniffi_septena_core_checksum_func_checklist_occurrence_id() != 31152.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_septena_core_checksum_func_conversation_state() != 24271.toShort()) {
+    if (lib.uniffi_septena_core_checksum_func_conversation_state() != 36620.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_septena_core_checksum_func_core_version() != 5866.toShort()) {
@@ -1089,7 +1089,7 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if (lib.uniffi_septena_core_checksum_func_normalize_ref_key() != 43412.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_septena_core_checksum_func_normalize_task_dates() != 27973.toShort()) {
+    if (lib.uniffi_septena_core_checksum_func_normalize_task_dates() != 42374.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_septena_core_checksum_func_occurrence_id() != 31912.toShort()) {
@@ -1122,7 +1122,7 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if (lib.uniffi_septena_core_checksum_func_should_arm_reminder() != 37582.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_septena_core_checksum_func_should_fade() != 20672.toShort()) {
+    if (lib.uniffi_septena_core_checksum_func_should_fade() != 10895.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_septena_core_checksum_func_task_ref_id() != 40151.toShort()) {
@@ -1513,10 +1513,15 @@ data class ConversationState (
      */
     var `isClaimed`: kotlin.Boolean, 
     /**
-     * The Agent smart list stage (`queued`, `working`, `yourTurn`, `review`,
-     * `done`), or none when the task is not agent work.
+     * The Agent smart list stage (`queued`, `working`, `yourTurn`, `stopped`,
+     * `review`, `done`), or none when the task is not agent work.
      */
-    var `agentStage`: kotlin.String?
+    var `agentStage`: kotlin.String?, 
+    /**
+     * The Review group this conversation puts an open task in: `questions`,
+     * `finished`, or none (`docs/REVIEW_SPEC.md` §1).
+     */
+    var `reviewGroup`: kotlin.String?
 ) {
     
     companion object
@@ -1535,6 +1540,7 @@ public object FfiConverterTypeConversationState: FfiConverterRustBuffer<Conversa
             FfiConverterBoolean.read(buf),
             FfiConverterBoolean.read(buf),
             FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalString.read(buf),
         )
     }
 
@@ -1545,7 +1551,8 @@ public object FfiConverterTypeConversationState: FfiConverterRustBuffer<Conversa
             FfiConverterBoolean.allocationSize(value.`awaitsHuman`) +
             FfiConverterBoolean.allocationSize(value.`hasStarted`) +
             FfiConverterBoolean.allocationSize(value.`isClaimed`) +
-            FfiConverterOptionalString.allocationSize(value.`agentStage`)
+            FfiConverterOptionalString.allocationSize(value.`agentStage`) +
+            FfiConverterOptionalString.allocationSize(value.`reviewGroup`)
     )
 
     override fun write(value: ConversationState, buf: ByteBuffer) {
@@ -1556,6 +1563,7 @@ public object FfiConverterTypeConversationState: FfiConverterRustBuffer<Conversa
             FfiConverterBoolean.write(value.`hasStarted`, buf)
             FfiConverterBoolean.write(value.`isClaimed`, buf)
             FfiConverterOptionalString.write(value.`agentStage`, buf)
+            FfiConverterOptionalString.write(value.`reviewGroup`, buf)
     }
 }
 
@@ -1618,6 +1626,10 @@ data class FadeInput (
     var `isAssignedToClaude`: kotlin.Boolean, 
     var `isAwaitingHuman`: kotlin.Boolean, 
     var `showsAgentCue`: kotlin.Boolean, 
+    /**
+     * An agent added the task and the user has not accepted it (ADR 0039).
+     */
+    var `isProposal`: kotlin.Boolean, 
     var `touchedAt`: kotlin.String?, 
     var `createdAt`: kotlin.String?, 
     var `created`: kotlin.String?, 
@@ -1646,6 +1658,7 @@ public object FfiConverterTypeFadeInput: FfiConverterRustBuffer<FadeInput> {
             FfiConverterBoolean.read(buf),
             FfiConverterBoolean.read(buf),
             FfiConverterBoolean.read(buf),
+            FfiConverterBoolean.read(buf),
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalString.read(buf),
@@ -1667,6 +1680,7 @@ public object FfiConverterTypeFadeInput: FfiConverterRustBuffer<FadeInput> {
             FfiConverterBoolean.allocationSize(value.`isAssignedToClaude`) +
             FfiConverterBoolean.allocationSize(value.`isAwaitingHuman`) +
             FfiConverterBoolean.allocationSize(value.`showsAgentCue`) +
+            FfiConverterBoolean.allocationSize(value.`isProposal`) +
             FfiConverterOptionalString.allocationSize(value.`touchedAt`) +
             FfiConverterOptionalString.allocationSize(value.`createdAt`) +
             FfiConverterOptionalString.allocationSize(value.`created`) +
@@ -1687,6 +1701,7 @@ public object FfiConverterTypeFadeInput: FfiConverterRustBuffer<FadeInput> {
             FfiConverterBoolean.write(value.`isAssignedToClaude`, buf)
             FfiConverterBoolean.write(value.`isAwaitingHuman`, buf)
             FfiConverterBoolean.write(value.`showsAgentCue`, buf)
+            FfiConverterBoolean.write(value.`isProposal`, buf)
             FfiConverterOptionalString.write(value.`touchedAt`, buf)
             FfiConverterOptionalString.write(value.`createdAt`, buf)
             FfiConverterOptionalString.write(value.`created`, buf)
@@ -1997,6 +2012,7 @@ public object FfiConverterTypeTaskConversation: FfiConverterRustBuffer<TaskConve
 data class TaskDateFields (
     var `scheduled`: kotlin.String?, 
     var `deadline`: kotlin.String?, 
+    var `deferredDeadline`: kotlin.String?, 
     var `today`: kotlin.Boolean, 
     var `todaySetOn`: kotlin.String?, 
     var `startTime`: kotlin.String?, 
@@ -2020,6 +2036,7 @@ public object FfiConverterTypeTaskDateFields: FfiConverterRustBuffer<TaskDateFie
         return TaskDateFields(
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalString.read(buf),
             FfiConverterBoolean.read(buf),
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalString.read(buf),
@@ -2036,6 +2053,7 @@ public object FfiConverterTypeTaskDateFields: FfiConverterRustBuffer<TaskDateFie
     override fun allocationSize(value: TaskDateFields) = (
             FfiConverterOptionalString.allocationSize(value.`scheduled`) +
             FfiConverterOptionalString.allocationSize(value.`deadline`) +
+            FfiConverterOptionalString.allocationSize(value.`deferredDeadline`) +
             FfiConverterBoolean.allocationSize(value.`today`) +
             FfiConverterOptionalString.allocationSize(value.`todaySetOn`) +
             FfiConverterOptionalString.allocationSize(value.`startTime`) +
@@ -2051,6 +2069,7 @@ public object FfiConverterTypeTaskDateFields: FfiConverterRustBuffer<TaskDateFie
     override fun write(value: TaskDateFields, buf: ByteBuffer) {
             FfiConverterOptionalString.write(value.`scheduled`, buf)
             FfiConverterOptionalString.write(value.`deadline`, buf)
+            FfiConverterOptionalString.write(value.`deferredDeadline`, buf)
             FfiConverterBoolean.write(value.`today`, buf)
             FfiConverterOptionalString.write(value.`todaySetOn`, buf)
             FfiConverterOptionalString.write(value.`startTime`, buf)
@@ -2116,6 +2135,10 @@ data class TaskSnapshot (
     var `createdAt`: kotlin.String?, 
     var `scheduled`: kotlin.String?, 
     var `deadline`: kotlin.String?, 
+    /**
+     * The deadline the user planned past (spec §2, I8).
+     */
+    var `deferredDeadline`: kotlin.String?, 
     var `today`: kotlin.Boolean, 
     var `todaySetOn`: kotlin.String?, 
     var `source`: kotlin.String?, 
@@ -2162,6 +2185,7 @@ public object FfiConverterTypeTaskSnapshot: FfiConverterRustBuffer<TaskSnapshot>
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalString.read(buf),
             FfiConverterBoolean.read(buf),
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalString.read(buf),
@@ -2192,6 +2216,7 @@ public object FfiConverterTypeTaskSnapshot: FfiConverterRustBuffer<TaskSnapshot>
             FfiConverterOptionalString.allocationSize(value.`createdAt`) +
             FfiConverterOptionalString.allocationSize(value.`scheduled`) +
             FfiConverterOptionalString.allocationSize(value.`deadline`) +
+            FfiConverterOptionalString.allocationSize(value.`deferredDeadline`) +
             FfiConverterBoolean.allocationSize(value.`today`) +
             FfiConverterOptionalString.allocationSize(value.`todaySetOn`) +
             FfiConverterOptionalString.allocationSize(value.`source`) +
@@ -2221,6 +2246,7 @@ public object FfiConverterTypeTaskSnapshot: FfiConverterRustBuffer<TaskSnapshot>
             FfiConverterOptionalString.write(value.`createdAt`, buf)
             FfiConverterOptionalString.write(value.`scheduled`, buf)
             FfiConverterOptionalString.write(value.`deadline`, buf)
+            FfiConverterOptionalString.write(value.`deferredDeadline`, buf)
             FfiConverterBoolean.write(value.`today`, buf)
             FfiConverterOptionalString.write(value.`todaySetOn`, buf)
             FfiConverterOptionalString.write(value.`source`, buf)
@@ -3599,8 +3625,8 @@ public object FfiConverterSequenceTypeParsedRef: FfiConverterRustBuffer<List<Par
         /**
          * The predicates and the Agent-list stage of a conversation
          * (`docs/TASK_FACTORY_SPEC.md` §3). Review and Done win over a stale
-         * assignee; a stop counts as Your turn, because only the human can resume it
-         * (ADR 0008).
+         * assignee; a stop wins over an open question, because only the human can
+         * resume it (ADR 0008).
          */
     @Throws(CoreException::class) fun `conversationState`(`conversation`: TaskConversation, `now`: kotlin.String): ConversationState {
             return FfiConverterTypeConversationState.lift(
@@ -3723,7 +3749,7 @@ public object FfiConverterSequenceTypeParsedRef: FfiConverterRustBuffer<List<Par
     
 
         /**
-         * A12 and restore: the task's fields brought to invariants I1–I7. A pin
+         * A12 and restore: the task's fields brought to invariants I1–I8. A pin
          * with a future When date loses the pin; a pin with an arrived When date
          * loses the date. An empty or invalid day becomes none.
          */
@@ -3867,7 +3893,8 @@ public object FfiConverterSequenceTypeParsedRef: FfiConverterRustBuffer<List<Par
     
 
         /**
-         * True when the task has gone untouched for the whole fade window.
+         * True when the task has gone untouched for the whole fade window, or is a
+         * proposal that the user left alone for the cue window (ADR 0039).
          */
     @Throws(CoreException::class) fun `shouldFade`(`input`: FadeInput): kotlin.Boolean {
             return FfiConverterBoolean.lift(

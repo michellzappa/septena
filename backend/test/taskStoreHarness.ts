@@ -202,7 +202,7 @@ export async function createTestTaskStore(existing?: DatabaseSync, envOverrides:
 
   // Expose an RPC-like async proxy matching `StoreRpc` as well as direct calls.
   const store = new TaskStore(ctx as never, envOverrides as never);
-  return { store, db, flushWaitUntil, sockets };
+  return { store, db, flushWaitUntil, sockets, alarmAt: () => alarm };
 }
 
 /// Gives `sid` a live app session, so an access token a test signs for it is
@@ -244,6 +244,21 @@ export async function createTestAccountStore(existing?: DatabaseSync) {
   };
 
   const store = new AccountStore(ctx as never, {} as never);
+  return { store, db };
+}
+
+/// Creates a real `SupportStore` (src/support/store.ts) on in-memory SQLite.
+export async function createTestSupportStore(existing?: DatabaseSync) {
+  installWorkerTestHooks();
+  const { SupportStore } = await import("../src/support/store.ts");
+  const db = existing ?? new DatabaseSync(":memory:");
+  const ctx = {
+    storage: { sql: makeSqlStorage(db) },
+    blockConcurrencyWhile<T>(fn: () => Promise<T>): Promise<T> {
+      return fn();
+    },
+  };
+  const store = new SupportStore(ctx as never, {} as never);
   return { store, db };
 }
 
@@ -314,6 +329,11 @@ export async function createTestProjectStore(env: Record<string, unknown>) {
       },
       async getAlarm() { return alarm; },
       async setAlarm(ts: number) { alarm = ts; },
+      async deleteAlarm() { alarm = null; },
+      async deleteAll() {
+        const tables = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'").all() as { name: string }[];
+        for (const { name } of tables) db.exec(`DROP TABLE "${name}"`);
+      },
     },
     waitUntil(p: Promise<unknown>) { pending.push(Promise.resolve(p)); },
   };
@@ -321,5 +341,5 @@ export async function createTestProjectStore(env: Record<string, unknown>) {
   async function flushWaitUntil(): Promise<void> {
     while (pending.length > 0) await Promise.allSettled(pending.splice(0, pending.length));
   }
-  return { store, flushWaitUntil, alarmAt: () => alarm };
+  return { store, db, flushWaitUntil, alarmAt: () => alarm };
 }

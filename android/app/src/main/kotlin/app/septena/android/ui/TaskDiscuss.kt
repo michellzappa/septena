@@ -85,7 +85,7 @@ internal fun DiscussStart(
                                     JsonValue.StringValue(RegistryEntityEnums.ConvoAssignee.CLAUDE),
                             ),
                         )
-                        graph.taskMutator.touch(taskId)
+                        graph.touchTask(taskId)
                     }
                     graph.sync.noteLocalChange()
                     graph.sync.requestSync()
@@ -127,7 +127,7 @@ internal suspend fun appendUserTurn(graph: AndroidAppGraph, taskId: String, fiel
             ),
         )
     }
-    graph.taskMutator.touch(taskId)
+    graph.touchTask(taskId)
 }
 
 /** What the agent produced (`convo.artifact`): its title, its text and its references. */

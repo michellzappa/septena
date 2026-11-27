@@ -1,0 +1,115 @@
+{
+  "version": 1,
+  "description": "Sign-in methods, their order per platform and the sign-in screen's copy (ADR 0047, docs/SIGN_IN_SURFACES_SPEC.md §3). Every client renders this one list. The screen is also the create-account screen: a first sign-in with a method that creates accounts makes one. Flow per platform: `native` is the platform's own flow (for email and device, the client draws the form itself), `web` is a redirect through api.septena.app in the system browser sheet, `none` means the platform cannot offer it (the reason is in `notes`). The `web` platform also covers the Claude connector's authorize page. Whether a method is turned on is not the registry's job: the backend lists the methods it has on in GET /v1/auth/methods, and a client hides the others. The Terms and Privacy URLs come from plans.json `legal`.",
+  "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+  "methods": [
+    {
+      "id": "apple",
+      "kind": "provider",
+      "name": "Apple",
+      "title": "Continue with Apple",
+      "icon": "auth.apple",
+      "createsAccount": true,
+      "featureId": "account.sign-in-apple",
+      "flows": { "ios": "native", "ipados": "native", "macos": "native", "web": "web", "android": "web", "windows": "web" },
+      "notes": "macos is native in the App Store build. The Developer ID build has no Sign in with Apple entitlement, so the client checks at run time (SeptaskSignIn.appleAvailable) and uses the web flow there (#551). Web Apple needs the Services ID (#638)."
+    },
+    {
+      "id": "google",
+      "kind": "provider",
+      "name": "Google",
+      "title": "Continue with Google",
+      "icon": "auth.google",
+      "createsAccount": true,
+      "featureId": "account.sign-in-google",
+      "flows": { "ios": "web", "ipados": "web", "macos": "web", "web": "web", "android": "native", "windows": "web" },
+      "notes": "android uses Credential Manager and POST /v1/auth/google/native. Clients draw Google's own mark where its branding rules ask for it; the icon is the fallback glyph."
+    },
+    {
+      "id": "microsoft",
+      "kind": "provider",
+      "name": "Microsoft",
+      "title": "Continue with Microsoft",
+      "icon": "auth.microsoft",
+      "createsAccount": true,
+      "featureId": "account.sign-in-microsoft",
+      "flows": { "ios": "web", "ipados": "web", "macos": "web", "web": "web", "android": "web", "windows": "web" },
+      "notes": "Personal and work accounts (the common tenant). Clients draw Microsoft's own mark where its branding rules ask for it; the icon is the fallback glyph."
+    },
+    {
+      "id": "email",
+      "kind": "email",
+      "title": "Continue with email",
+      "icon": "auth.email",
+      "createsAccount": true,
+      "featureId": "account.sign-in-email",
+      "flows": { "ios": "native", "ipados": "native", "macos": "native", "web": "native", "android": "native", "windows": "native" },
+      "notes": "A six-digit code by email (ADR 0016, #169): POST /v1/auth/email/start and /verify."
+    },
+    {
+      "id": "device",
+      "kind": "device",
+      "title": "I use Septena on another device",
+      "icon": "auth.device",
+      "createsAccount": false,
+      "featureId": "account.sign-in-device",
+      "flows": { "ios": "native", "ipados": "native", "macos": "native", "web": "native", "android": "native", "windows": "native" },
+      "notes": "Device approval (ADR 0016): a signed-in device approves this one. It never creates an account."
+    }
+  ],
+  "order": {
+    "ios": ["apple", "google", "microsoft", "email", "device"],
+    "ipados": ["apple", "google", "microsoft", "email", "device"],
+    "macos": ["apple", "google", "microsoft", "email", "device"],
+    "web": ["apple", "google", "microsoft", "email", "device"],
+    "android": ["google", "apple", "microsoft", "email", "device"],
+    "windows": ["apple", "google", "microsoft", "email", "device"]
+  },
+  "copy": {
+    "heading": "Sign in to Septena",
+    "subheading": "New here? Your first sign-in creates your account.",
+    "terms": "By continuing, you agree to the {terms} and the {privacy}.",
+    "termsLabel": "Terms of Use",
+    "privacyLabel": "Privacy Policy"
+  },
+  "email": {
+    "emailLabel": "Email",
+    "emailPlaceholder": "you@example.com",
+    "sendCode": "Send code",
+    "codeSent": "We sent a code to {email}.",
+    "codeLabel": "Code",
+    "signIn": "Sign in",
+    "resend": "Send a new code",
+    "differentEmail": "Use a different email"
+  },
+  "errors": {
+    "invalidEmail": "Enter a valid email address.",
+    "wrongCode": { "one": "That code is wrong. You have 1 try left.", "other": "That code is wrong. You have {count} tries left." },
+    "tooManyTries": "Too many wrong codes. Get a new code and try again.",
+    "codeExpired": "This code has expired. Get a new code and try again.",
+    "rateLimited": "Too many requests. Try again later.",
+    "network": "Can't reach Septena. Check your connection and try again."
+  },
+  "existingAccount": {
+    "title": "This email already has a Septena account",
+    "detail": "We'll send a code to {email}. Enter it to sign in, and we'll add {provider} to that account.",
+    "button": "Email me a code",
+    "manualDetail": "Sign in with {email}, then add {provider} in Settings."
+  },
+  "manage": {
+    "heading": "Sign-in methods",
+    "footer": "Add another sign-in method to open this same account on any device. You cannot remove your last method.",
+    "remove": "Remove",
+    "cancel": "Cancel",
+    "addProvider": "Add {provider}",
+    "addEmail": "Add email",
+    "addAppleDetail": "Link your Apple ID to sign in to this same Septena account.",
+    "alreadyLinked": "That sign-in method already belongs to another Septena account.",
+    "lastMethod": "Add another sign-in method before removing your last one.",
+    "added": "Sign-in method added.",
+    "removed": "Sign-in method removed.",
+    "loadFailed": "Could not load sign-in methods.",
+    "addFailed": "Could not add sign-in method.",
+    "removeFailed": "Could not remove sign-in method."
+  }
+}

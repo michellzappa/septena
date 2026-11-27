@@ -1,9 +1,10 @@
 package app.septena.android.ui
 
-import app.septena.core.DateBoardRowKinds
 import app.septena.core.JsonValue
+import app.septena.core.ProjectShare
 import app.septena.core.RegistryCatalog
 import app.septena.core.SyncRecord
+import app.septena.core.TaskConversation
 import app.septena.core.TaskFadeRules
 import app.septena.core.TaskProvenance
 import app.septena.core.TaskSnapshot
@@ -16,7 +17,6 @@ import app.septena.core.generated.RegistryDestinationIds
 import app.septena.core.generated.RegistryEntityEnums
 import app.septena.core.generated.RegistryEntityFields
 import app.septena.core.generated.RegistryEntityNames as EntityNames
-import app.septena.core.generated.RegistryTaskAttributeIds
 import app.septena.core.stringValue
 import app.septena.ui.SeptenaIconKind
 import app.septena.ui.TaskListItem
@@ -27,11 +27,15 @@ import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.Locale
 
-/** Preloaded per-task secondary metadata (checklist counts, tag names, attachments) for one list render. */
+/** Preloaded per-task secondary metadata (checklist counts, tag names, attachments, shared projects) for one list render. */
 internal data class TaskRowMetadataCatalog(
     val checklistCounts: Map<String, Pair<Int, Int>> = emptyMap(),
     val tagNames: Map<String, String> = emptyMap(),
     val attachmentTaskIds: Set<String> = emptySet(),
+    /** The shared projects, by project id. */
+    val shares: Map<String, ProjectShare> = emptyMap(),
+    /** Tasks an agent handed over for the user to check. */
+    val reviewTaskIds: Set<String> = emptySet(),
 ) {
     companion object {
         suspend fun load(store: TaskStore): TaskRowMetadataCatalog {
@@ -62,6 +66,10 @@ internal data class TaskRowMetadataCatalog(
                 checklistCounts = checklist,
                 tagNames = tags,
                 attachmentTaskIds = attachments,
+                shares = ProjectShare.byProject(store),
+                reviewTaskIds = store.records(EntityNames.CONVO)
+                    .filter { TaskConversation.needsHumanReview(it) }
+                    .mapTo(HashSet(), SyncRecord::id),
             )
         }
     }
@@ -87,10 +95,7 @@ internal fun buildTaskListItem(
 
     val todayLabel = RegistryCatalog.destinationTitle(RegistryDestinationIds.TODAY, languageTag)
         ?.takeIf(String::isNotBlank).orEmpty()
-    val tomorrowLabel = RegistryCatalog.dateBoardRows(
-        RegistryTaskAttributeIds.WHEN,
-        languageTag = languageTag,
-    ).firstOrNull { it.kind == DateBoardRowKinds.TOMORROW }?.label?.takeIf(String::isNotBlank).orEmpty()
+    val tomorrowLabel = RegistryCatalog.tomorrowLabel(languageTag)
     val overdueLabel = RegistryCatalog.taskDateBoardOverdueLabel(languageTag)
 
     // Deadline / Scheduled / Completed date — matches iOS `TaskRow.trailingDate`.
@@ -177,15 +182,33 @@ internal fun buildTaskListItem(
         null
     }
 
+    val share = snapshot.project?.let(catalog.shares::get)
+    val assignee = record.fields[RegistryEntityFields.Task.ASSIGNED_TO].stringValue()
+        ?.takeIf { it != share?.me }
+        ?.let { share?.member(it)?.name }
+
+    // "Waiting on Anna · 5 days" (docs/REVIEW_SPEC.md §6): only an open task waits.
+    val isWaiting = isOpen && !isDeleted && snapshot.isWaiting
+    val waitingText = if (isWaiting) {
+        WaitingCopy.label(snapshot.waitingOn.orEmpty().trim(), snapshot.waitingSince, today, languageTag)
+    } else {
+        null
+    }
+
     return TaskListItem(
         id = record.id,
         title = snapshot.title,
         agentName = agent,
+        canAssign = share != null,
+        assigneeName = assignee,
+        isWaiting = isWaiting,
+        waitingText = waitingText,
         subtitle = subtitle,
         isCompleted = snapshot.status == RegistryEntityEnums.TaskStatus.DONE,
         isOnToday = membership.isOnToday,
         isStarred = snapshot.starred,
         isFaded = isFaded,
+        isInReview = isOpen && record.id in catalog.reviewTaskIds,
         deadlineText = deadlineText,
         deadlineIsRed = deadlineIsRed,
         deadlineShowsFlag = deadlineShowsFlag,
@@ -201,6 +224,47 @@ internal fun buildTaskListItem(
         hasNotes = hasNotes,
         hasAttachments = hasAttachments,
     )
+}
+
+/**
+ * Row opacity from the core's fade fill (fade.rs), as on iOS: an
+ * untouched open task fades over the fade window. Agent work, waiting
+ * conversations, dated, deadline and repeating tasks never fade.
+ */
+internal fun TaskListItem.withFade(
+    snapshot: TaskSnapshot,
+    conversation: TaskConversation?,
+    now: Instant,
+    today: LocalDate,
+    showAging: Boolean,
+): TaskListItem {
+    // Settings ▸ Lists ▸ "Fade inactive tasks" (tasksShowAging) off: rows stay at full strength.
+    if (!showAging) return this
+    // A waiting task never fades (docs/REVIEW_SPEC.md §6).
+    if (snapshot.isWaiting) return this
+    val isProposal = TaskProvenance.isProposal(snapshot.source, snapshot.acknowledgedAt)
+    val fill = runCatching {
+        TaskFadeRules.fadeFill(
+            isOpen = snapshot.status == RegistryEntityEnums.TaskStatus.OPEN,
+            isHeading = snapshot.isHeading,
+            isDeleted = snapshot.deletedAt != null,
+            isFaded = TaskFadeRules.isFaded(snapshot.fadedAt),
+            deadline = snapshot.deadline,
+            scheduled = snapshot.scheduled,
+            hasRecurrence = snapshot.recurrenceUnit != null,
+            isAgentTurn = conversation?.isAgentTurn(now) == true,
+            isAssignedToClaude = conversation?.assignee == RegistryEntityEnums.ConvoAssignee.CLAUDE,
+            showsAgentCue = isProposal,
+            touchedAt = snapshot.touchedAt?.let { runCatching { Instant.parse(it) }.getOrNull() },
+            createdAt = snapshot.createdAt?.let { runCatching { Instant.parse(it) }.getOrNull() },
+            created = snapshot.created,
+            now = now,
+            today = today.toString(),
+            isAwaitingHuman = conversation?.awaitsHuman == true,
+            isProposal = isProposal,
+        )
+    }.getOrNull()
+    return copy(opacity = TaskFadeRules.rowOpacity(fill).toFloat())
 }
 
 internal fun destinationIconKind(destinationId: String): SeptenaIconKind = when (destinationId) {
@@ -235,6 +299,29 @@ internal fun formatShortLocalDay(
         val pattern = if (day.year == today.year) "MMM d" else "MMM d, yyyy"
         DateTimeFormatter.ofPattern(pattern, locale).format(day)
     }
+}
+
+/**
+ * Upcoming day header matching Apple `SeptenaDate.scheduleHeaderLabel`:
+ * Today, Tomorrow (from registry), full weekday (`EEEE`) within 6 days,
+ * else short weekday + month + day (`EEE, MMM d`).
+ */
+internal fun formatUpcomingDayHeader(
+    day: LocalDate,
+    today: LocalDate,
+    languageTag: String = Locale.getDefault().toLanguageTag(),
+): String {
+    val diff = java.time.temporal.ChronoUnit.DAYS.between(today, day)
+    if (diff == 0L) {
+        return RegistryCatalog.destinationTitle(RegistryDestinationIds.TODAY, languageTag).orEmpty()
+    }
+    if (diff == 1L) {
+        return RegistryCatalog.tomorrowLabel(languageTag)
+    }
+    val locale = Locale.forLanguageTag(languageTag)
+    val pattern = if (diff in 2L..6L) "EEEE" else if (day.year == today.year) "EEE, MMM d" else "EEE, MMM d, yyyy"
+    val formatted = DateTimeFormatter.ofPattern(pattern, locale).format(day)
+    return formatted.replaceFirstChar { ch -> if (ch.isLowerCase()) ch.titlecase(locale) else ch.toString() }
 }
 
 private fun formatShortInstantDay(

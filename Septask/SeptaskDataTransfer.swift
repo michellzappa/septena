@@ -108,6 +108,7 @@ enum TaskJSONTransfer {
     }
     let checklistItems = try context.fetch(FetchDescriptor<TaskChecklistItemEntity>(sortBy: [SortDescriptor(\.position), SortDescriptor(\.id)]))
     let refs = try context.fetch(FetchDescriptor<TaskRefEntity>(sortBy: [SortDescriptor(\.taskID), SortDescriptor(\.id)]))
+    let doSessions = try context.fetch(FetchDescriptor<DoSessionEntity>(sortBy: [SortDescriptor(\.taskID), SortDescriptor(\.id)]))
     let tags = try context.fetch(FetchDescriptor<TagEntity>(sortBy: [SortDescriptor(\.id)]))
 
     var tables: [String: [[String: Any]]] = [
@@ -116,6 +117,7 @@ enum TaskJSONTransfer {
       "task": tasks.map(taskDict),
       "checklist_item": checklistItems.map(checklistItemDict),
       "task_ref": refs.map(taskRefDict),
+      "do_session": doSessions.map(doSessionDict),
       "tag": tags.map(tagDict),
     ]
     if case .inline = attachmentMode {
@@ -169,7 +171,8 @@ enum TaskJSONTransfer {
       "id": e.id, "title": e.title, "status": e.statusRaw,
       "created": e.created, "scheduled": e.scheduled,
       "startTime": e.startTime, "durationMinutes": e.durationMinutes, "timeZone": e.timeZone,
-      "deadline": e.deadline,
+      "deadline": e.deadline, "deferredDeadline": e.deferredDeadline,
+      "waitingOn": e.waitingOn, "waitingSince": e.waitingSince,
       "today": e.today, "starred": e.starred ? true : nil,
       "tags": e.tagIDs.isEmpty ? nil : e.tagIDs,
       "todaySetOn": e.todaySetOn, "completedAt": e.completedAt,
@@ -244,6 +247,21 @@ enum TaskJSONTransfer {
     ])
   }
 
+  private static func doSessionDict(_ e: DoSessionEntity) -> [String: Any] {
+    compact([
+      "id": e.id,
+      "taskID": e.taskID,
+      "startedAt": e.startedAt,
+      "plannedMinutes": e.plannedMinutes,
+      "confirmedAt": e.confirmedAt,
+      "endedAt": e.endedAt,
+      "exit": e.exit,
+      "lapsed": e.lapsed,
+      "note": e.note,
+      "sourceClient": e.sourceClient,
+    ])
+  }
+
   // MARK: - Parse
 
   static func parseEnvelope(_ data: Data) throws -> Envelope {
@@ -294,6 +312,7 @@ enum TaskJSONTransfer {
     var attachmentIDs: [String] = []
     var checklistIDs: [String] = []
     var refIDs: [String] = []
+    var doSessionIDs: [String] = []
     var tagIDs: [String] = []
     var tagIDRemap: [String: String] = [:]
 
@@ -354,6 +373,16 @@ enum TaskJSONTransfer {
       }
     }
 
+    if let rows = doc.tables["do_session"] {
+      for r in rows {
+        if let id = try upsertDoSession(r, context: context) {
+          doSessionIDs.append(id)
+        } else {
+          result.skipped += 1
+        }
+      }
+    }
+
     try StoreHealth.saveOrThrow(context, op: "TaskJSONTransfer.apply")
 
     for id in tagIDs { engine.noteTagChange(id: id) }
@@ -363,11 +392,12 @@ enum TaskJSONTransfer {
     for id in attachmentIDs { engine.noteTaskAttachmentChange(id: id) }
     for id in checklistIDs { engine.noteChecklistItemChange(id: id) }
     for id in refIDs { engine.noteTaskRefChange(id: id) }
+    for id in doSessionIDs { engine.noteDoSessionChange(id: id) }
 
     if !areaIDs.isEmpty || !projectIDs.isEmpty {
       NotificationCenter.default.post(name: .septenaStructureChanged, object: nil)
     }
-    if !taskIDs.isEmpty || !attachmentIDs.isEmpty || !checklistIDs.isEmpty || !refIDs.isEmpty || !tagIDs.isEmpty {
+    if !taskIDs.isEmpty || !attachmentIDs.isEmpty || !checklistIDs.isEmpty || !refIDs.isEmpty || !doSessionIDs.isEmpty || !tagIDs.isEmpty {
       NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
     }
     return result
@@ -438,6 +468,9 @@ enum TaskJSONTransfer {
     entity.durationMinutes = intValue(r["durationMinutes"]).map { min(1440, max(5, $0)) }
     entity.timeZone = nonEmptyString(r["timeZone"])
     entity.deadline = nonEmptyString(r["deadline"])
+    entity.deferredDeadline = nonEmptyString(r["deferredDeadline"])
+    entity.waitingOn = TaskWaiting.normalizedName(nonEmptyString(r["waitingOn"]))
+    entity.waitingSince = entity.waitingOn == nil ? nil : nonEmptyString(r["waitingSince"])
     entity.today = (r["today"] as? Bool) ?? false
     entity.starred = (r["starred"] as? Bool) ?? false
     if let rawTags = r["tags"] as? [Any] {
@@ -558,6 +591,29 @@ enum TaskJSONTransfer {
       entity.createdAt = date
     }
     entity.updatedAt = Date()
+    return id
+  }
+
+  /// Nil when the row cannot come back: its task is not here, or it has no
+  /// start. An imported Do is history, so an open one ends where it started.
+  private static func upsertDoSession(_ r: [String: Any], context: ModelContext) throws -> String? {
+    guard let id = nonEmptyString(r["id"]),
+          let taskID = nonEmptyString(r["taskID"] ?? r["taskId"]),
+          let startedAt = nonEmptyString(r["startedAt"]), DoStamp.date(startedAt) != nil,
+          try context.fetchCount(FetchDescriptor<TaskEntity>(predicate: #Predicate { $0.id == taskID })) > 0,
+          try context.fetchCount(FetchDescriptor<DoSessionEntity>(predicate: #Predicate { $0.id == id })) == 0
+    else { return nil }
+    let entity = DoSessionEntity(id: id, taskID: taskID, startedAt: startedAt)
+    entity.plannedMinutes = (r["plannedMinutes"] as? Int).map { min(max($0, 1), RegistryEntityLimits.doPlannedMinutesMax) }
+    entity.confirmedAt = nonEmptyString(r["confirmedAt"]).flatMap { DoStamp.date($0) == nil ? nil : $0 }
+    let ended = nonEmptyString(r["endedAt"]).flatMap { DoStamp.date($0) == nil ? nil : $0 }
+    entity.endedAt = ended ?? startedAt
+    entity.exit = nonEmptyString(r["exit"]).flatMap { RegistryEntityEnums.doExit.contains($0) ? $0 : nil }
+      ?? DoExit.stopped.rawValue
+    entity.lapsed = ended == nil || (r["lapsed"] as? Bool) ?? false
+    entity.note = nonEmptyString(r["note"]).map { String($0.prefix(RegistryEntityLimits.doNoteMax)) }
+    entity.sourceClient = nonEmptyString(r["sourceClient"])
+    context.insert(entity)
     return id
   }
 
@@ -1369,7 +1425,7 @@ struct SeptaskImportExportPane: View {
     } header: {
       Text("Restore backup")
     } footer: {
-      Text("Imports a Septena JSON backup into this device. Matching IDs update in place; non-task records are skipped. For a .zip backup, unzip it and choose the JSON file inside; its attachments are not restored yet.")
+      Text("Imports a Septena JSON backup into this device. Items with the same ID are replaced by the backup’s version, new items are added, and nothing is deleted. For a .zip backup, unzip it and choose the JSON file inside; its attachments are not restored yet.")
     }
   }
 

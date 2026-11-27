@@ -36,6 +36,7 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     // that load can build a second shell.
     current = controller
     controller.restoreDestination()
+    controller.syncDo()
     controller.window?.makeKeyAndOrderFront(nil)
     // After the window is on screen, so `makeFirstResponder` sticks: keyboard
     // focus starts on the DETAIL pane (the task list), not the sidebar.
@@ -50,10 +51,17 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
   private var sidebar: SeptaskKitSidebarController?
   private var splitController: NSSplitViewController?
   private var inspectorItem: NSSplitViewItem?
+  private var sidebarItem: NSSplitViewItem?
+  /// The Do screen while this Mac shows the Do in full (docs/DO_SPEC.md §4).
+  /// It stands in the detail pane in place of the list.
+  private var doScreen: SeptaskKitDoScreenController?
+  private var doObserver: NSObjectProtocol?
   /// Key of the destination on screen, so a sidebar re-emit of the SAME
   /// destination (every structure rebuild re-selects its row) never commits
   /// an open edit or moves focus.
   private var currentDestinationKey: String?
+  /// Its title, for the way back from the Do screen.
+  private var destinationTitle = ""
   /// Split-view resize observer (sidebar-hidden mirror). Process-lived like
   /// the window, but removed on close all the same.
   private var layoutObserver: NSObjectProtocol?
@@ -127,11 +135,9 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     // otherwise has no use for. An accessory reaches the same strip of chrome
     // and stays out of that decision. `SyncIndicator` draws nothing when idle,
     // so the accessory collapses to zero width between syncs; it only takes
-    // space while a fetch/send is in flight, or during the first-run download
-    // where it also carries the running item count.
+    // space while a sync with the task backend runs.
     let syncHost = NSHostingView(
       rootView: SyncIndicator()
-        .environment(SeptenaServices.shared.ckEngine)
         .padding(.trailing, 12)
     )
     syncHost.frame.size = syncHost.fittingSize
@@ -158,6 +164,12 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     self.splitController = split
     self.inspector = inspector
     self.inspectorItem = inspectorItem
+    self.sidebarItem = sidebarItem
+    doObserver = NotificationCenter.default.addObserver(
+      forName: SeptaskKitDo.changed, object: nil, queue: .main
+    ) { [weak self] _ in
+      MainActor.assumeIsolated { self?.syncDo() }
+    }
     self.toggleInspector = { [weak list] in list?.onToggleInspector?() }
 
     // Keep the View menu's Show/Hide Sidebar title and the list's page-title
@@ -183,17 +195,23 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     // Wired after super.init — capturing `self` in the closures below would
     // be "used before super.init".
 
-    // Quick Find steers the sidebar, which drives the detail — so a jump
-    // always leaves the two in agreement — then selects the row it found.
-    let quickFind = SeptaskKitQuickFind { [weak self] destination in
-      guard let self else { return }
-      self.sidebar?.select(destination.filter)
-      if let taskId = destination.taskId {
-        self.list?.select(taskId: taskId)
-      } else {
-        self.focusDetail()
+    // Command Bar (⌘K / ⇧⌘F): runs contextual task actions, global commands,
+    // or steers the sidebar and selects the row it found.
+    let quickFind = SeptaskKitQuickFind(
+      onChoose: { [weak self] destination in
+        guard let self else { return }
+        self.leaveDoScreenForList()
+        self.sidebar?.select(destination.filter)
+        if let taskId = destination.taskId {
+          self.list?.select(taskId: taskId)
+        } else {
+          self.focusDetail()
+        }
+      },
+      commandsProvider: { [weak self] in
+        self?.commandBarCommands() ?? []
       }
-    }
+    )
     self.quickFind = quickFind
     list.onQuickFind = { [weak quickFind] in quickFind?.show() }
 
@@ -232,8 +250,13 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     inspector.onRequestFocusList = { [weak list] in list?.focusList() }
     // ⌘↩ is caught at the WINDOW, ahead of every view's key equivalents, so
     // the task table can never swallow it while the inspector holds focus.
-    window.onCommandReturn = { [weak inspector] in
-      inspector?.handleCommandReturn() ?? false
+    window.onCommandReturn = { [weak self, weak inspector] in
+      if let doScreen = self?.doScreen { return doScreen.handleCommandReturn() }
+      if inspector?.handleCommandReturn() == true {
+        self?.list?.suppressCompleteBriefly()
+        return true
+      }
+      return false
     }
 
     // The SwiftUI root normally starts the runtime; harmless if already up
@@ -279,9 +302,18 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
       currentDestinationKey = destination.key
       UserDefaults.standard.set(destination.key, forKey: SeptaskKitStateKey.lastDestination)
     }
+    // A pick in a sidebar the user opened over the Do screen leaves the
+    // screen. Any other change (a rebuild, a deleted project) only moves the
+    // list behind it.
+    if doScreen != nil, changed, sidebarItem?.isCollapsed == false { leaveDoScreenForList() }
     switch destination {
     case .filter(let filter, let title):
+      destinationTitle = title
       guard let list, let detail else { return }
+      guard doScreen == nil else {
+        list.show(filter)
+        return
+      }
       // The title is set HERE, not inside `list.show`, which returns early
       // when the destination is already current.
       window?.title = title
@@ -304,15 +336,102 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     list?.setSidebarVisible(!hidden)
   }
 
-  /// Give the keyboard to the detail pane — the task list.
+  /// Give the keyboard to the detail pane — the task list, or the Do screen.
   func focusDetail() {
-    list?.focusList()
+    if let doScreen {
+      doScreen.focus()
+    } else {
+      list?.focusList()
+    }
+  }
+
+  // MARK: - Do screen
+
+  /// Match the window to `DoStore`: the Do screen while this Mac shows the Do
+  /// in full, the list otherwise.
+  func syncDo() {
+    if DoStore.shared.isFullHere, let doing = DoStore.shared.current {
+      showDoScreen(doing)
+    } else {
+      hideDoScreen()
+    }
+    inspector?.refresh()
+  }
+
+  private func showDoScreen(_ doing: DoState) {
+    // Set on each call: a newer Do replaces the shown one.
+    defer {
+      window?.title = RegistryDoing.notice(title: doing.title)
+      // The screen names the task itself, like a list's own page title.
+      window?.titleVisibility = .hidden
+    }
+    if let doScreen {
+      doScreen.show(doing)
+      return
+    }
+    guard let detail else { return }
+    inspector?.flushPendingEdits()
+    list?.commitOpenEdits()
+    let screen = SeptaskKitDoScreenController()
+    screen.onLater = { [weak self] doing, button in
+      self?.list?.presentDoLater(doing, anchor: .rect(button.bounds, button))
+    }
+    doScreen = screen
+    detail.display(screen)
+    // The sidebar and the inspector step out of the way and come back as they
+    // were. The sidebar's state is stored: the split view autosaves it, so a
+    // quit during a Do would otherwise lose it.
+    if sidebarItem?.isCollapsed == false {
+      UserDefaults.standard.set(true, forKey: SeptaskKitStateKey.doHidSidebar)
+      sidebarItem?.isCollapsed = true
+    }
+    inspectorItem?.isCollapsed = true
+    screen.show(doing)
+    screen.focus()
+  }
+
+  private func hideDoScreen() {
+    if UserDefaults.standard.bool(forKey: SeptaskKitStateKey.doHidSidebar) {
+      UserDefaults.standard.removeObject(forKey: SeptaskKitStateKey.doHidSidebar)
+      sidebarItem?.isCollapsed = false
+    }
+    guard let screen = doScreen, let list, let detail else { return }
+    screen.flushPendingEdits()
+    doScreen = nil
+    detail.display(list)
+    inspectorItem?.isCollapsed = !UserDefaults.standard.bool(
+      forKey: SettingsKey.septaskInspectorVisible)
+    window?.title = destinationTitle
+    list.syncWindowTitle()
+    list.focusList()
+  }
+
+  /// A jump to a list is Show List: the Do goes on.
+  private func leaveDoScreenForList() {
+    guard doScreen != nil else { return }
+    DoStore.shared.showList()
+    hideDoScreen()
+  }
+
+  func presentDoLater(_ doing: DoState) {
+    if let doScreen {
+      doScreen.presentLater()
+    } else {
+      list?.presentDoLater(doing)
+    }
+  }
+
+  /// Done on a Do, from any of its surfaces.
+  func completeDoing(_ task: SeptenaTask) {
+    doScreen?.flushPendingEdits()
+    list?.completeDoing(task)
   }
 
   /// Save every open editor in the window: the list's open row (composer or
   /// rename) and the inspector's fields. Called on window close and on quit,
   /// where no blur happens to commit them.
   func commitAllEdits() {
+    doScreen?.flushPendingEdits()
     inspector?.flushPendingEdits()
     list?.commitOpenEdits()
   }
@@ -321,7 +440,8 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
   /// menu item, Escape inside the pane — commits pending
   /// edits, hands focus back to the list, and leaves the menu title truthful.
   private func setInspector(visible: Bool, focusTitle: Bool = false) {
-    guard let inspectorItem else { return }
+    // The Do screen has no inspector beside it.
+    guard let inspectorItem, doScreen == nil else { return }
     if !visible {
       inspector?.flushPendingEdits()
     }
@@ -358,8 +478,12 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
   /// fire while a panel or the Settings window is key.
   func focusWindow() { window?.makeKeyAndOrderFront(nil) }
 
-  func go(to filter: TaskFilter) { sidebar?.select(filter) }
+  func go(to filter: TaskFilter) {
+    leaveDoScreenForList()
+    sidebar?.select(filter)
+  }
   func revealTask(id taskId: String, in filter: TaskFilter, opensPage: Bool = false) {
+    leaveDoScreenForList()
     sidebar?.select(filter)
     list?.select(taskId: taskId)
     if opensPage { setInspector(visible: true) }
@@ -368,7 +492,15 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     revealTask(id: taskId, in: filter)
     setInspector(visible: true)
   }
-  func newTask() { list?.createTask() }
+  /// During a Do a new task is a stray thought: Quick Entry takes it, and the
+  /// Do goes on.
+  func newTask() {
+    if doScreen == nil {
+      list?.createTask()
+    } else {
+      SeptaskKitQuickEntry.show()
+    }
+  }
   var canCreateSection: Bool { list?.isViewingProject ?? false }
   func newSection() { list?.createSection() }
   func newProject() { sidebar?.newProject() }
@@ -382,6 +514,135 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     sidebar?.toggleShowsCounts()
     // An area page shows the same counts on its project rows.
     list?.refreshViewOptions()
+  }
+
+  /// Build the registry-backed commands currently available in the Command Bar
+  /// (⌘K): contextual task actions for the live selection plus global commands.
+  private func commandBarCommands() -> [SeptaskKitQuickFind.Command] {
+    func shortcutLabel(for id: RegistryActionID) -> String {
+      if let caps = RegistryActions.shortcut(for: id)?.keycaps, !caps.isEmpty {
+        return caps.joined()
+      }
+      return ""
+    }
+    func make(
+      _ id: RegistryActionID,
+      variant: RegistryTitleVariant = .base,
+      keywords: [String] = [],
+      contextual: Bool,
+      run: @escaping () -> Void
+    ) -> SeptaskKitQuickFind.Command? {
+      guard RegistryActions.isAvailableOnPlatform(id) else { return nil }
+      return SeptaskKitQuickFind.Command(
+        id: id.rawValue,
+        title: RegistryActions.title(id, variant),
+        subtitle: shortcutLabel(for: id),
+        symbol: RegistryActions.sfSymbols[id] ?? "command",
+        keywords: keywords,
+        isContextual: contextual,
+        run: run
+      )
+    }
+
+    var out: [SeptaskKitQuickFind.Command] = []
+
+    // Contextual row commands for the active selection.
+    let rowSpecs: [(RegistryActionID, RowCommand, [String])] = [
+      (.taskToggleComplete, .toggleComplete, ["done", "check", "finish", "tick"]),
+      (.taskDo, .startDo, ["focus", "start", "now"]),
+      (.taskToggleToday, .toggleToday, ["today", "schedule"]),
+      (.taskWhen, .when, ["schedule", "date", "defer", "later"]),
+      (.taskMove, .move, ["project", "area", "file", "folder"]),
+      (.taskTags, .editTags, ["tag", "label"]),
+      (.taskDeadline, .deadline, ["due", "date"]),
+      (.taskReminder, .reminder, ["alarm", "notify", "alert"]),
+      (.taskRepeat, .repeatEditor, ["recur", "recurring", "schedule"]),
+      (.taskToggleStar, .toggleStar, ["star", "favorite", "pin"]),
+      (.taskWaitingOn, .waitingOn, ["wait", "delegate", "follow up"]),
+      (.taskGotItBack, .gotItBack, ["waiting", "received", "unblock"]),
+      (.taskEditDetails, .rename, ["rename", "edit", "title"]),
+      (.taskOpen, .open, ["info", "inspector", "details", "notes"]),
+      (.taskDuplicate, .duplicate, ["clone", "copy"]),
+      (.taskAddChecklistItem, .addChecklistItem, ["subtask", "step", "checklist"]),
+      (.taskAddReference, .addReference, ["link", "url", "reference"]),
+      (.taskClearSchedule, .clearSchedule, ["unschedule", "anytime", "clear"]),
+      (.taskCancel, .cancel, ["drop", "wont do", "cancel"]),
+      (.taskDelete, .delete, ["trash", "remove"]),
+    ]
+    for (actionId, cmd, keywords) in rowSpecs where canRun(cmd) {
+      if actionId == .taskAddReference, !TaskRefActions.canAdd { continue }
+      if let entry = make(actionId, keywords: keywords, contextual: true, run: { [weak self] in
+        self?.focusWindow()
+        self?.rowCommand(cmd)
+      }) {
+        out.append(entry)
+      }
+    }
+
+    // Global commands.
+    let sidebarCollapsed = splitController?.splitViewItems.first?.isCollapsed ?? false
+    let inspectorVisible = UserDefaults.standard.bool(forKey: SettingsKey.septaskInspectorVisible)
+    let globalSpecs: [(RegistryActionID, RegistryTitleVariant, [String], Bool, () -> Void)] = [
+      (.appNewTask, .base, ["add", "create", "task"], true, { [weak self] in
+        self?.focusWindow()
+        self?.newTask()
+      }),
+      (.sidebarNewProject, .base, ["add", "create", "project"], true, { [weak self] in
+        self?.focusWindow()
+        self?.newProject()
+      }),
+      (.sidebarNewArea, .base, ["add", "create", "area"], true, { [weak self] in
+        self?.focusWindow()
+        self?.newArea()
+      }),
+      (.sectionNew, .base, ["add", "create", "heading", "section"], canCreateSection, { [weak self] in
+        self?.focusWindow()
+        self?.newSection()
+      }),
+      (.sidebarJoinShared, .base, ["share", "join", "invite", "collaborate"], true, {
+        SeptaskSharing.presentJoin()
+      }),
+      (.appQuickEntry, .base, ["capture", "add", "inbox"], true, {
+        SeptaskKitQuickEntry.show()
+      }),
+      (.taskToggleInfo, inspectorVisible ? .active : .base, ["inspector", "panel", "details"], true, { [weak self] in
+        self?.focusWindow()
+        self?.showInspector()
+      }),
+      (.appToggleSidebar, sidebarCollapsed ? .add : .remove, ["sidebar", "navigation", "panel"], true, { [weak self] in
+        self?.focusWindow()
+        self?.toggleSidebar()
+      }),
+      (.appToggleSidebarCounts, .base, ["counts", "badges", "numbers"], true, { [weak self] in
+        self?.focusWindow()
+        self?.toggleSidebarCounts()
+      }),
+      (.appSettings, .base, ["preferences", "prefs", "account", "theme", "sync"], true, {
+        SeptaskKitSettingsWindow.show()
+      }),
+      (.appKeyboardShortcuts, .base, ["keys", "hotkeys", "help"], true, {
+        NSWorkspace.shared.open(RegistrySettings.helpURL.appending(path: "keyboard-shortcuts"))
+      }),
+    ]
+    for (actionId, variant, keywords, enabled, run) in globalSpecs where enabled {
+      if let entry = make(actionId, variant: variant, keywords: keywords, contextual: false, run: run) {
+        out.append(entry)
+      }
+    }
+
+    return out
+  }
+
+  /// Route ⌘↩ to whichever text editor holds focus (DoScreen, Inspector, or
+  /// the inline row composer / field editor) so a stale enabled menu-bar
+  /// shortcut for Complete never swallows or misroutes ⌘↩ while typing.
+  private func handleCommandReturnInActiveEditor() -> Bool {
+    if let doScreen, doScreen.handleCommandReturn() { return true }
+    if inspector?.handleCommandReturn() == true {
+      list?.suppressCompleteBriefly()
+      return true
+    }
+    return list?.commitOpenEditsForCommandReturn() ?? false
   }
 
   /// Whether a Task-menu row command has a target. The menu acts on the pane
@@ -401,19 +662,27 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
       default: return false
       }
     }
+    // Over the Do screen the list's selection is out of sight. Complete acts
+    // on the Do; no other row command has a target.
+    if doScreen != nil { return command == .toggleComplete }
+    if command == .startDo { return list?.startableTask != nil }
     // ⌘K also ticks a selected Get started step; nothing else applies to one.
     if command == .toggleComplete { return list?.hasCompletableSelection ?? false }
     // `task.open` acts on one row, like the row menu item.
     if command == .open || command == .addReference { return list?.hasSingleActionableSelection ?? false }
+    if command == .waitingOn { return list?.hasSingleOpenSelection ?? false }
+    if command == .gotItBack { return list?.hasWaitingSelection ?? false }
     return list?.hasActionableSelection ?? false
   }
 
   func rowCommand(_ command: RowCommand) {
     // A menu key equivalent wins over the text view's own key bindings, so a
-    // stale enabled Delete item would swallow ⌘⌫ while typing. Give the text
-    // its standard meaning (delete to the start of the line) instead.
+    // stale enabled Delete or Complete item would swallow ⌘⌫ / ⌘↩ while typing.
+    // Give the text its standard meaning instead (delete to line start, or
+    // commit and close the open editor).
     if let text = editingText {
       if command == .delete { text.deleteToBeginningOfLine(nil) }
+      else if command == .toggleComplete { _ = handleCommandReturnInActiveEditor() }
       return
     }
     guard canRun(command), let list else { return }
@@ -425,8 +694,13 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
       }
       return
     }
+    if doScreen != nil {
+      if let doing = DoStore.shared.current { SeptaskKitDo.shared.done(doing) }
+      return
+    }
     switch command {
-    case .toggleComplete: list.toggleCompleteSelection()
+    case .startDo: list.startDo()
+    case .toggleComplete: list.toggleCompleteSelection(fromKeyboard: true)
     case .cancel: list.cancelSelection()
     case .toggleToday: list.toggleTodaySelection()
     case .toggleStar: list.toggleStarSelection()
@@ -446,6 +720,8 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     // `task.open` shows the task page, which on the Mac is the inspector
     // pane (ADR 0029). Double-click and Return keep the inline composer.
     case .open: list.onOpenInspector?()
+    case .waitingOn: list.presentWaitingPopover()
+    case .gotItBack: list.gotItBackSelection()
     }
   }
 
@@ -454,6 +730,8 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     case duplicate, move, createNextCopy
     case repeatEditor
     case open
+    case startDo
+    case waitingOn, gotItBack
   }
 
   required init?(coder: NSCoder) { fatalError("SeptaskKitWindowController is code-only") }
@@ -465,6 +743,8 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     sidebarCollapseObservation = nil
     if let layoutObserver { NotificationCenter.default.removeObserver(layoutObserver) }
     layoutObserver = nil
+    if let doObserver { NotificationCenter.default.removeObserver(doObserver) }
+    doObserver = nil
     Self.current = nil
   }
 
@@ -511,6 +791,8 @@ enum SeptaskKitStateKey {
   /// Mirror of the sidebar split item's collapsed state, so View ▸
   /// Show/Hide Sidebar can name the action it will take.
   static let sidebarHidden = "septaskKitSidebarHidden"
+  /// The Do screen collapsed the sidebar: it opens again when the screen goes.
+  static let doHidSidebar = "septaskKitDoHidSidebar"
 }
 
 /// Hosts the middle split pane's child (the task list) with manual
@@ -604,7 +886,7 @@ enum SeptaskKitCommands {
   static func newSection() { shell?.newSection() }
   static func newProject() { shell?.newProject() }
   static func newArea() { shell?.newArea() }
-  static func quickFind() { shell?.showQuickFind() }
+  static func quickFind() { SeptaskKitWindowController.existing?.showQuickFind() }
   static func showInspector() { shell?.showInspector() }
   static func toggleSidebar() { shell?.toggleSidebar() }
   static func toggleSidebarCounts() { shell?.toggleSidebarCounts() }

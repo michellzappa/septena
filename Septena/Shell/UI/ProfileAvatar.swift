@@ -13,17 +13,7 @@ struct ProfileAvatar: View {
   let isPlus: Bool
   var size: CGFloat = 56
 
-  private var initials: String {
-    let words = name.trimmingCharacters(in: .whitespaces).split(separator: " ")
-    // A single short token is almost certainly typed-in initials ("MZ",
-    // "abc") — show it verbatim. A longer single name → its first letter.
-    // Multi-word → first letter of the first two words.
-    if words.count <= 1 {
-      let token = words.first.map(String.init) ?? ""
-      return (token.count <= 3 ? token : String(token.prefix(1))).uppercased()
-    }
-    return words.prefix(2).compactMap(\.first).map(String.init).joined().uppercased()
-  }
+  private var initials: String { PersonInitials.of(name) }
 
   var body: some View {
     ZStack {
@@ -47,6 +37,31 @@ struct ProfileAvatar: View {
   }
 }
 
+/// The members of a shared project as initials, at the end of the
+/// project title (docs/PROJECT_SHARING_SPEC.md §8).
+struct MemberAvatars: View {
+  static let limit = 3
+  let share: ProjectShare
+  var size: CGFloat = 26
+
+  var body: some View {
+    HStack(spacing: 4) {
+      ForEach(share.members.prefix(Self.limit)) { circle($0.initials) }
+      if share.members.count > Self.limit { circle("+\(share.members.count - Self.limit)") }
+    }
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel(share.membersLabel)
+  }
+
+  private func circle(_ text: String) -> some View {
+    Text(text)
+      .font(.system(size: size * 0.4, weight: .semibold))
+      .foregroundStyle(Theme.inkSecondary)
+      .frame(width: size, height: size)
+      .background(Color.secondary.opacity(0.18), in: Circle())
+  }
+}
+
 /// The quiet counterpart to `SeptenaPlusBadge`, worn by a free account. A
 /// plain statement of fact, not a nudge: a muted capsule with no foil, so the
 /// profile names its plan either way (ADR 0023).
@@ -61,16 +76,18 @@ struct FreeAccountBadge: View {
   }
 }
 
-/// Compact "Plus" pill worn on the profile of a Septena Plus account. Ink
+/// Compact "Plus" or "Pro" pill worn on the profile of a paid account. Ink
 /// capsule with a champagne-foil hairline and a small foil mark. The server
 /// decides the plan (`PlanStatus`); this badge only shows it.
 struct SeptenaPlusBadge: View {
+  var isPro = false
+
   var body: some View {
     HStack(spacing: 3) {
-      Image(systemName: "plus")
+      Image(systemName: isPro ? RegistryIcons.sfSymbols["plans.pro"] ?? "infinity" : "plus")
         .font(.system(size: 8, weight: .bold))
         .foregroundStyle(SeptenaPlus.foil)
-      Text(RegistryPlans.shortName)
+      Text(isPro ? RegistryPlans.proName : RegistryPlans.shortName)
         .foregroundStyle(.white)
     }
     .font(.caption2.weight(.bold))

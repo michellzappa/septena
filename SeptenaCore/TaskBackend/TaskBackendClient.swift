@@ -98,15 +98,111 @@ actor TaskBackendClient {
     return (raw, hashed)
   }
 
-  /// Returns the backend user id of the new session.
+  /// Returns the backend user id of the new session. Throws
+  /// `BackendAccountExistsError` on 409 `account_exists` (ADR 0047 decision 5).
   @discardableResult
   func signIn(identityToken: String, rawNonce: String) async throws -> String {
     let body = try JSONEncoder().encode(["identityToken": identityToken, "nonce": rawNonce])
     let (data, status) = try await perform(path: "/v1/auth/apple", method: "POST", body: body, auth: nil)
+    if status == 409, let collision = Self.accountExistsError(from: data) { throw collision }
     guard status == 200 else { throw Self.httpError(status, data) }
     let session = try decode(BackendSession.self, from: data, what: "session")
     try adopt(session)
     return session.userId
+  }
+
+  /// Top-level OIDC redirect URL for Google, Microsoft, or Web Sign in with Apple.
+  nonisolated static func oidcStartURL(provider: String, returnTo: String) -> URL? {
+    var comps = URLComponents(url: baseURL.appendingPathComponent("v1/auth/oidc/\(provider)/start"), resolvingAgainstBaseURL: false)
+    comps?.queryItems = [URLQueryItem(name: "return_to", value: returnTo)]
+    return comps?.url
+  }
+
+  /// Trades a one-time OIDC callback code (`POST /v1/auth/oidc/redeem`) for a session.
+  @discardableResult
+  func redeemOidcSignIn(code: String) async throws -> String {
+    let body = try JSONEncoder().encode(["code": code])
+    let (data, status) = try await perform(path: "/v1/auth/oidc/redeem", method: "POST", body: body, auth: nil)
+    if status == 409, let collision = Self.accountExistsError(from: data) { throw collision }
+    guard status == 200 else { throw Self.httpError(status, data) }
+    let session = try decode(BackendSession.self, from: data, what: "session")
+    try adopt(session)
+    return session.userId
+  }
+
+  /// Completes a no-silent-linking email collision step (`POST /v1/auth/link/complete`).
+  @discardableResult
+  func completeCollisionLink(linkToken: String, code: String) async throws -> String {
+    let body = try JSONEncoder().encode(["linkToken": linkToken, "code": code])
+    let (data, status) = try await perform(path: "/v1/auth/link/complete", method: "POST", body: body, auth: nil)
+    guard status == 200 else { throw Self.emailError(status, data) }
+    let session = try decode(BackendSession.self, from: data, what: "session")
+    try adopt(session)
+    return session.userId
+  }
+
+  /// Lists linked sign-in methods on the signed-in account (`GET /v1/auth/identities`, #643).
+  func listIdentities() async throws -> BackendLinkedIdentities {
+    let (data, status) = try await authed(path: "/v1/auth/identities", method: "GET", body: nil)
+    guard status == 200 else { throw Self.httpError(status, data) }
+    return try decode(BackendLinkedIdentities.self, from: data, what: "sign-in methods")
+  }
+
+  /// Unlinks one sign-in method (`DELETE /v1/auth/identities/:id`); refuses the last one.
+  func unlinkIdentity(id: String) async throws -> BackendLinkedIdentities {
+    let encoded = id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? id
+    let (data, status) = try await authed(path: "/v1/auth/identities/\(encoded)", method: "DELETE", body: nil)
+    if status == 409 { throw BackendAuthLinkError.lastMethod }
+    if status == 404 { throw BackendAuthLinkError.notFound }
+    guard status == 200 else { throw Self.httpError(status, data) }
+    return try decode(BackendLinkedIdentities.self, from: data, what: "sign-in methods")
+  }
+
+  /// Sends a 6-digit code to add an email address to the signed-in account.
+  func startLinkEmail(email: String) async throws -> BackendEmailCodeSent {
+    let body = try JSONEncoder().encode(["email": email])
+    let (data, status) = try await authed(path: "/v1/auth/link/email/start", method: "POST", body: body)
+    guard status == 202 else { throw Self.emailError(status, data) }
+    return try decode(BackendEmailCodeSent.self, from: data, what: "email code")
+  }
+
+  /// Verifies the emailed code and attaches the email to the signed-in account.
+  func verifyLinkEmail(email: String, code: String) async throws -> BackendLinkedIdentities {
+    let body = try JSONEncoder().encode(["email": email, "code": code])
+    let (data, status) = try await authed(path: "/v1/auth/link/email/verify", method: "POST", body: body)
+    if status == 409 { throw BackendAuthLinkError.alreadyLinked }
+    guard status == 200 else { throw Self.emailError(status, data) }
+    return try decode(BackendLinkedIdentities.self, from: data, what: "sign-in methods")
+  }
+
+  /// Links native Sign in with Apple to the signed-in account (`POST /v1/auth/link/apple`).
+  func linkApple(identityToken: String, rawNonce: String) async throws -> BackendLinkedIdentities {
+    let body = try JSONEncoder().encode(["identityToken": identityToken, "nonce": rawNonce])
+    let (data, status) = try await authed(path: "/v1/auth/link/apple", method: "POST", body: body)
+    if status == 409 { throw BackendAuthLinkError.alreadyLinked }
+    guard status == 200 else { throw Self.httpError(status, data) }
+    return try decode(BackendLinkedIdentities.self, from: data, what: "sign-in methods")
+  }
+
+  /// Starts a web OIDC redirect URL to link Apple, Google, or Microsoft to this account.
+  func startLinkOidc(provider: String, returnTo: String) async throws -> URL {
+    let body = try JSONEncoder().encode(["provider": provider, "returnTo": returnTo])
+    let (data, status) = try await authed(path: "/v1/auth/link/oidc/start", method: "POST", body: body)
+    if status == 503 { throw BackendAuthLinkError.providerOff }
+    guard status == 200 else { throw Self.httpError(status, data) }
+    struct Reply: Decodable { let url: String }
+    let reply = try decode(Reply.self, from: data, what: "link url")
+    guard let url = URL(string: reply.url) else { throw TaskBackendError.badResponse("link url") }
+    return url
+  }
+
+  /// Completes a signed-in OIDC link callback (`POST /v1/auth/oidc/redeem` with Bearer).
+  func redeemOidcLink(code: String) async throws -> BackendLinkedIdentities {
+    let body = try JSONEncoder().encode(["code": code])
+    let (data, status) = try await authed(path: "/v1/auth/oidc/redeem", method: "POST", body: body)
+    if status == 409 { throw BackendAuthLinkError.alreadyLinked }
+    guard status == 200 else { throw Self.httpError(status, data) }
+    return try decode(BackendLinkedIdentities.self, from: data, what: "sign-in methods")
   }
 
   /// Starts sign-in by device approval (`POST /v1/auth/device/start`,
@@ -129,6 +225,40 @@ actor TaskBackendClient {
     case 410: return .expired
     default: throw Self.httpError(status, data)
     }
+  }
+
+  /// The sign-in methods this server has on (`GET /v1/auth/methods`), with capability flags.
+  func signInMethodEntries() async throws -> [BackendAuthMethods.Method] {
+    let (data, status) = try await perform(path: "/v1/auth/methods", method: "GET", body: nil, auth: nil)
+    guard status == 200 else { throw Self.httpError(status, data) }
+    return try decode(BackendAuthMethods.self, from: data, what: "sign-in methods").methods
+  }
+
+  /// The sign-in methods this server has on (`GET /v1/auth/methods`).
+  func signInMethods() async throws -> [String] {
+    try await signInMethodEntries().map(\.id)
+  }
+
+  /// Mails a sign-in code to `email` (`POST /v1/auth/email/start`). Throws
+  /// `BackendEmailSignInError` for the server's refusals.
+  func startEmailSignIn(email: String) async throws -> BackendEmailCodeSent {
+    let body = try JSONEncoder().encode(["email": email])
+    let (data, status) = try await perform(path: "/v1/auth/email/start", method: "POST", body: body, auth: nil)
+    guard status == 202 else { throw Self.emailError(status, data) }
+    return try decode(BackendEmailCodeSent.self, from: data, what: "email code")
+  }
+
+  /// Trades the mailed code for a session (`POST /v1/auth/email/verify`) and
+  /// stores it like an Apple sign-in. A new address creates an account.
+  /// Returns the backend user id.
+  @discardableResult
+  func verifyEmailSignIn(email: String, code: String) async throws -> String {
+    let body = try JSONEncoder().encode(["email": email, "code": code])
+    let (data, status) = try await perform(path: "/v1/auth/email/verify", method: "POST", body: body, auth: nil)
+    guard status == 200 else { throw Self.emailError(status, data) }
+    let session = try decode(BackendSession.self, from: data, what: "session")
+    try adopt(session)
+    return session.userId
   }
 
   /// Adopts the session of an approved device sign-in. Returns its user id.
@@ -237,9 +367,9 @@ actor TaskBackendClient {
   }
 
   func pull(since: Int, limit: Int = RegistryEntityLimits.maxPull) async throws -> BackendPullResponse {
-    // `settings=1`, `checklists=1`, `tags=1` & `refs=1`: this client syncs those entities.
+    // `settings=1`, `checklists=1`, `tags=1`, `refs=1` & `doSessions=1`: this client syncs those entities.
     // Without them the server omits those rows so older builds decode cleanly.
-    let (data, status) = try await authed(path: "/v1/sync/pull?since=\(since)&limit=\(limit)&settings=1&checklists=1&tags=1&refs=1",
+    let (data, status) = try await authed(path: "/v1/sync/pull?since=\(since)&limit=\(limit)&settings=1&checklists=1&tags=1&refs=1&doSessions=1",
                                           method: "GET", body: nil)
     guard status == 200 else { throw Self.httpError(status, data) }
     return try decode(BackendPullResponse.self, from: data, what: "pull")
@@ -437,6 +567,83 @@ actor TaskBackendClient {
     guard status == 204 else { throw Self.httpError(status, data) }
   }
 
+  /// A new agent key (`POST /v1/access/keys`, #86). The server returns the
+  /// key in this reply only.
+  struct CreatedAgentKey: Decodable, Sendable, Hashable {
+    let id: String
+    let key: String
+    let name: String
+    let scope: String
+  }
+
+  /// Creates an agent key with read and write access. The key's row in the
+  /// Agents list is `id`: rename and disconnect it like any agent.
+  func createAgentKey(name: String) async throws -> CreatedAgentKey {
+    let clean = String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(Self.agentNameMax))
+    guard !clean.isEmpty else { throw TaskBackendError.badResponse("agent name") }
+    let body = try JSONEncoder().encode(["name": clean, "access": "write"])
+    let (data, status) = try await authed(path: "/v1/access/keys", method: "POST", body: body)
+    guard status == 201 else { throw Self.httpError(status, data) }
+    return try decode(CreatedAgentKey.self, from: data, what: "agent key")
+  }
+
+  // MARK: - Shared projects (docs/PROJECT_SHARING_SPEC.md)
+
+  func createShare(projectID: String, name: String) async throws -> ProjectShare {
+    let body = try JSONEncoder().encode(["projectId": projectID, "name": name])
+    let (data, status) = try await authed(path: "/v1/shares", method: "POST", body: body)
+    guard status == 201 else { throw Self.httpError(status, data) }
+    return try decode(BackendShareCreated.self, from: data, what: "share").share
+  }
+
+  func shareDetails(id: String) async throws -> BackendShareDetails {
+    let (data, status) = try await authed(path: "/v1/shares/\(id)", method: "GET", body: nil)
+    guard status == 200 else { throw Self.httpError(status, data) }
+    return try decode(BackendShareDetails.self, from: data, what: "share")
+  }
+
+  /// A new invite link. The server shows it once.
+  func inviteToShare(id: String) async throws -> URL {
+    let (data, status) = try await authed(path: "/v1/shares/\(id)/invites", method: "POST", body: Data("{}".utf8))
+    guard status == 201 else { throw Self.httpError(status, data) }
+    guard let url = URL(string: try decode(BackendShareInvite.self, from: data, what: "invite").url) else {
+      throw TaskBackendError.badResponse("invite")
+    }
+    return url
+  }
+
+  func revokeShareInvite(shareID: String, inviteID: String) async throws {
+    try await deleteShare("/v1/shares/\(shareID)/invites/\(inviteID)")
+  }
+
+  /// Removes a member; with this account's own member id, leaves.
+  func endShareMembership(shareID: String, memberID: String) async throws {
+    try await deleteShare("/v1/shares/\(shareID)/members/\(memberID)")
+  }
+
+  func stopSharing(id: String) async throws {
+    try await deleteShare("/v1/shares/\(id)")
+  }
+
+  private func deleteShare(_ path: String) async throws {
+    let (data, status) = try await authed(path: path, method: "DELETE", body: nil)
+    guard status == 204 else { throw Self.httpError(status, data) }
+  }
+
+  func previewShare(token: String) async throws -> BackendSharePreview {
+    let body = try JSONEncoder().encode(["token": token])
+    let (data, status) = try await authed(path: "/v1/shares/preview", method: "POST", body: body)
+    guard status == 200 else { throw Self.httpError(status, data) }
+    return try decode(BackendSharePreview.self, from: data, what: "invite")
+  }
+
+  func joinShare(token: String, name: String) async throws -> BackendShareJoined {
+    let body = try JSONEncoder().encode(["token": token, "name": name])
+    let (data, status) = try await authed(path: "/v1/shares/join", method: "POST", body: body)
+    guard status == 200 else { throw Self.httpError(status, data) }
+    return try decode(BackendShareJoined.self, from: data, what: "join")
+  }
+
   // MARK: - Companion device (Apple Watch)
 
   /// Mints a SEPARATE session for the paired watch (`POST /v1/auth/device`).
@@ -507,20 +714,59 @@ actor TaskBackendClient {
     guard status == 204 || status == 200 else { throw Self.httpError(status, data) }
   }
 
+  // MARK: - Contact Support (ADR 0054, backend/src/support/)
+
+  /// Signed in: the bearer token, plus the support key so a signed-out
+  /// conversation moves to the account. Signed out: the support key alone.
+  private func support(path: String, method: String, body: Data?, supportKey: String) async throws -> (Data, Int) {
+    let headers = [SupportWire.keyHeader: supportKey]
+    if Self.hasSession {
+      return try await authed(path: path, method: method, body: body, headers: headers)
+    }
+    return try await perform(path: path, method: method, body: body, auth: nil, headers: headers)
+  }
+
+  func sendSupportMessage(_ message: SupportWire.Outgoing, supportKey: String) async throws -> SupportWire.Message {
+    let body = try JSONEncoder().encode(message)
+    let (data, status) = try await support(path: "/v1/support/messages", method: "POST", body: body, supportKey: supportKey)
+    switch status {
+    case 202:
+      return try decode(SupportWire.Sent.self, from: data, what: "support message").message
+    case 429:
+      throw SupportWire.SendError.rateLimited
+    case 400 where (try? JSONDecoder().decode(BackendErrorBody.self, from: data))?.error == "email_required":
+      throw SupportWire.SendError.emailRequired
+    default:
+      throw Self.httpError(status, data)
+    }
+  }
+
+  func supportConversation(supportKey: String) async throws -> SupportWire.Conversation {
+    let (data, status) = try await support(path: "/v1/support/messages", method: "GET", body: nil, supportKey: supportKey)
+    guard status == 200 else { throw Self.httpError(status, data) }
+    return try decode(SupportWire.Conversation.self, from: data, what: "support conversation")
+  }
+
+  func markSupportRead(supportKey: String) async throws {
+    let (data, status) = try await support(path: "/v1/support/read", method: "POST", body: nil, supportKey: supportKey)
+    guard status == 204 || status == 200 else { throw Self.httpError(status, data) }
+  }
+
   // MARK: - HTTP
 
   /// Sends with a bearer token. On 401 it refreshes once and retries. A
   /// transport error or a 5xx / 429 is retried up to twice; every op carries a
   /// deterministic `clientOpId`, so a repeated push does not apply twice.
   private func authed(path: String, method: String, body: Data?,
-                      contentType: String = "application/json") async throws -> (Data, Int) {
+                      contentType: String = "application/json",
+                      headers: [String: String] = [:]) async throws -> (Data, Int) {
     var forceRefresh = false
     var attempt = 0
     while true {
       let token = try await validAccessToken(forceRefresh: forceRefresh)
       do {
         let (data, status) = try await perform(path: path, method: method, body: body, auth: token,
-                                               contentType: contentType)
+                                               contentType: contentType, headers: headers)
         if status == 401, !forceRefresh { forceRefresh = true; continue }
         if (status >= 500 || status == 429), attempt < 2 {
           attempt += 1
@@ -537,7 +783,8 @@ actor TaskBackendClient {
   }
 
   private func perform(path: String, method: String, body: Data?, auth: String?,
-                       contentType: String = "application/json") async throws -> (Data, Int) {
+                       contentType: String = "application/json",
+                       headers: [String: String] = [:]) async throws -> (Data, Int) {
     guard let url = URL(string: path, relativeTo: Self.baseURL) else { throw TaskBackendError.badResponse("bad path") }
     var request = URLRequest(url: url)
     request.httpMethod = method
@@ -545,6 +792,7 @@ actor TaskBackendClient {
     request.setValue(Self.clientVersion, forHTTPHeaderField: "X-Septena-Version")
     request.setValue("application/json", forHTTPHeaderField: "Accept")
     if let auth { request.setValue("Bearer \(auth)", forHTTPHeaderField: "Authorization") }
+    for (name, value) in headers { request.setValue(value, forHTTPHeaderField: name) }
     if let body {
       request.setValue(contentType, forHTTPHeaderField: "Content-Type")
       request.setValue(String(body.count), forHTTPHeaderField: "Content-Length")
@@ -572,12 +820,42 @@ actor TaskBackendClient {
     do { return try JSONDecoder().decode(type, from: data) } catch { throw TaskBackendError.badResponse(what) }
   }
 
+  private static func accountExistsError(from data: Data) -> BackendAccountExistsError? {
+    guard let body = try? JSONDecoder().decode(BackendAccountExistsBody.self, from: data),
+          body.error == "account_exists",
+          let email = body.email,
+          let provider = body.provider else {
+      return nil
+    }
+    return BackendAccountExistsError(
+      email: email,
+      provider: provider,
+      linkToken: body.linkToken,
+      codeSent: body.codeSent ?? false,
+    )
+  }
+
   private static func httpError(_ status: Int, _ data: Data) -> TaskBackendError {
     if status == 402 {
       return .limitReached(BackendLimitError.decode(from: data))
     }
     let code = (try? JSONDecoder().decode(BackendErrorBody.self, from: data))?.error ?? "no detail"
     return .http(status: status, code: code)
+  }
+
+  /// Maps an email sign-in refusal. A status or code this build does not
+  /// know stays an ordinary `TaskBackendError`.
+  private static func emailError(_ status: Int, _ data: Data) -> Error {
+    let body = try? JSONDecoder().decode(BackendEmailErrorBody.self, from: data)
+    switch (status, body?.error) {
+    case (400, _): return BackendEmailSignInError.invalidRequest
+    case (401, "invalid_code"): return BackendEmailSignInError.wrongCode(attemptsLeft: max(body?.attemptsLeft ?? 0, 0))
+    case (410, _): return BackendEmailSignInError.expired
+    case (429, "too_many_attempts"): return BackendEmailSignInError.tooManyAttempts
+    case (429, _): return BackendEmailSignInError.rateLimited(retryAfterSeconds: body?.retryAfterSeconds)
+    case (503, _): return BackendEmailSignInError.unavailable
+    default: return httpError(status, data)
+    }
   }
 }
 

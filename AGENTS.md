@@ -84,6 +84,15 @@ It does not run tests or launch the app. The mini currently has no Java runtime,
 so do not use `remote-build` for Android or install toolchains unless the user
 explicitly asks for that download.
 
+**The website rebuilds on a registry change.** septena.app copies
+`registry/`, the changelog and the connector's tool list from `main`. When a
+push to `main` touches `registry/**`, `changelog/**`, `tools/changelog.mjs` or
+`backend/src/**`, `.github/workflows/site-rebuild.yml` sends the
+`app-registry-changed` repository_dispatch to `michellzappa/septena-site`. The
+site's workflow then builds against this repo's `main` and deploys. The job
+needs the secret `SITE_DISPATCH_TOKEN` (a fine-grained token with Contents
+read and write on septena-site). Without it, the job skips with a notice.
+
 **A branch on mz's phone, with no Mac:** push it to `device/<name>`. mz
 approves the run, then TestFlight delivers it to the internal group only. See
 `docs/DEVICE_BUILDS.md`. Never use it to ship: `main` ships.
@@ -275,6 +284,16 @@ commit on the branch first (or let the cron do it).
 - **The app does not use iCloud.** It syncs with `api.septena.app` through
   `TaskSyncEngine` (ADR 0002). `CKEngine` never starts; it remains only because
   the mutators still take it as a parameter. Do not build on it.
+- **Cross-platform parity — One PR, Three Shells.** Any change that touches
+  `registry/`, `core/`, or user-visible task/list behavior ships across Apple,
+  Android, and Web in the **same PR** by default. If a platform genuinely must
+  wait, file a tracked GitHub issue and add a single explicit entry (never a
+  new `.*` wildcard) to `registry/readers-allowlist.json` pointing to it. Any
+  multi-task rule or list-shaping logic (e.g. series rebasing, date grouping,
+  backup merge, notice selection) belongs in `core/crates/septena-core` with a
+  golden fixture in `registry/conformance/`, never re-implemented per shell.
+  `.github/workflows/parity.yml` gates every PR on `gen-registries.mjs --check`
+  (covering Apple, Android, and Web) and `scripts/lint-design.sh`.
 
 ## The Septask targets
 
@@ -515,7 +534,10 @@ The product is Septena; the code targets keep the working names `Septask` (iOS),
   page (no viewer in this repo), and `appstore/upload.sh` uploads through
   fastlane deliver. It is outward-facing: run it only when mz asks; never a
   binary, never a review submission (docs/APPSTORE-SEPTASK.md "Uploading").
-  Mac is a separate ASC app (own deliver run). See `docs/APPSTORE.md`.
+  The Mac is the macOS platform of the same App Store Connect record as
+  iPhone and iPad (one bundle id, universal purchase, mz 2026-11-26), with its
+  own deliver run: `docs/APPSTORE-SEPTASK.md`. The separate record in
+  `docs/APPSTORE.md` is Septena Life.
   For generated Photo Studio lifestyle images and device variants, use
   `docs/photo-studio/SKILL.md`. A device screen in a photo is always a composed
   PNG, never a generated screen: `docs/photo-composite/SKILL.md`.
@@ -547,6 +569,45 @@ The product is Septena; the code targets keep the working names `Septask` (iOS),
   written in a comment where the branch lives. "It was built that way first"
   is not a reason. When you find one platform drifting, fix it on all of them
   in the same change, or file an issue for the platform you cannot reach.
+- **No email address anywhere (mz, 2026-11-26, ADR 0054).** Support is the
+  in-app Contact Support form and https://septena.app/support, which both go
+  to the Septena workspace in Starlings (`docs/SUPPORT_SPEC.md`). Never write
+  mz's address, a company address or a role address (`support@`,
+  `contact@`) into copy, a page, a doc, a README, a registry string or code.
+  Link to `/support` instead. The privacy policy is the one page with an
+  address (`PRIVACY_EMAIL` on the site). A store or reviewer form that
+  requires an address carries `septena-lint:allow contact-email` with the
+  reason. Enforced by `scripts/lint-contact-email.sh` (run from
+  `lint-design.sh`, so CI fails on a new address).
+- **Never name platforms in copy (mz, 2026-11-26).** Every platform
+  (iPhone, iPad, Mac, Windows, web, Android, Watch) gets every feature: the
+  paywall, MCP and agents, sharing, accounts. Copy, registry strings, skill
+  briefs and docs say "every device" or "another device", never "iPhone, iPad
+  and Mac". Per-platform detail appears in exactly two places: the
+  comparison (build-state) table and the changelog.
+  `scripts/lint-platform-copy.mjs` (run from `lint-design.sh`) enforces it.
+  It scans every string in `registry/*.json` and `registry/cast/`,
+  `backend/skill.md`, `backend/onboard.md` and `TasksSkill.swift`. It skips
+  per-platform data: `capabilities.json`, `device-frames.json`, ids, keys,
+  symbols and URLs. In Markdown and Swift, put
+  `septena-lint:allow platform-copy` on the line. JSON holds no comments, so
+  a JSON exception is an entry in the script's `ALLOW` list, with a category
+  and a reason. An entry that no longer matches fails. The category
+  `control-location` ("press ⌃⌥Space on your Mac") is an open question for
+  mz.
+- **A temporary gap is not a product fact (mz, 2026-11-26).** "Android
+  cannot create an account yet", "checkout is closed", "limits only log" are
+  states of the build. Every platform gets every feature, and a plan or
+  platform that exists is shown as existing (Pro exists, Android exists).
+  Never write copy, status lines, specs or audit findings that present a
+  build gap as how Septena is, and never change copy to match a gap. A gap on
+  one platform is a parity bug: fix it or file it. Say "not yet" only where a
+  person acts on it today, and say it once for the whole product, never per
+  plan or per platform: closed checkout is `checkout.notice` under every paid
+  plan, never "You can't buy Pro yet". Copy never tells a reader to write in,
+  email or contact mz to get a plan or a feature (ADR 0059). A `planned` cell in
+  `registry/capabilities.json` means "not built yet", never "not in the
+  product".
 - **One selection/target language per surface — NEVER two.** There is exactly
   ONE visual treatment for "this row/item is selected, focused, hovered, pressed,
   or a drop target" on any given surface, and it is the app's canonical token
@@ -645,11 +706,27 @@ The product is Septena; the code targets keep the working names `Septask` (iOS),
   describe "two servers, edited in lockstep" are history. An MCP tool change
   lands in `backend/` plus the docs and skill briefs in the same change. Keep
   `backend/skill.md` and `Septena/Shell/Tasks/TasksSkill.swift` (the brief in
-  Settings ▸ MCP Skills) in sync with the backend's tools. The agent loop (`tasks_claim`, `tasks_release`,
+  Settings ▸ MCP Skills) in sync with the backend's tools. The skills in `skills/<name>/SKILL.md`
+  (ADR 0050 §6) are single procedures from that brief; the site serves them at
+  `septena.app/skills/<name>/SKILL.md`. A rule change lands in the brief and in
+  every skill that states it. Each capability in `registry/capabilities.json`
+  names the tools that reach it in `agent` (or `"none"`): a new or renamed
+  tool updates it. The agent loop (`tasks_claim`, `tasks_release`,
   `tasks_agent_events`, `tasks_activity`) lives in `src/shadow/agent.ts`: a
   claim needs the Durable Object's single writer, and its rules (leases, the
   human-only stop, pause, run budget) are enforced in `TaskStore`, not in tool
   code. See ADR 0008.
+- **The agent contract is generated (ADR 0050).** `api.septena.app/openapi.json`
+  comes from the /v1 Zod validators listed in `backend/src/api/openapi.ts`;
+  `docs/agent-spec/spec.md` and `schema.json` come from
+  `docs/agent-spec/spec.src.md`, `registry/entities.json` and the refusal
+  table in `backend/src/errors.ts`. After a change to a /v1 route, a
+  validator, an entity column, a refusal code or the spec source, run
+  `pnpm run gen:contract` in `backend/` and commit the output. Backend CI
+  runs it with `--check`, and a test fails when a new /v1 route is not in
+  `ROUTES` or `INTERNAL_ROUTES`. The site copies the spec, the schema,
+  `registry/conformance/*.json` and `docs/agent-spec/conformance/run.mjs`
+  at build time. Never edit the generated files by hand.
 - **The MCP server is DUAL-ERA and must stay that way.** MCP revision
   `2026-07-28` made the protocol stateless (no `initialize`, no
   `Mcp-Session-Id`, no GET stream; version + client identity ride in

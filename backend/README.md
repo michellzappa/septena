@@ -6,7 +6,11 @@ Cloudflare Worker for the Septask task backend, at `api.septena.app`:
   in the app repo).
 - `/mcp` — the Septena tasks MCP connector (`src/shadow/`). Claude reads and
   writes the user's tasks in their `TaskStore` Durable Object. The user pairs
-  it from the Septask app (`/oauth/*`, `/.well-known/*`).
+  it from the Septask app or signs in by email on `/oauth/authorize`
+  (`/oauth/*`, `/.well-known/*`). An agent that cannot run browser OAuth
+  uses an agent key (`sk1.`, #86, `POST /v1/access/keys`) or creates/connects
+  an account with human email confirmation (`POST /v1/agent/signup/start`,
+  `/agent/confirm/:token`, `POST /v1/agent/signup/poll`, ADR 0056).
 - `/skill.md` — the agent brief for the task tools.
 
 **2026-11-20: the CloudKit connector on `mcp.septena.app` is decommissioned.**
@@ -79,7 +83,7 @@ The task connector serves five agent-loop tools (`src/shadow/agent.ts`, app repo
 |---|---|
 | `tasks_claim(id, agent, ttlMinutes?, why?)` | Takes or renews a lease (30 min default, 240 max). Refusals name the rule: `paused`, `stopped`, `your_turn`, `held`, `budget`, `terminal`, `closed`. |
 | `tasks_release(id, agent, why)` | Ends the agent's own claim; `why` goes to the log. |
-| `tasks_agent_events(since?, limit?)` | Pointer events with a cursor: `assigned`, `user_turn`, `stopped`, `resumed`, `paused`, `unpaused`. |
+| `tasks_agent_events(since?, limit?)` | Pointer events with a cursor: `assigned`, `user_turn`, `stopped`, `resumed`, `paused`, `unpaused`, `do_started`, `do_ended`. |
 | `tasks_activity(id?, limit?)` | The change log in words, with reasons. |
 | `tasks_history(id, limit?)` | One task's changes, newest first: who (you or Claude), the op, and each field's before and after. |
 

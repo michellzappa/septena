@@ -2,11 +2,12 @@
 import AppKit
 import SwiftData
 
-// Quick Find (⇧⌘F): type to search tasks, projects, and areas; ↑/↓ walk the
-// results while the field keeps focus; Return jumps to the item — navigating
-// the window to the list that holds it and selecting the row.
+// Command Bar (⌘K, alias ⇧⌘F): type to run contextual task actions, global
+// app commands, or jump to any list, project, area, tag, or task. Prefix with
+// `>` to filter to commands only. ↑/↓ walk the results while the field keeps
+// focus; Return runs the command or jumps to the item.
 //
-// Quick Find is a TIER 2 surface (see SeptaskKitSurface.swift): it searches
+// Command Bar is a TIER 2 surface (see SeptaskKitSurface.swift): it acts across
 // the whole app, so there is no single row to hang it off. It is a centered
 // `KitFilterSurface` command panel — never a sheet, so it never blocks the
 // window it steers — and it reads from the same LocalCache / StructureCache
@@ -14,14 +15,26 @@ import SwiftData
 @MainActor
 final class SeptaskKitQuickFind {
 
-  /// Where choosing a result should take the window.
+  /// Where choosing a navigation result should take the window.
   struct Destination {
     let filter: TaskFilter
     /// Non-nil when a specific row should be selected once the list is shown.
     let taskId: String?
   }
 
+  /// A registry-backed command runnable from the Command Bar.
+  struct Command {
+    let id: String
+    let title: String
+    let subtitle: String
+    let symbol: String
+    let keywords: [String]
+    let isContextual: Bool
+    let run: () -> Void
+  }
+
   private enum Hit {
+    case command(Command)
     case task(SeptenaTask, subtitle: String)
     case project(Project)
     case area(Area)
@@ -31,6 +44,7 @@ final class SeptaskKitQuickFind {
 
     var title: String {
       switch self {
+      case .command(let cmd): return cmd.title
       case .task(let task, _): return task.title
       case .project(let project): return project.title
       case .area(let area): return area.title
@@ -40,6 +54,7 @@ final class SeptaskKitQuickFind {
 
     var subtitle: String {
       switch self {
+      case .command(let cmd): return cmd.subtitle
       case .task(_, let subtitle): return subtitle
       case .project: return TaskFilter.project("").title
       case .area: return TaskFilter.area("").title
@@ -49,6 +64,7 @@ final class SeptaskKitQuickFind {
 
     var symbol: String {
       switch self {
+      case .command(let cmd): return cmd.symbol
       case .task: return "circle"
       case .project: return "number"
       case .area: return "folder"
@@ -58,15 +74,16 @@ final class SeptaskKitQuickFind {
   }
 
   private let onChoose: (Destination) -> Void
+  private let commandsProvider: () -> [Command]
+  private var availableCommands: [Command] = []
   private var hits: [Hit] = []
 
   /// Chrome, keyboard and presentation all live in the shared surface; this
-  /// type owns the search and what a hit means.
+  /// type owns the search, commands, and what a hit means.
   private lazy var surface: KitFilterSurface = {
     let surface = KitFilterSurface(
-      size: NSSize(width: 620, height: 380),
-      a11yTitle: String(localized: "Quick Find",
-                        comment: "SeptaskKit: quick find panel a11y title"),
+      size: NSSize(width: 620, height: 420),
+      a11yTitle: RegistryActions.title(.appQuickFind),
       fieldA11yTitle: String(localized: "Search",
                              comment: "SeptaskKit: quick find field a11y title"))
     surface.rowCount = { [weak self] in self?.hits.count ?? 0 }
@@ -78,15 +95,24 @@ final class SeptaskKitQuickFind {
 
   private var context: ModelContext { LocalStore.shared.container.mainContext }
 
-  init(onChoose: @escaping (Destination) -> Void) {
+  init(
+    onChoose: @escaping (Destination) -> Void,
+    commandsProvider: @escaping () -> [Command] = { [] }
+  ) {
     self.onChoose = onChoose
+    self.commandsProvider = commandsProvider
   }
 
   // MARK: - Presentation
 
   func show() {
+    if surface.isVisible {
+      surface.dismiss()
+      return
+    }
+    availableCommands = commandsProvider()
     surface.show(anchor: .window,
-                 placeholder: RegistrySurfaces.quickFindPlaceholder)
+                 placeholder: RegistrySurfaces.quickFindCommandPlaceholder)
   }
 
   // MARK: - Search
@@ -96,13 +122,16 @@ final class SeptaskKitQuickFind {
     text.range(of: query, options: [.caseInsensitive, .diacriticInsensitive]) != nil
   }
 
+  private static func prefixMatches(_ text: String, _ query: String) -> Bool {
+    text.range(of: query, options: [.caseInsensitive, .diacriticInsensitive, .anchored]) != nil
+  }
+
   /// The smart lists an empty query offers. Inbox has no list of its own —
   /// it is the triage band on top of Today — so it lands on Today.
   private static var emptyQueryLists: [Hit] {
     [
       .list(.today, title: Route.filter(.today).title, symbol: Route.filter(.today).icon),
       .list(.review, title: Route.filter(.review).title, symbol: Route.filter(.review).icon),
-      .list(.agent, title: Route.filter(.agent).title, symbol: Route.filter(.agent).icon),
       .list(.today, title: TaskFilter.triage.title, symbol: Route.filter(.triage).icon),
       .list(.upcoming, title: Route.filter(.upcoming).title,
             symbol: Route.filter(.upcoming).icon),
@@ -111,15 +140,52 @@ final class SeptaskKitQuickFind {
     ]
   }
 
+  private func matchingCommands(for query: String) -> [Hit] {
+    guard !query.isEmpty else { return availableCommands.map(Hit.command) }
+    let tokens = query.split(whereSeparator: { $0.isWhitespace }).map(String.init)
+    guard !tokens.isEmpty else { return availableCommands.map(Hit.command) }
+    var scored: [(command: Command, score: Int, order: Int)] = []
+    for (idx, cmd) in availableCommands.enumerated() {
+      let haystack = ([cmd.title] + cmd.keywords).joined(separator: " ")
+      guard tokens.allSatisfy({ Self.matches(haystack, $0) }) else { continue }
+      var score = cmd.isContextual ? 20 : 10
+      if Self.prefixMatches(cmd.title, query) { score += 40 }
+      else if Self.matches(cmd.title, query) { score += 20 }
+      else if cmd.keywords.contains(where: { Self.prefixMatches($0, query) }) { score += 12 }
+      scored.append((cmd, score, idx))
+    }
+    return scored
+      .sorted { ($0.score, -$0.order) > ($1.score, -$1.order) }
+      .map { .command($0.command) }
+  }
+
   private func reloadHits() {
-    let query = surface.query.trimmingCharacters(in: .whitespaces)
+    let rawQuery = surface.query.trimmingCharacters(in: .whitespaces)
+    let commandsOnly = rawQuery.hasPrefix(">")
+    let query = commandsOnly
+      ? String(rawQuery.dropFirst()).trimmingCharacters(in: .whitespaces)
+      : rawQuery
+
+    if commandsOnly {
+      hits = Array(matchingCommands(for: query).prefix(60))
+      surface.reload()
+      surface.select(0)
+      return
+    }
+
     let snapshot = StructureCache.snapshot(in: context)
     let liveProjects = snapshot.projects.filter { $0.deletedAt == nil }
 
-    // Empty query lists the lists, then the structure — the panel doubles as
-    // a jump-to-list.
+    // Empty query offers contextual task commands (when a row is selected),
+    // the smart lists, primary global commands, then areas & projects.
     guard !query.isEmpty else {
-      hits = Self.emptyQueryLists + snapshot.areas.map(Hit.area) + liveProjects.map(Hit.project)
+      let contextual = availableCommands.filter(\.isContextual).prefix(6).map(Hit.command)
+      let global = availableCommands.filter { !$0.isContextual }.prefix(6).map(Hit.command)
+      hits = Array(contextual)
+        + Self.emptyQueryLists
+        + Array(global)
+        + snapshot.areas.map(Hit.area)
+        + liveProjects.map(Hit.project)
       surface.reload()
       surface.select(0)
       return
@@ -144,6 +210,8 @@ final class SeptaskKitQuickFind {
     }
 
     var found: [Hit] = []
+    found += matchingCommands(for: query)
+    found += Self.emptyQueryLists.filter { Self.matches($0.title, query) }
     found += snapshot.areas.filter { Self.matches($0.title, query) }.map(Hit.area)
     found += liveProjects.filter { Self.matches($0.title, query) }.map(Hit.project)
     // Title matches first, then tag matches, then tasks that match only in
@@ -209,6 +277,10 @@ final class SeptaskKitQuickFind {
     guard hits.indices.contains(row) else { return }
 
     switch hits[row] {
+    case .command(let cmd):
+      // Let the panel finish closing and hand key status back to the main
+      // window before opening popovers (When, Move, Tags, etc.).
+      DispatchQueue.main.async { cmd.run() }
     case .project(let project):
       onChoose(Destination(filter: .project(project.id), taskId: nil))
     case .area(let area):

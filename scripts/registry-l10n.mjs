@@ -31,18 +31,26 @@ const FIELDS = {
   surfaces: new Set([
     "title", "primaryTitle", "detail", "message", "confirmTitle", "cancelTitle", "dismissTitle", "format",
     "emptyTitleFormat", "singularFormat", "body", "footnote", "returningTitle", "returningBody",
-    "label", "countLabel", "workingLabel", "valueLabel", "instructions", "setup", "first", "placeholder", "untitledName", "selfLabel",
+    "label", "countLabel", "workingLabel", "valueLabel", "instructions", "setup", "first", "placeholder", "commandPlaceholder", "untitledName", "selfLabel",
     "askKicker", "reviewKicker", "reviewFallback", "acceptedLabel",
   ]),
   importSources: new Set(["detail"]),
+  signIn: new Set([
+    "title", "heading", "subheading", "terms", "termsLabel", "privacyLabel", "emailLabel", "emailPlaceholder", "sendCode",
+    "codeSent", "codeLabel", "signIn", "resend", "differentEmail", "invalidEmail", "wrongCode", "tooManyTries",
+    "codeExpired", "rateLimited", "network", "detail", "button", "manualDetail",
+    "footer", "remove", "cancel", "addProvider", "addEmail", "addAppleDetail", "alreadyLinked",
+    "lastMethod", "added", "removed", "loadFailed", "addFailed", "removeFailed",
+  ]),
   tokens: new Set(["name", "tag", "label"]),
   plans: new Set([
-    "name", "shortName", "headline", "subhead", "notice", "title", "detail", "label", "priceLabel",
-    "footnote", "priceFootnote", "device", "account", "plus", "free", "trial", "trialEnds",
-    "paidThrough", "subscribe", "restore", "manage", "notNow", "learnMore", "yourPlan", "planned", "included", "notIncluded",
+    "name", "shortName", "proName", "headline", "subhead", "notice", "title", "detail", "label", "priceLabel",
+    "footnote", "priceFootnote", "device", "account", "plus", "pro", "free", "trial", "trialEnds",
+    "paidThrough", "proThrough", "subscribe", "restore", "manage", "notNow", "learnMore", "yourPlan", "planned", "included", "notIncluded",
     "seePlus", "startTrial", "trialStarted", "trialBilling", "welcomeBack", "cancelNote", "success", "pending",
-    "serverRetry", "failed", "ownedApple", "ownedWeb", "ownedGoogle", "ownedGrant", "ownedOtherAccount", "done",
-    "syncThisDevice", "syncThisDeviceFailed",
+    "serverRetry", "failed", "ownedApple", "ownedWeb", "ownedGoogle", "ownedGrant", "ownedGrantPro", "ownedOtherAccount", "done",
+    "syncThisDevice", "syncThisDeviceFailed", "filesSyncing",
+    "seePro", "choosePlan", "youGet", "yourPlanIncludes", "compareAll", "upgradeNote", "upgradeElsewhere", "buyElsewhere",
   ]),
 };
 /** Fields skipped even when their name matches (machine data). */

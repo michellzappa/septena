@@ -92,9 +92,7 @@ enum TaskDestinations {
   static func nonEmptySmartListIDs(in context: ModelContext) -> Set<RegistryDestinationID> {
     var nonEmpty = Set<RegistryDestinationID>()
     if !LocalCache.tasks(in: context, filter: .review).isEmpty { nonEmpty.insert(.review) }
-    if !LocalCache.tasks(in: context, filter: .agent).isEmpty { nonEmpty.insert(.agent) }
     if !LocalCache.tasks(in: context, filter: .starred).isEmpty { nonEmpty.insert(.starred) }
-    if !LocalCache.tasks(in: context, filter: .faded).isEmpty { nonEmpty.insert(.faded) }
     return nonEmpty
   }
 
@@ -212,6 +210,13 @@ final class NavigationState {
   /// cleanup. Settings is the deliberate exception (macOS opens it as a Window,
   /// so it keeps `showSettings`).
   var presentedModal: AppModal? = nil
+
+  /// The open sheet of the Do flow in this window (`DoFlow`): Later, "Where
+  /// did you stop?", or the line after an exit.
+  var doSheet: DoSheet?
+  /// The start of the Do that just ended here, until the line after the exit
+  /// was offered.
+  var doExitSince: Date?
 
   // MARK: - Modal convenience
 

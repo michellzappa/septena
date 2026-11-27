@@ -1,5 +1,6 @@
 {
   "version": 2,
+  "helpURL": "https://septena.app/help",
   "description": "Canonical Septena task-app settings: synced keys (backend SETTING_VALUES + Swift SeptaskSyncedSettings), device-local keys/defaults, and new-user-first progressive-disclosure taxonomy (docs/SETTINGS_UX_SPEC.md).",
   "keys": {
     "welcomeName": {
@@ -216,12 +217,30 @@
       "featureId": "lists.today"
     },
     "tasksShowAging": {
-      "scope": "device",
+      "scope": "synced",
       "storageKey": "septena.tasks.showAging",
       "type": "bool",
       "default": true,
       "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
       "featureId": "task.aging"
+    },
+    "fadeSweptAt": {
+      "scope": "synced",
+      "type": "string",
+      "format": "stamp",
+      "default": null,
+      "ui": false,
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "featureId": "fade.sweep"
+    },
+    "fadeSweepDismissedOn": {
+      "scope": "synced",
+      "type": "string",
+      "format": "day",
+      "default": null,
+      "ui": false,
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "featureId": "fade.sweep"
     },
     "tasksShowFaded": {
       "scope": "device",
@@ -268,7 +287,7 @@
       "sharedAppGroup": true,
       "type": "bool",
       "default": false,
-      "platforms": ["ios", "ipados", "macos", "android", "windows"],
+      "platforms": ["macos"],
       "featureId": "settings.display"
     },
     "loggingAnimationsEnabled": {
@@ -379,6 +398,12 @@
     "account_profile_card": [
       { "id": "yourProfile", "label": "Your Profile" },
       { "id": "signInToSync", "label": "On this device · Sign in to sync" }
+    ],
+    "sync_account_status": [
+      { "id": "accountIdLabel", "label": "Account ID" },
+      { "id": "accountIdFooter", "label": "Share this ID with support if you need help with your account." },
+      { "id": "copy", "label": "Copy" },
+      { "id": "copied", "label": "Copied" }
     ],
     "syncStatus": [
       { "id": "syncing", "label": "Syncing" },
@@ -695,7 +720,7 @@
           "kind": "setting",
           "key": "tasksShowAging",
           "label": "Fade inactive tasks",
-          "detail": "Tasks without activity for 14 days fade out and move to Faded."
+          "detail": "Tasks without activity for 14 days fade out and move to Review. This applies on all your devices."
         },
         {
           "kind": "setting",
@@ -712,7 +737,8 @@
         {
           "kind": "setting",
           "key": "badgeShowOverdue",
-          "label": "Overdue app icon badge"
+          "label": "Overdue app icon badge",
+          "platforms": ["macos"]
         }
       ]
     },
@@ -1086,10 +1112,11 @@
         {
           "id": "actions",
           "items": [
+            { "kind": "customSurface", "surface": "open_help", "label": "Help", "icon": "settings.help" },
             { "kind": "customSurface", "surface": "check_updates", "label": "Check for Updates…", "platforms": ["macos", "windows"], "featureId": "mac.updates" },
             { "kind": "customSurface", "surface": "reset_get_started", "label": "Show Get Started Again" },
             { "kind": "customSurface", "surface": "reset_first_run", "label": "Show Welcome Again", "featureId": "onboarding.first-run" },
-            { "kind": "customSurface", "surface": "send_feedback", "label": "Send feedback", "icon": "settings.feedback" }
+            { "kind": "customSurface", "surface": "contact_support", "label": "Contact Support", "icon": "settings.feedback", "featureId": "support.contact" }
           ]
         },
         {

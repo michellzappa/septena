@@ -5,8 +5,8 @@
  * Opens `GET /v1/agent/events/stream` against api.septena.app using Node 24's
  * built-in `fetch` (zero npm dependencies), persists the last seen `rev`
  * cursor across restarts, reconnects with exponential backoff, and triggers
- * `scripts/task-runner.sh` immediately on `assigned`, `user_turn`, and
- * `resumed` events.
+ * `scripts/task-runner.sh` immediately on `assigned`, `user_turn`, `resumed`
+ * and `unpaused` events.
  *
  * Auth:
  *   SEPTENA_WAKE_TOKEN       Bearer token (`sa1.*` app session or `sm2.*` MCP OAuth)
@@ -27,7 +27,9 @@ import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-export const WAKE_EVENTS = new Set(["assigned", "user_turn", "resumed"]);
+// Keep in step with WAKE_EVENT_KINDS in backend/src/api/agentWake.ts.
+// `unpaused`: a reply that came in during a pause woke nobody.
+export const WAKE_EVENTS = new Set(["assigned", "user_turn", "resumed", "unpaused"]);
 
 export function isWakeEvent(eventName) {
   return WAKE_EVENTS.has(eventName);

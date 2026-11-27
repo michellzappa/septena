@@ -54,10 +54,20 @@ class AndroidDeviceSettings(context: Context) {
 
     /** A bool setting by key, its registry default when unset. */
     fun bool(key: String): Boolean {
-        val definition = RegistryCatalog.document("settings").fields["keys"]
-            .let { (it as? JsonValue.ObjectValue)?.fields?.get(key) as? JsonValue.ObjectValue }
-            ?: return false
+        val definition = RegistryCatalog.setting(key) ?: return false
         return read(key, definition).booleanValue() ?: false
+    }
+
+    /** The bool this device stored for [key], or null when the user never set it here. */
+    fun storedBool(key: String): Boolean? {
+        val storageKey = RegistryCatalog.setting(key)?.string("storageKey") ?: key
+        return if (preferences.contains(storageKey)) preferences.getBoolean(storageKey, false) else null
+    }
+
+    /** Forgets what this device stored for [key]: the account holds it now. */
+    fun forget(key: String) {
+        val storageKey = RegistryCatalog.setting(key)?.string("storageKey") ?: key
+        preferences.edit().remove(storageKey).apply()
     }
 
     private fun JsonValue.ObjectValue.string(key: String): String? = fields[key].stringValue()

@@ -90,6 +90,8 @@ private struct SeptaskTaskMenu: View {
     switch id {
     case .sidebarNewProject:
       return .init(perform: canNavigate ? newProject : nil)
+    case .sidebarJoinShared:
+      return .init { SeptaskSharing.presentJoin() }
     case .sidebarNewArea:
       return .init(perform: canNavigate ? newArea : nil)
     default:
@@ -180,6 +182,7 @@ private struct SeptaskTaskMenu: View {
     switch id {
     case .taskEditDetails: return .rename
     case .taskOpen: return .open
+    case .taskDo: return .startDo
     case .taskDuplicate: return .duplicate
     case .taskToggleComplete: return .toggleComplete
     case .taskCancel: return .cancel
@@ -196,6 +199,8 @@ private struct SeptaskTaskMenu: View {
     case .taskClearSchedule: return .clearSchedule
     case .taskRepeat: return .repeatEditor
     case .taskCreateNextCopy: return .createNextCopy
+    case .taskWaitingOn: return .waitingOn
+    case .taskGotItBack: return .gotItBack
     default: return nil
     }
   }
@@ -235,6 +240,10 @@ private struct SmartListCommands: View {
 /// (`registry/actions.json`): the App, File, View, Task and Help items, their
 /// order, titles and shortcuts. This struct binds each action ID to a handler.
 struct SeptaskCommandMenus: Commands {
+  @Environment(\.openURL) private var openURL
+  #if os(macOS)
+  @Environment(\.openWindow) private var openWindow
+  #endif
   @FocusedValue(\.septaskNavigationActions) private var actions
   @FocusedValue(\.taskActions) private var taskActions
   @AppStorage(SettingsKey.textSizeStep) private var textSizeRaw = 0
@@ -364,11 +373,22 @@ struct SeptaskCommandMenus: Commands {
       // The registry gates Quick Add off macOS (Quick Entry covers capture).
       return .init(perform: actions.map { actions in { actions.showQuickAdd() } })
 
+    case .appHelp:
+      return .init { openURL(RegistrySettings.helpURL) }
+
+    case .appContactSupport:
+      #if os(macOS)
+      return .init { openWindow(id: SupportView.windowID) }
+      #else
+      return .init { SupportCenter.shared.isPresentingSheet = true }
+      #endif
+
     case .appKeyboardShortcuts:
       #if os(macOS)
-      // SwiftUI-window only: the AppKit shell has no shortcuts sheet, and a
-      // permanently disabled item is worse than none.
-      guard let actions else { return nil }
+      // The AppKit shell has no shortcuts sheet, so it opens the help page.
+      guard let actions else {
+        return .init { openURL(RegistrySettings.helpURL.appending(path: "keyboard-shortcuts")) }
+      }
       return .init { actions.showKeyboardShortcuts() }
       #else
       return .init(perform: actions.map { actions in { actions.showKeyboardShortcuts() } })
@@ -455,8 +475,16 @@ struct SeptaskCommandMenus: Commands {
       Divider()
 
       Button(RegistryActions.title(.appQuickFind)) { showQuickFind() }
-        .keyboardShortcut("f", modifiers: [.command, .shift])
+        .keyboardShortcut(RegistryActions.shortcut(for: .appQuickFind)?.keyboardShortcut
+                          ?? KeyboardShortcut("k", modifiers: .command))
         .disabled(!canNavigate)
+
+      ForEach(Array((RegistryActions.shortcut(for: .appQuickFind)?.alternates ?? []).enumerated()), id: \.offset) { _, alternate in
+        Button(RegistryActions.title(.appQuickFind)) { showQuickFind() }
+          .keyboardShortcut(alternate.keyboardShortcut)
+          .disabled(!canNavigate)
+          .hidden()
+      }
 
       #if os(macOS)
       Divider()
@@ -499,7 +527,8 @@ struct SeptaskCommandMenus: Commands {
 
     CommandGroup(replacing: .appSettings) { menuBar(.app) }
 
-    CommandGroup(after: .help) { menuBar(.help) }
+    // Replaces the system "Septena Help", which looks for a help book.
+    CommandGroup(replacing: .help) { menuBar(.help) }
 
     #if os(macOS)
     SeptaskMacAppCommands()

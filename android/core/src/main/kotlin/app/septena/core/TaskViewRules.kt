@@ -23,6 +23,8 @@ data class TaskSnapshot(
     val deadline: String? = null,
     val today: Boolean = false,
     val todaySetOn: String? = null,
+    /** The deadline the user planned past (docs/TASK_DATES_SPEC.md I8). */
+    val deferredDeadline: String? = null,
     val source: String? = null,
     val sourceClient: String? = null,
     val acknowledgedAt: String? = null,
@@ -34,8 +36,15 @@ data class TaskSnapshot(
     val startTime: String? = null,
     val durationMinutes: Int? = null,
     val timeZone: String? = null,
+    /** Who the user handed the task to (docs/REVIEW_SPEC.md §6), or null. */
+    val waitingOn: String? = null,
+    /** The day the wait started (`YYYY-MM-DD`), or null. */
+    val waitingSince: String? = null,
 ) {
     val isHeading: Boolean get() = kind == RegistryEntityEnums.TaskKind.HEADING
+
+    /** The task waits on a person (docs/REVIEW_SPEC.md §6). */
+    val isWaiting: Boolean get() = !waitingOn.isNullOrBlank()
 
     companion object {
         fun from(record: SyncRecord): TaskSnapshot {
@@ -52,6 +61,7 @@ data class TaskSnapshot(
                 createdAt = f[RegistryEntityFields.Task.CREATED_AT].stringValue(),
                 scheduled = f[RegistryEntityFields.Task.SCHEDULED].stringValue(),
                 deadline = f[RegistryEntityFields.Task.DEADLINE].stringValue(),
+                deferredDeadline = f[RegistryEntityFields.Task.DEFERRED_DEADLINE].stringValue(),
                 today = f[RegistryEntityFields.Task.TODAY].booleanValue() ?: false,
                 todaySetOn = f[RegistryEntityFields.Task.TODAY_SET_ON].stringValue(),
                 source = f[RegistryEntityFields.Task.SOURCE].stringValue(),
@@ -69,6 +79,8 @@ data class TaskSnapshot(
                     else -> null
                 },
                 timeZone = f[RegistryEntityFields.Task.TIME_ZONE].stringValue(),
+                waitingOn = f[RegistryEntityFields.Task.WAITING_ON].stringValue(),
+                waitingSince = f[RegistryEntityFields.Task.WAITING_SINCE].stringValue(),
             )
         }
     }
@@ -86,6 +98,8 @@ data class TaskViewMembership(
     val dueState: String? = null,
     /** Core R4: true when the deadline renders in red. */
     val deadlineRed: Boolean = false,
+    /** Core upcoming bucket day (`YYYY-MM-DD`) when the task matches Upcoming, else null. */
+    val upcomingDay: String? = null,
 )
 
 /**
@@ -138,7 +152,24 @@ object TaskViewRules {
             ),
             dueState = m.dueState,
             deadlineRed = m.deadlineRed,
+            upcomingDay = m.upcomingDay,
         )
+    }
+
+    /**
+     * The Review group of a task (docs/REVIEW_SPEC.md §1), or null when it is not in Review:
+     * the first that fits of what waits on the user, a wait on a person (§6, ADR 0053), agent work
+     * in progress, and Faded (ADR 0046). [conversationGroup] is the core's group for its
+     * conversation; [agentStage] is the core's agent stage, which shows as its own group while the
+     * agent works.
+     */
+    fun reviewGroup(task: TaskSnapshot, conversationGroup: String?, agentStage: String? = null): String? = when {
+        task.status != RegistryEntityEnums.TaskStatus.OPEN || task.isHeading || task.deletedAt != null -> null
+        conversationGroup != null -> conversationGroup
+        task.isWaiting -> ReviewGroupIds.WAITING
+        agentStage in ReviewGroupIds.AGENT_WORK -> agentStage
+        TaskFadeRules.isFaded(task.fadedAt) -> ReviewGroupIds.FADED
+        else -> null
     }
 
     /**
@@ -200,6 +231,26 @@ object TaskViewRules {
     }
 }
 
+/** Ids of the Review groups (registry/destinations.json `review.groups`). */
+object ReviewGroupIds {
+    const val QUESTIONS: String = "questions"
+    const val FINISHED: String = "finished"
+    const val WAITING: String = "waiting"
+    const val WORKING: String = "working"
+    const val QUEUED: String = "queued"
+    const val STOPPED: String = "stopped"
+    const val FADED: String = RegistryDestinationIds.FADED
+
+    /** Agent work in progress: the core's agent stages that show as Review groups. `done` does not. */
+    val AGENT_WORK: Set<String> = setOf(WORKING, QUEUED, STOPPED)
+
+    /** Every group, in the order the Review list draws them. */
+    val ORDER: List<String> = listOf(QUESTIONS, FINISHED, WAITING, WORKING, QUEUED, STOPPED, FADED)
+
+    /** The groups that wait on the user. Only they count in the Review badge; Waiting does not. */
+    val BADGE: Set<String> = setOf(QUESTIONS, FINISHED)
+}
+
 /** The task as the shared core reads it. */
 internal fun TaskSnapshot.toCore(): CoreTaskSnapshot = CoreTaskSnapshot(
     id = id,
@@ -212,6 +263,7 @@ internal fun TaskSnapshot.toCore(): CoreTaskSnapshot = CoreTaskSnapshot(
     createdAt = createdAt,
     scheduled = scheduled,
     deadline = deadline,
+    deferredDeadline = deferredDeadline,
     today = today,
     todaySetOn = todaySetOn,
     source = source,

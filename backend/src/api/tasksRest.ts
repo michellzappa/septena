@@ -3,14 +3,16 @@ import { z } from "zod";
 import type { Env } from "../env.js";
 import { logEvent } from "../util.js";
 import { zId } from "../store/columns.js";
-import type { Row } from "../store/TaskStore.js";
+import type { Doing, Row } from "../store/TaskStore.js";
 import { addDaysYMD, isValidTz, todayYMD } from "../tz.js";
 import type { TaskOut } from "../tools/taskShared.js";
 import { matchesView } from "../tools/taskShared.js";
 import { listTasks, taskOut } from "../shadow/mcp.js";
 import { MAX_REF_INPUT, findByRef, zRefs } from "../shadow/refs.js";
 import { DESIGN_TOKENS, ENTITY_LIMITS } from "../generated/registries.js";
-import { AGENT_FALLBACK_NAME, acceptReview, rpcStoreFor, runWriteTool, sendBackReview, zWriteArgs, type StoreRpc, type WriteContext, type WriteToolName } from "../shadow/writes.js";
+import { Refusal, envelopeFor } from "../errors.js";
+import { IDEMPOTENCY_KEY_FIELD, withIdempotency, zIdempotencyKey } from "../idempotency.js";
+import { AGENT_FALLBACK_NAME, acceptReview, pushOps, rpcStoreFor, runWriteTool, sendBackReview, zWriteArgs, type StoreRpc, type WriteContext, type WriteToolName } from "../shadow/writes.js";
 
 // A small REST surface over the MCP task tools for thin app clients, first of
 // all the Apple Watch (docs/WATCH.md in the app repo). The watch has no task
@@ -26,6 +28,50 @@ type Vars = { userId: string; actor: string };
 type Ctx = Context<{ Bindings: Env; Variables: Vars }>;
 
 export const tasksRest = new Hono<{ Bindings: Env; Variables: Vars }>();
+
+/// Idempotency keys on every write here (ADR 0050 §4): the
+/// `Idempotency-Key` header or an `idempotency_key` body field. The first
+/// 2xx answer is kept 24 hours; a repeat gets it back with
+/// `Idempotent-Replayed: true` and writes nothing. `/by-ref` only reads.
+tasksRest.use("*", async (c, next) => {
+  if (c.req.method !== "POST" || c.req.path.endsWith("/by-ref")) return next();
+  const text = await c.req.text();
+  let body: unknown = text;
+  let bodyKey: unknown;
+  try {
+    const parsed = text.trim() ? JSON.parse(text) as unknown : {};
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      const { [IDEMPOTENCY_KEY_FIELD]: k, ...rest } = parsed as Record<string, unknown>;
+      bodyKey = k;
+      body = rest;
+    }
+  } catch {
+    // Not JSON: the handler answers invalid_json; the text is the body.
+  }
+  const headerKey = c.req.header("Idempotency-Key");
+  const raw = headerKey ?? bodyKey;
+  if (raw === undefined) return next();
+  const key = zIdempotencyKey.safeParse(raw);
+  if (!key.success || (headerKey !== undefined && bodyKey !== undefined && headerKey !== bodyKey)) {
+    return c.json({ error: "invalid_request", message: "The idempotency key is not valid, or the header and the body name two keys." }, 400);
+  }
+  try {
+    const { value, replayed } = await withIdempotency(rpcStoreFor(c.env, c.get("userId")), key.data, `v1:POST ${c.req.path}`, body, async () => {
+      await next();
+      const ok = c.res.status >= 200 && c.res.status < 300;
+      return { keep: ok, value: { status: c.res.status, body: ok ? await c.res.clone().text() : "" } };
+    });
+    if (replayed) {
+      c.res = new Response(value.body, {
+        status: value.status,
+        headers: { "Content-Type": "application/json", "Idempotent-Replayed": "true" },
+      });
+    }
+  } catch (e) {
+    if (!(e instanceof Refusal)) throw e;
+    return c.json({ error: e.code, message: e.message }, e.code === "idempotency_in_progress" ? 409 : 422);
+  }
+});
 
 /// The wrist's zone decides "today" (it's the device you're wearing), then the
 /// synced `homeTimezone`, then UTC — same fallbacks as the MCP connector.
@@ -121,6 +167,14 @@ export function clientTask(t: TaskOut, names: Map<string, string>): ClientTask {
   return out;
 }
 
+/// The current Do in every view (docs/DO_SPEC.md §7), or null. `now` lets a
+/// device correct its clock.
+export function doingOut(doing: Doing | null): (Omit<Doing, "isStale"> & { now: string }) | null {
+  if (!doing || doing.isStale) return null;
+  const { isStale: _stale, ...rest } = doing;
+  return { ...rest, now: new Date().toISOString() };
+}
+
 const ADDED_WINDOW_MS = 24 * 60 * 60 * 1000;
 const ADDED_MAX = 50;
 
@@ -163,7 +217,7 @@ function containerNames(areas: Row[], projects: Row[]): Map<string, string> {
   return m;
 }
 
-const zView = z.enum(["today", "inbox", "upcoming", "repeating", "anytime", "completed", "starred", "review", "added", "questions"]);
+export const zView = z.enum(["today", "inbox", "upcoming", "repeating", "anytime", "completed", "starred", "review", "added", "questions"]);
 
 /// Mirrors `TaskStructureOrder.positionOrdered` in SeptenaCore: positive
 /// `position` ascending, unset (`0` / missing) sinks to the bottom, ties break
@@ -253,16 +307,19 @@ tasksRest.get("/lists", async (c) => {
   });
 });
 
+export const zTasksQuery = z.object({
+  view: zView.default("today"),
+  area: zId.optional(),
+  project: zId.optional(),
+  limit: z.coerce.number().int().min(1).max(500).default(300),
+});
+
 tasksRest.get("/", async (c) => {
-  const q = z.object({
-    view: zView.default("today"),
-    area: zId.optional(),
-    project: zId.optional(),
-    limit: z.coerce.number().int().min(1).max(500).default(300),
-  }).safeParse(c.req.query());
+  const q = zTasksQuery.safeParse(c.req.query());
   if (!q.success) return c.json({ error: "invalid_request" }, 400);
   const store = rpcStoreFor(c.env, c.get("userId"));
   const timeZone = await timeZoneFor(c, store);
+  const doing = doingOut(await store.readDoing());
   if (q.data.view === "questions") {
     const [open, areas, projects, accentSetting] = await Promise.all([
       store.readOpenQuestions(q.data.limit),
@@ -285,6 +342,7 @@ tasksRest.get("/", async (c) => {
       view: "questions",
       today: todayYMD(timeZone),
       accent: accentFor(accentSetting),
+      doing,
       total: open.total,
       truncated: open.total > tasks.length,
       tasks,
@@ -302,6 +360,7 @@ tasksRest.get("/", async (c) => {
       view: "added",
       today: todayYMD(timeZone),
       accent: accentFor(accentSetting),
+      doing,
       total: added.total,
       truncated: added.total > added.tasks.length,
       tasks: added.tasks,
@@ -350,6 +409,7 @@ tasksRest.get("/", async (c) => {
     view: q.data.view,
     today,
     accent: accentFor(accentSetting),
+    doing,
     total,
     truncated,
     tasks: tasks.map((t) => clientTask(t, names)),
@@ -358,11 +418,13 @@ tasksRest.get("/", async (c) => {
 
 /// The tasks that point at a key, a URL or a `message://` link. The key is in
 /// the body, never in the URL: request logs hold URLs, and a key is content.
+export const zByRefBody = z.object({
+  key: z.string().min(1).max(MAX_REF_INPUT),
+  limit: z.number().int().min(1).max(200).default(50),
+}).strict();
+
 tasksRest.post("/by-ref", async (c) => {
-  const body = await json(c, z.object({
-    key: z.string().min(1).max(MAX_REF_INPUT),
-    limit: z.number().int().min(1).max(200).default(50),
-  }).strict());
+  const body = await json(c, zByRefBody);
   if (body instanceof Response) return body;
   try {
     return c.json(await findByRef(rpcStoreFor(c.env, c.get("userId")), body.key, body.limit));
@@ -373,13 +435,15 @@ tasksRest.post("/by-ref", async (c) => {
 
 const zWhen = z.enum(["inbox", "today", "tomorrow"]);
 
+export const zCreateTaskBody = z.object({
+  title: z.string().trim().min(1).max(500),
+  when: zWhen.default("inbox"),
+  refs: zRefs.optional(),
+  allow_duplicate: z.boolean().optional(),
+}).strict();
+
 tasksRest.post("/", async (c) => {
-  const body = await json(c, z.object({
-    title: z.string().trim().min(1).max(500),
-    when: zWhen.default("inbox"),
-    refs: zRefs.optional(),
-    allow_duplicate: z.boolean().optional(),
-  }).strict());
+  const body = await json(c, zCreateTaskBody);
   if (body instanceof Response) return body;
   const ctx = await writeContext(c);
   const args: Record<string, unknown> = { title: body.title };
@@ -390,7 +454,81 @@ tasksRest.post("/", async (c) => {
   return run(c, ctx, "tasks_create", args, 201);
 });
 
-const zVerb = z.enum(["complete", "today", "untoday", "tomorrow", "defer", "cancel"]);
+/// Starts a Do (docs/DO_SPEC.md §7). The client mints the session id, so a
+/// retry starts nothing new. The start is human engagement: it resets the fade.
+export const zDoStartBody = z.object({
+  sessionId: zId,
+  plannedMinutes: z.number().int().min(1).max(ENTITY_LIMITS.doPlannedMinutesMax).optional(),
+}).strict();
+
+tasksRest.post("/:id/do", async (c) => {
+  const id = zId.safeParse(c.req.param("id"));
+  if (!id.success) return c.json({ error: "invalid_request" }, 400);
+  const body = await json(c, zDoStartBody);
+  if (body instanceof Response) return body;
+  const ctx = await writeContext(c);
+  const read = await ctx.store.readTask(id.data);
+  if (!read || read.task.kind === "heading") return c.json({ error: "not_found" }, 404);
+  const existing = await ctx.store.readDoSession(body.sessionId);
+  if (existing) {
+    if (existing.taskId !== id.data) return c.json({ error: "invalid_request" }, 400);
+    return c.json({ sessionId: body.sessionId, taskId: id.data, alreadyStarted: true });
+  }
+  if (read.task.status !== "open") return stale(c);
+  return attempt(c, "do", async () => {
+    const now = new Date().toISOString();
+    await pushOps(ctx, [
+      { op: "upsert", entity: "task", id: id.data, fields: { touchedAt: now, deferCount: 0, ...(read.task.fadedAt ? { fadedAt: null } : {}) } },
+      {
+        op: "upsert", entity: "doSession", id: body.sessionId,
+        fields: { taskId: id.data, startedAt: now, plannedMinutes: body.plannedMinutes ?? null, sourceClient: ctx.source?.sourceClient ?? null },
+      },
+    ]);
+    return { sessionId: body.sessionId, taskId: id.data };
+  }, 201);
+});
+
+/// Ends (`stop`) or confirms (`confirm`) one Do. It names the session, so an
+/// old request cannot touch a newer Do. A repeat returns 200.
+export const zDoVerb = z.enum(["stop", "confirm"]);
+export const zDoEndBody = z.object({ note: z.string().trim().min(1).max(ENTITY_LIMITS.doNoteMax).optional() }).strict();
+
+tasksRest.post("/do/:sessionId/:verb", async (c) => {
+  const id = zId.safeParse(c.req.param("sessionId"));
+  const verb = zDoVerb.safeParse(c.req.param("verb"));
+  if (!id.success || !verb.success) return c.json({ error: "invalid_request" }, 400);
+  const body = await json(c, zDoEndBody);
+  if (body instanceof Response) return body;
+  const ctx = await writeContext(c);
+  const session = await ctx.store.readDoSession(id.data);
+  if (!session) return c.json({ error: "not_found" }, 404);
+  const ended = typeof session.endedAt === "string";
+  if (ended && (verb.data === "confirm" || !body.note)) {
+    return verb.data === "confirm" ? stale(c) : c.json({ sessionId: id.data, alreadyEnded: true });
+  }
+  return attempt(c, `do_${verb.data}`, async () => {
+    const now = new Date().toISOString();
+    if (verb.data === "confirm") {
+      await pushOps(ctx, [{ op: "upsert", entity: "doSession", id: id.data, fields: { confirmedAt: now } }]);
+      return { sessionId: id.data, confirmedAt: now };
+    }
+    await endDo(ctx, id.data, ended ? null : "stopped", now, body.note);
+    return { sessionId: id.data, ended: true };
+  });
+});
+
+/// Ends a Do with `exit`, or only adds the note when `exit` is null. The length
+/// of a stale one is unknown.
+async function endDo(ctx: WriteContext, sessionId: string, exit: "stopped" | "later" | null, now: string, note?: string): Promise<void> {
+  const doing = await ctx.store.readDoing();
+  const lapsed = doing?.sessionId === sessionId && doing.isStale;
+  await pushOps(ctx, [{
+    op: "upsert", entity: "doSession", id: sessionId,
+    fields: { ...(exit ? { endedAt: now, exit, lapsed } : {}), ...(note ? { note } : {}) },
+  }]);
+}
+
+export const zVerb = z.enum(["complete", "today", "untoday", "tomorrow", "defer", "cancel"]);
 
 /// Answers an open agent question turn from a thin client (the Apple Watch's
 /// notification action, F1b #213, and the desk orb). Runs
@@ -399,16 +537,18 @@ const zVerb = z.enum(["complete", "today", "untoday", "tomorrow", "defer", "canc
 /// index in the question's list, for a client that cannot hold the full text.
 /// With `inReplyTo` a question that is no longer the open one is refused, and
 /// the same answer sent again is not written again.
+export const zAnswerBody = z.object({
+  chosen: z.string().trim().min(1).max(ENTITY_LIMITS.turnChosenMax).optional(),
+  option: z.number().int().min(0).max(ENTITY_LIMITS.turnMaxOptions - 1).optional(),
+  inReplyTo: z.number().int().min(1).optional(),
+  step: z.enum(["confirm", "ground", "scope", "decide", "work"]).default("decide"),
+}).strict().refine((b) => (b.chosen === undefined) !== (b.option === undefined), "chosen or option")
+  .refine((b) => b.option === undefined || b.inReplyTo !== undefined, "option needs inReplyTo");
+
 tasksRest.post("/:id/answer", async (c) => {
   const id = zId.safeParse(c.req.param("id"));
   if (!id.success) return c.json({ error: "invalid_request" }, 400);
-  const body = await json(c, z.object({
-    chosen: z.string().trim().min(1).max(ENTITY_LIMITS.turnChosenMax).optional(),
-    option: z.number().int().min(0).max(ENTITY_LIMITS.turnMaxOptions - 1).optional(),
-    inReplyTo: z.number().int().min(1).optional(),
-    step: z.enum(["confirm", "ground", "scope", "decide", "work"]).default("decide"),
-  }).strict().refine((b) => (b.chosen === undefined) !== (b.option === undefined), "chosen or option")
-    .refine((b) => b.option === undefined || b.inReplyTo !== undefined, "option needs inReplyTo"));
+  const body = await json(c, zAnswerBody);
   if (body instanceof Response) return body;
   const ctx = await writeContext(c);
   let { chosen, step } = body as { chosen?: string; step: string };
@@ -443,10 +583,12 @@ async function reviewGate(c: Ctx, ctx: WriteContext, id: string, reviewAt: strin
   return null;
 }
 
+export const zAcceptBody = z.object({ reviewAt: z.string().max(40).optional() }).strict();
+
 tasksRest.post("/:id/accept", async (c) => {
   const id = zId.safeParse(c.req.param("id"));
   if (!id.success) return c.json({ error: "invalid_request" }, 400);
-  const body = await json(c, z.object({ reviewAt: z.string().max(40).optional() }).strict());
+  const body = await json(c, zAcceptBody);
   if (body instanceof Response) return body;
   const ctx = await writeContext(c);
   // A repeat of an accept that landed: say so, do not refuse it.
@@ -454,22 +596,35 @@ tasksRest.post("/:id/accept", async (c) => {
   if (read?.task.status === "done") return c.json({ id: id.data, status: "done", alreadyComplete: true });
   const gate = await reviewGate(c, ctx, id.data, body.reviewAt);
   if (gate) return gate;
-  return attempt(c, "accept", () => acceptReview(ctx, id.data));
+  return attempt(c, "accept", async () => {
+    const done = await acceptReview(ctx, id.data);
+    await touchTask(ctx, id.data);
+    return done;
+  });
 });
+
+export const zSendBackBody = z.object({
+  note: z.string().trim().min(1).max(10_000).default("Sent back without a note."),
+  reviewAt: z.string().max(40).optional(),
+}).strict();
 
 tasksRest.post("/:id/send_back", async (c) => {
   const id = zId.safeParse(c.req.param("id"));
   if (!id.success) return c.json({ error: "invalid_request" }, 400);
-  const body = await json(c, z.object({
-    note: z.string().trim().min(1).max(10_000).default("Sent back without a note."),
-    reviewAt: z.string().max(40).optional(),
-  }).strict());
+  const body = await json(c, zSendBackBody);
   if (body instanceof Response) return body;
   const ctx = await writeContext(c);
   const gate = await reviewGate(c, ctx, id.data, body.reviewAt);
   if (gate) return gate;
-  return attempt(c, "send_back", () => sendBackReview(ctx, id.data, body.note));
+  return attempt(c, "send_back", async () => {
+    const sent = await sendBackReview(ctx, id.data, body.note);
+    await touchTask(ctx, id.data);
+    return sent;
+  });
 });
+
+/// The body of the `defer` verb. `session`: the Do this Later ends.
+export const zDeferBody = z.object({ until: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), session: zId.optional() }).strict();
 
 tasksRest.post("/:id/:verb", async (c) => {
   const id = zId.safeParse(c.req.param("id"));
@@ -485,9 +640,14 @@ tasksRest.post("/:id/:verb", async (c) => {
     case "tomorrow":
       return run(c, ctx, "tasks_defer", { id: id.data, until: addDaysYMD(today, 1) });
     case "defer": {
-      const body = await json(c, z.object({ until: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }).strict());
+      const body = await json(c, zDeferBody);
       if (body instanceof Response) return body;
-      return run(c, ctx, "tasks_defer", { id: id.data, until: body.until });
+      const response = await run(c, ctx, "tasks_defer", { id: id.data, until: body.until });
+      if (response.ok && body.session) {
+        const session = await ctx.store.readDoSession(body.session);
+        if (session?.taskId === id.data && !session.endedAt) await endDo(ctx, body.session, "later", new Date().toISOString());
+      }
+      return response;
     }
     case "untoday":
       // The phone's "Remove from Today" (spec §4 A3): the core drops the pin
@@ -509,6 +669,11 @@ async function json<T extends z.ZodTypeAny>(c: Ctx, schema: T): Promise<z.infer<
       return c.json({ error: "invalid_json" }, 400);
     }
   }
+  // Read by the idempotency middleware above, not a field of the verb.
+  if (body && typeof body === "object" && !Array.isArray(body)) {
+    const { [IDEMPOTENCY_KEY_FIELD]: _key, ...rest } = body as Record<string, unknown>;
+    body = rest;
+  }
   const parsed = schema.safeParse(body);
   if (!parsed.success) return c.json({ error: "invalid_request", issues: parsed.error.issues.slice(0, 10) }, 400);
   return parsed.data;
@@ -521,7 +686,23 @@ async function run(
 ): Promise<Response> {
   const parsed = zWriteArgs[name].safeParse(args);
   if (!parsed.success) return c.json({ error: "invalid_request" }, 400);
-  return attempt(c, name, () => runWriteTool(ctx, name, parsed.data as Record<string, unknown>) as Promise<object>, okStatus);
+  const input = parsed.data as Record<string, unknown>;
+  return attempt(c, name, async () => {
+    const result = await runWriteTool(ctx, name, input) as object;
+    if (typeof input.id === "string") await touchTask(ctx, input.id, name === "tasks_defer" || input.today === false);
+    return result;
+  }, okStatus);
+}
+
+/// A thin client's gesture is the user's: it restarts the fade clock, as a
+/// gesture in an app does (docs/TASK_FADE_SPEC.md §3). A defer counts.
+async function touchTask(ctx: WriteContext, id: string, deferred = false): Promise<void> {
+  const read = await ctx.store.readTask(id);
+  if (!read) return;
+  const deferCount = deferred ? Number(read.task.deferCount ?? 0) + 1 : 0;
+  await pushOps(ctx, [{
+    op: "upsert", entity: "task", id, fields: { touchedAt: new Date().toISOString(), deferCount, fadedAt: null },
+  }]);
 }
 
 async function attempt(c: Ctx, name: string, write: () => Promise<object>, okStatus: 200 | 201 = 200): Promise<Response> {
@@ -534,6 +715,7 @@ async function attempt(c: Ctx, name: string, write: () => Promise<object>, okSta
     const message = e instanceof Error ? e.message : String(e);
     logEvent("tasks_rest", { tool: name, ok: false });
     if (/^Task not found/.test(message)) return c.json({ error: "not_found" }, 404);
-    return c.json({ error: "rejected", message }, 422);
+    // `reason`: the refusal's code (src/errors.ts), next to the old fields.
+    return c.json({ error: "rejected", reason: envelopeFor(e).code, message }, 422);
   }
 }

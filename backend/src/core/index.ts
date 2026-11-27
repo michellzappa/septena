@@ -71,6 +71,7 @@ export interface CoreTask {
   createdAt?: string | null;
   scheduled?: string | null;
   deadline?: string | null;
+  deferredDeadline?: string | null;
   today?: boolean;
   todaySetOn?: string | null;
   source?: string | null;
@@ -207,7 +208,7 @@ export function applyDateAction(
   return callCore("applyDateAction", { task, action, today, now });
 }
 
-/// The fields a row needs to meet the date invariants (I1–I7).
+/// The fields a row needs to meet the date invariants (I1–I8).
 export function normalizeTaskDates(task: CoreTask, today: string): Record<string, unknown> {
   return callCore("normalizeTaskDates", { task, today });
 }
@@ -269,4 +270,42 @@ export function findIssueRefs(text: string): CoreRef[] {
 /// task and key.
 export function taskRefId(taskId: string, key: string, deletedCount: number): string {
   return callCore("taskRefId", { taskId, key, deletedCount });
+}
+
+/// One Do as the core reads it (`do_session.rs`, vectors `do-session.json`).
+export interface CoreDoSession {
+  id: string;
+  startedAt: string;
+  plannedMinutes?: number | null;
+  confirmedAt?: string | null;
+  endedAt?: string | null;
+  /// The status of its task, or null when the task is gone.
+  taskStatus: string | null;
+}
+
+export interface CoreDoEnd {
+  id: string;
+  endedAt: string;
+  exit: string;
+  lapsed: boolean;
+}
+
+export interface CoreCurrentDo {
+  id: string;
+  startedMs: number;
+  plannedEndMs: number | null;
+  staleAtMs: number;
+  isStale: boolean;
+}
+
+/// Which open Do stays open, and how each other one ends (docs/DO_SPEC.md §2.1).
+export function resolveDoSessions(
+  sessions: CoreDoSession[], now: string,
+): { ends: CoreDoEnd[]; current: CoreCurrentDo | null } {
+  return callCore("resolveDoSessions", { sessions, now });
+}
+
+/// True when an end at `incoming` wins over the stored one (§2.1 rule 2).
+export function doEndWins(current: string | null, incoming: string): boolean {
+  return callCore("doEndWins", { current, incoming });
 }

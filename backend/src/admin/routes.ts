@@ -4,15 +4,20 @@ import type { Env } from "../env.js";
 import { logEvent } from "../util.js";
 import { createPlusLink, revokePlusLink } from "../api/plusLinks.js";
 import { USER_ID_RE, accountStoreFor } from "../store/AccountStore.js";
-import { PLUS_LINK_MAX_MONTHS, PLUS_LINK_MAX_USES } from "../store/plusLinks.js";
+import { storeFor } from "../api/session.js";
+import { grantRow } from "../entitlement/entitlement.js";
+import { PLUS_LINK_MAX_MONTHS, PLUS_LINK_MAX_USES, addMonths } from "../store/plusLinks.js";
 import { verifyAccessJwt } from "./access.js";
-import { refreshAccounts, sweepAccounts } from "./accounts.js";
-import { PAGE_HEADERS, renderAdmin } from "./page.js";
+import { ADMIN_GRANT_ID, refreshAccounts, sweepAccounts } from "./accounts.js";
+import { ADMIN_PAGES, PAGE_HEADERS, renderAdmin, type AdminPage, type AdminView } from "./page.js";
 import { signupView, signupsByEmail, signupsCsv } from "./signups.js";
+import { SERIES_DAYS, dayKey, recordMetrics } from "./metrics.js";
+import { forgetTraffic, trafficView } from "./plausible.js";
+import { macReleases } from "./releases.js";
 
 // The admin page, https://api.septena.app/admin (ADR 0043, #198). It shows
-// counts, dates and plans, never content. Its only writes are Plus links:
-// make, close, revoke. Cloudflare Access is in front, and the Worker checks
+// counts, dates and plans, never content. Its only writes are plans:
+// links (make, close, take back) and one grant per account (give, take back). Cloudflare Access is in front, and the Worker checks
 // the Access token itself. Fail closed: anything missing answers 404.
 
 type Vars = { email: string };
@@ -38,29 +43,44 @@ async function requireAdmin(c: Ctx, next: Next) {
 
 admin.use("*", requireAdmin);
 
-async function renderPage(c: Ctx, opts: { query?: string; newUrl?: string; error?: string } = {}): Promise<Response> {
+/// Each page loads only what it shows.
+const NEEDS: Record<AdminPage, { accounts?: true; links?: true; signups?: true; history?: true; traffic?: true; releases?: true }> = {
+  overview: { accounts: true, signups: true, history: true, traffic: true },
+  website: { signups: true, traffic: true },
+  product: { accounts: true, releases: true },
+  plans: { accounts: true, links: true },
+  accounts: { accounts: true },
+  signups: { signups: true },
+};
+
+async function renderPage(c: Ctx, page: AdminPage, opts: { query?: string; newUrl?: string; error?: string } = {}): Promise<Response> {
   const accounts = accountStoreFor(c.env);
   if (!accounts) return c.notFound();
+  const need = NEEDS[page];
   const query = (opts.query ?? "").trim().slice(0, 200);
   const isEmail = query.includes("@");
-  const [list, plus, signups, found, identity] = await Promise.all([
-    accounts.listAccounts(),
-    accounts.listPlusLinks(),
-    signupView(c.env),
+  const now = Date.now();
+  const [list, plus, signups, found, identity, history, traffic, releases] = await Promise.all([
+    need.accounts ? accounts.listAccounts() : [],
+    need.links ? accounts.listPlusLinks() : { links: [], uses: [] },
+    need.signups ? signupView(c.env) : null,
     isEmail ? signupsByEmail(c.env, query) : [],
     isEmail ? accounts.resolveIdentity("email", query) : null,
+    need.history ? accounts.listMetricDays(dayKey(now - (SERIES_DAYS + 7) * 86_400_000)) : [],
+    need.traffic ? trafficView(c.env) : { state: "off" as const },
+    need.releases ? macReleases(c.env) : [],
   ]);
-  const html = renderAdmin({
-    admin: c.get("email"), accounts: list, links: plus.links, uses: plus.uses, signups, query,
-    emailSignups: found, emailUserId: identity?.userId ?? null, newUrl: opts.newUrl, error: opts.error, now: Date.now(),
-  });
-  return new Response(html, { status: opts.error ? 400 : 200, headers: PAGE_HEADERS });
+  const view: AdminView = {
+    admin: c.get("email"), accounts: list, links: plus.links, uses: plus.uses, signups, query, history, traffic, releases,
+    emailSignups: found, emailUserId: identity?.userId ?? null, newUrl: opts.newUrl, error: opts.error, now,
+  };
+  return new Response(renderAdmin(page, view), { status: opts.error ? 400 : 200, headers: PAGE_HEADERS });
 }
 
-admin.get("/", (c) => renderPage(c));
+for (const p of ADMIN_PAGES) admin.get(p.path || "/", (c) => renderPage(c, p.id));
 
 // A search is a POST so an email address never lands in a URL or a log.
-admin.post("/search", async (c) => renderPage(c, { query: String((await c.req.parseBody()).q ?? "") }));
+admin.post("/search", async (c) => renderPage(c, "accounts", { query: String((await c.req.parseBody()).q ?? "") }));
 
 admin.get("/signups.csv", async (c) => {
   const csv = await signupsCsv(c.env);
@@ -74,28 +94,35 @@ admin.get("/signups.csv", async (c) => {
   });
 });
 
-const back = (c: Ctx) => c.redirect("/admin", 303);
+const back = (c: Ctx, page: AdminPage = "overview") =>
+  c.redirect(`/admin${ADMIN_PAGES.find((p) => p.id === page)!.path}`, 303);
 
 admin.post("/refresh", async (c) => {
   await sweepAccounts(c.env, 60_000);
-  return back(c);
+  await Promise.all([recordMetrics(c.env), forgetTraffic(c.env)]);
+  const page = String((await c.req.parseBody()).back ?? "");
+  return back(c, ADMIN_PAGES.some((p) => p.id === page) ? page as AdminPage : "overview");
 });
+
+const zPlan = z.enum(["plus", "pro"]);
+const zMonths = z.literal("forever").transform(() => null).or(z.coerce.number().int().min(1).max(PLUS_LINK_MAX_MONTHS));
 
 const zLink = z.object({
   label: z.string().trim().min(1).max(60),
-  months: z.literal("forever").transform(() => null).or(z.coerce.number().int().min(1).max(PLUS_LINK_MAX_MONTHS)),
+  plan: zPlan,
+  months: zMonths,
   maxUses: z.coerce.number().int().min(1).max(PLUS_LINK_MAX_USES),
 });
 
 admin.post("/links", async (c) => {
   const input = zLink.safeParse(await c.req.parseBody());
-  if (!input.success) return renderPage(c, { error: "A link needs a label (up to 60 characters), a length and a number of people." });
+  if (!input.success) return renderPage(c, "plans", { error: "A link needs a label (up to 60 characters), a plan, a length and a number of people." });
   const made = await createPlusLink(c.env, input.data);
-  return renderPage(c, { newUrl: made?.url });
+  return renderPage(c, "plans", { newUrl: made?.url });
 });
 
 admin.post("/links/:id/close", async (c) =>
-  await accountStoreFor(c.env)?.closePlusLink(c.req.param("id")) ? back(c) : c.notFound());
+  await accountStoreFor(c.env)?.closePlusLink(c.req.param("id")) ? back(c, "plans") : c.notFound());
 
 admin.post("/links/:id/revoke", async (c) => {
   const { who } = await c.req.parseBody();
@@ -103,5 +130,37 @@ admin.post("/links/:id/revoke", async (c) => {
   const users = await revokePlusLink(c.env, c.req.param("id"), who === "all" ? null : who);
   if (!users) return c.notFound();
   await refreshAccounts(c.env, users);
-  return back(c);
+  return back(c, "plans");
+});
+
+/// One account of the index, or null: an id that is not listed gets no store.
+async function knownAccount(c: Ctx): Promise<string | null> {
+  const id = c.req.param("userId") ?? "";
+  if (!USER_ID_RE.test(id)) return null;
+  return await accountStoreFor(c.env)?.hasAccount(id) ? id : null;
+}
+
+/// Gives the account a plan, or changes the one this page gave before.
+admin.post("/accounts/:userId/plan", async (c) => {
+  const userId = await knownAccount(c);
+  const input = z.object({ plan: zPlan, months: zMonths }).safeParse(await c.req.parseBody());
+  if (!userId || !input.success) return c.notFound();
+  const { plan, months } = input.data;
+  const now = Date.now();
+  await storeFor(c.env, userId).putEntitlement(
+    grantRow(ADMIN_GRANT_ID, plan, months === null ? null : addMonths(now, months), "admin page", now), "admin",
+  );
+  logEvent("entitlement_grant", { userId, name: "admin", plan, months });
+  await refreshAccounts(c.env, [userId]);
+  return back(c, "accounts");
+});
+
+/// Takes back the plan this page gave. A link's grant is the link's to end.
+admin.post("/accounts/:userId/plan/end", async (c) => {
+  const userId = await knownAccount(c);
+  if (!userId) return c.notFound();
+  const removed = await storeFor(c.env, userId).deleteEntitlement(ADMIN_GRANT_ID);
+  logEvent("entitlement_grant_revoked", { userId, name: "admin", removed });
+  await refreshAccounts(c.env, [userId]);
+  return back(c, "accounts");
 });

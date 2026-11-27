@@ -1,13 +1,17 @@
 # Sync subscription — spec
 
-**Status:** proposed 2026-11-19. Defaults marked *(default)* stand until mz
+**Status:** built (proposed 2026-11-19; updated 2026-11-26). §10 says what
+ships. The server still runs its limits in log-only mode
+(`ENTITLEMENT_ENFORCE=false`). Defaults marked *(default)* stand until mz
 overrules them in §11.
 **Decisions:** [ADR 0007](adr/0007-septena-is-the-task-app.md),
 [ADR 0002](adr/0002-own-backend-replaces-icloud.md),
 [ADR 0010](adr/0010-free-server-tier-with-limits.md) (free account with
 limits; changes §1, §3, §6, §7 on 2026-11-20),
 [ADR 0023](adr/0023-sync-across-devices-is-plus.md) (free account syncs one
-device; changes §1, §3, §3.2, §4 on 2026-11-22).
+device; changes §1, §3, §3.2, §4 on 2026-11-22),
+[ADR 0059](adr/0059-pro-sells-like-plus.md) (Pro sells like Plus on 2026-11-26),
+[ADR 0060](adr/0060-revenuecat-subscriptions-and-pinned-currencies.md) (RevenueCat across stores and pinned EUR/USD/GBP currencies on 2026-11-26).
 **Builds on:** the backend (`docs/SEPTASK_BACKEND.md`, auth in §7), the
 existing tip jar (`Septena/Shell/Settings/SupportStore.swift`,
 `SeptenaPlus.swift`, `Config/Septena.storekit`).
@@ -53,7 +57,9 @@ with limits, paid lifts the limits.**
 
 ## 3. Free and paid
 
-Three levels at launch, Pro later (ADR 0010, ADR 0023, ADR 0036). An account
+Three levels: Free, Plus and Pro (ADR 0010, ADR 0023, ADR 0036, ADR 0045,
+ADR 0052, ADR 0059). Pro sells like Plus, one level above it in the same
+subscription group (ADR 0059). An account
 adds the server; Plus adds more than one. The earlier rule "the server is paid" is
 replaced. The public rule: **free on one device, Plus on all of them.** The
 paid plan is named **Septena Plus** on every surface.
@@ -114,10 +120,10 @@ it names what the user gets. All copy goes through the humanizer skill.
 |---|---|
 | Second device signs in | The device works locally; one line says Plus syncs every device. Moving the slot to this device is offered too. |
 | History reaches the window edge | A count of older changes, with one tap to Plus. |
-| A task with a file opens on another device | "1 file on your iPhone." Plus syncs files to all devices. |
-| An agent past the count pairs | Replace an agent, or Plus *(not built: ADR 0036, the count only logs)*. |
+| A task with a file opens on another device | On a plan without file sync: "This file is on another device." Plus syncs files to all devices. On Plus or Pro, while the file is on its way: "Files are still syncing between your devices.", with no upsell. |
+| An agent past the count pairs | Replace an agent, or Plus. The server counts agents and only logs for now (ADR 0036, #445). |
 | A free member shares a project | Joining is free; creating a share is the upsell. |
-| Connector write over the abuse cap (500 a day) | The tool returns one line. No nagging inside a conversation. |
+| Connector write over the abuse cap (500 a day) | The tool returns one neutral line: the agent can make changes again tomorrow. No Plus sell: the cap is an abuse cap, not a plan feature (ADR 0036). |
 | Reverse trial ends | One notice listing what changes. No countdown screens. |
 
 Banned: timed nags, badges on paid features, blocked export, modals on
@@ -148,9 +154,11 @@ party. No per-user tracking, no SDKs.
 
 ## 4. Products
 
-- New subscription group on the `com.septena.tasks` record, one level:
-  - `com.septena.tasks.sync.monthly`
-  - `com.septena.tasks.sync.annual`
+- New subscription group on the `com.septena.tasks` record, two levels
+  (ADR 0059):
+  - Pro, the higher level: `com.septena.tasks.sync.pro.monthly`,
+    `com.septena.tasks.sync.pro.annual`
+  - Plus: `com.septena.tasks.sync.monthly`, `com.septena.tasks.sync.annual`
 - No StoreKit introductory offer. The trial is the server-side 14-day reverse
   trial (§3), with no card. Two trials would confuse the paywall. *(default,
   2026-11-22)*
@@ -189,8 +197,9 @@ party. No per-user tracking, no SDKs.
 - Every server path checks the user's **plan** in one place: a Hono
   middleware on `/v1` routes, and the same check in the gateway before it
   reaches the DO. The plan is `plus` when any entitlement row is active,
-  else `free`. `trial` (the reverse trial) is not built yet; it will resolve
-  to the Plus limits.
+  else `free`. `trial` (the reverse trial) resolves to the Plus limits, and an
+  active `pro` row to `pro` (a Pro grant, ADR 0045, or a Pro store product,
+  ADR 0059).
 - **Plan table (ADR 0010).** One table in `backend/` maps each plan to its
   limits: device count, sync mode (live / poll), connected agents, change-log
   window, Recently Deleted window, R2 attachments on/off and quota, connector
@@ -199,8 +208,8 @@ party. No per-user tracking, no SDKs.
   gate read this table. Apps fetch their limits from the server and never
   hardcode them.
 - **Gates read limits, never the plan name.** No code checks `plan == "paid"`.
-  A later tier (Pro, Supporter, Family; see the Starlings doc *Free and paid
-  plans*) is then a new row in the plan table and a new product in the same
+  Pro (ADR 0045, ADR 0059) is such a row. A later tier (Supporter, Family; see the
+  Starlings doc *Free and paid plans*) is then a new row in the plan table and a new product in the same
   subscription group, with no code change at the gates.
 - **Fail closed** on a missing or invalid row, with one exception: grace
   period and billing retry count as active (Apple's own rule).
@@ -213,7 +222,9 @@ row per source of access: `id` (`apple:<originalTransactionId>` or
 `grant:<name>`), `source`, `productId`, `expiresAt` (ms; null = no expiry),
 `originalTransactionId`, `status` (`active` / `grace` / `billing_retry` /
 `expired` / `revoked`), `environment`, `note`, `signedAt`, `updatedAt`. The
-user is on Plus when any row is active. An older Apple payload (`signedDate`)
+user is on Pro when any active row has `plan` = `pro` (a Pro grant, ADR 0045,
+or an App Store row for a Pro product, ADR 0059),
+else on Plus when any row is active. An older Apple payload (`signedDate`)
 never overwrites a newer one. KV `TOKENS` maps `ent-otx:<originalTransactionId>`
 and `ent-aat:<appAccountToken>` to the user, so a webhook finds its user.
 Account deletion removes the rows with the rest of the Durable Object.
@@ -232,11 +243,12 @@ does not cut sync); `grace` until the grace period end + 24 h;
 | `POST /v1/entitlement/device` | bearer | moves the sync slot to the calling device (P1.5, §6.3) |
 | `POST /v1/entitlement/apple` | bearer | body `{signedTransaction, signedRenewalInfo?}`; verifies, checks `appAccountToken`, bundle, environment, product; writes the row |
 | `POST /v1/webhooks/apple` | Apple JWS | App Store Server Notifications V2 `{signedPayload}`; 200 for any verified payload |
-| `POST /v1/admin/grants` | `X-Admin-Token` | body `{userId, name, note?, expiresAt?}`; writes `grant:<name>` |
+| `POST /v1/admin/grants` | `X-Admin-Token` | body `{userId, name, plan?, note?, expiresAt?}`; writes `grant:<name>` |
 | `DELETE /v1/admin/grants/:userId/:name` | `X-Admin-Token` | removes a grant |
 
-Plus links (ADR 0043) are the way to give Plus to people: make one at
-`https://api.septena.app/admin`. A claim writes a `grant:link-…` row. The
+The admin page `https://api.septena.app/admin` gives plans (ADR 0043, ADR
+0045). A link's claim writes a `grant:link-…` row; Give on an account writes
+`grant:admin`. The
 `X-Admin-Token` routes stay for scripts.
 
 The admin routes answer 404 while the `ADMIN_TOKEN` secret is unset.
@@ -319,7 +331,8 @@ Run from `~/Dev/septena/backend` after this code is deployed.
 ### 6.3 Plan table and free-account limits (P1.5, `backend/`)
 
 **Plan table.** `PLAN_TABLE` in `backend/src/entitlement/entitlement.ts`
-maps `free` → `PLAN_LIMITS.account` and `plus` → `PLAN_LIMITS.plus`
+maps `free` → `PLAN_LIMITS.account`, `plus` → `PLAN_LIMITS.plus` and `pro` →
+`PLAN_LIMITS.pro`
 (generated from `registry/plans.json` `limits`; null = no cap).
 `resolvePlan` gives `plus` when any entitlement row is active, else `free`.
 `planFor` reads the rows and the usage counters a gate needs in one call to
@@ -503,64 +516,81 @@ grants for testers; a week of `entitlement_would_block` logs; then
 
 ### 7.1 The paywall
 
-One sheet, **the Plus sheet**, is the only place that sells Plus in the
-app. It opens only from a tap, never on launch and never on a timer.
+One sheet, **the plan sheet** (`SeptaskPlusSheet`), is the only place that
+sells Plus and Pro in the app (ADR 0059). It opens only from a tap, never on
+launch and never on a timer.
 
 **Where it opens from:**
 
-- "See Plus" on an upsell moment (§3.2). The sheet then shows that moment's
-  title as its first line, so the user sees why it opened.
-- "Subscribe" on Settings ▸ Septena Plus (`SeptaskPlusPane`).
+- "See Plus" or "See Pro" on an upsell moment (§3.2), including the full
+  agent list in Settings ▸ AI & Agents ▸ Agents (`agents_full`,
+  `agents_full_plus`).
+- Settings ▸ Septena Plus (`SeptaskPlusPane`): "See Plus" before a plan,
+  "See Pro" on Plus, "Manage Subscription" on Pro or a store subscription
+  with nothing above it.
 - "See Plus" on the trial-end notice.
 
 **Each upsell moment shows once per account.** The "shown" mark syncs with
 the account's other settings, so a second device does not repeat it. After
 that the moment stays as a quiet line where the limit is (the device row,
-the history edge, the file row), never as a new prompt.
+the history edge, the file row, the agent list), never as a new prompt.
 
-**What it looks like** (iPhone; iPad and Mac show the same sheet at form
-size):
+**How it sells (in the order a reader decides):**
+
+1. **Why it opened.** The moment's title and detail come first. With no
+   moment, the plan name and the ladder headline.
+2. **Which plan.** A Plus / Pro picker. The sheet opens on the plan that
+   answers the moment (`upsells[].plan` in `plans.json`). An account on
+   Plus sees only Pro, as an upgrade.
+3. **What changes.** The plan's card line, then its card rows (devices,
+   agents, files, history). A value that differs from the account's plan
+   today is bold in the accent; one that stays the same is quiet. A trial
+   compares with Free, because the trial ends in a free account.
+4. **The price.** StoreKit lists the picked plan's two products, annual
+   first. Under it: cancel at any time, the no-hostage promise, Restore,
+   Terms, Privacy.
 
 ```text
 ┌───────────────────────────────────────┐
-│                                   ✕   │
-│  This device is not syncing           │  ← the moment's title, if any
+│ Not Now                Septena Plus   │
 │                                       │
-│  Septena Plus                         │
-│  Free on one device.                  │
-│  Plus on all of them.                 │
+│  All three agent slots are in use     │  ← the moment: title
+│  Plus connects three agents. Pro …    │    and detail
 │                                       │
-│  ◉  Your list everywhere             │  ← the three outcomes from
-│  ◉  Nothing lost                     │     plans.json, icon + title
-│  ◉  Help that keeps working          │
+│  [   Plus   |▐  Pro  ▌]               │  ← opens on the moment's plan
+│                                       │
+│  ◉ With Pro                           │
+│    For people who run many agents …   │
+│  Devices        All your devices      │  ← quiet: same as today
+│  Agents                 No limit      │  ← bold accent: what changes
+│  Files              50 GB synced      │
+│  History                365 days      │
 │                                       │
 │  ┌─────────────────────────────────┐  │
-│  │ ● €60 a year    €5 a month      │  │  ← highlighted price first
-│  │   You save €24                  │  │
-│  ├─────────────────────────────────┤  │
-│  │ ○ €7 a month                    │  │
+│  │ ● €120 a year                   │  │  ← StoreKit, the picked plan
+│  │ ○ €14 a month                   │  │
 │  └─────────────────────────────────┘  │
-│  [          Subscribe            ]    │
-│                                       │
-│  Cancel any time in Settings.         │
+│  [            Subscribe            ]  │
+│  Cancel at any time in Settings.      │
+│  We never hold your data back         │
 │  Restore Purchases · Terms · Privacy  │
 └───────────────────────────────────────┘
 ```
 
 **How it is built (standard StoreKit, no custom store UI):**
 
-- `SubscriptionStoreView(groupID:)` with a marketing header view. StoreKit
-  draws the products, the localized prices and periods, the purchase
-  button, Restore Purchases, and the Terms and Privacy links that App
-  Review requires.
-- `.subscriptionStoreControlStyle(.picker)`, annual first and selected.
-- Every purchase carries `appAccountToken` (§5). The header text, the
-  outcomes and every label come from `registry/plans.json` (a new
-  `paywall` block), so the site, iOS, Mac and Android say the same words.
-  Copy goes through the humanizer skill.
-- The Mac sells through the Mac App Store (ADR 0026), with the same
-  sheet in the settings window. Manage Subscription opens the App Store's
-  subscriptions page.
+- `SubscriptionStoreView(productIDs:)` for the picked plan, with the pitch
+  as its marketing header, rebuilt when the plan changes. Plus and Pro are
+  two levels of one subscription group (Pro level 1, Plus level 2), so the
+  App Store handles upgrade, downgrade and proration.
+- `.subscriptionStoreControlStyle(.picker)`. Every purchase carries
+  `appAccountToken` (§5). Every word comes from `registry/plans.json`
+  (`paywall`, `upsells`, `cards`, `cardRows`), so the site and every app
+  say the same words. Copy goes through the humanizer skill.
+- The Mac App Store build sells with the same sheet. The Mac download build
+  (Developer ID, Sparkle) has no App Store receipt: it never shows the
+  store, it says to buy in the App Store version and that the plan turns
+  on at sign-in (`PlusStore.isDirectDownload`, #683).
 - The sheet reads `PlanStatus` and the entitlement source. It never decides
   the plan itself.
 
@@ -568,12 +598,13 @@ size):
 
 | State | Main action | Notes |
 |---|---|---|
-| No account | "Try Plus free for 14 days" (Sign in with Apple) | No prices to buy yet. Signing in starts the reverse trial, and the sheet shows "Plus is on until {date}". The prices show below as information. |
-| Trial | Subscribe | The first line reads "Plus trial until {date}". A purchase now starts billing today; the sheet says so above the button. |
+| No account | "Try Plus free for 14 days" (Sign in) | The pitch and the picked plan's prices show as information. Signing in starts the reverse trial. |
+| Trial | Subscribe | "Plus is on until {date}"; a purchase now starts billing today, and the sheet says so. |
 | Free account | Subscribe | The standard sheet. |
 | Lapsed (was Plus) | Subscribe | The title reads "Welcome back". |
-| Plus through Apple | Manage Subscription (`.manageSubscriptionsSheet`) | No prices. |
-| Plus through another source | None | One line: "Plus through the web. Manage it at septena.app." or "...through Google Play". No Apple button (ADR 0026). |
+| Plus through Apple or a grant | Subscribe to Pro | Only Pro. Through Apple, one line says Pro starts at once and the App Store refunds the unused Plus. |
+| Plus through Google Play or the web | None | The owned line, and "change your plan in the store where you bought Plus" (ADR 0026: never two purchases). |
+| Pro | Manage Subscription | No prices. |
 
 **After the purchase:**
 
@@ -603,21 +634,37 @@ Keep the cosmetic supporter finish only if a subscriber gets it. The
 Connect, so nothing breaks. Septena Life may keep the tip jar until it moves
 to the backend.
 
-## 9. Other platforms
+## 9. Other platforms, RevenueCat and currencies
 
-Decided in ADR 0026 (2026-11-22). One account, one Plus, bought on any
-store, valid on every device.
+Decided in ADR 0026 (2026-11-22) and amended in ADR 0060 (2026-11-26). One
+account, one subscription (Plus or Pro, ADR 0059), bought on any store, valid
+on every device.
 
-- **Web and Windows:** Stripe Checkout in subscription mode, the Stripe
-  customer portal to manage it, Stripe webhooks to write the `stripe` row.
-  Stripe Tax calculates VAT; Envisioning Technology files EU VAT through the
-  One Stop Shop. Windows ships outside the Microsoft Store first and opens
-  the checkout in the browser.
-- **Android:** Google Play Billing in the Play Store build, a new `google`
-  source, verified through the Play Developer API and real-time developer
-  notifications.
-- **No double payment:** an account on Plus from any source sees no buy
-  button anywhere, only where to manage it.
+- **Subscription backend (ADR 0060):** Standardize on **RevenueCat** (free up
+  to $2,500 USD MTR, 1% above) across Apple App Store, Google Play and
+  Web/Windows (Stripe / RevenueCat Web Billing). Every purchase maps to the
+  Septena backend user id (`u_…`) as `app_user_id`. RevenueCat webhooks sync
+  entitlement rows into the user's Durable Object `entitlements` table so the
+  plan table and every server gate stay unchanged; the P0 direct Apple JWS
+  verifier (`backend/src/entitlement/appleJws.ts`) is superseded once
+  RevenueCat integration ships. Task data and sync traffic never touch
+  RevenueCat.
+- **Currencies (ADR 0060):** EUR is the baseline. Top markets are pinned to
+  clean `.00` prices on App Store Connect, Google Play and Web/Windows
+  checkout; all other store storefronts auto-equalize from the EUR base:
+  - **Plus:** `€7 / €60` (incl. VAT), `$7 / $60` (+ applicable tax), `£6 / £50` (incl. VAT), `R$ 29 / R$ 240` (BRL PPP, incl. taxes)
+  - **Pro:** `€14 / €120` (incl. VAT), `$14 / $120` (+ applicable tax), `£12 / £100` (incl. VAT), `R$ 58 / R$ 480` (BRL PPP, incl. taxes)
+  - **Web & Windows:** Fixed EUR, USD, GBP and BRL prices matching the pinned
+    store numbers (no dynamic FX conversion on subscriptions). Stripe Tax
+    calculates VAT; Envisioning Technology files EU VAT through the One Stop
+    Shop.
+  - **Pricing page (`/pricing` and home plan cards):** Geo-defaults to EUR,
+    USD, GBP or BRL via `/api/geo` (`CF-IPCountry`) with a quiet inline
+    currency switcher above the plan cards and currency-aware tax footnotes.
+  - **Annual price lock:** Locked in purchase currency within the same store;
+    protects Septena's subscription price tier, excluding statutory tax changes.
+- **No double payment:** an account on Plus or Pro from any source sees no buy
+  button for the same tier anywhere, only where to manage it.
 - **No checkout link out of a store app** at launch, on iOS or Android.
 
 ## 10. Phases
@@ -645,10 +692,12 @@ task's history (`/v1/changes` sends `upsell: "history_edge"` only on the
 free plan with hidden rows). The sheet adds "Sync This Device" for
 `second_device` (`POST /v1/entitlement/device`), and Settings ▸ Septena
 Plus keeps that line after the notice is gone. "Once per account" is the
-synced setting `upsellsSeen`. Not built: `file_elsewhere` (the app drops
-`uploadedAt` on attachments, so it cannot tell bytes elsewhere from bytes
-not yet downloaded), the agent count and `connector_cap` (#269),
-`share_create` (no sharing yet). The App Store Connect products do
+synced setting `upsellsSeen`. `file_elsewhere` shows in a task's
+attachments on a plan without file sync; on Plus or Pro the same row shows a
+neutral syncing line. `share_create` is the 402 line when a free account
+creates a shared project. `connector_cap` is the MCP tool's neutral line at
+the abuse cap. The connected-agent count only logs on the server for now (#445).
+The App Store Connect products do
 not exist yet; `checkout.open` stays false until they do. The Mac sells
 once its release moves to the Mac App Store (ADR 0026).
 
@@ -659,8 +708,8 @@ before any public release that uses the backend.
 
 | Question | Default |
 |---|---|
-| Monthly and annual price | Decided 2026-11-19: €5 / €40. Raised 2026-11-22 to €7 / €60 |
-| Web payment provider | Decided 2026-11-22: Stripe, not a merchant of record (ADR 0026) |
+| Monthly and annual price | Decided 2026-11-19: €5 / €40. Raised 2026-11-22 to €7 / €60. Pro added 2026-11-26 at €14 / €120 (ADR 0059). Currencies pinned 2026-11-26: EUR €7/€60, USD $7/$60, GBP £6/£50 (Pro 2×), rest auto-equalized from EUR (ADR 0060) |
+| Web payment provider & subscription backend | Decided 2026-11-22: Stripe, not a merchant of record (ADR 0026). Amended 2026-11-26: standardize on RevenueCat across Apple, Google Play and Web/Stripe, with fixed EUR/USD/GBP on web (ADR 0060) |
 | Subscribing during the trial | Default 2026-11-22: billing starts on the day of purchase; the sheet says so (§7.1) |
 | Terms of Use | Default: Apple's standard EULA, linked from the paywall and the App Store listing |
 | Trial length | Decided 2026-11-19: 14 days |

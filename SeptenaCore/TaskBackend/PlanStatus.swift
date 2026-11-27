@@ -19,8 +19,12 @@ struct BackendEntitlement: Decodable, Sendable {
     let expiresAt: Double?
     let status: String
     let active: Bool
+    /// The plan the row gives; nil means Plus (ADR 0045).
+    let plan: String?
   }
   let active: Bool
+  /// The plan the account is on: `free`, `plus` or `pro`.
+  let plan: String?
   let entitlements: [Row]
   /// The token every App Store purchase carries (spec §5). Optional so an
   /// older server answer still decodes.
@@ -77,6 +81,9 @@ final class PlanStatus {
   /// nil until the first answer from the server. Views show nothing for an
   /// unknown plan rather than guess.
   private(set) var plan: Plan?
+  /// The account is on Pro (ADR 0045). Pro has every Plus limit or more, so
+  /// `plan` is `.plus` and `isPlus` is true too. Only the words differ.
+  private(set) var isPro = false
   private(set) var lastError: String?
   /// From the last answer. Purchases need it; nil until the first read.
   private(set) var appAccountToken: UUID?
@@ -101,6 +108,11 @@ final class PlanStatus {
   /// This Apple ID holds a verified Plus entitlement whose `appAccountToken`
   /// belongs to another Septena account (spec §6.4 finding 7).
   private(set) var plusOwnedByAnotherAccount = false
+  /// The account holds an active App Store subscription. It can also hold a
+  /// grant (a Pro grant on top of a paid Plus, ADR 0045), and then `plan`
+  /// names the grant. The subscription still renews, so Manage Subscription
+  /// must stay reachable.
+  private(set) var hasAppleSubscription = false
 
   private init() {}
 
@@ -111,6 +123,40 @@ final class PlanStatus {
     default: return false
     }
   }
+
+  /// Given by hand, so there is no subscription to manage.
+  var isGranted: Bool {
+    if case .plus(_, "grant") = plan { return true }
+    return false
+  }
+
+  /// The plan pane shows its button: the account is on a plan that was
+  /// bought, it still pays for an App Store subscription under a grant, or a
+  /// Plus grant can move up to Pro (ADR 0059).
+  var showsPlanButton: Bool {
+    plan != nil && (!isGranted || hasAppleSubscription || !isPro)
+  }
+
+  /// The account pays an App Store subscription that is active now.
+  nonisolated static func hasAppleSubscription(_ answer: BackendEntitlement) -> Bool {
+    answer.entitlements.contains { $0.active && $0.source == "apple" }
+  }
+
+  /// The account has file sync in its plan: Plus, Pro, the trial, or a server
+  /// limit that gives storage. Unknown (nil plan) counts as no answer yet.
+  var fileSyncInPlan: Bool? {
+    guard plan != nil else { return nil }
+    if isPlus { return true }
+    if let gb = limits?.attachmentsGB { return gb > 0 }
+    return false
+  }
+
+  /// The file-sync Plus upsell applies: the plan is known and has no file sync.
+  var showsFileSyncUpsell: Bool { fileSyncInPlan == false }
+
+  /// The name of the plan page and its Settings row: Plus is the offer, and an
+  /// account on Pro sees its own plan.
+  var title: String { isPro ? RegistryPlans.proCard.title : RegistryPlans.name }
 
   /// The account may buy Plus here: signed in, not already paying from
   /// any source, and this Apple ID does not already hold Plus for another
@@ -148,8 +194,10 @@ final class PlanStatus {
     case .device: return RegistryPlans.Status.device
     case .free: return RegistryPlans.Status.free
     case .trial(let end): return RegistryPlans.Status.trialEnds(date: Self.day(end))
-    case .plus(let through?, _): return RegistryPlans.Status.paidThrough(date: Self.day(through))
-    case .plus(nil, _): return RegistryPlans.Status.plus
+    case .plus(let through?, _):
+      let date = Self.day(through)
+      return isPro ? RegistryPlans.Status.proThrough(date: date) : RegistryPlans.Status.paidThrough(date: date)
+    case .plus(nil, _): return isPro ? RegistryPlans.proName : RegistryPlans.Status.plus
     case nil: return nil
     }
   }
@@ -165,6 +213,7 @@ final class PlanStatus {
     defer { if noticeInputs != before { NotificationCenter.default.post(name: .septenaTasksChanged, object: nil) } }
     guard TaskBackendClient.hasSession else {
       plan = .device
+      isPro = false
       appAccountToken = nil
       lastError = nil
       enforced = false
@@ -174,17 +223,20 @@ final class PlanStatus {
       syncThisDeviceLimitMessage = nil
       trialEnded = false
       plusOwnedByAnotherAccount = false
+      hasAppleSubscription = false
       return
     }
     do {
       let answer = try await TaskBackendClient.shared.entitlement()
       plan = Self.plan(from: answer)
+      isPro = answer.plan == "pro"
       appAccountToken = answer.appAccountToken.flatMap(UUID.init(uuidString:))
       enforced = answer.enforced ?? false
       limits = answer.limits
       deviceSyncing = answer.device?.syncing ?? true
       serverBlockedDevice = false
       trialEnded = Self.trialEnded(answer)
+      hasAppleSubscription = Self.hasAppleSubscription(answer)
       lastError = nil
       TaskSyncEngine.shared.applyPlanStatus(
         deviceNotSyncing: deviceNotSyncing,
@@ -285,7 +337,8 @@ final class PlanStatus {
     guard answer.active, !live.isEmpty else {
       return .free(lapsed: answer.entitlements.contains { $0.source != "trial" })
     }
-    let paid = live.filter { $0.source != "trial" }
+    // The words name the plan the account is on, so its rows give the date.
+    let paid = live.filter { answer.plan == "pro" ? $0.plan == "pro" : $0.source != "trial" }
     guard let first = paid.first else {
       // Only the trial is active. The server reports its end; fall back to
       // the row's expiry for an older server.

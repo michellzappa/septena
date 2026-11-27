@@ -18,6 +18,9 @@ extension NSPasteboard.PasteboardType {
   /// so smart lists can only reorder within their own top cluster and never mix
   /// with areas or projects below.
   static let septaskSmartListItem = NSPasteboard.PasteboardType("com.septena.septask.smart-list-item")
+  /// Dragged Magic Plus button from the sidebar footer — drops a new Area (at
+  /// area level) or a new Project (inside an area or loose projects zone).
+  static let septaskMagicPlus = NSPasteboard.PasteboardType("com.septena.septask.magic-plus")
 }
 
 /// Shared by the list (reorder/re-file drops) and the sidebar (file/schedule
@@ -56,6 +59,7 @@ enum KitDrag {
 //   Return, ⌘↩, click-away, a list change and window close all SAVE and
 //   close. ⌘Z undoes the save (`TaskUndo`). Nothing discards typed text.
 //   ⌘↑ / ⌘↓ — move the selected task(s) one slot (manual-order lists only)
+//   ⌘J — Do the selected task (docs/DO_SPEC.md)
 //   ⌘⌫ — delete (soft; lands in Recently Deleted)
 //   ⌥⌘M — file into the suggested list (the "→ Suggested" capsule's pick)
 //   Space — deliberately unbound (the "Space completes the task" trap);
@@ -97,7 +101,7 @@ final class SeptaskKitTaskListController: NSViewController {
   /// `key` is the stable identity the animated diff runs on.
   private enum Row: Equatable {
     case header(id: String, title: String, icon: GroupIcon, count: Int)
-    case screenTitle(title: String, icon: GroupIcon)
+    case screenTitle(title: String, icon: GroupIcon, share: ProjectShare? = nil)
     case logbookBar(tab: LogbookTab, deletedCount: Int, showsSegmented: Bool, canEmptyTrash: Bool)
     case tagFilterBar(tags: [TaskTag], active: [String])
     case projectTarget(id: String, title: String, progress: Double, count: Int)
@@ -124,6 +128,9 @@ final class SeptaskKitTaskListController: NSViewController {
     /// Return, ⌘K, type-select, right-click) that is never a task. Every task
     /// command reads `task`, which is nil here, so it does nothing.
     case noticeStep(TaskNoticeStep)
+    /// A Do line on top of every list: the notice, the stale question or the
+    /// line after an exit (`KitDoNotice`). A press offers its actions.
+    case doNotice(KitDoNotice)
     /// An agent's proposed brief update, rendered directly above the notes row
     /// (`KitNotesProposalCell`, ADR 0012, #123). Not selectable.
     case notesProposal(isArea: Bool, id: String, currentNotes: String, proposal: NotesProposal)
@@ -147,6 +154,7 @@ final class SeptaskKitTaskListController: NSViewController {
       case .reminder(let item, _): return "reminder:" + item.id
       case .notice(let notice): return "notice:" + notice.id.rawValue
       case .noticeStep(let step): return step.selectionID
+      case .doNotice(let notice): return notice.key
       case .importAllReminders: return "import-all-reminders"
       case .notesProposal: return "notes-proposal"
       case .containerNotes: return "container-notes"
@@ -171,12 +179,18 @@ final class SeptaskKitTaskListController: NSViewController {
       return nil
     }
 
+    var doNotice: KitDoNotice? {
+      if case .doNotice(let notice) = self { return notice }
+      return nil
+    }
+
     /// Rows that draw on a card (tasks and events), vs. headers on the page.
     /// Project section headings sit BETWEEN cards (SwiftUI's `headingRow`),
     /// so they break the card run the same way a Today area/project header does.
     var isCardRow: Bool {
       switch self {
-      case .header, .screenTitle, .logbookBar, .tagFilterBar, .fadedFooter, .loggedFooter, .notesProposal, .containerNotes: return false
+      case .header, .screenTitle, .logbookBar, .tagFilterBar, .fadedFooter, .loggedFooter, .notesProposal, .containerNotes,
+           .doNotice: return false
       // A standalone notice sits on the page with its own card fill. A notice
       // with checklist steps (`Get started`) heads its steps' card so the
       // header and rows share one seamless frosted surface (matching iOS).
@@ -215,6 +229,10 @@ final class SeptaskKitTaskListController: NSViewController {
   /// A ⌘N row whose first title is still being typed — abandoned (empty on
   /// commit) it's purged, so escaping a fresh row leaves nothing behind.
   private var pendingNewTaskId: String?
+  /// The new-task draft drawn at the foot of Today because the Inbox was
+  /// empty when it opened (#708). It stays at the foot until it closes, so an
+  /// item that arrives mid-capture never moves the live editor.
+  private var todayFootDraftId: String?
   /// True while the rolled-back-save sheet is on screen, so a run of failures
   /// raises one report instead of one sheet per failed write.
   private var storeHealthSheetUp = false
@@ -500,8 +518,10 @@ final class SeptaskKitTaskListController: NSViewController {
     tableView.delegate = self
     tableView.target = self
     tableView.doubleAction = #selector(beginEditFromDoubleClick)
-    tableView.onToggleComplete = { [weak self] in self?.toggleCompleteSelection() }
+    tableView.onToggleComplete = { [weak self] in self?.toggleCompleteSelection(fromKeyboard: true) }
+    tableView.onCancel = { [weak self] in self?.cancelSelection() }
     tableView.onToggleToday = { [weak self] in self?.toggleTodaySelection() }
+    tableView.onDo = { [weak self] in self?.startDo() }
     tableView.onBeginEdit = { [weak self] in self?.beginEditSelectedRow() }
     tableView.onCommitEditing = { [weak self] in self?.commitComposerEditing() }
     tableView.onOpenNotes = { [weak self] in self?.beginComposingSelectedRowInNotes() }
@@ -591,7 +611,7 @@ final class SeptaskKitTaskListController: NSViewController {
         menu = self.buildHeadingContextMenu()
       } else if self.showingRecentlyDeleted {
         menu = self.buildRecentlyDeletedMenu()
-      } else if self.filter == .faded || (self.rows[row].task?.isFaded == true) {
+      } else if self.rows[row].task?.isFaded == true {
         menu = self.buildFadedMenu()
       } else {
         menu = self.buildContextMenu()
@@ -746,6 +766,17 @@ final class SeptaskKitTaskListController: NSViewController {
     ) { [weak self] _ in
       MainActor.assumeIsolated { self?.refreshViewOptions() }
     })
+    // The current Do, and its minute (SeptaskKitDo.swift).
+    observers.append(NotificationCenter.default.addObserver(
+      forName: SeptaskKitDo.changed, object: nil, queue: .main
+    ) { [weak self] _ in
+      MainActor.assumeIsolated { self?.scheduleReload(locallyChanged: []) }
+    })
+    observers.append(NotificationCenter.default.addObserver(
+      forName: SeptaskKitDo.ticked, object: nil, queue: .main
+    ) { [weak self] _ in
+      MainActor.assumeIsolated { self?.refreshDoTime() }
+    })
     // Pending Apple Reminders. `.EKEventStoreChanged` fires for every edit in
     // every list, so `refreshReminders` compares the resulting set and only
     // reloads when the mirrored list actually moved.
@@ -823,6 +854,21 @@ final class SeptaskKitTaskListController: NSViewController {
   private var unfoldedNotes = Set<String>()
   /// The table width the notes row was last measured at.
   private var notesRowMeasuredWidth: CGFloat = 0
+  /// The width the notes cell reported it draws at, when that differs from
+  /// the table's. Cleared when the table width moves.
+  private var notesCellWidth: CGFloat?
+
+  /// The notes cell found its row too short or too tall for its text (long
+  /// notes ran under the task card, 2026-11-26). Measure again at the width
+  /// the cell draws at.
+  private func remeasureNotesRow(id: String, cellWidth: CGFloat) {
+    guard let row = rows.firstIndex(where: {
+      if case .containerNotes(_, id, _) = $0 { return true }
+      return false
+    }), row < tableView.numberOfRows else { return }
+    notesCellWidth = cellWidth
+    tableView.noteHeightOfRows(withIndexesChanged: [row])
+  }
 
   /// The notes row wraps, so its height depends on the width: re-note it when
   /// the width moves. Guarded on a real change, for the same re-entry reason
@@ -831,6 +877,7 @@ final class SeptaskKitTaskListController: NSViewController {
     let width = tableView.bounds.width
     guard abs(width - notesRowMeasuredWidth) > 0.5 else { return }
     notesRowMeasuredWidth = width
+    notesCellWidth = nil
     let indexes = IndexSet(rows.indices.filter { idx in
       guard idx < tableView.numberOfRows else { return false }
       switch rows[idx] {
@@ -1164,7 +1211,8 @@ final class SeptaskKitTaskListController: NSViewController {
     let tagBarRows: [Row] = listTags.isEmpty
       ? []
       : [.tagFilterBar(tags: listTags, active: Array(activeTagFilterIDs).sorted())]
-    let titleRows: [Row] = (screenTitleRow().map { [$0] } ?? []) + logbookBarRows + tagBarRows
+    let doRows = KitDoNotice.current().map(Row.doNotice)
+    let titleRows: [Row] = (screenTitleRow().map { [$0] } ?? []) + doRows + logbookBarRows + tagBarRows
     var newRows: [Row]
     loggedClearIDs = []
     switch filter {
@@ -1207,8 +1255,8 @@ final class SeptaskKitTaskListController: NSViewController {
         + todayLoggedRows()
     case .upcoming:
       newRows = titleRows + upcomingBuckets(pool)
-    case .agent:
-      newRows = titleRows + agentStageRows(pool)
+    case .review:
+      newRows = titleRows + reviewGroupRows(pool)
     case .unscheduled, .starred:
       newRows = titleRows + groupedByList(pool)
     case .project, .area:
@@ -1274,12 +1322,6 @@ final class SeptaskKitTaskListController: NSViewController {
         // Already most-recent-first from LocalCache; cap what one screen needs.
         newRows = titleRows + pool.prefix(200).map(chipped)
       }
-    case .faded:
-      var fadedRows = titleRows
-      if !pool.isEmpty {
-        fadedRows.append(.notice(TaskNotices.fadedPile))
-      }
-      newRows = fadedRows + pool.map(chipped)
     default:
       newRows = titleRows + pool.map(chipped)
     }
@@ -1309,7 +1351,11 @@ final class SeptaskKitTaskListController: NSViewController {
     let priorRows = rows
     let live = liveEditorIDs
     var nextRows = pinned(newRows, liveEditors: live)
-    let currentInboxIDs = visibleInboxIDs(in: nextRows)
+    // An empty Inbox draws no band (#708). A draft opened into an empty Inbox
+    // sits at the foot of Today's own list instead.
+    let footDraftId = filter == .today ? moveDraftToTodayFoot(&nextRows) : nil
+    var currentInboxIDs = visibleInboxIDs(in: nextRows)
+    if let footDraftId { currentInboxIDs.remove(footDraftId) }
     if filter == .today,
        let headerIndex = nextRows.firstIndex(where: {
          if case .header(let id, _, _, _) = $0 { return id == "inbox" }
@@ -1336,11 +1382,19 @@ final class SeptaskKitTaskListController: NSViewController {
     )
     let preserveInboxHeader = inboxZeroOutcome.playVisualMotion
       || inboxZeroTracker.phase == .checkmark
+    // The Inbox header goes with its last item. The inbox-zero checkmark keeps
+    // it on screen until the motion ends; the hold's end reloads to drop it.
+    if filter == .today, currentInboxIDs.isEmpty, !preserveInboxHeader {
+      nextRows.removeAll {
+        if case .header(let id, _, _, _) = $0 { return id == "inbox" }
+        return false
+      }
+    }
     apply(nextRows, animated: animated, preserving: live, preserveInboxHeader: preserveInboxHeader)
     applyInboxZeroOutcome(inboxZeroOutcome, inboxCount: currentInboxIDs.count)
     let hasContent = rows.contains { row in
       switch row {
-      case .screenTitle, .logbookBar: return false
+      case .screenTitle, .logbookBar, .doNotice: return false
       default: return true
       }
     }
@@ -1635,13 +1689,76 @@ final class SeptaskKitTaskListController: NSViewController {
   /// Return on the selected notice both run this.
   private func noticePrimaryAction(_ id: TaskNotice.ID) -> (() -> Void)? {
     switch id {
-    case .signIn: return { SeptaskAppKitSignIn.shared.start() }
+    case .signIn: return { SeptaskSignInWindow.present() }
     case .weeklySweep: return { [weak self] in self?.presentWeeklySweepSheet() }
     case .trialEnd, .secondDevice:
       guard let upsell = RegistryNotices.byId[id.registryID]?.upsellId else { return nil }
       return { [weak self] in self?.presentPlusSheet(upsellID: upsell) }
     default: return nil
     }
+  }
+
+  // MARK: - Do (docs/DO_SPEC.md §4.1, §5)
+
+  /// The one selected task a Do can start on.
+  var startableTask: SeptenaTask? {
+    let selection = actionableSelection
+    guard selection.count == 1, let task = selection.first, task.status == .open,
+          task.deletedAt == nil else { return nil }
+    return task
+  }
+
+  /// ⌘J, the row menu and Task ▸ Do. A Do that was open ends, with no dialog.
+  func startDo() {
+    commitComposerTextIfOpen()
+    guard let task = startableTask else { NSSound.beep(); return }
+    SeptaskKitDo.shared.begin(taskID: task.id)
+  }
+
+  /// Done on a Do: the checkbox's own path.
+  func completeDoing(_ task: SeptenaTask) {
+    apply(completing: [task], reopening: [])
+  }
+
+  /// Later on a Do: the When popover for its task. Only a saved date ends the
+  /// Do. With no anchor it hangs off the notice, or off the top of the list.
+  func presentDoLater(_ doing: DoState, anchor: KitSurfaceAnchor? = nil) {
+    guard let task = LocalCache.task(id: doing.taskID, in: context) else { return }
+    presentDatePopover(kind: .when, anchor: anchor ?? doNoticeAnchor, tasks: [task]) {
+      DoStore.shared.endForLater(sessionID: doing.sessionID)
+    }
+  }
+
+  private var doNoticeAnchor: KitSurfaceAnchor {
+    guard let row = rows.firstIndex(where: { $0.doNotice?.state != nil }) else {
+      return .rect(NSRect(x: view.bounds.midX, y: view.bounds.maxY - view.safeAreaInsets.top,
+                          width: 1, height: 1), view)
+    }
+    tableView.scrollRowToVisible(row)
+    return .rect(tableView.rect(ofRow: row), tableView)
+  }
+
+  private func pressDoNotice(_ key: String) {
+    guard let row = rows.firstIndex(where: { $0.key == key }),
+          let notice = rows[row].doNotice else { return }
+    guard let doing = notice.state else {
+      SeptaskKitDo.shared.clearRequests()
+      onNavigate?(.filter(.review, title: TaskFilter.review.title))
+      return
+    }
+    let rect = tableView.rect(ofRow: row)
+    let inset = SeptaskKitLayout.inset(for: rect.width) + SeptaskKitLayout.rowLeadingPad
+    SeptaskKitDo.shared.menu(for: doing)
+      .popUp(positioning: nil, at: NSPoint(x: rect.minX + inset, y: rect.midY), in: tableView)
+  }
+
+  /// A new minute: only the notice row changes, so no reload.
+  private func refreshDoTime() {
+    guard let row = rows.firstIndex(where: { $0.doNotice?.state != nil }),
+          let notice = KitDoNotice.current().first(where: { $0.state != nil }),
+          rows[row] != .doNotice(notice) else { return }
+    rows[row] = .doNotice(notice)
+    tableView.reloadData(forRowIndexes: [row], columnIndexes: [0])
   }
 
   /// The Plus sheet for an upsell moment (spec §3.2, §7.1). Opening it from
@@ -1825,6 +1942,7 @@ final class SeptaskKitTaskListController: NSViewController {
                         deadline: pair.view.dueDate,
                         notes: pair.view.notes).id]
       })
+    showRemindersImported(ids: [created.id])
     reload()
   }
 
@@ -1854,16 +1972,27 @@ final class SeptaskKitTaskListController: NSViewController {
                          notes: pair.view.notes).id
         }
       })
+    showRemindersImported(ids: createdIDs)
     reload()
+  }
+
+  /// One done line after a Reminders import, with Undo. Same words and the
+  /// same ticket pattern as the SwiftUI Inbox (`RemindersInboxSection`).
+  private func showRemindersImported(ids: [String]) {
+    guard !ids.isEmpty else { return }
+    let ticket = TaskUndoTicket()
+    toastStore.show(RegistryToasts.importedReminders(count: ids.count)) { [weak self, mutator] in
+      ticket.undo { for id in ids { mutator.delete(id: id) } }
+      self?.reload()
+    }
   }
 
   /// The Inbox — every unratified row, whatever its source: pending Apple
   /// Reminders first, then agent proposals and loose captures.
   ///
-  /// Rendered even when empty: the Inbox header carries the `+`, so it is the
-  /// capture slot whether or not anything sits in it. Matches
-  /// `TaskListView.triageSection`, which shows the section whenever
-  /// `allowsInlineCreate` regardless of row count.
+  /// Built with its header even when empty; `reload` drops the header when no
+  /// Inbox row is visible and no inbox-zero checkmark is playing, so an empty
+  /// Inbox draws no band (#708). Matches `TaskListView.triageSection`.
   private func triageBand(_ rawBand: [SeptenaTask]) -> [Row] {
     let band = activeTagFilterIDs.isEmpty
       ? rawBand
@@ -1879,6 +2008,33 @@ final class SeptaskKitTaskListController: NSViewController {
                     count: count)]
       + reminders
       + band.map(chipped)
+  }
+
+  /// Moves the open new-task draft from the Inbox run to the foot of Today's
+  /// own list (above the logged block) when no other Inbox row is visible, or
+  /// when the draft already sits there. Returns the draft's id when it moved.
+  /// Same placement as `TaskListView`'s Today foot quick-add (#708).
+  private func moveDraftToTodayFoot(_ candidateRows: inout [Row]) -> String? {
+    guard let draftId = pendingNewTaskId else {
+      todayFootDraftId = nil
+      return nil
+    }
+    let inboxIDs = visibleInboxIDs(in: candidateRows)
+    guard inboxIDs.contains(draftId),
+          todayFootDraftId == draftId || inboxIDs == [draftId],
+          let from = candidateRows.firstIndex(where: { $0.task?.id == draftId })
+    else {
+      todayFootDraftId = nil
+      return nil
+    }
+    let draft = candidateRows.remove(at: from)
+    let foot = candidateRows.firstIndex(where: {
+      if case .loggedFooter = $0 { return true }
+      return false
+    }) ?? candidateRows.endIndex
+    candidateRows.insert(draft, at: foot)
+    todayFootDraftId = draftId
+    return draftId
   }
 
   // MARK: - Inbox zero motion (docs/INBOX_ZERO_MOTION_SPEC.md, #298)
@@ -1904,7 +2060,7 @@ final class SeptaskKitTaskListController: NSViewController {
         ids.insert(task.id)
       case .header, .loggedFooter, .fadedFooter,
            .screenTitle, .logbookBar, .tagFilterBar, .projectTarget, .containerNotes,
-           .notice, .noticeStep, .event, .notesProposal:
+           .notice, .noticeStep, .doNotice, .event, .notesProposal:
         return ids
       }
     }
@@ -1949,6 +2105,9 @@ final class SeptaskKitTaskListController: NSViewController {
         guard self.inboxZeroTracker.phase == .checkmark else { return }
         self.inboxZeroTracker.finishMotion()
         self.inboxHeaderCell()?.finishInboxZeroToEmptyTray()
+        // The empty Inbox draws no band (#708): drop the header once the
+        // checkmark has played.
+        self.reload(animated: true)
       }
       inboxZeroHoldWorkItem = work
       DispatchQueue.main.asyncAfter(deadline: .now() + InboxZeroMotion.holdDuration, execute: work)
@@ -2089,25 +2248,31 @@ final class SeptaskKitTaskListController: NSViewController {
     return nil
   }
 
-  /// Agent smart list (docs/TASK_FACTORY_SPEC.md §3): one header per
-  /// non-empty `AgentStage`, in registry order, then that stage's tasks. The
-  /// AppKit twin of `TaskListView.agentStageRows`.
-  private func agentStageRows(_ pool: [SeptenaTask]) -> [Row] {
-    // A claim lease is backend wall-clock time, not the app's day.
-    let now = Date()
-    let byStage = Dictionary(grouping: pool.filter { !$0.isHeading }) {
-      $0.conversation.agentStage(at: now) ?? .queued
-    }
+  /// Review (docs/REVIEW_SPEC.md §1): one header per non-empty `ReviewGroup`,
+  /// in registry order: what waits on the user, then agent work in progress
+  /// (ADR 0046). Faded is last, behind its toggle. The AppKit twin of
+  /// `TaskListView.reviewGroupRows`.
+  private func reviewGroupRows(_ pool: [SeptenaTask]) -> [Row] {
+    let byGroup = ReviewGroup.grouped(pool)
     var result: [Row] = []
-    for stage in AgentStage.allCases {
-      guard let tasks = byStage[stage], !tasks.isEmpty else { continue }
-      result.append(.header(id: "agent-\(stage.rawValue)",
-                            title: stage.group?.title ?? stage.rawValue,
-                            icon: .symbol(stage.group?.sfSymbol ?? "circle"),
+    for group in ReviewGroup.allCases where group != .faded {
+      guard let tasks = byGroup[group], !tasks.isEmpty else { continue }
+      result.append(.header(id: "review-\(group.rawValue)",
+                            title: group.group?.title ?? group.rawValue,
+                            icon: .symbol(group.group?.sfSymbol ?? "circle"),
                             count: tasks.count))
       result += tasks.map(chipped)
     }
+    guard let faded = byGroup[.faded], !faded.isEmpty else { return result }
+    let expanded = UserDefaults.standard.bool(forKey: ReviewGroup.fadedExpandedKey)
+    result.append(.fadedFooter(count: faded.count, expanded: expanded))
+    if expanded { result += [.notice(TaskNotices.fadedPile)] + faded.map(chipped) }
     return result
+  }
+
+  /// A Finished work row of Review: it draws Accept and Send back.
+  private func isReviewRow(_ task: SeptenaTask) -> Bool {
+    filter == .review && !task.isHeading && task.conversation.needsHumanReview
   }
 
   /// The grouped open list — reference implementation is TaskListView's
@@ -2147,9 +2312,6 @@ final class SeptaskKitTaskListController: NSViewController {
     case .review:
       return .screenTitle(title: TaskFilter.review.title,
                           icon: .symbol("eye"))
-    case .agent:
-      return .screenTitle(title: TaskFilter.agent.title,
-                          icon: .symbol(Route.filter(.agent).icon))
     case .upcoming:
       return .screenTitle(title: TaskFilter.upcoming.title,
                           icon: .symbol("calendar"))
@@ -2174,7 +2336,7 @@ final class SeptaskKitTaskListController: NSViewController {
     case .project(let id):
       guard let project = snapshot.projects.first(where: { $0.id == id }) else { return nil }
       let progress = projectProgress()[id] ?? 0
-      return .screenTitle(title: project.title, icon: .project(progress))
+      return .screenTitle(title: project.title, icon: .project(progress), share: project.share)
     case .area(let id):
       guard let area = snapshot.areas.first(where: { $0.id == id }) else { return nil }
       return .screenTitle(title: area.title, icon: area.emoji.map(GroupIcon.emoji) ?? .areaDot)
@@ -2229,10 +2391,7 @@ final class SeptaskKitTaskListController: NSViewController {
     KitContainerNotesPopover.present(
       isArea: isArea,
       notes: text,
-      relativeTo: anchor,
-      onHistory: { [weak self] in
-        self?.showContainerNotesHistory(isArea: isArea, id: id)
-      }
+      relativeTo: anchor
     ) { [weak self] newText in
       let value: String? = newText.isEmpty ? nil : newText
       Task { @MainActor in
@@ -2240,7 +2399,7 @@ final class SeptaskKitTaskListController: NSViewController {
           if isArea {
             try await SeptenaServices.shared.areasMutator.setContext(id: id, context: value)
           } else {
-            try await SeptenaServices.shared.projectsMutator.setNotes(id: id, notes: value)
+            try await SeptenaServices.shared.projectsMutator.setNotes(id: id, notes: value, from: text)
           }
         } catch {
           SeptenaLog.error("[notes] save failed for \(isArea ? "area" : "project") \(id)", error)
@@ -2472,6 +2631,12 @@ final class SeptaskKitTaskListController: NSViewController {
   }
 
   func toggleFadedExpanded() {
+    if filter == .review {
+      let defaults = UserDefaults.standard
+      defaults.set(!defaults.bool(forKey: ReviewGroup.fadedExpandedKey), forKey: ReviewGroup.fadedExpandedKey)
+      reload(animated: false)
+      return
+    }
     guard let key = scopeId else { return }
     var ids = fadedCollapsedIds()
     if ids.contains(key) { ids.remove(key) } else { ids.insert(key) }
@@ -2594,15 +2759,10 @@ final class SeptaskKitTaskListController: NSViewController {
         tableView.insertRows(at: [offset], withAnimation: insertAnimation)
       }
     }
-    tableView.endUpdates()
-    // The insert/remove/move above can change which SURVIVING rows are now
-    // first/last in their card — refresh every on-screen row's geometry
-    // directly rather than relying on the content-diff below, which only
-    // catches a row whose own `Row` value changed (see the doc comment on
-    // `refreshCardGeometry`).
-    refreshCardGeometry()
-
-    // Surviving rows whose content changed (rename, date, today flag).
+    // Surviving rows whose content changed (rename, date, today flag). Their
+    // heights join THIS batch: noted after `endUpdates`, they started a second
+    // row animation on top of the first (a header's count or ring changes with
+    // every completion), and the rows no longer moved as one.
     let oldByKey = Dictionary(old.map { ($0.key, $0) }, uniquingKeysWith: { a, _ in a })
     var changed = IndexSet()
     for index in new.indices where !isPreserved(index) {
@@ -2610,9 +2770,16 @@ final class SeptaskKitTaskListController: NSViewController {
         changed.insert(index)
       }
     }
+    // Same cached-height rule as the equal-keys path above.
+    if !changed.isEmpty { tableView.noteHeightOfRows(withIndexesChanged: changed) }
+    tableView.endUpdates()
+    // The insert/remove/move above can change which SURVIVING rows are now
+    // first/last in their card — refresh every on-screen row's geometry
+    // directly rather than relying on the content-diff below, which only
+    // catches a row whose own `Row` value changed (see the doc comment on
+    // `refreshCardGeometry`).
+    refreshCardGeometry()
     if !changed.isEmpty {
-      // Same cached-height rule as the equal-keys path above.
-      tableView.noteHeightOfRows(withIndexesChanged: changed)
       tableView.reloadData(forRowIndexes: changed, columnIndexes: [0])
     }
   }
@@ -2621,6 +2788,12 @@ final class SeptaskKitTaskListController: NSViewController {
   var hasActionableSelection: Bool { !actionableSelection.isEmpty }
   /// Exactly one task row is selected: the inspector has one subject.
   var hasSingleActionableSelection: Bool { actionableSelection.count == 1 }
+  /// One open task is selected: Waiting On… has a subject.
+  var hasSingleOpenSelection: Bool {
+    actionableSelection.count == 1 && actionableSelection[0].status == .open
+  }
+  /// A selected task waits on someone: Got It Back has a subject.
+  var hasWaitingSelection: Bool { actionableSelection.contains(where: \.isWaiting) }
 
   /// The selected Get started steps. They take Return (open), ⌘K (tick) and
   /// their own context menu; no task command sees them.
@@ -2878,6 +3051,42 @@ final class SeptaskKitTaskListController: NSViewController {
     }
   }
 
+  /// Waiting On… (docs/REVIEW_SPEC.md §6) for the one selected open task,
+  /// anchored to its row (or to `anchor`). `task` names a task the list may
+  /// not have selected (the inspector).
+  func presentWaitingPopover(anchor: KitSurfaceAnchor? = nil, task named: SeptenaTask? = nil) {
+    commitComposerTextIfOpen()
+    guard let task = named ?? (hasSingleOpenSelection ? actionableSelection.first : nil) else {
+      NSSound.beep()
+      return
+    }
+    guard case .rect(let rect, let host)? = anchor ?? selectedRowAnchor else {
+      NSSound.beep()
+      return
+    }
+    SeptaskKitWaitingPopover.present(task: task, relativeTo: rect, of: host) { [weak self] name, checkBack in
+      guard let self else { return }
+      let live = LocalCache.task(id: task.id, in: self.context) ?? task
+      let day = SeptenaDate.format(checkBack)
+      let scheduled: Date?? = day == live.scheduled ? nil : .some(checkBack)
+      TaskUndo.setWaiting(id: task.id, on: name, scheduled: scheduled,
+                          context: self.context, mutator: self.mutator)
+      self.refreshComposerRow(taskId: task.id)
+      self.reload()
+      self.onStoreChanged?()
+    }
+  }
+
+  /// Got It Back (docs/REVIEW_SPEC.md §6) on the selected waiting tasks, or
+  /// on `ids` when given. The tasks stay open where they are.
+  func gotItBackSelection(ids: [String]? = nil) {
+    let targets = ids ?? actionableSelection.map(\.id)
+    TaskUndo.gotItBack(ids: targets, context: context, mutator: mutator)
+    for id in targets { refreshComposerRow(taskId: id) }
+    reload()
+    onStoreChanged?()
+  }
+
   /// Open the type-to-filter/assign/create Tag popover (`⇧⌘T`) for the current
   /// selection (single or multi-select), anchored to the row or composer pill.
   func presentTagPopover(anchor: KitSurfaceAnchor? = nil) {
@@ -3067,10 +3276,38 @@ final class SeptaskKitTaskListController: NSViewController {
 
   // MARK: - Mutations
 
-  func toggleCompleteSelection() {
-    // ⌘K on a focused checklist step ticks the step (composer or inspector).
+  /// Uptime of the last ⌘↩ commit that closed an open row editor (or returned
+  /// focus from the inspector). A rapid second ⌘↩ within the guard window is
+  /// swallowed so finishing an edit cannot accidentally complete the task.
+  private var lastCommandReturnCommitAt: TimeInterval = 0
+  private static let completeGuardAfterCommit: TimeInterval = 0.55
+
+  func suppressCompleteBriefly() {
+    lastCommandReturnCommitAt = ProcessInfo.processInfo.systemUptime
+  }
+
+  /// Commit an open composer or field editor in response to ⌘↩, stamping the
+  /// double-tap guard. Returns false when no row editor is active.
+  @discardableResult
+  func commitOpenEditsForCommandReturn() -> Bool {
+    guard composingTaskId != nil || isTitleEditorActive else { return false }
+    commitComposerEditing()
+    return true
+  }
+
+  func toggleCompleteSelection(fromKeyboard: Bool = false) {
+    if fromKeyboard {
+      if composingTaskId != nil || isTitleEditorActive {
+        commitComposerEditing()
+        return
+      }
+      if ProcessInfo.processInfo.systemUptime - lastCommandReturnCommitAt < Self.completeGuardAfterCommit {
+        return
+      }
+    }
+    // ⌘↩ on a focused checklist step ticks the step (composer or inspector).
     if KitChecklistView.toggleFocusedStep(in: tableView.window) { return }
-    // ⌘K with the row open: save the typed text, close, complete (Things).
+    // Checkbox tap with the row open: save the typed text, close, complete.
     if composingTaskId != nil {
       completeComposingTask()
       return
@@ -3109,6 +3346,7 @@ final class SeptaskKitTaskListController: NSViewController {
   /// rows are left alone; trash has nothing to cancel.
   func cancelSelection() {
     guard !showingRecentlyDeleted else { return }
+    if composingTaskId != nil { collapseComposer(commit: true, animated: false) }
     let open = actionableSelection.filter { $0.status == .open }
     guard !open.isEmpty else { return }
     applyCancel(open)
@@ -3329,12 +3567,16 @@ final class SeptaskKitTaskListController: NSViewController {
 
   /// Anchor a date popover to the focused row (or to `anchor`: a composer
   /// pill or an inspector row) and apply the choice to the whole actionable
-  /// selection. The ONE When / Deadline picker path (ADR 0029).
-  func presentDatePopover(kind: SeptaskKitDatePopover.Kind, anchor: KitSurfaceAnchor? = nil) {
+  /// selection. The ONE When / Deadline picker path (ADR 0029). Later on a Do
+  /// names its task (`tasks`), because the list may not show it, and hears of
+  /// a saved date (`onSaved`).
+  func presentDatePopover(kind: SeptaskKitDatePopover.Kind, anchor: KitSurfaceAnchor? = nil,
+                          tasks: [SeptenaTask]? = nil, onSaved: (() -> Void)? = nil) {
     commitComposerTextIfOpen()
-    let selection = actionableSelection
-    guard !selection.isEmpty, tableView.selectedRow >= 0 else { return }
-    guard case .rect(let anchorRect, let anchorView)? = anchor ?? selectedRowAnchor else { return }
+    let selection = tasks ?? actionableSelection
+    guard !selection.isEmpty, tasks != nil || tableView.selectedRow >= 0 else { return }
+    guard case .rect(let anchorRect, let anchorView)? = anchor ?? selectedRowAnchor,
+          anchorView.window != nil else { return }
 
     let initial: Date? = switch kind {
     case .when: KitDayFormat.date(fromWire: selection.first?.scheduled)
@@ -3365,13 +3607,15 @@ final class SeptaskKitTaskListController: NSViewController {
       } : nil,
       // Repeat lives in the When picker (docs/TASK_ROW_MENU_SPEC.md). The
       // title names the rule only when every selected row agrees on it.
-      repeatTitle: kind == .when
+      // The Repeat editor acts on the selection, so it is not offered for a
+      // task the caller named.
+      repeatTitle: kind == .when && tasks == nil
         ? TaskRepeatLabel.title(Set(selection.map(\.recurrence)).count == 1 ? selection.first?.recurrence : nil)
         : nil,
       // The Repeat editor hangs off the same control as this picker. In the
       // inspector, where When folds open under its row, Repeat folds open
       // under the Repeat row instead (the iOS task page does the same).
-      onRepeat: kind == .when ? { [weak self] in
+      onRepeat: kind == .when && tasks == nil ? { [weak self] in
         self?.presentRecurrencePanel(anchor: anchor?.inlineSibling(attribute: .repeat) ?? anchor)
       } : nil
     ) { [weak self] date, today in
@@ -3382,6 +3626,7 @@ final class SeptaskKitTaskListController: NSViewController {
       self.noteInboxGesture(ids: liveSel.map(\.id))
       let before = liveSel.map(self.scheduleSnapshot)
       var deferredTo: Date?
+      var saved = false
       for task in liveSel {
         switch kind {
         case .when:
@@ -3390,15 +3635,18 @@ final class SeptaskKitTaskListController: NSViewController {
             let target = KitDayFormat.todayDate()
             guard let mode = self.rescheduleMode(for: task, newDate: target) else { continue }
             self.mutator.apply(.putOnToday, to: task.id, mode: mode)
+            saved = true
           } else if let date {
             guard let mode = self.rescheduleMode(for: task, newDate: date) else { continue }
             self.mutator.apply(.scheduleFor(date), to: task.id, mode: mode)
             deferredTo = date
+            saved = true
           } else {
             self.mutator.apply(.clearWhenDate, to: task.id)
           }
         case .deadline:
           self.mutator.apply(.setDeadline(date), to: task.id)
+          saved = date != nil
         }
         self.refreshComposerRow(taskId: task.id)
       }
@@ -3409,6 +3657,7 @@ final class SeptaskKitTaskListController: NSViewController {
           ? String(localized: "Change When", comment: "SeptaskKit: undo action")
           : String(localized: "Change Deadline", comment: "SeptaskKit: undo action"),
         before: before)
+      if saved { onSaved?() }
       // The inspector shows the new date when it opened this picker.
       self.onStoreChanged?()
     }
@@ -3827,7 +4076,7 @@ final class SeptaskKitTaskListController: NSViewController {
     // Repeating lists the templates that already carry a recurrence rule;
     // a plain new task can't join it, so ⌘N stays off there — same as the
     // two read-only lists.
-    case .review, .agent, .repeating, .logbook, .faded, .recentlyDeleted: return nil
+    case .review, .repeating, .logbook, .faded, .recentlyDeleted: return nil
     }
     return (area, project, today, scheduled)
   }
@@ -3939,6 +4188,11 @@ final class SeptaskKitTaskListController: NSViewController {
       noticePrimaryAction(notice.id)?()
       return
     }
+    // Return on a Do line offers what a click on it offers.
+    if rows.indices.contains(row), let notice = rows[row].doNotice {
+      pressDoNotice(notice.key)
+      return
+    }
     guard row >= 0, let task = rows[row].task else { return }
     // A section heading has no pills/notes to open a full composer for —
     // same as the SwiftUI project page, renaming it is a bare title edit.
@@ -3946,9 +4200,10 @@ final class SeptaskKitTaskListController: NSViewController {
       beginEditingRow(row)
       return
     }
-    // A Review row opens the task page (the inspector), same as iPhone. It
-    // never expands inline: the review cell is not a task row.
-    if filter == .review {
+    // A Review row about agent work (question, finished work, work in
+    // progress) opens the task page (the inspector), where its conversation
+    // is, same as iPhone. Only Faded rows expand inline.
+    if filter == .review, task.opensConversationInReview {
       onOpenInspector?()
       return
     }
@@ -3968,6 +4223,7 @@ final class SeptaskKitTaskListController: NSViewController {
   /// all. Descending is `↓` on the title's last line or Tab, both of which
   /// read top-to-bottom instead of as a chord.
   func commitComposerEditing() {
+    suppressCompleteBriefly()
     // ⌘↩ in a bare field editor (⌘R, the "New task" line) finishes it too.
     if composingTaskId == nil, isTitleEditorActive {
       commitFieldEditorNow()
@@ -4378,7 +4634,7 @@ final class SeptaskKitTaskListController: NSViewController {
       self.animateComposerHeight(ofRow: row, animated: false)
     }
 
-    cell.onCommit = { [weak self] title, notes in
+    cell.onCommit = { [weak self] title, notes, from in
       guard let self,
             // Compare against the STORE, not the `task` this closure captured:
             // a pill, a sync batch or an earlier commit may have moved it on.
@@ -4390,19 +4646,22 @@ final class SeptaskKitTaskListController: NSViewController {
          self.headingPrefixForNewTask(title: trimmed, task: current) != nil {
         return
       }
-      let titleChanged = !trimmed.isEmpty && trimmed != current.title
+      // A field nobody typed in is not written: the store may hold a newer
+      // value that another device or member wrote while the row was open.
+      let titleChanged = !trimmed.isEmpty && trimmed != current.title && title != from.title
       // Same normalization on both sides as the cell applies to what it
       // saves (trailing whitespace only), so an untouched row never rewrites
       // its notes — and never syncs a no-op.
       let storedNotes = KitComposerCell.normalizedNotes(current.notes)
-      let notesChanged = KitComposerCell.normalizedNotes(notes) != storedNotes
+      let notesChanged = notes != from.notes && KitComposerCell.normalizedNotes(notes) != storedNotes
       guard titleChanged || notesChanged else { return }
       // Title and notes are one logical edit. Send one save/notification; an
       // empty notes string is intentional because the backend uses it to clear
       // the optional notes field.
       self.mutator.update(id: task.id,
                           title: titleChanged ? trimmed : nil,
-                          notes: notesChanged ? (notes ?? "") : nil)
+                          notes: notesChanged ? (notes ?? "") : nil,
+                          notesFrom: from.notes ?? "")
       // A brand-new row's first save is its CREATION, recorded when it closes
       // (`collapseComposer` → `recordNewTaskUndo`); an edit to an existing row
       // is undoable as an edit.
@@ -4511,9 +4770,18 @@ final class SeptaskKitTaskListController: NSViewController {
       case .taskSendBackReview:
         guard let single, single.conversation.needsHumanReview else { return nil }
         return .init { self.presentSendBackForSelectedRow(taskID: single.id) }
+      case .taskWaitingOn:
+        guard let single, single.status == .open else { return nil }
+        return .init { self.presentWaitingPopover() }
+      case .taskGotItBack:
+        guard selection.contains(where: \.isWaiting) else { return nil }
+        return .init { self.gotItBackSelection() }
       case .taskToggleInfo:
         let visible = UserDefaults.standard.bool(forKey: SettingsKey.septaskInspectorVisible)
         return .init(variant: visible ? .active : .base) { self.onToggleInspector?() }
+      case .taskDo:
+        guard self.startableTask != nil else { return nil }
+        return .init { self.startDo() }
       case .taskDuplicate: return .init(variant: plural) { self.duplicateSelection() }
       case .taskToggleComplete:
         // Several tasks only: one task completes from its checkbox
@@ -4564,6 +4832,7 @@ final class SeptaskKitTaskListController: NSViewController {
       case "moveDestinations": return self.moveDestinationNodes(selection: selection)
       case "sectionDestinations": return self.sectionDestinationNodes(selection: selection)
       case "filingSuggestion": return self.filingSuggestionNodes(selection: selection)
+      case "assignees": return SeptaskSharing.assigneeNodes(selection)
       default: return []
       }
     })
@@ -4748,7 +5017,7 @@ final class SeptaskKitTaskListController: NSViewController {
   }
 
   private func presentWeeklySweepSheet() {
-    let tasks: [SeptenaTask] = filter == .faded
+    let tasks: [SeptenaTask] = filter == .review
       ? LocalCache.tasks(in: context, filter: .faded)
       : TaskNotices.sweepCandidates(context: context)
     guard !tasks.isEmpty else { return }
@@ -4936,7 +5205,7 @@ final class SeptaskKitTaskListController: NSViewController {
 
   /// Project header `…` overflow menu: New Section + New Task, built from
   /// canonical registry titles so the Mac project header mirrors iOS's `…`.
-  private func buildProjectOverflowMenu() -> NSMenu {
+  private func buildProjectOverflowMenu(_ projectID: String) -> NSMenu {
     KitRegistryMenu.build([
       RegistryMenuEntry.slot(
         id: "project.newSection",
@@ -4948,6 +5217,11 @@ final class SeptaskKitTaskListController: NSViewController {
         title: RegistryActions.title(.appNewTask),
         sfSymbol: "checkmark.circle"
       ) { [weak self] in self?.createTask() },
+      RegistryMenuEntry.slot(
+        id: RegistryActionID.projectShare.rawValue,
+        title: RegistryActions.title(.projectShare),
+        sfSymbol: RegistryIcons.sfSymbol(for: "action.share_project")
+      ) { SeptaskSharing.present(projectID: projectID) },
     ])
   }
 
@@ -5104,7 +5378,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
                  row: Int) -> String? {
     guard rows.indices.contains(row) else { return nil }
     return rows[row].task?.title ?? rows[row].noticeStep?.title
-      ?? rows[row].standaloneNotice?.title
+      ?? rows[row].standaloneNotice?.title ?? rows[row].doNotice?.title
   }
 
   func tableView(_ tableView: NSTableView, shouldSelectRow row: Int) -> Bool {
@@ -5117,7 +5391,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
     // not (it has no task and no step).
     if case .noticeStep = rows[row] { return true }
     // A standalone notice is a row too: ↑/↓ reach it, ⌘K dismisses it.
-    if rows[row].standaloneNotice != nil { return true }
+    if rows[row].standaloneNotice != nil || rows[row].doNotice != nil { return true }
     return rows[row].task != nil
   }
 
@@ -5165,7 +5439,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       if task.id == composingTaskId {
         return composerRowHeight ?? KitComposerCell.baseHeight
       }
-      if filter == .review {
+      if isReviewRow(task) {
         return KitReviewTaskCell.height(for: task, issue: issueRefs[task.id],
                                         contextText: KitListPath.text(for: task, in: context),
                                         width: tableView.bounds.width)
@@ -5186,7 +5460,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       return KitContainerNotes.height(
         text: text,
         placeholder: isArea ? ContainerNotes.areaPlaceholder : ContainerNotes.projectPlaceholder,
-        rowWidth: tableView.bounds.width,
+        rowWidth: notesCellWidth ?? tableView.bounds.width,
         expanded: unfoldedNotes.contains(id))
     // Reminder rows read as task rows (they become tasks on click); their
     // header sits on the page like every other group header.
@@ -5195,6 +5469,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
     // Inline notices: one component, its height follows its content.
     case .notice(let notice): return KitNoticeCell.height(for: KitNotice(notice))
     case .noticeStep: return SeptaskKitTheme.rowHeight
+    case .doNotice(let notice): return KitNoticeCell.height(for: notice.notice)
     }
   }
 
@@ -5324,7 +5599,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
   /// don't reorder.
   private var allowsReorder: Bool {
     switch filter {
-    case .review, .agent, .logbook, .faded, .recentlyDeleted: return false
+    case .review, .logbook, .faded, .recentlyDeleted: return false
     default: return true
     }
   }
@@ -5750,11 +6025,11 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       }
       return cell
 
-    case .screenTitle(let title, let icon):
+    case .screenTitle(let title, let icon, let share):
       let identifier = NSUserInterfaceItemIdentifier("screenTitleCell")
       let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? KitScreenTitleCell
         ?? KitScreenTitleCell(identifier: identifier)
-      cell.configure(title: title, icon: icon, showsNavMenu: !isSidebarVisible)
+      cell.configure(title: title, icon: icon, share: share, showsNavMenu: !isSidebarVisible)
       // The title IS the navigation dropdown (Things-style) when the sidebar is
       // collapsed — same contract as SwiftUI's `TaskNavMenu`. Built fresh per
       // click via the closure rather than once here, so it can never show a
@@ -5770,10 +6045,12 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       } else {
         cell.onPickGlyph = nil
       }
-      if case .project = filter {
-        cell.onOpenOverflowMenu = { [weak self] in self?.buildProjectOverflowMenu() }
+      if case .project(let projectID) = filter {
+        cell.onOpenOverflowMenu = { [weak self] in self?.buildProjectOverflowMenu(projectID) }
+        cell.onOpenMembers = { SeptaskSharing.present(projectID: projectID) }
       } else {
         cell.onOpenOverflowMenu = nil
+        cell.onOpenMembers = nil
       }
       return cell
 
@@ -5859,6 +6136,9 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       cell.onHistory = { [weak self] in
         self?.showContainerNotesHistory(isArea: isArea, id: id)
       }
+      cell.onHeightMismatch = { [weak self] width in
+        self?.remeasureNotesRow(id: id, cellWidth: width)
+      }
       return cell
 
     case .importAllReminders(let count, let importing):
@@ -5875,6 +6155,14 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       cell.isRowSelected = tableView.selectedRowIndexes.contains(row)
       cell.onPrimary = noticePrimaryAction(notice.id)
       cell.onDismiss = notice.dismissible ? { [weak self] in self?.dismissNotice(notice.id) } : nil
+      return cell
+
+    case .doNotice(let notice):
+      let cell = noticeCell(notice.notice)
+      cell.isRowSelected = tableView.selectedRowIndexes.contains(row)
+      cell.onPrimary = nil
+      cell.onDismiss = { SeptaskKitDo.shared.clearRequests() }
+      cell.onPress = { [weak self] in self?.pressDoNotice(notice.key) }
       return cell
 
     case .noticeStep(let step):
@@ -5905,7 +6193,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
         wireComposer(cell, task: task)
         return cell
       }
-      if filter == .review, !task.isHeading {
+      if isReviewRow(task) {
         let identifier = NSUserInterfaceItemIdentifier("reviewTaskCell")
         let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? KitReviewTaskCell
           ?? KitReviewTaskCell(identifier: identifier)
@@ -5981,10 +6269,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
   /// lossless undo back into Review (`needs_verify` + check note).
   private func acceptReviewTask(id: String) {
     guard let task = LocalCache.task(id: id, in: context), task.status == .open else { return }
-    let previousNote = task.conversation.endStateNote
-    mutator.complete(id: id)
-    mutator.acknowledge(id: id)
-    TaskUndo.recordAcceptReview(id: id, previousNote: previousNote, mutator: mutator)
+    TaskUndo.acceptReview(id: id, mutator: mutator)
     reload()
   }
 
@@ -6041,6 +6326,10 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
   private let agentGlyph = NSImageView()
   private let chip = KitChipView()
   private let statusChip = KitChipView()
+  /// Shared projects: who does this task, when that is somebody else.
+  private let assigneeChip = KitChipView()
+  /// "Waiting on Anna · 5 days" (docs/REVIEW_SPEC.md §6).
+  private let waitingChip = KitChipView()
   private let suggestionChip = KitSuggestionChipView()
   /// The item the task was created from (its `from` reference).
   private let fromGlyph = NSImageView()
@@ -6231,7 +6520,7 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     let trailingShove = NSView()
     trailingShove.setContentHuggingPriority(.defaultLow, for: .horizontal)
     trailingShove.setContentCompressionResistancePriority(.fittingSizeCompression, for: .horizontal)
-    let trailing = NSStackView(views: [trailingShove, suggestionChip, chip, statusChip,
+    let trailing = NSStackView(views: [trailingShove, suggestionChip, chip, waitingChip, assigneeChip, statusChip,
                                       tagStack, attachmentGlyph, attachmentLabel,
                                       checklistGlyph, checklistLabel, reminderGlyph, reminderLabel,
                                       scheduleGlyph, detail, repeatGlyph, starGlyph, fromGlyph, notesGlyph, agentGlyph])
@@ -6256,6 +6545,8 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     trailing.kitA11yIgnore()
     chip.kitA11yIgnore()
     statusChip.kitA11yIgnore()
+    assigneeChip.kitA11yIgnore()
+    waitingChip.kitA11yIgnore()
 
     addSubview(checkbox)
     addSubview(title)
@@ -6354,6 +6645,8 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
       agentGlyph.isHidden = true
       chip.isHidden = true
       statusChip.isHidden = true
+      assigneeChip.isHidden = true
+      waitingChip.isHidden = true
       fromGlyph.isHidden = true
       tagStack.isHidden = true
       attachmentGlyph.isHidden = true
@@ -6395,25 +6688,26 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     // `isOnToday`, not the raw `today` field) it shows solid.
     // Recently Deleted rows are out of every list, Today included: no gold
     // Today badge there.
-    let showFadedInScope = task.isFaded && filter != .faded
+    let isInFadedPile = filter == .review && task.isFaded
+    let showFadedInScope = task.isFaded && !isInFadedPile
     checkbox.isToday = task.isOnToday && filter != .today && task.deletedAt == nil && !task.isFaded
     // Countdown toward the 14-day fade window in every open list
-    // (`docs/TASK_FADE_SPEC.md` §4). Inside the Faded pile itself rows stay at
+    // (`docs/TASK_FADE_SPEC.md` §4). In Review's Faded group rows stay at
     // full opacity; inside projects and areas faded rows render visibly faded.
     if showFadedInScope {
       checkbox.tenureFill = 1.0
     } else {
-      checkbox.tenureFill = (done || !TaskRowFlags.agingEnabled || filter == .recentlyDeleted || task.deletedAt != nil || filter == .faded)
+      checkbox.tenureFill = (done || !TaskRowFlags.agingEnabled || filter == .recentlyDeleted || task.deletedAt != nil || isInFadedPile)
         ? nil : task.fadeFill()
     }
     // The whole row fades, checkbox included: same curve as `CheckableRow`.
     let fade = CGFloat(TaskFade.rowOpacity(checkbox.tenureFill))
-    for view in [checkbox, title, notesGlyph, agentGlyph, fromGlyph, chip, statusChip, suggestionChip,
+    for view in [checkbox, title, notesGlyph, agentGlyph, fromGlyph, chip, statusChip, waitingChip, suggestionChip,
                  tagStack, attachmentGlyph, attachmentLabel, checklistGlyph, checklistLabel,
                  reminderGlyph, reminderLabel, scheduleGlyph, detail, repeatGlyph, starGlyph] as [NSView] {
       view.alphaValue = fade
     }
-    checkbox.cornerDot = !done && !isProposal && task.conversation.hasStarted
+    checkbox.cornerDot = !done && !isProposal && task.conversation.hasStarted && deriveConvo(task.conversation).badge != nil
     checkbox.agentCue = !done && task.showsAgentCue()
 
     var titleAttributes: [NSAttributedString.Key: Any] = [
@@ -6462,6 +6756,20 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
       chip.configure(symbol: chipValue.symbol, title: chipValue.title)
     } else {
       chip.isHidden = true
+    }
+
+    if !done, task.deletedAt == nil, let waiting = task.waitingLabel() {
+      waitingChip.isHidden = false
+      waitingChip.configure(symbol: RegistryIcons.sfSymbol(for: "action.waiting"), title: waiting)
+    } else {
+      waitingChip.isHidden = true
+    }
+
+    if let name = SharedProjects.assigneeName(of: task, in: LocalStore.shared.container.mainContext) {
+      assigneeChip.isHidden = false
+      assigneeChip.configure(symbol: RegistryIcons.sfSymbol(for: "action.assign"), title: name)
+    } else {
+      assigneeChip.isHidden = true
     }
 
     if showFadedInScope {
@@ -6998,6 +7306,9 @@ final class KitScreenTitleCell: NSTableCellView {
     }
   }
   private let moreButton = NSButton()
+  /// The members of a shared project. Opens Share Project.
+  private let membersButton = NSButton()
+  var onOpenMembers: (() -> Void)?
   private var moreTrailingConstraint: NSLayoutConstraint!
 
   private static var font: NSFont { .systemFont(ofSize: SeptenaTypeScale.size(.title2), weight: .bold) }
@@ -7060,6 +7371,17 @@ final class KitScreenTitleCell: NSTableCellView {
     moreButton.toolTip = RegistryActions.title(.sectionNew)
     moreButton.setAccessibilityLabel(RegistryActions.title(.sectionNew))
 
+    membersButton.translatesAutoresizingMaskIntoConstraints = false
+    membersButton.isBordered = false
+    membersButton.title = ""
+    membersButton.imagePosition = .imageOnly
+    membersButton.target = self
+    membersButton.action = #selector(openMembers)
+    membersButton.refusesFirstResponder = true
+    membersButton.isHidden = true
+    membersButton.setContentHuggingPriority(.required, for: .horizontal)
+    membersButton.setContentCompressionResistancePriority(.required, for: .horizontal)
+
     icon.kitA11yIgnore()
     emoji.kitA11yIgnore()
 
@@ -7069,6 +7391,7 @@ final class KitScreenTitleCell: NSTableCellView {
     addSubview(titleLabel)
     addSubview(glyphButton)
     addSubview(moreButton)
+    addSubview(membersButton)
     leadingConstraint = icon.centerXAnchor.constraint(
       equalTo: leadingAnchor,
       constant: KitCardRowView.horizontalInset + SeptaskKitLayout.leadingGlyphCenterX)
@@ -7078,9 +7401,9 @@ final class KitScreenTitleCell: NSTableCellView {
     moreTrailingConstraint = moreButton.trailingAnchor.constraint(
       equalTo: trailingAnchor, constant: -(KitCardRowView.horizontalInset + 8))
     trailingConstraint = button.trailingAnchor.constraint(
-      lessThanOrEqualTo: moreButton.leadingAnchor, constant: -6)
+      lessThanOrEqualTo: membersButton.leadingAnchor, constant: -6)
     labelTrailingConstraint = titleLabel.trailingAnchor.constraint(
-      lessThanOrEqualTo: moreButton.leadingAnchor, constant: -6)
+      lessThanOrEqualTo: membersButton.leadingAnchor, constant: -6)
     NSLayoutConstraint.activate([
       leadingConstraint,
       buttonLeadingConstraint,
@@ -7093,6 +7416,8 @@ final class KitScreenTitleCell: NSTableCellView {
       glyphButton.widthAnchor.constraint(equalToConstant: 28),
       glyphButton.heightAnchor.constraint(equalToConstant: 28),
       moreTrailingConstraint,
+      membersButton.trailingAnchor.constraint(equalTo: moreButton.leadingAnchor, constant: -4),
+      membersButton.centerYAnchor.constraint(equalTo: button.centerYAnchor),
       moreButton.centerYAnchor.constraint(equalTo: button.centerYAnchor),
       moreButton.widthAnchor.constraint(equalToConstant: 28),
       moreButton.heightAnchor.constraint(equalToConstant: 28),
@@ -7108,6 +7433,10 @@ final class KitScreenTitleCell: NSTableCellView {
 
   @objc private func pickGlyph() {
     onPickGlyph?(glyphButton)
+  }
+
+  @objc private func openMembers() {
+    onOpenMembers?()
   }
 
   @objc private func openOverflowMenu() {
@@ -7139,6 +7468,9 @@ final class KitScreenTitleCell: NSTableCellView {
     if !moreButton.isHidden {
       addCursorRect(moreButton.frame, cursor: .pointingHand)
     }
+    if !membersButton.isHidden {
+      addCursorRect(membersButton.frame, cursor: .pointingHand)
+    }
   }
 
   /// Same width-dependent centered-column margin as every other row.
@@ -7160,7 +7492,12 @@ final class KitScreenTitleCell: NSTableCellView {
 
   func configure(title titleText: String,
                  icon iconKind: SeptaskKitTaskListController.GroupIcon,
+                 share: ProjectShare? = nil,
                  showsNavMenu: Bool) {
+    membersButton.isHidden = share == nil
+    membersButton.image = share.map { KitGlyph.members($0) }
+    membersButton.toolTip = share?.membersLabel
+    membersButton.setAccessibilityLabel(share?.membersLabel ?? "")
     // `attributedTitle`, not `title`: a borderless NSButton otherwise paints
     // its label in the control's default color, which loses the page title's
     // full-strength ink. Populate both the button and the static label so
@@ -8100,7 +8437,10 @@ final class SeptaskKitTableView: NSTableView {
     return resigned
   }
   var onToggleComplete: (() -> Void)?
+  var onCancel: (() -> Void)?
   var onToggleToday: (() -> Void)?
+  /// ⌘J — Do the selected task (docs/DO_SPEC.md §4.1).
+  var onDo: (() -> Void)?
   /// ⌘R — bare-title rename.
   var onBeginEdit: (() -> Void)?
   /// Return / double-click — the full inline composer.
@@ -8230,13 +8570,13 @@ final class SeptaskKitTableView: NSTableView {
       let commandShift = flags == [.command, .shift]
       let commandOption = flags == [.command, .option]
       let allowed: Bool
-      if command, ["\r", "\u{3}", "n", ","].contains(key) {
-        allowed = true            // ⌘↩ save + close, ⌘N save then create, ⌘, settings
+      if command, ["\r", "\u{3}", "n", ",", "k"].contains(key) {
+        allowed = true            // ⌘↩ save + close, ⌘K command bar, ⌘N save then create, ⌘, settings
       } else if (commandShift && key == "f") || (commandOption && key == "i") {
-        allowed = true            // Quick Find, inspector: window-level, no row write
-      } else if (command && ["k", "t", "s", "m"].contains(key))
+        allowed = true            // Command bar alias, inspector: window-level, no row write
+      } else if (command && ["t", "s", "m", "j"].contains(key))
                   || (commandShift && ["m", "d", "c"].contains(key))
-                  || (commandOption && ["r", "s"].contains(key)) {
+                  || (commandOption && ["r", "s", "\r", "\u{3}"].contains(key)) {
         allowed = composer        // act on the composing row (text saved first)
       } else {
         allowed = false
@@ -8256,6 +8596,8 @@ final class SeptaskKitTableView: NSTableView {
 
     if flags == [.command, .option] {
       switch key {
+      // ⌥⌘↩ — cancel selected open tasks (registry task.cancel).
+      case "\r", "\u{3}": onCancel?(); return true
       // ⌥⌘I — the platform's inspector toggle.
       case "i": onToggleInspector?(); return true
       // ⌥⌘M — file into the SUGGESTED list, deliberately one modifier from
@@ -8293,17 +8635,18 @@ final class SeptaskKitTableView: NSTableView {
     }
     switch key {
     // ⌘↩ / ⌘keypad-Enter — save and close the open row (composer or field
-    // editor), the platform's "finish this". Caught here rather than in the
-    // composer cell so ONE handler covers the caret being in the title, in
-    // notes, or on a pill. With nothing open it is not ours: pass it on.
+    // editor), or mark the closed selected row(s) complete (with double-tap
+    // guard after closing an editor).
     case "\r", "\u{3}":
-      guard isComposing?() == true || focus == .fieldEditor else {
-        return super.performKeyEquivalent(with: event)
+      if isComposing?() == true || focus == .fieldEditor {
+        onCommitEditing?()
+      } else {
+        onToggleComplete?()
       }
-      onCommitEditing?()
       return true
-    case "k": onToggleComplete?(); return true
+    case "k": onQuickFind?(); return true
     case "t": onToggleToday?(); return true
+    case "j": onDo?(); return true
     case "r": onBeginEdit?(); return true
     case "n": onNewTask?(); return true
     case "s": onWhen?(); return true

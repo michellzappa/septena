@@ -36,6 +36,8 @@ shapes, with a fixed `mcp:claude` actor and no claim.
 - **The stop belongs to the human.** `convo.stoppedAt` is written only by an
   app actor. While it is set, the store refuses every agent write to that
   task. "Pause all agents" (`agentsPaused`, synced setting) refuses every
+  claim and, since 2026-11-25 (#554), every other agent write: edits, new
+  tasks, completions and turns. Reads still work, and an agent can release a
   claim. No agent can clear either one.
 - **Run budget.** An agent may take at most 5 fresh claims on a task between
   two human turns. Then it must ask. Only a human turn refills the budget, so

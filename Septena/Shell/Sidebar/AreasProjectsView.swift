@@ -173,6 +173,7 @@ struct AreaDetailView: View {
   @Environment(NavigationState.self) private var nav
   @Environment(\.usesPushNavigation) private var usesPushNavigation
   @Environment(AreasMutator.self) private var areasMutator
+  @Environment(ProjectsMutator.self) private var projectsMutator
   @Environment(TaskMutator.self) private var taskMutator
   @Environment(\.modelContext) private var modelContext
 
@@ -181,6 +182,7 @@ struct AreaDetailView: View {
   @State private var originalNotes: String
   @State private var notesProposal: NotesProposal?
   @State private var showingNotesHistory = false
+  @State private var showingNewProject = false
   @State private var draftEmoji: String
   @State private var originalEmoji: String
   @State private var showingEmojiEditor = false
@@ -321,12 +323,8 @@ struct AreaDetailView: View {
     .septenaInlineTitle()
     #if os(iOS)
     .toolbar {
-      if TaskHistory.isAvailable {
-        ToolbarItem(placement: usesPushNavigation ? .primaryAction : .topBarTrailing) {
-          Button { showingNotesHistory = true } label: {
-            Label(ContainerNotesCopy.historyMenuTitle, systemImage: "clock.arrow.circlepath")
-          }
-        }
+      ToolbarItem(placement: usesPushNavigation ? .primaryAction : .topBarTrailing) {
+        areaOverflowMenu
       }
       if !usesPushNavigation {
         ToolbarItem(placement: .topBarTrailing) { QuickFindToolbarButton() }
@@ -334,15 +332,16 @@ struct AreaDetailView: View {
     }
     #else
     .toolbar {
-      if TaskHistory.isAvailable {
-        ToolbarItem(placement: .primaryAction) {
-          Button { showingNotesHistory = true } label: {
-            Label(ContainerNotesCopy.historyMenuTitle, systemImage: "clock.arrow.circlepath")
-          }
-        }
-      }
+      ToolbarItem(placement: .primaryAction) { areaOverflowMenu }
     }
     #endif
+    .sheet(isPresented: $showingNewProject) {
+      NewProjectSheet(areas: areas, initialAreaId: area.id) { title, areaId in
+        createProjectInArea(title: title, areaId: areaId)
+      }
+      .presentationDetents([.medium])
+      .septenaSheetChrome()
+    }
     .sheet(isPresented: $showingNotesHistory) {
       NotesHistorySheet(
         container: .area,
@@ -376,6 +375,30 @@ struct AreaDetailView: View {
     }
     .onReceive(NotificationCenter.default.publisher(for: .septenaStructureChanged)) { _ in
       Task { await load() }
+    }
+  }
+
+  private var areaOverflowMenu: some View {
+    OverflowMenu {
+      Button {
+        showingNewProject = true
+      } label: {
+        Label(RegistryActions.title(.areaNewProject), systemImage: "plus")
+      }
+    }
+  }
+
+  private func createProjectInArea(title: String, areaId: String?) {
+    let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return }
+    Haptics.commit()
+    Task {
+      do {
+        _ = try await projectsMutator.create(title: trimmed, area: areaId)
+        await load()
+      } catch {
+        errorMessage = error.localizedDescription
+      }
     }
   }
 
@@ -679,6 +702,14 @@ struct ProjectDetailView: View {
               }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            if let share = project.share {
+              Button { SeptaskSharing.present(projectID: project.id) } label: {
+                MemberAvatars(share: share)
+                  .frame(minHeight: 44)
+                  .contentShape(Rectangle())
+              }
+              .buttonStyle(.plain)
+            }
           }
           if let proposal = notesProposal {
             NotesProposalCard(
@@ -809,13 +840,6 @@ struct ProjectDetailView: View {
 
   private var projectOverflowMenu: some View {
     OverflowMenu {
-      if TaskHistory.isAvailable {
-        Button {
-          showingNotesHistory = true
-        } label: {
-          Label(ContainerNotesCopy.historyMenuTitle, systemImage: "clock.arrow.circlepath")
-        }
-      }
       Button {
         nav.shouldCreateHeading = true
       } label: {
@@ -828,6 +852,12 @@ struct ProjectDetailView: View {
         Label("Move to Area…", systemImage: "folder")
       }
       Button {
+        SeptaskSharing.present(projectID: project.id)
+      } label: {
+        Label(RegistryActions.title(.projectShare), systemImage: RegistryIcons.sfSymbol(for: "action.share_project"))
+      }
+      Divider()
+      Button {
         setStatus(.done)
       } label: {
         Label(RegistryActions.title(.projectMarkDone), systemImage: "checkmark.circle")
@@ -837,11 +867,14 @@ struct ProjectDetailView: View {
       } label: {
         Label(RegistryActions.title(.projectCancel), systemImage: "xmark.circle")
       }
-      Divider()
-      Button(role: .destructive) {
-        showingDeleteConfirm = true
-      } label: {
-        Label(RegistryActions.title(.projectDelete), systemImage: "trash")
+      // A shared project ends from its Share screen.
+      if project.share == nil {
+        Divider()
+        Button(role: .destructive) {
+          showingDeleteConfirm = true
+        } label: {
+          Label(RegistryActions.title(.projectDelete), systemImage: "trash")
+        }
       }
     }
   }
@@ -868,12 +901,19 @@ struct ProjectDetailView: View {
   }
 
   private func moveToArea(_ newAreaId: String?) {
+    let oldAreaId = project.area
+    guard oldAreaId != newAreaId else { return }
     Haptics.commit()
+    let mutator = projectsMutator
+    let projectId = project.id
     Task {
       do {
-        try await projectsMutator.setArea(id: project.id, area: newAreaId)
-        // Project's `area` value is captured in `let project`; the route
-        // identity changes on the next sidebar refresh.
+        try await mutator.setArea(id: projectId, area: newAreaId)
+        TaskUndo.record(
+          name: String(localized: "Move Project", comment: "AreaPickerSheet: undo action"),
+          undo: { Task { try? await mutator.setArea(id: projectId, area: oldAreaId) } },
+          redo: { Task { try? await mutator.setArea(id: projectId, area: newAreaId) } }
+        )
       } catch {
         errorMessage = error.localizedDescription
       }
@@ -917,9 +957,10 @@ struct ProjectDetailView: View {
 
   private func commitNotes() {
     guard draftNotes != originalNotes else { return }
+    let from = originalNotes
     originalNotes = draftNotes
     Task {
-      do { try await projectsMutator.setNotes(id: project.id, notes: draftNotes) }
+      do { try await projectsMutator.setNotes(id: project.id, notes: draftNotes, from: from) }
       catch { errorMessage = error.localizedDescription }
     }
   }
@@ -1038,17 +1079,26 @@ struct AreaPickerSheet: View {
   var body: some View {
     NavigationStack {
       List {
-        Button { onPick(nil); dismiss() } label: {
+        Button {
+          if currentAreaId != nil { onPick(nil) }
+          dismiss()
+        } label: {
           row(label: "No Area", icon: "tray", selected: currentAreaId == nil)
         }
         .buttonStyle(PlainHoverRowButtonStyle())
+        .listRowBackground(SelectableListRowBackground(isSelected: currentAreaId == nil))
 
         ForEach(areas) { area in
-          Button { onPick(area.id); dismiss() } label: {
+          let isCurrent = currentAreaId == area.id
+          Button {
+            if !isCurrent { onPick(area.id) }
+            dismiss()
+          } label: {
             row(label: area.title, icon: "square.stack.3d.up.fill",
-                emoji: area.emoji, selected: currentAreaId == area.id)
+                emoji: area.emoji, selected: isCurrent)
           }
           .buttonStyle(PlainHoverRowButtonStyle())
+          .listRowBackground(SelectableListRowBackground(isSelected: isCurrent))
         }
       }
       .navigationTitle("Move to Area")
@@ -1074,12 +1124,14 @@ struct AreaPickerSheet: View {
           .foregroundStyle(Theme.iconMuted)
           .frame(width: 22)
       }
-      Text(label).foregroundStyle(Theme.inkPrimary)
+      Text(label)
+        .fontWeight(selected ? .semibold : .regular)
+        .foregroundStyle(Theme.inkPrimary)
       Spacer()
       if selected {
         Image(systemName: "checkmark")
           .scaledFont(size: 13, weight: .semibold)
-          .foregroundStyle(Theme.inkSecondary)
+          .foregroundStyle(AppearancePreferences.shared.accentSwiftUIColor)
       }
     }
     .contentShape(Rectangle())

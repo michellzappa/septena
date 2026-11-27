@@ -11,7 +11,7 @@ const { claimPlusLink, createPlusLink, plusContinue, plusLanding, plusStart, rev
 const { admin } = await import("../src/admin/routes.ts");
 const { overview, planView, sweepAccounts } = await import("../src/admin/accounts.ts");
 const { approvePairing, inspectPairing, pollDevicePairing } = await import("../src/shadow/oauth.ts");
-const { trialRow } = await import("../src/entitlement/entitlement.ts");
+const { grantRow, planFor, resolvePlan, trialRow } = await import("../src/entitlement/entitlement.ts");
 const { base64url } = await import("../src/util.ts");
 const { Hono } = await import("hono");
 
@@ -79,7 +79,7 @@ describe("Plus links", () => {
 
   it("gives Plus once per account, keeps the count, and stops at the limit", async () => {
     const h = await harness();
-    const made = (await createPlusLink(h.env, { label: "Friends", months: 12, maxUses: 2 }))!;
+    const made = (await createPlusLink(h.env, { label: "Friends", months: 12, maxUses: 2, plan: "plus" }))!;
     const hash = await hashOf(made.url);
     for (const n of [1, 2, 3]) await h.signIn(userId(n));
     const first = await claimPlusLink(h.env, hash, userId(1));
@@ -95,7 +95,7 @@ describe("Plus links", () => {
 
   it("close keeps Plus, take back ends it for one or for all", async () => {
     const h = await harness();
-    const made = (await createPlusLink(h.env, { label: "Press", months: null, maxUses: 9 }))!;
+    const made = (await createPlusLink(h.env, { label: "Press", months: null, maxUses: 9, plan: "plus" }))!;
     const hash = await hashOf(made.url);
     for (const n of [1, 2, 3]) await h.signIn(userId(n));
     assert.equal((await claimPlusLink(h.env, hash, userId(1)))?.expiresAt, null);
@@ -113,7 +113,7 @@ describe("Plus links", () => {
 
   it("refuses an account with no session", async () => {
     const h = await harness();
-    const made = (await createPlusLink(h.env, { label: "x", months: 1, maxUses: 1 }))!;
+    const made = (await createPlusLink(h.env, { label: "x", months: 1, maxUses: 1, plan: "plus" }))!;
     assert.equal(await claimPlusLink(h.env, await hashOf(made.url), userId(1)), null);
     assert.ok(h.accounts.openPlusLink(await hashOf(made.url)), "no use is spent");
   });
@@ -121,7 +121,7 @@ describe("Plus links", () => {
   it("runs the whole page: open, start, approve in the app, Plus is on; the code never signs anything in", async () => {
     const h = await harness();
     await h.signIn(userId(1));
-    const made = (await createPlusLink(h.env, { label: "Anna", months: 12, maxUses: 1 }))!;
+    const made = (await createPlusLink(h.env, { label: "Anna", months: 12, maxUses: 1, plan: "plus" }))!;
     const path = new URL(made.url).pathname;
     const landing = await h.call(path);
     assert.equal(landing.status, 200);
@@ -133,7 +133,7 @@ describe("Plus links", () => {
     const go = () => h.call(`${path}/continue`, { headers: { Cookie: cookie } });
     assert.match(await (await go()).text(), /Approve this code/);
     const seen = await inspectPairing(h.env, userId(1), { code });
-    assert.ok(seen.ok && seen.kind === "device" && seen.client === "Septena Plus link");
+    assert.ok(seen.ok && seen.kind === "device" && seen.client === "Septena plan link");
     const approved = await approvePairing(h.env, userId(1), { code, kind: "device" });
     assert.ok(approved.ok);
     assert.equal((await pollDevicePairing(h.env, { code, pollSecret: secret })).status, "gone", "a plus code mints no session");
@@ -142,6 +142,38 @@ describe("Plus links", () => {
     assert.equal((await go()).status, 410, "one shot");
     assert.equal((await h.call(path)).status, 404, "used up");
     assert.equal((await h.call("/plus/nonsense")).status, 404);
+  });
+});
+
+describe("Pro", () => {
+  it("is the highest active grant, gives the Pro limits, and ends with its row", async () => {
+    const h = await harness();
+    await h.signIn(userId(1));
+    const store = await h.taskStore(userId(1));
+    const plan = () => planFor(h.env, userId(1));
+    store.startTrialOnce(trialRow());
+    assert.equal((await plan()).plan, "plus");
+    const made = (await createPlusLink(h.env, { label: "Pro", plan: "pro", months: null, maxUses: 1 }))!;
+    assert.equal((await claimPlusLink(h.env, await hashOf(made.url), userId(1)))?.plan, "pro");
+    const pro = await plan();
+    assert.deepEqual([pro.plan, pro.limits.connectedAgents, pro.limits.attachmentsGB, pro.limits.devices], ["pro", null, 50, null]);
+    await revokePlusLink(h.env, made.link.id, null);
+    assert.equal((await plan()).plan, "plus", "back to the trial");
+    store.putEntitlement({ ...grantRow("grant:x", "pro", Date.now() - 1, null) }, "admin");
+    assert.equal((await plan()).plan, "plus", "an ended Pro row gives nothing");
+  });
+
+  it("keeps rows and links from before plans as Plus", async () => {
+    const { store, db } = await createTestTaskStore();
+    store.putEntitlement({ ...grantRow("grant:old", "plus", null, null), plan: undefined }, "admin");
+    db.exec("ALTER TABLE entitlements DROP COLUMN plan");
+    const reopened = (await createTestTaskStore(db)).store;
+    assert.equal(resolvePlan(reopened.entitlements()), "plus");
+    const first = await createTestAccountStore();
+    first.store.createPlusLink("hash", { label: "old", plan: "pro", months: null, maxUses: 1 });
+    first.db.exec("ALTER TABLE plus_links DROP COLUMN plan");
+    const again = (await createTestAccountStore(first.db)).store;
+    assert.equal(again.listPlusLinks().links[0].plan, "plus");
   });
 });
 
@@ -217,7 +249,7 @@ describe("admin page", () => {
     const post = (path: string, body: Record<string, string>, origin = ORIGIN) => h.call(path, {
       method: "POST", body: new URLSearchParams(body), headers: { "CF-Access-Jwt-Assertion": jwt, Origin: origin },
     });
-    const form = { label: "<b>Anna</b>", months: "forever", maxUses: "3" };
+    const form = { label: "<b>Anna</b>", plan: "plus", months: "forever", maxUses: "3" };
     assert.equal((await post("/admin/links", form, "https://evil.example")).status, 403);
     assert.equal((await post("/admin/links", { ...form, maxUses: "0" })).status, 400);
     const html = await (await post("/admin/links", form)).text();
@@ -225,7 +257,31 @@ describe("admin page", () => {
     assert.ok(html.includes("&lt;b&gt;Anna") && !html.includes("<b>Anna"));
     const id = h.accounts.listPlusLinks().links[0].id;
     assert.equal((await post(`/admin/links/${id}/revoke`, {})).status, 404, "a revoke must say who");
-    assert.equal((await post(`/admin/links/${id}/close`, {})).status, 303);
+    const closed = await post(`/admin/links/${id}/close`, {});
+    assert.equal(closed.status, 303);
+    assert.equal(closed.headers.get("Location"), "/admin/plans");
     assert.ok(h.accounts.listPlusLinks().links[0].closedAt);
+  });
+
+  it("gives a listed account a plan, changes it, takes it back, and touches no other account", async () => {
+    const h = await harness();
+    const jwt = await accessJwt("mz@example.com");
+    const post = (path: string, body: Record<string, string> = {}) => h.call(path, {
+      method: "POST", body: new URLSearchParams(body), headers: { "CF-Access-Jwt-Assertion": jwt, Origin: ORIGIN },
+    });
+    const { userId: id } = await h.accounts.resolveOrCreateIdentity("email", "a@example.com");
+    await h.signIn(id);
+    await sweepAccounts(h.env);
+    const rows = async () => (await h.taskStore(id)).entitlements();
+    assert.equal((await post(`/admin/accounts/${id}/plan`, { plan: "pro", months: "forever" })).status, 303);
+    assert.deepEqual((await rows()).map((r) => [r.id, r.plan, r.expiresAt]), [["grant:admin", "pro", null]]);
+    const view = planView(h.accounts.listAccounts()[0].summary);
+    assert.deepEqual([view.word, view.plan, view.until, view.adminGrant], ["granted", "pro", null, true]);
+    await post(`/admin/accounts/${id}/plan`, { plan: "plus", months: "12" });
+    assert.deepEqual((await rows()).map((r) => r.plan), ["plus"], "one grant per account");
+    assert.equal((await post(`/admin/accounts/${id}/plan`, { plan: "free", months: "12" })).status, 404);
+    assert.equal((await post(`/admin/accounts/${userId(9)}/plan`, { plan: "pro", months: "forever" })).status, 404, "an unlisted id gets no store");
+    assert.equal((await post(`/admin/accounts/${id}/plan/end`)).status, 303);
+    assert.deepEqual(await rows(), []);
   });
 });

@@ -448,13 +448,16 @@ describe("TaskStore references", () => {
     h.push(HUMAN, { op: "upsert", entity: "setting", id: "agentsPaused", fields: { value: true } });
     assert.equal(h.push(AGENT, h.ref("ref-c", { taskId: "t2", key: "issue:a/b#3" })).reason, "paused");
     await assert.rejects(h.run("tasks_update", { id: "t2", refs: [{ key: "issue:a/b#3" }] }), /paused/);
-    const updated = await h.run("tasks_update", { id: "t2", title: "Renamed", refs: [{ key: "issue:a/b#3" }] }) as unknown as Record<string, unknown>;
-    assert.deepEqual(updated.updated, ["title"]);
-    assert.equal((updated.refs_refused as { reason: string }[])[0].reason, "paused");
-    // A create still works; the refused reference is named, not dropped.
-    const created = await h.run("tasks_create", { title: "New", refs: [{ key: "issue:a/b#4" }] }) as unknown as Record<string, unknown>;
-    assert.equal(created.refs, undefined);
-    assert.equal((created.refs_refused as { key: string; reason: string }[])[0].reason, "paused");
+    // The pause refuses every agent write, not only references (#554).
+    await assert.rejects(h.run("tasks_update", { id: "t2", title: "Renamed" }), /paused/);
+    await assert.rejects(h.run("tasks_create", { title: "New", refs: [{ key: "issue:a/b#4" }] }), /paused/);
+    await assert.rejects(h.run("tasks_create", { title: "New", tags: ["fresh"] }), /paused/);
+    await assert.rejects(h.run("tasks_thread_append", { id: "t2", turn: { role: "provider", step: "work", note: "hi" } }), /paused/);
+    await assert.rejects(h.run("tasks_complete", { id: "t2" }), /paused/);
+    assert.equal(h.store.readTags().length, 0);
+    assert.equal(h.push(HUMAN, { op: "upsert", entity: "task", id: "t2", fields: { title: "Mine" } }).status, "applied");
+    h.push(HUMAN, { op: "upsert", entity: "setting", id: "agentsPaused", fields: { value: false } });
+    await h.run("tasks_update", { id: "t2", title: "Renamed" });
   });
 });
 
@@ -517,7 +520,7 @@ describe("Issue links become references (§6.6)", () => {
     assert.ok(h.keys("t1").includes("issue:acme/app#1"));
     h.task("t2");
     h.push(HUMAN, { op: "upsert", entity: "setting", id: "agentsPaused", fields: { value: true } });
-    await h.run("tasks_thread_append", { id: "t2", turn: { role: "provider", step: "work", note: url(1) } });
+    await assert.rejects(h.run("tasks_thread_append", { id: "t2", turn: { role: "provider", step: "work", note: url(1) } }), /paused/);
     assert.equal(h.keys("t2").length, 0);
   });
 

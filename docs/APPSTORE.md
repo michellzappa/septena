@@ -1,5 +1,12 @@
 # App Store metadata — source of truth
 
+> **Septena Life only.** Septena Life left this repo (ADR 0017, tag
+> `septena-life-archive`). This file is its listing (`com.septena.cloud`):
+> its `HEALTH_AND_FITNESS` category and its `planned` watchOS entry describe
+> Septena Life, not the task app. The task app's listing is
+> `docs/APPSTORE-SEPTASK.md` (category `PRODUCTIVITY`; the task app's watch
+> app ships, #65).
+
 This file is the canonical store listing copy for every Septena Life platform
 (the life OS, `com.septena.cloud`; ADR 0007). The task app (Septena) has its
 own listing in `docs/APPSTORE-SEPTASK.md`. `appstore/metadata.mjs` parses this
