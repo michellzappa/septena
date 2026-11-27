@@ -20,14 +20,13 @@ enum SeptaskSettingsLink {
 ///
 /// Structure, grouping, ordering, defaults, icons, and platform gates come
 /// from `registry/settings.json` (`RegistrySettings` in
-/// `SeptenaCore/Generated/RegistryConstants.swift`):
-///   • iOS: flat, scannable grouped root `Form` — everyday Lists controls sit
-///     inline on screen 1; Appearance and multi-step flows are 1 tap deep with
-///     live status badges; dev/diagnostic tools sit 2 taps deep under
-///     About ▸ Advanced.
-///   • macOS: 7-tab `NavigationSplitView` generated from
-///     `RegistrySettings.desktopTabs`, sharing the exact same pushed subpages
-///     as mobile (no `desktopInline` divergence).
+/// `SeptenaCore/Generated/RegistryConstants.swift`). The top level holds only
+/// navigation rows, one per place, in the same order on every platform:
+///   • iOS: the account card, then one row per place (`rootGroups`). Every
+///     setting lives on a pushed page.
+///   • macOS: a `NavigationSplitView` with one sidebar tab per place
+///     (`desktopTabs`). A tab shows the depth-1 page with the same id, the
+///     same page iOS pushes.
 struct SeptaskSettingsView: View {
   @Environment(\.dismiss) private var dismiss
   @Environment(\.modelContext) private var modelContext
@@ -130,7 +129,7 @@ struct SeptaskSettingsView: View {
   }
 
   /// The depth-1 page that links to a depth-2 page (About ▸ Advanced,
-  /// Privacy & Data ▸ Import & Export), read from the registry.
+  /// General ▸ Lists, Connections ▸ Calendar), read from the registry.
   private static func parentPage(of pageID: String) -> String? {
     RegistrySettings.pages.first { page in
       page.sections.contains { section in
@@ -190,11 +189,10 @@ struct SeptaskSettingsView: View {
         }
       }
     }
-    // Apple Watch moved to Account ▸ Devices (2026-11-22).
   }
   #endif
 
-  // MARK: - macOS 7-Tab Sidebar (from RegistrySettings.desktopTabs)
+  // MARK: - macOS Sidebar (from RegistrySettings.desktopTabs)
 
   #if os(macOS)
   @ViewBuilder
@@ -242,53 +240,14 @@ struct SeptaskSettingsView: View {
     }
   }
 
-  @ViewBuilder
+  /// Each tab is the depth-1 page with the same id (`registry/settings.json`).
   private func macTabPane(_ tabID: String) -> some View {
-    switch tabID {
-    case RegistrySettings.TabID.account:
-      SeptaskAccountPane()
-    case RegistrySettings.TabID.appearance:
-      Form {
-        registryPageSections(RegistrySettings.PageID.appearance)
-      }
-      .formStyle(.grouped)
-      .navigationTitle(RegistrySettings.pageById[RegistrySettings.PageID.appearance]?.title ?? "")
-    case RegistrySettings.TabID.privacy:
-      SeptaskPrivacyPane()
-    case RegistrySettings.TabID.about:
-      SeptaskAboutPane()
-    default:
-      Form {
-        let groups = RegistrySettings.rootGroups.filter { $0.desktopTab == tabID }
-        ForEach(groups) { group in
-          let visibleItems = group.items.filter(isItemVisible)
-          if !visibleItems.isEmpty {
-            Section {
-              ForEach(visibleItems) { item in
-                registryItemRow(item)
-              }
-            } header: {
-              if let header = group.header, header != RegistrySettings.tabById[tabID]?.title {
-                Text(header)
-              }
-            }
-          }
-        }
-      }
-      .formStyle(.grouped)
-      .navigationTitle(RegistrySettings.tabById[tabID]?.title ?? "Settings")
-    }
+    page(tabID)
   }
 
   private func owningDesktopTab(for pageID: String) -> String {
     if RegistrySettings.tabById[pageID] != nil { return pageID }
     if let parent = Self.parentPage(of: pageID) { return owningDesktopTab(for: parent) }
-    for group in RegistrySettings.rootGroups {
-      if let tab = group.desktopTab,
-         group.items.contains(where: { $0.kind == "pageLink" && $0.page == pageID }) {
-        return tab
-      }
-    }
     return RegistrySettings.TabID.general
   }
   #endif
@@ -358,7 +317,15 @@ struct SeptaskSettingsView: View {
       if let pageID = item.page {
         NavigationLink(value: pageID) {
           HStack(spacing: 12) {
-            pageLinkLabel(item)
+            if let detail = item.detail, !detail.isEmpty {
+              Label {
+                rowLabel(pageLinkTitle(item), detail: detail)
+              } icon: {
+                if let symbol = item.sfSymbol { Image(systemName: symbol) }
+              }
+            } else {
+              pageLinkLabel(item)
+            }
             Spacer(minLength: 8)
             if let badge = statusText(for: item.statusKey) {
               Text(badge)
@@ -382,9 +349,13 @@ struct SeptaskSettingsView: View {
     }
   }
 
+  private func pageLinkTitle(_ item: RegistrySettingsItem) -> String {
+    item.label ?? RegistrySettings.pageById[item.page ?? ""]?.title ?? ""
+  }
+
   @ViewBuilder
   private func pageLinkLabel(_ item: RegistrySettingsItem) -> some View {
-    let title = item.label ?? RegistrySettings.pageById[item.page ?? ""]?.title ?? ""
+    let title = pageLinkTitle(item)
     if item.iconId == "settings.claude" {
       Label {
         Text(title)
@@ -557,10 +528,6 @@ struct SeptaskSettingsView: View {
       return TaskSyncEngine.shared.signedIn ? liveSyncSummary : "On this device"
     case "planStatus":
       return PlanStatus.shared.statusLine
-    case "claudeStatus":
-      guard TaskSyncEngine.shared.signedIn else { return RegistrySettings.copy("syncStatus", "needsSignIn") }
-      let paired = SeptaskSyncedSettings.current().getStartedSteps?.contains(TaskNoticeStep.ID.connectAI.rawValue) == true
-      return paired ? "Connected" : "Set up"
     case "agentsStatus":
       let paused = RegistrySettings.copy("access_agents", "paused")
       if store.agentsPaused {
@@ -585,7 +552,8 @@ struct SeptaskSettingsView: View {
   // MARK: - Registry-Rendered Page Sections
 
   /// Renders a page's sections straight from `RegistrySettings.pages`, for
-  /// pages whose rows are all plain settings and inline surfaces (Appearance).
+  /// pages whose rows are plain settings, page links and inline surfaces
+  /// (General, Appearance, Connections).
   @ViewBuilder
   private func registryPageSections(_ pageID: String) -> some View {
     if let page = RegistrySettings.pageById[pageID] {
@@ -619,8 +587,6 @@ struct SeptaskSettingsView: View {
       SupportView()
     case RegistrySettings.PageID.account:
       SeptaskAccountPane()
-    case RegistrySettings.PageID.claudePairing:
-      SeptaskClaudePairingPane()
     case RegistrySettings.PageID.aiPreferences:
       SeptaskAIPreferencesPane()
     case RegistrySettings.PageID.calendar:
@@ -651,7 +617,11 @@ struct SeptaskSettingsView: View {
       SeptaskDevicesAccessPane()
     case RegistrySettings.PageID.agents:
       SeptaskAgentsPane()
-    case RegistrySettings.PageID.appearance:
+    case RegistrySettings.PageID.shortcuts:
+      SeptaskShortcutsPane()
+    case RegistrySettings.PageID.general,
+         RegistrySettings.PageID.connections,
+         RegistrySettings.PageID.appearance:
       Form {
         registryPageSections(pageID)
       }
@@ -675,8 +645,27 @@ private struct SeptaskAccountPane: View {
   @AppStorage(SettingsKey.welcomeName) private var welcomeName: String =
     RegistrySettings.Defaults.welcomeName
 
+  private static let page = RegistrySettings.pageById[RegistrySettings.PageID.account]
+
   var body: some View {
     Form {
+      // Section order comes from the registry `account` page.
+      ForEach(Self.page?.sections ?? []) { section in
+        accountSection(section.id)
+      }
+    }
+    .formStyle(.grouped)
+    .task { await PlanStatus.shared.refresh() }
+    .navigationTitle(RegistrySettings.pageById[RegistrySettings.PageID.account]?.title ?? "")
+    #if os(iOS)
+    .navigationBarTitleDisplayMode(.inline)
+    #endif
+  }
+
+  @ViewBuilder
+  private func accountSection(_ id: String) -> some View {
+    switch id {
+    case "profile":
       Section {
         HStack(spacing: 16) {
           ProfileAvatar(name: welcomeName, isPlus: PlanStatus.shared.isPlus, size: 64)
@@ -709,7 +698,7 @@ private struct SeptaskAccountPane: View {
           Text(footer)
         }
       }
-
+    case "plan":
       Section {
         NavigationLink(value: RegistrySettings.PageID.plus) {
           LabeledContent {
@@ -720,24 +709,22 @@ private struct SeptaskAccountPane: View {
           }
         }
       }
-
+    case "devices_access":
       Section {
         NavigationLink(value: RegistrySettings.PageID.devicesAccess) {
           Label(RegistrySettings.pageById[RegistrySettings.PageID.devicesAccess]?.title ?? "",
                 systemImage: RegistryIcons.sfSymbols["settings.devices"] ?? "laptopcomputer.and.iphone")
         }
       }
-
-      SeptaskSyncAccountSection()
+    case "sign_in_methods":
       SeptaskSignInMethodsSection()
+    case "sync":
+      SeptaskSyncAccountSection()
+    case "delete_account":
       SeptaskDeleteAccountSection()
+    default:
+      EmptyView()
     }
-    .formStyle(.grouped)
-    .task { await PlanStatus.shared.refresh() }
-    .navigationTitle(RegistrySettings.pageById[RegistrySettings.PageID.account]?.title ?? "")
-    #if os(iOS)
-    .navigationBarTitleDisplayMode(.inline)
-    #endif
   }
 }
 
@@ -944,7 +931,7 @@ enum SeptaskAbout {
   }
 }
 
-// MARK: - Smart Lists (Depth 1)
+// MARK: - Lists (Depth 2, General ▸ Lists)
 
 private struct SeptaskSmartListsPane: View {
   @State private var prefs = SmartListPreferences.shared
@@ -970,7 +957,7 @@ private struct SeptaskSmartListsPane: View {
     .environment(\.editMode, .constant(.active))
     .navigationBarTitleDisplayMode(.inline)
     #endif
-    .navigationTitle("Smart Lists")
+    .navigationTitle(RegistrySettings.pageById[RegistrySettings.PageID.smartLists]?.title ?? "")
   }
 
   @ViewBuilder
@@ -1040,5 +1027,37 @@ private struct SeptaskSmartListsPane: View {
       .labelsHidden()
       .disabled(!dest.canHide)
     }
+  }
+}
+
+// MARK: - Siri & Shortcuts (Depth 2, Connections ▸ Siri & Shortcuts)
+
+/// Explains that Septena's App Intents (`SeptaskAppShortcuts`) work in Siri
+/// and the Shortcuts app, and opens the Shortcuts app. Apple platforms only: the row and page carry
+/// `platforms` with the reason "system Shortcuts API" in the registry.
+private struct SeptaskShortcutsPane: View {
+  private static let page = RegistrySettings.pageById[RegistrySettings.PageID.shortcuts]
+  private static let item = RegistrySettings.itemBySurface["siri_shortcuts"]
+  private static let section = RegistrySettings.section("actions", page: RegistrySettings.PageID.shortcuts)
+
+  var body: some View {
+    Form {
+      Section {
+        if let detail = Self.item?.detail {
+          Text(detail)
+        }
+        // `ShortcutsLink` is iOS only; the URL opens Shortcuts on iOS and Mac alike.
+        Link(destination: URL(string: "shortcuts://")!) {
+          Label(Self.item?.label ?? "", systemImage: Self.item?.sfSymbol ?? "square.2.layers.3d")
+        }
+      } footer: {
+        if let footer = Self.section?.footer { Text(footer) }
+      }
+    }
+    .formStyle(.grouped)
+    .navigationTitle(Self.page?.title ?? "")
+    #if os(iOS)
+    .navigationBarTitleDisplayMode(.inline)
+    #endif
   }
 }

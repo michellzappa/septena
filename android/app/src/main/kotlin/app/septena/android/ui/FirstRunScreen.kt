@@ -327,7 +327,7 @@ private fun StepContent(
                 deviceStartTitle = step.primary?.title ?: deviceSignInCopy("start", languageTag),
             )
         }
-        // The code field is the one on Settings ▸ Connect Claude. Its approval dialog ticks the Get started
+        // The code field is the one on Settings ▸ Agents. Its approval dialog ticks the Get started
         // step itself (`completeConnectAgentStep`), so this step only marks itself done.
         "connectAgent" -> Column(
             modifier = Modifier.widthIn(max = 460.dp).fillMaxWidth(),

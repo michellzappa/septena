@@ -138,22 +138,23 @@ describe("web URL routing", () => {
 
   it("parses and builds settings tab URLs", () => {
     assert.equal(settingsPath("account"), "/settings/account");
-    assert.equal(settingsPath("ai_agents"), "/settings/ai-agents");
-    assert.equal(settingsPath("connections_data"), "/settings/connections");
+    assert.equal(settingsPath("agents"), "/settings/agents");
+    assert.equal(settingsPath("connections"), "/settings/connections");
 
     const bare = parseWebRoute("/settings");
     assert.equal(bare.settingsOpen, true);
     assert.equal(bare.settingsTab, "general");
     assert.equal(bare.canonicalize, true);
 
-    const ai = parseWebRoute("/settings/ai-agents");
-    assert.equal(ai.settingsOpen, true);
-    assert.equal(ai.settingsTab, "ai_agents");
-    assert.equal(ai.canonicalize, false);
+    const agents = parseWebRoute("/settings/agents");
+    assert.equal(agents.settingsOpen, true);
+    assert.equal(agents.settingsTab, "agents");
+    assert.equal(agents.canonicalize, false);
 
-    const aiAlias = parseWebRoute("/settings/ai_agents");
+    // The old AI & Agents URL still opens the Agents tab and canonicalizes.
+    const aiAlias = parseWebRoute("/settings/ai-agents");
     assert.equal(aiAlias.settingsOpen, true);
-    assert.equal(aiAlias.settingsTab, "ai_agents");
+    assert.equal(aiAlias.settingsTab, "agents");
     assert.equal(aiAlias.canonicalize, true);
 
     assert.equal(

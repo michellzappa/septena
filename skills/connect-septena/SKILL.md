@@ -34,7 +34,7 @@ the next one.
 ## Procedure: no browser
 
 If the person already has an agent key, use it. They make one in the app:
-Settings, then AI & Agents, then Agents, then New Agent Key. The app shows the
+Settings, then Agents, then New Agent Key. The app shows the
 key once. Never print it, log it or write it into a file in a repository.
 
 If they have no key, create their account, or connect to the one they have,

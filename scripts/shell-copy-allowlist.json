@@ -99,7 +99,7 @@
     },
     {
       "file": "Septena/Shell/Sidebar/SidebarView.swift",
-      "literal": "Customize Smart Lists…",
+      "literal": "Customize Lists…",
       "reasonId": "predates-rule"
     },
     {
@@ -620,11 +620,6 @@
     {
       "file": "Septask/SeptaskSettingsView.swift",
       "literal": "On this device",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septask/SeptaskSettingsView.swift",
-      "literal": "Smart Lists",
       "reasonId": "predates-rule"
     },
     {

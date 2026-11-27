@@ -14,8 +14,8 @@ export type SettingsTabId =
   | "account"
   | "general"
   | "appearance"
-  | "ai_agents"
-  | "connections_data"
+  | "agents"
+  | "connections"
   | "privacy"
   | "about";
 
@@ -58,8 +58,8 @@ const SETTINGS_TAB_TO_SLUG: Record<SettingsTabId, string> = {
   account: "account",
   general: "general",
   appearance: "appearance",
-  ai_agents: "ai-agents",
-  connections_data: "connections",
+  agents: "agents",
+  connections: "connections",
   privacy: "privacy",
   about: "about",
 };
@@ -68,13 +68,14 @@ const SETTINGS_SLUG_TO_TAB: Record<string, SettingsTabId> = {
   account: "account",
   general: "general",
   appearance: "appearance",
-  "ai-agents": "ai_agents",
-  ai_agents: "ai_agents",
-  agents: "ai_agents",
-  ai: "ai_agents",
-  connections: "connections_data",
-  connections_data: "connections_data",
-  data: "connections_data",
+  agents: "agents",
+  // Older links: the Agents tab was "AI & Agents" (/settings/ai-agents).
+  "ai-agents": "agents",
+  ai_agents: "agents",
+  ai: "agents",
+  connections: "connections",
+  connections_data: "connections",
+  data: "connections",
   privacy: "privacy",
   about: "about",
 };
