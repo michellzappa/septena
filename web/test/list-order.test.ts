@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { groupTasksByList, moveIdToTarget, nextStructurePosition, orderByPosition } from "../src/lib/listOrder.ts";
+import { groupTasksByList, moveIdToTarget, nextStructurePosition, orderByPosition, positionAbove } from "../src/lib/listOrder.ts";
 import type { AreaRow, ProjectRow } from "../src/lib/types.ts";
 
 test("orderByPosition puts positioned items ascending and sinks position 0/unset to bottom", () => {
@@ -66,4 +66,12 @@ test("moveIdToTarget refuses a drop on itself or on an id outside the list", () 
   assert.equal(moveIdToTarget(["a", "b"], "a", "a"), null);
   assert.equal(moveIdToTarget(["a", "b"], "x", "b"), null);
   assert.equal(moveIdToTarget(["a", "b"], "a", "x"), null);
+});
+
+test("positionAbove matches Apple TaskOrder.between(nil, below) and never returns 0", () => {
+  assert.equal(positionAbove(null), 1024);
+  assert.equal(positionAbove(undefined), 1024);
+  assert.equal(positionAbove(3000), 3000 - 1024);
+  assert.equal(positionAbove(1024), -512);
+  assert.notEqual(positionAbove(1024), 0);
 });

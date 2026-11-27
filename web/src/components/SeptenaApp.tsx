@@ -70,7 +70,7 @@ import {
   PLAN_UI,
 } from "@/lib/generated/registries";
 import { hexWithAlpha, type HeaderTextureStyle } from "@/lib/headerWash";
-import { groupTasksByList, moveIdToTarget, orderByPosition } from "@/lib/listOrder";
+import { groupTasksByList, moveIdToTarget, orderByPosition, positionAbove } from "@/lib/listOrder";
 import {
   LIST_SORT_OPTIONS,
   LIST_SORT_SURFACE,
@@ -1790,6 +1790,36 @@ export function SeptenaApp() {
       await reorderWithUndo(reordered, "position", sourceId);
     },
     [draggedHeadingId, projectHeadings, reorderWithUndo],
+  );
+
+  // A task dropped on a section header files it into that section, at the top of its tasks
+  // (Apple handleHeadingDrop). A sorted project shows the sort, so the drop files only and
+  // writes no position (docs/DRAG_AND_DROP.md §1). One undo entry puts heading and position back.
+  const handleTaskDropOnHeading = useCallback(
+    async (headingId: string) => {
+      const sourceId = draggedTaskId;
+      setDraggedTaskId(null);
+      setDropTargetHeadingId(null);
+      if (!sourceId) return;
+      const task = syncState.snapshot.tasks.find((t) => t.id === sourceId);
+      const heading = projectHeadings.find((h) => h.id === headingId);
+      if (!task || !heading || task.kind === "heading") return;
+      const prev = { heading: task.heading ?? null, position: task.position ?? null };
+      const next: { heading: string; position?: number } = { heading: headingId };
+      if (currentListSort === "manual") {
+        const first = visibleTasks.find((v) => v.task.heading === headingId && v.task.id !== sourceId);
+        next.position = positionAbove(first?.task.position);
+      }
+      // projectHeadings holds only this project's headings, and the dragged row is on this
+      // project page, so the task stays in its project: only heading and position change.
+      await engine.updateTaskFields(task, next);
+      undoStack.record({
+        label: `Moved “${task.title}” to ${heading.title}`,
+        undo: () => engine.updateTaskFields(task, prev),
+        redo: () => engine.updateTaskFields(task, next),
+      });
+    },
+    [currentListSort, draggedTaskId, engine, projectHeadings, syncState.snapshot.tasks, undoStack, visibleTasks],
   );
 
   const handleDropOnSidebarSmart = useCallback(
@@ -4726,7 +4756,7 @@ export function SeptenaApp() {
                             setDropTargetHeadingId(null);
                           },
                           onDragOver: (e) => {
-                            if (!draggedHeadingId) return;
+                            if (!draggedHeadingId && !draggedTaskId) return;
                             e.preventDefault();
                             setDropTargetHeadingId(h.id);
                           },
@@ -4735,7 +4765,8 @@ export function SeptenaApp() {
                           },
                           onDrop: (e) => {
                             e.preventDefault();
-                            void handleDropOnHeading(h.id);
+                            if (draggedTaskId) void handleTaskDropOnHeading(h.id);
+                            else void handleDropOnHeading(h.id);
                           },
                         },
                         onContextMenu: (e) => {

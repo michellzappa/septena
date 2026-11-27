@@ -152,3 +152,17 @@ export function moveIdToTarget(ids: readonly string[], sourceId: string, targetI
   next.splice(toIdx, 0, moved);
   return next;
 }
+
+/** Apple `TaskOrder.gap`: the step between manual positions at a list edge. */
+export const TASK_ORDER_GAP = 1024;
+
+/**
+ * Apple `TaskOrder.between(above: nil, below:)`: the position for one task placed above
+ * `below` (the first task of a group), or at the start of an empty group. Never 0, the
+ * "never dragged" value: a result of 0 moves half a step, which stays above `below`.
+ */
+export function positionAbove(below: number | null | undefined): number {
+  if (typeof below !== "number" || !Number.isFinite(below)) return TASK_ORDER_GAP;
+  const slot = below - TASK_ORDER_GAP;
+  return slot === 0 ? slot - TASK_ORDER_GAP / 2 : slot;
+}
