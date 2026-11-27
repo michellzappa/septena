@@ -81,7 +81,7 @@ internal class DpapiSecretVault : SecretVault {
 
 private const val CRYPTPROTECT_UI_FORBIDDEN = 0x1
 
-private interface Crypt32 : StdCallLibrary {
+internal interface Crypt32 : StdCallLibrary {
     fun CryptProtectData(input: DataBlob, description: WString?, entropy: DataBlob?, reserved: Pointer?, prompt: Pointer?, flags: Int, output: DataBlob): Boolean
     fun CryptUnprotectData(input: DataBlob, description: PointerByReference?, entropy: DataBlob?, reserved: Pointer?, prompt: Pointer?, flags: Int, output: DataBlob): Boolean
 
@@ -90,7 +90,7 @@ private interface Crypt32 : StdCallLibrary {
     }
 }
 
-private interface Kernel32 : StdCallLibrary {
+internal interface Kernel32 : StdCallLibrary {
     fun LocalFree(memory: Pointer): Pointer
 
     companion object {
@@ -99,7 +99,7 @@ private interface Kernel32 : StdCallLibrary {
 }
 
 @Structure.FieldOrder("cbData", "pbData")
-private class DataBlob : Structure {
+internal class DataBlob : Structure {
     @JvmField var cbData: Int = 0
     @JvmField var pbData: Pointer? = null
 
