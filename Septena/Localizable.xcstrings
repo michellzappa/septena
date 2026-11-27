@@ -11818,6 +11818,10 @@
         }
       }
     },
+    "Created" : {
+      "comment" : "Generated from registry settings.keys.listSort.options.4.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Created from %@" : {
       "comment" : "Generated from registry surfaces.taskReferences.createdFrom.format. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -21706,6 +21710,10 @@
           }
         }
       }
+    },
+    "Manual" : {
+      "comment" : "Generated from registry settings.keys.listSort.options.0.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Mark as Complete" : {
       "comment" : "SeptaskKit localization pass 2026-08-09",
@@ -36274,6 +36282,14 @@
         }
       }
     },
+    "Sort By" : {
+      "comment" : "Generated from registry actions.menuBar.view.items.sortBy.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Sorted by %@" : {
+      "comment" : "Generated from registry surfaces.listSort.sortedBy. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Spreadsheet-friendly table of tasks" : {
       "comment" : "Generated from registry settings.copy.import_export.exportCsvDetail.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -39922,7 +39938,7 @@
       }
     },
     "Title" : {
-      "comment" : "Generated from registry surfaces.taskDetail.fields.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.keys.listSort.options.3.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {

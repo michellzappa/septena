@@ -399,6 +399,9 @@ struct AreaDetailView: View {
       } label: {
         Label(RegistryActions.title(.areaNewProject), systemImage: "plus")
       }
+      Divider()
+      // Sort By for this area's tasks (docs/LIST_SORT_SPEC.md §6).
+      ListSortMenu(filter: .area(area.id))
     }
   }
 
@@ -885,6 +888,8 @@ struct ProjectDetailView: View {
       } label: {
         Label(RegistryActions.title(.sectionNew), systemImage: "rectangle.split.1x2")
       }
+      // Sort By for this project's tasks (docs/LIST_SORT_SPEC.md §6).
+      ListSortMenu(filter: .project(project.id))
       Divider()
       Button {
         showingMoveToArea = true

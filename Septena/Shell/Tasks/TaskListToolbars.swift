@@ -161,6 +161,10 @@ struct TaskListStandaloneChrome: ViewModifier {
   var starFilter: Binding<Bool>? = nil
   /// The owning list's own create action (see `TaskListToolbarChrome.onNew`).
   var onNew: (() -> Void)? = nil
+  /// The list, when it takes a Sort By (docs/LIST_SORT_SPEC.md §6): its
+  /// "···" menu then holds Sort By. nil → no Sort By here. Project and area
+  /// pages are embedded and carry Sort By in their own "···".
+  var sortFilter: TaskFilter? = nil
 
   private func newTask() {
     if let onNew { onNew() } else { nav.requestNewTask() }
@@ -197,6 +201,11 @@ struct TaskListStandaloneChrome: ViewModifier {
               StarFilterToolbarButton(isOn: starFilter)
             }
           }
+          if let sortFilter {
+            ToolbarItem(placement: .topBarTrailing) {
+              OverflowMenu { ListSortMenu(filter: sortFilter) }
+            }
+          }
           if !recentlyDeleted {
             ToolbarItem(placement: .topBarTrailing) {
               PageAddButton { newTask() }
@@ -210,6 +219,7 @@ struct TaskListStandaloneChrome: ViewModifier {
       content.pageChrome(
         id: "tasks",
         title: "Tasks",
+        localActions: { sortFilter.map { AnyView(ListSortMenu(filter: $0)) } },
         accessory: { starFilter.map { AnyView(StarFilterToolbarButton(isOn: $0)) } },
         add: recentlyDeleted ? nil : .action { newTask() }
       )

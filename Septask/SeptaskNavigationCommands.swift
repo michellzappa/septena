@@ -247,6 +247,9 @@ struct SeptaskCommandMenus: Commands {
   @FocusedValue(\.septaskNavigationActions) private var actions
   @FocusedValue(\.taskActions) private var taskActions
   @AppStorage(SettingsKey.textSizeStep) private var textSizeRaw = 0
+  /// Wakes View ▸ Sort By when the list in front or its sort changes
+  /// (`ListSortFocus`): a `Commands` body re-evaluates on `@AppStorage`.
+  @AppStorage(ListSortFocus.revisionKey) private var listSortRevision = 0
 
   /// A navigation command has a target when a SwiftUI window is focused, or —
   /// on macOS, where it's the default window — when the AppKit shell is.
@@ -425,6 +428,23 @@ struct SeptaskCommandMenus: Commands {
     }
   }
 
+  /// The View menu's slots.
+  private func viewSlots(_ id: String) -> [RegistryMenuNode] {
+    switch id {
+    case "textSizeSteps": return textSizeSteps(id)
+    case "listSortOptions": return listSortOptions()
+    default: return []
+    }
+  }
+
+  /// View ▸ Sort By ▸ the five choices for the list in front, the current one
+  /// checked (docs/LIST_SORT_SPEC.md §6). Disabled when that list takes no
+  /// sort. Both shells set the list in front (`ListSortFocus`).
+  private func listSortOptions() -> [RegistryMenuNode] {
+    _ = listSortRevision
+    return ListSortMenuNodes.nodes(for: ListSortFocus.filter)
+  }
+
   /// View ▸ Text Size ▸ the five steps, the current one checked. Writes the
   /// same preference as Settings → Text Size.
   private func textSizeSteps(_ id: String) -> [RegistryMenuNode] {
@@ -509,8 +529,9 @@ struct SeptaskCommandMenus: Commands {
     }
 
     CommandGroup(after: .sidebar) {
-      // Registry View menu: sidebar, Info, sidebar counts, Text Size ▸.
-      menuBar(.view, slot: textSizeSteps)
+      // Registry View menu: sidebar, Info, sidebar counts, Text Size ▸,
+      // Sort By ▸.
+      menuBar(.view, slot: viewSlots)
 
       // View options for the lists themselves. Not shell-gated: it writes a
       // stored preference both shells read, and on iPadOS this same group is

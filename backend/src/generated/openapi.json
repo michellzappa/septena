@@ -6000,6 +6000,60 @@
                               "pattern": "^[A-Za-z0-9_-]{8,64}$"
                             },
                             "op": {
+                              "const": "upsert"
+                            },
+                            "entity": {
+                              "const": "setting"
+                            },
+                            "id": {
+                              "const": "listSort"
+                            },
+                            "fields": {
+                              "type": "object",
+                              "properties": {
+                                "value": {
+                                  "anyOf": [
+                                    {
+                                      "type": "object",
+                                      "additionalProperties": {
+                                        "type": "string",
+                                        "enum": [
+                                          "when",
+                                          "deadline",
+                                          "title",
+                                          "created"
+                                        ]
+                                      }
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "value"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": [
+                            "clientOpId",
+                            "op",
+                            "entity",
+                            "id",
+                            "fields"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "clientOpId": {
+                              "type": "string",
+                              "pattern": "^[A-Za-z0-9_-]{8,64}$"
+                            },
+                            "op": {
                               "const": "delete"
                             },
                             "entity": {

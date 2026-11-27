@@ -236,6 +236,11 @@ fun TaskHomeContent(
     onDropTaskRow: ((index: Int, before: Boolean) -> Unit)? = null,
     onDropGroupHeader: ((targetLocationKey: String) -> Unit)? = null,
     canReorder: Boolean = false,
+    /**
+     * False in a sorted list (docs/LIST_SORT_SPEC.md §6): rows still drag to headings and
+     * other targets, but a drop between two rows does not reorder. The Inbox band keeps its order.
+     */
+    reorderBetweenRows: Boolean = true,
     onReorderInboxHeader: ((ids: List<String>) -> Unit)? = null,
     onReorderInboxRow: ((ids: List<String>, index: Int, before: Boolean) -> Unit)? = null,
     onReorderTaskRow: ((ids: List<String>, index: Int, before: Boolean) -> Unit)? = null,
@@ -525,6 +530,7 @@ fun TaskHomeContent(
                     onDropRow = onDropTaskRow,
                     onDropGroupHeader = onDropGroupHeader,
                     canReorder = canReorder && onReorderTaskRow != null,
+                    reorderBetweenRows = reorderBetweenRows,
                     orderedDragIds = orderedSelectionIds,
                     onReorderRow = onReorderTaskRow,
                     onReorderGroupHeader = onReorderGroupHeader,
@@ -604,6 +610,7 @@ private fun LazyListScope.taskCardRows(
     onDropRow: ((index: Int, before: Boolean) -> Unit)?,
     onDropGroupHeader: ((targetLocationKey: String) -> Unit)? = null,
     canReorder: Boolean = false,
+    reorderBetweenRows: Boolean = true,
     orderedDragIds: List<String> = emptyList(),
     onReorderRow: ((ids: List<String>, index: Int, before: Boolean) -> Unit)? = null,
     onReorderGroupHeader: ((ids: List<String>, targetLocationKey: String) -> Unit)? = null,
@@ -718,7 +725,7 @@ private fun LazyListScope.taskCardRows(
                         .taskReorderRowDrop(
                             id = "reorder-$keyPrefix-${task.id}",
                             taskId = task.id,
-                            enabled = canReorder && onReorderRow != null,
+                            enabled = canReorder && reorderBetweenRows && onReorderRow != null,
                             onDrop = { ids, before -> onReorderRow?.invoke(ids, index, before) },
                         ),
                 )

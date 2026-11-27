@@ -121,6 +121,8 @@ fun AreasProjectsScreen(
     var notesFocused by remember(destination.key) { mutableStateOf(false) }
 
     LaunchedEffect(destination) { viewModel.select(destination) }
+    // A row in its inline foldout keeps its place in a sorted page until it closes (LIST_SORT_SPEC §6).
+    LaunchedEffect(expandedTaskId) { viewModel.setPinnedTask(expandedTaskId) }
     LaunchedEffect(state.destination, state.notes) {
         if (!notesFocused) {
             notesDraft = state.notes
@@ -570,7 +572,8 @@ fun AreasProjectsScreen(
                                         .taskReorderRowDrop(
                                             id = "reorder-area-row-${task.id}",
                                             taskId = task.id,
-                                            enabled = true,
+                                            // A sorted page does not reorder between rows; heading drops still work.
+                                            enabled = !state.isSorted,
                                             onDrop = { ids, before ->
                                                 val newPositions = reorderPositions(areaPositions, index, before, ids.size)
                                                 viewModel.reorderTasks(ids, newPositions)
@@ -670,7 +673,8 @@ fun AreasProjectsScreen(
                                         .taskReorderRowDrop(
                                             id = "reorder-project-row-${task.id}",
                                             taskId = task.id,
-                                            enabled = true,
+                                            // A sorted page does not reorder between rows; heading drops still work.
+                                            enabled = !state.isSorted,
                                             onDrop = { ids, before ->
                                                 val newPositions = reorderPositions(projectPositions, index, before, ids.size)
                                                 viewModel.reorderTasks(ids, newPositions, targetHeadingId = null, updateHeading = true)
@@ -725,6 +729,7 @@ fun AreasProjectsScreen(
                                 onDelete = { dialog = PlacesDialog.DeleteSection(section.id) },
                                 onMagicPlusDrop = onMagicPlusDrop,
                                 orderedDragIds = orderedPlaceDragIds,
+                                reorderBetweenRows = !state.isSorted,
                                 onReorderToSection = { ids, newPositions ->
                                     viewModel.reorderTasks(ids, newPositions, targetHeadingId = section.id, updateHeading = true)
                                 },
@@ -900,6 +905,8 @@ private fun LazyListScope.placeSection(
     onMagicPlusDrop: ((QuickAddDraft) -> Unit)? = null,
     orderedDragIds: List<String> = emptyList(),
     onReorderToSection: (ids: List<String>, positions: List<Double>) -> Unit = { _, _ -> },
+    /** False on a sorted page: a drop between two rows does not reorder. */
+    reorderBetweenRows: Boolean = true,
     expandedTaskId: String? = null,
     expandedTaskContent: (@Composable (task: TaskListItem, position: TaskCardPosition, modifier: Modifier) -> Unit)? = null,
 ) {
@@ -966,7 +973,7 @@ private fun LazyListScope.placeSection(
                         .taskReorderRowDrop(
                             id = "reorder-section-row-${task.id}",
                             taskId = task.id,
-                            enabled = true,
+                            enabled = reorderBetweenRows,
                             onDrop = { ids, before ->
                                 val newPositions = reorderPositions(sectionPositions, index, before, ids.size)
                                 onReorderToSection(ids, newPositions)

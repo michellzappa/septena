@@ -5,6 +5,8 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import app.septena.android.AndroidAppGraph
 import app.septena.core.JsonValue
+import app.septena.core.ListSortPreferences
+import app.septena.core.ListSortRules
 import app.septena.core.NotesBase
 import app.septena.core.ProjectShare
 import app.septena.core.RegistryCatalog
@@ -24,6 +26,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -78,8 +81,15 @@ data class AreasProjectsUiState(
     val areaTasks: List<PlaceTaskRow> = emptyList(),
     val unsectionedTasks: List<PlaceTaskRow> = emptyList(),
     val sections: List<PlaceSectionRow> = emptyList(),
+    /** The Sort By choice of this page (docs/LIST_SORT_SPEC.md); Manual is the stored order. */
+    val listSort: String = RegistryEntityEnums.ListSort.MANUAL,
+    /** The rows the core sorts, by id. Empty under Manual. */
+    val sortSnapshots: Map<String, TaskSnapshot> = emptyMap(),
     val errorMessage: String? = null,
-)
+) {
+    /** A sorted page turns drag between rows off; drops on headings still work (spec §6). */
+    val isSorted: Boolean get() = listSort != RegistryEntityEnums.ListSort.MANUAL
+}
 
 /** Store-backed area/project detail state. Reads stay on IO and reload after every sync data-version change. */
 class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
@@ -93,6 +103,10 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
 
     private val destination = MutableStateFlow<AreasProjectsDestination?>(null)
     private val errorMessage = MutableStateFlow<String?>(null)
+    /** The row in inline edit: it keeps its place in a sorted page until the edit ends. */
+    private val pinnedTaskId = MutableStateFlow<String?>(null)
+    /** The row order each group of the page showed last, for [pinnedTaskId]. */
+    @Volatile private var lastShownOrder: Map<String, List<String>> = emptyMap()
 
     @OptIn(ExperimentalCoroutinesApi::class)
     private val loaded: StateFlow<AreasProjectsUiState> = combine(destination, graph.sync.dataVersion) { selected, _ ->
@@ -105,13 +119,56 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         initialValue = AreasProjectsUiState(),
     )
 
-    val state: StateFlow<AreasProjectsUiState> = combine(loaded, errorMessage) { places, error ->
+    /** [loaded] with the page's Sort By applied off the main thread, inside each group. */
+    private val sortedLoaded = combine(loaded, pinnedTaskId) { places, pinned ->
+        applyListSort(places, pinned)
+    }.flowOn(Dispatchers.Default)
+
+    val state: StateFlow<AreasProjectsUiState> = combine(sortedLoaded, errorMessage) { places, error ->
         places.copy(errorMessage = error)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(stopTimeoutMillis = 5_000),
         initialValue = AreasProjectsUiState(),
     )
+
+    /** The row in inline edit, or null when no edit is open. */
+    fun setPinnedTask(id: String?) {
+        pinnedTaskId.value = id
+    }
+
+    /** Sorts the area's tasks, the tasks above the first heading, and each heading's tasks; headings keep their order. */
+    private fun applyListSort(places: AreasProjectsUiState, pinned: String?): AreasProjectsUiState {
+        val destination = places.destination
+        if (destination == null || !places.isSorted) {
+            lastShownOrder = emptyMap()
+            return places
+        }
+        val shown = mutableMapOf<String, List<String>>()
+        val previous = lastShownOrder
+        fun sort(group: String, rows: List<PlaceTaskRow>): List<PlaceTaskRow> {
+            val key = "${destination.key}|$group"
+            val sorted = ListSortRules.sortInGroups(
+                items = rows,
+                sort = places.listSort,
+                id = PlaceTaskRow::id,
+                groupKey = { null },
+                snapshot = { places.sortSnapshots[it.id] },
+                isFixed = { it.item.isCompleted },
+                pinnedId = pinned,
+                previousIds = previous[key].orEmpty(),
+            )
+            shown[key] = sorted.map(PlaceTaskRow::id)
+            return sorted
+        }
+        val result = places.copy(
+            areaTasks = sort("area", places.areaTasks),
+            unsectionedTasks = sort("unsectioned", places.unsectionedTasks),
+            sections = places.sections.map { it.copy(tasks = sort("section:${it.id}", it.tasks)) },
+        )
+        lastShownOrder = shown
+        return result
+    }
 
     fun select(destination: AreasProjectsDestination) {
         if (this.destination.value != destination) {
@@ -359,6 +416,18 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             .toList()
         val taskRows = allTaskRecords
             .filter { (_, task) -> task.status == RegistryEntityEnums.TaskStatus.OPEN }
+        val listSort = ListSortPreferences.fromSynced(graph.syncedSettings).sortFor(
+            when (selected) {
+                is AreasProjectsDestination.Area -> ListSortPreferences.areaKey(selected.id)
+                is AreasProjectsDestination.Project -> ListSortPreferences.projectKey(selected.id)
+            },
+        )
+        fun sortSnapshots(ids: Set<String>): Map<String, TaskSnapshot> =
+            if (listSort == RegistryEntityEnums.ListSort.MANUAL) {
+                emptyMap()
+            } else {
+                taskRows.asSequence().map { it.second }.filter { it.id in ids }.associateBy(TaskSnapshot::id)
+            }
 
         fun placeRow(record: app.septena.core.SyncRecord, task: TaskSnapshot, pos: Double?): PlaceTaskRow {
             val membership = TaskViewRules.membership(task, today, now)
@@ -435,6 +504,8 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                     notes = notes,
                     projects = projects,
                     areaTasks = tasks,
+                    listSort = listSort,
+                    sortSnapshots = sortSnapshots(tasks.mapTo(HashSet(), PlaceTaskRow::id)),
                 )
             }
             is AreasProjectsDestination.Project -> {
@@ -497,6 +568,10 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                     availableAreas = availableAreas,
                     unsectionedTasks = unsectioned,
                     sections = sections,
+                    listSort = listSort,
+                    sortSnapshots = sortSnapshots(
+                        (unsectioned + sections.flatMap(PlaceSectionRow::tasks)).mapTo(HashSet(), PlaceTaskRow::id),
+                    ),
                 )
             }
         }

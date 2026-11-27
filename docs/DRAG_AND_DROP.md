@@ -27,7 +27,7 @@ four drops:
 
 | Drop | Membership change | Order change |
 |------|-------------------|--------------|
-| Reorder in place | none | set `position` between neighbors |
+| Reorder in place (Manual sort only) | none | set `position` between neighbors |
 | Re-home to area/project (sidebar) | set `area`/`project`, clear the other + `heading` | land at top/bottom of destination |
 | File under heading (in-project) | set `heading` | set `position` within the section |
 | Pin to Today (sidebar) | set `today` | (keeps existing) |
@@ -53,6 +53,16 @@ The Mac list draws the same bar (`KitCardRowView.dropLine`). A container whose
 tasks are not on screen (a sidebar row, a project card on an area page, the Move
 panel) wears the selection fill, because there is no place to mark. Android
 draws the same bar for both drags (`drawInsertionMark` in `MagicPlusDrag.kt`).
+
+**A sorted list has no reorder** (Sort By, `docs/LIST_SORT_SPEC.md` §6, #779).
+When a list's sort is not Manual, the rows do not follow `position`, so a drop
+between rows has nothing to mean. Every shell turns it off: SwiftUI gives
+`TaskReorderDrop` no handler (`cardedRows`, `isSortedList`), the Mac list
+refuses the gap (`validateDrop` → `sortedDropFiles`) and ⌥⌘↑/↓ beeps. A drop
+that files still lands: onto a Today or Anytime group header, into another
+group of the Mac list, onto a project heading, or onto the sidebar. The row
+then takes its sorted place, and no `position` is written. Headings still
+reorder in a sorted project. Manual shows the stored order again, untouched.
 
 ---
 

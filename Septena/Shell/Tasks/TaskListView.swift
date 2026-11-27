@@ -175,13 +175,41 @@ struct TaskListView: View {
     if let cached = preHydration.items { return cached }
     if filter == .today {
       let lists = LocalCache.todayAndTriage(in: modelContext)
-      preHydration.items = lists.today
+      let today = sortedForList(lists.today)
+      preHydration.items = today
       preHydration.triage = lists.triage
-      return lists.today
+      return today
     }
-    let fresh = localTasks()
+    let fresh = sortedForList(localTasks())
     preHydration.items = fresh
     return fresh
+  }
+
+  // MARK: Sort By (docs/LIST_SORT_SPEC.md)
+
+  /// This list's sort. Manual for a list that takes none.
+  private var listSort: String { ListSortPreferences.shared.sort(for: filter) }
+
+  /// True when the rows do not follow the manual order: drag-to-reorder
+  /// between rows is off (spec §6).
+  private var isSortedList: Bool { listSort != ListSort.manual }
+
+  /// `rows` in this list's sort, through the shared core (`ListSort`).
+  /// Only open tasks move. On Today the Inbox rows (unfiled) keep their
+  /// place: the Inbox band keeps its own order. An open inline editor or a
+  /// new draft stays where it appeared until the edit ends.
+  private func sortedForList(_ rows: [SeptenaTask]) -> [SeptenaTask] {
+    let sort = listSort
+    guard sort != ListSort.manual else { return rows }
+    var pinned = draftEditIds
+    if let expandedEditId { pinned.insert(expandedEditId) }
+    if let quickAddDraftId { pinned.insert(quickAddDraftId) }
+    let keepsInbox = filter == .today
+    return ListSort.ordered(
+      rows, sort: sort,
+      isSortable: { $0.status == .open && !$0.isHeading && !(keepsInbox && $0.isUnfiled) },
+      pinned: pinned,
+      onScreen: storageFilter == filter ? itemsStorage.map(\.id) : [])
   }
 
   private func preHydrationTriage() -> [SeptenaTask] {
@@ -884,7 +912,8 @@ struct TaskListView: View {
                                        recentlyDeleted: showingRecentlyDeleted,
                                        starFilter: starFilterInToolbar && showsStarFilterPill
                                          ? $starredOnlyFilter : nil,
-                                       onNew: { handleExternalCreateTrigger() }))
+                                       onNew: { handleExternalCreateTrigger() },
+                                       sortFilter: ListSort.key(for: filter) != nil ? filter : nil))
     // (Keyboard navigation — ↑↓ traversal, Return/Esc, focus reclaim —
     // is owned by `SelectableScrollList`; the `+` toolbar button and ⌘N still
     // open the composer via `shouldStartCreating` → `openContextualQuickAdd()`.)
@@ -1036,6 +1065,10 @@ struct TaskListView: View {
     .onReceive(NotificationCenter.default.publisher(for: .septenaStructureChanged)) { _ in
       reloadOrDeferWhileEditing(coalescing: true)
     }
+    // Sort By changed here, on another surface or on another device.
+    .onReceive(NotificationCenter.default.publisher(for: .septenaListSortChanged)) { _ in
+      reloadOrDeferWhileEditing()
+    }
     .onReceive(NotificationCenter.default.publisher(for: .septaskSettingsPulled)) { _ in
       // Synced notice state (Get started, rolled-in dismissal) arrived from
       // another device — re-evaluate Today's notices immediately.
@@ -1115,6 +1148,7 @@ struct TaskListView: View {
       refreshCalendarEvents()
       hydrateFilterStorageIfNeeded()
       refreshTodayNotices()
+      if isOnScreen { ListSortFocus.filter = filter }
       Task { await load() }
     }
     .onChange(of: logbookTab) { _, _ in
@@ -1148,6 +1182,7 @@ struct TaskListView: View {
     .onAppear(perform: didAppearOnScreen)
     .onDisappear {
       isOnScreen = false
+      if ListSortFocus.filter == filter { ListSortFocus.filter = nil }
       cancelInboxZeroMotion()
       #if os(iOS)
       showingQuickDropTray = false
@@ -1344,6 +1379,8 @@ struct TaskListView: View {
   /// visible list (see `isOnScreen`).
   private func didAppearOnScreen() {
     isOnScreen = true
+    // View ▸ Sort By acts on the list in front (docs/LIST_SORT_SPEC.md §6).
+    ListSortFocus.filter = filter
     hydrateFilterStorageIfNeeded()
     hydrateRowDecorationsIfNeeded()
     refreshTodayNotices()
@@ -2098,6 +2135,13 @@ struct TaskListView: View {
   @ViewBuilder
   private var taskListHeader: some View {
     titleRow
+    // "Sorted by …" under the title while the list is not in manual order.
+    // Type-erased like the rows: keeps the header's generic type shallow.
+    if isSortedList {
+      AnyView(ListSortIndicator(filter: filter)
+        .plainListChrome()
+        .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit))
+    }
     logbookSubViewBar
     noticesRow
     todayCalendarRow
@@ -3611,8 +3655,10 @@ struct TaskListView: View {
         classifiedIds = orderedFromGroupedOpen(pool: classified)
       } else {
         // Same sequence `ungroupedOpenItems` renders: by list, Today's own
-        // order inside each list (#66).
-        classifiedIds = orderedFromGroupedOpen(pool: classified)
+        // order inside each list (#66); one sorted list under a Sort By.
+        classifiedIds = isSortedList
+          ? classified.map(\.id)
+          : orderedFromGroupedOpen(pool: classified)
       }
       // The Get started steps sit above everything, under their notice.
       let footDraft = quickAddDraftAtTodayFoot ? quickAddCaptureTask.map { [$0.id] } ?? [] : []
@@ -4207,7 +4253,8 @@ struct TaskListView: View {
   private func handleTodayHeaderDrop(ids: [String], target: TodayDropTarget) -> Bool {
     let first = excludingQuickAddCapture(visibleItems)
       .first { isTask($0, alreadyIn: target) && !ids.contains($0.id) }
-    guard filter == .today, !TaskDragIDs.isNewTaskPayload(ids), let first else {
+    // A sorted Today only files: the row lands in its sorted place.
+    guard filter == .today, !isSortedList, !TaskDragIDs.isNewTaskPayload(ids), let first else {
       return handleTodayMoveDrop(ids: ids, target: target)
     }
     return handleReorderDrop(ids: ids, target: first, before: true, refileTo: target)
@@ -5070,9 +5117,12 @@ struct TaskListView: View {
     // Sidebar order, not due-first: flat drops the headers, not the sequence
     // (`TaskListOrder.byList`, shared with `groupedOpenItems`' emission order
     // and Septask's AppKit list).
-    let classified = TaskListOrder.byList(
-      pool.filter { $0.project != nil || $0.area != nil },
-      areas: areas, projects: projects)
+    // A sorted flat Today is one sorted list (docs/LIST_SORT_SPEC.md §4):
+    // `items` already arrives in that order.
+    let filed = pool.filter { $0.project != nil || $0.area != nil }
+    let classified = isSortedList
+      ? filed
+      : TaskListOrder.byList(filed, areas: areas, projects: projects)
     cardedRows(classified)
   }
 
@@ -5215,10 +5265,14 @@ struct TaskListView: View {
     // Today rows reorder in Today's own order (#66). The row's reorder drop
     // also files a row dragged in from another group, so the row-level
     // group drop steps aside (the group headers keep theirs).
-    let todayReorder = filter == .today
+    // A sorted list (Sort By, docs/LIST_SORT_SPEC.md §6) has no drop between
+    // rows: the row-level group drop takes over, so a row dragged in from
+    // another group still files into it and lands in its sorted place.
+    let sortedList = isSortedList
+    let todayReorder = filter == .today && !sortedList
     let rowMoveDrop = onDropIDs.map { TaskMoveDrop(perform: $0, showsMark: true) }
       ?? todayMoveDrop(todayReorder ? nil : moveDropTarget)
-    let canMagicRowDrop = reorderable || todayReorder
+    let canMagicRowDrop = (reorderable || todayReorder) && !sortedList
     ForEach(Array(rows.enumerated()), id: \.element.id) { idx, task in
       let position = TaskCardPosition(index: idx, count: cardCount)
       let isExpanded = expandedEditId == task.id
@@ -5936,8 +5990,10 @@ struct TaskListView: View {
     // fires, so a plain re-read is correct.
     // Today and its triage band share one fetch of the open rows.
     let todayLists = filter == .today ? LocalCache.todayAndTriage(in: modelContext) : nil
+    // Sort By (docs/LIST_SORT_SPEC.md) orders the read once, here, before
+    // the merge, so every group the body forms from `items` comes out sorted.
     let outcome = model.merge(prior: items,
-                             fresh: todayLists?.today ?? localTasks(),
+                             fresh: sortedForList(todayLists?.today ?? localTasks()),
                              context: modelContext,
                              animateArrivals: loadedFilters.contains(filter),
                              ownCreations: ownCreateExclusions(),

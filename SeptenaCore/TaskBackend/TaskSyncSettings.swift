@@ -87,6 +87,9 @@ enum SeptaskSyncedSettings {
     case "smartListHidden": return s.smartListHidden.map { .array($0.map { .string($0) }) } ?? .null
     case "smartListPlacement":
       return s.smartListPlacement.map { .object($0.mapValues { .string($0) }) } ?? .null
+    // The settings key, which shares its name with the `listSort` surface.
+    case "listSort": // septena-lint:allow registry-id-literal
+      return s.listSort.map { .object($0.mapValues { .string($0) }) } ?? .null
     default: return .null
     }
   }
@@ -226,6 +229,24 @@ enum SeptaskSyncedSettings {
           out[k] = str
         }
         s.smartListPlacement = out
+      default: return false
+      }
+    // The settings key, which shares its name with the `listSort` surface.
+    case "listSort": // septena-lint:allow registry-id-literal
+      switch v {
+      case .null: s.listSort = nil
+      case .object(let dict):
+        // A record of `listSort` values (registry `maxEntries` 256). Manual
+        // is the absence of a key, so a stored `manual` is the wrong shape.
+        // Literals, not `ListSort`: this file builds in SeptenaCoreTests.
+        guard dict.count <= 256 else { return false }
+        var out: [String: String] = [:]
+        for (k, val) in dict {
+          guard let str = val.stringValue, str != "manual",
+                RegistryEntityEnums.listSort.contains(str) else { return false }
+          out[k] = str
+        }
+        s.listSort = out
       default: return false
       }
     default:

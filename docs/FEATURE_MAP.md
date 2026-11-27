@@ -8,10 +8,10 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 
 | Status | iPhone | iPad | Mac | Web | Android | Windows | linux | Watch |
 |---|---|---|---|---|---|---|---|---|
-| ships | 60 | 61 | 61 | 53 | 57 | 0 | 0 | 1 |
+| ships | 61 | 62 | 62 | 54 | 58 | 0 | 0 | 1 |
 | partial | 1 | 1 | 1 | 1 | 2 | 0 | 0 | 3 |
-| planned | 2 | 2 | 2 | 6 | 3 | 63 | 63 | 2 |
-| - | 4 | 3 | 3 | 7 | 5 | 4 | 4 | 61 |
+| planned | 2 | 2 | 2 | 6 | 3 | 64 | 64 | 2 |
+| - | 4 | 3 | 3 | 7 | 5 | 4 | 4 | 62 |
 
 **Agent** lists the MCP tools at `api.septena.app/mcp` that reach the feature; **none** means an agent cannot reach it.
 
@@ -24,6 +24,7 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 | `lists.agent` | Agent work by stage (Working, Queued, Stopped groups in Review) | ships | ships | ships | ships | ships | planned | planned | - | `tasks_pending_reasoning`, `tasks_claim`, `tasks_release`, `tasks_agent_events`, `tasks_set_assignee` |
 | `lists.upcoming` | Upcoming | ships | ships | ships | ships | ships | planned | planned | - | `tasks_list`, `tasks_defer` |
 | `lists.anytime` | Anytime | ships | ships | ships | ships | ships | planned | planned | - | `tasks_list` |
+| `lists.sort` | Sort By | ships | ships | ships | ships | ships | planned | planned | - | none |
 | `lists.repeating` | Repeating | ships | ships | ships | ships | ships | planned | planned | - | none |
 | `lists.logbook` | Logbook | ships | ships | ships | ships | ships | planned | planned | - | `tasks_list`, `tasks_complete` |
 | `lists.faded` | Faded group of Review | ships | ships | ships | ships | ships | planned | planned | - | `tasks_list` |
