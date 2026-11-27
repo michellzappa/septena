@@ -26,6 +26,7 @@ import Testing
     "smartListOrder": .array([.string("today"), .string("upcoming")]),
     "smartListHidden": .array([.string("logbook")]),
     "smartListPlacement": .object(["logbook": .string("top")]),
+    "listSort": .object(["today": .string("when")]),
   ]
 
   @Test(arguments: RegistrySettings.syncedKeys)

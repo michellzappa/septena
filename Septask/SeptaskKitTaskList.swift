@@ -141,6 +141,9 @@ final class SeptaskKitTaskListController: NSViewController {
     /// (`KitContainerNotesCell`, ADR 0012). Not selectable: it carries no
     /// task, and a click opens its editor popover.
     case containerNotes(isArea: Bool, id: String, text: String)
+    /// "Sorted by …" under the page title while the list has a Sort By
+    /// (docs/LIST_SORT_SPEC.md §6). Not selectable: it carries no task.
+    case sortIndicator(String)
 
     var key: String {
       switch self {
@@ -162,6 +165,7 @@ final class SeptaskKitTaskListController: NSViewController {
       case .importAllReminders: return "import-all-reminders"
       case .notesProposal: return "notes-proposal"
       case .containerNotes: return "container-notes"
+      case .sortIndicator: return "sort-indicator"
       }
     }
 
@@ -194,7 +198,7 @@ final class SeptaskKitTaskListController: NSViewController {
     var isCardRow: Bool {
       switch self {
       case .header, .screenTitle, .logbookBar, .tagFilterBar, .fadedFooter, .loggedFooter, .notesProposal, .containerNotes,
-           .doNotice: return false
+           .doNotice, .sortIndicator: return false
       // A standalone notice sits on the page with its own card fill. A notice
       // with checklist steps (`Get started`) heads its steps' card so the
       // header and rows share one seamless frosted surface (matching iOS).
@@ -774,6 +778,12 @@ final class SeptaskKitTaskListController: NSViewController {
     ) { [weak self] _ in
       MainActor.assumeIsolated { self?.refreshViewOptions() }
     })
+    // Sort By changed here, in a menu or on another device.
+    observers.append(NotificationCenter.default.addObserver(
+      forName: .septenaListSortChanged, object: nil, queue: .main
+    ) { [weak self] _ in
+      MainActor.assumeIsolated { self?.scheduleReload(locallyChanged: []) }
+    })
     // The current Do, and its minute (SeptaskKitDo.swift).
     observers.append(NotificationCenter.default.addObserver(
       forName: SeptaskKitDo.changed, object: nil, queue: .main
@@ -948,6 +958,8 @@ final class SeptaskKitTaskListController: NSViewController {
     activeAssigneeFilter = nil
     logbookTab = .completed
     self.filter = filter
+    // View ▸ Sort By acts on the list in front (docs/LIST_SORT_SPEC.md §6).
+    ListSortFocus.filter = filter
     if case .project(let id) = filter {
       headerWashView.projectID = id
     } else {
@@ -1208,12 +1220,14 @@ final class SeptaskKitTaskListController: NSViewController {
       activeAssigneeFilter = nil
     }
     if activeProjectShare == nil { activeAssigneeFilter = nil }
-    let pool = rawPool.filter { task in
+    // Sort By (docs/LIST_SORT_SPEC.md) orders the read once, here: every
+    // group below is built from `pool` in order, so each comes out sorted.
+    let pool = sortedForList(rawPool.filter { task in
       if task.isHeading { return true }
       if !activeTagFilterIDs.isEmpty && !activeTagFilterIDs.isSubset(of: Set(task.tags)) { return false }
       if let af = activeAssigneeFilter, !af.matches(task) { return false }
       return true
-    }
+    })
     // Capsules first: `chipped()` reads the snapshot, so it has to be current
     // before any row is built. Includes the triage band, which `pool` omits on
     // Today — the band is exactly where most suggestions land.
@@ -1234,7 +1248,9 @@ final class SeptaskKitTaskListController: NSViewController {
       : [.tagFilterBar(tags: listTags, active: Array(activeTagFilterIDs).sorted(),
                        share: activeProjectShare, activeAssignee: activeAssigneeFilter)]
     let doRows = KitDoNotice.current().map(Row.doNotice)
-    let titleRows: [Row] = (screenTitleRow().map { [$0] } ?? []) + doRows + logbookBarRows + tagBarRows
+    // "Sorted by …" right under the page title (docs/LIST_SORT_SPEC.md §6).
+    let sortRows: [Row] = ListSort.indicator(listSort).map { [.sortIndicator($0)] } ?? []
+    let titleRows: [Row] = (screenTitleRow().map { [$0] } ?? []) + sortRows + doRows + logbookBarRows + tagBarRows
     var newRows: [Row]
     loggedClearIDs = []
     switch filter {
@@ -1256,10 +1272,12 @@ final class SeptaskKitTaskListController: NSViewController {
       // projects after its direct work — so removing the headers changes what
       // you SEE, not the sequence you already know. `TaskListOrder.byList` is
       // the same ordering `groupedByList` emits its headers in.
+      // A sorted flat Today is one sorted list (docs/LIST_SORT_SPEC.md §4).
       let structure = StructureCache.snapshot(in: context)
-      let classified = TaskListOrder.byList(
-        rest.filter { $0.project != nil || $0.area != nil },
-        areas: structure.areas, projects: structure.projects)
+      let filed = rest.filter { $0.project != nil || $0.area != nil }
+      let classified = isSortedList
+        ? filed
+        : TaskListOrder.byList(filed, areas: structure.areas, projects: structure.projects)
       // One divider under the Inbox run, drawn as an ordinary group header so
       // it breaks the card exactly the way an area / project header does in
       // grouped mode — flat Today collapses the MANY list headers into this
@@ -1418,7 +1436,7 @@ final class SeptaskKitTaskListController: NSViewController {
     applyInboxZeroOutcome(inboxZeroOutcome, inboxCount: currentInboxIDs.count)
     let hasContent = rows.contains { row in
       switch row {
-      case .screenTitle, .logbookBar, .doNotice: return false
+      case .screenTitle, .sortIndicator, .logbookBar, .doNotice: return false
       default: return true
       }
     }
@@ -1442,6 +1460,32 @@ final class SeptaskKitTaskListController: NSViewController {
         tableView.deselectAll(nil)
       }
     }
+  }
+
+  // MARK: Sort By (docs/LIST_SORT_SPEC.md)
+
+  /// This list's sort. Manual for a list that takes none.
+  private var listSort: String { ListSortPreferences.shared.sort(for: filter) }
+
+  /// True when the rows do not follow the manual order: drag-to-reorder
+  /// between rows and ⌥⌘↑/↓ are off (spec §6).
+  private var isSortedList: Bool { listSort != ListSort.manual }
+
+  /// `rows` in this list's sort, through the shared core (`ListSort`), the
+  /// same rule as `TaskListView.sortedForList`. Only open tasks move; on
+  /// Today the Inbox rows (unfiled) keep their place. A live editor (rename,
+  /// a new draft, the composer) stays where it is on screen until it closes.
+  private func sortedForList(_ rows: [SeptenaTask]) -> [SeptenaTask] {
+    let sort = listSort
+    guard sort != ListSort.manual else { return rows }
+    var pinned = liveEditorIDs
+    if let editingTaskId { pinned.insert(editingTaskId) }
+    let keepsInbox = filter == .today
+    return ListSort.ordered(
+      rows, sort: sort,
+      isSortable: { $0.status == .open && !$0.isHeading && !(keepsInbox && $0.isUnfiled) },
+      pinned: pinned,
+      onScreen: self.rows.compactMap { $0.task?.id })
   }
 
   /// Rows whose CELL holds live state a reload must not touch: the open
@@ -2084,7 +2128,7 @@ final class SeptaskKitTaskListController: NSViewController {
         ids.insert(task.id)
       case .header, .loggedFooter, .fadedFooter,
            .screenTitle, .logbookBar, .tagFilterBar, .projectTarget, .newProject, .containerNotes,
-           .notice, .noticeStep, .doNotice, .event, .notesProposal:
+           .notice, .noticeStep, .doNotice, .event, .notesProposal, .sortIndicator:
         return ids
       }
     }
@@ -3263,7 +3307,8 @@ final class SeptaskKitTaskListController: NSViewController {
   /// selection that spans groups, or is already at the group's edge, beeps.
   /// Only manual order changes; the row never changes list this way.
   func moveSelectionOneSlot(up: Bool) {
-    guard allowsReorder, composingTaskId == nil else { NSSound.beep(); return }
+    // A sorted list has no manual order on screen to move in (spec §6).
+    guard allowsReorder, !isSortedList, composingTaskId == nil else { NSSound.beep(); return }
     let picked = tableView.selectedRowIndexes.filter { index in
       guard rows.indices.contains(index), let task = rows[index].task else { return false }
       return !task.isHeading && task.status == .open
@@ -5257,6 +5302,9 @@ final class SeptaskKitTaskListController: NSViewController {
         title: RegistryActions.title(.projectShare),
         sfSymbol: RegistryIcons.sfSymbol(for: "action.share_project")
       ) { SeptaskSharing.present(projectID: projectID) },
+      // Sort By for this project (docs/LIST_SORT_SPEC.md §6).
+      .divider(id: "project.sortDivider"),
+      ListSortMenuNodes.submenu(for: .project(projectID)),
     ])
   }
 
@@ -5463,6 +5511,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
     // The page's own title — noticeably taller than an in-list header, the
     // same visual weight a big navigation title would carry.
     case .screenTitle: return SeptenaTypeScale.size(.title2) + 40
+    case .sortIndicator: return KitSortIndicatorCell.height
     case .logbookBar: return 38
     case .tagFilterBar: return 34
     case .projectTarget: return SeptaskKitTheme.rowHeight
@@ -5695,6 +5744,13 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       dropAboveRow = nil
       return []
     }
+    // Sort By (docs/LIST_SORT_SPEC.md §6): a sorted list has no drop between
+    // rows. A drop that files the rows into another group still lands (they
+    // take their sorted place there), and headings still reorder.
+    if isSortedList, !sortedDropFiles(ids: KitDrag.ids(from: info), at: clampDropRow(row) ?? row) {
+      dropAboveRow = nil
+      return []
+    }
     // From the first hover until the drop, the rows this indicator points
     // at must be the rows `acceptDrop` resolves: hold sync reloads.
     isDragActive = true
@@ -5744,6 +5800,16 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       return acceptProjectDrop(ids: ids, at: insertAt, projectId: projectId)
     }
 
+    // A sorted list only files (see `validateDrop`): no order is written.
+    if isSortedList {
+      let filingBefore = ids.compactMap { LocalCache.task(id: $0, in: context) }
+        .map(TaskUndo.FilingSnapshot.init)
+      guard refileIfGroupedDrop(ids: ids, at: insertAt) else { return false }
+      TaskUndo.recordMove(before: filingBefore, context: context, mutator: mutator)
+      reload()
+      return true
+    }
+
     let dragged = Set(ids)
     // Order within the RECEIVING group only — the open task rows between the
     // headers around the gap. A neighbour from a different group (grouped
@@ -5784,6 +5850,47 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
     TaskUndo.recordReorder(positionsBefore, context: context, mutator: mutator)
     reload()
     return true
+  }
+
+  /// In a sorted list, whether a drop at `gap` files the rows somewhere new:
+  /// headings reordering on a project page, a task under another heading, or
+  /// a task into another group of grouped Today / Anytime (the same target
+  /// `refileIfGroupedDrop` reads). Reads `rows` first, the store only for a
+  /// row this table does not show (a drag from another window).
+  private func sortedDropFiles(ids: [String], at gap: Int) -> Bool {
+    guard !ids.isEmpty else { return false }
+    let onScreen = Dictionary(rows.compactMap(\.task).map { ($0.id, $0) },
+                              uniquingKeysWith: { a, _ in a })
+    func task(_ id: String) -> SeptenaTask? { onScreen[id] ?? LocalCache.task(id: id, in: context) }
+    if case .project = filter {
+      let headingIds = Set(onScreen.values.filter(\.isHeading).map(\.id))
+      if ids.allSatisfy({ headingIds.contains($0) }) { return true }
+      let group = destinationHeading(aboveRow: gap - 1, headingIds: headingIds)
+      return ids.contains { id in
+        guard let t = task(id), !t.isHeading else { return false }
+        return resolvedHeading(t, headingIds: headingIds) != group
+      }
+    }
+    let grouped: Bool
+    switch filter {
+    case .today: grouped = todayGroupsByList
+    case .unscheduled: grouped = true
+    default: grouped = false
+    }
+    guard grouped else { return false }
+    var targetProject: String?
+    var targetArea: String?
+    for index in stride(from: min(gap, rows.count) - 1, through: 0, by: -1) {
+      if case .header(let id, _, _, _) = rows[index] {
+        if id.hasPrefix("p-") { targetProject = String(id.dropFirst(2)) }
+        if id.hasPrefix("a-") { targetArea = String(id.dropFirst(2)) }
+        break
+      }
+    }
+    return ids.contains { id in
+      guard let t = task(id) else { return false }
+      return t.project != targetProject || (targetProject == nil && t.area != targetArea)
+    }
   }
 
   /// The rows of the group around a drop gap (or a row): from just below the
@@ -5959,6 +6066,15 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
         mutator.setHeading(id: id, heading: group)
         refiled = true
       }
+    }
+    // A sorted project only files under the heading (docs/LIST_SORT_SPEC.md
+    // §6): the rows take their sorted place, no order is written.
+    if isSortedList {
+      if refiled {
+        TaskUndo.recordMove(before: filingBefore, context: context, mutator: mutator)
+        reload()
+      }
+      return refiled
     }
     applyManualOrder(ids: ids, into: groupRows, at: insertion)
     if refiled {
@@ -6166,6 +6282,13 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       cell.onReject = { [weak self] in
         self?.rejectContainerNotesProposal(isArea: isArea, id: id, currentNotes: currentNotes, proposal: proposal)
       }
+      return cell
+
+    case .sortIndicator(let line):
+      let identifier = NSUserInterfaceItemIdentifier("sortIndicatorCell")
+      let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? KitSortIndicatorCell
+        ?? KitSortIndicatorCell(identifier: identifier)
+      cell.configure(line: line)
       return cell
 
     case .containerNotes(let isArea, let id, let text):
@@ -7586,6 +7709,72 @@ final class KitScreenTitleCell: NSTableCellView {
     // A reused cell carries a stale cursor rect otherwise — matches
     // `KitGroupHeaderCell.configure`'s identical call.
     window?.invalidateCursorRects(for: self)
+  }
+}
+
+// MARK: - Sort indicator ("Sorted by When")
+
+/// One quiet line under the page title while the list has a Sort By
+/// (docs/LIST_SORT_SPEC.md §6), so the user knows why the rows do not follow
+/// their drag order. The AppKit counterpart of SwiftUI's `ListSortIndicator`:
+/// meta font, secondary ink, the sort glyph in the checkbox column. Inert:
+/// the choice lives in View ▸ Sort By and the page's `…` menu.
+@MainActor
+final class KitSortIndicatorCell: NSTableCellView {
+  static var height: CGFloat { SeptenaTypeScale.size(.footnote) + 14 }
+
+  private let glyph = NSImageView()
+  private let label = NSTextField(labelWithString: "")
+  private var glyphConstraint: NSLayoutConstraint!
+  private var labelConstraint: NSLayoutConstraint!
+
+  init(identifier: NSUserInterfaceItemIdentifier) {
+    super.init(frame: .zero)
+    self.identifier = identifier
+    glyph.translatesAutoresizingMaskIntoConstraints = false
+    glyph.image = NSImage(systemSymbolName: RegistrySurfaces.listSortSymbol, accessibilityDescription: nil)?
+      .withSymbolConfiguration(.init(pointSize: 11, weight: .medium))
+    glyph.contentTintColor = SeptaskKitTheme.inkSecondary
+    glyph.kitA11yIgnore()
+    label.translatesAutoresizingMaskIntoConstraints = false
+    label.font = SeptaskKitTheme.meta
+    label.textColor = SeptaskKitTheme.inkSecondary
+    label.lineBreakMode = .byTruncatingTail
+    label.maximumNumberOfLines = 1
+    addSubview(glyph)
+    addSubview(label)
+    textField = label
+    glyphConstraint = glyph.centerXAnchor.constraint(
+      equalTo: leadingAnchor,
+      constant: KitCardRowView.horizontalInset + SeptaskKitLayout.leadingGlyphCenterX)
+    labelConstraint = label.leadingAnchor.constraint(
+      equalTo: leadingAnchor,
+      constant: KitCardRowView.horizontalInset + SeptaskKitLayout.screenTitleLeading)
+    NSLayoutConstraint.activate([
+      glyphConstraint,
+      labelConstraint,
+      glyph.centerYAnchor.constraint(equalTo: label.centerYAnchor),
+      label.centerYAnchor.constraint(equalTo: centerYAnchor),
+      label.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor,
+                                      constant: -(KitCardRowView.horizontalInset + 8)),
+    ])
+  }
+
+  required init?(coder: NSCoder) { fatalError("KitSortIndicatorCell is code-only") }
+
+  /// Same width-dependent centered-column margin as the page title.
+  override func layout() {
+    let inset = SeptaskKitLayout.inset(for: bounds.width)
+    glyphConstraint.constant = inset + SeptaskKitLayout.leadingGlyphCenterX
+    labelConstraint.constant = inset + SeptaskKitLayout.screenTitleLeading
+    super.layout()
+  }
+
+  func configure(line: String) {
+    label.stringValue = line
+    setAccessibilityElement(true)
+    setAccessibilityRole(.staticText)
+    setAccessibilityLabel(line)
   }
 }
 

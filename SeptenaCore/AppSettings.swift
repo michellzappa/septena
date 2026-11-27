@@ -84,6 +84,10 @@ struct AppSettings: Codable {
   /// Optional per-destination placement override ("top" | "bottom") keyed by
   /// canonical destination ID. Absent IDs fall back to `registry/destinations.json`.
   var smartListPlacement: [String: String]? = nil
+  /// Sort By per list (docs/LIST_SORT_SPEC.md §5): list key (`today`,
+  /// `anytime`, `project:<id>`, `area:<id>`) → a `listSort` value other than
+  /// `manual`. Manual is the absence of a key. Read by `ListSortPreferences`.
+  var listSort: [String: String]? = nil
 
   /// When the first-run welcome (section picker + chained onboarding) was
   /// completed. The durable, cross-device "this account has been welcomed"
@@ -131,5 +135,6 @@ struct AppSettings: Codable {
     case smartListOrder = "smart_list_order"
     case smartListHidden = "smart_list_hidden"
     case smartListPlacement = "smart_list_placement"
+    case listSort = "list_sort"
   }
 }
