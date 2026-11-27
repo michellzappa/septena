@@ -24,6 +24,7 @@ internal data class DesktopTaskLists(
     val byDestination: Map<String, List<TaskListItem>> = emptyMap(),
     val places: DesktopPlaces = DesktopPlaces(),
     val byPlace: Map<DesktopLocation, List<TaskListItem>> = emptyMap(),
+    val agentsPaused: Boolean = false,
 ) {
     fun rows(destination: String): List<TaskListItem> = byDestination[destination].orEmpty()
 

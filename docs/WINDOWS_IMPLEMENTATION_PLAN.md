@@ -28,7 +28,9 @@ The third fixture slice adds the task editor for title, notes, When, Deadline an
 
 The fourth fixture slice adds local Quick Find (`find.quick-find`) for tasks, active projects and areas. It uses the same Kotlin ranking as Android for titles, notes, tags and references, including pasted links and completed tasks. Windows snapshots the SQLite-backed records when search opens so typing stays independent of sync. The registry shortcut opens the picker. Up and Down select a hit, Enter opens it, and Escape dismisses the picker. A task opens in its editor with the appropriate sidebar destination when one is available.
 
-Next add conversations and agent actions. Command search, archived project navigation, advanced repeat-pattern editing, broader undo coverage for task actions and device keyboard acceptance stay in the parity backlog. These slices can use fixture workspaces until live W1 is ready. A feature's fixture and CI evidence stays separate from its Win365 result. [Compose Desktop keyboard event scopes](https://kotlinlang.org/docs/multiplatform/compose-desktop-keyboard.html)
+The fifth fixture slice adds task conversations, option and free-text replies, Stop and Resume on a task, and account-wide Pause and Resume (`ai.discuss`, `agents.stop-pause`). It uses the shared conversation and settings mutators. CI checks stale answers, offline reopen, durable turns and state seen by a peer. The fixture seeds a question, so testing the agent's actual behavior requires live W1.
+
+Windows CI now runs on shared-client pull requests. The registry reader check includes Windows claims and looks for a desktop reader in the Windows source. Keep fixture evidence and Win365 acceptance separate when promoting capability claims. Command search, archived project navigation, advanced repeat patterns, broader undo, review actions, and device keyboard acceptance stay in the parity backlog. [Compose Desktop keyboard event scopes](https://kotlinlang.org/docs/multiplatform/compose-desktop-keyboard.html)
 
 ## Checkpoint 2 — live W1 on Win365
 

@@ -12,8 +12,24 @@ on:
       - "android/gradle/**"
       - "android/gradlew*"
       - "core/release/release.json"
-      - "registry/conformance/**"
+      - "registry/**"
+      - "scripts/gen-registries.mjs"
+      - "scripts/registry-readers.mjs"
       - "docs/WINDOWS_IMPLEMENTATION_PLAN.md"
+      - ".github/workflows/windows-spike.yml"
+  pull_request:
+    paths:
+      - "windows/**"
+      - "android/core/**"
+      - "android/store/**"
+      - "android/transport/**"
+      - "android/ui/**"
+      - "android/gradle/**"
+      - "android/gradlew*"
+      - "core/release/release.json"
+      - "registry/**"
+      - "scripts/gen-registries.mjs"
+      - "scripts/registry-readers.mjs"
       - ".github/workflows/windows-spike.yml"
   workflow_dispatch:
 

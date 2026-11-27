@@ -35,6 +35,7 @@ import app.septena.core.RecurrenceRules
 import app.septena.core.RegistryCatalog
 import app.septena.core.TaskMutator
 import app.septena.core.TaskRecord
+import app.septena.core.TaskStatus
 import app.septena.core.booleanValue
 import app.septena.core.formatUpcomingDayHeader
 import app.septena.core.generated.RegistryActionIds
@@ -43,6 +44,7 @@ import app.septena.core.generated.RegistryEntityEnums
 import app.septena.core.generated.RegistryEntityFields.Task
 import app.septena.core.generated.RegistryPromptIds
 import app.septena.core.generated.RegistryTaskDetail
+import app.septena.core.generated.RegistryTaskPageBlockIds
 import app.septena.core.stringValue
 import app.septena.sharedcore.RescheduleMode
 import java.time.Instant
@@ -54,14 +56,17 @@ internal sealed interface DesktopTaskEdit {
     data class When(val day: LocalDate?, val mode: RescheduleMode) : DesktopTaskEdit
     data class Deadline(val day: LocalDate?) : DesktopTaskEdit
     data class Repeat(val rule: RecurrenceRule?, val paused: Boolean) : DesktopTaskEdit
+    data class Conversation(val edit: ConversationEdit) : DesktopTaskEdit
 }
 
-private enum class TaskEditorPanel { Details, When, Deadline, Repeat, Reschedule }
+private enum class TaskEditorPanel { Details, When, Deadline, Repeat, Reschedule, Conversation }
 
 @Composable
 internal fun DesktopTaskEditor(
     task: TaskRecord,
+    conversation: DesktopConversation,
     today: LocalDate,
+    now: Instant,
     languageTag: String,
     busy: Boolean,
     error: String?,
@@ -117,6 +122,9 @@ internal fun DesktopTaskEditor(
                     EditorAttribute(copy.field(RegistryTaskDetail.Fields.REPEAT), repeatLabel, !busy) {
                         panel = TaskEditorPanel.Repeat
                     }
+                    val threadLabel = RegistryCatalog.surface(RegistryTaskPageBlockIds.TASK_PAGE_CONVERSATION)
+                        ?.get("label").stringValue().orEmpty()
+                    EditorAttribute(copy.label(threadLabel), "", !busy) { panel = TaskEditorPanel.Conversation }
                     EditorError(error)
                 }
             },
@@ -152,6 +160,9 @@ internal fun DesktopTaskEditor(
         TaskEditorPanel.Repeat -> RepeatEditor(rule, paused, canUseFixed, copy, !busy, error, back) { edit ->
             onEdit(edit, back)
         }
+        TaskEditorPanel.Conversation -> DesktopConversationDialog(
+            conversation, now, languageTag, !busy, task.status == TaskStatus.OPEN, error, back,
+        ) { edit, done -> onEdit(DesktopTaskEdit.Conversation(edit), done) }
         TaskEditorPanel.Reschedule -> {
             val prompt = RegistryCatalog.surface(RegistryPromptIds.RESCHEDULE_FIXED_REPEAT)
             val options = (prompt?.get("options") as? JsonValue.ArrayValue)?.values.orEmpty()

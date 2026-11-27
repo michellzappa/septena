@@ -2,6 +2,7 @@ package app.septena.windows
 
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
 import app.septena.core.DayClock
+import app.septena.core.ConversationMutator
 import app.septena.core.JsonValue
 import app.septena.core.NotesBase
 import app.septena.core.QuickFindSearch
@@ -15,7 +16,10 @@ import app.septena.core.SyncPushResponse
 import app.septena.core.SyncRecord
 import app.septena.core.SyncResultStatus
 import app.septena.core.SyncTransport
+import app.septena.core.SyncedSettings
+import app.septena.core.SyncedSettingsMutator
 import app.septena.core.SystemDayClock
+import app.septena.core.TaskConversation
 import app.septena.core.TaskMutator
 import app.septena.core.TaskRecord
 import app.septena.core.TaskSnapshot
@@ -25,10 +29,13 @@ import app.septena.core.UuidTaskIdGenerator
 import app.septena.core.WireTimestamp
 import app.septena.core.asSyncRecord
 import app.septena.core.asTaskRecord
+import app.septena.core.booleanValue
 import app.septena.core.generated.RegistryDestinationIds
 import app.septena.core.generated.RegistryEntityEnums
 import app.septena.core.generated.RegistryEntityFields
 import app.septena.core.generated.RegistryEntityNames
+import app.septena.core.generated.RegistryPlatformIds
+import app.septena.core.generated.RegistrySettingKeys
 import app.septena.core.stringValue
 import app.septena.store.SqlDelightTaskStore
 import app.septena.store.db.SeptenaDatabase
@@ -48,13 +55,18 @@ internal class SpikeWorkspace(
     private val ids = UuidTaskIdGenerator()
     private val mutator = TaskMutator(store, clock, ids, sourceClient = "Septena Windows")
     private val entityMutator = RegistryEntityMutator(store, clock, ids)
+    private val conversationMutator = ConversationMutator(store, ids)
+    private val settings = SyncedSettings(store, RegistryPlatformIds.WINDOWS)
+    private val settingsMutator = SyncedSettingsMutator(store, ids, RegistryPlatformIds.WINDOWS)
     private val syncEngine = TaskSyncEngine(store, transport, clock)
     private val undoHistory = TaskUndoHistory()
     val undoState = undoHistory.state
 
     suspend fun lists(languageTag: String): DesktopTaskLists {
         val records = store.activeTasks()
-        return desktopTaskLists(records, places(records), clock, languageTag)
+        return desktopTaskLists(records, places(records), clock, languageTag).copy(
+            agentsPaused = settings.value(RegistrySettingKeys.AGENTS_PAUSED).booleanValue() == true,
+        )
     }
 
     private suspend fun places(tasks: List<SyncRecord>? = null) =
@@ -62,10 +74,62 @@ internal class SpikeWorkspace(
 
     suspend fun task(id: String) = store.record(RegistryEntityNames.TASK, id)
 
+    suspend fun conversation(id: String): DesktopConversation {
+        val record = store.record(RegistryEntityNames.CONVO, id) ?: SyncRecord(RegistryEntityNames.CONVO, id, emptyMap())
+        val turns = store.turns(id)
+        return DesktopConversation(TaskConversation.from(record, turns), turns)
+    }
+
+    suspend fun changeConversation(id: String, edit: ConversationEdit) {
+        val task = checkNotNull(task(id)).asTaskRecord()
+        require(task.deletedAt == null && task.status == app.septena.core.TaskStatus.OPEN)
+        val current = conversation(id)
+        when (edit) {
+            is ConversationEdit.Stop -> {
+                require(current.canStop(clock.now()))
+                if ((current.state.stoppedAt != null) != edit.stopped) {
+                    conversationMutator.setStopped(id, edit.stopped, clock.now())
+                }
+            }
+            is ConversationEdit.Answer -> {
+                val question = checkNotNull(current.question()) { "This question has already been answered." }
+                require(question.sequence == edit.sequence) { "The agent has asked a different question." }
+                val value = edit.text.trim()
+                require(value.isNotEmpty() && (edit.other || value in question.choices()))
+                appendUserTurn(id, question.fields["step"].stringValue() ?: RegistryEntityEnums.ConvoTurnStep.WORK,
+                    mapOf(
+                        (if (edit.other) "otherText" else "chosen") to JsonValue.StringValue(value),
+                        "inReplyTo" to JsonValue.IntegerValue(question.sequence),
+                    ),
+                )
+            }
+            is ConversationEdit.Reply -> {
+                require(current.question() == null)
+                val reply = edit.text.trim()
+                require(reply.isNotEmpty())
+                appendUserTurn(id, RegistryEntityEnums.ConvoTurnStep.WORK, mapOf("note" to JsonValue.StringValue(reply)))
+            }
+        }
+    }
+
+    private suspend fun appendUserTurn(id: String, step: String, answer: Map<String, JsonValue>) {
+        conversationMutator.appendUserTurn(id, answer + mapOf(
+            "role" to JsonValue.StringValue(RegistryEntityEnums.ConvoTurnRole.USER),
+            "step" to JsonValue.StringValue(step),
+            "ts" to JsonValue.StringValue(WireTimestamp.format(clock.now())),
+        ))
+        mutator.touch(id)
+    }
+
+    suspend fun setAgentsPaused(paused: Boolean) {
+        settingsMutator.set(RegistrySettingKeys.AGENTS_PAUSED, JsonValue.BooleanValue(paused))
+    }
+
     suspend fun quickFindSnapshot(): QuickFindSearch =
         QuickFindSearch(store, clock, includeArchivedProjects = false).snapshot()
 
     fun today(): LocalDate = clock.today(clock.now())
+    fun now() = clock.now()
 
     suspend fun saveText(original: TaskRecord, title: String, notes: String): TaskRecord {
         val cleanTitle = title.trim()
@@ -251,6 +315,7 @@ internal class FixtureTransport(clock: DayClock = SystemDayClock()) : SyncTransp
     private val changes = mutableListOf<SyncChange>()
     private val records = mutableMapOf<Pair<String, String>, SyncRecord>()
     private val results = mutableMapOf<String, SyncOperationResult>()
+    private val turnSequences = mutableMapOf<String, Long>()
 
     init {
         val now = clock.now()
@@ -271,6 +336,16 @@ internal class FixtureTransport(clock: DayClock = SystemDayClock()) : SyncTransp
                 sourceClient = "Spike fixture",
             ), revision = 1),
         ).forEach { recordChange(it.asSyncRecord()) }
+        recordChange(SyncRecord(RegistryEntityNames.CONVO, "seedtask0001", mapOf(
+            RegistryEntityFields.Convo.ASSIGNEE to JsonValue.StringValue(RegistryEntityEnums.ConvoAssignee.CLAUDE),
+        ), revision = 1))
+        recordTurn("seedtask0001", mapOf(
+            "role" to JsonValue.StringValue(RegistryEntityEnums.ConvoTurnRole.PROVIDER),
+            "step" to JsonValue.StringValue(RegistryEntityEnums.ConvoTurnStep.CONFIRM),
+            "question" to JsonValue.StringValue("Which part should I check first?"),
+            "options" to JsonValue.ArrayValue(listOf("Installer", "Task lists").map(JsonValue::StringValue)),
+            "ts" to JsonValue.StringValue(stamp),
+        ))
         recordChange(SyncRecord(RegistryEntityNames.AREA, "seedarea0001", mapOf(
             RegistryEntityFields.Area.TITLE to JsonValue.StringValue("Example area"),
         ), revision = 1))
@@ -295,11 +370,18 @@ internal class FixtureTransport(clock: DayClock = SystemDayClock()) : SyncTransp
         if (!online) throw IOException("Fixture is offline")
         val applied = operations.map { operation ->
             results.getOrPut(operation.clientOpId) {
-                check(operation is SyncOperation.Upsert)
-                val previous = records[operation.entity to operation.id]
-                val revision = (previous?.revision ?: 0L) + 1L
-                recordChange(SyncRecord(operation.entity, operation.id, previous?.fields.orEmpty() + operation.fields, revision))
-                SyncOperationResult(operation.clientOpId, SyncResultStatus.APPLIED, revision, changes.size.toLong())
+                when (operation) {
+                    is SyncOperation.Upsert -> {
+                        val previous = records[operation.entity to operation.id]
+                        val revision = (previous?.revision ?: 0L) + 1L
+                        recordChange(SyncRecord(operation.entity, operation.id, previous?.fields.orEmpty() + operation.fields, revision))
+                        SyncOperationResult(operation.clientOpId, SyncResultStatus.APPLIED, revision, changes.size.toLong())
+                    }
+                    is SyncOperation.AppendTurn -> SyncOperationResult(
+                        operation.clientOpId, SyncResultStatus.APPLIED, sequence = recordTurn(operation.taskId, operation.turn),
+                    )
+                    is SyncOperation.Delete -> error("The fixture does not accept deletes")
+                }
             }
         }
         return SyncPushResponse(changes.size.toLong(), applied)
@@ -329,5 +411,15 @@ internal class FixtureTransport(clock: DayClock = SystemDayClock()) : SyncTransp
                 "rev" to JsonValue.IntegerValue(requireNotNull(record.revision)),
             ),
         )
+    }
+
+    private fun recordTurn(taskId: String, turn: Map<String, JsonValue>): Long {
+        val sequence = (turnSequences[taskId] ?: 0L) + 1L
+        turnSequences[taskId] = sequence
+        changes += SyncChange("turn", turn + mapOf(
+            "taskId" to JsonValue.StringValue(taskId),
+            "seq" to JsonValue.IntegerValue(sequence),
+        ))
+        return sequence
     }
 }

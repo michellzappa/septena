@@ -224,20 +224,10 @@ internal fun TaskConversationSection(
     fun toggleStopped() {
         if (!canWrite || busy) return
         val stopped = conversation.stoppedAt != null
-        val changes = if (stopped) {
-            mapOf(
-                RegistryEntityFields.Convo.STOPPED_AT to JsonValue.Null,
-                RegistryEntityFields.Convo.ASSIGNEE to JsonValue.StringValue(RegistryEntityEnums.ConvoAssignee.CLAUDE),
-            )
-        } else {
-            mapOf(
-                RegistryEntityFields.Convo.STOPPED_AT to JsonValue.StringValue(WireTimestamp.format(graph.clock.now())),
-            )
-        }
         scope.launch {
             busy = true
             runCatching {
-                withContext(Dispatchers.IO) { graph.conversationMutator.update(taskId, changes) }
+                withContext(Dispatchers.IO) { graph.conversationMutator.setStopped(taskId, !stopped, graph.clock.now()) }
             }.onSuccess {
                 graph.sync.noteLocalChange()
                 graph.sync.requestSync()

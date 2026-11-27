@@ -1,12 +1,37 @@
 package app.septena.core
 
 import app.septena.core.generated.RegistryEntityNames
+import app.septena.core.generated.RegistryEntityEnums
+import app.septena.core.generated.RegistryEntityFields
+import java.time.Instant
 
 /** Conversation rows are keyed by task ID; turns are append-only operations. */
 class ConversationMutator(
     private val store: TaskStore,
     private val ids: TaskIdGenerator,
 ) {
+    suspend fun appendUserTurn(taskId: String, fields: Map<String, JsonValue>) {
+        appendTurn(taskId, fields)
+        val chosen = fields["chosen"].stringValue()
+        if (chosen != null && fields["step"].stringValue() == RegistryEntityEnums.ConvoTurnStep.CONFIRM) {
+            update(taskId, mapOf(
+                RegistryEntityFields.Convo.CONFIRMED_INTENT to JsonValue.StringValue(fields["note"].stringValue() ?: chosen),
+            ))
+        }
+    }
+
+    suspend fun setStopped(taskId: String, stopped: Boolean, now: Instant): SyncRecord {
+        val changes = if (stopped) {
+            mapOf(RegistryEntityFields.Convo.STOPPED_AT to JsonValue.StringValue(WireTimestamp.format(now)))
+        } else {
+            mapOf(
+                RegistryEntityFields.Convo.STOPPED_AT to JsonValue.Null,
+                RegistryEntityFields.Convo.ASSIGNEE to JsonValue.StringValue(RegistryEntityEnums.ConvoAssignee.CLAUDE),
+            )
+        }
+        return update(taskId, changes)
+    }
+
     suspend fun update(taskId: String, changes: Map<String, JsonValue>): SyncRecord {
         require(changes.isNotEmpty()) { "A conversation update must contain at least one field" }
         val task = store.record(RegistryEntityNames.TASK, taskId)

@@ -78,10 +78,60 @@ fun main() = runBlocking {
         checkPlaceParity(directory.toPath(), clock)
         checkTaskEditor(directory.toPath(), clock)
         checkQuickFind(directory.toPath(), clock)
+        checkConversations(directory.toPath(), clock)
     } finally {
         check(directory.deleteRecursively()) { "SQLite files remained locked after close" }
     }
-    println("Windows spike smoke passed: lists, offline persistence, task edits, places, editor undo, Quick Find, peer pull, cleanup")
+    println("Windows spike smoke passed: lists, offline persistence, editor undo, Quick Find, conversations, agent controls, peer pull, cleanup")
+}
+
+private suspend fun checkConversations(directory: Path, clock: DayClock) {
+    val fixture = FixtureTransport(clock)
+    val id = "seedtask0001"
+    val path = directory.resolve("conversation.db")
+    SpikeWorkspace(path, fixture, clock).use { workspace ->
+        workspace.sync()
+        val prompt = checkNotNull(workspace.conversation(id).question())
+        check(prompt.choices() == listOf("Installer", "Task lists"))
+        check(!workspace.lists("en").agentsPaused)
+        fixture.online = false
+
+        check(runCatching { workspace.changeConversation(id, ConversationEdit.Answer(prompt.sequence + 1, "Installer")) }.isFailure)
+        workspace.changeConversation(id, ConversationEdit.Answer(prompt.sequence, "Installer"))
+        check(workspace.conversation(id).question() == null)
+        check(workspace.conversation(id).state.confirmedIntent == "Installer")
+        check(workspace.conversation(id).turns.last().isPending)
+        check(runCatching { workspace.changeConversation(id, ConversationEdit.Answer(prompt.sequence, "Task lists")) }.isFailure)
+        workspace.changeConversation(id, ConversationEdit.Reply("I will check the x64 image."))
+        workspace.changeConversation(id, ConversationEdit.Stop(true))
+        workspace.setAgentsPaused(true)
+        check(workspace.conversation(id).state.stoppedAt != null)
+        check(workspace.lists("en").agentsPaused)
+    }
+
+    SpikeWorkspace(path, fixture, clock).use { workspace ->
+        check(workspace.conversation(id).turns.count { it.isPending } == 2)
+        fixture.online = true
+        check(workspace.sync().pushedOperations > 0)
+        check(workspace.rejected().isEmpty())
+        check(workspace.conversation(id).turns.none { it.isPending })
+        check(workspace.sync().pushedOperations == 0)
+
+        SpikeWorkspace(directory.resolve("conversation-peer.db"), fixture, clock).use { peer ->
+            peer.sync()
+            val thread = peer.conversation(id)
+            check(thread.turns.size == 3)
+            check(thread.turns[1].fields["chosen"].stringValue() == "Installer")
+            check(thread.turns[2].fields["note"].stringValue() == "I will check the x64 image.")
+            check(thread.state.stoppedAt != null && peer.lists("en").agentsPaused)
+
+            workspace.changeConversation(id, ConversationEdit.Stop(false))
+            workspace.setAgentsPaused(false)
+            workspace.sync()
+            peer.sync()
+            check(peer.conversation(id).state.stoppedAt == null && !peer.lists("en").agentsPaused)
+        }
+    }
 }
 
 private suspend fun checkQuickFind(directory: Path, clock: DayClock) {

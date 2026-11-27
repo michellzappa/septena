@@ -107,7 +107,7 @@ private fun DesktopTasks(
     var destination by remember { mutableStateOf<DesktopLocation>(today) }
     var lists by remember { mutableStateOf(DesktopTaskLists()) }
     var editor by remember { mutableStateOf<NameEditor?>(null) }
-    var editingTask by remember { mutableStateOf<TaskRecord?>(null) }
+    var editingTask by remember { mutableStateOf<Pair<TaskRecord, DesktopConversation>?>(null) }
     var movingTask by remember { mutableStateOf<String?>(null) }
     var quickFind by remember { mutableStateOf<QuickFindSearch?>(null) }
     var status by remember { mutableStateOf("Loading fixture") }
@@ -156,9 +156,9 @@ private fun DesktopTasks(
         work({
             checkNotNull(workspace.task(id)?.takeIf { it.deletedAt == null }) {
                 localized("Task is no longer available.", languageTag)
-            }.asTaskRecord()
+            }.asTaskRecord() to workspace.conversation(id)
         }, refresh = false) { selected ->
-            hit?.let { target -> quickFindTaskLocation(target, selected, lists)?.let { destination = it } }
+            hit?.let { target -> quickFindTaskLocation(target, selected.first, lists)?.let { destination = it } }
             editingTask = selected
         }
     }
@@ -276,6 +276,17 @@ private fun DesktopTasks(
                     }
                 }) { Text(actionTitle(RegistryActionIds.APP_UNDO, languageTag)) }
             }
+            if (loaded) {
+                val pauseLabel = RegistryCatalog.actionTitle(
+                    RegistryActionIds.APP_PAUSE_AGENTS,
+                    if (lists.agentsPaused) "activeTitle" else "title",
+                    languageTag,
+                ).orEmpty()
+                TextButton(enabled = !busy, onClick = {
+                    val pause = !lists.agentsPaused
+                    work({ workspace.setAgentsPaused(pause) })
+                }) { Text(pauseLabel) }
+            }
             Text(status, style = MaterialTheme.typography.bodySmall)
             TaskHomeContent(
                 completeTitle = actionTitle(RegistryActionIds.TASK_TOGGLE_COMPLETE, languageTag),
@@ -331,15 +342,22 @@ private fun DesktopTasks(
             }
         }
     }
-    editingTask?.let { task ->
-        DesktopTaskEditor(task, workspace.today(), languageTag, busy, error, onDismiss = { editingTask = null }) { change, done ->
+    editingTask?.let { (task, thread) ->
+        DesktopTaskEditor(
+            task, thread, workspace.today(), workspace.now(), languageTag, busy, error, onDismiss = { editingTask = null },
+        ) { change, done ->
             work({
-                when (change) {
+                val updated = when (change) {
                     is DesktopTaskEdit.Text -> workspace.saveText(task, change.title, change.notes)
                     is DesktopTaskEdit.When -> workspace.setWhen(task.id, change.day, change.mode)
                     is DesktopTaskEdit.Deadline -> workspace.setDeadline(task.id, change.day)
                     is DesktopTaskEdit.Repeat -> workspace.setRepeat(task.id, change.rule, change.paused)
+                    is DesktopTaskEdit.Conversation -> {
+                        workspace.changeConversation(task.id, change.edit)
+                        checkNotNull(workspace.task(task.id)).asTaskRecord()
+                    }
                 }
+                updated to workspace.conversation(task.id)
             }) { updated ->
                 editingTask = updated
                 status = "Task saved to the outbox"

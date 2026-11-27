@@ -3,7 +3,7 @@ name: Parity & Design Lint
 # Fast cross-platform parity gate on every PR and push to main:
 # - `gen-registries.mjs --check` validates all 11 registries, generated Swift /
 #   Kotlin / TypeScript / Rust outputs, reader coverage across every shell, and
-#   `capabilities.json` ships claims on Apple, Android, and Web.
+#   `capabilities.json` ships claims on Apple, Android, Web, and Windows.
 # - `lint-design.sh` enforces cross-platform design-system, copy, tap-target,
 #   and shell guardrails.
 
