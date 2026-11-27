@@ -1451,11 +1451,10 @@ export function SeptenaApp() {
       const next = memberId && memberId.trim() ? memberId.trim() : null;
       if (prev === next) return;
       await engine.assignTask(live, next);
-      const assignMenu = ACTIONS_CATALOG.contextMenus.task.row.find(
-        (i): i is { kind: "submenu"; id: string; title: string; icon: string; items: readonly { readonly kind: string; readonly slot: string }[] } =>
-          "id" in i && i.id === "assign",
+      const assignMenu = ACTIONS_CATALOG.contextMenus["task.row"].find(
+        (i) => "id" in i && i.id === "assign",
       );
-      const assignTitle = assignMenu ? registryText(assignMenu.title, prefs.language) : "Assign To";
+      const assignTitle = assignMenu && "title" in assignMenu ? registryText(assignMenu.title, prefs.language) : "Assign To";
       undoStack.record({
         label: `${assignTitle}: “${live.title}”`,
         undo: async () => {
