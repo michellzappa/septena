@@ -107,7 +107,6 @@ const CSS = `
   .kpi b { font-size: 26px; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
   .kpi svg { width: 100%; height: 30px; color: var(--accent); }
   .delta { font-size: 12px; font-variant-numeric: tabular-nums; } .up { color: var(--accent); } .down { color: var(--dim); }
-  .funnel td.bar { width: 45%; } .meter { height: 8px; border-radius: 4px; background: var(--accent); min-width: 2px; }
   .chart { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
   .chart svg { width: 100%; height: 90px; color: var(--accent); display: block; margin-top: 6px; }
   .chart rect:hover { opacity: .7; }
@@ -231,15 +230,12 @@ function kpi(label: string, value: number | string, series: (number | null)[], d
   return `<div class="kpi"><span class="dim">${esc(label)}</span><b>${esc(typeof value === "number" ? fmt(value) : value)}</b>${deltaText(c.abs, c.rel, c.label)}${sparkline(series, days)}</div>`;
 }
 
-function funnel(title: string, steps: { name: string; n: number; note?: string }[]): string {
-  const top = Math.max(1, steps[0]?.n ?? 0);
-  const rows = steps.map((s, i) => {
-    const prev = i === 0 ? null : steps[i - 1].n;
-    return `<tr><td>${esc(s.name)}${s.note ? `<div class="dim">${esc(s.note)}</div>` : ""}</td><td class="n">${fmt(s.n)}</td>
-      <td class="n dim">${prev === null ? "" : pct(ratio(s.n, prev))}</td>
-      <td class="bar"><div class="meter" style="width:${Math.min(100, (s.n / top) * 100).toFixed(1)}%"></div></td></tr>`;
-  });
-  return `<div><h3 style="margin-top:0">${esc(title)}</h3>${table(["Step", "Count", "Of step before", ""], rows, "No data.").replace('class="scroll"', 'class="scroll funnel"')}</div>`;
+/// A funnel as a plain table: one line per step, no notes, no bars.
+function funnel(title: string, steps: { name: string; n: number }[]): string {
+  const first = steps[0]?.n ?? 0;
+  const rows = steps.map((s, i) => `<tr><td>${esc(s.name)}</td><td class="n">${fmt(s.n)}</td>
+      <td class="n">${i === 0 ? "" : pct(ratio(s.n, steps[i - 1].n))}</td><td class="n dim">${i === 0 ? "" : pct(ratio(s.n, first))}</td></tr>`);
+  return `<div><h3 style="margin-top:0">${esc(title)}</h3>${table(["Step", "Count", "Of step before", "Of first step"], rows, "No data.")}</div>`;
 }
 
 const tallyList = (title: string, rows: (Tally | TrafficRow)[], unit = "") =>
@@ -324,12 +320,12 @@ function funnelsSection(v: AdminView): string {
   return `<div class="grid2">
     ${funnel("Website, last 30 days", traffic ? [
       { name: "Visitors", n: traffic.totals.visitors },
-      { name: "Left an email", n: traffic.goals.find((g) => g.name === "Signup")?.visitors ?? 0, note: "Plausible goal Signup" },
+      { name: "Left an email", n: traffic.goals.find((g) => g.name === "Signup")?.visitors ?? 0 },
       { name: "Clicked a download", n: traffic.goals.find((g) => g.name === "Download click")?.visitors ?? 0 },
-    ] : [{ name: "Visitors", n: 0, note: "needs a Plausible Stats API key" }])}
+    ] : [{ name: "Visitors (Plausible not connected)", n: 0 }])}
     ${funnel("Product, every account", [
       { name: "Accounts", n: o.accounts },
-      { name: "Activated", n: o.activated, note: "completed a task" },
+      { name: "Activated (completed a task)", n: o.activated },
       { name: "Two or more devices", n: o.twoDevices },
       { name: "Connected an agent", n: o.withAgent },
       { name: "Started a trial", n: o.trialsStarted },
