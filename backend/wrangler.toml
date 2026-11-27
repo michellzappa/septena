@@ -54,9 +54,10 @@ WEB_ALLOWED_ORIGINS = "https://web.septena.app"
 ADMIN_EMAILS = "mz@envisioning.com" # septena-lint:allow contact-email (an access list, not a contact)
 ACCESS_TEAM_DOMAIN = "wispy-tooth-45ec.cloudflareaccess.com"
 ACCESS_AUD = "5154cf50dab7e60f4e49494cd5cafab0e5cd1ebec1f44fdf99fcc0445236a83a"
-# Email sign-in codes (ADR 0016, #169). Off until Terms of Use and the
-# privacy copy ship (#564); then "true".
-EMAIL_SIGNIN = "false"
+# Email sign-in codes (ADR 0016, #169). On since 2026-11-27, after the Terms
+# of Use and the privacy copy shipped (#564). "false" hides email on every
+# client (GET /v1/auth/methods) and refuses the email routes with 503.
+EMAIL_SIGNIN = "true"
 
 # Account summaries for the admin page (src/admin/accounts.ts).
 [triggers]
