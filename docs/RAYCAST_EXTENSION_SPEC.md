@@ -51,7 +51,7 @@ for this is a row in AS12 (septena-site#31, one page per agent client).
 ## Sign-in
 
 - **v1: an agent key** *(default)*. A password preference holds the key from
-  Settings ▸ AI & Agents ▸ Agents ▸ New Agent Key. Raycast stores it
+  Settings ▸ Agents ▸ New Agent Key. Raycast stores it
   encrypted. The key's row in the Agents list is "Raycast", so the user can
   disconnect it there.
 - **v2: OAuth** with PKCE through Raycast's OAuth client, so the user signs in

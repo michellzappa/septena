@@ -85,6 +85,48 @@
         }
       }
     },
+    "%@ can read and change your tasks. You can pause it in Agents." : {
+      "comment" : "Generated from registry settings.copy.sign_in_approval.detailConnector.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ kann deine Aufgaben lesen und ändern. Du kannst es unter Agenten pausieren."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ puede leer y modificar tus tareas. Puedes pausarlo en Agentes."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ peut lire et modifier vos tâches. Vous pouvez le mettre en pause dans Agents."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ può leggere e modificare le tue attività. Puoi metterlo in pausa in Agenti."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ kan je taken lezen en wijzigen. Je kunt de verbinding pauzeren bij Agents."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ pode ler e alterar suas tarefas. Você pode pausá-lo em Agentes."
+          }
+        }
+      }
+    },
     "$30 a year for 7 years. Half the annual rate." : {
       "comment" : "Generated from registry plans.currencies.1.plus.pass.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
@@ -5702,7 +5744,7 @@
       }
     },
     "Agents" : {
-      "comment" : "Generated from registry plans.outcomes.agents.rows.connected.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.desktopTabs.agents.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
@@ -5912,7 +5954,7 @@
       }
     },
     "AI on this device" : {
-      "comment" : "Generated from registry settings.pages.ai_preferences.sections.on_device.header. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.pages.general.sections.ai.items.0.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
@@ -9073,7 +9115,7 @@
       }
     },
     "Check for Updates…" : {
-      "comment" : "Generated from registry settings.pages.about.sections.actions.items.2.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.pages.about.sections.actions.items.3.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
@@ -9201,6 +9243,48 @@
     "Choose a plan" : {
       "comment" : "Generated from registry plans.paywall.choosePlan. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
+    },
+    "Choose which lists you see and their order." : {
+      "comment" : "Generated from registry settings.pages.general.sections.lists.items.0.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wähle, welche Listen du siehst und in welcher Reihenfolge."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elige qué listas ves y en qué orden."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisis les listes que tu vois et leur ordre."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scegli quali elenchi vedi e in che ordine."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kies welke lijsten je ziet en in welke volgorde."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escolha quais listas você vê e a ordem delas."
+          }
+        }
+      }
     },
     "Chore" : {
       "extractionState" : "manual",
@@ -10440,6 +10524,48 @@
         }
       }
     },
+    "Connect an agent" : {
+      "comment" : "Generated from registry settings.pages.agents.sections.connect.header. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agent verbinden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conectar un agente"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connecter un agent"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Collega un agente"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Een agent koppelen"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conectar um agente"
+          }
+        }
+      }
+    },
     "Connect an Agent" : {
       "comment" : "Generated from registry settings.rootGroups.ai_agents_root.items.1.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
@@ -10777,7 +10903,7 @@
       }
     },
     "Contact Support" : {
-      "comment" : "Generated from registry settings.pages.about.sections.actions.items.5.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.pages.about.sections.actions.items.1.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
@@ -13690,7 +13816,7 @@
       }
     },
     "Devices" : {
-      "comment" : "Generated from registry settings.pages.devices_access.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.pages.account.sections.devices_access.items.0.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
@@ -16178,7 +16304,7 @@
       }
     },
     "Fade inactive tasks" : {
-      "comment" : "Generated from registry settings.rootGroups.lists_root.items.3.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.pages.general.sections.lists.items.3.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
@@ -17876,7 +18002,7 @@
       }
     },
     "Group Today by list" : {
-      "comment" : "Generated from registry settings.rootGroups.lists_root.items.1.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.pages.general.sections.lists.items.1.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
@@ -19144,7 +19270,7 @@
       }
     },
     "Import & Export" : {
-      "comment" : "Generated from registry settings.pages.import_export.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.pages.privacy.sections.transfer.items.0.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
@@ -20651,7 +20777,7 @@
       }
     },
     "Keyboard Shortcuts" : {
-      "comment" : "Generated from registry settings.pages.about.sections.actions.items.1.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.pages.about.sections.actions.items.2.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
@@ -20733,7 +20859,7 @@
       }
     },
     "Language" : {
-      "comment" : "Generated from registry settings.rootGroups.language_root.header. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.pages.general.sections.language.header. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
     "Large" : {
@@ -20946,7 +21072,7 @@
       }
     },
     "Learn where you usually file similar tasks." : {
-      "comment" : "Generated from registry settings.rootGroups.lists_root.items.5.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.pages.general.sections.lists.items.5.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
@@ -21312,7 +21438,7 @@
       }
     },
     "Lists" : {
-      "comment" : "Generated from registry settings.rootGroups.lists_root.header. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.pages.general.sections.lists.items.0.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
@@ -21921,7 +22047,7 @@
       "extractionState" : "manual"
     },
     "MCP Skills" : {
-      "comment" : "Generated from registry settings.pages.claude_pairing.sections.agent_tools.items.0.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.pages.agents.sections.connect.items.1.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
@@ -26041,7 +26167,7 @@
       }
     },
     "Notifications" : {
-      "comment" : "Generated from registry settings.rootGroups.notifications_root.header. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.pages.general.sections.notifications.header. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
     "now" : {
@@ -27343,6 +27469,48 @@
         }
       }
     },
+    "Open Shortcuts" : {
+      "comment" : "Generated from registry settings.pages.shortcuts.sections.actions.items.0.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kurzbefehle öffnen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abrir Atajos"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir Raccourcis"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apri Comandi Rapidi"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Opdrachten"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abrir Atalhos"
+          }
+        }
+      }
+    },
     "Open source" : {
       "comment" : "Generated from registry settings.pages.about.sections.open_source.items.0.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -27710,7 +27878,7 @@
       }
     },
     "Overdue app icon badge" : {
-      "comment" : "Generated from registry settings.rootGroups.lists_root.items.6.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.pages.general.sections.lists.items.6.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
@@ -30548,7 +30716,7 @@
       }
     },
     "Reminders" : {
-      "comment" : "Generated from registry settings.rootGroups.connections_data_root.items.1.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.pages.connections.sections.connections.items.1.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
@@ -33941,6 +34109,48 @@
         }
       }
     },
+    "Septena works with Siri and the Shortcuts app. Ask Siri to add a task, or build a shortcut that adds, completes or shows your tasks." : {
+      "comment" : "Generated from registry settings.pages.shortcuts.sections.actions.items.0.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Septena funktioniert mit Siri und der Kurzbefehle-App. Bitte Siri, eine Aufgabe hinzuzufügen, oder erstelle einen Kurzbefehl, der deine Aufgaben hinzufügt, erledigt oder anzeigt."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Septena funciona con Siri y la app Atajos. Pide a Siri que añada una tarea, o crea un atajo que añada, complete o muestre tus tareas."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Septena fonctionne avec Siri et l’app Raccourcis. Demande à Siri d’ajouter une tâche, ou crée un raccourci qui ajoute, termine ou affiche tes tâches."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Septena funziona con Siri e l’app Comandi Rapidi. Chiedi a Siri di aggiungere un’attività, oppure crea un comando che aggiunge, completa o mostra le tue attività."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Septena werkt met Siri en de Opdrachten-app. Vraag Siri een taak toe te voegen, of maak een opdracht die je taken toevoegt, afrondt of toont."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Septena funciona com a Siri e o app Atalhos. Peça à Siri para adicionar uma tarefa, ou crie um atalho que adiciona, conclui ou mostra suas tarefas."
+          }
+        }
+      }
+    },
     "Services" : {
       "localizations" : {
         "pt-BR" : {
@@ -34815,7 +35025,7 @@
       }
     },
     "Show completed tasks" : {
-      "comment" : "Generated from registry settings.rootGroups.lists_root.items.2.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.pages.general.sections.lists.items.2.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
@@ -34857,7 +35067,7 @@
       }
     },
     "Show faded tasks" : {
-      "comment" : "Generated from registry settings.rootGroups.lists_root.items.4.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.pages.general.sections.lists.items.4.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
@@ -34899,7 +35109,7 @@
       }
     },
     "Show faded tasks in projects and areas." : {
-      "comment" : "Generated from registry settings.rootGroups.lists_root.items.4.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.pages.general.sections.lists.items.4.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
@@ -34941,7 +35151,7 @@
       }
     },
     "Show Get Started Again" : {
-      "comment" : "Generated from registry settings.pages.about.sections.actions.items.3.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.pages.about.sections.actions.items.4.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
@@ -35150,7 +35360,7 @@
       }
     },
     "Show sidebar counts" : {
-      "comment" : "Generated from registry settings.rootGroups.lists_root.items.7.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.pages.general.sections.lists.items.7.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
     "Show Sidebar Counts" : {
@@ -35196,7 +35406,7 @@
       }
     },
     "Show Welcome Again" : {
-      "comment" : "Generated from registry settings.pages.about.sections.actions.items.4.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.pages.about.sections.actions.items.5.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
@@ -35846,6 +36056,48 @@
     "Sign-in methods" : {
       "comment" : "Generated from registry signIn.manage.heading. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
+    },
+    "Siri & Shortcuts" : {
+      "comment" : "Generated from registry settings.pages.connections.sections.connections.items.2.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Siri und Kurzbefehle"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Siri y Atajos"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Siri et Raccourcis"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Siri e Comandi Rapidi"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Siri en Opdrachten"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Siri e Atalhos"
+          }
+        }
+      }
     },
     "Skip" : {
       "localizations" : {
@@ -36840,7 +37092,7 @@
       }
     },
     "Suggest where to file" : {
-      "comment" : "Generated from registry settings.rootGroups.lists_root.items.5.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.pages.general.sections.lists.items.5.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
@@ -38265,7 +38517,7 @@
       }
     },
     "Tasks without activity for 14 days fade out and move to Review. This applies on all your devices." : {
-      "comment" : "Generated from registry settings.rootGroups.lists_root.items.3.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.pages.general.sections.lists.items.3.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
@@ -38747,7 +38999,7 @@
       }
     },
     "The brief that teaches a model how to use your tasks through the connection (tools, conventions, and examples)." : {
-      "comment" : "Generated from registry settings.pages.claude_pairing.sections.agent_tools.footer. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.pages.agents.sections.connect.items.1.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
@@ -39204,6 +39456,48 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "O item selecionado não é uma seção."
+          }
+        }
+      }
+    },
+    "The Shortcuts app lists every Septena action. Add them to your own shortcuts." : {
+      "comment" : "Generated from registry settings.pages.shortcuts.sections.actions.footer. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Kurzbefehle-App zeigt jede Septena-Aktion. Füge sie deinen eigenen Kurzbefehlen hinzu."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La app Atajos muestra todas las acciones de Septena. Añádelas a tus propios atajos."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’app Raccourcis liste chaque action de Septena. Ajoute-les à tes propres raccourcis."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’app Comandi Rapidi elenca ogni azione di Septena. Aggiungile ai tuoi comandi."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De Opdrachten-app toont elke Septena-actie. Voeg ze toe aan je eigen opdrachten."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O app Atalhos lista cada ação do Septena. Adicione-as aos seus próprios atalhos."
           }
         }
       }
@@ -39896,7 +40190,7 @@
       }
     },
     "Timed reminders" : {
-      "comment" : "Generated from registry settings.rootGroups.notifications_root.items.0.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.pages.general.sections.notifications.items.0.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
     "Timed tasks only" : {
@@ -42542,7 +42836,7 @@
       }
     },
     "When off, tasks appear in one list with their project or area underneath." : {
-      "comment" : "Generated from registry settings.rootGroups.lists_root.items.1.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.pages.general.sections.lists.items.1.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
@@ -44718,6 +45012,48 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Suas tarefas, áreas e projetos"
+          }
+        }
+      }
+    },
+    "Your tasks, areas, projects, and conversations stay on this device until you sign in. When signed in, they sync through Septena’s private server at api.septena.app, encrypted at rest (not end-to-end, so connected agents can read them when you choose). AI on your device stays on your device. Connect an agent under Agents." : {
+      "comment" : "Generated from registry settings.pages.privacy.sections.data_locality.items.0.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deine Aufgaben, Bereiche, Projekte und Unterhaltungen bleiben auf diesem Gerät, bis du dich anmeldest. Nach der Anmeldung werden sie über Septenas privaten Server unter api.septena.app synchronisiert, verschlüsselt gespeichert (nicht Ende-zu-Ende, damit verbundene Agenten sie lesen können, wenn du es willst). KI auf deinem Gerät bleibt auf deinem Gerät. Verbinde einen Agenten unter Agenten."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tus tareas, áreas, proyectos y conversaciones se quedan en este dispositivo hasta que inicies sesión. Con la sesión iniciada, se sincronizan a través del servidor privado de Septena en api.septena.app, cifradas en reposo (no de extremo a extremo, para que los agentes conectados puedan leerlas cuando tú quieras). La IA de tu dispositivo se queda en tu dispositivo. Conecta un agente en Agentes."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tes tâches, domaines, projets et conversations restent sur cet appareil jusqu’à ce que tu te connectes. Une fois connecté, ils se synchronisent via le serveur privé de Septena sur api.septena.app, chiffrés au repos (pas de bout en bout, pour que les agents connectés puissent les lire quand tu le choisis). L’IA de ton appareil reste sur ton appareil. Connecte un agent dans Agents."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le tue attività, aree, progetti e conversazioni restano su questo dispositivo finché non accedi. Dopo l’accesso si sincronizzano tramite il server privato di Septena su api.septena.app, cifrati a riposo (non end-to-end, così gli agenti collegati possono leggerli quando lo scegli tu). L’IA sul tuo dispositivo resta sul tuo dispositivo. Collega un agente in Agenti."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Je taken, gebieden, projecten en gesprekken blijven op dit apparaat tot je inlogt. Na het inloggen synchroniseren ze via de privéserver van Septena op api.septena.app, versleuteld opgeslagen (niet end-to-end, zodat gekoppelde agents ze kunnen lezen als jij dat kiest). AI op je apparaat blijft op je apparaat. Koppel een agent onder Agents."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suas tarefas, áreas, projetos e conversas ficam neste dispositivo até você entrar. Depois de entrar, eles sincronizam pelo servidor privado do Septena em api.septena.app, criptografados em repouso (não de ponta a ponta, para que agentes conectados possam lê-los quando você escolher). A IA do seu dispositivo fica no seu dispositivo. Conecte um agente em Agentes."
           }
         }
       }

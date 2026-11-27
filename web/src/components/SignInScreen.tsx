@@ -1,16 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
 import { ArrowLeft, RefreshCw, Smartphone } from "lucide-react";
 import { ApiError, SeptenaApiClient } from "@/lib/api/client";
-import { SIGN_IN, SURFACES_CATALOG, registryText } from "@/lib/generated/registries";
+import { DESIGN_TOKENS, SIGN_IN, SURFACES_CATALOG, registryText } from "@/lib/generated/registries";
+import { hexWithAlpha } from "@/lib/headerWash";
 import type { AuthMethodEntry, DeviceStartResponse, SessionResponse } from "@/lib/types";
+import { HeaderWash } from "./HeaderWash";
 import { QrCode } from "./QrCode";
 import { RegistryIcon } from "./RegistryIcon";
 
 interface SignInScreenProps {
   api: SeptenaApiClient;
   language: string;
+  isDark: boolean;
+  dayISO: string;
   onSignedIn: (session: SessionResponse) => void;
 }
 
@@ -87,7 +91,7 @@ interface PendingCollisionLink {
   linkToken?: string;
 }
 
-export function SignInScreen({ api, language, onSignedIn }: SignInScreenProps) {
+export function SignInScreen({ api, language, isDark, dayISO, onSignedIn }: SignInScreenProps) {
   // null: the server's method list has not answered yet.
   const [methods, setMethods] = useState<MethodId[] | null>(null);
   const [showDevice, setShowDevice] = useState(false);
@@ -187,11 +191,57 @@ export function SignInScreen({ api, language, onSignedIn }: SignInScreenProps) {
     ),
   };
 
+  // Sign-in is a brand surface (before any user accent is loaded): use Persimmon
+  // and the Topography texture from the shared design token registry.
+  const brandFruit =
+    DESIGN_TOKENS.fruitAccents.find((f) => f.id === "persimmon") ??
+    DESIGN_TOKENS.fruitAccents[0];
+  const brandAccent = isDark ? brandFruit.dark : brandFruit.light;
+  const brandCheck = isDark ? brandFruit.checkDark : brandFruit.checkLight;
+  const brandSelected = hexWithAlpha(
+    brandAccent,
+    isDark
+      ? DESIGN_TOKENS.selection.emphasizedAlphaDark
+      : DESIGN_TOKENS.selection.emphasizedAlphaLight,
+  );
+  const brandStyle = {
+    ["--accent" as string]: brandAccent,
+    ["--accent-check" as string]: brandCheck,
+    ["--bg-selected" as string]: brandSelected,
+    accentColor: brandAccent,
+  } as CSSProperties;
+
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[var(--bg-sidebar)] p-4">
-      <div className="w-full max-w-[420px] rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)] p-7 shadow-sm">
+    <main
+      className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[var(--bg-canvas)] p-4"
+      style={brandStyle}
+    >
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-0 z-0 h-96"
+        style={{
+          backgroundImage: `linear-gradient(to bottom, ${hexWithAlpha(brandAccent, isDark ? 0.14 : 0.09)}, transparent)`,
+        }}
+      />
+      <HeaderWash
+        style="topography"
+        isDark={isDark}
+        accentHex={brandAccent}
+        intensity={65}
+        motion="still"
+        dayISO={dayISO}
+        fullBleed
+      />
+      <div className="relative z-10 w-full max-w-[420px] rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/95 p-7 shadow-lg backdrop-blur-sm">
         <div className="mb-5 flex items-center gap-3">
-          <img src="/icon.svg" alt="" className="h-9 w-9 rounded-xl" />
+          <img
+            src="/icon.svg"
+            alt=""
+            width={40}
+            height={40}
+            draggable={false}
+            className="h-10 w-10 shrink-0 select-none"
+          />
           <div>
             <h1 className="text-lg font-semibold tracking-tight text-[var(--text-primary)]">
               {registryText(SIGN_IN.copy.heading, language)}
@@ -275,26 +325,22 @@ export function SignInScreen({ api, language, onSignedIn }: SignInScreenProps) {
           </>
         )}
 
-        {/* A visitor with no Septena app has nothing to approve this browser
-            from: point them at the apps. Same tab, like every site link. */}
-        <p className="mt-5 text-center text-sm text-[var(--text-secondary)]">
-          New to Septena?{" "}
-          <a
-            href="https://septena.app/download"
-            className="font-medium text-[var(--accent)] underline-offset-4 hover:underline"
-          >
-            Get the app
-          </a>
-        </p>
+        {/* Only show when the server falls back to device-only approval, where a
+            new visitor has no existing app to approve this browser from. */}
+        {methods !== null && !hasPrimary && (
+          <p className="mt-5 text-center text-sm text-[var(--text-secondary)]">
+            New to Septena?{" "}
+            <a
+              href="https://septena.app/download"
+              className="font-medium text-[var(--accent)] underline-offset-4 hover:underline"
+            >
+              Get the app
+            </a>
+          </p>
+        )}
 
-        <p className="mt-4 text-center text-xs leading-relaxed text-[var(--text-muted)]">
+        <p className="mt-5 text-center text-xs leading-relaxed text-[var(--text-muted)]">
           {withLinks(registryText(SIGN_IN.copy.terms, language), links)}
-        </p>
-
-        <p className="mt-6 border-t border-[var(--border-subtle)] pt-4 text-xs leading-relaxed text-[var(--text-muted)]">
-          Task data syncs directly between this browser and{" "}
-          <span className="font-mono-tabular">api.septena.app</span>, stored locally in
-          IndexedDB so new tasks queue offline and push on reconnect.
         </p>
       </div>
     </main>
@@ -369,7 +415,7 @@ function CollisionLinkForm({
             maxLength={DEFAULT_CODE_LENGTH}
             value={code}
             onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, DEFAULT_CODE_LENGTH))}
-            className="font-mono-tabular w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-canvas)] px-3 py-2.5 text-center text-lg tracking-[0.3em] text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
+            className="font-mono-tabular w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-canvas)] px-3 py-2.5 text-center text-lg tracking-[0.3em] text-[var(--text-primary)] outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/20"
           />
           {error && <p role="alert" className="text-sm text-red-600 dark:text-red-400">{error}</p>}
           <button
@@ -517,7 +563,7 @@ function EmailSignIn({
   };
 
   const inputClass =
-    "w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-canvas)] px-3 py-2.5 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent)]";
+    "w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-canvas)] px-3 py-2.5 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/20";
   const primaryClass =
     "inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50";
   const linkClass = "text-sm font-medium text-[var(--accent)] hover:opacity-90 disabled:opacity-50";

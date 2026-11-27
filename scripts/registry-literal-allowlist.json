@@ -128,12 +128,6 @@
       "issue": "#260"
     },
     {
-      "file": "Septask/SeptaskSettingsView.swift",
-      "literal": "Smart Lists",
-      "reason": "Settings chrome or status word that is not a registry item yet (P2d hand-over).",
-      "issue": "#260"
-    },
-    {
       "file": "Septask/TasksSkillPane.swift",
       "literal": "MCP Skills",
       "reason": "Settings chrome or status word that is not a registry item yet (P2d hand-over).",

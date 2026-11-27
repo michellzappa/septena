@@ -4,7 +4,7 @@ import SwiftUI
 /// docs/SEPTASK_BACKEND.md §10). Every app install signed in to the account.
 /// Another device can be signed out from here. The Apple Watch row lives here
 /// too (iOS only). Agents (MCP connections) are a separate list:
-/// `SeptaskAgentsSections`, Settings ▸ AI & Agents ▸ Agents.
+/// `SeptaskAgentsSections`, Settings ▸ Agents.
 struct SeptaskDevicesAccessPane: View {
   private var sync: TaskSyncEngine { .shared }
 

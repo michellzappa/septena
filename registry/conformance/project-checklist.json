@@ -1,0 +1,79 @@
+{
+  "version": 1,
+  "description": "Reusable project checklists keep checked rows out of the active groups, match titles in project order, and assign only known new groceries.",
+  "layout": [
+    {
+      "name": "active items retain their groups and checked matches can be reopened",
+      "input": {
+        "rows": [
+          { "id": "dairy", "title": "Dairy", "status": "open", "kind": "heading" },
+          { "id": "pantry", "title": "Pantry", "status": "open", "kind": "heading" },
+          { "id": "bread", "title": "Bread", "status": "open", "heading": "removed" },
+          { "id": "milk", "title": "Milk", "status": "open", "heading": "dairy" },
+          { "id": "yogurt", "title": "Greek yogurt", "status": "checklistChecked", "heading": "dairy" },
+          { "id": "old", "title": "Greek yogurt", "status": "done", "heading": "dairy" },
+          { "id": "trash", "title": "Greek yogurt", "status": "checklistChecked", "deletedAt": "2026-11-26" }
+        ],
+        "query": "yo",
+        "groceries": true
+      },
+      "expected": {
+        "ungrouped": ["bread"],
+        "groups": [{ "id": "dairy", "items": ["milk"] }],
+        "checked": ["yogurt"],
+        "matches": ["yogurt"],
+        "suggestedGroup": null
+      }
+    },
+    {
+      "name": "exact case-insensitive matches precede prefixes",
+      "input": {
+        "rows": [
+          { "id": "large", "title": "Bananas for baking", "status": "open" },
+          { "id": "regular", "title": "Bananas", "status": "checklistChecked" }
+        ],
+        "query": " BANANAS ",
+        "groceries": true
+      },
+      "expected": {
+        "ungrouped": ["large"],
+        "groups": [],
+        "checked": ["regular"],
+        "matches": ["regular", "large"],
+        "suggestedGroup": "produce"
+      }
+    },
+    {
+      "name": "plain checklists can remain flat",
+      "input": { "rows": [], "query": "bananas" },
+      "expected": { "ungrouped": [], "groups": [], "checked": [], "matches": [], "suggestedGroup": null }
+    }
+  ],
+  "check": [
+    {
+      "name": "checking clears occurrence dates and carries no completion stamp",
+      "input": { "checked": true },
+      "expected": {
+        "status": "checklistChecked",
+        "today": false,
+        "todaySetOn": null,
+        "todayPosition": null,
+        "scheduled": null,
+        "deadline": null,
+        "deferredDeadline": null,
+        "startTime": null,
+        "durationMinutes": null,
+        "timeZone": null,
+        "reminderAt": null,
+        "reminderMode": null,
+        "reminderSnoozedUntil": null,
+        "reminderDismissedAt": null
+      }
+    },
+    {
+      "name": "reopening retains the same item and leaves it undated",
+      "input": { "checked": false },
+      "expected": { "status": "open" }
+    }
+  ]
+}

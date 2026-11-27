@@ -2857,7 +2857,7 @@ struct TaskListView: View {
       startCreate()
     case .connectAI, .importTasks:
       let pageID = id == .connectAI
-        ? RegistrySettings.PageID.claudePairing
+        ? RegistrySettings.PageID.agents
         : RegistrySettings.PageID.importExport
       SeptaskSettingsLink.request(pageID)
       nav.showSettings = true

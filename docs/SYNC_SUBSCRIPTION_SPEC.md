@@ -525,7 +525,7 @@ launch and never on a timer.
 **Where it opens from:**
 
 - "See Plus" or "See Pro" on an upsell moment (§3.2), including the full
-  agent list in Settings ▸ AI & Agents ▸ Agents (`agents_full`,
+  agent list in Settings ▸ Agents (`agents_full`,
   `agents_full_plus`).
 - Settings ▸ Septena Plus (`SeptaskPlusPane`): "See Plus" before a plan,
   "See Pro" on Plus, "Manage Subscription" on Pro or a store subscription

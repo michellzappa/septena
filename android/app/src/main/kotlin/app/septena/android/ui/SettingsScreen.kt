@@ -133,7 +133,7 @@ internal fun SettingsScreen(graph: AndroidAppGraph, onBack: () -> Unit) {
     fun titleFor(pageId: String?): String = pageId?.let { pages[it]?.title }.orEmpty()
     val currentPageId = pageStack.lastOrNull()
 
-    // The root page shows the agent count (AI & Agents, `agentsStatus`); the
+    // The root page shows the agent count (the Agents row, `agentsStatus`); the
     // Agents and Devices pages show the lists. Each reloads when it opens.
     LaunchedEffect(signedIn, currentPageId) {
         if (currentPageId == null ||
@@ -361,8 +361,10 @@ private fun SettingsRegistryRow(
                 AI_MODE_STATUS_KEY -> optionTitle(definitions[RegistrySettingKeys.AI_MODE], values[RegistrySettingKeys.AI_MODE], languageTag)
                 else -> null
             }
+            // `calendarStatus` has no registry words yet, so the Calendar row shows none (#770).
             ListItem(
                 headlineContent = { Text(title) },
+                supportingContent = item.detail?.let { { Text(it) } },
                 modifier = Modifier.fillMaxWidth().clickable { onPage(target) },
                 trailingContent = {
                     Row(

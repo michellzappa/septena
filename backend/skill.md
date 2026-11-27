@@ -26,7 +26,7 @@ This brief stays the full set of rules. When a skill and this brief disagree, th
   2. Tell the user to open the confirmation link Septena emailed them (valid 10 minutes) and approve.
   3. Poll `POST https://api.septena.app/v1/agent/signup/poll` with `{"requestId": "...", "pollSecret": "..."}` every ~3 seconds (`202` while pending, `410` if declined or expired).
   4. On `200`, store the returned `key` (`sk1.…`) securely and send it as `Authorization: Bearer sk1.…` to `https://api.septena.app/mcp`. Then run the onboarding flow (`https://api.septena.app/onboard.md`) if `created: true`, and tell the user they can sign in with that email on any of their devices or at `https://web.septena.app`.
-- **Pre-created agent key:** an agent that already has a key from Septena Settings ▸ AI & Agents sends it as `Authorization: Bearer sk1.…`.
+- **Pre-created agent key:** an agent that already has a key from Septena Settings ▸ Agents sends it as `Authorization: Bearer sk1.…`.
 
 ## Conventions
 

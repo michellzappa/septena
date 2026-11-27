@@ -396,7 +396,7 @@ tasks through CloudKit.
   `invalid_grant`.
 - **Agents (2026-11-24).** One agent is one MCP connection (one token
   family). The apps show devices and agents as separate lists: Settings ▸
-  Account ▸ Devices, and Settings ▸ AI & Agents ▸ Agents. Each agent has a
+  Account ▸ Devices, and Settings ▸ Agents. Each agent has a
   name: the user gives it when they approve the code (`name` on
   `POST /v1/pair/approve`), and can change it with
   `PATCH /v1/access/connections/:id {name}` (`null` goes back to the client's

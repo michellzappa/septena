@@ -665,7 +665,7 @@ struct SidebarRootView: View {
       nav.showSettings = true
       #endif
     } label: {
-      Label("Customize Smart Lists…", systemImage: "slider.horizontal.3")
+      Label("Customize Lists…", systemImage: "slider.horizontal.3")
     }
   }
 
@@ -741,7 +741,7 @@ struct SidebarRootView: View {
       nav.showSettings = true
       #endif
     } label: {
-      Label("Customize Smart Lists…", systemImage: "slider.horizontal.3")
+      Label("Customize Lists…", systemImage: "slider.horizontal.3")
     }
   }
 
