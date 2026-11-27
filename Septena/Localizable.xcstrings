@@ -16793,6 +16793,48 @@
         }
       }
     },
+    "For people who hand a lot of work to agents." : {
+      "comment" : "Generated from registry plans.cards.pro.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Für alle, die Agenten viel Arbeit übergeben."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Para quienes delegan mucho trabajo en agentes."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pour celles et ceux qui confient beaucoup de travail à des agents."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Per chi affida molto lavoro agli agenti."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voor wie veel werk aan agents overlaat."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Para quem passa muito trabalho para agentes."
+          }
+        }
+      }
+    },
     "For people who run many agents on one list." : {
       "comment" : "Generated from registry plans.cards.pro.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",

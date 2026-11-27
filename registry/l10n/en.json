@@ -1782,8 +1782,8 @@
       "surfaces.taskReferences.roles.follow_up.label"
     ]
   },
-  "For people who run many agents on one list.": {
-    "text": "For people who run many agents on one list.",
+  "For people who hand a lot of work to agents.": {
+    "text": "For people who hand a lot of work to agents.",
     "paths": [
       "plans.cards.pro.detail"
     ]
