@@ -271,8 +271,8 @@
       "signIn.manage.footer"
     ]
   },
-  "Add as a custom MCP connector in Claude or any MCP client": {
-    "text": "Add as a custom MCP connector in Claude or any MCP client",
+  "Add as a custom MCP server in any MCP client": {
+    "text": "Add as a custom MCP server in any MCP client",
     "paths": [
       "settings.copy.claude_connector.connectorUrlDetail.label"
     ]
@@ -298,8 +298,8 @@
       "surfaces.checklistProjects.addItemToGroup"
     ]
   },
-  "Add the connector URL to Claude or any MCP client, or paste the setup prompt into Claude. When your browser shows an 8-character code, enter it above. Only enter a code from a browser window you opened yourself.": {
-    "text": "Add the connector URL to Claude or any MCP client, or paste the setup prompt into Claude. When your browser shows an 8-character code, enter it above. Only enter a code from a browser window you opened yourself.",
+  "Add the MCP server URL to any MCP client, or paste the setup prompt into your agent. When your browser shows an 8-character code, enter it above. Only enter a code from a window you opened yourself.": {
+    "text": "Add the MCP server URL to any MCP client, or paste the setup prompt into your agent. When your browser shows an 8-character code, enter it above. Only enter a code from a window you opened yourself.",
     "paths": [
       "settings.copy.claude_connector.footer.label"
     ]
@@ -357,6 +357,12 @@
     "text": "Agent",
     "paths": [
       "destinations.destinations.agent.title"
+    ]
+  },
+  "Agent comments": {
+    "text": "Agent comments",
+    "paths": [
+      "settings.pages.agents.sections.notifications.items.0.label"
     ]
   },
   "Agent connected. Go back to your browser to finish.": {
@@ -576,6 +582,12 @@
       "tokens.fruitAccents.acai.name"
     ]
   },
+  "Back": {
+    "text": "Back",
+    "paths": [
+      "surfaces.firstRun.chrome.back.label"
+    ]
+  },
   "Backup on our server": {
     "text": "Backup on our server",
     "paths": [
@@ -774,6 +786,12 @@
       "surfaces.checklistProjects.chooseGroup"
     ]
   },
+  "Choose when agent comments notify you. You can override this for any connected agent below.": {
+    "text": "Choose when agent comments notify you. You can override this for any connected agent below.",
+    "paths": [
+      "settings.pages.agents.sections.notifications.footer"
+    ]
+  },
   "Choose which lists you see and their order.": {
     "text": "Choose which lists you see and their order.",
     "paths": [
@@ -784,24 +802,6 @@
     "text": "Classic Window",
     "paths": [
       "actions.actions.app.classicWindow.title"
-    ]
-  },
-  "Claude reads and changes your tasks through your Septena account. You decide which tasks it works on.": {
-    "text": "Claude reads and changes your tasks through your Septena account. You decide which tasks it works on.",
-    "paths": [
-      "surfaces.firstRun.steps.connectClaude.body"
-    ]
-  },
-  "Claude setup prompt": {
-    "text": "Claude setup prompt",
-    "paths": [
-      "settings.copy.claude_connector.setupPrompt.label"
-    ]
-  },
-  "Claude starter prompt": {
-    "text": "Claude starter prompt",
-    "paths": [
-      "settings.copy.claude_connector.firstPrompt.label"
     ]
   },
   "Clear": {
@@ -913,12 +913,6 @@
       "settings.copy.ai_explainer.confirmTitle.label"
     ]
   },
-  "Connect Claude": {
-    "text": "Connect Claude",
-    "paths": [
-      "surfaces.firstRun.steps.connectClaude.title"
-    ]
-  },
   "Connect Claude and two more. Each one asks before it acts.": {
     "text": "Connect Claude and two more. Each one asks before it acts.",
     "paths": [
@@ -934,7 +928,14 @@
   "Connect an agent": {
     "text": "Connect an agent",
     "paths": [
-      "settings.pages.agents.sections.connect.header"
+      "settings.pages.agents.sections.connect.header",
+      "surfaces.firstRun.steps.agentSetup.title"
+    ]
+  },
+  "Connect the agent you already use. You choose what it works on, and only you mark work done.": {
+    "text": "Connect the agent you already use. You choose what it works on, and only you mark work done.",
+    "paths": [
+      "surfaces.firstRun.steps.agentSetup.body"
     ]
   },
   "Connect your agent": {
@@ -966,12 +967,6 @@
       "settings.pages.connections.title"
     ]
   },
-  "Connector URL": {
-    "text": "Connector URL",
-    "paths": [
-      "settings.copy.claude_connector.connectorUrl.label"
-    ]
-  },
   "Contact Support": {
     "text": "Contact Support",
     "paths": [
@@ -990,7 +985,7 @@
     "paths": [
       "settings.copy.sign_in_approval.continue.label",
       "surfaces.firstRun.steps.welcome.primary.title",
-      "surfaces.firstRun.steps.connectClaude.afterDone.title"
+      "surfaces.firstRun.steps.agentSetup.afterDone.title"
     ]
   },
   "Continue with Apple": {
@@ -1068,22 +1063,10 @@
       "settings.copy.calendar_detail.copyUrl.label"
     ]
   },
-  "Copy first prompt": {
-    "text": "Copy first prompt",
-    "paths": [
-      "surfaces.firstRun.steps.connectClaude.tertiary.title"
-    ]
-  },
   "Copy setup prompt": {
     "text": "Copy setup prompt",
     "paths": [
-      "surfaces.firstRun.steps.connectClaude.primary.title"
-    ]
-  },
-  "Copy the setup prompt and paste it into Claude.": {
-    "text": "Copy the setup prompt and paste it into Claude.",
-    "paths": [
-      "surfaces.firstRun.steps.connectClaude.instructions.0"
+      "surfaces.firstRun.steps.agentSetup.primary.title"
     ]
   },
   "Could not add sign-in method.": {
@@ -1175,6 +1158,12 @@
     "text": "Daily change limit reached",
     "paths": [
       "plans.upsells.connector_cap.title"
+    ]
+  },
+  "Daily digest": {
+    "text": "Daily digest",
+    "paths": [
+      "settings.keys.agentCommentNotifications.options.2.title"
     ]
   },
   "Dark": {
@@ -1491,8 +1480,8 @@
       "surfaces.sharing.copy.inviteNote.label"
     ]
   },
-  "Each project has notes, so you and Claude know what it’s for.": {
-    "text": "Each project has notes, so you and Claude know what it’s for.",
+  "Each project has notes, so you and your agents know what it’s for.": {
+    "text": "Each project has notes, so you and your agents know what it’s for.",
     "paths": [
       "surfaces.firstRun.steps.welcome.points.2.detail"
     ]
@@ -1570,6 +1559,12 @@
     "text": "Error",
     "paths": [
       "surfaces.prompts.error.title"
+    ]
+  },
+  "Every comment": {
+    "text": "Every comment",
+    "paths": [
+      "settings.keys.agentCommentNotifications.options.0.title"
     ]
   },
   "Every device, a year of history and shared projects.": {
@@ -1858,7 +1853,6 @@
   "Get a sign-in code": {
     "text": "Get a sign-in code",
     "paths": [
-      "surfaces.firstRun.steps.accountDevice.primary.title",
       "surfaces.deviceSignIn.copy.start.label"
     ]
   },
@@ -1914,6 +1908,12 @@
     "text": "Haskap",
     "paths": [
       "tokens.fruitAccents.haskap.name"
+    ]
+  },
+  "Have a connection code?": {
+    "text": "Have a connection code?",
+    "paths": [
+      "settings.copy.claude_connector.haveCode.label"
     ]
   },
   "Header Texture": {
@@ -2001,8 +2001,8 @@
       "surfaces.prompts.items.agentReplaces.message"
     ]
   },
-  "If you prefer not to keep a subscription, one payment covers seven years of Septena Plus across your devices. That works out to half the annual rate. When the seven years end, your tasks stay on your devices, and you can extend, move to a free account, or export everything. Support for running the open-source sync server on your own Cloudflare account is on the roadmap.": {
-    "text": "If you prefer not to keep a subscription, one payment covers seven years of Septena Plus across your devices. That works out to half the annual rate. When the seven years end, your tasks stay on your devices, and you can extend, move to a free account, or export everything. Support for running the open-source sync server on your own Cloudflare account is on the roadmap.",
+  "If you prefer not to keep a subscription, one payment covers seven years of Septena Plus across your devices, for the price of three annual years. When the seven years end, your tasks stay on your devices, and you can extend, move to a free account, or export everything. Support for running the open-source sync server on your own Cloudflare account is on the roadmap.": {
+    "text": "If you prefer not to keep a subscription, one payment covers seven years of Septena Plus across your devices, for the price of three annual years. When the seven years end, your tasks stay on your devices, and you can extend, move to a free account, or export everything. Support for running the open-source sync server on your own Cloudflare account is on the roadmap.",
     "paths": [
       "plans.pass.detail"
     ]
@@ -2017,6 +2017,12 @@
     "text": "If you subscribe during the trial, billing starts on the day you subscribe.",
     "paths": [
       "plans.paywall.trialBilling"
+    ]
+  },
+  "If your browser showed an 8-character code, enter it here. Only enter a code from a window you opened yourself.": {
+    "text": "If your browser showed an 8-character code, enter it here. Only enter a code from a window you opened yourself.",
+    "paths": [
+      "settings.copy.claude_connector.codeHint.label"
     ]
   },
   "Import": {
@@ -2242,7 +2248,7 @@
   "Later": {
     "text": "Later",
     "paths": [
-      "surfaces.firstRun.steps.connectClaude.secondary.title"
+      "surfaces.firstRun.steps.agentSetup.secondary.title"
     ]
   },
   "Later…": {
@@ -2269,16 +2275,16 @@
       "surfaces.doing.screen.length.title"
     ]
   },
-  "Let Claude or your own agent work your list": {
-    "text": "Let Claude or your own agent work your list",
-    "paths": [
-      "surfaces.notices.items.getStarted.steps.connectAI.detail"
-    ]
-  },
   "Let Go": {
     "text": "Let Go",
     "paths": [
       "actions.actions.task.letGoFaded.title"
+    ]
+  },
+  "Let your agent work from your list": {
+    "text": "Let your agent work from your list",
+    "paths": [
+      "surfaces.notices.items.getStarted.steps.connectAI.detail"
     ]
   },
   "Light": {
@@ -2335,6 +2341,12 @@
     "text": "MCP Skills",
     "paths": [
       "settings.pages.agents.sections.connect.items.1.label"
+    ]
+  },
+  "MCP server URL": {
+    "text": "MCP server URL",
+    "paths": [
+      "settings.copy.claude_connector.connectorUrl.label"
     ]
   },
   "MIT License": {
@@ -2583,6 +2595,12 @@
       "surfaces.prompts.text.nameAgent.title"
     ]
   },
+  "Needs my answer or approval": {
+    "text": "Needs my answer or approval",
+    "paths": [
+      "settings.keys.agentCommentNotifications.options.1.title"
+    ]
+  },
   "New Agent Key": {
     "text": "New Agent Key",
     "paths": [
@@ -2710,6 +2728,12 @@
     "text": "No messages yet.",
     "paths": [
       "surfaces.support.copy.noMessages.label"
+    ]
+  },
+  "No notifications": {
+    "text": "No notifications",
+    "paths": [
+      "settings.keys.agentCommentNotifications.options.3.title"
     ]
   },
   "No open tasks in this area yet.": {
@@ -2854,7 +2878,9 @@
   "Notifications": {
     "text": "Notifications",
     "paths": [
-      "settings.pages.general.sections.notifications.header"
+      "settings.copy.access_agents.notificationsLabel.label",
+      "settings.pages.general.sections.notifications.header",
+      "settings.pages.agents.sections.notifications.header"
     ]
   },
   "OK": {
@@ -3073,22 +3099,16 @@
       "surfaces.taskReferences.add.placeholder"
     ]
   },
-  "Paste into Claude to start connecting": {
-    "text": "Paste into Claude to start connecting",
-    "paths": [
-      "settings.copy.claude_connector.setupPromptDetail.label"
-    ]
-  },
   "Paste into a model's context to teach it the task tools without connecting MCP.": {
     "text": "Paste into a model's context to teach it the task tools without connecting MCP.",
     "paths": [
       "settings.copy.mcp_skills.copyFooter.label"
     ]
   },
-  "Paste the first prompt. Claude sets up your areas and projects with you.": {
-    "text": "Paste the first prompt. Claude sets up your areas and projects with you.",
+  "Paste into your agent to connect your account": {
+    "text": "Paste into your agent to connect your account",
     "paths": [
-      "surfaces.firstRun.steps.connectClaude.instructions.2"
+      "settings.copy.claude_connector.setupPromptDetail.label"
     ]
   },
   "Pause Repeat": {
@@ -3241,8 +3261,8 @@
       "settings.copy.import_export.importJsonDetail.label"
     ]
   },
-  "Prices include VAT where it applies. Outside the euro area, the App Store and Google Play charge their matching local price.": {
-    "text": "Prices include VAT where it applies. Outside the euro area, the App Store and Google Play charge their matching local price.",
+  "Prices include VAT where it applies. In the US, prices are the same numbers in USD plus applicable local sales tax. Elsewhere, the App Store and Google Play charge their matching local price.": {
+    "text": "Prices include VAT where it applies. In the US, prices are the same numbers in USD plus applicable local sales tax. Elsewhere, the App Store and Google Play charge their matching local price.",
     "paths": [
       "plans.priceFootnote"
     ]
@@ -3954,6 +3974,12 @@
       "actions.actions.app.settings.title"
     ]
   },
+  "Setup prompt": {
+    "text": "Setup prompt",
+    "paths": [
+      "settings.copy.claude_connector.setupPrompt.label"
+    ]
+  },
   "Share Project": {
     "text": "Share Project",
     "paths": [
@@ -4091,6 +4117,8 @@
     "text": "Sign in",
     "paths": [
       "settings.copy.syncStatus.needsSignIn.label",
+      "surfaces.firstRun.steps.account.primary.title",
+      "surfaces.firstRun.steps.accountDevice.primary.title",
       "signIn.email.signIn"
     ]
   },
@@ -4103,8 +4131,8 @@
       "settings.copy.sign_in_approval.confirmDevice.label"
     ]
   },
-  "Sign in so Claude or another MCP agent can connect to your tasks through your private Septena account.": {
-    "text": "Sign in so Claude or another MCP agent can connect to your tasks through your private Septena account.",
+  "Sign in so your agent can connect to your tasks through your private Septena account.": {
+    "text": "Sign in so your agent can connect to your tasks through your private Septena account.",
     "paths": [
       "settings.copy.claude_connector.signInBody.label"
     ]
@@ -4134,23 +4162,18 @@
       "settings.copy.claude_connector.signInHeader.label"
     ]
   },
+  "Sign in to keep your tasks in sync on all your devices and let your agents connect. Your first sign-in creates your account.": {
+    "text": "Sign in to keep your tasks in sync on all your devices and let your agents connect. Your first sign-in creates your account.",
+    "paths": [
+      "surfaces.firstRun.steps.account.body",
+      "surfaces.firstRun.steps.accountDevice.body"
+    ]
+  },
   "Sign in to sync": {
     "text": "Sign in to sync",
     "paths": [
       "surfaces.firstRun.steps.account.title",
       "surfaces.firstRun.steps.accountDevice.title"
-    ]
-  },
-  "Sign in with Apple": {
-    "text": "Sign in with Apple",
-    "paths": [
-      "surfaces.firstRun.steps.account.primary.title"
-    ]
-  },
-  "Sign in with Apple to keep your tasks on all your devices and to let Claude connect. Septena never sees your Apple password.": {
-    "text": "Sign in with Apple to keep your tasks on all your devices and to let Claude connect. Septena never sees your Apple password.",
-    "paths": [
-      "surfaces.firstRun.steps.account.body"
     ]
   },
   "Sign in with {email}, then add {provider} in Settings.": {
@@ -4271,6 +4294,12 @@
     "text": "Starlings record",
     "paths": [
       "surfaces.taskReferences.kinds.door.label"
+    ]
+  },
+  "Starter prompt": {
+    "text": "Starter prompt",
+    "paths": [
+      "settings.copy.claude_connector.firstPrompt.label"
     ]
   },
   "Still on It": {
@@ -4906,6 +4935,18 @@
       "settings.keys.tasksTitleLines.options.1.title"
     ]
   },
+  "Two months free. You save €14 against paying monthly.": {
+    "text": "Two months free. You save €14 against paying monthly.",
+    "paths": [
+      "plans.prices.annual.detail"
+    ]
+  },
+  "Two months free. You save €28 against paying monthly.": {
+    "text": "Two months free. You save €28 against paying monthly.",
+    "paths": [
+      "plans.proPrices.pro_annual.detail"
+    ]
+  },
   "Type above to add your first task.": {
     "text": "Type above to add your first task.",
     "paths": [
@@ -4966,12 +5007,6 @@
       "surfaces.deviceSignIn.copy.intro.label"
     ]
   },
-  "Use a device where Septena is already signed in. It approves this one with a code, and your tasks sync here.": {
-    "text": "Use a device where Septena is already signed in. It approves this one with a code, and your tasks sync here.",
-    "paths": [
-      "surfaces.firstRun.steps.accountDevice.body"
-    ]
-  },
   "Use a different email": {
     "text": "Use a different email",
     "paths": [
@@ -4982,6 +5017,12 @@
     "text": "Use as Checklist",
     "paths": [
       "surfaces.checklistProjects.useAsChecklist"
+    ]
+  },
+  "Use default": {
+    "text": "Use default",
+    "paths": [
+      "settings.copy.access_agents.notificationsDefault.label"
     ]
   },
   "Use for Groceries": {
@@ -5136,12 +5177,6 @@
     "paths": [
       "settings.keys.listSort.options.1.title",
       "surfaces.taskAttributes.when.label"
-    ]
-  },
-  "When Claude shows a code, enter it below.": {
-    "text": "When Claude shows a code, enter it below.",
-    "paths": [
-      "surfaces.firstRun.steps.connectClaude.instructions.1"
     ]
   },
   "When dates, deadlines and repeats": {
@@ -5757,29 +5792,23 @@
       "plans.cards.free.priceLabel"
     ]
   },
-  "€10 a month. You save €48 against paying monthly.": {
-    "text": "€10 a month. You save €48 against paying monthly.",
+  "€14 a month": {
+    "text": "€14 a month",
     "paths": [
-      "plans.proPrices.pro_annual.detail"
+      "plans.proPrices.pro_monthly.label"
     ]
   },
-  "€120 a year": {
-    "text": "€120 a year",
+  "€140 a year": {
+    "text": "€140 a year",
     "paths": [
       "plans.proPrices.pro_annual.label",
       "plans.cards.pro.priceLabel"
     ]
   },
-  "€120 a year or €14 a month": {
-    "text": "€120 a year or €14 a month",
+  "€140 a year or €14 a month": {
+    "text": "€140 a year or €14 a month",
     "paths": [
       "plans.levels.pro.detail"
-    ]
-  },
-  "€14 a month": {
-    "text": "€14 a month",
-    "paths": [
-      "plans.proPrices.pro_monthly.label"
     ]
   },
   "€210 once": {
@@ -5788,34 +5817,28 @@
       "plans.pass.label"
     ]
   },
-  "€30 a year for 7 years. Half the annual rate.": {
-    "text": "€30 a year for 7 years. Half the annual rate.",
+  "€30 a year for 7 years. Pay for 3 years, get 7.": {
+    "text": "€30 a year for 7 years. Pay for 3 years, get 7.",
     "paths": [
       "plans.pass.rateDetail"
-    ]
-  },
-  "€5 a month. You save €24 against paying monthly.": {
-    "text": "€5 a month. You save €24 against paying monthly.",
-    "paths": [
-      "plans.prices.annual.detail"
-    ]
-  },
-  "€60 a year": {
-    "text": "€60 a year",
-    "paths": [
-      "plans.prices.annual.label"
-    ]
-  },
-  "€60 a year or €7 a month": {
-    "text": "€60 a year or €7 a month",
-    "paths": [
-      "plans.levels.plus.detail"
     ]
   },
   "€7 a month": {
     "text": "€7 a month",
     "paths": [
       "plans.prices.monthly.label"
+    ]
+  },
+  "€70 a year": {
+    "text": "€70 a year",
+    "paths": [
+      "plans.prices.annual.label"
+    ]
+  },
+  "€70 a year or €7 a month": {
+    "text": "€70 a year or €7 a month",
+    "paths": [
+      "plans.levels.plus.detail"
     ]
   }
 }

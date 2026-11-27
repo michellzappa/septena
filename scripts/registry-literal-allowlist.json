@@ -512,12 +512,6 @@
       "issue": "#260"
     },
     {
-      "file": "Septask/SeptaskFirstRun.swift",
-      "literal": "Copied",
-      "reason": "Copy-button feedback word that settings.json copy claude_connector now owns (#353); the first run does not read it yet.",
-      "issue": "#260"
-    },
-    {
       "file": "Septask/TasksSkillPane.swift",
       "literal": "Copied",
       "reason": "Copy-button feedback word that settings.json copy claude_connector now owns (#353); this pane does not read it yet.",

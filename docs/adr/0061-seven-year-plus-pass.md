@@ -17,18 +17,18 @@ Septena's actual unit economics leave room for a time-boxed upfront pass:
 - Users bring their own AI provider, so inference costs Septena $0.
 - The backend is already MIT-licensed and self-hostable on a user's own Cloudflare account (ADR 0011), giving users a real, permanent no-lock-in exit path alongside export.
 
-Seven years matches the product name (*Septena*), spans more than a full hardware lifecycle, bounds server liability, and avoids misleading "lifetime" claims. Against the €60/year Plus plan (and 3.3×–4× indie lifetime benchmarks such as Structured and Stuff), **3.5× annual = €210** divides evenly to exact half price across all four pinned ADR 0060 currencies.
+Seven years matches the product name (*Septena*), spans more than a full hardware lifecycle, bounds server liability, and avoids misleading "lifetime" claims. Against the **€70/year ($70/year)** Plus plan, **€210 ($210)** is exact **3× annual** (pay for 3 years, get 7 — €30/$30 a year), keeping every Septena price a clean multiple of 7 (`7 / 70 / 210` for Plus; `14 / 140` for Pro).
 
 ## Decision
 
 1. **Offer a 7-Year Plus Pass as a one-time purchase — Plus only.**
-   - **Septena Plus 7-Year Pass** grants 7 years of Plus across every platform (iOS, iPadOS, macOS, Watch, Android, Windows, Web) at exact 50% off the annual rate × 7:
+   - **Septena Plus 7-Year Pass** grants 7 years of Plus across every platform (iOS, iPadOS, macOS, Watch, Android, Windows, Web) for the price of 3 annual years (**€210 / $210**):
 
-     | Plan | EUR (base, incl. VAT) | USD (+ applicable tax) | GBP (incl. VAT) | BRL (PPP, incl. taxes) | Other storefronts |
-     |---|---|---|---|---|---|
-     | **Plus (7-Year Pass)** | **€210** (€30/yr) | **$210** ($30/yr) | **£175** (£25/yr) | **R$ 840** (R$ 120/yr) | Auto-equalized from EUR |
+     | Plan | EUR (base, incl. VAT) | USD (1:1 parity, + applicable sales tax) | Other storefronts |
+     |---|---|---|---|
+     | **Plus (7-Year Pass)** | **€210** (€30/yr) | **$210** ($30/yr) | Auto-equalized from EUR |
 
-   - **No one-time Pro pass.** Pro (€14/month · €120/year) stays subscription-only while multi-agent MCP traffic and 50 GB attachment loads remain unmeasured.
+   - **No one-time Pro pass.** Pro (€14/month · €140/year; $14/month · $140/year) stays subscription-only while multi-agent MCP traffic and 50 GB attachment loads remain unmeasured.
    - **Naming:** Always call it a **"7-Year Pass"** (or "7 years of Plus"). Never market it as "lifetime".
 
 2. **Store product types and RevenueCat / backend handling.**

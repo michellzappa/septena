@@ -21,12 +21,12 @@
     {
       "id": "annual",
       "productId": "com.septena.tasks.sync.annual",
-      "amountMinor": 6000,
+      "amountMinor": 7000,
       "currency": "EUR",
       "interval": "year",
       "highlighted": true,
-      "label": "€60 a year",
-      "detail": "€5 a month. You save €24 against paying monthly."
+      "label": "€70 a year",
+      "detail": "Two months free. You save €14 against paying monthly."
     },
     {
       "id": "monthly",
@@ -43,12 +43,12 @@
     {
       "id": "pro_annual",
       "productId": "com.septena.tasks.sync.pro.annual",
-      "amountMinor": 12000,
+      "amountMinor": 14000,
       "currency": "EUR",
       "interval": "year",
       "highlighted": true,
-      "label": "€120 a year",
-      "detail": "€10 a month. You save €48 against paying monthly."
+      "label": "€140 a year",
+      "detail": "Two months free. You save €28 against paying monthly."
     },
     {
       "id": "pro_monthly",
@@ -69,16 +69,16 @@
     "amountMinor": 21000,
     "currency": "EUR",
     "title": "Pay once for seven years of Plus",
-    "detail": "If you prefer not to keep a subscription, one payment covers seven years of Septena Plus across your devices. That works out to half the annual rate. When the seven years end, your tasks stay on your devices, and you can extend, move to a free account, or export everything. Support for running the open-source sync server on your own Cloudflare account is on the roadmap.",
+    "detail": "If you prefer not to keep a subscription, one payment covers seven years of Septena Plus across your devices, for the price of three annual years. When the seven years end, your tasks stay on your devices, and you can extend, move to a free account, or export everything. Support for running the open-source sync server on your own Cloudflare account is on the roadmap.",
     "label": "€210 once",
-    "rateDetail": "€30 a year for 7 years. Half the annual rate.",
+    "rateDetail": "€30 a year for 7 years. Pay for 3 years, get 7.",
     "action": "Get 7-Year Pass"
   },
-  "priceFootnote": "Prices include VAT where it applies. Outside the euro area, the App Store and Google Play charge their matching local price.",
+  "priceFootnote": "Prices include VAT where it applies. In the US, prices are the same numbers in USD plus applicable local sales tax. Elsewhere, the App Store and Google Play charge their matching local price.",
   "levels": [
     { "id": "free", "title": "Free", "detail": "€0" },
-    { "id": "plus", "title": "Plus", "detail": "€60 a year or €7 a month" },
-    { "id": "pro", "title": "Pro", "detail": "€120 a year or €14 a month" }
+    { "id": "plus", "title": "Plus", "detail": "€70 a year or €7 a month" },
+    { "id": "pro", "title": "Pro", "detail": "€140 a year or €14 a month" }
   ],
   "ladderHeadline": "One device free. All devices on Plus. All your agents on Pro.",
   "cardRows": ["devices", "connected", "files", "history"],
@@ -130,7 +130,7 @@
       "id": "pro",
       "title": "Septena Pro",
       "icon": "plans.pro",
-      "priceLabel": "€120 a year",
+      "priceLabel": "€140 a year",
       "priceDetail": "Or €14 a month.",
       "detail": "For people who hand a lot of work to agents.",
       "footnote": "Everything in Plus is included."

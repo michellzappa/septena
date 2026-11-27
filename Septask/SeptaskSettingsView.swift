@@ -408,6 +408,15 @@ struct SeptaskSettingsView: View {
       )) {
         rowLabel(label, detail: item.detail)
       }
+    case "agentCommentNotifications":
+      Picker(label, selection: Binding(
+        get: { store.agentCommentNotifications },
+        set: { store.setAgentCommentNotifications($0, context: modelContext, engine: ckEngine) }
+      )) {
+        ForEach(RegistrySettings.optionsByKey["agentCommentNotifications"] ?? []) { opt in
+          Text(opt.title).tag(opt.value)
+        }
+      }
     case "loggingAnimationsEnabled":
       Toggle(isOn: $completionAnimations) {
         if let symbol = item.sfSymbol {

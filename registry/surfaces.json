@@ -64,7 +64,7 @@
           {
             "id": "connectAI",
             "title": "Connect your agent",
-            "detail": "Let Claude or your own agent work your list"
+            "detail": "Let your agent work from your list"
           },
           {
             "id": "importTasks",
@@ -555,10 +555,15 @@
   "firstRun": {
     "featureId": "onboarding.first-run",
     "completionSetting": "onboardedAt",
+    "connectorUrl": "https://api.septena.app/mcp",
     "chrome": [
       {
         "id": "close",
         "label": "Close"
+      },
+      {
+        "id": "back",
+        "label": "Back"
       }
     ],
     "prompts": {
@@ -586,7 +591,7 @@
           {
             "icon": "onboarding.notes",
             "title": "Notes keep the context",
-            "detail": "Each project has notes, so you and Claude know what it’s for."
+            "detail": "Each project has notes, so you and your agents know what it’s for."
           }
         ],
         "primary": {
@@ -604,11 +609,11 @@
         ],
         "icon": "onboarding.account",
         "title": "Sign in to sync",
-        "body": "Sign in with Apple to keep your tasks on all your devices and to let Claude connect. Septena never sees your Apple password.",
+        "body": "Sign in to keep your tasks in sync on all your devices and let your agents connect. Your first sign-in creates your account.",
         "footnote": "If you skip this, your tasks stay on this device until you sign in.",
         "skipWhen": "signedIn",
         "primary": {
-          "title": "Sign in with Apple",
+          "title": "Sign in",
           "action": "signIn"
         },
         "secondary": {
@@ -624,34 +629,25 @@
         ],
         "icon": "onboarding.account",
         "title": "Sign in to sync",
-        "body": "Use a device where Septena is already signed in. It approves this one with a code, and your tasks sync here.",
+        "body": "Sign in to keep your tasks in sync on all your devices and let your agents connect. Your first sign-in creates your account.",
         "skipWhen": "signedIn",
         "primary": {
-          "title": "Get a sign-in code",
+          "title": "Sign in",
           "action": "signIn"
         }
       },
       {
-        "id": "connectClaude",
+        "id": "agentSetup",
         "kind": "connectAgent",
         "featureId": "agents.connector",
-        "icon": "settings.claude",
-        "title": "Connect Claude",
-        "body": "Claude reads and changes your tasks through your Septena account. You decide which tasks it works on.",
+        "icon": "list.agent",
+        "title": "Connect an agent",
+        "body": "Connect the agent you already use. You choose what it works on, and only you mark work done.",
         "requires": "signedIn",
         "completesGetStartedStep": "connectAI",
-        "instructions": [
-          "Copy the setup prompt and paste it into Claude.",
-          "When Claude shows a code, enter it below.",
-          "Paste the first prompt. Claude sets up your areas and projects with you."
-        ],
         "primary": {
           "title": "Copy setup prompt",
           "action": "copySetupPrompt"
-        },
-        "tertiary": {
-          "title": "Copy first prompt",
-          "action": "copyFirstPrompt"
         },
         "secondary": {
           "title": "Later",

@@ -57,6 +57,31 @@
       "platforms": ["ios", "ipados", "macos", "web", "android", "windows", "linux"],
       "featureId": "agents.stop-pause"
     },
+    "agentCommentNotifications": {
+      "scope": "synced",
+      "type": "enum",
+      "values": ["every_comment", "needs_input", "daily_digest", "off"],
+      "default": "needs_input",
+      "options": [
+        { "value": "every_comment", "title": "Every comment" },
+        { "value": "needs_input", "title": "Needs my answer or approval" },
+        { "value": "daily_digest", "title": "Daily digest" },
+        { "value": "off", "title": "No notifications" }
+      ],
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows", "linux"],
+      "featureId": "agents.connector"
+    },
+    "agentCommentNotificationsByAgent": {
+      "scope": "synced",
+      "type": "record",
+      "maxEntries": 64,
+      "keyMaxLength": 120,
+      "values": ["every_comment", "needs_input", "daily_digest", "off"],
+      "default": {},
+      "ui": false,
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows", "linux"],
+      "featureId": "agents.connector"
+    },
     "getStartedDismissed": {
       "scope": "synced",
       "type": "bool",
@@ -444,7 +469,9 @@
     ],
     "access_agents": [
       { "id": "lastUsed", "label": "Last used {time}" },
-      { "id": "paused", "label": "Paused" }
+      { "id": "paused", "label": "Paused" },
+      { "id": "notificationsLabel", "label": "Notifications" },
+      { "id": "notificationsDefault", "label": "Use default" }
     ],
     "ai_explainer": [
       { "id": "title", "label": "How AI helps" },
@@ -505,18 +532,20 @@
     ],
     "claude_connector": [
       { "id": "signInHeader", "label": "Sign in to connect an agent" },
-      { "id": "signInBody", "label": "Sign in so Claude or another MCP agent can connect to your tasks through your private Septena account." },
-      { "id": "setupPrompt", "label": "Claude setup prompt" },
-      { "id": "setupPromptDetail", "label": "Paste into Claude to start connecting" },
-      { "id": "firstPrompt", "label": "Claude starter prompt" },
+      { "id": "signInBody", "label": "Sign in so your agent can connect to your tasks through your private Septena account." },
+      { "id": "setupPrompt", "label": "Setup prompt" },
+      { "id": "setupPromptDetail", "label": "Paste into your agent to connect your account" },
+      { "id": "firstPrompt", "label": "Starter prompt" },
       { "id": "firstPromptDetail", "label": "Set up your areas, projects, and tasks" },
-      { "id": "connectorUrl", "label": "Connector URL" },
-      { "id": "connectorUrlDetail", "label": "Add as a custom MCP connector in Claude or any MCP client" },
+      { "id": "connectorUrl", "label": "MCP server URL" },
+      { "id": "connectorUrlDetail", "label": "Add as a custom MCP server in any MCP client" },
       { "id": "approveHeader", "label": "Approve connection code" },
+      { "id": "haveCode", "label": "Have a connection code?" },
+      { "id": "codeHint", "label": "If your browser showed an 8-character code, enter it here. Only enter a code from a window you opened yourself." },
       { "id": "copy", "label": "Copy" },
       { "id": "copied", "label": "Copied" },
       { "id": "codePlaceholder", "label": "ABCD-EFGH" },
-      { "id": "footer", "label": "Add the connector URL to Claude or any MCP client, or paste the setup prompt into Claude. When your browser shows an 8-character code, enter it above. Only enter a code from a browser window you opened yourself." }
+      { "id": "footer", "label": "Add the MCP server URL to any MCP client, or paste the setup prompt into your agent. When your browser shows an 8-character code, enter it above. Only enter a code from a window you opened yourself." }
     ],
     "aiMode": [
       { "id": "useMyClaude", "label": "Prefer your connected Claude for reasoning (your account, your data). {app} still never runs AI on your tasks." },
@@ -1101,6 +1130,19 @@
               "key": "agentsPaused",
               "label": "Pause all agents",
               "detail": "While paused, no agent can start or work on a task.",
+              "visibility": "signedIn"
+            }
+          ]
+        },
+        {
+          "id": "notifications",
+          "header": "Notifications",
+          "footer": "Choose when agent comments notify you. You can override this for any connected agent below.",
+          "items": [
+            {
+              "kind": "setting",
+              "key": "agentCommentNotifications",
+              "label": "Agent comments",
               "visibility": "signedIn"
             }
           ]

@@ -14,7 +14,7 @@ import app.septena.core.stringValue
  * step is done. The registry names the step (`completesGetStartedStep`).
  */
 internal suspend fun completeConnectAgentStep(graph: AndroidAppGraph) {
-    val step = RegistryCatalog.surface(RegistryFirstRunStepIds.CONNECT_CLAUDE)
+    val step = RegistryCatalog.surface(RegistryFirstRunStepIds.AGENT_SETUP)
         ?.fields?.get("completesGetStartedStep").stringValue() ?: return
     val saved = graph.syncedSettings.value(RegistrySettingKeys.GET_STARTED_STEPS) as? JsonValue.ArrayValue
     val done = saved?.values.orEmpty().mapNotNull { it.stringValue() }.toSet()

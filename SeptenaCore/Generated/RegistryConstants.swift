@@ -448,7 +448,7 @@ struct RegistrySettingsPage: Sendable, Hashable, Identifiable {
 enum RegistrySettings {
   /// The help center. Help rows and menu items open it or a page below it.
   static let helpURL = URL(string: "https://septena.app/help")!
-  static let syncedKeys: [String] = ["welcomeName", "telemetryLevel", "calendarHiddenTitles", "rolledInDismissedOn", "homeTimezone", "agentsPaused", "getStartedDismissed", "getStartedSteps", "upsellsSeen", "onboardedAt", "accentColor", "canvasTexture", "textureIntensity", "textureMotion", "smartListOrder", "smartListHidden", "smartListPlacement", "listSort", "tasksShowAging", "fadeSweptAt", "fadeSweepDismissedOn"]
+  static let syncedKeys: [String] = ["welcomeName", "telemetryLevel", "calendarHiddenTitles", "rolledInDismissedOn", "homeTimezone", "agentsPaused", "agentCommentNotifications", "agentCommentNotificationsByAgent", "getStartedDismissed", "getStartedSteps", "upsellsSeen", "onboardedAt", "accentColor", "canvasTexture", "textureIntensity", "textureMotion", "smartListOrder", "smartListHidden", "smartListPlacement", "listSort", "tasksShowAging", "fadeSweptAt", "fadeSweepDismissedOn"]
 
   enum StorageKey {
     static let welcomeName = "septena.homepage.welcomeName"
@@ -488,6 +488,7 @@ enum RegistrySettings {
     static let welcomeName: String = ""
     static let telemetryLevel: String = "balanced"
     static let agentsPaused: Bool = false
+    static let agentCommentNotifications: String = "needs_input"
     static let getStartedDismissed: Bool = false
     static let accentColor: String = "colorful"
     static let canvasTexture: String = "none"
@@ -545,6 +546,7 @@ enum RegistrySettings {
   }
 
   static let optionsByKey: [String: [RegistrySettingsOption]] = [
+    "agentCommentNotifications": [RegistrySettingsOption(value: "every_comment", title: RegistryL10n.t("Every comment")), RegistrySettingsOption(value: "needs_input", title: RegistryL10n.t("Needs my answer or approval")), RegistrySettingsOption(value: "daily_digest", title: RegistryL10n.t("Daily digest")), RegistrySettingsOption(value: "off", title: RegistryL10n.t("No notifications"))],
     "listSort": [RegistrySettingsOption(value: "manual", title: RegistryL10n.t("Manual")), RegistrySettingsOption(value: "when", title: RegistryL10n.t("When")), RegistrySettingsOption(value: "deadline", title: RegistryL10n.t("Deadline")), RegistrySettingsOption(value: "title", title: RegistryL10n.t("Title")), RegistrySettingsOption(value: "created", title: RegistryL10n.t("Created"))],
     "appearanceMode": [RegistrySettingsOption(value: "system", title: RegistryL10n.t("System")), RegistrySettingsOption(value: "light", title: RegistryL10n.t("Light")), RegistrySettingsOption(value: "dark", title: RegistryL10n.t("Dark"))],
     "tasksTitleLines": [RegistrySettingsOption(value: "1", title: RegistryL10n.t("One")), RegistrySettingsOption(value: "2", title: RegistryL10n.t("Two")), RegistrySettingsOption(value: "3", title: RegistryL10n.t("Three"))],
@@ -665,6 +667,9 @@ enum RegistrySettings {
       RegistrySettingsSection(id: "pause", header: nil, footer: RegistryL10n.t("While paused, no agent can pick up or work on a task. Stop one task from its conversation instead. Agents never close assigned tasks on their own; finished work lands in Review for you to accept or send back."), platforms: nil, items: [
         RegistrySettingsItem(kind: "setting", key: "agentsPaused", page: nil, surface: nil, label: RegistryL10n.t("Pause all agents"), detail: RegistryL10n.t("While paused, no agent can start or work on a task."), iconId: nil, sfSymbol: nil, statusKey: nil, visibility: "signedIn", platforms: nil, featureId: "agents.stop-pause"),
       ]),
+      RegistrySettingsSection(id: "notifications", header: RegistryL10n.t("Notifications"), footer: RegistryL10n.t("Choose when agent comments notify you. You can override this for any connected agent below."), platforms: nil, items: [
+        RegistrySettingsItem(kind: "setting", key: "agentCommentNotifications", page: nil, surface: nil, label: RegistryL10n.t("Agent comments"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, visibility: "signedIn", platforms: nil, featureId: "agents.connector"),
+      ]),
       RegistrySettingsSection(id: "agents", header: RegistryL10n.t("Connected agents"), footer: RegistryL10n.t("Each agent you connected to your tasks, with the name you gave it. An agent counts while it was used in the last 30 days. Your phones, tablets and computers are under Account, Devices."), platforms: nil, items: [
         RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "access_agents", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, visibility: "always", platforms: nil, featureId: "agents.connector"),
       ]),
@@ -783,6 +788,8 @@ enum RegistrySettings {
     "access_devices.deviceBrowser": RegistryL10n.t("Browser"),
     "access_devices.deviceUnknown": RegistryL10n.t("Unknown device"),
     "access_agents.paused": RegistryL10n.t("Paused"),
+    "access_agents.notificationsLabel": RegistryL10n.t("Notifications"),
+    "access_agents.notificationsDefault": RegistryL10n.t("Use default"),
     "ai_explainer.title": RegistryL10n.t("How AI helps"),
     "ai_explainer.intro": RegistryL10n.t("Some tasks need thinking before you can act. Tap Discuss and talk them through, right on the task."),
     "ai_explainer.flowHeader": RegistryL10n.t("How a task conversation moves"),
@@ -828,18 +835,20 @@ enum RegistrySettings {
     "sign_in_approval.tooManyAttempts": RegistryL10n.t("Too many wrong codes. Try again in 10 minutes."),
     "sign_in_approval.doneConnector": RegistryL10n.t("Agent connected. Go back to your browser to finish."),
     "claude_connector.signInHeader": RegistryL10n.t("Sign in to connect an agent"),
-    "claude_connector.signInBody": RegistryL10n.t("Sign in so Claude or another MCP agent can connect to your tasks through your private Septena account."),
-    "claude_connector.setupPrompt": RegistryL10n.t("Claude setup prompt"),
-    "claude_connector.setupPromptDetail": RegistryL10n.t("Paste into Claude to start connecting"),
-    "claude_connector.firstPrompt": RegistryL10n.t("Claude starter prompt"),
+    "claude_connector.signInBody": RegistryL10n.t("Sign in so your agent can connect to your tasks through your private Septena account."),
+    "claude_connector.setupPrompt": RegistryL10n.t("Setup prompt"),
+    "claude_connector.setupPromptDetail": RegistryL10n.t("Paste into your agent to connect your account"),
+    "claude_connector.firstPrompt": RegistryL10n.t("Starter prompt"),
     "claude_connector.firstPromptDetail": RegistryL10n.t("Set up your areas, projects, and tasks"),
-    "claude_connector.connectorUrl": RegistryL10n.t("Connector URL"),
-    "claude_connector.connectorUrlDetail": RegistryL10n.t("Add as a custom MCP connector in Claude or any MCP client"),
+    "claude_connector.connectorUrl": RegistryL10n.t("MCP server URL"),
+    "claude_connector.connectorUrlDetail": RegistryL10n.t("Add as a custom MCP server in any MCP client"),
     "claude_connector.approveHeader": RegistryL10n.t("Approve connection code"),
+    "claude_connector.haveCode": RegistryL10n.t("Have a connection code?"),
+    "claude_connector.codeHint": RegistryL10n.t("If your browser showed an 8-character code, enter it here. Only enter a code from a window you opened yourself."),
     "claude_connector.copy": RegistryL10n.t("Copy"),
     "claude_connector.copied": RegistryL10n.t("Copied"),
     "claude_connector.codePlaceholder": RegistryL10n.t("ABCD-EFGH"),
-    "claude_connector.footer": RegistryL10n.t("Add the connector URL to Claude or any MCP client, or paste the setup prompt into Claude. When your browser shows an 8-character code, enter it above. Only enter a code from a browser window you opened yourself."),
+    "claude_connector.footer": RegistryL10n.t("Add the MCP server URL to any MCP client, or paste the setup prompt into your agent. When your browser shows an 8-character code, enter it above. Only enter a code from a window you opened yourself."),
     "aiMode.onDeviceOnlyNoModel": RegistryL10n.t("Discuss never leaves this device. Septena has no on-device model here, so Discuss is off."),
     "aiMode.autoNoModel": RegistryL10n.t("Septena has no on-device model here, so Discuss hands the task to your own Claude. Recommended."),
     "smart_lists_editor.topHeader": RegistryL10n.t("Above Areas & Projects"),
@@ -1807,7 +1816,7 @@ enum RegistryNotices {
   static let all: [RegistryNotice] = [
     RegistryNotice(id: .signIn, kind: "actionNeeded", priority: 0, iconId: "notice.sign_in", sfSymbol: "person.crop.circle.badge.exclamationmark", dismissScope: "device", dismissible: true, explainerSlot: false, featureId: "sync.backend", title: RegistryL10n.t("Not signed in"), detail: RegistryL10n.t("Your changes stay on this device until you sign in."), platformDetails: ["macos": RegistryL10n.t("Your changes stay on this Mac until you sign in."), "ipados": RegistryL10n.t("Your changes stay on this iPad until you sign in."), "ios": RegistryL10n.t("Your changes stay on this iPhone until you sign in.")], primaryTitle: RegistryL10n.t("Sign in…"), upsellId: nil, steps: []),
     RegistryNotice(id: .rolledIn, kind: "info", priority: 1, iconId: "notice.rolled_in", sfSymbol: "arrow.down.circle", dismissScope: "accountDay", dismissible: true, explainerSlot: false, featureId: "lists.today", title: nil, detail: nil, platformDetails: [:], primaryTitle: nil, upsellId: nil, steps: []),
-    RegistryNotice(id: .getStarted, kind: "info", priority: 2, iconId: "notice.get_started", sfSymbol: "sparkles", dismissScope: "account", dismissible: true, explainerSlot: true, featureId: "lists.today", title: RegistryL10n.t("Get started with Septena"), detail: nil, platformDetails: [:], primaryTitle: nil, upsellId: nil, steps: [RegistryNoticeStep(id: "connectAI", title: RegistryL10n.t("Connect your agent"), detail: RegistryL10n.t("Let Claude or your own agent work your list"), platformDetails: [:]), RegistryNoticeStep(id: "importTasks", title: RegistryL10n.t("Bring in your tasks"), detail: RegistryL10n.t("Import from another app"), platformDetails: [:]), RegistryNoticeStep(id: "addTask", title: RegistryL10n.t("Add your first task"), detail: RegistryL10n.t("It lands in your Inbox until you schedule or file it"), platformDetails: ["macos": RegistryL10n.t("Or press ⌃⌥Space anywhere on your Mac")])]),
+    RegistryNotice(id: .getStarted, kind: "info", priority: 2, iconId: "notice.get_started", sfSymbol: "sparkles", dismissScope: "account", dismissible: true, explainerSlot: true, featureId: "lists.today", title: RegistryL10n.t("Get started with Septena"), detail: nil, platformDetails: [:], primaryTitle: nil, upsellId: nil, steps: [RegistryNoticeStep(id: "connectAI", title: RegistryL10n.t("Connect your agent"), detail: RegistryL10n.t("Let your agent work from your list"), platformDetails: [:]), RegistryNoticeStep(id: "importTasks", title: RegistryL10n.t("Bring in your tasks"), detail: RegistryL10n.t("Import from another app"), platformDetails: [:]), RegistryNoticeStep(id: "addTask", title: RegistryL10n.t("Add your first task"), detail: RegistryL10n.t("It lands in your Inbox until you schedule or file it"), platformDetails: ["macos": RegistryL10n.t("Or press ⌃⌥Space anywhere on your Mac")])]),
     RegistryNotice(id: .trialEnd, kind: "info", priority: 1, iconId: "notice.trial_end", sfSymbol: "hourglass", dismissScope: "account", dismissible: true, explainerSlot: false, featureId: "sync.backend", title: nil, detail: nil, platformDetails: [:], primaryTitle: RegistryL10n.t("See Plus"), upsellId: "trial_end", steps: []),
     RegistryNotice(id: .secondDevice, kind: "info", priority: 1, iconId: "notice.second_device", sfSymbol: "laptopcomputer.and.iphone", dismissScope: "account", dismissible: true, explainerSlot: false, featureId: "sync.backend", title: nil, detail: nil, platformDetails: [:], primaryTitle: RegistryL10n.t("See Plus"), upsellId: "second_device", steps: []),
     RegistryNotice(id: .weeklySweep, kind: "info", priority: 3, iconId: "notice.weekly_sweep", sfSymbol: "circle.dashed", dismissScope: "accountWeek", dismissible: true, explainerSlot: false, featureId: "fade.sweep", title: nil, detail: RegistryL10n.t("Still want any of them?"), platformDetails: [:], primaryTitle: RegistryL10n.t("Review"), upsellId: nil, steps: []),
@@ -2336,7 +2345,7 @@ enum RegistryFirstRunStepID: String, CaseIterable, Hashable, Sendable {
   case welcome = "welcome"
   case account = "account"
   case accountDevice = "accountDevice"
-  case connectClaude = "connectClaude"
+  case agentSetup = "agentSetup"
   case done = "done"
 }
 
@@ -2348,7 +2357,6 @@ enum RegistryFirstRunActionID: String, CaseIterable, Hashable, Sendable {
   case importThings = "importThings"
   case importReminders = "importReminders"
   case copySetupPrompt = "copySetupPrompt"
-  case copyFirstPrompt = "copyFirstPrompt"
 }
 
 /// One button in the first run. `action` is one of a closed set the client implements.
@@ -2391,10 +2399,8 @@ struct RegistryFirstRunStep: Sendable, Hashable, Identifiable {
   let featureId: String?
   let points: [RegistryFirstRunPoint]
   let choices: [RegistryFirstRunChoice]
-  let instructions: [String]
   let primary: RegistryFirstRunButton?
   let secondary: RegistryFirstRunButton?
-  let tertiary: RegistryFirstRunButton?
   /// Replaces `secondary` once the step's work is done (paired, imported).
   let afterDone: RegistryFirstRunButton?
 }
@@ -2403,14 +2409,16 @@ enum RegistryFirstRun {
   static let featureId: String = "onboarding.first-run"
   /// The synced setting that records a finished first run, so a second device skips it.
   static let completionSetting: String = "onboardedAt"
+  static let connectorUrl: String = "https://api.septena.app/mcp"
+  static let backTitle: String = RegistryL10n.t("Back")
   static let setupPrompt: String = RegistryL10n.t("Set up Septena for me using https://septena.app/agents.md")
   static let firstPrompt: String = RegistryL10n.t("Set up my Septena areas, projects, and tasks by following https://api.septena.app/onboard.md")
   static let steps: [RegistryFirstRunStep] = [
-    RegistryFirstRunStep(id: .welcome, kind: "intro", icon: "onboarding.welcome", title: RegistryL10n.t("Welcome to Septena"), body: RegistryL10n.t("Tasks that think with you."), footnote: nil, returningTitle: nil, returningBody: nil, skipWhen: nil, requires: nil, completesGetStartedStep: nil, platforms: [], featureId: nil, points: [RegistryFirstRunPoint(icon: "onboarding.devices", title: RegistryL10n.t("On every device"), detail: RegistryL10n.t("Your tasks stay in step on every device you sign in to.")), RegistryFirstRunPoint(icon: "onboarding.agent", title: RegistryL10n.t("Your agents do the work"), detail: RegistryL10n.t("You decide when it’s done.")), RegistryFirstRunPoint(icon: "onboarding.notes", title: RegistryL10n.t("Notes keep the context"), detail: RegistryL10n.t("Each project has notes, so you and Claude know what it’s for."))], choices: [], instructions: [], primary: RegistryFirstRunButton(title: RegistryL10n.t("Continue"), action: .next), secondary: nil, tertiary: nil, afterDone: nil),
-    RegistryFirstRunStep(id: .account, kind: "account", icon: "onboarding.account", title: RegistryL10n.t("Sign in to sync"), body: RegistryL10n.t("Sign in with Apple to keep your tasks on all your devices and to let Claude connect. Septena never sees your Apple password."), footnote: RegistryL10n.t("If you skip this, your tasks stay on this device until you sign in."), returningTitle: nil, returningBody: nil, skipWhen: "signedIn", requires: nil, completesGetStartedStep: nil, platforms: ["ios", "ipados", "macos"], featureId: nil, points: [], choices: [], instructions: [], primary: RegistryFirstRunButton(title: RegistryL10n.t("Sign in with Apple"), action: .signIn), secondary: RegistryFirstRunButton(title: RegistryL10n.t("Not now"), action: .next), tertiary: nil, afterDone: nil),
-    RegistryFirstRunStep(id: .accountDevice, kind: "account", icon: "onboarding.account", title: RegistryL10n.t("Sign in to sync"), body: RegistryL10n.t("Use a device where Septena is already signed in. It approves this one with a code, and your tasks sync here."), footnote: nil, returningTitle: nil, returningBody: nil, skipWhen: "signedIn", requires: nil, completesGetStartedStep: nil, platforms: ["android"], featureId: nil, points: [], choices: [], instructions: [], primary: RegistryFirstRunButton(title: RegistryL10n.t("Get a sign-in code"), action: .signIn), secondary: nil, tertiary: nil, afterDone: nil),
-    RegistryFirstRunStep(id: .connectClaude, kind: "connectAgent", icon: "settings.claude", title: RegistryL10n.t("Connect Claude"), body: RegistryL10n.t("Claude reads and changes your tasks through your Septena account. You decide which tasks it works on."), footnote: nil, returningTitle: nil, returningBody: nil, skipWhen: nil, requires: "signedIn", completesGetStartedStep: "connectAI", platforms: [], featureId: "agents.connector", points: [], choices: [], instructions: [RegistryL10n.t("Copy the setup prompt and paste it into Claude."), RegistryL10n.t("When Claude shows a code, enter it below."), RegistryL10n.t("Paste the first prompt. Claude sets up your areas and projects with you.")], primary: RegistryFirstRunButton(title: RegistryL10n.t("Copy setup prompt"), action: .copySetupPrompt), secondary: RegistryFirstRunButton(title: RegistryL10n.t("Later"), action: .next), tertiary: RegistryFirstRunButton(title: RegistryL10n.t("Copy first prompt"), action: .copyFirstPrompt), afterDone: RegistryFirstRunButton(title: RegistryL10n.t("Continue"), action: .next)),
-    RegistryFirstRunStep(id: .done, kind: "finish", icon: "onboarding.done", title: RegistryL10n.t("You’re all set"), body: RegistryL10n.t("Today shows what to do now. Anything you skipped stays on the Get started list."), footnote: nil, returningTitle: RegistryL10n.t("Welcome back"), returningBody: RegistryL10n.t("This account is already set up. Your tasks are syncing to this device."), skipWhen: nil, requires: nil, completesGetStartedStep: nil, platforms: [], featureId: nil, points: [], choices: [], instructions: [], primary: RegistryFirstRunButton(title: RegistryL10n.t("Open Today"), action: .finish), secondary: nil, tertiary: nil, afterDone: nil),
+    RegistryFirstRunStep(id: .welcome, kind: "intro", icon: "onboarding.welcome", title: RegistryL10n.t("Welcome to Septena"), body: RegistryL10n.t("Tasks that think with you."), footnote: nil, returningTitle: nil, returningBody: nil, skipWhen: nil, requires: nil, completesGetStartedStep: nil, platforms: [], featureId: nil, points: [RegistryFirstRunPoint(icon: "onboarding.devices", title: RegistryL10n.t("On every device"), detail: RegistryL10n.t("Your tasks stay in step on every device you sign in to.")), RegistryFirstRunPoint(icon: "onboarding.agent", title: RegistryL10n.t("Your agents do the work"), detail: RegistryL10n.t("You decide when it’s done.")), RegistryFirstRunPoint(icon: "onboarding.notes", title: RegistryL10n.t("Notes keep the context"), detail: RegistryL10n.t("Each project has notes, so you and your agents know what it’s for."))], choices: [], primary: RegistryFirstRunButton(title: RegistryL10n.t("Continue"), action: .next), secondary: nil, afterDone: nil),
+    RegistryFirstRunStep(id: .account, kind: "account", icon: "onboarding.account", title: RegistryL10n.t("Sign in to sync"), body: RegistryL10n.t("Sign in to keep your tasks in sync on all your devices and let your agents connect. Your first sign-in creates your account."), footnote: RegistryL10n.t("If you skip this, your tasks stay on this device until you sign in."), returningTitle: nil, returningBody: nil, skipWhen: "signedIn", requires: nil, completesGetStartedStep: nil, platforms: ["ios", "ipados", "macos"], featureId: nil, points: [], choices: [], primary: RegistryFirstRunButton(title: RegistryL10n.t("Sign in"), action: .signIn), secondary: RegistryFirstRunButton(title: RegistryL10n.t("Not now"), action: .next), afterDone: nil),
+    RegistryFirstRunStep(id: .accountDevice, kind: "account", icon: "onboarding.account", title: RegistryL10n.t("Sign in to sync"), body: RegistryL10n.t("Sign in to keep your tasks in sync on all your devices and let your agents connect. Your first sign-in creates your account."), footnote: nil, returningTitle: nil, returningBody: nil, skipWhen: "signedIn", requires: nil, completesGetStartedStep: nil, platforms: ["android"], featureId: nil, points: [], choices: [], primary: RegistryFirstRunButton(title: RegistryL10n.t("Sign in"), action: .signIn), secondary: nil, afterDone: nil),
+    RegistryFirstRunStep(id: .agentSetup, kind: "connectAgent", icon: "list.agent", title: RegistryL10n.t("Connect an agent"), body: RegistryL10n.t("Connect the agent you already use. You choose what it works on, and only you mark work done."), footnote: nil, returningTitle: nil, returningBody: nil, skipWhen: nil, requires: "signedIn", completesGetStartedStep: "connectAI", platforms: [], featureId: "agents.connector", points: [], choices: [], primary: RegistryFirstRunButton(title: RegistryL10n.t("Copy setup prompt"), action: .copySetupPrompt), secondary: RegistryFirstRunButton(title: RegistryL10n.t("Later"), action: .next), afterDone: RegistryFirstRunButton(title: RegistryL10n.t("Continue"), action: .next)),
+    RegistryFirstRunStep(id: .done, kind: "finish", icon: "onboarding.done", title: RegistryL10n.t("You’re all set"), body: RegistryL10n.t("Today shows what to do now. Anything you skipped stays on the Get started list."), footnote: nil, returningTitle: RegistryL10n.t("Welcome back"), returningBody: RegistryL10n.t("This account is already set up. Your tasks are syncing to this device."), skipWhen: nil, requires: nil, completesGetStartedStep: nil, platforms: [], featureId: nil, points: [], choices: [], primary: RegistryFirstRunButton(title: RegistryL10n.t("Open Today"), action: .finish), secondary: nil, afterDone: nil),
   ]
 }
 
@@ -2501,18 +2509,18 @@ enum RegistryPlans {
   static let trialDays = 14
   static var trialTitle: String { RegistryL10n.t("Every new account starts with 14 days of Plus") }
   static var trialDetail: String { RegistryL10n.t("You do not need a card. After 14 days the account becomes a free account, and your tasks stay where they are.") }
-  static var priceFootnote: String { RegistryL10n.t("Prices include VAT where it applies. Outside the euro area, the App Store and Google Play charge their matching local price.") }
+  static var priceFootnote: String { RegistryL10n.t("Prices include VAT where it applies. In the US, prices are the same numbers in USD plus applicable local sales tax. Elsewhere, the App Store and Google Play charge their matching local price.") }
   static var prices: [RegistryPlanPrice] { [
-    RegistryPlanPrice(id: "annual", productId: "com.septena.tasks.sync.annual", amountMinor: 6000, currency: "EUR", interval: "year", highlighted: true, label: RegistryL10n.t("€60 a year"), detail: RegistryL10n.t("€5 a month. You save €24 against paying monthly.")),
+    RegistryPlanPrice(id: "annual", productId: "com.septena.tasks.sync.annual", amountMinor: 7000, currency: "EUR", interval: "year", highlighted: true, label: RegistryL10n.t("€70 a year"), detail: RegistryL10n.t("Two months free. You save €14 against paying monthly.")),
     RegistryPlanPrice(id: "monthly", productId: "com.septena.tasks.sync.monthly", amountMinor: 700, currency: "EUR", interval: "month", highlighted: false, label: RegistryL10n.t("€7 a month"), detail: RegistryL10n.t("Cancel at any time.")),
   ] }
   /// What Pro costs (ADR 0059): the higher level of the same subscription group.
   static var proPrices: [RegistryPlanPrice] { [
-    RegistryPlanPrice(id: "pro_annual", productId: "com.septena.tasks.sync.pro.annual", amountMinor: 12000, currency: "EUR", interval: "year", highlighted: true, label: RegistryL10n.t("€120 a year"), detail: RegistryL10n.t("€10 a month. You save €48 against paying monthly.")),
+    RegistryPlanPrice(id: "pro_annual", productId: "com.septena.tasks.sync.pro.annual", amountMinor: 14000, currency: "EUR", interval: "year", highlighted: true, label: RegistryL10n.t("€140 a year"), detail: RegistryL10n.t("Two months free. You save €28 against paying monthly.")),
     RegistryPlanPrice(id: "pro_monthly", productId: "com.septena.tasks.sync.pro.monthly", amountMinor: 1400, currency: "EUR", interval: "month", highlighted: false, label: RegistryL10n.t("€14 a month"), detail: RegistryL10n.t("Cancel at any time.")),
   ] }
   /// The 7-Year Plus Pass (ADR 0061): one-time Non-Renewing Subscription, Plus only.
-  static var pass: RegistryPlanPass { RegistryPlanPass(id: "plus_7year", plan: "plus", productId: "com.septena.tasks.sync.plus.7year", years: 7, amountMinor: 21000, currency: "EUR", title: RegistryL10n.t("Pay once for seven years of Plus"), detail: RegistryL10n.t("If you prefer not to keep a subscription, one payment covers seven years of Septena Plus across your devices. That works out to half the annual rate. When the seven years end, your tasks stay on your devices, and you can extend, move to a free account, or export everything. Support for running the open-source sync server on your own Cloudflare account is on the roadmap."), label: RegistryL10n.t("€210 once"), rateDetail: RegistryL10n.t("€30 a year for 7 years. Half the annual rate."), action: RegistryL10n.t("Get 7-Year Pass")) }
+  static var pass: RegistryPlanPass { RegistryPlanPass(id: "plus_7year", plan: "plus", productId: "com.septena.tasks.sync.plus.7year", years: 7, amountMinor: 21000, currency: "EUR", title: RegistryL10n.t("Pay once for seven years of Plus"), detail: RegistryL10n.t("If you prefer not to keep a subscription, one payment covers seven years of Septena Plus across your devices, for the price of three annual years. When the seven years end, your tasks stay on your devices, and you can extend, move to a free account, or export everything. Support for running the open-source sync server on your own Cloudflare account is on the roadmap."), label: RegistryL10n.t("€210 once"), rateDetail: RegistryL10n.t("€30 a year for 7 years. Pay for 3 years, get 7."), action: RegistryL10n.t("Get 7-Year Pass")) }
   static var plusBenefits: [RegistryPlanBenefit] { [
     RegistryPlanBenefit(id: "devices", icon: "plans.devices", title: RegistryL10n.t("Every device, always current"), detail: RegistryL10n.t("Your list on all your devices, updated as you type.")),
     RegistryPlanBenefit(id: "agents", icon: "plans.agents", title: RegistryL10n.t("Three agents at work"), detail: RegistryL10n.t("Connect Claude and two more. Each one asks before it acts.")),

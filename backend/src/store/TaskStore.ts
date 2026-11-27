@@ -1,6 +1,7 @@
 import { DurableObject } from "cloudflare:workers";
 import type { Env } from "../env.js";
 import {
+  AGENT_COMMENT_NOTIFICATION_MODES,
   ENTITIES,
   ENTITY_NAMES,
   MAX_CHECKLIST_ITEMS_PER_TASK,
@@ -12,6 +13,7 @@ import {
   decodeRow,
   encodeValue,
   snapshotFits,
+  type AgentCommentNotificationMode,
   type EntityName,
   type EntitySpec,
   type RefSnapshot,
@@ -760,6 +762,15 @@ export class TaskStore extends DurableObject<Env> {
       );
       CREATE INDEX IF NOT EXISTS agent_webhook_outbox_due ON agent_webhook_outbox(nextAt, id);
       CREATE INDEX IF NOT EXISTS agent_webhook_outbox_hook ON agent_webhook_outbox(webhookId);
+      CREATE TABLE IF NOT EXISTS agent_notification_digest (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        taskId TEXT NOT NULL,
+        taskTitle TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        agentName TEXT,
+        snippet TEXT NOT NULL,
+        at TEXT NOT NULL
+      );
     `);
     this.sessions.migrate();
     this.shares.migrate();
@@ -1145,7 +1156,17 @@ export class TaskStore extends DurableObject<Env> {
     if (isAgentActor(actor) && op.entity === "convo" && op.fields.endStateAt && op.fields.endStateNote
       && (op.fields.endState ?? row?.endState) === "needs_verify") {
       const title = this.sql.exec<{ title: string | null }>("SELECT title FROM tasks WHERE id = ?", op.id).toArray()[0]?.title;
-      agentPushes.push({ taskId: op.id, taskTitle: title ?? "", note: op.fields.endStateNote as string });
+      const noteText = op.fields.endStateNote as string;
+      this.routeAgentNotification(
+        actor,
+        "review",
+        { taskId: op.id, taskTitle: title ?? "", note: noteText },
+        op.id,
+        title ?? "",
+        noteText,
+        now,
+        agentPushes,
+      );
     }
     if (op.entity === "convo" && op.fields.endState === "needs_verify") this.unfadeForReview(op.id, actor, now);
     if (op.entity === "convo" && (op.fields.assignee === "claude" || (isAgentActor(actor) && op.fields.endState === "needs_verify"))) {
@@ -2078,18 +2099,49 @@ export class TaskStore extends DurableObject<Env> {
       this.writeConvoServerFields(taskId, { runsSinceUser: 0 }, "budget", actor, now, true);
     } else if (isAgentActor(actor) && turn.role === "provider" && turn.options?.length) {
       // The agent asked: the ball is in the human's court, so the claim ends
-      // and we alert the user's Apple devices via APNs (F1b #213).
+      // and we route the notification per the user's setting (#743).
       this.writeConvoServerFields(taskId, { claimedBy: null, claimUntil: null }, "release", actor, now, true);
       this.unfadeForReview(taskId, actor, now);
-      agentPushes.push({
+      const snippet = turn.question?.trim() || turn.note?.trim() || "Needs your input";
+      this.routeAgentNotification(
+        actor,
+        "question",
+        {
+          taskId,
+          taskTitle: task.title ?? "",
+          turnSeq: seq,
+          step: turn.step,
+          question: turn.question ?? null,
+          note: turn.note ?? null,
+          options: turn.options,
+        },
         taskId,
-        taskTitle: task.title ?? "",
-        turnSeq: seq,
-        step: turn.step,
-        question: turn.question ?? null,
-        note: turn.note ?? null,
-        options: turn.options,
-      });
+        task.title ?? "",
+        snippet,
+        now,
+        agentPushes,
+      );
+    } else if (isAgentActor(actor) && turn.role === "provider") {
+      const text = turn.note?.trim() || turn.question?.trim();
+      if (text) {
+        const actorName = this.agentActorDisplayName(actor);
+        this.routeAgentNotification(
+          actor,
+          "note",
+          {
+            kind: "note",
+            taskId,
+            taskTitle: task.title ?? "",
+            note: text,
+            actorName,
+          },
+          taskId,
+          task.title ?? "",
+          text,
+          now,
+          agentPushes,
+        );
+      }
     }
     return { clientOpId, status: "applied", rev, seq };
   }
@@ -2991,6 +3043,127 @@ export class TaskStore extends DurableObject<Env> {
       }
       return removed;
     });
+  }
+
+  private static isNotificationMode(value: unknown): value is AgentCommentNotificationMode {
+    return typeof value === "string"
+      && (AGENT_COMMENT_NOTIFICATION_MODES as readonly string[]).includes(value);
+  }
+
+  /// Extracts a clean display/override key from an `mcp:<holder>` actor string.
+  private agentActorDisplayName(actor: string): string | null {
+    if (!actor.startsWith("mcp:")) return null;
+    const raw = actor.slice(4).trim();
+    if (!raw) return null;
+    const beforeAt = raw.includes("@") ? raw.slice(0, raw.indexOf("@")) : raw;
+    return beforeAt || raw;
+  }
+
+  /// Resolves the notification mode for `actor` (#743): per-agent override from
+  /// `agentCommentNotificationsByAgent` (matching holder, connection name, or
+  /// clientName), falling back to global `agentCommentNotifications` (default
+  /// `needs_input`).
+  resolveAgentNotificationMode(actor: string): AgentCommentNotificationMode {
+    const rawOverrides = this.readSetting("agentCommentNotificationsByAgent");
+    if (rawOverrides && typeof rawOverrides === "object" && !Array.isArray(rawOverrides)) {
+      const overrides = rawOverrides as Record<string, unknown>;
+      const candidates: string[] = [];
+      const rawHolder = actor.startsWith("mcp:") ? actor.slice(4).trim() : actor.trim();
+      if (rawHolder) {
+        candidates.push(rawHolder);
+        const atIdx = rawHolder.indexOf("@");
+        if (atIdx > 0) {
+          candidates.push(rawHolder.slice(0, atIdx));
+          const clientPart = rawHolder.slice(atIdx + 1);
+          if (clientPart) candidates.push(clientPart);
+        }
+        // Also match renamed connection labels whose clientId/familyId/name matches.
+        const conns = this.sql.exec<{ name: string; clientName: string; clientId: string; familyId: string }>(
+          "SELECT COALESCE(label, clientName) AS name, clientName, clientId, familyId FROM connections",
+        ).toArray();
+        for (const c of conns) {
+          if (
+            c.name === rawHolder || c.clientName === rawHolder
+            || c.clientId === rawHolder || c.familyId === rawHolder
+            || (atIdx > 0 && (c.clientId === rawHolder.slice(atIdx + 1) || c.name === rawHolder.slice(0, atIdx)))
+          ) {
+            candidates.push(c.name, c.clientName);
+          }
+        }
+      }
+      const lowerOverrides = new Map<string, AgentCommentNotificationMode>();
+      for (const [k, v] of Object.entries(overrides)) {
+        if (TaskStore.isNotificationMode(v)) lowerOverrides.set(k.trim().toLowerCase(), v);
+      }
+      for (const key of candidates) {
+        const direct = overrides[key];
+        if (TaskStore.isNotificationMode(direct)) return direct;
+        const ci = lowerOverrides.get(key.trim().toLowerCase());
+        if (ci) return ci;
+      }
+    }
+    const global = this.readSetting("agentCommentNotifications");
+    return TaskStore.isNotificationMode(global) ? global : "needs_input";
+  }
+
+  private routeAgentNotification(
+    actor: string,
+    kind: "question" | "review" | "note",
+    push: AgentPush,
+    taskId: string,
+    taskTitle: string,
+    snippet: string,
+    nowIso: string,
+    agentPushes: AgentPush[],
+  ): void {
+    const mode = this.resolveAgentNotificationMode(actor);
+    if (mode === "off") return;
+    if (mode === "needs_input") {
+      if (kind === "question" || kind === "review") agentPushes.push(push);
+      return;
+    }
+    if (mode === "every_comment") {
+      agentPushes.push(push);
+      return;
+    }
+    // daily_digest: queue for the daily alarm flush.
+    const agentName = this.agentActorDisplayName(actor);
+    this.sql.exec(
+      "INSERT INTO agent_notification_digest (taskId, taskTitle, kind, agentName, snippet, at) VALUES (?, ?, ?, ?, ?, ?)",
+      taskId, taskTitle, kind, agentName, snippet.slice(0, 300), nowIso,
+    );
+  }
+
+  /// Sends one APNs digest push summarizing all queued `daily_digest` agent
+  /// comments and clears the queue (#743). Called on the daily DO alarm.
+  async flushAgentNotificationDigest(): Promise<number> {
+    const rows = this.sql.exec<{
+      id: number; taskId: string; taskTitle: string; kind: string; agentName: string | null; snippet: string;
+    }>(
+      "SELECT id, taskId, taskTitle, kind, agentName, snippet FROM agent_notification_digest ORDER BY id ASC",
+    ).toArray();
+    if (rows.length === 0) return 0;
+
+    const tokens = this.listPushTokens();
+    const maxId = rows[rows.length - 1].id;
+    const taskIds = new Set(rows.map((r) => r.taskId));
+    const first = rows[0];
+    const firstLabel = first.taskTitle ? `${first.taskTitle}: ${first.snippet}` : first.snippet;
+    const summary = rows.length === 1
+      ? firstLabel
+      : `${firstLabel} (+${rows.length - 1} more)`;
+
+    if (tokens.length > 0) {
+      await this.dispatchAgentPushes([{
+        kind: "digest",
+        taskId: taskIds.size === 1 ? first.taskId : null,
+        count: rows.length,
+        taskCount: taskIds.size,
+        summary,
+      }], tokens);
+    }
+    this.sql.exec("DELETE FROM agent_notification_digest WHERE id <= ?", maxId);
+    return rows.length;
   }
 
   private async dispatchAgentPushes(
@@ -3983,6 +4156,7 @@ export class TaskStore extends DurableObject<Env> {
     });
     if (this.meta("rev") > revBefore) this.broadcast(this.meta("rev"));
     await this.ctx.storage.setAlarm(now + DAY_MS);
+    await this.flushAgentNotificationDigest();
     // Shares and webhook retries pull the alarm earlier if still pending.
     await this.drainShares();
     await this.drainAgentWebhookOutbox();
