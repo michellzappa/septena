@@ -7,7 +7,7 @@ use serde_json::{Value, json};
 
 use crate::do_session::{do_end_wins, resolve_do_sessions};
 use crate::error::CoreError;
-use crate::project_checklist::{ChecklistRow, checklist_check_patch, project_checklist};
+use crate::project_checklist::{checklist_check_patch, project_checklist};
 use crate::task_dates::patch_json;
 use crate::{
     ConversationProjection, DateAction, EmailRefInput, FadeInput, OrdinalWeekday, ParsedRef, PullPageHeader,
@@ -86,10 +86,7 @@ pub(crate) fn invoke_value(function: &str, input: Value) -> Result<Value, CoreEr
             let args: SortArgs = decode(input).map_err(|e| parse(&e))?;
             Ok(json!(sort_tasks(args.tasks, args.sort)?))
         }
-        "projectChecklist" => {
-            let args: ProjectChecklistArgs = decode(input).map_err(|e| parse(&e))?;
-            Ok(project_checklist(args.rows, args.query, args.groceries))
-        }
+        "projectChecklist" => project_checklist(&input),
         "checklistCheckPatch" => {
             let checked = input["checked"].as_bool().ok_or_else(|| parse("checked must be a boolean"))?;
             Ok(checklist_check_patch(checked))
@@ -413,12 +410,4 @@ pub(crate) struct PushArgs {
 pub(crate) struct RejectionArgs {
     pub status: u16,
     pub body: String,
-}
-
-#[derive(Deserialize)]
-struct ProjectChecklistArgs {
-    rows: Vec<ChecklistRow>,
-    query: Option<String>,
-    #[serde(default)]
-    groceries: bool,
 }

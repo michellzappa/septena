@@ -392,6 +392,7 @@ The conformance vectors are the cases every Septena implementation passes: the a
 | [`convo-derived.json`](https://septena.app/spec/conformance/convo-derived.json) | `cases` (10), `conversationState` (11) |
 | [`do-session.json`](https://septena.app/spec/conformance/do-session.json) | `resolve` (16), `endWins` (4) |
 | [`list-sort.json`](https://septena.app/spec/conformance/list-sort.json) | `cases` (15) |
+| [`project-checklist.json`](https://septena.app/spec/conformance/project-checklist.json) | `layout` (3), `check` (2) |
 | [`recurrence.json`](https://septena.app/spec/conformance/recurrence.json) | `nextScheduledDate` (36), `occurrenceID` (3), `checklistOccurrenceID` (3) |
 | [`refs.json`](https://septena.app/spec/conformance/refs.json) | `parseRef` (110), `normalizeRefKey` (63), `findIssueRefs` (10), `emailRefKeys` (12), `taskRefId` (3) |
 | [`reminders.json`](https://septena.app/spec/conformance/reminders.json) | `shiftReminderForRecurrence` (6), `shiftReminderOnReschedule` (5), `shouldArmReminder` (8) |
