@@ -30,6 +30,29 @@ export function orderByPosition<
     .map((entry) => entry.item);
 }
 
+/**
+ * Position to write when appending a newly created Area or Project:
+ * - If every existing item in the group already has an explicit positive position,
+ *   return `max + 1` so the new item appends cleanly at the bottom.
+ * - Otherwise return `0` (matching Apple's default unset position) so unpositioned
+ *   groups stay alphabetically sorted and the new item never jumps ahead of `0` rows.
+ */
+export function nextStructurePosition(
+  existing: readonly { position?: number | null }[],
+): number {
+  if (existing.length === 0) return 0;
+  let maxPos = 0;
+  for (const item of existing) {
+    const pos = item.position;
+    if (typeof pos !== "number" || !Number.isFinite(pos) || pos <= 0) {
+      return 0;
+    }
+    const whole = Math.ceil(pos);
+    if (whole > maxPos) maxPos = whole;
+  }
+  return maxPos + 1;
+}
+
 export type TaskListGroup<T> =
   | { key: string; kind: "project"; projectId: string; title: string; items: T[] }
   | { key: string; kind: "area"; areaId: string; emoji: string | null; title: string; items: T[] };

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { groupTasksByList, orderByPosition } from "../src/lib/listOrder.ts";
+import { groupTasksByList, nextStructurePosition, orderByPosition } from "../src/lib/listOrder.ts";
 import type { AreaRow, ProjectRow } from "../src/lib/types.ts";
 
 test("orderByPosition puts positioned items ascending and sinks position 0/unset to bottom", () => {
@@ -47,4 +47,11 @@ test("groupTasksByList walks areas -> area projects -> standalone projects in si
   );
   assert.deepEqual(grouped.groups[0].items.map((x) => x.id), ["t7"]);
   assert.deepEqual(grouped.groups[3].items.map((x) => x.id), ["t6"]);
+});
+
+test("nextStructurePosition uses 0 for unpositioned/mixed groups and max + 1 for positioned groups", () => {
+  assert.equal(nextStructurePosition([]), 0);
+  assert.equal(nextStructurePosition([{ position: 0 }, { position: null }]), 0);
+  assert.equal(nextStructurePosition([{ position: 1 }, { position: 0 }]), 0);
+  assert.equal(nextStructurePosition([{ position: 1 }, { position: 3 }, { position: 2 }]), 4);
 });
