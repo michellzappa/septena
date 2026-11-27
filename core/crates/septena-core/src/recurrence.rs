@@ -185,7 +185,10 @@ pub(crate) fn recurrence_window(input: &Value) -> Result<Value, CoreError> {
     }
     let expiry = (fresh && !rule.after_completion && anchor <= through).then(|| last.to_string());
     let mut out = serde_json::Map::new();
-    out.insert("create".into(), Value::Array(dates.into_iter().map(|day| Value::String(day.to_string())).collect()));
+    out.insert(
+        "create".into(),
+        Value::Array(dates.into_iter().map(|day| Value::String(day.to_string())).collect()),
+    );
     out.insert("expireBefore".into(), expiry.map_or(Value::Null, Value::String));
     out.insert("hasMore".into(), Value::Bool(more));
     Ok(Value::Object(out))
