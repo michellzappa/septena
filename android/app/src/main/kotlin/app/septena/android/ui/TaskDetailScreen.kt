@@ -75,6 +75,7 @@ import app.septena.android.AndroidAppGraph
 import app.septena.core.JsonValue
 import app.septena.core.NotesBase
 import app.septena.core.RegistryCatalog
+import app.septena.core.StructureOrder
 import app.septena.core.SyncRecord
 import app.septena.core.TaskConversation
 import app.septena.core.TaskPageBlockKinds
@@ -2181,25 +2182,37 @@ internal data class TaskDetailLabels(
 
 internal suspend fun loadTaskDetail(graph: AndroidAppGraph, taskId: String): TaskDetailData? {
     val task = graph.taskStore.record(RegistryEntityNames.TASK, taskId) ?: return null
-    val areas = graph.taskStore.records(RegistryEntityNames.AREA)
-        .filter { it.deletedAt == null }
-        .mapNotNull { row ->
-            row.fields[RegistryEntityFields.Area.TITLE].stringValue()?.let { title ->
-                DetailListItem(row.id, title)
+    val selectedProjectId = task.fields[RegistryEntityFields.Task.PROJECT].stringValue()
+    val areas = StructureOrder.orderByPosition(
+        items = graph.taskStore.records(RegistryEntityNames.AREA)
+            .filter { it.deletedAt == null }
+            .mapNotNull { row ->
+                row.fields[RegistryEntityFields.Area.TITLE].stringValue()?.let { title ->
+                    row to DetailListItem(row.id, title)
+                }
+            },
+        position = { it.first.fields[RegistryEntityFields.Area.POSITION].numberValue() },
+        label = { it.second.title },
+    ).map { it.second }
+    val projects = StructureOrder.orderByPosition(
+        items = graph.taskStore.records(RegistryEntityNames.PROJECT)
+            .filter { it.deletedAt == null }
+            .filter { row ->
+                val status = row.fields[RegistryEntityFields.Project.STATUS].stringValue()
+                status == null || status == RegistryEntityEnums.ProjectStatus.ACTIVE || row.id == selectedProjectId
             }
-        }
-        .sortedBy { it.title.lowercase() }
-    val projects = graph.taskStore.records(RegistryEntityNames.PROJECT)
-        .filter { it.deletedAt == null }
-        .mapNotNull { row ->
-            row.fields[RegistryEntityFields.Project.TITLE].stringValue()?.let { title ->
-                DetailListItem(
-                    row.id,
-                    title,
-                    row.fields[RegistryEntityFields.Project.AREA].stringValue(),
-                )
-            }
-        }
+            .mapNotNull { row ->
+                row.fields[RegistryEntityFields.Project.TITLE].stringValue()?.let { title ->
+                    row to DetailListItem(
+                        row.id,
+                        title,
+                        row.fields[RegistryEntityFields.Project.AREA].stringValue(),
+                    )
+                }
+            },
+        position = { it.first.fields[RegistryEntityFields.Project.POSITION].numberValue() },
+        label = { it.second.title },
+    ).map { it.second }
     val checklist = graph.taskStore.records(RegistryEntityNames.CHECKLIST_ITEM)
         .asSequence()
         .filter { it.deletedAt == null }
@@ -2215,12 +2228,15 @@ internal suspend fun loadTaskDetail(graph: AndroidAppGraph, taskId: String): Tas
         .sortedBy { it.title.lowercase() }
         .sortedBy(ChecklistLine::position)
         .toList()
-    val tags = graph.taskStore.records(RegistryEntityNames.TAG)
-        .filter { it.deletedAt == null }
-        .mapNotNull { row ->
-            row.fields[RegistryEntityFields.Tag.NAME].stringValue()?.let { name -> TagLine(row.id, name) }
-        }
-        .sortedBy { it.name.lowercase() }
+    val tags = StructureOrder.orderByPosition(
+        items = graph.taskStore.records(RegistryEntityNames.TAG)
+            .filter { it.deletedAt == null }
+            .mapNotNull { row ->
+                row.fields[RegistryEntityFields.Tag.NAME].stringValue()?.let { name -> row to TagLine(row.id, name) }
+            },
+        position = { it.first.fields[RegistryEntityFields.Tag.POSITION].numberValue() },
+        label = { it.second.name },
+    ).map { it.second }
     val attachmentCount = graph.taskStore.records(RegistryEntityNames.ATTACHMENT)
         .count { it.deletedAt == null && it.fields[RegistryEntityFields.Attachment.TASK_ID].stringValue() == taskId }
     val conversation = graph.taskStore.record(RegistryEntityNames.CONVO, taskId)?.let { record ->

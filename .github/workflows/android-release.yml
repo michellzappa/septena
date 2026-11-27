@@ -50,6 +50,10 @@ jobs:
     name: Build & sign Android release
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # A step's `if:` cannot read `secrets`; GitHub rejects the whole file
+    # ("workflow file issue"). Expose whether the Play key exists as env.
+    env:
+      HAS_PLAY_SERVICE_ACCOUNT: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON != '' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -260,7 +264,7 @@ jobs:
           fi
 
       - name: Upload .aab to Google Play Console
-        if: inputs.play_track != '' && inputs.play_track != 'none' && secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON != ''
+        if: inputs.play_track != '' && inputs.play_track != 'none' && env.HAS_PLAY_SERVICE_ACCOUNT == 'true'
         uses: r0adkll/upload-google-play@v1
         with:
           serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}

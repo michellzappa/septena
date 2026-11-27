@@ -47,6 +47,12 @@ pub struct TaskSnapshot {
     pub recurrence_after_completion: Option<bool>,
     /// The logical slot of a fixed repeat.
     pub recurrence_anchor_date: Option<String>,
+    /// Shared projects: true when this task is assigned to another member
+    /// (`assignedTo != nil && assignedTo != share.me`). Keeps another member's
+    /// task out of personal Anytime, and keeps its shared deadline from pulling
+    /// it into personal Today or Upcoming unless the user sets a personal When
+    /// or Today pin (`docs/PROJECT_SHARING_SPEC.md` §8).
+    pub assigned_to_other: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -98,7 +104,8 @@ pub(crate) fn date_facts(task: &TaskSnapshot, today: Day) -> DateFacts {
     let active = open && !is_heading && task.deleted_at.is_none() && task.faded_at.is_none();
     let scheduled = parse_day(&task.scheduled);
     let deadline = parse_day(&task.deadline);
-    let holding_deadline = deadline.filter(|_| !is_deferred(parse_day(&task.deferred_deadline), scheduled, deadline));
+    let holding_deadline = deadline
+        .filter(|_| !task.assigned_to_other && !is_deferred(parse_day(&task.deferred_deadline), scheduled, deadline));
     let is_on_today =
         active && (task.today || scheduled.is_some_and(|d| d <= today) || holding_deadline.is_some_and(|d| d <= today));
     DateFacts {
@@ -156,7 +163,12 @@ pub fn task_view_membership(task: TaskSnapshot, today: String, now: String) -> R
         _ => None,
     };
     let upcoming_day = if active && !is_on_today {
-        [scheduled, deadline].into_iter().flatten().filter(|d| *d > today).min()
+        let personal_deadline = (!task.assigned_to_other).then_some(deadline).flatten();
+        [scheduled, personal_deadline]
+            .into_iter()
+            .flatten()
+            .filter(|d| *d > today)
+            .min()
     } else {
         None
     };
@@ -177,7 +189,7 @@ pub fn task_view_membership(task: TaskSnapshot, today: String, now: String) -> R
         matches_today: active && (is_on_today || in_triage_band),
         matches_inbox: in_today_inbox,
         matches_upcoming: upcoming_day.is_some(),
-        matches_anytime: active && !task.today && !has_date,
+        matches_anytime: active && !task.today && !has_date && !task.assigned_to_other,
         deadline_red: due_state.is_some(),
         due_state,
         upcoming_day: upcoming_day.map(|d| d.to_string()),
@@ -218,4 +230,70 @@ fn carried_days(
 
 pub(crate) fn parse_day(raw: &Option<String>) -> Option<Day> {
     raw.as_deref().and_then(Day::parse)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn shared_task() -> TaskSnapshot {
+        TaskSnapshot {
+            id: "s1".into(),
+            title: "Call plumber".into(),
+            status: "open".into(),
+            project: Some("p1".into()),
+            source: Some("app".into()),
+            created: Some("2026-11-15".into()),
+            assigned_to_other: true,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn assigned_to_other_hides_from_anytime() {
+        let m = task_view_membership(shared_task(), "2026-11-21".into(), "2026-11-21T12:00:00Z".into()).unwrap();
+        assert!(!m.matches_anytime);
+        assert!(!m.matches_today);
+        assert!(!m.matches_upcoming);
+    }
+
+    #[test]
+    fn assigned_to_other_suppresses_shared_deadline_from_today_and_upcoming() {
+        let mut due_today = shared_task();
+        due_today.deadline = Some("2026-11-21".into());
+        let m = task_view_membership(due_today, "2026-11-21".into(), "2026-11-21T12:00:00Z".into()).unwrap();
+        assert!(!m.matches_today);
+        assert!(!m.matches_upcoming);
+        assert!(!m.matches_anytime);
+        assert!(!m.arrived_on_own);
+        assert_eq!(m.due_state.as_deref(), Some(DUE_TODAY));
+        assert!(m.deadline_red);
+
+        let mut future_deadline = shared_task();
+        future_deadline.deadline = Some("2026-11-28".into());
+        let m = task_view_membership(future_deadline, "2026-11-21".into(), "2026-11-21T12:00:00Z".into()).unwrap();
+        assert!(!m.matches_today);
+        assert!(!m.matches_upcoming);
+        assert_eq!(m.upcoming_day, None);
+    }
+
+    #[test]
+    fn assigned_to_other_still_honors_personal_when_and_today() {
+        let mut scheduled_future = shared_task();
+        scheduled_future.scheduled = Some("2026-11-25".into());
+        scheduled_future.deadline = Some("2026-11-23".into());
+        let m = task_view_membership(scheduled_future, "2026-11-21".into(), "2026-11-21T12:00:00Z".into()).unwrap();
+        assert!(!m.matches_today);
+        assert!(m.matches_upcoming);
+        assert_eq!(m.upcoming_day.as_deref(), Some("2026-11-25"));
+
+        let mut pinned = shared_task();
+        pinned.today = true;
+        pinned.today_set_on = Some("2026-11-20".into());
+        pinned.deadline = Some("2026-11-18".into());
+        let m = task_view_membership(pinned, "2026-11-21".into(), "2026-11-21T12:00:00Z".into()).unwrap();
+        assert!(m.matches_today);
+        assert!(m.is_on_today);
+        assert_eq!(m.days_on_today, 1);
+    }
 }

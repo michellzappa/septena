@@ -112,6 +112,9 @@ export interface Env {
   /// Business plan, a shared link works on Growth. Secret: anyone with the
   /// link sees the dashboard.
   PLAUSIBLE_SHARED_LINK?: string;
+  /// Optional read-only GitHub token for the admin page's Mac download counts
+  /// (src/admin/releases.ts): without it GitHub rate-limits Worker IPs.
+  GITHUB_TOKEN?: string;
   ATTACHMENTS: R2Bucket;                         // attachment bytes, u/{userId}/att/{id}
   PAIRING: DurableObjectNamespace<PairingStore>; // one object per pending app-pairing code (src/shadow/)
 }
