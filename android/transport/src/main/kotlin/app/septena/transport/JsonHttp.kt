@@ -15,6 +15,23 @@ import kotlin.coroutines.resumeWithException
 
 internal data class HttpResponse(val statusCode: Int, val body: String)
 
+/** Per-client headers and label supplied by the owning app shell. */
+data class ClientIdentity(
+    val platformId: String,
+    val userAgent: String,
+    val defaultDeviceName: String,
+) {
+    init {
+        require(platformId.isNotBlank())
+        require(userAgent.isNotBlank())
+        require(defaultDeviceName.isNotBlank())
+    }
+
+    companion object {
+        val ANDROID = ClientIdentity("android", "septena-android", "Septena Android")
+    }
+}
+
 /** One blocking HTTP request on a background executor. Shared by the sync, auth and task backend clients. */
 internal object JsonHttp {
     /** `X-Septena-Client`. The version travels in `X-Septena-Version`. */
@@ -37,8 +54,9 @@ internal object JsonHttp {
         bearer: String? = null,
         pool: ExecutorService = executor,
         headers: Map<String, String> = emptyMap(),
+        identity: ClientIdentity = ClientIdentity.ANDROID,
     ): HttpResponse = perform(pool) { onOpened ->
-        execute(baseUrl, path, method, clientVersion, bearer, accept = "application/json", onOpened, headers) { connection ->
+        execute(baseUrl, path, method, clientVersion, bearer, identity, accept = "application/json", onOpened, headers) { connection ->
             if (body != null) {
                 connection.doOutput = true
                 connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
@@ -67,8 +85,9 @@ internal object JsonHttp {
         uploadType: String? = null,
         download: File? = null,
         pool: ExecutorService = executor,
+        identity: ClientIdentity = ClientIdentity.ANDROID,
     ): HttpResponse = perform(pool) { onOpened ->
-        execute(baseUrl, path, method, clientVersion, bearer, accept = "*/*", onOpened) { connection ->
+        execute(baseUrl, path, method, clientVersion, bearer, identity, accept = "*/*", onOpened) { connection ->
             if (upload != null) {
                 val length = upload.length()
                 connection.doOutput = true
@@ -127,6 +146,7 @@ internal object JsonHttp {
         method: String,
         clientVersion: String,
         bearer: String?,
+        identity: ClientIdentity,
         accept: String,
         onConnectionOpened: (HttpURLConnection) -> Unit,
         headers: Map<String, String> = emptyMap(),
@@ -140,7 +160,7 @@ internal object JsonHttp {
             connection.readTimeout = READ_TIMEOUT_MS
             connection.instanceFollowRedirects = false
             connection.setRequestProperty("Accept", accept)
-            connection.setRequestProperty("X-Septena-Client", CLIENT_NAME)
+            connection.setRequestProperty("X-Septena-Client", identity.userAgent)
             connection.setRequestProperty("X-Septena-Version", clientVersion)
             if (bearer != null) connection.setRequestProperty("Authorization", "Bearer $bearer")
             for ((name, value) in headers) connection.setRequestProperty(name, value)

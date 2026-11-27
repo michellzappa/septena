@@ -47,6 +47,7 @@ import app.septena.core.stringValue
 import app.septena.ui.TaskHomeContent
 import app.septena.ui.TaskMenuActionIcon
 import app.septena.ui.TaskRowMenuAction
+import app.septena.windows.platform.DesktopHost
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -55,11 +56,12 @@ import java.nio.file.Files
 import java.util.Locale
 
 fun main() {
+    val host = DesktopHost.current()
     val directory = Files.createTempDirectory("septena-spike-")
     val clock = SystemDayClock()
     val transport = FixtureTransport(clock)
     try {
-        SpikeWorkspace(directory.resolve("tasks.db"), transport, clock).use { workspace ->
+        SpikeWorkspace(directory.resolve("tasks.db"), transport, clock, host.identity).use { workspace ->
             application(exitProcessOnExit = false) {
                 var busy by remember { mutableStateOf(false) }
                 var findRequests by remember { mutableStateOf(0) }

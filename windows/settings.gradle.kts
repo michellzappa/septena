@@ -18,6 +18,7 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "SeptenaWindows"
-include(":core", ":store")
+include(":core", ":store", ":transport")
 project(":core").projectDir = file("../android/core")
 project(":store").projectDir = file("../android/store")
+project(":transport").projectDir = file("../android/transport")
