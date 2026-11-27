@@ -607,20 +607,20 @@
       "featureId": "settings.display"
     },
     {
-      "id": "ai_agents",
-      "title": "AI & Agents",
-      "icon": "settings.ai_agents",
+      "id": "agents",
+      "title": "Agents",
+      "icon": "settings.agents",
       "group": "main",
       "paletteSlot": 4,
-      "featureId": "ai.reach-dial"
+      "featureId": "agents.connector"
     },
     {
-      "id": "connections_data",
+      "id": "connections",
       "title": "Connections",
       "icon": "settings.connections",
       "group": "main",
       "paletteSlot": 5,
-      "featureId": "sync.backend"
+      "featureId": "calendar.feed"
     },
     {
       "id": "privacy",
@@ -642,7 +642,6 @@
     {
       "id": "account_root",
       "mobilePresentation": "card",
-      "desktopTab": "account",
       "items": [
         {
           "kind": "pageLink",
@@ -656,177 +655,51 @@
       ]
     },
     {
-      "id": "ai_agents_root",
-      "header": "AI & Agents",
+      "id": "places_root",
       "mobilePresentation": "inline",
-      "desktopTab": "ai_agents",
       "items": [
         {
           "kind": "pageLink",
-          "page": "agents",
-          "label": "Connected Agents",
-          "icon": "settings.agents",
-          "statusKey": "agentsStatus",
-          "visibility": "signedIn",
-          "featureId": "agents.connector"
+          "page": "general",
+          "label": "General",
+          "icon": "settings.general",
+          "featureId": "lists.today"
         },
-        {
-          "kind": "pageLink",
-          "page": "claude_pairing",
-          "label": "Connect an Agent",
-          "icon": "settings.claude",
-          "statusKey": "claudeStatus",
-          "featureId": "agents.connector"
-        },
-        {
-          "kind": "pageLink",
-          "page": "ai_preferences",
-          "label": "On-Device AI",
-          "icon": "settings.ai_agents",
-          "statusKey": "aiMode",
-          "featureId": "ai.reach-dial"
-        }
-      ]
-    },
-    {
-      "id": "connections_data_root",
-      "header": "Connections",
-      "mobilePresentation": "inline",
-      "desktopTab": "connections_data",
-      "items": [
-        {
-          "kind": "pageLink",
-          "page": "calendar",
-          "label": "Calendar",
-          "icon": "settings.calendar",
-          "statusKey": "calendarStatus",
-          "featureId": "calendar.events"
-        },
-        {
-          "kind": "pageLink",
-          "page": "reminders",
-          "label": "Reminders",
-          "icon": "settings.reminders",
-          "statusKey": "remindersStatus",
-          "platforms": ["ios", "ipados", "macos"],
-          "featureId": "import.reminders"
-        }
-      ]
-    },
-    {
-      "id": "lists_root",
-      "header": "Lists",
-      "mobilePresentation": "inline",
-      "desktopTab": "general",
-      "items": [
-        {
-          "kind": "pageLink",
-          "page": "smart_lists",
-          "label": "Smart Lists",
-          "icon": "list.today",
-          "featureId": "settings.display"
-        },
-        {
-          "kind": "setting",
-          "key": "todayGroupByList",
-          "label": "Group Today by list",
-          "detail": "When off, tasks appear in one list with their project or area underneath."
-        },
-        {
-          "kind": "setting",
-          "key": "todayShowCompleted",
-          "label": "Show completed tasks"
-        },
-        {
-          "kind": "setting",
-          "key": "tasksShowAging",
-          "label": "Fade inactive tasks",
-          "detail": "Tasks without activity for 14 days fade out and move to Review. This applies on all your devices."
-        },
-        {
-          "kind": "setting",
-          "key": "tasksShowFaded",
-          "label": "Show faded tasks",
-          "detail": "Show faded tasks in projects and areas."
-        },
-        {
-          "kind": "setting",
-          "key": "tasksFilingSuggestions",
-          "label": "Suggest where to file",
-          "detail": "Learn where you usually file similar tasks."
-        },
-        {
-          "kind": "setting",
-          "key": "badgeShowOverdue",
-          "label": "Overdue app icon badge",
-          "platforms": ["macos"]
-        },
-        {
-          "kind": "setting",
-          "key": "sidebarCounts",
-          "label": "Show sidebar counts",
-          "platforms": ["web"]
-        }
-      ]
-    },
-    {
-      "id": "notifications_root",
-      "header": "Notifications",
-      "mobilePresentation": "inline",
-      "desktopTab": "general",
-      "items": [
-        {
-          "kind": "customSurface",
-          "surface": "browser_notifications",
-          "label": "Timed reminders",
-          "icon": "settings.notifications",
-          "platforms": ["web"],
-          "featureId": "task.alerts"
-        }
-      ]
-    },
-    {
-      "id": "language_root",
-      "header": "Language",
-      "mobilePresentation": "inline",
-      "desktopTab": "general",
-      "items": [
-        {
-          "kind": "customSurface",
-          "surface": "web_language",
-          "label": "Language",
-          "icon": "settings.language",
-          "platforms": ["web"],
-          "featureId": "settings.display"
-        }
-      ]
-    },
-    {
-      "id": "appearance_root",
-      "mobilePresentation": "inline",
-      "desktopTab": "appearance",
-      "items": [
         {
           "kind": "pageLink",
           "page": "appearance",
           "label": "Appearance",
           "icon": "settings.appearance",
           "featureId": "settings.display"
-        }
-      ]
-    },
-    {
-      "id": "meta_root",
-      "mobilePresentation": "inline",
-      "desktopTab": null,
-      "items": [
+        },
+        {
+          "kind": "pageLink",
+          "page": "agents",
+          "label": "Agents",
+          "icon": "settings.agents",
+          "statusKey": "agentsStatus",
+          "featureId": "agents.connector"
+        },
+        {
+          "kind": "pageLink",
+          "page": "connections",
+          "label": "Connections",
+          "icon": "settings.connections",
+          "featureId": "calendar.feed"
+        },
         {
           "kind": "pageLink",
           "page": "privacy",
           "label": "Privacy & Data",
           "icon": "settings.privacy",
           "featureId": "settings.display"
-        },
+        }
+      ]
+    },
+    {
+      "id": "about_root",
+      "mobilePresentation": "inline",
+      "items": [
         {
           "kind": "pageLink",
           "page": "about",
@@ -839,6 +712,102 @@
   ],
   "pages": [
     {
+      "id": "account",
+      "title": "Account",
+      "icon": "settings.account",
+      "depth": 1,
+      "featureId": "sync.backend",
+      "sections": [
+        {
+          "id": "profile",
+          "footer": "Your name stays on this device, and syncs when you sign in.",
+          "items": [
+            {
+              "kind": "customSurface",
+              "surface": "account_profile_editor",
+              "label": "Your name",
+              "ownsKeys": ["welcomeName"]
+            }
+          ]
+        },
+        {
+          "id": "plan",
+          "items": [
+            {
+              "kind": "pageLink",
+              "page": "plus",
+              "label": "Septena Plus",
+              "icon": "settings.plus",
+              "statusKey": "planStatus",
+              "featureId": "sync.backend"
+            }
+          ]
+        },
+        {
+          "id": "devices_access",
+          "items": [
+            {
+              "kind": "pageLink",
+              "page": "devices_access",
+              "label": "Devices",
+              "icon": "settings.devices",
+              "featureId": "sync.backend"
+            }
+          ]
+        },
+        {
+          "id": "sign_in_methods",
+          "items": [
+            {
+              "kind": "customSurface",
+              "surface": "sign_in_methods",
+              "visibility": "signedIn",
+              "featureId": "sync.backend"
+            }
+          ]
+        },
+        {
+          "id": "sync",
+          "header": "Sync",
+          "items": [
+            {
+              "kind": "customSurface",
+              "surface": "sync_account_status"
+            }
+          ]
+        },
+        {
+          "id": "delete_account",
+          "items": [
+            {
+              "kind": "customSurface",
+              "surface": "delete_account",
+              "visibility": "signedIn",
+              "featureId": "account.delete"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "plus",
+      "title": "Septena Plus",
+      "icon": "settings.plus",
+      "depth": 2,
+      "featureId": "sync.backend",
+      "sections": [
+        {
+          "id": "offer",
+          "items": [
+            {
+              "kind": "customSurface",
+              "surface": "plus_offer"
+            }
+          ]
+        }
+      ]
+    },
+    {
       "id": "devices_access",
       "title": "Devices",
       "icon": "settings.devices",
@@ -850,21 +819,208 @@
           "header": "Devices",
           "footer": "Each app you signed in to. A device you sign out stops syncing within the hour.",
           "items": [
-            { "kind": "customSurface", "surface": "access_devices", "featureId": "sync.backend" }
+            {
+              "kind": "customSurface",
+              "surface": "access_devices",
+              "featureId": "sync.backend"
+            }
           ]
         },
         {
           "id": "sign_in_approval",
           "header": "Add a device",
           "items": [
-            { "kind": "customSurface", "surface": "sign_in_approval", "visibility": "signedIn", "featureId": "sync.backend" }
+            {
+              "kind": "customSurface",
+              "surface": "sign_in_approval",
+              "visibility": "signedIn",
+              "featureId": "sync.backend"
+            }
           ]
         },
         {
           "id": "watch",
           "platforms": ["ios"],
           "items": [
-            { "kind": "customSurface", "surface": "apple_watch", "platforms": ["ios"], "featureId": "sync.backend" }
+            {
+              "kind": "customSurface",
+              "surface": "apple_watch",
+              "platforms": ["ios"],
+              "featureId": "sync.backend"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "general",
+      "title": "General",
+      "icon": "settings.general",
+      "depth": 1,
+      "featureId": "lists.today",
+      "sections": [
+        {
+          "id": "lists",
+          "items": [
+            {
+              "kind": "pageLink",
+              "page": "smart_lists",
+              "label": "Lists",
+              "icon": "list.today",
+              "featureId": "settings.display",
+              "detail": "Choose which lists you see and their order."
+            },
+            {
+              "kind": "setting",
+              "key": "todayGroupByList",
+              "label": "Group Today by list",
+              "detail": "When off, tasks appear in one list with their project or area underneath."
+            },
+            {
+              "kind": "setting",
+              "key": "todayShowCompleted",
+              "label": "Show completed tasks"
+            },
+            {
+              "kind": "setting",
+              "key": "tasksShowAging",
+              "label": "Fade inactive tasks",
+              "detail": "Tasks without activity for 14 days fade out and move to Review. This applies on all your devices."
+            },
+            {
+              "kind": "setting",
+              "key": "tasksShowFaded",
+              "label": "Show faded tasks",
+              "detail": "Show faded tasks in projects and areas."
+            },
+            {
+              "kind": "setting",
+              "key": "tasksFilingSuggestions",
+              "label": "Suggest where to file",
+              "detail": "Learn where you usually file similar tasks."
+            },
+            {
+              "kind": "setting",
+              "key": "badgeShowOverdue",
+              "label": "Overdue app icon badge",
+              "platforms": ["macos"],
+              "platformsReason": "Dock icon badge"
+            },
+            {
+              "kind": "setting",
+              "key": "sidebarCounts",
+              "label": "Show sidebar counts",
+              "platforms": ["web"]
+            }
+          ]
+        },
+        {
+          "id": "notifications",
+          "header": "Notifications",
+          "platforms": ["web"],
+          "items": [
+            {
+              "kind": "customSurface",
+              "surface": "browser_notifications",
+              "label": "Timed reminders",
+              "icon": "settings.notifications",
+              "platforms": ["web"],
+              "featureId": "task.alerts",
+              "platformsReason": "browser notification permission; other platforms use the system notification settings"
+            }
+          ]
+        },
+        {
+          "id": "language",
+          "header": "Language",
+          "platforms": ["web"],
+          "items": [
+            {
+              "kind": "customSurface",
+              "surface": "web_language",
+              "label": "Language",
+              "icon": "settings.language",
+              "platforms": ["web"],
+              "featureId": "settings.display",
+              "platformsReason": "other platforms follow the system language"
+            }
+          ]
+        },
+        {
+          "id": "ai",
+          "items": [
+            {
+              "kind": "pageLink",
+              "page": "ai_preferences",
+              "label": "AI on this device",
+              "icon": "settings.ai_agents",
+              "statusKey": "aiMode",
+              "featureId": "ai.reach-dial"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "smart_lists",
+      "title": "Lists",
+      "icon": "list.today",
+      "depth": 2,
+      "featureId": "settings.display",
+      "sections": [
+        {
+          "id": "smart_lists",
+          "items": [
+            {
+              "kind": "customSurface",
+              "surface": "smart_lists_editor",
+              "ownsKeys": ["smartListOrder", "smartListHidden", "smartListPlacement"]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ai_preferences",
+      "title": "AI on this device",
+      "icon": "settings.ai_agents",
+      "depth": 2,
+      "featureId": "ai.reach-dial",
+      "sections": [
+        {
+          "id": "on_device",
+          "platforms": ["ios", "ipados", "macos"],
+          "items": [
+            {
+              "kind": "customSurface",
+              "surface": "apple_intelligence_status",
+              "label": "Apple Intelligence",
+              "platforms": ["ios", "ipados", "macos"],
+              "featureId": "ai.reach-dial"
+            }
+          ]
+        },
+        {
+          "id": "reach",
+          "header": "Where AI runs",
+          "footer": "Septena never runs AI on your data and never reads it. The intelligence is your own (Apple on-device, Private Cloud Compute, or your Claude). This only sets where requests may run.",
+          "items": [
+            {
+              "kind": "setting",
+              "key": "aiMode",
+              "label": "AI Mode"
+            }
+          ]
+        },
+        {
+          "id": "explainer",
+          "items": [
+            {
+              "kind": "customSurface",
+              "surface": "ai_explainer",
+              "label": "How AI helps with your tasks",
+              "icon": "settings.about"
+            }
           ]
         }
       ]
@@ -930,64 +1086,8 @@
       ]
     },
     {
-      "id": "account",
-      "title": "Account",
-      "icon": "settings.account",
-      "depth": 1,
-      "featureId": "sync.backend",
-      "sections": [
-        {
-          "id": "profile",
-          "footer": "Your name stays on this device, and syncs when you sign in.",
-          "items": [
-            { "kind": "customSurface", "surface": "account_profile_editor", "label": "Your name", "ownsKeys": ["welcomeName"] }
-          ]
-        },
-        {
-          "id": "plan",
-          "items": [
-            { "kind": "pageLink", "page": "plus", "label": "Septena Plus", "icon": "settings.plus", "statusKey": "planStatus", "featureId": "sync.backend" }
-          ]
-        },
-        {
-          "id": "devices_access",
-          "items": [
-            { "kind": "pageLink", "page": "devices_access", "label": "Devices", "icon": "settings.devices", "featureId": "sync.backend" }
-          ]
-        },
-        {
-          "id": "sync",
-          "header": "Sync",
-          "items": [
-            { "kind": "customSurface", "surface": "sync_account_status" }
-          ]
-        },
-        {
-          "id": "delete_account",
-          "items": [
-            { "kind": "customSurface", "surface": "delete_account", "visibility": "signedIn", "featureId": "account.delete" }
-          ]
-        }
-      ]
-    },
-    {
-      "id": "plus",
-      "title": "Septena Plus",
-      "icon": "settings.plus",
-      "depth": 2,
-      "featureId": "sync.backend",
-      "sections": [
-        {
-          "id": "offer",
-          "items": [
-            { "kind": "customSurface", "surface": "plus_offer" }
-          ]
-        }
-      ]
-    },
-    {
       "id": "agents",
-      "title": "Connected Agents",
+      "title": "Agents",
       "icon": "settings.agents",
       "depth": 1,
       "featureId": "agents.connector",
@@ -1010,62 +1110,71 @@
           "header": "Connected agents",
           "footer": "Each agent you connected to your tasks, with the name you gave it. An agent counts while it was used in the last 30 days. Your phones, tablets and computers are under Account, Devices.",
           "items": [
-            { "kind": "customSurface", "surface": "access_agents", "featureId": "agents.connector" }
+            {
+              "kind": "customSurface",
+              "surface": "access_agents",
+              "featureId": "agents.connector"
+            }
+          ]
+        },
+        {
+          "id": "connect",
+          "header": "Connect an agent",
+          "items": [
+            {
+              "kind": "customSurface",
+              "surface": "claude_connector",
+              "featureId": "agents.connector"
+            },
+            {
+              "kind": "customSurface",
+              "surface": "mcp_skills",
+              "label": "MCP Skills",
+              "icon": "settings.skills",
+              "featureId": "agents.connector",
+              "detail": "The brief that teaches a model how to use your tasks through the connection (tools, conventions, and examples)."
+            }
           ]
         }
       ]
     },
     {
-      "id": "claude_pairing",
-      "title": "Connect an Agent",
-      "icon": "settings.claude",
+      "id": "connections",
+      "title": "Connections",
+      "icon": "settings.connections",
       "depth": 1,
-      "featureId": "agents.connector",
+      "featureId": "calendar.feed",
       "sections": [
         {
-          "id": "connector",
-          "header": "MCP connector",
+          "id": "connections",
           "items": [
-            { "kind": "customSurface", "surface": "claude_connector", "featureId": "agents.connector" }
-          ]
-        },
-        {
-          "id": "agent_tools",
-          "header": "Agent tools",
-          "footer": "The brief that teaches a model how to use your tasks through the connection (tools, conventions, and examples).",
-          "items": [
-            { "kind": "customSurface", "surface": "mcp_skills", "label": "MCP Skills", "icon": "settings.skills", "featureId": "agents.connector" }
-          ]
-        }
-      ]
-    },
-    {
-      "id": "ai_preferences",
-      "title": "On-Device AI",
-      "icon": "settings.ai_agents",
-      "depth": 1,
-      "featureId": "ai.reach-dial",
-      "sections": [
-        {
-          "id": "on_device",
-          "header": "AI on this device",
-          "platforms": ["ios", "ipados", "macos"],
-          "items": [
-            { "kind": "customSurface", "surface": "apple_intelligence_status", "label": "Apple Intelligence", "platforms": ["ios", "ipados", "macos"], "featureId": "ai.reach-dial" }
-          ]
-        },
-        {
-          "id": "reach",
-          "header": "Where AI runs",
-          "footer": "Septena never runs AI on your data and never reads it. The intelligence is your own (Apple on-device, Private Cloud Compute, or your Claude). This only sets where requests may run.",
-          "items": [
-            { "kind": "setting", "key": "aiMode", "label": "AI Mode" }
-          ]
-        },
-        {
-          "id": "explainer",
-          "items": [
-            { "kind": "customSurface", "surface": "ai_explainer", "label": "How AI helps with your tasks", "icon": "settings.about" }
+            {
+              "kind": "pageLink",
+              "page": "calendar",
+              "label": "Calendar",
+              "icon": "settings.calendar",
+              "statusKey": "calendarStatus",
+              "featureId": "calendar.events"
+            },
+            {
+              "kind": "pageLink",
+              "page": "reminders",
+              "label": "Reminders",
+              "icon": "settings.reminders",
+              "statusKey": "remindersStatus",
+              "platforms": ["ios", "ipados", "macos"],
+              "featureId": "import.reminders",
+              "platformsReason": "Apple Reminders (EventKit)"
+            },
+            {
+              "kind": "pageLink",
+              "page": "shortcuts",
+              "label": "Siri & Shortcuts",
+              "icon": "settings.siri_shortcuts",
+              "platforms": ["ios", "ipados", "macos"],
+              "platformsReason": "system Shortcuts API",
+              "featureId": "system.shortcuts"
+            }
           ]
         }
       ]
@@ -1074,7 +1183,7 @@
       "id": "calendar",
       "title": "Calendar",
       "icon": "settings.calendar",
-      "depth": 1,
+      "depth": 2,
       "featureId": "calendar.events",
       "sections": [
         {
@@ -1094,38 +1203,47 @@
       "id": "reminders",
       "title": "Reminders",
       "icon": "settings.reminders",
-      "depth": 1,
+      "depth": 2,
       "platforms": ["ios", "ipados", "macos"],
       "featureId": "import.reminders",
       "sections": [
         {
           "id": "reminders",
           "items": [
-            { "kind": "customSurface", "surface": "reminders_inbox", "platforms": ["ios", "ipados", "macos"], "featureId": "import.reminders" }
+            {
+              "kind": "customSurface",
+              "surface": "reminders_inbox",
+              "platforms": ["ios", "ipados", "macos"],
+              "featureId": "import.reminders"
+            }
           ]
         }
-      ]
+      ],
+      "platformsReason": "Apple Reminders (EventKit)"
     },
     {
-      "id": "import_export",
-      "title": "Import & Export",
-      "icon": "settings.data",
+      "id": "shortcuts",
+      "title": "Siri & Shortcuts",
+      "icon": "settings.siri_shortcuts",
       "depth": 2,
-      "featureId": "sync.backend",
+      "platforms": ["ios", "ipados", "macos"],
+      "platformsReason": "system Shortcuts API",
+      "featureId": "system.shortcuts",
       "sections": [
         {
-          "id": "move_in",
-          "header": "Move from another app",
-          "footer": "You can undo an import.",
-          "platforms": ["ios", "ipados", "macos"],
+          "id": "actions",
+          "footer": "The Shortcuts app lists every Septena action. Add them to your own shortcuts.",
           "items": [
-            { "kind": "customSurface", "surface": "import_sources", "label": "Move from another app", "icon": "settings.import", "platforms": ["ios", "ipados", "macos"], "featureId": "import.things" }
-          ]
-        },
-        {
-          "id": "transfer",
-          "items": [
-            { "kind": "customSurface", "surface": "import_export" }
+            {
+              "kind": "customSurface",
+              "surface": "siri_shortcuts",
+              "label": "Open Shortcuts",
+              "detail": "Septena works with Siri and the Shortcuts app. Ask Siri to add a task, or build a shortcut that adds, completes or shows your tasks.",
+              "icon": "settings.siri_shortcuts",
+              "platforms": ["ios", "ipados", "macos"],
+              "platformsReason": "system Shortcuts API",
+              "featureId": "system.shortcuts"
+            }
           ]
         }
       ]
@@ -1144,14 +1262,54 @@
             {
               "kind": "customSurface",
               "surface": "privacy_explainer",
-              "detail": "Your tasks, areas, projects, and conversations stay on this device until you sign in. When signed in, they sync through Septena’s private server at api.septena.app, encrypted at rest (not end-to-end, so connected agents can read them when you choose). AI on your device stays on your device. Connect an agent under AI & Agents."
+              "detail": "Your tasks, areas, projects, and conversations stay on this device until you sign in. When signed in, they sync through Septena’s private server at api.septena.app, encrypted at rest (not end-to-end, so connected agents can read them when you choose). AI on your device stays on your device. Connect an agent under Agents."
             }
           ]
         },
         {
           "id": "transfer",
           "items": [
-            { "kind": "pageLink", "page": "import_export", "label": "Import & Export", "icon": "settings.data", "featureId": "sync.backend" }
+            {
+              "kind": "pageLink",
+              "page": "import_export",
+              "label": "Import & Export",
+              "icon": "settings.data",
+              "featureId": "sync.backend"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "import_export",
+      "title": "Import & Export",
+      "icon": "settings.data",
+      "depth": 2,
+      "featureId": "sync.backend",
+      "sections": [
+        {
+          "id": "move_in",
+          "header": "Move from another app",
+          "footer": "You can undo an import.",
+          "platforms": ["ios", "ipados", "macos"],
+          "items": [
+            {
+              "kind": "customSurface",
+              "surface": "import_sources",
+              "label": "Move from another app",
+              "icon": "settings.import",
+              "platforms": ["ios", "ipados", "macos"],
+              "featureId": "import.things"
+            }
+          ]
+        },
+        {
+          "id": "transfer",
+          "items": [
+            {
+              "kind": "customSurface",
+              "surface": "import_export"
+            }
           ]
         }
       ]
@@ -1166,7 +1324,56 @@
         {
           "id": "version",
           "items": [
-            { "kind": "customSurface", "surface": "about_header", "label": "Tasks that think with you", "detail": "Version {version}" }
+            {
+              "kind": "customSurface",
+              "surface": "about_header",
+              "label": "Tasks that think with you",
+              "detail": "Version {version}"
+            }
+          ]
+        },
+        {
+          "id": "actions",
+          "items": [
+            {
+              "kind": "customSurface",
+              "surface": "open_help",
+              "label": "Help",
+              "icon": "settings.help"
+            },
+            {
+              "kind": "customSurface",
+              "surface": "contact_support",
+              "label": "Contact Support",
+              "icon": "settings.feedback",
+              "featureId": "support.contact"
+            },
+            {
+              "kind": "customSurface",
+              "surface": "keyboard_shortcuts",
+              "label": "Keyboard Shortcuts",
+              "icon": "settings.shortcuts",
+              "platforms": ["web"],
+              "featureId": "mac.keyboard"
+            },
+            {
+              "kind": "customSurface",
+              "surface": "check_updates",
+              "label": "Check for Updates…",
+              "platforms": ["macos", "windows", "linux"],
+              "featureId": "mac.updates"
+            },
+            {
+              "kind": "customSurface",
+              "surface": "reset_get_started",
+              "label": "Show Get Started Again"
+            },
+            {
+              "kind": "customSurface",
+              "surface": "reset_first_run",
+              "label": "Show Welcome Again",
+              "featureId": "onboarding.first-run"
+            }
           ]
         },
         {
@@ -1182,20 +1389,15 @@
           ]
         },
         {
-          "id": "actions",
-          "items": [
-            { "kind": "customSurface", "surface": "open_help", "label": "Help", "icon": "settings.help" },
-            { "kind": "customSurface", "surface": "keyboard_shortcuts", "label": "Keyboard Shortcuts", "icon": "settings.shortcuts", "platforms": ["web"], "featureId": "mac.keyboard" },
-            { "kind": "customSurface", "surface": "check_updates", "label": "Check for Updates…", "platforms": ["macos", "windows", "linux"], "featureId": "mac.updates" },
-            { "kind": "customSurface", "surface": "reset_get_started", "label": "Show Get Started Again" },
-            { "kind": "customSurface", "surface": "reset_first_run", "label": "Show Welcome Again", "featureId": "onboarding.first-run" },
-            { "kind": "customSurface", "surface": "contact_support", "label": "Contact Support", "icon": "settings.feedback", "featureId": "support.contact" }
-          ]
-        },
-        {
           "id": "advanced_link",
           "items": [
-            { "kind": "pageLink", "page": "advanced", "label": "Advanced", "icon": "settings.advanced", "featureId": "settings.display" }
+            {
+              "kind": "pageLink",
+              "page": "advanced",
+              "label": "Advanced",
+              "icon": "settings.advanced",
+              "featureId": "settings.display"
+            }
           ]
         }
       ]
@@ -1210,25 +1412,13 @@
         {
           "id": "diagnostics",
           "items": [
-            { "kind": "customSurface", "surface": "sync_diagnostics", "label": "Sync & storage diagnostics", "detail": "Changes the server refused appear here, newest first. The server kept its own version of each.", "icon": "settings.diagnostics", "featureId": "sync.backend" }
-          ]
-        }
-      ]
-    },
-    {
-      "id": "smart_lists",
-      "title": "Smart Lists",
-      "icon": "list.today",
-      "depth": 1,
-      "featureId": "settings.display",
-      "sections": [
-        {
-          "id": "smart_lists",
-          "items": [
             {
               "kind": "customSurface",
-              "surface": "smart_lists_editor",
-              "ownsKeys": ["smartListOrder", "smartListHidden", "smartListPlacement"]
+              "surface": "sync_diagnostics",
+              "label": "Sync & storage diagnostics",
+              "detail": "Changes the server refused appear here, newest first. The server kept its own version of each.",
+              "icon": "settings.diagnostics",
+              "featureId": "sync.backend"
             }
           ]
         }

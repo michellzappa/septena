@@ -131,6 +131,7 @@
     "settings.notifications": { "sfSymbol": "bell", "material": "notifications", "lucide": "bell" },
     "settings.language": { "sfSymbol": "globe", "material": "language", "lucide": "globe" },
     "settings.shortcuts": { "sfSymbol": "keyboard", "material": "keyboard", "lucide": "keyboard" },
+    "settings.siri_shortcuts": { "sfSymbol": "square.2.layers.3d", "material": "bolt", "lucide": "zap" },
     "plans.free": { "sfSymbol": "iphone", "material": "smartphone", "lucide": "smartphone" },
     "plans.pro": { "sfSymbol": "infinity", "material": "all_inclusive", "lucide": "infinity" },
     "plans.history": { "sfSymbol": "clock.arrow.circlepath", "material": "history", "lucide": "history" },
