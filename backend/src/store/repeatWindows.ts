@@ -50,9 +50,11 @@ export function repeatOccurrence(task: Task, seriesId: string, scheduled: string
   const fields = Object.fromEntries(templateFields
     .filter((key) => key in task)
     .map((key) => [key, task[key]]));
+  const dates = nextOccurrenceDates(task as unknown as CoreTask, scheduled, now);
   return {
     ...fields,
-    ...nextOccurrenceDates(task as unknown as CoreTask, scheduled, now),
+    ...dates,
+    ...(dates.reminderAt ? { reminderMode: task.reminderMode ?? "floating" } : {}),
     status: "open",
     scheduled: scheduled,
     recurrenceAnchorDate: scheduled,

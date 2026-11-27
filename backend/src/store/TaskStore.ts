@@ -18,7 +18,7 @@ import {
   type EntitySpec,
   type RefSnapshot,
 } from "./columns.js";
-import { CoreInputError, doEndWins, findIssueRefs, occurrenceId, parseRef, resolveDoSessions, taskRefId, type CoreDoSession, type CoreRef } from "../core/index.js";
+import { CoreInputError, checklistOccurrenceId, doEndWins, findIssueRefs, occurrenceId, parseRef, resolveDoSessions, taskRefId, type CoreDoSession, type CoreRef } from "../core/index.js";
 import type { Op, OpResult, PullResult, PushResult, Turn } from "./ops.js";
 import type { EntitlementRow } from "../entitlement/entitlement.js";
 import type { IcalTask } from "../ical.js";
@@ -2369,6 +2369,23 @@ export class TaskStore extends DurableObject<Env> {
           clientOpId: randomId(), op: "upsert", entity: "task", id,
           fields: repeatOccurrence(template, seriesId, scheduled, iso),
         });
+        const templateId = String(template.id);
+        this.readChecklistItems(templateId).forEach((item, index) => {
+          if (typeof item.id !== "string" || typeof item.title !== "string") return;
+          operations.push({
+            clientOpId: randomId(), op: "upsert", entity: "checklistItem",
+            id: checklistOccurrenceId(id, index, item.id),
+            fields: { taskId: id, title: item.title, checked: false, position: item.position ?? null, createdAt: iso },
+          });
+        });
+        for (const ref of this.readTaskRefs(templateId)) {
+          if (ref.role !== "about" || typeof ref.key !== "string" || typeof ref.kind !== "string") continue;
+          operations.push({
+            clientOpId: randomId(), op: "upsert", entity: "taskRef", id: taskRefId(id, ref.key, 0),
+            fields: { taskId: id, key: ref.key, kind: ref.kind, role: "about",
+              snapshot: ref.snapshot ?? null, position: ref.position ?? null, createdAt: iso },
+          });
+        }
       }
       if (plan.expireBefore) {
         for (const row of members) {
