@@ -762,6 +762,32 @@ export function SettingsModal({
             onChange={(v) => void engine.setSetting("agentsPaused", v)}
           />
         );
+      case "agentCommentNotifications": {
+        const opts = SETTINGS_REGISTRY.keys.agentCommentNotifications.options;
+        const current =
+          typeof snapshot.settings.agentCommentNotifications === "string"
+            ? snapshot.settings.agentCommentNotifications
+            : SETTINGS_REGISTRY.keys.agentCommentNotifications.default;
+        return (
+          <div className="flex items-center justify-between gap-3 py-2.5">
+            <div className="min-w-0">
+              <p className="text-xs font-medium text-[var(--text-primary)]">{label}</p>
+              {detail && <p className="text-[11px] text-[var(--text-muted)]">{detail}</p>}
+            </div>
+            <select
+              value={current}
+              onChange={(e) => void engine.setSetting("agentCommentNotifications", e.target.value)}
+              className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-canvas)] px-2.5 py-1 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
+            >
+              {opts.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {registryText(opt.title, lang)}
+                </option>
+              ))}
+            </select>
+          </div>
+        );
+      }
       case "textSizeStep":
         return (
           <div className="py-2.5">
@@ -1428,7 +1454,7 @@ export function SettingsModal({
                         </form>
                       ) : (
                         <>
-                          <div>
+                          <div className="min-w-0 flex-1">
                             <p className="font-medium text-[var(--text-primary)]">{displayName}</p>
                             <p className="text-[11px] text-[var(--text-muted)]">
                               {(conn.lastUsed ?? conn.lastUsedAt)
@@ -1439,6 +1465,49 @@ export function SettingsModal({
                             </p>
                           </div>
                           <div className="flex items-center gap-1">
+                            <select
+                              aria-label={`${displayName} ${settingsCopy("access_agents", "notificationsLabel", lang)}`}
+                              value={
+                                typeof (
+                                  snapshot.settings.agentCommentNotificationsByAgent as
+                                    | Record<string, string>
+                                    | undefined
+                                )?.[displayName] === "string"
+                                  ? (
+                                      snapshot.settings.agentCommentNotificationsByAgent as Record<
+                                        string,
+                                        string
+                                      >
+                                    )[displayName]
+                                  : ""
+                              }
+                              onChange={(e) => {
+                                const prev =
+                                  snapshot.settings.agentCommentNotificationsByAgent &&
+                                  typeof snapshot.settings.agentCommentNotificationsByAgent === "object" &&
+                                  !Array.isArray(snapshot.settings.agentCommentNotificationsByAgent)
+                                    ? {
+                                        ...(snapshot.settings.agentCommentNotificationsByAgent as Record<
+                                          string,
+                                          string
+                                        >),
+                                      }
+                                    : {};
+                                if (!e.target.value) delete prev[displayName];
+                                else prev[displayName] = e.target.value;
+                                void engine.setSetting("agentCommentNotificationsByAgent", prev);
+                              }}
+                              className="rounded border border-[var(--border-subtle)] bg-[var(--bg-canvas)] px-1.5 py-0.5 text-[11px] text-[var(--text-secondary)] outline-none focus:border-[var(--accent)]"
+                            >
+                              <option value="">
+                                {settingsCopy("access_agents", "notificationsDefault", lang)}
+                              </option>
+                              {SETTINGS_REGISTRY.keys.agentCommentNotifications.options.map((opt) => (
+                                <option key={opt.value} value={opt.value}>
+                                  {registryText(opt.title, lang)}
+                                </option>
+                              ))}
+                            </select>
                             <button
                               type="button"
                               onClick={() => {

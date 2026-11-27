@@ -12,6 +12,8 @@ import Testing
     "rolledInDismissedOn": .string("2026-11-25"),
     "homeTimezone": .string("Europe/Amsterdam"),
     "agentsPaused": .bool(true),
+    "agentCommentNotifications": .string("every_comment"),
+    "agentCommentNotificationsByAgent": .object(["Claude": .string("daily_digest")]),
     "tasksShowAging": .bool(false),
     "fadeSweptAt": .string("2026-11-22T09:00:00Z"),
     "fadeSweepDismissedOn": .string("2026-11-22"),

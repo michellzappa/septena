@@ -36,10 +36,30 @@ export interface AgentReviewPush {
   note: string;
 }
 
-/// A question carries `turnSeq`; a hand-off does not.
-export type AgentPush = AgentQuestionPush | AgentReviewPush;
+/// A plain agent comment note (sent when the user chooses "Every comment", #743).
+export interface AgentNotePush {
+  kind: "note";
+  taskId: string;
+  taskTitle: string;
+  note: string;
+  actorName?: string | null;
+}
+
+/// One daily digest summarizing queued agent comments (#743).
+export interface AgentDigestPush {
+  kind: "digest";
+  taskId: string | null;
+  count: number;
+  taskCount: number;
+  summary: string;
+}
+
+/// A question carries `turnSeq`; note and digest carry `kind`; otherwise it is a Review hand-off.
+export type AgentPush = AgentQuestionPush | AgentReviewPush | AgentNotePush | AgentDigestPush;
 
 const isQuestion = (push: AgentPush): push is AgentQuestionPush => "turnSeq" in push;
+const isNote = (push: AgentPush): push is AgentNotePush => "kind" in push && push.kind === "note";
+const isDigest = (push: AgentPush): push is AgentDigestPush => "kind" in push && push.kind === "digest";
 
 export interface ApnsConfig {
   keyPem: string;
@@ -68,6 +88,8 @@ export const APNS_DEFAULT_BUNDLE_ID = "com.septena.tasks";
 export const AGENT_QUESTION_CATEGORY = "AGENT_QUESTION";
 /// No buttons: a hand-off is accepted after a look, not from the lock screen.
 export const AGENT_REVIEW_CATEGORY = "AGENT_REVIEW";
+export const AGENT_COMMENT_CATEGORY = "AGENT_COMMENT";
+export const AGENT_DIGEST_CATEGORY = "AGENT_DIGEST";
 export const MAX_NOTIFICATION_OPTIONS = 3;
 
 /// APNs requires provider JWTs to be rotated before 60 minutes (and not more
@@ -243,6 +265,61 @@ export function buildAgentReviewPayload(r: AgentReviewPush): AgentReviewApnsPayl
   };
 }
 
+export interface AgentNoteApnsPayload {
+  aps: {
+    alert: { title: string; body: string };
+    sound: "default";
+    category: typeof AGENT_COMMENT_CATEGORY;
+    "thread-id": string;
+  };
+  taskId: string;
+}
+
+export function buildAgentNotePayload(n: AgentNotePush): AgentNoteApnsPayload {
+  const title = clip(n.taskTitle || "Septena", 120) || "Septena";
+  const prefix = n.actorName?.trim() ? `${clip(n.actorName, 40)}: ` : "";
+  return {
+    aps: {
+      alert: { title, body: clip(`${prefix}${n.note}`, 300) },
+      sound: "default",
+      category: AGENT_COMMENT_CATEGORY,
+      "thread-id": `agent-comment:${n.taskId}`,
+    },
+    taskId: n.taskId,
+  };
+}
+
+export interface AgentDigestApnsPayload {
+  aps: {
+    alert: { title: string; body: string };
+    sound: "default";
+    category: typeof AGENT_DIGEST_CATEGORY;
+    "thread-id": string;
+  };
+  count: number;
+  taskCount: number;
+  taskId?: string;
+}
+
+export function buildAgentDigestPayload(d: AgentDigestPush): AgentDigestApnsPayload {
+  const title = d.count === 1
+    ? "1 agent update"
+    : d.taskCount === 1
+      ? `${d.count} agent updates`
+      : `${d.count} agent updates across ${d.taskCount} tasks`;
+  return {
+    aps: {
+      alert: { title, body: clip(d.summary, 300) },
+      sound: "default",
+      category: AGENT_DIGEST_CATEGORY,
+      "thread-id": "agent-digest",
+    },
+    count: d.count,
+    taskCount: d.taskCount,
+    ...(d.taskId ? { taskId: d.taskId } : {}),
+  };
+}
+
 export function topicForPlatform(bundleId: string, platform: PushPlatform): string {
   return platform === "watchos" ? `${bundleId}.watchkitapp` : bundleId;
 }
@@ -294,7 +371,18 @@ export async function sendAgentPushes(
     return { attempted: 0, delivered: 0, pruned: [] };
   }
 
-  const payloadStr = JSON.stringify(isQuestion(push) ? buildAgentQuestionPayload(push) : buildAgentReviewPayload(push));
+  const payloadStr = JSON.stringify(
+    isQuestion(push)
+      ? buildAgentQuestionPayload(push)
+      : isNote(push)
+        ? buildAgentNotePayload(push)
+        : isDigest(push)
+          ? buildAgentDigestPayload(push)
+          : buildAgentReviewPayload(push),
+  );
+  const collapseId = isDigest(push)
+    ? "agent-digest"
+    : `agent-${isQuestion(push) ? "q" : isNote(push) ? "n" : "r"}-${push.taskId}`.slice(0, 64);
   const doFetch = opts.fetchFn ?? testFetchOverride ?? fetch;
   const pruned: string[] = [];
   let delivered = 0;
@@ -311,7 +399,7 @@ export async function sendAgentPushes(
             "apns-topic": topic,
             "apns-push-type": "alert",
             "apns-priority": "10",
-            "apns-collapse-id": `agent-${isQuestion(push) ? "q" : "r"}-${push.taskId}`.slice(0, 64),
+            "apns-collapse-id": collapseId,
             "content-type": "application/json",
           },
           body: payloadStr,

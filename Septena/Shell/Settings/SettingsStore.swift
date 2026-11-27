@@ -132,6 +132,40 @@ final class SettingsStore {
     SettingsMirror.upsert(settings: s, context: context, engine: engine)
   }
 
+  /// Global agent comment notification mode (#743–#745). Synced account-wide.
+  var agentCommentNotifications: String {
+    serverSettings?.agentCommentNotifications ?? RegistrySettings.Defaults.agentCommentNotifications
+  }
+
+  func setAgentCommentNotifications(_ mode: String, context: ModelContext, engine: CKEngine?) {
+    guard agentCommentNotifications != mode else { return }
+    var s = serverSettings ?? AppSettings()
+    s.agentCommentNotifications = mode
+    serverSettings = s
+    SettingsMirror.upsert(settings: s, context: context, engine: engine)
+  }
+
+  /// Per-agent notification override keyed by display name; nil means use the global default.
+  func agentNotificationOverride(for agentName: String) -> String? {
+    serverSettings?.agentCommentNotificationsByAgent?[agentName]
+  }
+
+  func setAgentNotificationOverride(_ mode: String?, for agentName: String,
+                                    context: ModelContext, engine: CKEngine?) {
+    var overrides = serverSettings?.agentCommentNotificationsByAgent ?? [:]
+    let next = mode?.isEmpty == true ? nil : mode
+    guard overrides[agentName] != next else { return }
+    if let next {
+      overrides[agentName] = next
+    } else {
+      overrides.removeValue(forKey: agentName)
+    }
+    var s = serverSettings ?? AppSettings()
+    s.agentCommentNotificationsByAgent = overrides
+    serverSettings = s
+    SettingsMirror.upsert(settings: s, context: context, engine: engine)
+  }
+
   /// Show or hide one calendar (by `EKCalendar.title`) from the day timeline /
   /// Next feed. Writes `CalendarBridge`'s local cache (the authority EventKit
   /// fetches filter on) AND the CloudKit-synced `calendarHiddenTitles` payload,

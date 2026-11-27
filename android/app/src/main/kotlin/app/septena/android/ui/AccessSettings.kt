@@ -28,6 +28,7 @@ import app.septena.core.JsonValue
 import app.septena.core.RegistryCatalog
 import app.septena.core.generated.RegistryActionIds
 import app.septena.core.generated.RegistryPromptIds
+import app.septena.core.generated.RegistrySettingKeys
 import app.septena.core.stringValue
 import app.septena.transport.AccessDevice
 import app.septena.transport.AccountAccess
@@ -88,6 +89,24 @@ internal class AccessSettingsModel(
 
     fun dismissCreatedKey() {
         createdKey = null
+    }
+
+    /** Updates one per-agent notification override in `agentCommentNotificationsByAgent` (#746). */
+    fun setAgentNotificationOverride(agentName: String, mode: String?) {
+        scope.launch {
+            val current = (graph.syncedSettings.rawValue(RegistrySettingKeys.AGENT_COMMENT_NOTIFICATIONS_BY_AGENT)
+                as? JsonValue.ObjectValue)?.fields.orEmpty().toMutableMap()
+            if (mode.isNullOrBlank()) {
+                current.remove(agentName)
+            } else {
+                current[agentName] = JsonValue.StringValue(mode)
+            }
+            graph.syncedSettingsMutator.set(
+                RegistrySettingKeys.AGENT_COMMENT_NOTIFICATIONS_BY_AGENT,
+                JsonValue.ObjectValue(current),
+            )
+            graph.sync.noteLocalChange()
+        }
     }
 
     private fun perform(action: suspend () -> Unit) {
@@ -168,11 +187,18 @@ internal fun AccessDevicesList(model: AccessSettingsModel, signedIn: Boolean, la
  * disconnect, then New Agent Key for an agent that cannot sign in (#86).
  */
 @Composable
-internal fun AccessAgentsList(model: AccessSettingsModel, signedIn: Boolean, languageTag: String, plans: PlanSettingsModel? = null) {
+internal fun AccessAgentsList(
+    model: AccessSettingsModel,
+    signedIn: Boolean,
+    languageTag: String,
+    plans: PlanSettingsModel? = null,
+    notificationOverrides: Map<String, String> = emptyMap(),
+) {
     if (!signedIn) return
     var renaming by remember { mutableStateOf<AgentConnection?>(null) }
     var draftName by remember { mutableStateOf("") }
     var pendingDisconnect by remember { mutableStateOf<AgentConnection?>(null) }
+    var pickingNotificationsFor by remember { mutableStateOf<AgentConnection?>(null) }
     val renamePrompt = remember(languageTag) { registryPrompt(RegistryPromptIds.RENAME_AGENT, languageTag) }
     val newKeyPrompt = remember(languageTag) { registryPrompt(RegistryPromptIds.NEW_AGENT_KEY, languageTag) }
     val keyCreatedPrompt = remember(languageTag) { registryPrompt(RegistryPromptIds.AGENT_KEY_CREATED, languageTag) }
@@ -180,6 +206,18 @@ internal fun AccessAgentsList(model: AccessSettingsModel, signedIn: Boolean, lan
     var keyName by remember { mutableStateOf("") }
     val context = LocalContext.current
     val disconnectTitle = registryPrompt(RegistryPromptIds.DISCONNECT_AGENT, languageTag).confirmTitle
+    val notificationOptions = remember(languageTag) {
+        val raw = RegistryCatalog.setting(RegistrySettingKeys.AGENT_COMMENT_NOTIFICATIONS)
+            ?.fields?.get("options") as? JsonValue.ArrayValue
+        raw?.values.orEmpty().mapNotNull { entry ->
+            val obj = entry as? JsonValue.ObjectValue ?: return@mapNotNull null
+            val v = obj.fields["value"].stringValue() ?: return@mapNotNull null
+            val title = obj.fields["title"].stringValue()?.accessLocalized(languageTag) ?: v
+            v to title
+        }
+    }
+    val notificationsLabel = settingsCopy(AGENTS_COPY, "notificationsLabel", languageTag)
+    val notificationsDefault = settingsCopy(AGENTS_COPY, "notificationsDefault", languageTag)
     val access = model.access
 
     ListItem(
@@ -208,9 +246,18 @@ internal fun AccessAgentsList(model: AccessSettingsModel, signedIn: Boolean, lan
         }
     }
     access?.connections.orEmpty().forEach { agent ->
+        val currentOverride = notificationOverrides[agent.name]
+        val currentLabel = notificationOptions.firstOrNull { it.first == currentOverride }?.second ?: notificationsDefault
         ListItem(
             headlineContent = { Text(agent.name) },
-            supportingContent = { Text(agentDetailLine(agent, languageTag)) },
+            supportingContent = {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(agentDetailLine(agent, languageTag))
+                    TextButton(onClick = { pickingNotificationsFor = agent }) {
+                        Text("$notificationsLabel: $currentLabel")
+                    }
+                }
+            },
             trailingContent = {
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     TextButton(onClick = {
@@ -301,6 +348,37 @@ internal fun AccessAgentsList(model: AccessSettingsModel, signedIn: Boolean, lan
             },
             dismissButton = {
                 TextButton(onClick = { renaming = null }) { Text(promptChrome("cancelTitle", languageTag)) }
+            },
+        )
+    }
+    pickingNotificationsFor?.let { agent ->
+        AlertDialog(
+            onDismissRequest = { pickingNotificationsFor = null },
+            title = { Text("${agent.name} · $notificationsLabel") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    TextButton(
+                        onClick = {
+                            pickingNotificationsFor = null
+                            model.setAgentNotificationOverride(agent.name, null)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text(notificationsDefault) }
+                    notificationOptions.forEach { (value, title) ->
+                        TextButton(
+                            onClick = {
+                                pickingNotificationsFor = null
+                                model.setAgentNotificationOverride(agent.name, value)
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text(title) }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { pickingNotificationsFor = null }) {
+                    Text(promptChrome("cancelTitle", languageTag))
+                }
             },
         )
     }

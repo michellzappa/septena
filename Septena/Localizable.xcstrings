@@ -5739,6 +5739,10 @@
         }
       }
     },
+    "Agent comments" : {
+      "comment" : "Generated from registry settings.pages.agents.sections.notifications.items.0.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Agent connected. Go back to your browser to finish." : {
       "comment" : "Generated from registry settings.copy.sign_in_approval.doneConnector.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
@@ -9328,6 +9332,10 @@
       "comment" : "Generated from registry plans.paywall.choosePlan. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
+    "Choose when agent comments notify you. You can override this for any connected agent below." : {
+      "comment" : "Generated from registry settings.pages.agents.sections.notifications.footer. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Choose which lists you see and their order." : {
       "comment" : "Generated from registry settings.pages.general.sections.lists.items.0.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -12314,6 +12322,10 @@
         }
       }
     },
+    "Daily digest" : {
+      "comment" : "Generated from registry settings.keys.agentCommentNotifications.options.2.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Dark" : {
       "comment" : "Generated from registry settings.keys.appearanceMode.options.2.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -12747,28 +12759,10 @@
     },
     "Default" : {
       "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Padrão"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Standaard"
-          }
-        },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Standard"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Par défaut"
           }
         },
         "es" : {
@@ -12777,10 +12771,28 @@
             "value" : "Predeterminado"
           }
         },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Par défaut"
+          }
+        },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Predefinito"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Standaard"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Padrão"
           }
         }
       }
@@ -15476,6 +15488,10 @@
           }
         }
       }
+    },
+    "Every comment" : {
+      "comment" : "Generated from registry settings.keys.agentCommentNotifications.options.0.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Every device, a year of history and shared projects." : {
       "comment" : "Generated from registry plans.benefits.pro.everything.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -24259,6 +24275,10 @@
         }
       }
     },
+    "Needs my answer or approval" : {
+      "comment" : "Generated from registry settings.keys.agentCommentNotifications.options.1.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Never" : {
       "localizations" : {
         "pt-BR" : {
@@ -25312,6 +25332,10 @@
           }
         }
       }
+    },
+    "No notifications" : {
+      "comment" : "Generated from registry settings.keys.agentCommentNotifications.options.3.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "No open tasks in this area yet." : {
       "comment" : "Generated from registry surfaces.prompts.placesScreen.emptyStates.emptyAreaTasks.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -26503,7 +26527,7 @@
       }
     },
     "Notifications" : {
-      "comment" : "Generated from registry settings.pages.general.sections.notifications.header. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.copy.access_agents.notificationsLabel.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
     "now" : {
@@ -26622,28 +26646,10 @@
     },
     "Off" : {
       "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Desativado"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Uit"
-          }
-        },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aus"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Désactivé"
           }
         },
         "es" : {
@@ -26652,10 +26658,28 @@
             "value" : "Desactivado"
           }
         },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Désactivé"
+          }
+        },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Disattivato"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uit"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desativado"
           }
         }
       }
@@ -42144,6 +42168,10 @@
     },
     "Use a different email" : {
       "comment" : "Generated from registry signIn.email.differentEmail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Use default" : {
+      "comment" : "Generated from registry settings.copy.access_agents.notificationsDefault.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
     "Use my Claude" : {
