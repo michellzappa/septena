@@ -43,6 +43,13 @@ struct AppSettings: Codable {
   /// holds on all of them. Nil → not paused.
   var agentsPaused: Bool? = nil
 
+  /// Agent comment push notification mode (#743): `every_comment`, `needs_input`
+  /// (default), `daily_digest`, or `off`. Synced account-wide.
+  var agentCommentNotifications: String? = nil
+
+  /// Per-agent comment notification overrides keyed by agent display name (#743).
+  var agentCommentNotificationsByAgent: [String: String]? = nil
+
   /// "Fade inactive tasks" (docs/TASK_FADE_SPEC.md §4). Nil → on. Mirrored
   /// into `TaskFade.enabledDefaultsKey`, which rows read.
   var tasksShowAging: Bool? = nil
@@ -119,6 +126,8 @@ struct AppSettings: Codable {
     case welcomeName = "welcome_name"
     case rolledInDismissedOn = "rolled_in_dismissed_on"
     case agentsPaused = "agents_paused"
+    case agentCommentNotifications = "agent_comment_notifications"
+    case agentCommentNotificationsByAgent = "agent_comment_notifications_by_agent"
     case tasksShowAging = "tasks_show_aging"
     case fadeSweptAt = "fade_swept_at"
     case fadeSweepDismissedOn = "fade_sweep_dismissed_on"

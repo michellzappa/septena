@@ -121,10 +121,14 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
     @Volatile private var lastShownOrder: Map<String, List<String>> = emptyMap()
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    private val loaded: StateFlow<AreasProjectsUiState> = combine(destination, graph.sync.dataVersion) { selected, _ ->
-        selected
-    }.mapLatest { selected ->
-        withContext(Dispatchers.IO) { load(selected) }
+    private val loaded: StateFlow<AreasProjectsUiState> = combine(
+        destination,
+        graph.sync.dataVersion,
+        graph.completionSettle.state,
+    ) { selected, _, settle ->
+        selected to settle
+    }.mapLatest { (selected, settle) ->
+        withContext(Dispatchers.IO) { load(selected, settle) }
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(stopTimeoutMillis = 5_000),
@@ -184,6 +188,7 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
 
     fun select(destination: AreasProjectsDestination) {
         if (this.destination.value != destination) {
+            graph.completionSettle.clearAll()
             this.destination.value = destination
             errorMessage.value = null
         }
@@ -494,7 +499,10 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         }
     }
 
-    private suspend fun load(selected: AreasProjectsDestination?): AreasProjectsUiState {
+    private suspend fun load(
+        selected: AreasProjectsDestination?,
+        settle: CompletionSettleState = CompletionSettleState(),
+    ): AreasProjectsUiState {
         if (selected == null) return AreasProjectsUiState(isLoading = false)
         val entity = selected.entityName()
         val container = graph.taskStore.record(entity, selected.id)
@@ -524,7 +532,7 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             }
             .toList()
         val taskRows = allTaskRecords
-            .filter { (_, task) -> task.status == RegistryEntityEnums.TaskStatus.OPEN }
+            .filter { (_, task) -> task.status == RegistryEntityEnums.TaskStatus.OPEN || task.id in settle.entries }
         val listSort = ListSortPreferences.fromSynced(graph.syncedSettings).sortFor(
             when (selected) {
                 is AreasProjectsDestination.Area -> ListSortPreferences.areaKey(selected.id)
@@ -539,7 +547,13 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             }
 
         fun placeRow(record: app.septena.core.SyncRecord, task: TaskSnapshot, pos: Double?): PlaceTaskRow {
-            val membership = TaskViewRules.membership(task, today, now)
+            val settleEntry = settle.entries[record.id]
+            val membershipSnapshot = if (settleEntry != null && task.status != RegistryEntityEnums.TaskStatus.OPEN) {
+                task.copy(status = RegistryEntityEnums.TaskStatus.OPEN)
+            } else {
+                task
+            }
+            val membership = TaskViewRules.membership(membershipSnapshot, today, now)
             val base = buildTaskListItem(
                 record = record,
                 snapshot = task,
@@ -550,8 +564,11 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                 now = now,
                 showTodayIndicator = true,
                 showsOwnAssignee = selected is AreasProjectsDestination.Project,
-            ).copy(position = pos)
-                .withFade(task, conversations[record.id], now, today, showAging)
+            ).copy(
+                position = pos,
+                isSettling = settleEntry != null,
+                isFadingOut = settleEntry?.fadingOut == true,
+            ).withFade(task, conversations[record.id], now, today, showAging)
             return PlaceTaskRow(
                 id = record.id,
                 title = task.title,

@@ -1,6 +1,7 @@
 import { DurableObject } from "cloudflare:workers";
 import type { Env } from "../env.js";
 import {
+  AGENT_COMMENT_NOTIFICATION_MODES,
   ENTITIES,
   ENTITY_NAMES,
   MAX_CHECKLIST_ITEMS_PER_TASK,
@@ -12,6 +13,7 @@ import {
   decodeRow,
   encodeValue,
   snapshotFits,
+  type AgentCommentNotificationMode,
   type EntityName,
   type EntitySpec,
   type RefSnapshot,
@@ -33,11 +35,15 @@ import {
 import {
   MAX_AGENT_WEBHOOKS,
   SSE_HEARTBEAT_MS,
-  deliverWebhookWithRetry,
-  WEBHOOK_RETRY_DELAYS_MS,
+  WEBHOOK_DISABLE_AFTER_FAILURES,
+  WEBHOOK_OUTBOX_BACKOFF_MS,
+  WEBHOOK_OUTBOX_BATCH,
+  WEBHOOK_OUTBOX_MAX_ROWS_PER_HOOK,
+  deliverWebhookEvent,
   formatSseEvent,
   formatSseKeepalive,
   formatSseReady,
+  isRetryableWebhookStatus,
   isWakeEventKind,
   type AgentWebhookTarget,
 } from "../api/agentWake.js";
@@ -744,6 +750,27 @@ export class TaskStore extends DurableObject<Env> {
         lastStatus INTEGER,
         failureCount INTEGER NOT NULL DEFAULT 0
       );
+      CREATE TABLE IF NOT EXISTS agent_webhook_outbox (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        webhookId TEXT NOT NULL,
+        rev INTEGER NOT NULL,
+        kind TEXT NOT NULL,
+        taskId TEXT,
+        eventAt TEXT NOT NULL,
+        attempts INTEGER NOT NULL DEFAULT 0,
+        nextAt INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS agent_webhook_outbox_due ON agent_webhook_outbox(nextAt, id);
+      CREATE INDEX IF NOT EXISTS agent_webhook_outbox_hook ON agent_webhook_outbox(webhookId);
+      CREATE TABLE IF NOT EXISTS agent_notification_digest (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        taskId TEXT NOT NULL,
+        taskTitle TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        agentName TEXT,
+        snippet TEXT NOT NULL,
+        at TEXT NOT NULL
+      );
     `);
     this.sessions.migrate();
     this.shares.migrate();
@@ -1129,7 +1156,17 @@ export class TaskStore extends DurableObject<Env> {
     if (isAgentActor(actor) && op.entity === "convo" && op.fields.endStateAt && op.fields.endStateNote
       && (op.fields.endState ?? row?.endState) === "needs_verify") {
       const title = this.sql.exec<{ title: string | null }>("SELECT title FROM tasks WHERE id = ?", op.id).toArray()[0]?.title;
-      agentPushes.push({ taskId: op.id, taskTitle: title ?? "", note: op.fields.endStateNote as string });
+      const noteText = op.fields.endStateNote as string;
+      this.routeAgentNotification(
+        actor,
+        "review",
+        { taskId: op.id, taskTitle: title ?? "", note: noteText },
+        op.id,
+        title ?? "",
+        noteText,
+        now,
+        agentPushes,
+      );
     }
     if (op.entity === "convo" && op.fields.endState === "needs_verify") this.unfadeForReview(op.id, actor, now);
     if (op.entity === "convo" && (op.fields.assignee === "claude" || (isAgentActor(actor) && op.fields.endState === "needs_verify"))) {
@@ -1326,20 +1363,33 @@ export class TaskStore extends DurableObject<Env> {
     this.ctx.waitUntil(this.drainShares());
   }
 
+  /// Pulls the DO alarm forward to `targetAt` if earlier than the current
+  /// alarm, preserving the daily housekeeping time in `meta.housekeepAt`.
+  private async scheduleEarlierAlarm(targetAt: number): Promise<void> {
+    const at = await this.ctx.storage.getAlarm();
+    if (at !== null && at <= targetAt) return;
+    if (at !== null && this.meta("housekeepAt") === 0) {
+      this.setMeta("housekeepAt", at);
+    }
+    await this.ctx.storage.setAlarm(targetAt);
+  }
+
   /// The alarm before the work: an object that stops in the middle sends the
   /// rest when it fires. `housekeepAt` keeps the daily run where it was.
   private async armShareAlarm(): Promise<void> {
-    const at = await this.ctx.storage.getAlarm();
-    const retry = Date.now() + SHARE_RETRY_MS;
-    if (at !== null && at <= retry) return;
-    if (at !== null) this.setMeta("housekeepAt", at);
-    await this.ctx.storage.setAlarm(retry);
+    await this.scheduleEarlierAlarm(Date.now() + SHARE_RETRY_MS);
   }
 
-  /// Nothing is left to send.
+  /// Nothing is left to send for shares; restore housekeeping unless a webhook
+  /// retry is due sooner.
   private async disarmShareAlarm(): Promise<void> {
     const at = this.meta("housekeepAt");
     if (!at) return;
+    const nextWebhookAt = this.nextWebhookOutboxAt();
+    if (nextWebhookAt !== null && nextWebhookAt < at) {
+      await this.ctx.storage.setAlarm(Math.max(nextWebhookAt, Date.now()));
+      return;
+    }
     this.setMeta("housekeepAt", 0);
     await this.ctx.storage.setAlarm(Math.max(at, Date.now()));
   }
@@ -2049,18 +2099,49 @@ export class TaskStore extends DurableObject<Env> {
       this.writeConvoServerFields(taskId, { runsSinceUser: 0 }, "budget", actor, now, true);
     } else if (isAgentActor(actor) && turn.role === "provider" && turn.options?.length) {
       // The agent asked: the ball is in the human's court, so the claim ends
-      // and we alert the user's Apple devices via APNs (F1b #213).
+      // and we route the notification per the user's setting (#743).
       this.writeConvoServerFields(taskId, { claimedBy: null, claimUntil: null }, "release", actor, now, true);
       this.unfadeForReview(taskId, actor, now);
-      agentPushes.push({
+      const snippet = turn.question?.trim() || turn.note?.trim() || "Needs your input";
+      this.routeAgentNotification(
+        actor,
+        "question",
+        {
+          taskId,
+          taskTitle: task.title ?? "",
+          turnSeq: seq,
+          step: turn.step,
+          question: turn.question ?? null,
+          note: turn.note ?? null,
+          options: turn.options,
+        },
         taskId,
-        taskTitle: task.title ?? "",
-        turnSeq: seq,
-        step: turn.step,
-        question: turn.question ?? null,
-        note: turn.note ?? null,
-        options: turn.options,
-      });
+        task.title ?? "",
+        snippet,
+        now,
+        agentPushes,
+      );
+    } else if (isAgentActor(actor) && turn.role === "provider") {
+      const text = turn.note?.trim() || turn.question?.trim();
+      if (text) {
+        const actorName = this.agentActorDisplayName(actor);
+        this.routeAgentNotification(
+          actor,
+          "note",
+          {
+            kind: "note",
+            taskId,
+            taskTitle: task.title ?? "",
+            note: text,
+            actorName,
+          },
+          taskId,
+          task.title ?? "",
+          text,
+          now,
+          agentPushes,
+        );
+      }
     }
     return { clientOpId, status: "applied", rev, seq };
   }
@@ -2964,6 +3045,127 @@ export class TaskStore extends DurableObject<Env> {
     });
   }
 
+  private static isNotificationMode(value: unknown): value is AgentCommentNotificationMode {
+    return typeof value === "string"
+      && (AGENT_COMMENT_NOTIFICATION_MODES as readonly string[]).includes(value);
+  }
+
+  /// Extracts a clean display/override key from an `mcp:<holder>` actor string.
+  private agentActorDisplayName(actor: string): string | null {
+    if (!actor.startsWith("mcp:")) return null;
+    const raw = actor.slice(4).trim();
+    if (!raw) return null;
+    const beforeAt = raw.includes("@") ? raw.slice(0, raw.indexOf("@")) : raw;
+    return beforeAt || raw;
+  }
+
+  /// Resolves the notification mode for `actor` (#743): per-agent override from
+  /// `agentCommentNotificationsByAgent` (matching holder, connection name, or
+  /// clientName), falling back to global `agentCommentNotifications` (default
+  /// `needs_input`).
+  resolveAgentNotificationMode(actor: string): AgentCommentNotificationMode {
+    const rawOverrides = this.readSetting("agentCommentNotificationsByAgent");
+    if (rawOverrides && typeof rawOverrides === "object" && !Array.isArray(rawOverrides)) {
+      const overrides = rawOverrides as Record<string, unknown>;
+      const candidates: string[] = [];
+      const rawHolder = actor.startsWith("mcp:") ? actor.slice(4).trim() : actor.trim();
+      if (rawHolder) {
+        candidates.push(rawHolder);
+        const atIdx = rawHolder.indexOf("@");
+        if (atIdx > 0) {
+          candidates.push(rawHolder.slice(0, atIdx));
+          const clientPart = rawHolder.slice(atIdx + 1);
+          if (clientPart) candidates.push(clientPart);
+        }
+        // Also match renamed connection labels whose clientId/familyId/name matches.
+        const conns = this.sql.exec<{ name: string; clientName: string; clientId: string; familyId: string }>(
+          "SELECT COALESCE(label, clientName) AS name, clientName, clientId, familyId FROM connections",
+        ).toArray();
+        for (const c of conns) {
+          if (
+            c.name === rawHolder || c.clientName === rawHolder
+            || c.clientId === rawHolder || c.familyId === rawHolder
+            || (atIdx > 0 && (c.clientId === rawHolder.slice(atIdx + 1) || c.name === rawHolder.slice(0, atIdx)))
+          ) {
+            candidates.push(c.name, c.clientName);
+          }
+        }
+      }
+      const lowerOverrides = new Map<string, AgentCommentNotificationMode>();
+      for (const [k, v] of Object.entries(overrides)) {
+        if (TaskStore.isNotificationMode(v)) lowerOverrides.set(k.trim().toLowerCase(), v);
+      }
+      for (const key of candidates) {
+        const direct = overrides[key];
+        if (TaskStore.isNotificationMode(direct)) return direct;
+        const ci = lowerOverrides.get(key.trim().toLowerCase());
+        if (ci) return ci;
+      }
+    }
+    const global = this.readSetting("agentCommentNotifications");
+    return TaskStore.isNotificationMode(global) ? global : "needs_input";
+  }
+
+  private routeAgentNotification(
+    actor: string,
+    kind: "question" | "review" | "note",
+    push: AgentPush,
+    taskId: string,
+    taskTitle: string,
+    snippet: string,
+    nowIso: string,
+    agentPushes: AgentPush[],
+  ): void {
+    const mode = this.resolveAgentNotificationMode(actor);
+    if (mode === "off") return;
+    if (mode === "needs_input") {
+      if (kind === "question" || kind === "review") agentPushes.push(push);
+      return;
+    }
+    if (mode === "every_comment") {
+      agentPushes.push(push);
+      return;
+    }
+    // daily_digest: queue for the daily alarm flush.
+    const agentName = this.agentActorDisplayName(actor);
+    this.sql.exec(
+      "INSERT INTO agent_notification_digest (taskId, taskTitle, kind, agentName, snippet, at) VALUES (?, ?, ?, ?, ?, ?)",
+      taskId, taskTitle, kind, agentName, snippet.slice(0, 300), nowIso,
+    );
+  }
+
+  /// Sends one APNs digest push summarizing all queued `daily_digest` agent
+  /// comments and clears the queue (#743). Called on the daily DO alarm.
+  async flushAgentNotificationDigest(): Promise<number> {
+    const rows = this.sql.exec<{
+      id: number; taskId: string; taskTitle: string; kind: string; agentName: string | null; snippet: string;
+    }>(
+      "SELECT id, taskId, taskTitle, kind, agentName, snippet FROM agent_notification_digest ORDER BY id ASC",
+    ).toArray();
+    if (rows.length === 0) return 0;
+
+    const tokens = this.listPushTokens();
+    const maxId = rows[rows.length - 1].id;
+    const taskIds = new Set(rows.map((r) => r.taskId));
+    const first = rows[0];
+    const firstLabel = first.taskTitle ? `${first.taskTitle}: ${first.snippet}` : first.snippet;
+    const summary = rows.length === 1
+      ? firstLabel
+      : `${firstLabel} (+${rows.length - 1} more)`;
+
+    if (tokens.length > 0) {
+      await this.dispatchAgentPushes([{
+        kind: "digest",
+        taskId: taskIds.size === 1 ? first.taskId : null,
+        count: rows.length,
+        taskCount: taskIds.size,
+        summary,
+      }], tokens);
+    }
+    this.sql.exec("DELETE FROM agent_notification_digest WHERE id <= ?", maxId);
+    return rows.length;
+  }
+
   private async dispatchAgentPushes(
     questions: AgentPush[],
     initialTokens: PushTokenRow[],
@@ -3534,7 +3736,24 @@ export class TaskStore extends DurableObject<Env> {
   }
 
   deleteAgentWebhook(id: string): boolean {
-    return this.sql.exec("DELETE FROM agent_webhooks WHERE id = ?", id).rowsWritten > 0;
+    return this.ctx.storage.transactionSync(() => {
+      this.sql.exec("DELETE FROM agent_webhook_outbox WHERE webhookId = ?", id);
+      return this.sql.exec("DELETE FROM agent_webhooks WHERE id = ?", id).rowsWritten > 0;
+    });
+  }
+
+  private nextWebhookOutboxAt(): number | null {
+    const row = this.sql.exec<{ nextAt: number | null }>(
+      "SELECT MIN(nextAt) AS nextAt FROM agent_webhook_outbox",
+    ).one();
+    return row.nextAt;
+  }
+
+  private recordAgentWebhookAttempt(id: string, status: number, deliveredAt: string): void {
+    this.sql.exec(
+      "UPDATE agent_webhooks SET lastDeliveredAt = ?, lastStatus = ? WHERE id = ?",
+      deliveredAt, status, id,
+    );
   }
 
   private recordAgentWebhookDelivery(id: string, status: number, ok: boolean, deliveredAt: string): void {
@@ -3543,11 +3762,20 @@ export class TaskStore extends DurableObject<Env> {
         "UPDATE agent_webhooks SET lastDeliveredAt = ?, lastStatus = ?, failureCount = 0 WHERE id = ?",
         deliveredAt, status, id,
       );
-    } else {
-      this.sql.exec(
-        "UPDATE agent_webhooks SET lastDeliveredAt = ?, lastStatus = ?, failureCount = failureCount + 1 WHERE id = ?",
-        deliveredAt, status, id,
-      );
+      return;
+    }
+    this.sql.exec(
+      "UPDATE agent_webhooks SET lastDeliveredAt = ?, lastStatus = ?, failureCount = failureCount + 1 WHERE id = ?",
+      deliveredAt, status, id,
+    );
+    const row = this.sql.exec<{ failureCount: number; enabled: number }>(
+      "SELECT failureCount, enabled FROM agent_webhooks WHERE id = ?",
+      id,
+    ).toArray()[0];
+    if (row && row.enabled !== 0 && row.failureCount >= this.webhookDisableAfterFailures) {
+      this.sql.exec("UPDATE agent_webhooks SET enabled = 0 WHERE id = ?", id);
+      this.sql.exec("DELETE FROM agent_webhook_outbox WHERE webhookId = ?", id);
+      logEvent("agent_webhook_disabled", { webhookId: id, failureCount: row.failureCount });
     }
   }
 
@@ -3574,7 +3802,9 @@ export class TaskStore extends DurableObject<Env> {
       }
     }
 
-    // 3. Outbound signed webhooks for wake-worthy events (WAKE_EVENT_KINDS)
+    // 3. Durable outbound signed webhooks for wake-worthy events (#748).
+    // Persist outbox rows synchronously before returning so DO eviction or
+    // restarts never lose pending deliveries or retries.
     const wakeEvents = events.filter((ev) => isWakeEventKind(ev.kind));
     if (wakeEvents.length === 0) return;
     const targets: AgentWebhookTarget[] = this.sql.exec<{ id: string; url: string; secret: string }>(
@@ -3582,7 +3812,10 @@ export class TaskStore extends DurableObject<Env> {
     ).toArray();
     if (targets.length === 0) return;
 
-    const delivery = this.deliverAgentWebhooks(targets, wakeEvents).catch(() => {
+    const now = Date.now();
+    this.enqueueAgentWebhookOutbox(targets, wakeEvents, now);
+
+    const delivery = this.drainAgentWebhookOutbox().catch(() => {
       // Delivery errors are recorded per webhook; never break the main write.
     });
     if (typeof this.ctx.waitUntil === "function") {
@@ -3590,22 +3823,127 @@ export class TaskStore extends DurableObject<Env> {
     }
   }
 
-  /// The waits between webhook attempts. Tests set it to zeros.
-  private webhookRetryDelaysMs: readonly number[] = WEBHOOK_RETRY_DELAYS_MS;
+  /// Durable backoff schedule between retry attempts (#748). Tests override this.
+  private webhookRetryDelaysMs: readonly number[] = WEBHOOK_OUTBOX_BACKOFF_MS;
+  /// Consecutive failed deliveries before a webhook is disabled (`enabled = 0`). Tests may override.
+  private webhookDisableAfterFailures = WEBHOOK_DISABLE_AFTER_FAILURES;
+  private drainingWebhookOutbox = false;
+  private webhookOutboxAgain = false;
 
-  private async deliverAgentWebhooks(targets: AgentWebhookTarget[], events: AgentEvent[]): Promise<void> {
-    await Promise.allSettled(
-      targets.flatMap((target) =>
-        events.map(async (ev) => {
-          const res = await deliverWebhookWithRetry(target, ev, this.webhookRetryDelaysMs);
+  private enqueueAgentWebhookOutbox(targets: AgentWebhookTarget[], events: AgentEvent[], now: number): void {
+    for (const target of targets) {
+      for (const ev of events) {
+        this.sql.exec(
+          "INSERT INTO agent_webhook_outbox (webhookId, rev, kind, taskId, eventAt, attempts, nextAt) VALUES (?, ?, ?, ?, ?, 0, ?)",
+          target.id, ev.rev, ev.kind, ev.taskId, ev.at, now,
+        );
+      }
+      // Trim oldest rows if a dead receiver builds up a deep backlog.
+      const queued = this.sql.exec<{ n: number }>(
+        "SELECT COUNT(*) AS n FROM agent_webhook_outbox WHERE webhookId = ?",
+        target.id,
+      ).one().n;
+      if (queued > WEBHOOK_OUTBOX_MAX_ROWS_PER_HOOK) {
+        this.sql.exec(
+          "DELETE FROM agent_webhook_outbox WHERE id IN (SELECT id FROM agent_webhook_outbox WHERE webhookId = ? ORDER BY id ASC LIMIT ?)",
+          target.id, queued - WEBHOOK_OUTBOX_MAX_ROWS_PER_HOOK,
+        );
+      }
+    }
+  }
+
+  /// Sends due rows from `agent_webhook_outbox`, reschedules retryable failures
+  /// with exponential backoff on the DO alarm, drops rows after the final
+  /// attempt or webhook deletion, and disables webhooks after consecutive failures.
+  async drainAgentWebhookOutbox(): Promise<void> {
+    if (this.drainingWebhookOutbox) {
+      this.webhookOutboxAgain = true;
+      return;
+    }
+    this.drainingWebhookOutbox = true;
+    try {
+      // Loop handles zero-delay test schedules and newly enqueued rows cleanly,
+      // bounded so a pathological clock cannot spin forever.
+      for (let pass = 0; pass < 10; pass++) {
+        this.webhookOutboxAgain = false;
+        const now = Date.now();
+        const rows = this.sql.exec<{
+          id: number;
+          webhookId: string;
+          rev: number;
+          kind: AgentEvent["kind"];
+          taskId: string | null;
+          eventAt: string;
+          attempts: number;
+          url: string | null;
+          secret: string | null;
+          enabled: number | null;
+        }>(
+          `SELECT o.id, o.webhookId, o.rev, o.kind, o.taskId, o.eventAt, o.attempts,
+                  w.url, w.secret, w.enabled
+           FROM agent_webhook_outbox o
+           LEFT JOIN agent_webhooks w ON w.id = o.webhookId
+           WHERE o.nextAt <= ?
+           ORDER BY o.nextAt ASC, o.id ASC
+           LIMIT ?`,
+          now, WEBHOOK_OUTBOX_BATCH,
+        ).toArray();
+        if (rows.length === 0) break;
+
+        for (const row of rows) {
+          // Drop rows whose webhook was deleted or disabled.
+          if (!row.url || !row.secret || row.enabled === 0) {
+            this.sql.exec("DELETE FROM agent_webhook_outbox WHERE id = ?", row.id);
+            continue;
+          }
+          // Re-check live webhook state in case an earlier row in this batch disabled it.
+          const live = this.sql.exec<{ enabled: number }>(
+            "SELECT enabled FROM agent_webhooks WHERE id = ?",
+            row.webhookId,
+          ).toArray()[0];
+          if (!live || live.enabled === 0) {
+            this.sql.exec("DELETE FROM agent_webhook_outbox WHERE id = ?", row.id);
+            continue;
+          }
+
+          const ev: AgentEvent = { rev: row.rev, kind: row.kind, taskId: row.taskId, at: row.eventAt };
+          const res = await deliverWebhookEvent({ id: row.webhookId, url: row.url, secret: row.secret }, ev);
           try {
-            this.recordAgentWebhookDelivery(target.id, res.status, res.ok, res.deliveredAt);
+            if (res.ok) {
+              this.sql.exec("DELETE FROM agent_webhook_outbox WHERE id = ?", row.id);
+              this.recordAgentWebhookDelivery(row.webhookId, res.status, true, res.deliveredAt);
+            } else if (!res.blocked && isRetryableWebhookStatus(res.status) && row.attempts < this.webhookRetryDelaysMs.length) {
+              const delayMs = this.webhookRetryDelaysMs[row.attempts];
+              const nextAt = Date.now() + delayMs;
+              this.sql.exec(
+                "UPDATE agent_webhook_outbox SET attempts = attempts + 1, nextAt = ? WHERE id = ?",
+                nextAt, row.id,
+              );
+              this.recordAgentWebhookAttempt(row.webhookId, res.status, res.deliveredAt);
+            } else {
+              this.sql.exec("DELETE FROM agent_webhook_outbox WHERE id = ?", row.id);
+              this.recordAgentWebhookDelivery(row.webhookId, res.status, false, res.deliveredAt);
+            }
           } catch {
             // Store may have been deleted while delivery was in flight.
+            return;
           }
-        }),
-      ),
-    );
+        }
+
+        // Continue immediately only if more rows are already due now (e.g., delay = 0 or > batch size).
+        const nextDue = this.nextWebhookOutboxAt();
+        if (!this.webhookOutboxAgain && (nextDue === null || nextDue > Date.now())) {
+          break;
+        }
+      }
+
+      const nextDue = this.nextWebhookOutboxAt();
+      if (nextDue !== null) {
+        await this.scheduleEarlierAlarm(Math.max(nextDue, Date.now()));
+      }
+    } finally {
+      this.drainingWebhookOutbox = false;
+    }
   }
 
   /// Account deletion (§10). The Worker empties the user's R2 prefix.
@@ -3777,11 +4115,13 @@ export class TaskStore extends DurableObject<Env> {
     const now = Date.now();
     const tombstoneCutoff = new Date(now - TOMBSTONE_TTL_MS).toISOString();
     const revBefore = this.meta("rev");
-    // Only a share retry, and the daily run is not due.
+    // Only a share or webhook retry, and the daily run is not due.
     const housekeepAt = this.meta("housekeepAt");
     if (housekeepAt > now) {
+      this.setMeta("housekeepAt", 0);
       await this.ctx.storage.setAlarm(housekeepAt);
       await this.drainShares();
+      await this.drainAgentWebhookOutbox();
       return;
     }
     this.setMeta("housekeepAt", 0);
@@ -3816,7 +4156,9 @@ export class TaskStore extends DurableObject<Env> {
     });
     if (this.meta("rev") > revBefore) this.broadcast(this.meta("rev"));
     await this.ctx.storage.setAlarm(now + DAY_MS);
-    // It sets its own, earlier alarm.
+    await this.flushAgentNotificationDigest();
+    // Shares and webhook retries pull the alarm earlier if still pending.
     await this.drainShares();
+    await this.drainAgentWebhookOutbox();
   }
 }

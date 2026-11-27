@@ -99,17 +99,58 @@ body {
 }
 
 @keyframes septena-check-pop {
-  0% { transform: scale(1); }
-  45% { transform: scale(1.18); }
-  100% { transform: scale(1); }
+  0% { transform: scale(0.55); opacity: 0.4; }
+  55% { transform: scale(1.14); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes septena-check-mark {
+  0% { transform: scale(0.25); opacity: 0; }
+  65% { transform: scale(1.12); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes septena-check-ring {
+  0% { transform: scale(0.9); opacity: 0.55; }
+  100% { transform: scale(1.9); opacity: 0; }
 }
 
 .animate-check-pop {
-  animation: septena-check-pop 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  animation: septena-check-pop 280ms cubic-bezier(0.22, 1.35, 0.36, 1);
+}
+
+.animate-check-mark {
+  animation: septena-check-mark 280ms cubic-bezier(0.22, 1.35, 0.36, 1);
+}
+
+.animate-check-ring {
+  animation: septena-check-ring 400ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.septena-settle-row {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 350ms ease-in-out, opacity 350ms ease-in-out;
+}
+
+.septena-settle-row[data-fading-out="true"] {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.septena-settle-row-inner {
+  overflow: hidden;
+  min-height: 0;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .animate-check-pop {
+  .animate-check-pop,
+  .animate-check-mark,
+  .animate-check-ring {
     animation: none;
+  }
+  .septena-settle-row {
+    transition: none;
   }
 }

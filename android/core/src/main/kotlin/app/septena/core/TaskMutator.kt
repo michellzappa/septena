@@ -589,6 +589,20 @@ class TaskMutator(
         return updated
     }
 
+    /** Reopens a completed or cancelled task (e.g. unchecking during the completion settle window). */
+    suspend fun reopen(id: String): TaskRecord? {
+        val existing = store.record(RegistryEntityNames.TASK, id)?.asTaskRecord() ?: return null
+        if (existing.deletedAt != null || existing.status == TaskStatus.OPEN) return null
+        return updateFields(
+            id,
+            linkedMapOf(
+                RegistryEntityFields.Task.STATUS to JsonValue.StringValue(app.septena.core.generated.RegistryEntityEnums.TaskStatus.OPEN),
+                RegistryEntityFields.Task.COMPLETED_AT to JsonValue.Null,
+                RegistryEntityFields.Task.DROP_REASON to JsonValue.Null,
+            ),
+        )
+    }
+
     /**
      * A completed repeating task creates its next row (spec A10, W12), as the
      * apps and the backend do. The core computes the next day, the row id and

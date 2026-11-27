@@ -112,6 +112,7 @@ import {
   sharingCopy,
   waitingName,
 } from "@/lib/waiting";
+import { CompletionSettleController, type SettleSnapshot } from "@/lib/settle";
 import { UndoStack, type UndoSnapshot } from "@/lib/sync/undo";
 import type {
   ActiveDestination,
@@ -236,17 +237,29 @@ export function SeptenaApp() {
   const apiRef = useRef<SeptenaApiClient | null>(null);
   const engineRef = useRef<WebSyncEngine | null>(null);
   const undoRef = useRef<UndoStack | null>(null);
+  const settleRef = useRef<CompletionSettleController | null>(null);
   if (!apiRef.current) apiRef.current = new SeptenaApiClient();
   if (!engineRef.current) engineRef.current = new WebSyncEngine(apiRef.current);
   if (!undoRef.current) undoRef.current = new UndoStack();
+  if (!settleRef.current) settleRef.current = new CompletionSettleController();
 
   const api = apiRef.current;
   const engine = engineRef.current;
   const undoStack = undoRef.current;
+  const settle = settleRef.current;
 
   const [bootPhase, setBootPhase] = useState<"loading" | "signed_out" | "signed_in">("loading");
   const [syncState, setSyncState] = useState<SyncState>(() => engine.getState());
   const [undoSnap, setUndoSnap] = useState<UndoSnapshot>(() => undoStack.getSnapshot());
+  const [settleSnap, setSettleSnap] = useState<SettleSnapshot>(() => settle.getSnapshot());
+
+  useEffect(() => {
+    const unsub = settle.subscribe(() => setSettleSnap(settle.getSnapshot()));
+    return () => {
+      unsub();
+      settle.clearAll();
+    };
+  }, [settle]);
   const [prefs, setPrefs] = useState<WebDisplayPrefs>(() => loadWebPrefs());
   const [systemDark, setSystemDark] = useState<boolean>(false);
 
@@ -826,6 +839,11 @@ export function SeptenaApp() {
     [projectById],
   );
 
+  // Clear any active completion settle window when switching lists.
+  useEffect(() => {
+    settle.clearAll();
+  }, [destination, settle]);
+
   // Evaluate membership, fade opacity, and conversation projection/state via the shared Rust WASM core.
   const evaluatedTasks = useMemo((): EvaluatedTask[] => {
     if (bootPhase !== "signed_in") return [];
@@ -833,8 +851,14 @@ export function SeptenaApp() {
       .filter((t) => t.kind !== "heading")
       .map((task) => {
         const share = shareForTask(task);
+        const settling = settleSnap.entries.has(task.id);
+        // While a just-completed/cancelled row lingers in its settle window,
+        // evaluate list membership as open so it stays in its exact slot until fade-out.
+        const membershipTask = settling && task.status !== "open"
+          ? { ...task, status: "open" as const, assignedToOther: isAssignedToOther(task, share) }
+          : { ...task, assignedToOther: isAssignedToOther(task, share) };
         const membership = taskViewMembership(
-          { ...task, assignedToOther: isAssignedToOther(task, share) },
+          membershipTask,
           todayYMD,
           nowIso,
         );
@@ -856,7 +880,7 @@ export function SeptenaApp() {
           convoState: conversation?.state ?? null,
         };
       });
-  }, [bootPhase, convoByTask, fade.enabled, nowIso, shareForTask, syncState.snapshot.tasks, todayYMD, turnsByTask, utcOffsetSeconds]);
+  }, [bootPhase, convoByTask, fade.enabled, nowIso, settleSnap, shareForTask, syncState.snapshot.tasks, todayYMD, turnsByTask, utcOffsetSeconds]);
 
   // A new app day syncs, and the engine's daily fade pass follows the sync.
   const syncedDayRef = useRef(todayYMD);
@@ -1033,15 +1057,21 @@ export function SeptenaApp() {
 
   const destinationTasks = useMemo(() => {
     return evaluatedTasks.filter(({ task, membership, convoState }) => {
+      const settleEntry = settleSnap.entries.get(task.id);
+      const isSettling = Boolean(settleEntry);
       if (destination.kind === "smart") {
         if (destination.id === "logbook") {
           if (logbookTab === "deleted") return Boolean(task.deletedAt);
           return !task.deletedAt && (task.status === "done" || task.status === "cancelled");
         }
-        if (task.deletedAt || task.status !== "open") return false;
+        if (task.deletedAt || (task.status !== "open" && !isSettling)) return false;
         switch (destination.id) {
           case "today": return membership.matchesView.today;
-          case "review": return reviewGroupOf(task, convoState, shareForTask(task)) !== null;
+          case "review":
+            return (
+              (isSettling && settleEntry?.reviewGroup != null) ||
+              reviewGroupOf(task, convoState, shareForTask(task)) !== null
+            );
           case "agent": return false; // a group of Review: navigateTo opens Review
           case "upcoming": return membership.matchesView.upcoming;
           case "repeating": return Boolean(task.recurrenceUnit);
@@ -1051,7 +1081,7 @@ export function SeptenaApp() {
         }
       }
 
-      if (task.deletedAt || task.status !== "open") return false;
+      if (task.deletedAt || (task.status !== "open" && !isSettling)) return false;
       if (!prefs.tasksShowFaded && task.fadedAt) return false;
       if (destination.kind === "area") {
         if (task.area === destination.id) return true;
@@ -1060,7 +1090,7 @@ export function SeptenaApp() {
       }
       return task.project === destination.id;
     });
-  }, [destination, evaluatedTasks, logbookTab, prefs.tasksShowFaded, projectById, shareForTask]);
+  }, [destination, evaluatedTasks, logbookTab, prefs.tasksShowFaded, projectById, settleSnap, shareForTask]);
 
   // Progressive disclosure (matching iOS TaskListView.swift): only surface tags
   // that actually appear on tasks in the current list; empty → zero chrome.
@@ -1185,7 +1215,11 @@ export function SeptenaApp() {
       .map((group) => ({
         ...group,
         items: (() => {
-          const items = listedTasks.filter((i) => reviewGroupOf(i.task, i.convoState, shareForTask(i.task)) === group.id);
+          const items = listedTasks.filter((i) => {
+            const held = settleSnap.entries.get(i.task.id)?.reviewGroup;
+            const resolved = held ?? reviewGroupOf(i.task, i.convoState, shareForTask(i.task));
+            return resolved === group.id;
+          });
           // Waiting: oldest wait first (REVIEW_SPEC §6).
           return group.id === "waiting"
             ? [...items].sort((a, b) => compareWaiting(a.task, b.task, shareForTask(a.task), shareForTask(b.task)))
@@ -1193,7 +1227,7 @@ export function SeptenaApp() {
         })(),
       }))
       .filter((g) => g.items.length > 0);
-  }, [destination, listedTasks, shareForTask]);
+  }, [destination, listedTasks, settleSnap, shareForTask]);
 
   // The rows on screen, in order: what the keyboard and the selection work on.
   const visibleTasks = useMemo(() => {
@@ -1214,6 +1248,7 @@ export function SeptenaApp() {
       .filter(({ task }) => {
         if (task.deletedAt) return false;
         if (task.status !== "done" && task.status !== "cancelled") return false;
+        if (settleSnap.entries.has(task.id)) return false;
         if (completedLocalDay(task.completedAt) !== todayYMD) return false;
         if (tagFilterId) {
           const tags = Array.isArray(task.tags) ? task.tags : [];
@@ -1222,7 +1257,7 @@ export function SeptenaApp() {
         return true;
       })
       .sort((a, b) => String(b.task.completedAt ?? "").localeCompare(String(a.task.completedAt ?? "")));
-  }, [destination, evaluatedTasks, prefs.todayShowCompleted, tagFilterId, todayYMD]);
+  }, [destination, evaluatedTasks, prefs.todayShowCompleted, settleSnap, tagFilterId, todayYMD]);
 
   // Project / Area logged footer: completed tasks in this scope, newest first
   // (collapsed by default, matching iOS TaskListView.scopeLoggedSection & Mac).
@@ -1231,6 +1266,7 @@ export function SeptenaApp() {
     return evaluatedTasks
       .filter(({ task }) => {
         if (task.deletedAt || task.status !== "done") return false;
+        if (settleSnap.entries.has(task.id)) return false;
         if (tagFilterId) {
           const tags = Array.isArray(task.tags) ? task.tags : [];
           if (!tags.includes(tagFilterId)) return false;
@@ -1241,7 +1277,7 @@ export function SeptenaApp() {
         return proj?.area === destination.id;
       })
       .sort((a, b) => String(b.task.completedAt ?? "").localeCompare(String(a.task.completedAt ?? "")));
-  }, [destination, evaluatedTasks, projectById, tagFilterId]);
+  }, [destination, evaluatedTasks, projectById, settleSnap, tagFilterId]);
 
   // On Today: foldable Inbox band at top (matching iOS/Mac, docs/TRIAGE_BAND_SPEC.md).
   const { todayInboxTasks, todayCommittedTasks } = useMemo(() => {
@@ -1329,6 +1365,15 @@ export function SeptenaApp() {
     [handleChangePref],
   );
 
+  const reviewGroupForSettle = useCallback(
+    (task: TaskRow) => {
+      if (!(destination.kind === "smart" && destination.id === "review")) return undefined;
+      const item = evaluatedTasks.find((e) => e.task.id === task.id);
+      return reviewGroupOf(task, item?.convoState ?? null, shareForTask(task));
+    },
+    [destination, evaluatedTasks, shareForTask],
+  );
+
   // Complete and reopen: the one path for the checkbox, menus, shortcuts and
   // drops. In Review it is an Accept, and undo puts the task back in Review.
   const recordCompletion = useCallback(
@@ -1337,7 +1382,10 @@ export function SeptenaApp() {
       undoStack.record(
         {
           label,
-          undo: () => engine.undoCompletion(latest),
+          undo: async () => {
+            for (const b of latest.before) settle.cancel(b.task.id);
+            await engine.undoCompletion(latest);
+          },
           redo: async () => {
             latest = await redo();
           },
@@ -1345,37 +1393,54 @@ export function SeptenaApp() {
         toast,
       );
     },
-    [engine, undoStack],
+    [engine, settle, undoStack],
   );
 
   const toggleDone = useCallback(
     async (task: TaskRow) => {
-      const wasDone = task.status === "done" || task.status === "checklistChecked";
+      const wasChecked = task.status === "checklistChecked";
+      const wasDone = task.status === "done" || wasChecked;
+      const isChecklist = Boolean(task.project && projectById.get(task.project)?.checklistMode);
+      const inLogbook = destination.kind === "smart" && destination.id === "logbook";
+      if (!isChecklist) {
+        if (wasDone) {
+          settle.cancel(task.id);
+        } else if (!inLogbook) {
+          settle.start(task.id, { reviewGroup: reviewGroupForSettle(task) });
+        }
+      }
       const receipt = await engine.toggleTaskDone(task);
       recordCompletion(
-        wasDone ? `Reopened “${task.title}”` : `Completed “${task.title}”`,
+        wasDone ? `Reopened “${task.title}”` : isChecklist ? `Checked “${task.title}”` : `Completed “${task.title}”`,
         receipt,
         () => engine.toggleTaskDone(task),
-        !wasDone,
+        !wasDone && !isChecklist,
       );
     },
-    [engine, recordCompletion],
+    [destination, engine, projectById, recordCompletion, reviewGroupForSettle, settle],
   );
 
   const acceptReview = useCallback(
     async (task: TaskRow) => {
+      settle.start(task.id, { reviewGroup: reviewGroupForSettle(task) });
       const receipt = await engine.acceptAgentReview(task);
       recordCompletion(`Accepted “${task.title}”`, receipt, () => engine.acceptAgentReview(task), true);
     },
-    [engine, recordCompletion],
+    [engine, recordCompletion, reviewGroupForSettle, settle],
   );
 
   const completeMany = useCallback(
     async (tasks: TaskRow[]) => {
+      const inLogbook = destination.kind === "smart" && destination.id === "logbook";
+      if (!inLogbook) {
+        for (const t of tasks) {
+          if (t.status === "open") settle.start(t.id, { reviewGroup: reviewGroupForSettle(t) });
+        }
+      }
       const receipt = await engine.completeTasks(tasks);
       recordCompletion(`Completed ${tasks.length} tasks`, receipt, () => engine.completeTasks(tasks), true);
     },
-    [engine, recordCompletion],
+    [destination, engine, recordCompletion, reviewGroupForSettle, settle],
   );
 
   const sendBackReview = useCallback(
@@ -2590,6 +2655,8 @@ export function SeptenaApp() {
       lang,
       isColorfulAccent,
       animateCompletion: prefs.loggingAnimationsEnabled,
+      isSettling: settleSnap.entries.has(task.id),
+      isFadingOut: settleSnap.entries.get(task.id)?.fadingOut === true,
       draggable: canManualOrder && !isDeletedView,
       isDropTarget: dropTargetTaskId === task.id && draggedTaskId !== task.id,
       checklistItems: checklistsByTask.get(task.id) ?? [],
@@ -2895,18 +2962,24 @@ export function SeptenaApp() {
       onDropFaded: () => void letGoFaded([task]),
       onRestoreDeleted: () => void engine.restoreDeletedTask(task),
       onCancelTask: async () => {
+        const inLogbook = destination.kind === "smart" && destination.id === "logbook";
+        if (!inLogbook) settle.start(task.id, { reviewGroup: reviewGroupForSettle(task) });
         await engine.cancelTask(task);
         setExpandedTaskId(null);
         undoStack.record(
           {
             label: `Cancelled “${task.title}”`,
-            undo: () => engine.reopenTask(task),
+            undo: () => {
+              settle.cancel(task.id);
+              return engine.reopenTask(task);
+            },
             redo: () => engine.cancelTask(task),
           },
           true,
         );
       },
       onDelete: async () => {
+        settle.cancel(task.id);
         setExpandedTaskId(null);
         if (taskPageId === task.id) setTaskPageId(null);
         await engine.deleteTask(task);
@@ -3434,11 +3507,18 @@ export function SeptenaApp() {
   const hasAnyActiveTasks = syncState.snapshot.tasks.some((t) => !t.deletedAt && t.kind !== "heading");
   const todayIconColor = isColorfulAccent ? "var(--today-gold)" : "var(--accent)";
 
-  const renderSidebarButton = (dest: (typeof sidebarDestinations.top)[number]) => {
+  const renderSidebarButton = (
+    dest: (typeof sidebarDestinations.top)[number],
+    placement: "top" | "bottom",
+  ) => {
     const selected = destination.kind === "smart" && destination.id === dest.id;
     const count = smartCounts.counts[dest.id];
     const isDropOver = dropTargetSidebar === `smart:${dest.id}`;
     const destHref = destinationPath({ kind: "smart", id: dest.id });
+    const unselectedInk =
+      placement === "top"
+        ? "text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
+        : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]";
     return (
       <a
         key={dest.id}
@@ -3464,7 +3544,7 @@ export function SeptenaApp() {
             ? "ring-2 ring-[var(--accent)] bg-[var(--bg-selected)] text-[var(--text-primary)]"
             : selected
               ? "bg-[var(--bg-selected)] font-medium text-[var(--text-primary)]"
-              : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+              : unselectedInk
         }`}
       >
         <RegistryIcon
@@ -3557,7 +3637,7 @@ export function SeptenaApp() {
             }
           }}
         >
-          {sidebarDestinations.top.map(renderSidebarButton)}
+          {sidebarDestinations.top.map((d) => renderSidebarButton(d, "top"))}
         </div>
 
         <div className="mt-4 border-t border-[var(--border-subtle)] pt-3">
@@ -4086,7 +4166,7 @@ export function SeptenaApp() {
 
         {sidebarDestinations.bottom.length > 0 && (
           <div className="mt-4 space-y-0.5 border-t border-[var(--border-subtle)] pt-3">
-            {sidebarDestinations.bottom.map(renderSidebarButton)}
+            {sidebarDestinations.bottom.map((d) => renderSidebarButton(d, "bottom"))}
           </div>
         )}
       </nav>

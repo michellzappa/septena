@@ -773,8 +773,8 @@ struct SeptaskSyncAccountSection: View {
         Text(header)
       }
     } footer: {
-      if offered == [.apple, .device] || offered == [.apple] {
-        Text("Your tasks sync through Septena's own server at api.septena.app. Sign in with Apple once on each device.")
+      if offered.contains(where: { RegistrySignIn.method($0)?.createsAccount == true }) {
+        Text(RegistrySignIn.Manage.footer)
       }
     }
   }
@@ -786,12 +786,10 @@ struct SeptaskSyncAccountSection: View {
       return String(localized: "Not signed in. \(sync.pendingOps) changes are waiting on this device and sync when you sign in.",
                     comment: "Septask sync: signed out with queued edits")
     }
-    // Apple alone (with device approval) keeps its own line; any other
-    // account-creating method takes the sign-in screen's line.
-    if offered.contains(.email) { return RegistrySignIn.Copy.subheading }
-    if !offered.contains(.apple) { return RegistryDeviceSignIn.intro }
-    return String(localized: "Your tasks stay on this device. Sign in with Apple when you want to sync across devices.",
-                  comment: "Septask sync: free no-account mode")
+    if offered.contains(where: { RegistrySignIn.method($0)?.createsAccount == true }) {
+      return RegistrySignIn.Copy.subheading
+    }
+    return RegistryDeviceSignIn.intro
   }
 
   private var statusLine: String {

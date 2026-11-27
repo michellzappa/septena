@@ -11,12 +11,13 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -34,17 +35,18 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.septena.android.AndroidAppGraph
-import app.septena.ui.ChevronLeftGlyph
 import app.septena.core.JsonValue
 import app.septena.core.RegistryCatalog
 import app.septena.core.generated.RegistryPlatformIds
 import app.septena.core.generated.RegistryTaskDetail
 import app.septena.core.stringValue
+import app.septena.ui.ChevronLeftGlyph
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -72,11 +74,9 @@ private data class FirstRunStep(
     val platforms: List<String>,
     val featureId: String?,
     val points: List<FirstRunPoint>,
-    val instructions: List<String>,
     val primary: FirstRunButton?,
     val secondary: FirstRunButton?,
-    val tertiary: FirstRunButton?,
-    /** Replaces [secondary] once the step's work is done (Claude is paired). */
+    /** Replaces [primary]/[secondary] once the step's work is done (agent connected). */
     val afterDone: FirstRunButton?,
 )
 
@@ -84,7 +84,7 @@ private data class FirstRunStep(
  * The first-run button actions Android runs. The account step's sign-in action needs no entry: that step
  * renders the sign-in panel in place of its primary button. The Apple importers never reach a button here.
  */
-private val SUPPORTED_ACTIONS = setOf("next", "finish", "copySetupPrompt", "copyFirstPrompt")
+private val SUPPORTED_ACTIONS = setOf("next", "finish", "copySetupPrompt")
 
 /** The step kinds this file draws. */
 private val RENDERED_KINDS = setOf("intro", "account", "connectAgent", "finish")
@@ -121,10 +121,8 @@ private fun firstRunSteps(languageTag: String): List<FirstRunStep> {
                 val p = (point as? JsonValue.ObjectValue)?.fields ?: return@mapNotNull null
                 FirstRunPoint(text(p["title"]), text(p["detail"]))
             },
-            instructions = strings(f["instructions"]).map { registryText(it, languageTag) },
             primary = button(f["primary"]),
             secondary = button(f["secondary"]),
-            tertiary = button(f["tertiary"]),
             afterDone = button(f["afterDone"]),
         )
     }
@@ -147,6 +145,9 @@ private fun firstRunPrompt(key: String, languageTag: String): String {
     return registryText(prompts?.fields?.get(key).stringValue(), languageTag)
 }
 
+private fun firstRunConnectorUrl(): String =
+    firstRun?.fields?.get("connectorUrl").stringValue().orEmpty()
+
 private fun firstRunChrome(id: String, languageTag: String): String {
     val chrome = (firstRun?.fields?.get("chrome") as? JsonValue.ArrayValue)?.values.orEmpty()
     val entry = chrome.firstOrNull { (it as? JsonValue.ObjectValue)?.fields?.get("id").stringValue() == id }
@@ -167,10 +168,12 @@ fun FirstRunScreen(graph: AndroidAppGraph) {
     /** Sign-in found an account that already finished its first run. */
     var returning by rememberSaveable { mutableStateOf(false) }
     var checkingAccount by remember { mutableStateOf(false) }
-    /** Steps whose work is done: they show `afterDone`. */
+    /** Steps whose work is done: they promote `afterDone` to the primary button. */
     val doneSteps = remember { mutableStateListOf<String>() }
     /** The copy action that ran last on this step; its button reads "Copied", as on iOS. */
     var copiedAction by remember(currentId) { mutableStateOf<String?>(null) }
+    var copiedUrl by remember(currentId) { mutableStateOf(false) }
+    var codeExpanded by remember(currentId) { mutableStateOf(false) }
     val step = steps.firstOrNull { it.id == currentId } ?: return
 
     val backTitle = RegistryCatalog.surface(RegistryTaskDetail.ID)
@@ -197,10 +200,7 @@ fun FirstRunScreen(graph: AndroidAppGraph) {
             "copySetupPrompt" -> {
                 copyToClipboard(context, step.title, firstRunPrompt("setup", languageTag))
                 copiedAction = action
-            }
-            "copyFirstPrompt" -> {
-                copyToClipboard(context, step.title, firstRunPrompt("first", languageTag))
-                copiedAction = action
+                copiedUrl = false
             }
         }
     }
@@ -286,8 +286,18 @@ fun FirstRunScreen(graph: AndroidAppGraph) {
                 languageTag = languageTag,
                 signedIn = signedIn,
                 checkingAccount = checkingAccount,
-                buttonTitle = ::buttonTitle,
-                perform = ::perform,
+                done = step.id in doneSteps,
+                copiedUrl = copiedUrl,
+                codeExpanded = codeExpanded,
+                onCopyUrl = {
+                    val url = firstRunConnectorUrl()
+                    if (url.isNotEmpty()) {
+                        copyToClipboard(context, settingsCopy(CLAUDE_CONNECTOR, "connectorUrl", languageTag), url)
+                        copiedUrl = true
+                        copiedAction = null
+                    }
+                },
+                onToggleCode = { codeExpanded = !codeExpanded },
                 onDone = { if (step.id !in doneSteps) doneSteps.add(step.id) },
             )
         }
@@ -302,8 +312,11 @@ private fun StepContent(
     languageTag: String,
     signedIn: Boolean,
     checkingAccount: Boolean,
-    buttonTitle: (FirstRunButton) -> String,
-    perform: (String) -> Unit,
+    done: Boolean,
+    copiedUrl: Boolean,
+    codeExpanded: Boolean,
+    onCopyUrl: () -> Unit,
+    onToggleCode: () -> Unit,
     onDone: () -> Unit,
 ) {
     when (step.kind) {
@@ -327,22 +340,77 @@ private fun StepContent(
                 deviceStartTitle = step.primary?.title ?: deviceSignInCopy("start", languageTag),
             )
         }
-        // The code field is the one on Settings ▸ Agents. Its approval dialog ticks the Get started
-        // step itself (`completeConnectAgentStep`), so this step only marks itself done.
+        // The MCP server URL and optional connection code disclosure mirror Apple and Web.
+        // The code field's approval dialog ticks the Get started step itself (`completeConnectAgentStep`).
         "connectAgent" -> Column(
             modifier = Modifier.widthIn(max = 460.dp).fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            step.instructions.forEachIndexed { index, line ->
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("${index + 1}.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(line)
+            if (done) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    tonalElevation = 1.dp,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(
+                        settingsCopy("sign_in_approval", "doneConnector", languageTag),
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(16.dp),
+                    )
+                }
+            } else {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    tonalElevation = 1.dp,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Text(
+                                    settingsCopy(CLAUDE_CONNECTOR, "connectorUrl", languageTag),
+                                    style = MaterialTheme.typography.titleSmall,
+                                )
+                                Text(
+                                    firstRunConnectorUrl(),
+                                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            TextButton(onClick = onCopyUrl) {
+                                Text(settingsCopy(CLAUDE_CONNECTOR, if (copiedUrl) "copied" else "copy", languageTag))
+                            }
+                        }
+                        Text(
+                            settingsCopy(CLAUDE_CONNECTOR, "connectorUrlDetail", languageTag),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+
+                Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = onToggleCode) {
+                        Text(settingsCopy(CLAUDE_CONNECTOR, "haveCode", languageTag))
+                    }
+                    if (codeExpanded) {
+                        Text(
+                            settingsCopy(CLAUDE_CONNECTOR, "codeHint", languageTag),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                        )
+                        PairingCodeField(graph, signedIn, languageTag, onApproved = onDone)
+                    }
                 }
             }
-            step.tertiary?.takeIf { it.action in SUPPORTED_ACTIONS }?.let { tertiary ->
-                OutlinedButton(onClick = { perform(tertiary.action) }) { Text(buttonTitle(tertiary)) }
-            }
-            PairingCodeField(graph, signedIn, languageTag, onApproved = onDone)
         }
     }
 }
@@ -362,16 +430,18 @@ private fun StepButtons(
     ) {
         // The account step's primary button is the sign-in panel's own first button.
         if (step.kind != "account") {
-            step.primary?.takeIf { it.action in SUPPORTED_ACTIONS }?.let { primary ->
+            val primaryButton = if (done) step.afterDone ?: step.primary else step.primary
+            primaryButton?.takeIf { it.action in SUPPORTED_ACTIONS }?.let { primary ->
                 Button(
                     onClick = { perform(primary.action) },
                     modifier = Modifier.widthIn(max = 400.dp).fillMaxWidth(),
                 ) { Text(buttonTitle(primary)) }
             }
         }
-        val secondaryButton = if (done) step.afterDone ?: step.secondary else step.secondary
-        secondaryButton?.takeIf { it.action in SUPPORTED_ACTIONS }?.let { secondary ->
-            TextButton(onClick = { perform(secondary.action) }, enabled = !checkingAccount) { Text(secondary.title) }
+        if (!done) {
+            step.secondary?.takeIf { it.action in SUPPORTED_ACTIONS }?.let { secondary ->
+                TextButton(onClick = { perform(secondary.action) }, enabled = !checkingAccount) { Text(secondary.title) }
+            }
         }
         step.footnote?.let {
             Text(
