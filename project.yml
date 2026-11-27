@@ -637,7 +637,7 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         PRODUCT_BUNDLE_IDENTIFIER: com.septena.cloud.coretests
 
-  # Septask marketing-screenshot capture (App Store viz pipeline, appstore/,
+  # Septask marketing-screenshot capture (App Store viz pipeline, septena/studio appstore/,
   # SEPTENA_APP=septask). Task-only sidebar navigation; see the test file.
   SeptaskUITests:
     type: bundle.ui-testing

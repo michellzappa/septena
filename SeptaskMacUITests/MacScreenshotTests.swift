@@ -1,14 +1,14 @@
 import XCTest
 
 /// Captures App Store marketing screenshots for the **Septask Mac** app from the
-/// demo-seeded build. Run via `SEPTENA_APP=septask appstore/capture.sh mac`, or:
+/// demo-seeded build. Run via `SEPTENA_APP=septask appstore/capture.sh mac` in septena/studio, or:
 ///   xcodebuild test -scheme SeptaskMac -destination 'platform=macOS' \
 ///     -only-testing:SeptaskMacUITests
 ///
 /// Like the iOS Septask capture, this is a small cousin of Septena's Mac test:
 /// same demo seed, same window-capture mechanism, but sidebar-only task
 /// navigation. Snapshots the app window (not the whole screen) so the render
-/// pipeline (appstore/) drops it into a Mac window frame at 2880×1800. Basenames
+/// pipeline (septena/studio appstore/) drops it into a Mac window frame at 2880×1800. Basenames
 /// match panels.septask.mjs (mac): tasks-today · tasks-project · tasks-upcoming.
 final class MacScreenshotTests: XCTestCase {
   override func setUpWithError() throws { continueAfterFailure = false }

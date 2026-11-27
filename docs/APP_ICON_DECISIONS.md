@@ -30,7 +30,7 @@ The only Septena mark, on every app surface.
 - **Bundle & OS Light/Dark behavior:**
   - **iOS:** 23 `.appiconset` bundles (`1 Default + 22 Alternates`, `ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS: YES`), each with explicit 1024px Light OS + Dark OS (`luminosity: dark`) opaque RGB PNGs. Primary `AppIcon` stays 8-bit pristine; 22 alternates use 5-bit/channel (32-level) quantization with an 8×8 ordered (Bayer) dither. The plain cut (2026-11-21) shrank `Assets.car` from 96.8 MB to 24.7 MB universal but banded the dial's gradients. The dither (2026-11-22) removes the banding at Home Screen sizes for 37.9 MB universal (18.9 MB thinned for iPhone 17,1) with 30 alternates. Measured alternatives: 64 levels without dither 41.3 MB (faint bands), 64 levels with dither 55.1 MB. `ICON_QUANT_LEVELS` and `ICON_DITHER=0` in `scripts/generate-app-icons.mjs` rerun the comparison. Without Stealth (22 alternates): 27.9 MB universal, 13.9 MB thinned for iPhone 17,1.
   - **macOS:** Live CoreGraphics Retina `NSImage` rendering into `NSApp.applicationIconImage` + `dockTile` (reacts to Light/Dark appearance switches) and persists on `/Applications/Septask.app` via `NSWorkspace.shared.setIcon(_:forFile:)`.
-- **Single generator source of truth:** `tools/logo-builder/dial-svg.mjs` → `scripts/generate-app-icons.mjs` (outputs all 23 iOS `.appiconset`s, macOS `Septask/AppIcon.icns`, and watchOS `AppIcon-1024.png`).
+- **Single generator source of truth:** `scripts/dial-svg.mjs` → `scripts/generate-app-icons.mjs` (outputs all 23 iOS `.appiconset`s, macOS `Septask/AppIcon.icns`, and watchOS `AppIcon-1024.png`).
 
 ## 3. Where the mark is drawn
 

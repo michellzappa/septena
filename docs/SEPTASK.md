@@ -211,7 +211,7 @@ gap list; git holds the full narrative.
 ## Icon Notes
 
 The icon is generated, not designed by hand: regenerate rather than retouch.
-`tools/logo-builder/dial-svg.mjs` holds the geometry and
+`scripts/dial-svg.mjs` holds the geometry and
 `scripts/generate-app-icons.mjs` writes every icon set. Decisions:
 `docs/APP_ICON_DECISIONS.md`.
 

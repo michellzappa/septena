@@ -2,7 +2,7 @@
 // Generates all 23 prebaked Septena Upright Compass iOS App Icon asset sets
 // (1 Default `AppIcon` + 22 Alternates) inside `Septask/Assets.xcassets/`.
 //
-// Source of truth: `tools/logo-builder/dial-svg.mjs`.
+// Source of truth: `scripts/dial-svg.mjs`.
 // Each `.appiconset` ships explicit 1024x1024 opaque RGB PNGs for both Light OS
 // and Dark OS (`luminosity: dark`), so iOS handles Light/Dark Home Screen icons
 // natively.
@@ -14,7 +14,7 @@ import os from 'os';
 import path from 'path';
 import { execFileSync } from 'child_process';
 import { fileURLToPath } from 'url';
-import { FRUIT_PALETTES, appIconSets, renderDialSVG } from '../tools/logo-builder/dial-svg.mjs';
+import { FRUIT_PALETTES, appIconSets, renderDialSVG } from './dial-svg.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, '..');

@@ -564,20 +564,22 @@ The product is Septena; the code targets keep the working names `Septask` (iOS),
   (`docs/WATCH.md`). `SeptaskWidgets/`, `ShareExtension/` — extensions.
 - `android/` — the Android app. `core/` — the shared Rust core. `backend/` — the
   task backend and MCP server. `registry/` — copy, actions and settings.
-- `appstore/` — App Store packaging (iPhone/iPad/Mac/Watch): copy in
-  `docs/APPSTORE.md`, panel visuals in `appstore/panels.config.mjs`, surfaces in
-  `appstore/devices.mjs`. `appstore/capture.sh <device>` shoots raw screens, `npm run all`
-  renders + validates, and the website's `/about/brand#app-store` is the review
-  page (no viewer in this repo), and `appstore/upload.sh` uploads through
-  fastlane deliver. It is outward-facing: run it only when mz asks; never a
-  binary, never a review submission (docs/APPSTORE-SEPTASK.md "Uploading").
+- **Marketing lives in `septena/studio` (private, `~/Dev/septena/studio`,
+  moved out 2026-11-27):** the App Store and Play Store panels, capture,
+  metadata and upload (`appstore/`, `fastlane/`), the store copy docs
+  (`docs/APPSTORE-SEPTASK.md`, `docs/APPSTORE.md`, `docs/PLAYSTORE.md`), the
+  3D, bento and photo studios and the logo galleries. It reads this repo's
+  `registry/` and runs the screenshot UI tests here, so those stay here, with
+  the icon generator (`scripts/dial-svg.mjs`) and the Play Store release
+  notes (`android/playstore/whatsnew/`). Uploading is outward-facing: run it
+  only when mz asks; never a binary, never a review submission.
   The Mac is the macOS platform of the same App Store Connect record as
   iPhone and iPad (one bundle id, universal purchase, mz 2026-11-26), with its
-  own deliver run: `docs/APPSTORE-SEPTASK.md`. The separate record in
-  `docs/APPSTORE.md` is Septena Life.
+  own deliver run (studio `docs/APPSTORE-SEPTASK.md`). The separate record in
+  studio `docs/APPSTORE.md` is Septena Life.
   For generated Photo Studio lifestyle images and device variants, use
-  `docs/photo-studio/SKILL.md`. A device screen in a photo is always a composed
-  PNG, never a generated screen: `docs/photo-composite/SKILL.md`.
+  studio `docs/photo-studio/SKILL.md`. A device screen in a photo is always a
+  composed PNG, never a generated screen: studio `docs/photo-composite/SKILL.md`.
 
 ## Conventions
 
