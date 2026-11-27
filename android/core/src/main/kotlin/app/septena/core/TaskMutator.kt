@@ -8,6 +8,7 @@ import app.septena.sharedcore.DateAction
 import app.septena.sharedcore.RescheduleMode
 import java.time.Duration
 import java.time.Instant
+import java.time.ZoneId
 import app.septena.sharedcore.TaskSnapshot as CoreTaskSnapshot
 import app.septena.sharedcore.applyDateAction as coreApplyDateAction
 import app.septena.sharedcore.nextOccurrenceDates as coreNextOccurrenceDates
@@ -286,6 +287,17 @@ class TaskMutator(
         val f = existing.fields
         val unit = rule?.unit
         val fixed = rule?.afterCompletion == false
+        val previous = RecurrenceRules.fromFields(f)
+        val missed = if (fixed) rule?.missed ?: previous?.missed
+            ?: RegistryEntityEnums.RecurrenceMissed.KEEP_ONE_OPEN.takeIf { previous == null } else null
+        val anchor = f[RegistryEntityFields.Task.RECURRENCE_ANCHOR_DATE].stringValue()
+            ?: f[RegistryEntityFields.Task.SCHEDULED].stringValue()
+        val starts = when {
+            missed == null -> null
+            previous?.missed == missed -> f[RegistryEntityFields.Task.RECURRENCE_MISSED_FROM].stringValue()
+            previous == null -> anchor
+            else -> rule?.let { RecurrenceRules.nextScheduledDate(clock.today().toString(), anchor, anchor, it) }
+        }
         val weekdays = rule?.weekdays?.takeIf { fixed && unit == RegistryEntityEnums.RecurrenceUnit.WEEK }
         val useMonthRule = fixed && (unit == RegistryEntityEnums.RecurrenceUnit.MONTH || unit == RegistryEntityEnums.RecurrenceUnit.YEAR)
         val ordinal = rule?.ordinalWeekday?.takeIf { useMonthRule }
@@ -293,6 +305,8 @@ class TaskMutator(
             RegistryEntityFields.Task.RECURRENCE_UNIT to JsonValue.stringOrNull(unit),
             RegistryEntityFields.Task.RECURRENCE_INTERVAL to JsonValue.integerOrNull(rule?.interval?.coerceIn(1, 99)?.toLong()),
             RegistryEntityFields.Task.RECURRENCE_AFTER_COMPLETION to JsonValue.BooleanValue(rule?.afterCompletion == true),
+            RegistryEntityFields.Task.RECURRENCE_MISSED to JsonValue.stringOrNull(missed),
+            RegistryEntityFields.Task.RECURRENCE_MISSED_FROM to JsonValue.stringOrNull(starts),
             RegistryEntityFields.Task.RECURRENCE_PAUSED to JsonValue.BooleanValue(
                 rule != null && (paused ?: f[RegistryEntityFields.Task.RECURRENCE_PAUSED].booleanValue() ?: false),
             ),
@@ -315,8 +329,23 @@ class TaskMutator(
                     "weekday" to JsonValue.IntegerValue(it.weekday.toLong()),
                 ))
             } ?: JsonValue.Null),
-        ).filter { (field, value) -> value != (f[field] ?: JsonValue.Null) }
-        return if (changes.isEmpty()) existing else updateFields(id, changes)
+        ).apply {
+            if (RecurrenceRules.followsCalendar(missed) && f[RegistryEntityFields.Task.TIME_ZONE].stringValue() == null) {
+                put(RegistryEntityFields.Task.TIME_ZONE, JsonValue.StringValue(ZoneId.systemDefault().id))
+            }
+        }.filter { (field, value) -> value != (f[field] ?: JsonValue.Null) }
+        if (changes.isEmpty()) return existing
+        val series = f[RegistryEntityFields.Task.RECURRENCE_SERIES_ID].stringValue() ?: id
+        val shared = changes - setOf(RegistryEntityFields.Task.RECURRENCE_ANCHOR_DATE, RegistryEntityFields.Task.TIME_ZONE)
+        if (shared.isNotEmpty()) {
+            for (member in store.records(RegistryEntityNames.TASK)) {
+                if (member.id != id && member.deletedAt == null &&
+                    member.fields[RegistryEntityFields.Task.RECURRENCE_SERIES_ID].stringValue() == series) {
+                    updateFields(member.id, shared)
+                }
+            }
+        }
+        return updateFields(id, changes)
     }
 
     /**
@@ -341,6 +370,8 @@ class TaskMutator(
         val f = patch.fields
         val changes = linkedMapOf<String, JsonValue>()
         for (name in patch.changed) {
+            if (name == RegistryEntityFields.Task.TIME_ZONE && f.timeZone == null &&
+                RecurrenceRules.followsCalendar(RecurrenceRules.fromFields(existing.fields)?.missed)) continue
             changes[name] = when (name) {
                 RegistryEntityFields.Task.SCHEDULED -> JsonValue.stringOrNull(f.scheduled)
                 RegistryEntityFields.Task.DEADLINE -> JsonValue.stringOrNull(f.deadline)
@@ -358,6 +389,7 @@ class TaskMutator(
                 else -> error("The core changed an unknown date field: $name")
             }
         }
+        if (changes.isEmpty()) return existing
         val updated = updateFields(id, changes) ?: return null
         val updatesSeries = when (action) {
             is DateAction.ScheduleFor -> action.mode == RescheduleMode.UPDATE_RULE
@@ -609,19 +641,20 @@ class TaskMutator(
      * its date fields, so a completion here and one on the phone or by an
      * agent converge on the same row. An existing row with that id is kept.
      */
-    private suspend fun spawnNextOccurrence(source: TaskRecord) {
+    private suspend fun spawnNextOccurrence(source: TaskRecord, calendarDay: String? = null, series: String? = null) {
         val f = source.fields
         if (f[RegistryEntityFields.Task.RECURRENCE_PAUSED].booleanValue() == true) return
         val rule = RecurrenceRules.fromFields(f) ?: return
+        if (calendarDay == null && !rule.afterCompletion && RecurrenceRules.followsCalendar(rule.missed)) return
         val now = clock.now()
         val today = clock.today(now).toString()
-        val next = RecurrenceRules.nextScheduledDate(
+        val next = calendarDay ?: RecurrenceRules.nextScheduledDate(
             completedOn = today,
             scheduled = f[RegistryEntityFields.Task.SCHEDULED].stringValue(),
             logicalScheduled = f[RegistryEntityFields.Task.RECURRENCE_ANCHOR_DATE].stringValue(),
             rule = rule,
         ) ?: return
-        val nextId = RecurrenceRules.occurrenceId(source.id, next)
+        val nextId = RecurrenceRules.occurrenceId(series ?: source.id, next)
         if (store.record(RegistryEntityNames.TASK, nextId) != null) return
 
         val fields = linkedMapOf<String, JsonValue>(
@@ -641,6 +674,7 @@ class TaskMutator(
             RegistryEntityFields.Task.RECURRENCE_UNIT, RegistryEntityFields.Task.RECURRENCE_INTERVAL,
             RegistryEntityFields.Task.RECURRENCE_AFTER_COMPLETION, RegistryEntityFields.Task.RECURRENCE_WEEKDAYS,
             RegistryEntityFields.Task.RECURRENCE_MONTH_DAY, RegistryEntityFields.Task.RECURRENCE_ORDINAL_WEEKDAY,
+            RegistryEntityFields.Task.RECURRENCE_MISSED, RegistryEntityFields.Task.RECURRENCE_MISSED_FROM,
         )) {
             val value = f[name]
             if (value != null && value != JsonValue.Null) fields[name] = value
@@ -684,6 +718,41 @@ class TaskMutator(
                 SyncOperation.Upsert(ids.nextClientOpId(), RegistryEntityNames.CHECKLIST_ITEM, itemId, itemFields),
             )
         }
+    }
+
+    suspend fun reconcileRepeatWindows(): Boolean {
+        val records = store.records(RegistryEntityNames.TASK).filter {
+            it.deletedAt == null && it.fields[RegistryEntityFields.Task.RECURRENCE_MISSED].stringValue() != null
+        }
+        val groups = records.groupBy { it.fields[RegistryEntityFields.Task.RECURRENCE_SERIES_ID].stringValue() ?: it.id }
+        fun slot(row: SyncRecord): String =
+            row.fields[RegistryEntityFields.Task.RECURRENCE_ANCHOR_DATE].stringValue()
+                ?: row.fields[RegistryEntityFields.Task.SCHEDULED].stringValue().orEmpty()
+        var changed = false
+        for ((id, members) in groups) {
+            val head = members.maxWithOrNull(compareBy<SyncRecord>({ slot(it) }, { it.id }))?.asTaskRecord() ?: continue
+            val rule = RecurrenceRules.fromFields(head.fields) ?: continue
+            if (head.status == TaskStatus.CANCELLED || isChecklistItem(head) || rule.afterCompletion ||
+                head.fields[RegistryEntityFields.Task.RECURRENCE_PAUSED].booleanValue() == true ||
+                !RecurrenceRules.followsCalendar(rule.missed)) continue
+            val plan = RecurrenceRules.window(rule, head.fields, clock.now()) ?: continue
+            val starts = head.fields[RegistryEntityFields.Task.RECURRENCE_MISSED_FROM].stringValue().orEmpty()
+            for (due in plan.create) {
+                if (due >= starts && store.record(RegistryEntityNames.TASK, RecurrenceRules.occurrenceId(id, due)) == null) {
+                    spawnNextOccurrence(head, calendarDay = due, series = id)
+                    changed = true
+                }
+            }
+            val cutoff = plan.expireBefore ?: continue
+            for (row in members) {
+                val day = slot(row)
+                if (row.asTaskRecord().status == TaskStatus.OPEN && day >= starts && day < cutoff) {
+                    updateFields(row.id, mapOf(RegistryEntityFields.Task.STATUS to JsonValue.StringValue(TaskStatus.REPEAT_EXPIRED.wireValue)))
+                    changed = true
+                }
+            }
+        }
+        return changed
     }
 
     /** Clear the agent cue: the user engaged with an agent's row. No-op for other rows. */

@@ -65,6 +65,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.septena.android.AndroidAppGraph
 import app.septena.core.JsonValue
+import app.septena.core.RecurrenceRule
+import app.septena.core.OrdinalWeekday
 import app.septena.core.NotesBase
 import app.septena.core.RegistryCatalog
 import app.septena.core.TaskPageBlockKinds
@@ -345,6 +347,7 @@ internal fun TaskInlineFoldout(
         )
     }
     val repeatUnit = taskFields[RegistryEntityFields.Task.RECURRENCE_UNIT].stringValue()
+    val repeatMissed = taskFields[RegistryEntityFields.Task.RECURRENCE_MISSED].stringValue()
     val repeatInterval = taskFields[RegistryEntityFields.Task.RECURRENCE_INTERVAL].longValue() ?: 1L
     val repeatAfterCompletion = repeatUnit == null ||
         (taskFields[RegistryEntityFields.Task.RECURRENCE_AFTER_COMPLETION].booleanValue() ?: true)
@@ -597,58 +600,21 @@ internal fun TaskInlineFoldout(
         weekdays: Set<Int> = recurrenceWeekdays,
         monthDay: Int? = recurrenceMonthDay,
         ordinalWeekday: Pair<Int, Int>? = recurrenceOrdinal,
+        missed: String? = repeatMissed,
     ) {
-        val existing = savedTask ?: return
-        val currentScheduled = existing.fields[RegistryEntityFields.Task.SCHEDULED].stringValue()
-        val changes = if (unit == null) {
-            linkedMapOf(
-                RegistryEntityFields.Task.RECURRENCE_UNIT to JsonValue.Null,
-                RegistryEntityFields.Task.RECURRENCE_INTERVAL to JsonValue.Null,
-                RegistryEntityFields.Task.RECURRENCE_AFTER_COMPLETION to JsonValue.BooleanValue(false),
-                RegistryEntityFields.Task.RECURRENCE_PAUSED to JsonValue.BooleanValue(false),
-                RegistryEntityFields.Task.RECURRENCE_SERIES_ID to JsonValue.Null,
-                RegistryEntityFields.Task.RECURRENCE_ANCHOR_DATE to JsonValue.Null,
-                RegistryEntityFields.Task.RECURRENCE_WEEKDAYS to JsonValue.Null,
-                RegistryEntityFields.Task.RECURRENCE_MONTH_DAY to JsonValue.Null,
-                RegistryEntityFields.Task.RECURRENCE_ORDINAL_WEEKDAY to JsonValue.Null,
-            )
-        } else {
-            val fixed = !afterCompletion
-            val usesWeekdays = fixed && unit == RegistryEntityEnums.RecurrenceUnit.WEEK
-            val usesMonthRules = fixed && (unit == RegistryEntityEnums.RecurrenceUnit.MONTH || unit == RegistryEntityEnums.RecurrenceUnit.YEAR)
-            linkedMapOf(
-                RegistryEntityFields.Task.RECURRENCE_UNIT to JsonValue.StringValue(unit),
-                RegistryEntityFields.Task.RECURRENCE_INTERVAL to JsonValue.IntegerValue(interval.coerceIn(1L, 99L)),
-                RegistryEntityFields.Task.RECURRENCE_AFTER_COMPLETION to JsonValue.BooleanValue(afterCompletion),
-                RegistryEntityFields.Task.RECURRENCE_PAUSED to JsonValue.BooleanValue(
-                    existing.fields[RegistryEntityFields.Task.RECURRENCE_PAUSED].booleanValue() ?: false,
-                ),
-                RegistryEntityFields.Task.RECURRENCE_SERIES_ID to JsonValue.StringValue(
-                    existing.fields[RegistryEntityFields.Task.RECURRENCE_SERIES_ID].stringValue() ?: taskId,
-                ),
-                RegistryEntityFields.Task.RECURRENCE_ANCHOR_DATE to JsonValue.stringOrNull(
-                    if (fixed) {
-                        existing.fields[RegistryEntityFields.Task.RECURRENCE_ANCHOR_DATE].stringValue()
-                            ?: currentScheduled
-                    } else null,
-                ),
-                RegistryEntityFields.Task.RECURRENCE_WEEKDAYS to if (usesWeekdays && weekdays.isNotEmpty()) {
-                    JsonValue.ArrayValue(weekdays.sorted().map { JsonValue.IntegerValue(it.toLong()) })
-                } else JsonValue.Null,
-                RegistryEntityFields.Task.RECURRENCE_MONTH_DAY to if (usesMonthRules && monthDay != null) {
-                    JsonValue.IntegerValue(monthDay.toLong())
-                } else JsonValue.Null,
-                RegistryEntityFields.Task.RECURRENCE_ORDINAL_WEEKDAY to if (usesMonthRules && ordinalWeekday != null) {
-                    JsonValue.ObjectValue(
-                        mapOf(
-                            "ordinal" to JsonValue.IntegerValue(ordinalWeekday.first.toLong()),
-                            "weekday" to JsonValue.IntegerValue(ordinalWeekday.second.toLong()),
-                        ),
-                    )
-                } else JsonValue.Null,
+        if (savedTask == null) return
+        val rule = unit?.let {
+            RecurrenceRule(
+                unit = it,
+                interval = interval.coerceIn(1L, 99L).toInt(),
+                afterCompletion = afterCompletion,
+                weekdays = weekdays.toList(),
+                monthDay = monthDay,
+                ordinalWeekday = ordinalWeekday?.let { (ordinal, weekday) -> OrdinalWeekday(ordinal, weekday) },
+                missed = missed,
             )
         }
-        write { check(graph.taskMutator.updateFields(taskId, changes) != null) }
+        write { check(graph.taskMutator.setRepeat(taskId, rule) != null) }
     }
 
     fun setRepeatPaused(paused: Boolean) = write {
@@ -1227,6 +1193,8 @@ internal fun TaskInlineFoldout(
                             onUnitChange = { setRepeat(it) },
                             onIntervalChange = { setRepeat(repeatUnit, it) },
                             onAfterCompletionChange = { setRepeat(repeatUnit, repeatInterval, it) },
+                            missed = repeatMissed,
+                            onMissedChange = { setRepeat(repeatUnit, missed = it) },
                             onWeekdaysChange = { setRepeat(repeatUnit, repeatInterval, false, it, null, null) },
                             onMonthDayChange = { setRepeat(repeatUnit, repeatInterval, false, emptySet(), it, null) },
                             onOrdinalWeekdayChange = { setRepeat(repeatUnit, repeatInterval, false, emptySet(), null, it) },

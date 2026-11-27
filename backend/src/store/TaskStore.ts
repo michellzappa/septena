@@ -18,7 +18,7 @@ import {
   type EntitySpec,
   type RefSnapshot,
 } from "./columns.js";
-import { CoreInputError, doEndWins, findIssueRefs, parseRef, resolveDoSessions, taskRefId, type CoreDoSession, type CoreRef } from "../core/index.js";
+import { CoreInputError, checklistOccurrenceId, doEndWins, findIssueRefs, occurrenceId, parseRef, resolveDoSessions, taskRefId, type CoreDoSession, type CoreRef } from "../core/index.js";
 import type { Op, OpResult, PullResult, PushResult, Turn } from "./ops.js";
 import type { EntitlementRow } from "../entitlement/entitlement.js";
 import type { IcalTask } from "../ical.js";
@@ -64,6 +64,7 @@ import {
   type ShareValue,
   type SharedEntity,
 } from "./shares.js";
+import { advancesBySchedule, repeatOccurrence, repeatWindow, scheduledSlot } from "./repeatWindows.js";
 import { mergeNotes } from "./mergeText.js";
 import { AGENT_KEY_CLIENT, AGENT_KEY_CLIENT_NAME, AGENT_KEY_EXPIRES_AT, SESSION_HEADER, SessionBook, type RenewResult, type SessionGrant } from "./sessions.js";
 
@@ -940,6 +941,22 @@ export class TaskStore extends DurableObject<Env> {
 
     const spec: EntitySpec = ENTITIES[op.entity];
     const row = this.sql.exec(`SELECT * FROM ${spec.table} WHERE id = ?`, op.id).toArray()[0];
+    if (op.op === "upsert" && op.entity === "task") {
+      const fields = op.fields;
+      // A stale offline expiry cannot overwrite a completion or a newer policy.
+      const staleExpiry = fields.status === "repeatExpired" &&
+        (row?.status !== "open" || row.recurrenceMissed !== "startFresh" || row.recurrencePaused === 1);
+      // A different device may have created and closed this slot while the
+      // writer was offline. An explicit reopen patches status without createdAt.
+      const staleCreation = row && row.status !== "open" && fields.status === "open" &&
+        typeof fields.createdAt === "string" && advancesBySchedule(fields) &&
+        typeof fields.recurrenceSeriesID === "string" && typeof fields.recurrenceAnchorDate === "string" &&
+        op.id === occurrenceId(fields.recurrenceSeriesID, fields.recurrenceAnchorDate);
+      if (staleExpiry || staleCreation) {
+        if (row) this.sql.exec("UPDATE tasks SET rev = ? WHERE id = ?", this.nextRev(), op.id);
+        return { clientOpId: op.clientOpId, status: "noop" };
+      }
+    }
 
     const sharing = this.shares.any();
     const shareRefusal = sharing ? this.shareRefusal(op, row as Record<string, unknown> | undefined) : null;
@@ -2330,6 +2347,72 @@ export class TaskStore extends DurableObject<Env> {
     return { events, nextSince: full || !reachedEnd ? cursor : Math.max(cursor, this.meta("rev")) };
   }
 
+  /// Advance calendar-driven series before the client reads their window.
+  /// Existing ids, including tombstones, win over generation.
+  reconcileRepeats(at = Date.now()): void {
+    const rows = this.sql.exec(`
+      SELECT t.* FROM tasks t
+      LEFT JOIN projects p ON p.id = t.project
+      WHERE t.deletedAt IS NULL AND t.recurrenceMissed IS NOT NULL
+        AND t.recurrenceUnit IS NOT NULL AND p.checklistMode IS NULL
+        AND COALESCE(t.kind, '') != 'heading'
+        AND COALESCE(t.recurrenceAnchorDate, t.scheduled) IS NOT NULL
+      ORDER BY COALESCE(t.recurrenceAnchorDate, t.scheduled) DESC, t.id DESC`).toArray()
+      .map((row) => decodeRow(ENTITIES.task, row) as Row);
+    const bySeries = new Map<string, Row[]>();
+    for (const row of rows) {
+      const seriesId = String(row.recurrenceSeriesID ?? row.id);
+      const existing = bySeries.get(seriesId);
+      if (existing) existing.push(row);
+      else bySeries.set(seriesId, [row]);
+    }
+    const now = new Date(at);
+    const iso = now.toISOString();
+    const operations: Op[] = [];
+    for (const [seriesId, members] of bySeries) {
+      const template = members[0];
+      if (!advancesBySchedule(template) || template.recurrencePaused === true || template.status === "cancelled") continue;
+      const plan = repeatWindow(template, now);
+      const starts = String(template.recurrenceMissedFrom ?? "");
+      for (const scheduled of plan.create) {
+        const id = occurrenceId(seriesId, scheduled);
+        if (scheduled < starts || this.rowOf("task", id)) continue;
+        operations.push({
+          clientOpId: randomId(), op: "upsert", entity: "task", id,
+          fields: repeatOccurrence(template, seriesId, scheduled, iso),
+        });
+        const templateId = String(template.id);
+        this.readChecklistItems(templateId).forEach((item, index) => {
+          if (typeof item.id !== "string" || typeof item.title !== "string") return;
+          operations.push({
+            clientOpId: randomId(), op: "upsert", entity: "checklistItem",
+            id: checklistOccurrenceId(id, index, item.id),
+            fields: { taskId: id, title: item.title, checked: false, position: item.position ?? null, createdAt: iso },
+          });
+        });
+        for (const ref of this.readTaskRefs(templateId)) {
+          if (ref.role !== "about" || typeof ref.key !== "string" || typeof ref.kind !== "string") continue;
+          operations.push({
+            clientOpId: randomId(), op: "upsert", entity: "taskRef", id: taskRefId(id, ref.key, 0),
+            fields: { taskId: id, key: ref.key, kind: ref.kind, role: "about",
+              snapshot: ref.snapshot ?? null, position: ref.position ?? null, createdAt: iso },
+          });
+        }
+      }
+      if (plan.expireBefore) {
+        for (const row of members) {
+          const day = scheduledSlot(row);
+          if (typeof row.id !== "string" || row.status !== "open" || day < starts || day >= plan.expireBefore) continue;
+          operations.push({
+            clientOpId: randomId(), op: "upsert", entity: "task", id: row.id,
+            fields: { status: "repeatExpired" },
+          });
+        }
+      }
+    }
+    if (operations.length) this.push(operations, "system:repeat");
+  }
+
   // ---- pull ----
 
   /// `includeSettings`: the client syncs the `setting` entity. Clients built
@@ -2338,8 +2421,9 @@ export class TaskStore extends DurableObject<Env> {
   /// The other flags do the same for entities that came later.
   pull(
     since: number, limit: number, includeSettings = false, includeChecklists = false, includeTags = false,
-    includeRefs = false, includeDoSessions = false,
+    includeRefs = false, includeDoSessions = false, supportsRepeatWindows = true,
   ): PullResult {
+    this.reconcileRepeats();
     const n = Math.min(Math.max(limit, 1), MAX_PULL);
     if (since > 0 && since < this.meta("purgedThrough")) {
       return { resetRequired: true, changes: [], nextSince: 0, hasMore: true };
@@ -2366,7 +2450,13 @@ export class TaskStore extends DurableObject<Env> {
     const head = this.meta("rev");
     const nextSince = page.length ? page[page.length - 1].rev : Math.max(since, head);
     return {
-      changes: page.map(({ entity, row }) => ({ entity, row })),
+      changes: page.map(({ entity, row }) => ({
+        entity,
+        // Older builds fall back to open for unknown status values.
+        row: !supportsRepeatWindows && entity === "task" && row.status === "repeatExpired"
+          ? { ...row, status: "cancelled" }
+          : row,
+      })),
       nextSince,
       hasMore: merged.length > n,
     };
@@ -4113,6 +4203,7 @@ export class TaskStore extends DurableObject<Env> {
 
   override async alarm(): Promise<void> {
     const now = Date.now();
+    this.reconcileRepeats(now);
     const tombstoneCutoff = new Date(now - TOMBSTONE_TTL_MS).toISOString();
     const revBefore = this.meta("rev");
     // Only a share or webhook retry, and the daily run is not due.

@@ -1602,7 +1602,7 @@ struct SidebarRootView: View {
         switch t.status {
         case .done:                 done[pid, default: 0] += 1; total[pid, default: 0] += 1
         case .open:                 total[pid, default: 0] += 1; projOpen[pid, default: 0] += 1
-        case .cancelled, .checklistChecked: break
+        case .cancelled, .checklistChecked, .repeatExpired: break
         }
       } else if let aid = t.area, t.status == .open {
         areaDirectOpen[aid, default: 0] += 1

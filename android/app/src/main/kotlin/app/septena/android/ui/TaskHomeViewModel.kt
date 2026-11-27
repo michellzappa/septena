@@ -36,6 +36,8 @@ import app.septena.ui.TaskGroupHeader
 import app.septena.ui.TaskListItem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -267,6 +269,13 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         viewModelScope.launch {
             val swept = runCatching { withContext(Dispatchers.IO) { graph.sweepAbandonedInlineDrafts() } }.getOrDefault(0)
             if (swept > 0) graph.sync.noteLocalChange()
+        }
+        viewModelScope.launch {
+            while (isActive) {
+                val changed = withContext(Dispatchers.IO) { graph.taskMutator.reconcileRepeatWindows() }
+                if (changed) noteLocalChangeAndSync()
+                delay(60_000)
+            }
         }
     }
 

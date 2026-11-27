@@ -61,6 +61,8 @@ Required on create: `title`, `status`. Can be deleted.
 | `recurrenceUnit` | text, ≤ 16 | may be null |
 | `recurrenceInterval` | integer | may be null |
 | `recurrenceAfterCompletion` | boolean | default false |
+| `recurrenceMissed` | one of `recurrenceMissed` | may be null |
+| `recurrenceMissedFrom` | day | may be null |
 | `recurrencePaused` | boolean | default false |
 | `recurrenceSeriesID` | text, ≤ 128 | may be null |
 | `recurrenceAnchorDate` | day | may be null |
@@ -249,7 +251,8 @@ One step of a task's conversation, in its `thread`. Turns are appended, never ch
 
 | Name | Values |
 |---|---|
-| `taskStatus` | `open`, `done`, `cancelled`, `checklistChecked` |
+| `taskStatus` | `open`, `done`, `cancelled`, `checklistChecked`, `repeatExpired` |
+| `recurrenceMissed` | `keepOneOpen`, `startFresh`, `keepEach` |
 | `checklistMode` | `plain`, `groceries` |
 | `taskSource` | `app`, `mcp` |
 | `projectStatus` | `active`, `done`, `cancelled` |

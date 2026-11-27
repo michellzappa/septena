@@ -4,6 +4,7 @@ import { randomId } from "../util.js";
 import { localServerTimestamp, todayYMD } from "../tz.js";
 import { checklistOccurrenceID, nextScheduledDate, occurrenceID } from "../recurrence.js";
 import { applyDateAction, callCore, nextOccurrenceDates, normalizeTaskDates, taskRefId, taskViewMembership, type CoreDateAction, type CoreTask } from "../core/index.js";
+import { advancesBySchedule } from "../store/repeatWindows.js";
 import { storeFor } from "../api/session.js";
 import { MAX_REFS_PER_TASK, MAX_TAGS_PER_TASK, TAG_NAME_MAX, zId } from "../store/columns.js";
 import { zPushBody, type Op, type OpResult } from "../store/ops.js";
@@ -539,6 +540,7 @@ function planDateEdits(
   const changed: Record<string, unknown> = {};
   for (const action of actions) {
     const patch = applyDateAction(coreRow(row), action, today, now);
+    if (patch.timeZone === null && advancesBySchedule(row)) delete patch.timeZone;
     Object.assign(row, patch);
     Object.assign(changed, patch);
   }
@@ -552,6 +554,8 @@ function recurrenceColumns(rule: RecurrenceRuleInput | null): Record<string, unk
       recurrenceUnit: null,
       recurrenceInterval: 1,
       recurrenceAfterCompletion: true,
+      recurrenceMissed: null,
+      recurrenceMissedFrom: null,
       recurrencePaused: false,
       recurrenceWeekdays: null,
       recurrenceMonthDay: null,
@@ -562,6 +566,7 @@ function recurrenceColumns(rule: RecurrenceRuleInput | null): Record<string, unk
     recurrenceUnit: rule.unit,
     recurrenceInterval: rule.interval,
     recurrenceAfterCompletion: rule.afterCompletion,
+    ...(rule.afterCompletion ? { recurrenceMissed: null, recurrenceMissedFrom: null } : {}),
     recurrencePaused: false,
     recurrenceWeekdays: rule.weekdays && rule.weekdays.length > 0 ? rule.weekdays : null,
     recurrenceMonthDay: rule.monthDay ?? null,
@@ -921,7 +926,7 @@ async function completeTask(ctx: WriteContext, id: string) {
   // watch, the desk orb) keeps the series going.
   const refusable = isAgentActor(ctx.actor ?? MCP_ACTOR);
   const canSpawnOccurrence = !refusable || (!current.convo?.stoppedAt && current.convo?.assignee !== "claude");
-  if (unit && src.recurrencePaused !== true && canSpawnOccurrence) {
+  if (unit && src.recurrencePaused !== true && canSpawnOccurrence && !advancesBySchedule(src)) {
     const interval = Number(src.recurrenceInterval ?? 1) || 1;
     const afterCompletion = src.recurrenceAfterCompletion === true;
     const weekdays = Array.isArray(src.recurrenceWeekdays) && src.recurrenceWeekdays.length > 0
@@ -960,7 +965,7 @@ async function completeTask(ctx: WriteContext, id: string) {
           position,
           createdAt: now,
         };
-        for (const k of ["area", "project", "heading", "kind", "notes", "sourceClient", "source"] as const) {
+        for (const k of ["area", "project", "heading", "kind", "notes", "sourceClient", "source", "recurrenceMissed", "recurrenceMissedFrom"] as const) {
           if (str(src[k])) fields[k] = src[k];
         }
         // The next row's date fields are the core's (spec A10): the new day,

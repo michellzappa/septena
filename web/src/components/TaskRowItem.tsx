@@ -1,5 +1,8 @@
 "use client";
 
+import { SURFACES_CATALOG } from "../lib/generated/registries";
+import type { MissedRepeatBehavior } from "../lib/types";
+
 import { useEffect, useRef, useState } from "react";
 import {
   AlignLeft,
@@ -123,6 +126,7 @@ export interface TaskRowItemProps {
     unit: "day" | "week" | "month" | "year" | null;
     interval?: number;
     afterCompletion?: boolean;
+    missed?: MissedRepeatBehavior | null;
     paused?: boolean;
   }) => void;
   onMoveTask: (target: { area: string | null; project: string | null }) => void;
@@ -577,6 +581,35 @@ export function TaskDetailEditor({
                 ))}
               </select>
             </label>
+
+            {task.recurrenceUnit && task.scheduled && (
+              <select aria-label="Repeat schedule" value={task.recurrenceAfterCompletion ? "completion" : "schedule"}
+                onChange={(event) => props.onSetRecurrence({
+                  unit: task.recurrenceUnit as "day" | "week" | "month" | "year",
+                  interval: task.recurrenceInterval ?? 1,
+                  afterCompletion: event.target.value === "completion",
+                  paused: Boolean(task.recurrencePaused),
+                })}>
+                <option value="schedule">On scheduled date</option>
+                <option value="completion">After completion</option>
+              </select>
+            )}
+            {task.recurrenceUnit && !task.recurrenceAfterCompletion && (
+              <label className="inline-flex items-center gap-1 px-2">
+                {registryText(SURFACES_CATALOG.missedRepeat.label, props.lang)}
+                <select value={task.recurrenceMissed ?? "keepOneOpen"} onChange={(event) => props.onSetRecurrence({
+                  unit: task.recurrenceUnit as "day" | "week" | "month" | "year",
+                  interval: task.recurrenceInterval ?? 1,
+                  afterCompletion: false,
+                  missed: event.target.value as MissedRepeatBehavior,
+                  paused: Boolean(task.recurrencePaused),
+                })}>
+                  {SURFACES_CATALOG.missedRepeat.options.map((option) => (
+                    <option key={option.id} value={option.id}>{registryText(option.title, props.lang)}</option>
+                  ))}
+                </select>
+              </label>
+            )}
 
             {task.recurrenceUnit && (
               <button

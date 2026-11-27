@@ -31,7 +31,16 @@
         "open",
         "done",
         "cancelled",
-        "checklistChecked"
+        "checklistChecked",
+        "repeatExpired"
+      ]
+    },
+    "recurrenceMissed": {
+      "type": "string",
+      "enum": [
+        "keepOneOpen",
+        "startFresh",
+        "keepEach"
       ]
     },
     "checklistMode": {
@@ -467,6 +476,26 @@
         "recurrenceAfterCompletion": {
           "type": "boolean",
           "default": false
+        },
+        "recurrenceMissed": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/recurrenceMissed"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "recurrenceMissedFrom": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/day"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "recurrencePaused": {
           "type": "boolean",

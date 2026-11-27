@@ -1995,6 +1995,12 @@
       "signIn.methods.device.title"
     ]
   },
+  "If missed": {
+    "text": "If missed",
+    "paths": [
+      "surfaces.missedRepeat.label"
+    ]
+  },
   "If this agent takes the place of one you connected before, pick it. That agent stops working.": {
     "text": "If this agent takes the place of one you connected before, pick it. That agent stops working.",
     "paths": [
@@ -2202,6 +2208,18 @@
     "text": "Keep",
     "paths": [
       "actions.actions.task.keepFaded.title"
+    ]
+  },
+  "Keep each occurrence": {
+    "text": "Keep each occurrence",
+    "paths": [
+      "surfaces.missedRepeat.options.keepEach.title"
+    ]
+  },
+  "Keep one open": {
+    "text": "Keep one open",
+    "paths": [
+      "surfaces.missedRepeat.options.keepOneOpen.title"
     ]
   },
   "Keyboard Shortcuts": {
@@ -4289,6 +4307,12 @@
     "text": "Starlings record",
     "paths": [
       "surfaces.taskReferences.kinds.door.label"
+    ]
+  },
+  "Start fresh next time": {
+    "text": "Start fresh next time",
+    "paths": [
+      "surfaces.missedRepeat.options.startFresh.title"
     ]
   },
   "Starter prompt": {

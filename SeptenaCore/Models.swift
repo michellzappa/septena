@@ -10,6 +10,7 @@ enum TaskStatus: String, Codable, Hashable {
   case done
   case cancelled
   case checklistChecked
+  case repeatExpired
 }
 
 /// Provenance values stamped on a row's `source` field — what authored it.
@@ -778,11 +779,21 @@ struct TaskRef: Identifiable, Hashable, Sendable {
 /// A recurring task spawns a new instance when completed. `afterCompletion`
 /// = true advances from today (e.g. "every 3 days after completion");
 /// false advances from the prior scheduled date (e.g. "every Friday").
+enum MissedRepeatBehavior: String, Codable, Hashable, CaseIterable {
+  case keepOneOpen
+  case startFresh
+  case keepEach
+
+  var title: String { RegistrySurfaces.missedRepeatOptions[rawValue] ?? rawValue }
+  var advancesOnSchedule: Bool { self != .keepOneOpen }
+}
+
 struct Recurrence: Codable, Hashable {
   enum Unit: String, Codable, Hashable { case day, week, month, year }
   var unit: Unit
   var interval: Int        // 1+
   var afterCompletion: Bool
+  var missed: MissedRepeatBehavior?
   /// Optional specific weekdays (1 = Sun ... 7 = Sat) for fixed weekly rules.
   var weekdays: [Int]?
   /// Optional day of month (1..31, or -1 for last day) for fixed monthly/yearly rules.
@@ -791,7 +802,7 @@ struct Recurrence: Codable, Hashable {
   var ordinalWeekday: RecurrenceOrdinalWeekday?
 
   enum CodingKeys: String, CodingKey {
-    case unit, interval, weekdays
+    case unit, interval, weekdays, missed
     case afterCompletion = "after_completion"
     case monthDay = "month_day"
     case ordinalWeekday = "ordinal_weekday"
@@ -800,12 +811,14 @@ struct Recurrence: Codable, Hashable {
   init(unit: Unit,
        interval: Int = 1,
        afterCompletion: Bool = true,
+       missed: MissedRepeatBehavior? = nil,
        weekdays: [Int]? = nil,
        monthDay: Int? = nil,
        ordinalWeekday: RecurrenceOrdinalWeekday? = nil) {
     self.unit = unit
     self.interval = max(1, interval)
     self.afterCompletion = afterCompletion
+    self.missed = afterCompletion ? nil : missed
     if !afterCompletion && unit == .week, let w = weekdays {
       let clean = Array(Set(w.filter { (1...7).contains($0) })).sorted()
       self.weekdays = clean.isEmpty ? nil : clean
@@ -842,6 +855,7 @@ struct Recurrence: Codable, Hashable {
     self.init(unit: unit,
               interval: interval,
               afterCompletion: afterCompletion,
+              missed: try? c.decode(MissedRepeatBehavior.self, forKey: .missed),
               weekdays: weekdays,
               monthDay: monthDay,
               ordinalWeekday: ordinalWeekday)

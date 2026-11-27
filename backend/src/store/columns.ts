@@ -198,6 +198,8 @@ export const ENTITIES = {
       recurrenceUnit: text(16),
       recurrenceInterval: int(),
       recurrenceAfterCompletion: bool(),
+      recurrenceMissed: { kind: "text", zod: z.enum(ENTITY_ENUMS.recurrenceMissed).nullable() },
+      recurrenceMissedFrom: day(),
       recurrencePaused: bool(),
       recurrenceSeriesID: text(128),
       recurrenceAnchorDate: day(),

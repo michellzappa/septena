@@ -1001,7 +1001,7 @@ struct ProjectDetailView: View {
         switch t.status {
         case .done:                 done += 1; total += 1
         case .open:                 total += 1
-        case .cancelled, .checklistChecked: break
+        case .cancelled, .checklistChecked, .repeatExpired: break
         }
       }
       let fresh = total > 0 ? Double(done) / Double(total) : 0

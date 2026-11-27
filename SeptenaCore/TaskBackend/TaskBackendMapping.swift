@@ -189,6 +189,8 @@ enum TaskBackendMapping {
       "recurrenceUnit": c.text("recurrenceUnit", t.recurrenceUnit, max: 16),
       "recurrenceInterval": .int(Int64(t.recurrenceInterval)),
       "recurrenceAfterCompletion": .bool(t.recurrenceAfterCompletion),
+      "recurrenceMissed": c.text("recurrenceMissed", t.recurrenceMissed, max: 32),
+      "recurrenceMissedFrom": c.day("recurrenceMissedFrom", t.recurrenceMissedFrom),
       "recurrencePaused": .bool(t.recurrencePaused),
       "recurrenceSeriesID": c.text("recurrenceSeriesID", t.recurrenceSeriesID, max: 128),
       "recurrenceAnchorDate": c.day("recurrenceAnchorDate", t.recurrenceAnchorDate),

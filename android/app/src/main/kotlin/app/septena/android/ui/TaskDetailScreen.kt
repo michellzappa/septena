@@ -381,6 +381,7 @@ fun TaskDetailScreen(
         )
     } ?: labels.control(RegistryTaskDetail.Controls.REMINDER_NONE)
     val repeatUnit = taskFields[RegistryEntityFields.Task.RECURRENCE_UNIT].stringValue()
+    val repeatMissed = taskFields[RegistryEntityFields.Task.RECURRENCE_MISSED].stringValue()
     val repeatInterval = taskFields[RegistryEntityFields.Task.RECURRENCE_INTERVAL].longValue() ?: 1L
     val repeatAfterCompletion = repeatUnit == null ||
         (taskFields[RegistryEntityFields.Task.RECURRENCE_AFTER_COMPLETION].booleanValue() ?: true)
@@ -592,6 +593,7 @@ fun TaskDetailScreen(
         weekdays: Set<Int> = recurrenceWeekdays,
         monthDay: Int? = recurrenceMonthDay,
         ordinalWeekday: Pair<Int, Int>? = recurrenceOrdinal,
+        missed: String? = repeatMissed,
     ) {
         if (savedTask == null) return
         val rule = unit?.let {
@@ -602,6 +604,7 @@ fun TaskDetailScreen(
                 weekdays = weekdays.toList(),
                 monthDay = monthDay,
                 ordinalWeekday = ordinalWeekday?.let { (ordinal, weekday) -> OrdinalWeekday(ordinal, weekday) },
+                missed = missed,
             )
         }
         write { check(graph.taskMutator.setRepeat(taskId, rule) != null) }
@@ -1336,6 +1339,8 @@ fun TaskDetailScreen(
                                                         onUnitChange = { setRepeat(it) },
                                                         onIntervalChange = { setRepeat(repeatUnit, it) },
                                                         onAfterCompletionChange = { setRepeat(repeatUnit, repeatInterval, it) },
+                                                        missed = repeatMissed,
+                                                        onMissedChange = { setRepeat(repeatUnit, missed = it) },
                                                         onWeekdaysChange = { setRepeat(repeatUnit, repeatInterval, false, it, null, null) },
                                                         onMonthDayChange = { setRepeat(repeatUnit, repeatInterval, false, emptySet(), it, null) },
                                                         onOrdinalWeekdayChange = { setRepeat(repeatUnit, repeatInterval, false, emptySet(), null, it) },
@@ -1791,8 +1796,20 @@ internal fun RepeatEditor(
     onOrdinalWeekdayChange: (Pair<Int, Int>) -> Unit,
     onMonthRuleChange: (String) -> Unit,
     onPauseToggle: (Boolean) -> Unit,
+    missed: String?,
+    onMissedChange: (String) -> Unit,
 ) {
     var unitMenuOpen by remember { mutableStateOf(false) }
+    var missedMenuOpen by remember { mutableStateOf(false) }
+    val languageTag = LocalConfiguration.current.locales[0].toLanguageTag()
+    val missedCopy = RegistryCatalog.surface(RegistrySurfaceIds.MISSED_REPEAT)?.fields.orEmpty()
+    val missedChoices = (missedCopy["options"] as? JsonValue.ArrayValue)?.values.orEmpty()
+        .mapNotNull { value ->
+            val fields = (value as? JsonValue.ObjectValue)?.fields ?: return@mapNotNull null
+            val id = fields["id"].stringValue() ?: return@mapNotNull null
+            val title = fields["title"].stringValue() ?: return@mapNotNull null
+            id to (RegistryCatalog.localizedString(title, languageTag) ?: title)
+        }
     var monthRuleMenuOpen by remember { mutableStateOf(false) }
     var dayMenuOpen by remember { mutableStateOf(false) }
     var ordinalMenuOpen by remember { mutableStateOf(false) }
@@ -1881,6 +1898,26 @@ internal fun RepeatEditor(
                     onCheckedChange = onAfterCompletionChange,
                     enabled = enabled && hasScheduledDate,
                 )
+            }
+            if (!afterCompletion && hasScheduledDate) {
+                val label = missedCopy["label"].stringValue().orEmpty()
+                val choice = missed ?: RegistryEntityEnums.RecurrenceMissed.KEEP_ONE_OPEN
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(RegistryCatalog.localizedString(label, languageTag) ?: label, modifier = Modifier.weight(1f))
+                    Box {
+                        TextButton(onClick = { missedMenuOpen = true }, enabled = enabled) {
+                            Text(missedChoices.firstOrNull { it.first == choice }?.second.orEmpty())
+                        }
+                        DropdownMenu(expanded = missedMenuOpen, onDismissRequest = { missedMenuOpen = false }) {
+                            for ((id, title) in missedChoices) {
+                                DropdownMenuItem(text = { Text(title) }, onClick = {
+                                    missedMenuOpen = false
+                                    onMissedChange(id)
+                                })
+                            }
+                        }
+                    }
+                }
             }
             if (!afterCompletion && hasScheduledDate &&
                 selectedUnit in setOf(RegistryEntityEnums.RecurrenceUnit.WEEK, RegistryEntityEnums.RecurrenceUnit.MONTH, RegistryEntityEnums.RecurrenceUnit.YEAR)

@@ -1944,6 +1944,13 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push(`  static let quickFindEmptyTitle: String = ${L(qf.emptyState.title, qf.emptyState, "title")}`);
   lines.push(`  static let quickFindEmptyDetail: String = ${L(qf.emptyState.detail, qf.emptyState, "detail")}`);
   lines.push(`  static let quickFindCompletedLabel: String = ${L(qf.completed.label, qf.completed, "label")}`);
+  const missedRepeat = surfaces.missedRepeat;
+  lines.push(`  static let missedRepeatLabel: String = ${L(missedRepeat.label, missedRepeat, "label")}`);
+  lines.push("  static let missedRepeatOptions: [String: String] = [");
+  for (const option of missedRepeat.options) {
+    lines.push(`    ${swiftStr(option.id)}: ${L(option.title, option, "title")},`);
+  }
+  lines.push("  ]");
   const checklist = surfaces.checklistProjects;
   for (const field of ["useAsChecklist", "useForGroceries", "addItem", "onList", "checked", "projectType", "moveToGroup", "ungrouped"]) {
     const swiftName = "checklist" + field[0].toUpperCase() + field.slice(1);
@@ -2544,7 +2551,7 @@ function generateTS({ entities, rules, icons, tokens, caps, settings, dests, act
   lines.push(`export const DESIGN_TOKENS = ${JSON.stringify({ accentPolicy: tokens.accentPolicy, fruitAccents: tokens.fruitAccents ?? [], textures: tokens.textures ?? [], selection: tokens.selection, colors: tokens.colors, multicolorGlyphs: tokens.multicolorGlyphs?.glyphs ?? {}, accentPalette: tokens.accentPalette, radii: tokens.radii, spacing: tokens.spacing, desktopColumn: tokens.desktopColumn, textScale: tokens.textScale, motion: tokens.motion })} as const;`);
   lines.push(`export const CAPABILITIES = ${JSON.stringify(caps.capabilities)} as const;`);
   lines.push(`export const ACTIONS_CATALOG = ${JSON.stringify({ actions: actions.actions, contextMenus: actions.contextMenus, menuBar: actions.menuBar, shortcutsSheet: actions.shortcutsSheet })} as const;`);
-  lines.push(`export const SURFACES_CATALOG = ${JSON.stringify({ notices: surfaces.notices, prompts: surfaces.prompts, toasts: surfaces.toasts, taskAttributes: surfaces.taskAttributes, taskDateBoard: surfaces.taskDateBoard, taskPage: surfaces.taskPage, waiting: surfaces.waiting, sharing: surfaces.sharing, accountSwitch: surfaces.accountSwitch, deviceSignIn: surfaces.deviceSignIn, quickFind: surfaces.quickFind, checklistProjects: surfaces.checklistProjects, listSort: surfaces.listSort, support: surfaces.support })} as const;`);
+  lines.push(`export const SURFACES_CATALOG = ${JSON.stringify({ notices: surfaces.notices, prompts: surfaces.prompts, toasts: surfaces.toasts, taskAttributes: surfaces.taskAttributes, taskDateBoard: surfaces.taskDateBoard, taskPage: surfaces.taskPage, waiting: surfaces.waiting, sharing: surfaces.sharing, accountSwitch: surfaces.accountSwitch, deviceSignIn: surfaces.deviceSignIn, quickFind: surfaces.quickFind, checklistProjects: surfaces.checklistProjects, missedRepeat: surfaces.missedRepeat, listSort: surfaces.listSort, support: surfaces.support })} as const;`);
   lines.push(`export const FIRST_RUN = ${JSON.stringify(surfaces.firstRun)} as const;`);
   lines.push("/** Plan limits (registry/plans.json). The server's plan table: every gate reads these, never a plan name. */");
   lines.push(`export const PLAN_LIMITS = ${JSON.stringify(plans.limits)} as const;`);

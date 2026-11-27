@@ -59,6 +59,7 @@ class UrlConnectionSyncTransport(
             "tags=${includeTags.flag()}",
             "refs=${includeRefs.flag()}",
             "doSessions=${includeDoSessions.flag()}",
+            "repeatWindows=1",
         ).joinToString("&")
         return SyncWireCodec.decodePullPage(request(path, "GET", body = null))
     }

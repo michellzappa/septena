@@ -67,7 +67,8 @@ enum RegistryEntityPatterns {
 
 /// Canonical enum wire strings shared with the backend (`registry/entities.json`).
 enum RegistryEntityEnums {
-  static let taskStatus: [String] = ["open", "done", "cancelled", "checklistChecked"]
+  static let taskStatus: [String] = ["open", "done", "cancelled", "checklistChecked", "repeatExpired"]
+  static let recurrenceMissed: [String] = ["keepOneOpen", "startFresh", "keepEach"]
   static let checklistMode: [String] = ["plain", "groceries"]
   static let taskSource: [String] = ["app", "mcp"]
   static let projectStatus: [String] = ["active", "done", "cancelled"]
@@ -2082,6 +2083,12 @@ enum RegistrySurfaces {
   static let quickFindEmptyTitle: String = RegistryL10n.t("Search Tasks")
   static let quickFindEmptyDetail: String = RegistryL10n.t("Find any task, project, or area.")
   static let quickFindCompletedLabel: String = RegistryL10n.t("Completed")
+  static let missedRepeatLabel: String = RegistryL10n.t("If missed")
+  static let missedRepeatOptions: [String: String] = [
+    "keepOneOpen": RegistryL10n.t("Keep one open"),
+    "startFresh": RegistryL10n.t("Start fresh next time"),
+    "keepEach": RegistryL10n.t("Keep each occurrence"),
+  ]
   static let checklistUseAsChecklist: String = RegistryL10n.t("Use as Checklist")
   static let checklistUseForGroceries: String = RegistryL10n.t("Use for Groceries")
   static let checklistAddItem: String = RegistryL10n.t("Add item")

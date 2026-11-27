@@ -19327,6 +19327,10 @@
         }
       }
     },
+    "If missed" : {
+      "comment" : "Generated from registry surfaces.missedRepeat.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "If this agent takes the place of one you connected before, pick it. That agent stops working." : {
       "comment" : "Generated from registry surfaces.prompts.items.agentReplaces.message. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -21083,6 +21087,14 @@
           }
         }
       }
+    },
+    "Keep each occurrence" : {
+      "comment" : "Generated from registry surfaces.missedRepeat.options.keepEach.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Keep one open" : {
+      "comment" : "Generated from registry surfaces.missedRepeat.options.keepOneOpen.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Keyboard Shortcuts" : {
       "comment" : "Generated from registry settings.pages.about.sections.actions.items.2.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -37229,6 +37241,10 @@
           }
         }
       }
+    },
+    "Start fresh next time" : {
+      "comment" : "Generated from registry surfaces.missedRepeat.options.startFresh.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Starter prompt" : {
       "comment" : "Generated from registry settings.copy.claude_connector.firstPrompt.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",

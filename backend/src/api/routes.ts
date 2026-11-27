@@ -612,6 +612,7 @@ export const zSyncPullQuery = z.object({
     refs: z.enum(["0", "1"]).default("0"),
     // `doSessions=1`: the client syncs the `doSession` entity (TaskStore.pull).
     doSessions: z.enum(["0", "1"]).default("0"),
+    repeatWindows: z.enum(["0", "1"]).default("0"),
   });
 
 api.get("/sync/pull", async (c) => {
@@ -625,6 +626,7 @@ api.get("/sync/pull", async (c) => {
     q.data.tags === "1",
     q.data.refs === "1",
     q.data.doSessions === "1",
+    q.data.repeatWindows === "1",
   ));
 });
 

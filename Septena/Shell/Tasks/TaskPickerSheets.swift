@@ -483,6 +483,7 @@ struct RecurrencePickerSheet: View {
   @State private var unit: Recurrence.Unit
   @State private var interval: Int
   @State private var afterCompletion: Bool
+  @State private var missed: MissedRepeatBehavior?
   @State private var paused: Bool
   @State private var weekdays: Set<Int>
   @State private var monthlyMode: MonthlyMode
@@ -511,6 +512,7 @@ struct RecurrencePickerSheet: View {
     _interval = State(initialValue: initial?.interval ?? 1)
     // With no date the effective anchor IS completion — show what will happen.
     _afterCompletion = State(initialValue: hasScheduledDate ? (initial?.afterCompletion ?? true) : true)
+    _missed = State(initialValue: initial?.missed)
     _paused = State(initialValue: initialPaused)
     _weekdays = State(initialValue: Set(initial?.weekdays ?? []))
     let anchor = scheduledDate.flatMap(SeptenaDate.parse) ?? DayClock.appNow
@@ -550,7 +552,8 @@ struct RecurrencePickerSheet: View {
       ? RecurrenceOrdinalWeekday(ordinal: ordinal, weekday: ordinalWeekdayNum) : nil
     return Recurrence(unit: unit,
                       interval: interval,
-                      afterCompletion: fixed ? false : true,
+                      afterCompletion: !fixed,
+                      missed: fixed ? missed ?? (initial == nil ? .keepOneOpen : nil) : nil,
                       weekdays: resolvedWeekdays,
                       monthDay: resolvedMonthDay,
                       ordinalWeekday: resolvedOrdinal)
@@ -618,6 +621,19 @@ struct RecurrencePickerSheet: View {
           }
           .padding(.horizontal, Theme.hPadding)
           .padding(.top, 16)
+
+          if hasScheduledDate && !afterCompletion {
+            Picker(RegistrySurfaces.missedRepeatLabel, selection: Binding(
+              get: { missed ?? .keepOneOpen },
+              set: { missed = $0 }
+            )) {
+              ForEach(MissedRepeatBehavior.allCases, id: \.self) { choice in
+                Text(choice.title).tag(choice)
+              }
+            }
+            .pickerStyle(.menu)
+            .padding(.horizontal, Theme.hPadding)
+          }
 
           // Quick preset strip — calm defaults with 1-tap Weekdays & Yearly.
           ScrollView(.horizontal, showsIndicators: false) {
