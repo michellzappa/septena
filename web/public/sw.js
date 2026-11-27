@@ -2,7 +2,7 @@
 // Caches the static shell and WASM core so the app opens and queues writes
 // while offline. Never caches or intercepts api.septena.app traffic.
 
-const CACHE_NAME = "septena-web-shell-v2";
+const CACHE_NAME = "septena-web-shell-v3";
 const SHELL_URLS = [
   "/",
   "/manifest.webmanifest",
