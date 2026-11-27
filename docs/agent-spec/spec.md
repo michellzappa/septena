@@ -110,6 +110,7 @@ Required on create: `title`, `status`. Can be deleted.
 | `id` | id | Set at create, never changes. |
 | `title` | text, ≤ 2000 | may be null |
 | `status` | text, ≤ 32 | may be null |
+| `checklistMode` | one of `checklistMode` | may be null |
 | `area` | id | may be null |
 | `created` | day | may be null |
 | `completedAt` | stamp | may be null |
@@ -248,7 +249,8 @@ One step of a task's conversation, in its `thread`. Turns are appended, never ch
 
 | Name | Values |
 |---|---|
-| `taskStatus` | `open`, `done`, `cancelled` |
+| `taskStatus` | `open`, `done`, `cancelled`, `checklistChecked` |
+| `checklistMode` | `plain`, `groceries` |
 | `taskSource` | `app`, `mcp` |
 | `projectStatus` | `active`, `done`, `cancelled` |
 | `taskKind` | `heading` |

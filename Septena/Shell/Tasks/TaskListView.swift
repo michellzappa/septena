@@ -112,6 +112,7 @@ struct TaskListView: View {
 
   @State private var areas: [Area]
   @State private var projects: [Project]
+  @State private var checklistAddHeading: String?
 
   /// Which area/project cluster (if any) is currently the hovered drop
   /// target during a drag. All rows + header sharing the same key light
@@ -2538,7 +2539,11 @@ struct TaskListView: View {
     case .project:
       return AnyView(Group {
         AnyView(starFilterBar)
-        AnyView(projectGroupedRows)
+        if let mode = checklistMode {
+          AnyView(checklistRows(mode: mode))
+        } else {
+          AnyView(projectGroupedRows)
+        }
       })
     case .review:
       return AnyView(Group {
@@ -3175,6 +3180,62 @@ struct TaskListView: View {
   private func refreshProjectHeadings() {
     guard storageFilter == filter else { return }
     headingsStorage = storedProjectHeadings()
+  }
+
+  private var checklistMode: ProjectChecklistMode? {
+    guard case .project(let id) = filter else { return nil }
+    return projects.first { $0.id == id }?.checklistMode
+  }
+
+  @ViewBuilder
+  private func checklistRows(mode: ProjectChecklistMode) -> some View {
+    if case .project(let id) = filter {
+      let headings = projectHeadingList
+      let rows = headings + items
+      let byID = Dictionary(uniqueKeysWithValues: rows.map { ($0.id, $0) })
+      if let layout = ProjectChecklist.layout(rows: rows, mode: mode) {
+        ProjectChecklistAddView(rows: rows, mode: mode, initialHeading: checklistAddHeading) { title, heading in
+          ProjectChecklist.add(title: title, project: id, mode: mode, heading: heading,
+                               headings: headings, mutator: mutator)
+        } reopen: { item in
+          TaskUndo.toggleProjectChecklist(id: item, mutator: mutator)
+        }
+        .padding(.vertical, 8)
+
+        cardedRows(layout.ungrouped.compactMap { byID[$0] }, grouped: true)
+        ForEach(layout.groups, id: \.id) { group in
+          if let heading = byID[group.id] {
+            AnyView(headingRow(heading))
+            cardedRows(group.items.compactMap { byID[$0] }, grouped: true, magicContext: heading.title)
+            Button(RegistrySurfaces.checklistAddItemToGroup(group: heading.title)) { checklistAddHeading = group.id }
+              .font(.septenaMeta)
+          }
+        }
+        if !layout.checked.isEmpty {
+          Text(RegistrySurfaces.checklistChecked)
+            .font(.septenaMeta)
+            .foregroundStyle(.secondary)
+          ForEach(layout.checked.compactMap { byID[$0] }) { task in
+            HStack {
+              Button {
+                TaskUndo.toggleProjectChecklist(id: task.id, mutator: mutator)
+              } label: {
+                Label(task.title, systemImage: "checkmark.circle.fill")
+              }
+              Spacer()
+              if !headings.isEmpty {
+                Menu(task.heading.flatMap { byID[$0]?.title } ?? RegistrySurfaces.checklistMoveToGroup) {
+                  Button(RegistrySurfaces.checklistUngrouped) { mutator.setHeading(id: task.id, heading: nil) }
+                  ForEach(headings) { heading in
+                    Button(heading.title) { mutator.setHeading(id: task.id, heading: heading.id) }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
   }
 
   private var projectHeadingIds: Set<String> { Set(projectHeadingList.map(\.id)) }
@@ -5788,6 +5849,10 @@ struct TaskListView: View {
     // AppKit shell) rather than toggling completion on a trashed row.
     if showingRecentlyDeleted {
       restoreTasks([task.id])
+      return
+    }
+    if mutator.isProjectChecklistItem(id: task.id) {
+      TaskUndo.toggleProjectChecklist(id: task.id, mutator: mutator)
       return
     }
     let newStatus: TaskStatus = task.status == .done ? .open : .done

@@ -268,6 +268,7 @@ export const ENTITIES = {
     columns: {
       title: text(),
       status: text(32),
+      checklistMode: { kind: "text", zod: z.enum(ENTITY_ENUMS.checklistMode).nullable() },
       area: { kind: "text", zod: zId.nullable() },
       created: day(),
       completedAt: stamp(),

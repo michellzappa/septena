@@ -169,3 +169,30 @@ describe("Checklists (1-level subtasks, CL0 #153)", () => {
     assert.equal(store.readChecklistItems("t-stop").length, 0);
   });
 });
+
+describe("Reusable Checklist projects", () => {
+  it("checks a scheduled item without completing it or creating a repeat", async () => {
+    const { store } = await createTestTaskStore();
+    const { runWriteTool } = await import("../src/shadow/writes.ts");
+    await store.push([
+      { clientOpId: opId(), op: "upsert", entity: "project", id: "groceries",
+        fields: { title: "Groceries", status: "active", checklistMode: "groceries" } },
+      { clientOpId: opId(), op: "upsert", entity: "task", id: "milk",
+        fields: { title: "Milk", project: "groceries", status: "open", today: true,
+          scheduled: "2026-11-27", recurrenceUnit: "week", recurrenceInterval: 1 } },
+    ], HUMAN_ACTOR);
+
+    const ctx = { store: store as never, timeZone: "UTC", actor: HUMAN_ACTOR };
+    assert.deepEqual(await runWriteTool(ctx, "tasks_complete", { id: "milk" }), {
+      id: "milk", status: "checklistChecked",
+    });
+    const row = store.readTask("milk")?.task;
+    assert.equal(row?.status, "checklistChecked");
+    assert.equal(row?.project, "groceries");
+    assert.equal(row?.today, false);
+    assert.equal(row?.scheduled, null);
+    assert.equal(row?.completedAt, null);
+    assert.deepEqual(store.readTasks("done", 20).rows, []);
+    assert.deepEqual(store.readTasks("open", 20).rows, []);
+  });
+});

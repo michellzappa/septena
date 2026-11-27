@@ -4220,6 +4220,20 @@
                                     }
                                   ]
                                 },
+                                "checklistMode": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "plain",
+                                        "groceries"
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
                                 "area": {
                                   "anyOf": [
                                     {

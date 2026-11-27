@@ -138,6 +138,7 @@ enum TaskBackendMapping {
     let fields: [String: BackendJSON] = [
       "title": c.text("title", p.title),
       "status": c.text("status", p.statusRaw, max: 32),
+      "checklistMode": c.text("checklistMode", p.checklistModeRaw, max: 32),
       "area": c.id("area", p.area),
       "created": c.day("created", p.created),
       "completedAt": c.stamp("completedAt", p.completedAt),

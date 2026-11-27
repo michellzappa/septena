@@ -1665,7 +1665,8 @@ export class TaskStore extends DurableObject<Env> {
       : null;
     if (taskId && this.convoStopped(taskId)) return "stopped";
     if (op.op !== "appendTurn" && op.entity === "task") {
-      const ends = op.op === "delete" || op.fields.status === "done" || op.fields.status === "cancelled";
+      const ends = op.op === "delete" || op.fields.status === "done"
+        || op.fields.status === "cancelled" || op.fields.status === "checklistChecked";
       if (ends && this.convoRequiresHumanAccept(op.id)) return "human_accepts";
       // Only the user ends a wait (ADR 0053): an agent may set one, never
       // clear it or close the task while it waits.

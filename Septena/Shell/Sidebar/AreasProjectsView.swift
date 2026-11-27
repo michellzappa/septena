@@ -350,8 +350,8 @@ struct AreaDetailView: View {
     }
     #endif
     .sheet(isPresented: $showingNewProject) {
-      NewProjectSheet(areas: areas, initialAreaId: area.id) { title, areaId in
-        createProjectInArea(title: title, areaId: areaId)
+      NewProjectSheet(areas: areas, initialAreaId: area.id) { title, areaId, mode in
+        createProjectInArea(title: title, areaId: areaId, mode: mode)
       }
       .presentationDetents([.medium])
       .septenaSheetChrome()
@@ -405,13 +405,13 @@ struct AreaDetailView: View {
     }
   }
 
-  private func createProjectInArea(title: String, areaId: String?) {
+  private func createProjectInArea(title: String, areaId: String?, mode: ProjectChecklistMode?) {
     let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty else { return }
     Haptics.commit()
     Task {
       do {
-        let project = try await projectsMutator.create(title: trimmed, area: areaId)
+        let project = try await projectsMutator.create(title: trimmed, area: areaId, checklistMode: mode)
         // Recorded at the gesture, after the create lands: undo removes it.
         TaskUndo.recordProjectCreate(project, projects: projectsMutator)
         await load()
@@ -513,10 +513,15 @@ struct AreaDetailView: View {
       // Ink (not accent) ring, sized + nudged to sit exactly over the task
       // checkboxes in the card below — the same treatment the mixed-list group
       // headers give a project ring.
-      ProjectProgressIcon(progress: projectProgress[project.id] ?? 0,
-                          tint: Theme.inkSecondary, diameter: 14)
-        .frame(width: Theme.checkboxTap, alignment: .center)
-        .offset(x: -Theme.checkboxLeadingNudge)
+      Group {
+        if project.checklistMode == nil {
+          ProjectProgressIcon(progress: projectProgress[project.id] ?? 0, tint: Theme.inkSecondary, diameter: 14)
+        } else {
+          Image(systemName: "checklist").foregroundStyle(Theme.inkSecondary)
+        }
+      }
+      .frame(width: Theme.checkboxTap, alignment: .center)
+      .offset(x: -Theme.checkboxLeadingNudge)
 
       Text(project.title)
         .font(.septenaTaskTitle.weight(.semibold))
@@ -735,9 +740,15 @@ struct ProjectDetailView: View {
             // Same glyph as the mixed-list group headers: ink (not accent),
             // diameter 14 in the checkbox-width column so it reads identically
             // wherever a project progress ring appears.
-            ProjectProgressIcon(progress: progress, tint: Theme.inkSecondary, diameter: 14)
-              .frame(width: Theme.checkboxTap, alignment: .center)
-              .offset(x: -Theme.checkboxLeadingNudge)
+            Group {
+              if project.checklistMode == nil {
+                ProjectProgressIcon(progress: progress, tint: Theme.inkSecondary, diameter: 14)
+              } else {
+                Image(systemName: "checklist").foregroundStyle(Theme.inkSecondary)
+              }
+            }
+            .frame(width: Theme.checkboxTap, alignment: .center)
+            .offset(x: -Theme.checkboxLeadingNudge)
             ClickToEditTitle(placeholder: "Project", text: $draftName,
                              onCommit: { commitNameTo($0) }) {
               if nav.showsTitleNavMenu(usesPushNavigation: usesPushNavigation) {
@@ -888,6 +899,14 @@ struct ProjectDetailView: View {
       } label: {
         Label(RegistryActions.title(.sectionNew), systemImage: "rectangle.split.1x2")
       }
+      if project.checklistMode == nil {
+        Button(RegistrySurfaces.checklistUseAsChecklist) {
+          Task { try await projectsMutator.useAsChecklist(id: project.id) }
+        }
+        Button(RegistrySurfaces.checklistUseForGroceries) {
+          Task { try await projectsMutator.useAsChecklist(id: project.id, mode: .groceries) }
+        }
+      }
       // Sort By for this project's tasks (docs/LIST_SORT_SPEC.md §6).
       ListSortMenu(filter: .project(project.id))
       Divider()
@@ -982,7 +1001,7 @@ struct ProjectDetailView: View {
         switch t.status {
         case .done:                 done += 1; total += 1
         case .open:                 total += 1
-        case .cancelled:            break
+        case .cancelled, .checklistChecked: break
         }
       }
       let fresh = total > 0 ? Double(done) / Double(total) : 0

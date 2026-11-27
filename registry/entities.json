@@ -48,7 +48,8 @@
     "turnNoteMax": 100000
   },
   "enums": {
-    "taskStatus": ["open", "done", "cancelled"],
+    "taskStatus": ["open", "done", "cancelled", "checklistChecked"],
+    "checklistMode": ["plain", "groceries"],
     "taskSource": ["app", "mcp"],
     "projectStatus": ["active", "done", "cancelled"],
     "taskKind": ["heading"],
@@ -156,6 +157,7 @@
       "columns": {
         "title": { "kind": "text", "max": 2000, "nullable": true },
         "status": { "kind": "text", "max": 32, "nullable": true },
+        "checklistMode": { "kind": "text", "enum": "checklistMode", "nullable": true },
         "area": { "kind": "text", "format": "id", "nullable": true },
         "created": { "kind": "text", "format": "day", "nullable": true },
         "completedAt": { "kind": "text", "format": "stamp", "max": 40, "nullable": true },

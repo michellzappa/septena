@@ -59,7 +59,13 @@ pub mod enums {
         pub const OPEN: &str = "open";
         pub const DONE: &str = "done";
         pub const CANCELLED: &str = "cancelled";
-        pub const ALL: &[&str] = &["open", "done", "cancelled"];
+        pub const CHECKLIST_CHECKED: &str = "checklistChecked";
+        pub const ALL: &[&str] = &["open", "done", "cancelled", "checklistChecked"];
+    }
+    pub mod checklist_mode {
+        pub const PLAIN: &str = "plain";
+        pub const GROCERIES: &str = "groceries";
+        pub const ALL: &[&str] = &["plain", "groceries"];
     }
     pub mod task_source {
         pub const APP: &str = "app";

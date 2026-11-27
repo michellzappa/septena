@@ -9,6 +9,7 @@ enum TaskStatus: String, Codable, Hashable {
   case open
   case done
   case cancelled
+  case checklistChecked
 }
 
 /// Provenance values stamped on a row's `source` field — what authored it.
@@ -951,10 +952,16 @@ enum ProjectStatus: String, Codable, Hashable {
   case cancelled
 }
 
+enum ProjectChecklistMode: String, Codable, Hashable {
+  case plain
+  case groceries
+}
+
 struct Project: Identifiable, Codable, Hashable {
   let id: String
   var title: String
   var status: ProjectStatus
+  var checklistMode: ProjectChecklistMode?
   var area: String?
   var created: String?
   var completedAt: String?
@@ -978,7 +985,7 @@ struct Project: Identifiable, Codable, Hashable {
   var deletedAt: String?
 
   enum CodingKeys: String, CodingKey {
-    case id, title, status, area, created, notes, context
+    case id, title, status, checklistMode, area, created, notes, context
     case completedAt = "completed_at"
     case githubRepo = "github_repo"
     case updatedAt = "updated_at"
@@ -986,12 +993,14 @@ struct Project: Identifiable, Codable, Hashable {
   }
 
   init(id: String, title: String, status: ProjectStatus = .active,
+       checklistMode: ProjectChecklistMode? = nil,
        area: String? = nil, created: String? = nil, completedAt: String? = nil,
        notes: String? = nil, context: String? = nil, noteRev: Int = 0,
        notesProposal: NotesProposal? = nil, githubRepo: String? = nil,
        share: ProjectShare? = nil, position: Int = 0,
        updatedAt: String? = nil, deletedAt: String? = nil) {
     self.id = id; self.title = title; self.status = status
+    self.checklistMode = checklistMode
     self.area = area; self.created = created; self.completedAt = completedAt
     self.notes = notes; self.context = context; self.noteRev = noteRev
     self.notesProposal = notesProposal; self.githubRepo = githubRepo
@@ -1005,6 +1014,7 @@ struct Project: Identifiable, Codable, Hashable {
     id = try c.decode(String.self, forKey: .id)
     title = try c.decodeIfPresent(String.self, forKey: .title) ?? id
     status = (try? c.decode(ProjectStatus.self, forKey: .status)) ?? .active
+    checklistMode = try? c.decode(ProjectChecklistMode.self, forKey: .checklistMode)
     area = try c.decodeIfPresent(String.self, forKey: .area)
     created = try c.decodeIfPresent(String.self, forKey: .created)
     completedAt = try c.decodeIfPresent(String.self, forKey: .completedAt)

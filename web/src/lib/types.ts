@@ -282,10 +282,13 @@ export interface ProjectShareInfo {
   members: ShareMember[];
 }
 
+export type ProjectChecklistMode = "plain" | "groceries";
+
 export interface ProjectRow {
   id: string;
   title: string;
   status: "active" | "done" | "cancelled" | string;
+  checklistMode?: ProjectChecklistMode | null;
   area?: string | null;
   created?: string | null;
   completedAt?: string | null;

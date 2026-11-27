@@ -19,7 +19,9 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
@@ -53,10 +55,15 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.septena.android.AndroidAppGraph
 import app.septena.core.JsonValue
+import app.septena.core.ProjectChecklistRules
+import app.septena.core.SyncRecord
 import app.septena.core.RegistryCatalog
 import app.septena.core.generated.RegistryActionIds
+import app.septena.core.generated.RegistryEntityEnums
+import app.septena.core.generated.RegistryEntityFields
 import app.septena.core.generated.RegistryPlacesScreenIds
 import app.septena.core.generated.RegistryPromptIds
+import app.septena.core.generated.RegistrySurfaceIds
 import app.septena.core.generated.RegistryTaskAttributeIds
 import app.septena.core.stringValue
 import app.septena.ui.ChevronRightGlyph
@@ -325,6 +332,16 @@ fun AreasProjectsScreen(
                                     },
                                 )
                                 if (destination is AreasProjectsDestination.Project) {
+                                    if (state.checklistMode == null) {
+                                        PlaceMenuItem(title = checklistCopy("useAsChecklist", languageTag), onClick = {
+                                            menuOpen = false
+                                            viewModel.useAsChecklist(RegistryEntityEnums.ChecklistMode.PLAIN)
+                                        })
+                                        PlaceMenuItem(title = checklistCopy("useForGroceries", languageTag), onClick = {
+                                            menuOpen = false
+                                            viewModel.useAsChecklist(RegistryEntityEnums.ChecklistMode.GROCERIES)
+                                        })
+                                    }
                                     PlaceMenuItem(
                                         title = RegistryCatalog.submenuTitle("sidebar.project", "moveToArea", languageTag).orEmpty(),
                                         onClick = {
@@ -597,7 +614,19 @@ fun AreasProjectsScreen(
                     }
                 }
 
-                if (destination is AreasProjectsDestination.Project) {
+                if (destination is AreasProjectsDestination.Project && state.checklistMode != null) {
+                    item(key = "project-checklist") {
+                        ProjectChecklistContent(
+                            rows = state.checklistRows,
+                            groceries = state.checklistMode == RegistryEntityEnums.ChecklistMode.GROCERIES,
+                            add = viewModel::addChecklistItem,
+                            toggle = viewModel::toggleChecklistItem,
+                            move = viewModel::moveChecklistItem,
+                            delete = viewModel::deleteChecklistItem,
+                            open = onOpenTask,
+                        )
+                    }
+                } else if (destination is AreasProjectsDestination.Project) {
                     item(key = "project-tasks-heading") {
                         Text(
                             text = surfaceText(RegistryPlacesScreenIds.TASKS_HEADING, "label", languageTag),
@@ -1262,4 +1291,122 @@ private fun AreasProjectsDestination.renameAction(): String = when (this) {
 private fun AreasProjectsDestination.renamePrompt(): String = when (this) {
     is AreasProjectsDestination.Area -> RegistryPromptIds.RENAME_AREA
     is AreasProjectsDestination.Project -> RegistryPromptIds.RENAME_PROJECT
+}
+
+@Composable
+private fun ProjectChecklistContent(
+    rows: List<SyncRecord>,
+    groceries: Boolean,
+    add: (String, String?) -> Unit,
+    toggle: (String) -> Unit,
+    move: (String, String?) -> Unit,
+    delete: (String) -> Unit,
+    open: (String) -> Unit,
+) {
+    val languageTag = LocalConfiguration.current.locales[0].toLanguageTag()
+    fun copy(key: String) = checklistCopy(key, languageTag)
+    var title by rememberSaveable { mutableStateOf("") }
+    var heading by rememberSaveable { mutableStateOf<String?>(null) }
+    val byId = remember(rows) { rows.associateBy(SyncRecord::id) }
+    val headings = remember(rows) {
+        rows.filter { it.fields[RegistryEntityFields.Task.KIND].stringValue() == RegistryEntityEnums.TaskKind.HEADING }
+    }
+    val layout = remember(rows, title, groceries) { ProjectChecklistRules.layout(rows, title, groceries) }
+    fun name(row: SyncRecord?): String = row?.fields?.get(RegistryEntityFields.Task.TITLE).stringValue().orEmpty()
+    fun checked(row: SyncRecord): Boolean =
+        row.fields[RegistryEntityFields.Task.STATUS].stringValue() == RegistryEntityEnums.TaskStatus.CHECKLIST_CHECKED
+
+    Column(Modifier.fillMaxWidth().padding(horizontal = TaskCardMetrics.Margin), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            OutlinedTextField(
+                value = title,
+                onValueChange = { title = it },
+                label = { Text(copy("addItem")) },
+                singleLine = true,
+                modifier = Modifier.weight(1f),
+            )
+            TextButton(enabled = title.isNotBlank(), onClick = {
+                add(title, heading)
+                title = ""
+            }) { Text("Add") }
+        }
+        if (headings.isNotEmpty()) {
+            ChecklistGroupMenu(label = name(byId[heading]).ifBlank { copy("chooseGroup") }, groups = headings, choose = { heading = it })
+        }
+        for (id in layout.matches) {
+            val row = byId[id] ?: continue
+            val savedGroup = row.fields[RegistryEntityFields.Task.HEADING].stringValue()
+            val description = listOfNotNull(name(row), name(byId[savedGroup]).takeIf(String::isNotBlank),
+                copy("onList").takeUnless { checked(row) }).joinToString(" · ")
+            TextButton(enabled = checked(row), onClick = {
+                toggle(id)
+                title = ""
+            }) { Text(description) }
+        }
+        for (id in layout.ungrouped) {
+            val row = byId[id] ?: continue
+            ChecklistProjectRow(id, name(row), checked(row), headings, toggle, move, delete, open)
+        }
+        for (section in layout.groups) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(name(byId[section.id]), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                TextButton(onClick = { heading = section.id }) { Text(copy("addItem")) }
+            }
+            for (id in section.items) {
+                val row = byId[id] ?: continue
+                ChecklistProjectRow(id, name(row), checked(row), headings, toggle, move, delete, open)
+            }
+        }
+        if (layout.checked.isNotEmpty()) {
+            Text(copy("checked"), style = MaterialTheme.typography.titleMedium)
+            for (id in layout.checked) {
+                val row = byId[id] ?: continue
+                ChecklistProjectRow(id, name(row), checked(row), headings, toggle, move, delete, open)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChecklistProjectRow(
+    id: String,
+    title: String,
+    checked: Boolean,
+    groups: List<SyncRecord>,
+    toggle: (String) -> Unit,
+    move: (String, String?) -> Unit,
+    delete: (String) -> Unit,
+    open: (String) -> Unit,
+) {
+    val languageTag = LocalConfiguration.current.locales[0].toLanguageTag()
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Checkbox(checked = checked, onCheckedChange = { toggle(id) },
+            modifier = Modifier.semantics { contentDescription = title })
+        TextButton(onClick = { open(id) }, modifier = Modifier.weight(1f)) { Text(title) }
+        if (groups.isNotEmpty()) {
+            ChecklistGroupMenu(checklistCopy("moveToGroup", languageTag), groups) { move(id, it) }
+        }
+        TextButton(onClick = { delete(id) }) { Text("Delete") }
+    }
+}
+
+@Composable
+private fun ChecklistGroupMenu(label: String, groups: List<SyncRecord>, choose: (String?) -> Unit) {
+    val languageTag = LocalConfiguration.current.locales[0].toLanguageTag()
+    var open by remember { mutableStateOf(false) }
+    Box {
+        TextButton(onClick = { open = true }) { Text(label) }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            DropdownMenuItem(text = { Text(checklistCopy("ungrouped", languageTag)) }, onClick = { open = false; choose(null) })
+            for (group in groups) {
+                val title = group.fields[RegistryEntityFields.Task.TITLE].stringValue().orEmpty()
+                DropdownMenuItem(text = { Text(title) }, onClick = { open = false; choose(group.id) })
+            }
+        }
+    }
+}
+
+internal fun checklistCopy(key: String, languageTag: String): String {
+    val raw = RegistryCatalog.surface(RegistrySurfaceIds.CHECKLIST_PROJECTS)?.fields?.get(key).stringValue().orEmpty()
+    return RegistryCatalog.localizedString(raw, languageTag) ?: raw
 }

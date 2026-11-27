@@ -1152,7 +1152,9 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
       cell.textField?.font = SeptaskKitTheme.taskTitle
       cell.textField?.stringValue = project.title
       cell.textField?.textColor = SeptaskKitTheme.inkPrimary
-      cell.imageView?.image = KitGlyph.progress(progress)
+      cell.imageView?.image = project.checklistMode == nil
+        ? KitGlyph.progress(progress)
+        : NSImage(systemSymbolName: "checklist", accessibilityDescription: nil)
       if let share = project.share {
         cell.sharedMark.isHidden = false
         cell.sharedMark.toolTip = share.membersLabel
@@ -1637,15 +1639,16 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
   /// rename-in-place the sidebar's own New Project does.
   func newProject(inArea areaId: String) { newProject(inArea: areaId, atIndex: nil) }
 
-  private func newProject(inArea areaId: String?, atIndex index: Int?) {
+  private func newProject(inArea areaId: String?, atIndex index: Int?, mode: ProjectChecklistMode? = nil) {
     if let areaId { setCollapsed(false, forKey: "area:\(areaId)") }
     let snapshot = StructureCache.snapshot(in: context)
     let beforeSiblings = projectOrder(inArea: areaId, snapshot: snapshot)
     Task { [weak self] in
       guard let self,
             let project = try? await self.projectsMutator.create(
-              title: RegistryActions.title(.sidebarNewProject),
-              area: areaId)
+              title: mode.map { $0 == .groceries ? RegistrySurfaces.groceriesProjectTitle : RegistrySurfaces.checklistProjectTitle }
+                ?? RegistryActions.title(.sidebarNewProject),
+              area: areaId, checklistMode: mode)
       else { return }
       if let index {
         var ids = beforeSiblings.filter { $0 != project.id }
@@ -1756,6 +1759,11 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     magicDropBadge.isHidden = true
   }
 
+  @objc private func newChecklistFromFooter(_ sender: NSMenuItem) {
+    guard let raw = sender.representedObject as? String, let mode = ProjectChecklistMode(rawValue: raw) else { return }
+    newProject(inArea: selectedAreaID, atIndex: nil, mode: mode)
+  }
+
   private func presentMagicPlusMenu(from button: NSView) {
     let menu = NSMenu()
     if let areaId = selectedAreaID, let areaTitle = selectedAreaTitle {
@@ -1777,6 +1785,14 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     looseProject.target = self
     looseProject.image = NSImage(systemSymbolName: "number", accessibilityDescription: nil)
     menu.addItem(looseProject)
+    for (mode, title) in [(ProjectChecklistMode.plain, RegistrySurfaces.checklistProjectTitle),
+                          (.groceries, RegistrySurfaces.groceriesProjectTitle)] {
+      let item = NSMenuItem(title: title, action: #selector(newChecklistFromFooter(_:)), keyEquivalent: "")
+      item.target = self
+      item.representedObject = mode.rawValue
+      item.image = NSImage(systemSymbolName: "checklist", accessibilityDescription: nil)
+      menu.addItem(item)
+    }
 
     let areaItem = NSMenuItem(
       title: RegistryActions.title(.sidebarNewArea),

@@ -73,7 +73,7 @@ class TaskMutator(
         deferPush = deferPush,
     )
 
-    suspend fun createHeading(title: String, project: String, position: Double? = null): TaskRecord = createTask(
+    suspend fun createHeading(title: String, project: String, position: Double? = null, id: String? = null): TaskRecord = createTask(
         title = title,
         area = null,
         project = project,
@@ -85,6 +85,7 @@ class TaskMutator(
         kind = app.septena.core.generated.RegistryEntityEnums.TaskKind.HEADING,
         heading = null,
         position = position,
+        explicitId = id,
     )
 
     private suspend fun createTask(
@@ -99,9 +100,11 @@ class TaskMutator(
         kind: String?,
         heading: String?,
         position: Double?,
+        explicitId: String? = null,
         deferPush: Boolean = false,
     ): TaskRecord {
-        val id = ids.nextTaskId()
+        val id = explicitId ?: ids.nextTaskId()
+        if (explicitId != null) store.record(RegistryEntityNames.TASK, id)?.let { return it.asTaskRecord() }
         val normalizedTitle = title.trim { it.isWhitespace() }
         val now = clock.now()
         val todayString = clock.today(now).toString()
@@ -549,9 +552,30 @@ class TaskMutator(
         return if (extra.isEmpty()) copy else updateFields(copy.id, extra) ?: copy
     }
 
+    private suspend fun isChecklistItem(task: TaskRecord): Boolean {
+        if (task.fields[RegistryEntityFields.Task.KIND].stringValue() == RegistryEntityEnums.TaskKind.HEADING) return false
+        val project = task.fields[RegistryEntityFields.Task.PROJECT].stringValue() ?: return false
+        val row = store.record(RegistryEntityNames.PROJECT, project) ?: return false
+        return row.deletedAt == null && row.fields[RegistryEntityFields.Project.CHECKLIST_MODE].stringValue() != null
+    }
+
+    suspend fun toggleProjectChecklist(id: String): TaskRecord? {
+        val task = store.record(RegistryEntityNames.TASK, id)?.asTaskRecord() ?: return null
+        if (task.deletedAt != null || !isChecklistItem(task)) return null
+        if (task.status != TaskStatus.OPEN && task.status != TaskStatus.CHECKLIST_CHECKED) return null
+        return writeChecklistState(task)
+    }
+
+    private suspend fun writeChecklistState(task: TaskRecord): TaskRecord? {
+        val updated = updateFields(task.id, ProjectChecklistRules.patch(task.status == TaskStatus.OPEN))
+        if (updated != null) endDoIfClosed(updated)
+        return updated
+    }
+
     suspend fun complete(id: String): TaskRecord? {
         val existing = store.record(RegistryEntityNames.TASK, id)?.asTaskRecord() ?: return null
         if (existing.deletedAt != null || existing.status != TaskStatus.OPEN) return null
+        if (isChecklistItem(existing)) return writeChecklistState(existing)
         val changes = linkedMapOf(
             RegistryEntityFields.Task.STATUS to JsonValue.StringValue(app.septena.core.generated.RegistryEntityEnums.TaskStatus.DONE),
             RegistryEntityFields.Task.COMPLETED_AT to JsonValue.StringValue(WireTimestamp.format(clock.now())),

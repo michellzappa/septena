@@ -1,5 +1,6 @@
 "use client";
 
+import { ProjectChecklist } from "./ProjectChecklist";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Bell,
@@ -335,6 +336,7 @@ export function SeptenaApp() {
   } | null>(null);
 
   // Inline creation & container notes
+  const [creatingChecklistMode, setCreatingChecklistMode] = useState<"plain" | "groceries" | null>(null);
   const [creatingKind, setCreatingKind] = useState<"area" | "project" | "heading" | null>(null);
   const [creatingAreaId, setCreatingAreaId] = useState<string | null>(null);
   const [creatingInsertIndex, setCreatingInsertIndex] = useState<number | null>(null);
@@ -1396,22 +1398,26 @@ export function SeptenaApp() {
 
   const toggleDone = useCallback(
     async (task: TaskRow) => {
-      const wasDone = task.status === "done";
+      const wasChecked = task.status === "checklistChecked";
+      const wasDone = task.status === "done" || wasChecked;
+      const isChecklist = Boolean(task.project && projectById.get(task.project)?.checklistMode);
       const inLogbook = destination.kind === "smart" && destination.id === "logbook";
-      if (wasDone) {
-        settle.cancel(task.id);
-      } else if (!inLogbook) {
-        settle.start(task.id, { reviewGroup: reviewGroupForSettle(task) });
+      if (!isChecklist) {
+        if (wasDone) {
+          settle.cancel(task.id);
+        } else if (!inLogbook) {
+          settle.start(task.id, { reviewGroup: reviewGroupForSettle(task) });
+        }
       }
       const receipt = await engine.toggleTaskDone(task);
       recordCompletion(
-        wasDone ? `Reopened “${task.title}”` : `Completed “${task.title}”`,
+        wasDone ? `Reopened “${task.title}”` : isChecklist ? `Checked “${task.title}”` : `Completed “${task.title}”`,
         receipt,
         () => engine.toggleTaskDone(task),
-        !wasDone,
+        !wasDone && !isChecklist,
       );
     },
-    [destination, engine, recordCompletion, reviewGroupForSettle, settle],
+    [destination, engine, projectById, recordCompletion, reviewGroupForSettle, settle],
   );
 
   const acceptReview = useCallback(
@@ -2447,6 +2453,7 @@ export function SeptenaApp() {
     setCreatingKind(null);
     setCreatingAreaId(null);
     setCreatingInsertIndex(null);
+    setCreatingChecklistMode(null);
     if (kind === "area") {
       const area = await engine.createArea(title);
       if (insertIndex !== null) {
@@ -2456,7 +2463,7 @@ export function SeptenaApp() {
       }
       setDestination({ kind: "area", id: area.id });
     } else if (kind === "project") {
-      const proj = await engine.createProject(title, targetAreaId);
+      const proj = await engine.createProject(title, targetAreaId, creatingChecklistMode);
       if (insertIndex !== null) {
         const siblings = activeProjects.filter(
           (p) => (p.area ?? null) === (targetAreaId ?? null) && p.id !== proj.id,
@@ -2522,6 +2529,8 @@ export function SeptenaApp() {
     });
   };
 
+  const checklistProject = destination.kind === "project" ? projectById.get(destination.id) : undefined;
+
   const openProjectContextMenu = (e: React.MouseEvent, proj: ProjectRow) => {
     e.preventDefault();
     const currentAreaId = proj.area ?? null;
@@ -2556,6 +2565,10 @@ export function SeptenaApp() {
         { kind: "divider" },
         ...moveAreaItems,
         { kind: "divider" },
+        ...(!proj.checklistMode ? [
+          { kind: "item" as const, label: "Use as Checklist", onSelect: () => void engine.updateProject(proj, { checklistMode: "plain" }) },
+          { kind: "item" as const, label: "Use for Groceries", onSelect: () => void engine.updateProject(proj, { checklistMode: "groceries" }) },
+        ] : []),
         {
           kind: "item",
           label: "Mark Done",
@@ -3714,7 +3727,7 @@ export function SeptenaApp() {
                     }`}
                   >
                     <span className="flex h-4 w-4 shrink-0 items-center justify-center">
-                      <ProjectRing done={stats.done} total={stats.total} />
+                      {proj.checklistMode ? <span aria-hidden="true">☑</span> : <ProjectRing done={stats.done} total={stats.total} />}
                     </span>
                     <span className="flex min-w-0 flex-1 items-center gap-1.5">
                       <span className="truncate text-left">{proj.title}</span>
@@ -3983,7 +3996,7 @@ export function SeptenaApp() {
                             }`}
                           >
                             <span className="flex h-4 w-4 shrink-0 items-center justify-center">
-                              <ProjectRing done={stats.done} total={stats.total} />
+                              {proj.checklistMode ? <span aria-hidden="true">☑</span> : <ProjectRing done={stats.done} total={stats.total} />}
                             </span>
                             <span className="flex min-w-0 flex-1 items-center gap-1.5">
                               <span className="truncate text-left">{proj.title}</span>
@@ -4050,6 +4063,7 @@ export function SeptenaApp() {
                 onKeyDown={(e) => {
                   if (e.key === "Escape") {
                     setCreatingKind(null);
+                    setCreatingChecklistMode(null);
                     setCreatingAreaId(null);
                     setCreatingInsertIndex(null);
                     setNewContainerTitle("");
@@ -4058,6 +4072,19 @@ export function SeptenaApp() {
                 placeholder={creatingKind === "area" ? "New area name…" : "New project name…"}
                 className="w-full rounded-lg border border-[var(--accent)] bg-[var(--bg-elevated)] px-2.5 py-1 text-xs text-[var(--text-primary)] outline-none"
               />
+              {creatingKind === "project" && (
+                <select
+                  aria-label="Project type"
+                  value={creatingChecklistMode ?? ""}
+                  onChange={(e) => setCreatingChecklistMode(e.target.value === "groceries" ? "groceries" :
+                    e.target.value === "plain" ? "plain" : null)}
+                  className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-elevated)] px-2 py-1 text-[11px] text-[var(--text-secondary)]"
+                >
+                  <option value="">Project</option>
+                  <option value="plain">Checklist</option>
+                  <option value="groceries">Groceries</option>
+                </select>
+              )}
               {creatingKind === "project" && activeAreas.length > 0 && (
                 <select
                   aria-label="Area"
@@ -4769,7 +4796,7 @@ export function SeptenaApp() {
             {/* Inline Quick-Add Composer — aligned on the same 22px leading axis as task checkboxes */}
             {/* Shown where a new task lands in this list (registry newTaskTarget "here" or
                 "tomorrow"); a "today" list sends N and New Task to Today instead. */}
-            {newTaskTarget !== "today" && (
+            {newTaskTarget !== "today" && !checklistProject?.checklistMode && (
               <form
                 onSubmit={(e) => void handleQuickAddInline(e)}
                 className={`mb-5 flex items-center gap-2.5 rounded-[14px] border border-[var(--border-subtle)]/75 px-3 py-2.5 focus-within:border-[var(--accent)] ${
@@ -4802,7 +4829,10 @@ export function SeptenaApp() {
             )}
 
             {/* Task Lists — iOS grouped rounded cards on soft gray canvas */}
-            {listedTasks.length === 0 && projectHeadings.length === 0 && completedTodayTasks.length === 0 ? (
+            {checklistProject?.checklistMode ? (
+              <ProjectChecklist key={checklistProject.id} project={checklistProject} tasks={syncState.snapshot.tasks}
+                engine={engine} toggle={toggleDone} open={(task) => setTaskPageId(task.id)} />
+            ) : listedTasks.length === 0 && projectHeadings.length === 0 && completedTodayTasks.length === 0 ? (
               <div className="py-16 text-center">
                 <p className="text-sm font-medium text-[var(--text-secondary)]">{pageMeta.emptyTitle}</p>
                 <p className="mt-1 text-xs text-[var(--text-muted)]">{pageMeta.emptyDetail}</p>

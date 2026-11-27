@@ -283,6 +283,21 @@
       "signIn.manage.addEmail"
     ]
   },
+  "Add item": {
+    "text": "Add item",
+    "paths": [
+      "surfaces.checklistProjects.addItem"
+    ]
+  },
+  "Add item to {group}": {
+    "text": "Add item to {group}",
+    "placeholders": [
+      "group"
+    ],
+    "paths": [
+      "surfaces.checklistProjects.addItemToGroup"
+    ]
+  },
   "Add the MCP server URL to any MCP client, or paste the setup prompt into your agent. When your browser shows an 8-character code, enter it above. Only enter a code from a window you opened yourself.": {
     "text": "Add the MCP server URL to any MCP client, or paste the setup prompt into your agent. When your browser shows an 8-character code, enter it above. Only enter a code from a window you opened yourself.",
     "paths": [
@@ -740,6 +755,12 @@
       "settings.pages.about.sections.actions.items.3.label"
     ]
   },
+  "Checked": {
+    "text": "Checked",
+    "paths": [
+      "surfaces.checklistProjects.checked"
+    ]
+  },
   "Checking the code…": {
     "text": "Checking the code…",
     "paths": [
@@ -749,13 +770,20 @@
   "Checklist": {
     "text": "Checklist",
     "paths": [
-      "surfaces.taskAttributes.checklist.label"
+      "surfaces.taskAttributes.checklist.label",
+      "surfaces.checklistProjects.checklist"
     ]
   },
   "Choose a plan": {
     "text": "Choose a plan",
     "paths": [
       "plans.paywall.choosePlan"
+    ]
+  },
+  "Choose group": {
+    "text": "Choose group",
+    "paths": [
+      "surfaces.checklistProjects.chooseGroup"
     ]
   },
   "Choose when agent comments notify you. You can override this for any connected agent below.": {
@@ -1858,6 +1886,12 @@
       "actions.actions.task.gotItBack.title"
     ]
   },
+  "Groceries": {
+    "text": "Groceries",
+    "paths": [
+      "surfaces.checklistProjects.groceries"
+    ]
+  },
   "Group Today by list": {
     "text": "Group Today by list",
     "paths": [
@@ -2488,6 +2522,12 @@
       "plans.outcomes.everywhere.rows.new_device.label"
     ]
   },
+  "Move to group": {
+    "text": "Move to group",
+    "paths": [
+      "surfaces.checklistProjects.moveToGroup"
+    ]
+  },
   "Move up": {
     "text": "Move up",
     "paths": [
@@ -2891,6 +2931,12 @@
       "surfaces.firstRun.steps.welcome.points.0.title"
     ]
   },
+  "On list": {
+    "text": "On list",
+    "paths": [
+      "surfaces.checklistProjects.onList"
+    ]
+  },
   "On this device": {
     "text": "On this device",
     "paths": [
@@ -3284,7 +3330,8 @@
   "Project": {
     "text": "Project",
     "paths": [
-      "surfaces.prompts.items.deleteProject.untitledName"
+      "surfaces.prompts.items.deleteProject.untitledName",
+      "surfaces.checklistProjects.project"
     ]
   },
   "Project name": {
@@ -3292,6 +3339,12 @@
     "paths": [
       "surfaces.prompts.text.newProject.placeholder",
       "surfaces.prompts.text.renameProject.placeholder"
+    ]
+  },
+  "Project type": {
+    "text": "Project type",
+    "paths": [
+      "surfaces.checklistProjects.projectType"
     ]
   },
   "Projects": {
@@ -4918,6 +4971,12 @@
       "actions.actions.task.toggleStar.removeTitle"
     ]
   },
+  "Ungrouped": {
+    "text": "Ungrouped",
+    "paths": [
+      "surfaces.checklistProjects.ungrouped"
+    ]
+  },
   "Unknown device": {
     "text": "Unknown device",
     "paths": [
@@ -4954,10 +5013,22 @@
       "signIn.email.differentEmail"
     ]
   },
+  "Use as Checklist": {
+    "text": "Use as Checklist",
+    "paths": [
+      "surfaces.checklistProjects.useAsChecklist"
+    ]
+  },
   "Use default": {
     "text": "Use default",
     "paths": [
       "settings.copy.access_agents.notificationsDefault.label"
+    ]
+  },
+  "Use for Groceries": {
+    "text": "Use for Groceries",
+    "paths": [
+      "surfaces.checklistProjects.useForGroceries"
     ]
   },
   "Use my Claude": {

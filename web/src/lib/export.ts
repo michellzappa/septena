@@ -178,6 +178,7 @@ export function parseImportJson(rawText: string): ParsedBackupPreview {
       id: String(p.id),
       title: String(p.title).trim(),
       status: p.status === "done" || p.status === "cancelled" ? p.status : "active",
+      checklistMode: p.checklistMode === "plain" || p.checklistMode === "groceries" ? p.checklistMode : null,
       area: typeof p.area === "string" ? p.area : null,
       notes: typeof p.notes === "string" ? p.notes : null,
       created: typeof p.created === "string" ? p.created : null,
@@ -198,7 +199,7 @@ export function parseImportJson(rawText: string): ParsedBackupPreview {
     .map((t) => ({
       id: String(t.id),
       title: String(t.title).trim(),
-      status: t.status === "done" || t.status === "cancelled" ? t.status : "open",
+      status: t.status === "done" || t.status === "cancelled" || t.status === "checklistChecked" ? t.status : "open",
       kind: t.kind === "heading" ? "heading" : null,
       heading: typeof t.heading === "string" ? t.heading : null,
       area: typeof t.area === "string" ? t.area : null,

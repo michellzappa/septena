@@ -75,6 +75,19 @@ final class TaskMutator {
                                deferPush: deferPush, atBottom: atBottom)
   }
 
+  func isProjectChecklistItem(id: String) -> Bool {
+    guard let cloudBackend, let entity = cloudBackend.fetch(id: id) else { return false }
+    return cloudBackend.isProjectChecklistItem(entity)
+  }
+
+  func toggleProjectChecklist(id: String) -> (before: [String: BackendJSON], after: [String: BackendJSON])? {
+    cloudBackend?.toggleProjectChecklist(id: id)
+  }
+
+  func restoreChecklistFields(id: String, from expected: [String: BackendJSON], to fields: [String: BackendJSON]) {
+    cloudBackend?.restoreChecklistFields(id: id, from: expected, to: fields)
+  }
+
   func complete(id: String) {
     guard let cloudBackend else {
       SeptenaLog.error("[TaskMutator] complete called before CK bound — dropping", nil)
@@ -588,13 +601,13 @@ final class TaskMutator {
   /// Create a project section-divider "heading" (docs/ORDERING_AND_HEADINGS_PLAN.md).
   @discardableResult
   func createHeading(title: String, project: String, atTop: Bool = false,
-                     afterHeadingID: String? = nil) -> SeptenaTask? {
+                     afterHeadingID: String? = nil, id: String? = nil) -> SeptenaTask? {
     guard let cloudBackend else {
       SeptenaLog.error("[TaskMutator] createHeading called before CK bound — dropping", nil)
       return nil
     }
     return cloudBackend.createHeading(title: title, project: project, atTop: atTop,
-                                      afterHeadingID: afterHeadingID)
+                                      afterHeadingID: afterHeadingID, id: id)
   }
 
   /// File a task under a heading (or clear it with `nil`).
