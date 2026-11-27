@@ -66,15 +66,16 @@ filters.
 
 ## 3. Choreography
 
-The Inbox header stays on screen when the Inbox is empty (it carries the `+`
-capture slot), so the motion happens inside the header. No row, section or
-layout height animates beyond what the list already does.
+An empty Inbox draws no band (#708, [TRIAGE_BAND_SPEC.md](TRIAGE_BAND_SPEC.md)).
+The header stays on screen only for the motion: the motion happens inside the
+header, and the header leaves when the motion ends. Without the motion (setting
+off, budget spent, Reduce Motion), the header leaves with the last row.
 
 | Time | What happens |
 |---|---|
 | 0 | The last row leaves with the existing settle animation (`SettleStore`, `Theme.Motion.settle`). The motion waits for the settle to end. |
 | settle end | The header icon changes from the filled tray (`tray.full`) to a check mark with the SF Symbols replace content transition. The check mark draws on (SF Symbols 7 draw-on effect). The count goes to 0 with a numeric content transition. The haptic plays. |
-| + ~0.9 s | The check mark changes back to the empty tray (`tray`) with the replace transition. The header is now at rest. |
+| + ~0.9 s | The check mark changes back to the empty tray (`tray`) with the replace transition. Then the header leaves with the list's normal row animation. |
 
 Rules:
 

@@ -9,6 +9,18 @@
 > `tasks_list view=inbox`; `triage` is an alias). Deleting an area or project
 > never puts tasks in the Inbox (`docs/RECENTLY_DELETED_SPEC.md`).
 
+> **Empty Inbox draws no band (decided 2026-11-26, built #708).** With zero
+> Inbox rows, Today shows no Inbox header and no band on every platform. The
+> band appears with its first item (a capture, an agent proposal, a pending
+> reminder). When the last item leaves, the inbox-zero checkmark plays in the
+> header ([INBOX_ZERO_MOTION_SPEC.md](INBOX_ZERO_MOTION_SPEC.md)), then the
+> header goes. A capture opened while the Inbox is empty sits at the foot of
+> Today's own list (`showsQuickAddAtTodayFoot` in `TaskListView`,
+> `moveDraftToTodayFoot` in `SeptaskKitTaskList`) and stays there until it
+> closes; while the band shows, the capture sits at the band's foot. The web
+> app and Android already drew no band for an empty Inbox; their capture is
+> a sheet, not a line in the band.
+
 > **Decided 2026-11-25, not built (#499):** an unanswered agent proposal expires
 > to the Faded pile ([ADR 0039](adr/0039-unanswered-proposals-expire.md)). The
 > "ratification-by-timeout" below goes when that ships.
