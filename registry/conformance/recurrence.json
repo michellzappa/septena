@@ -1,6 +1,43 @@
 {
   "version": 1,
   "description": "Golden conformance vectors for recurrence arithmetic (nextScheduledDate, occurrenceID, checklistOccurrenceID) across Swift, TypeScript, and Kotlin (docs/RECURRENCE_V2_SPEC.md).",
+  "missedWindows": [
+    {
+      "name": "an overdue chore keeps its existing row open",
+      "input": {"mode": "keepOneOpen", "lastSlot": "2026-11-03", "today": "2026-11-24", "rule": {"unit": "week", "interval": 1, "afterCompletion": false}},
+      "expected": {"create": [], "expireBefore": null, "hasMore": false}
+    },
+    {
+      "name": "a daily habit skips missed slots and opens only the latest one",
+      "input": {"mode": "startFresh", "lastSlot": "2026-11-03", "today": "2026-11-07", "rule": {"unit": "day", "interval": 1, "afterCompletion": false}},
+      "expected": {"create": ["2026-11-07"], "expireBefore": "2026-11-07", "hasMore": false}
+    },
+    {
+      "name": "a timely reconciliation keeps the existing habit and expires older slots",
+      "input": {"mode": "startFresh", "lastSlot": "2026-11-07", "today": "2026-11-07", "rule": {"unit": "day", "interval": 1, "afterCompletion": false}},
+      "expected": {"create": [], "expireBefore": "2026-11-07", "hasMore": false}
+    },
+    {
+      "name": "a timed habit expires only once its next slot begins",
+      "input": {"mode": "startFresh", "lastSlot": "2026-11-06", "today": "2026-11-07", "rule": {"unit": "day", "interval": 1, "afterCompletion": false}, "startTime": "09:00", "localTime": "08:59"},
+      "expected": {"create": [], "expireBefore": "2026-11-06", "hasMore": false}
+    },
+    {
+      "name": "a timed habit opens at the scheduled minute",
+      "input": {"mode": "startFresh", "lastSlot": "2026-11-06", "today": "2026-11-07", "rule": {"unit": "day", "interval": 1, "afterCompletion": false}, "startTime": "09:00", "localTime": "09:00"},
+      "expected": {"create": ["2026-11-07"], "expireBefore": "2026-11-07", "hasMore": false}
+    },
+    {
+      "name": "every owed timesheet has its own due date",
+      "input": {"mode": "keepEach", "lastSlot": "2026-11-03", "today": "2026-11-25", "rule": {"unit": "week", "interval": 1, "afterCompletion": false}},
+      "expected": {"create": ["2026-11-10", "2026-11-17", "2026-11-24"], "expireBefore": null, "hasMore": false}
+    },
+    {
+      "name": "a completion-anchored repeat cannot generate from the calendar",
+      "input": {"mode": "keepEach", "lastSlot": "2026-11-03", "today": "2026-11-27", "rule": {"unit": "month", "interval": 1, "afterCompletion": true}},
+      "expected": {"create": [], "expireBefore": null, "hasMore": false}
+    }
+  ],
   "nextScheduledDate": [
     {
       "name": "daily after completion advances from completedOn",
