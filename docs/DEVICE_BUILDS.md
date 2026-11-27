@@ -31,6 +31,8 @@ A manual run works too: Actions, Septena iOS TestFlight, `branch`.
 | --- | --- |
 | Environment `apple-release`: deploys from `main` only | GitHub |
 | Environment `apple-device`: deploys from `main` only, mz approves | GitHub |
+| Environment `cloudflare-deploy`: deploys from `main` only | GitHub |
+| Ruleset `main: require PR (block deploy keys)`: Admin-only bypass | GitHub |
 | Internal group "Device builds" with only mz in it | App Store Connect |
 
 ## Before another machine gets push access
