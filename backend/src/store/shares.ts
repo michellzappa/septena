@@ -27,7 +27,7 @@ export const SHARED_PROJECT_ROW = "project";
 export const SHARED_FIELDS: Record<SharedEntity, readonly string[]> = {
   task: [
     "title", "status", "kind", "heading", "created", "deadline", "completedAt", "notes", "position",
-    "recurrenceUnit", "recurrenceInterval", "recurrenceAfterCompletion", "recurrencePaused",
+    "recurrenceUnit", "recurrenceInterval", "recurrenceAfterCompletion", "recurrenceMissed", "recurrenceMissedFrom", "recurrencePaused",
     "recurrenceSeriesID", "recurrenceAnchorDate", "recurrenceWeekdays", "recurrenceMonthDay",
     "recurrenceOrdinalWeekday", "createdAt", "dropReason", "assignedTo", "assignedBy", "assignedAt",
   ],

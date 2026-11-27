@@ -64,6 +64,8 @@ final class TaskEntity {
   var recurrenceUnit: String?
   var recurrenceInterval: Int
   var recurrenceAfterCompletion: Bool
+  var recurrenceMissed: String?
+  var recurrenceMissedFrom: String?
   /// Keeps the repeat rule while preventing completion from generating the
   /// next copy. Pause/resume is a series-level operation.
   /// The `= false` is REQUIRED, not style: a new non-optional attribute with
@@ -386,6 +388,7 @@ final class TaskEntity {
       return Recurrence(unit: unit,
                         interval: recurrenceInterval,
                         afterCompletion: recurrenceAfterCompletion,
+                        missed: recurrenceMissed.flatMap(MissedRepeatBehavior.init(rawValue:)),
                         weekdays: weekdays,
                         monthDay: recurrenceMonthDay,
                         ordinalWeekday: ordinalWeekday)
@@ -394,6 +397,8 @@ final class TaskEntity {
       recurrenceUnit = newValue?.unit.rawValue
       recurrenceInterval = newValue?.interval ?? 1
       recurrenceAfterCompletion = newValue?.afterCompletion ?? true
+      recurrenceMissed = newValue?.missed?.rawValue
+      if newValue?.missed == nil { recurrenceMissedFrom = nil }
       if let w = newValue?.weekdays, !w.isEmpty,
          let data = try? JSONEncoder().encode(w),
          let s = String(data: data, encoding: .utf8) {
@@ -1309,7 +1314,7 @@ enum LocalCache {
         guard row.fadedAt == nil else { continue }
         total[project, default: 0] += 1
         open[project, default: 0] += 1
-      case .cancelled, .checklistChecked:
+      case .cancelled, .checklistChecked, .repeatExpired:
         break
       }
     }
@@ -1665,7 +1670,7 @@ enum LocalCache {
       case .open: open += 1
       case .done: done += 1
       case .cancelled: cancelled += 1
-      case .checklistChecked: break
+      case .checklistChecked, .repeatExpired: break
       }
       if e.today { todayFlag += 1 }
       if let s = e.scheduled, s <= today { scheduledLE += 1 }

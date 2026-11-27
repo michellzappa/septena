@@ -141,8 +141,9 @@ final class CloudKitTasksBackend {
   @discardableResult
   private func createRecurringOccurrence(from entity: TaskEntity,
                                          recurrence: Recurrence,
-                                         scheduled: String) -> Bool {
-    let id = Recurrence.occurrenceID(sourceTaskID: entity.id, scheduled: scheduled)
+                                         scheduled: String,
+                                         calendarSeriesID: String? = nil) -> Bool {
+    let id = Recurrence.occurrenceID(sourceTaskID: calendarSeriesID ?? entity.id, scheduled: scheduled)
     guard fetch(id: id) == nil else {
       SeptenaLog.info("[CK] recurrence.create id=\(id) already exists — idempotent no-op")
       return false
@@ -190,6 +191,7 @@ final class CloudKitTasksBackend {
     )
     next.assignedTo = entity.assignedTo
     next.recurrence = recurrence
+    next.recurrenceMissedFrom = entity.recurrenceMissedFrom
     if let shifted = TaskReminderRules.shiftForRecurrence(
       sourceReminderAt: entity.reminderAt,
       sourceScheduled: entity.recurrenceAnchorDate ?? entity.scheduled,
@@ -473,7 +475,8 @@ final class CloudKitTasksBackend {
     // `appToday`, not `SeptenaDate.today`: the next occurrence must be computed
     // against the day the user is actually looking at, so time travel can
     // exercise a repeat rule. In Release the two are identical.
-    let nextDate = entity.recurrencePaused ? nil : recurrence?.nextDate(
+    let followsCalendar = recurrence?.missed?.advancesOnSchedule == true
+    let nextDate = entity.recurrencePaused || followsCalendar ? nil : recurrence?.nextDate(
       completedOn: DayClock.appToday,
       scheduled: entity.scheduled,
       logicalScheduled: entity.recurrenceAnchorDate
@@ -502,7 +505,7 @@ final class CloudKitTasksBackend {
     commitAndPush(entity, op: "complete")
     if let recurrence, let nextDate {
       createRecurringOccurrence(from: entity, recurrence: recurrence, scheduled: nextDate)
-    } else if recurrence != nil {
+    } else if recurrence != nil && !followsCalendar {
       SeptenaLog.error("[CK] complete id=\(id) could not calculate next recurrence", nil)
     }
   }
@@ -522,6 +525,7 @@ final class CloudKitTasksBackend {
     // (or the undo button right beside it) permanently leaves TWO open rows:
     // the restored source AND the generated instance, both recurring.
     if let recurrence = entity.recurrence,
+       recurrence.missed?.advancesOnSchedule != true,
        !entity.recurrencePaused,
        let completedAt = entity.completedAt {
       retractSpawnedOccurrence(source: entity,
@@ -1295,6 +1299,7 @@ final class CloudKitTasksBackend {
   @discardableResult
   func catchUpFixedSchedules(today explicitToday: String? = nil) -> Int {
     let today = explicitToday ?? DayClock.appToday
+    let planned = reconcileRepeatWindows(at: DayClock.appNow)
     let descriptor = FetchDescriptor<TaskEntity>(
       predicate: #Predicate { $0.recurrenceUnit != nil }
     )
@@ -1305,8 +1310,9 @@ final class CloudKitTasksBackend {
         && $0.deletedAt == nil
         && !$0.pendingDeletion
         && $0.recurrence?.afterCompletion == false
+        && $0.recurrenceMissed == nil
     }
-    guard !candidates.isEmpty else { return 0 }
+    guard !candidates.isEmpty else { return planned }
 
     // One head per series: the open copy holding the LATEST logical slot.
     // Walking from anywhere else would re-create copies the series already
@@ -1328,7 +1334,41 @@ final class CloudKitTasksBackend {
     if created > 0 {
       SeptenaLog.info("[CK] recurrence.catchUp created \(created) occurrence(s) through \(today)")
     }
-    return created
+    return created + planned
+  }
+
+  /// Only explicitly calendar-driven modes enter the shared planner.
+  func reconcileRepeatWindows(at now: Date) -> Int {
+    let descriptor = FetchDescriptor<TaskEntity>(predicate: #Predicate { $0.recurrenceMissed != nil })
+    let rows = ((try? context.fetch(descriptor)) ?? []).filter {
+      $0.deletedAt == nil && !$0.pendingDeletion && !$0.isHeading && $0.recurrenceUnit != nil
+    }
+    let series = Dictionary(grouping: rows) { $0.recurrenceSeriesID ?? $0.id }
+    var count = 0
+    for (seriesID, members) in series {
+      guard let head = members.max(by: { a, b in
+        ((a.recurrenceAnchorDate ?? a.scheduled ?? ""), a.id) < ((b.recurrenceAnchorDate ?? b.scheduled ?? ""), b.id)
+      }), let rule = head.recurrence,
+      !head.recurrencePaused && head.status != .cancelled && !isProjectChecklistItem(head),
+      let slot = head.recurrenceAnchorDate ?? head.scheduled,
+      let plan = RepeatWindow.plan(rule: rule, lastSlot: slot, at: now, zone: head.timeZone, startTime: head.startTime)
+      else { continue }
+      let starts = head.recurrenceMissedFrom ?? ""
+      for day in plan.create where day >= starts {
+        if createRecurringOccurrence(from: head, recurrence: rule, scheduled: day, calendarSeriesID: seriesID) {
+          count += 1
+        }
+      }
+      if let cutoff = plan.expireBefore {
+        for row in members where row.status == .open {
+          guard let day = row.recurrenceAnchorDate ?? row.scheduled, day >= starts, day < cutoff else { continue }
+          row.status = .repeatExpired
+          row.pendingSync = true
+          commitAndPush(row, op: "recurrence.expire")
+        }
+      }
+    }
+    return count
   }
 
   /// Walk one series' cadence from its head to today, creating what is
@@ -1506,9 +1546,22 @@ final class CloudKitTasksBackend {
     // task edited from the Logbook, or the occurrence you just ticked — wrote
     // nothing at all and reported success.
     let targets = seriesTargets(entity: entity, members: members)
+    let previousRule = entity.recurrence
+    let currentSlot = entity.recurrenceAnchorDate ?? entity.scheduled
+    let starts: String? = if recurrence.missed == previousRule?.missed {
+      entity.recurrenceMissedFrom
+    } else if recurrence.missed != nil, previousRule != nil {
+      recurrence.nextDate(completedOn: DayClock.appToday, scheduled: entity.scheduled, logicalScheduled: currentSlot)
+    } else {
+      currentSlot
+    }
     for member in targets {
       member.recurrenceSeriesID = seriesID
       member.recurrence = recurrence
+      member.recurrenceMissedFrom = recurrence.missed == nil ? nil : starts
+      if recurrence.missed?.advancesOnSchedule == true && member.timeZone == nil {
+        member.timeZone = TimeZone.current.identifier
+      }
       member.recurrencePaused = false
       if recurrence.afterCompletion {
         member.recurrenceAnchorDate = nil

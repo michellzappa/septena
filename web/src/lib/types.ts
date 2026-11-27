@@ -176,6 +176,8 @@ export const zIcalFeedSettings = z.object({
 });
 export type IcalFeedSettings = z.infer<typeof zIcalFeedSettings>;
 
+export type MissedRepeatBehavior = "keepOneOpen" | "startFresh" | "keepEach";
+
 export interface OrdinalWeekday {
   ordinal: number;
   weekday: number;
@@ -208,6 +210,8 @@ export interface TaskRow {
   recurrenceUnit?: "day" | "week" | "month" | "year" | string | null;
   recurrenceInterval?: number | null;
   recurrenceAfterCompletion?: boolean | null;
+  recurrenceMissed?: MissedRepeatBehavior | null;
+  recurrenceMissedFrom?: string | null;
   recurrencePaused?: boolean | null;
   recurrenceSeriesID?: string | null;
   recurrenceAnchorDate?: string | null;

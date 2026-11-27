@@ -36,6 +36,9 @@ public final class DayClock {
   public var debugDayOffset: Int = 0 { didSet { refreshIfNeeded() } }
   #endif
 
+  static var onMinute: ((Date) -> Void)?
+  private static var lastPublishedMinute: Int?
+
   @ObservationIgnored private var dayObserver: NSObjectProtocol?
   @ObservationIgnored private var minuteTimer: Timer?
 
@@ -63,6 +66,11 @@ public final class DayClock {
     if now != nowDate { now = nowDate }
     let day = SeptenaDate.format(nowDate) ?? today
     if day != today { today = day }
+    let minute = Int(nowDate.timeIntervalSince1970 / 60)
+    if let publish = Self.onMinute, minute != Self.lastPublishedMinute {
+      Self.lastPublishedMinute = minute
+      publish(nowDate)
+    }
     #if DEBUG
     DayClock.travelledToday = debugDayOffset == 0 ? nil : day
     #endif

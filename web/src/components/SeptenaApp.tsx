@@ -492,19 +492,22 @@ export function SeptenaApp() {
     window.history.replaceState({}, "", destinationPath(destination, logbookTab));
   }, [bootPhase, destination, logbookTab]);
 
-  // DayClock midnight rollover watcher.
+  // Reconcile calendar repeats on return and while the list stays open.
   useEffect(() => {
+    if (bootPhase !== "signed_in") return;
     const checkRollover = () => {
       const current = localTodayYMD();
       setTodayYMD((prev) => (prev === current ? prev : current));
+      void engine.reconcileRepeatWindows().catch((error) => console.error("Repeat reconciliation failed", error));
     };
+    checkRollover();
     const interval = setInterval(checkRollover, 60_000);
     window.addEventListener("focus", checkRollover);
     return () => {
       clearInterval(interval);
       window.removeEventListener("focus", checkRollover);
     };
-  }, []);
+  }, [bootPhase, engine]);
 
   useEffect(() => engine.subscribe(setSyncState), [engine]);
   useEffect(() => undoStack.subscribe(setUndoSnap), [undoStack]);

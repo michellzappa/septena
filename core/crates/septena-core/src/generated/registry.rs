@@ -60,7 +60,14 @@ pub mod enums {
         pub const DONE: &str = "done";
         pub const CANCELLED: &str = "cancelled";
         pub const CHECKLIST_CHECKED: &str = "checklistChecked";
-        pub const ALL: &[&str] = &["open", "done", "cancelled", "checklistChecked"];
+        pub const REPEAT_EXPIRED: &str = "repeatExpired";
+        pub const ALL: &[&str] = &["open", "done", "cancelled", "checklistChecked", "repeatExpired"];
+    }
+    pub mod recurrence_missed {
+        pub const KEEP_ONE_OPEN: &str = "keepOneOpen";
+        pub const START_FRESH: &str = "startFresh";
+        pub const KEEP_EACH: &str = "keepEach";
+        pub const ALL: &[&str] = &["keepOneOpen", "startFresh", "keepEach"];
     }
     pub mod checklist_mode {
         pub const PLAIN: &str = "plain";

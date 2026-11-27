@@ -181,6 +181,7 @@ enum TaskJSONTransfer {
       "recurrenceUnit": e.recurrenceUnit,
       "recurrenceInterval": e.recurrenceUnit != nil ? e.recurrenceInterval : nil,
       "recurrenceAfterCompletion": e.recurrenceUnit != nil ? e.recurrenceAfterCompletion : nil,
+      "recurrenceMissed": e.recurrenceMissed, "recurrenceMissedFrom": e.recurrenceMissedFrom,
       "recurrencePaused": e.recurrencePaused ? true : nil,
       "recurrenceSeriesID": e.recurrenceSeriesID,
       "recurrenceAnchorDate": e.recurrenceAnchorDate,
@@ -487,6 +488,8 @@ enum TaskJSONTransfer {
     entity.recurrenceUnit = nonEmptyString(r["recurrenceUnit"])
     entity.recurrenceInterval = max(1, intValue(r["recurrenceInterval"]) ?? 1)
     entity.recurrenceAfterCompletion = (r["recurrenceAfterCompletion"] as? Bool) ?? true
+    entity.recurrenceMissed = (r["recurrenceMissed"] as? String).flatMap(MissedRepeatBehavior.init(rawValue:))?.rawValue
+    entity.recurrenceMissedFrom = r["recurrenceMissedFrom"] as? String
     entity.recurrencePaused = (r["recurrencePaused"] as? Bool) ?? false
     entity.recurrenceSeriesID = nonEmptyString(r["recurrenceSeriesID"])
     entity.recurrenceAnchorDate = nonEmptyString(r["recurrenceAnchorDate"])
@@ -729,6 +732,7 @@ enum TaskJSONTransfer {
     case TaskStatus.done.rawValue: return TaskStatus.done.rawValue
     case TaskStatus.cancelled.rawValue: return TaskStatus.cancelled.rawValue
     case TaskStatus.checklistChecked.rawValue: return TaskStatus.checklistChecked.rawValue
+    case TaskStatus.repeatExpired.rawValue: return TaskStatus.repeatExpired.rawValue
     default: return TaskStatus.open.rawValue
     }
   }
@@ -824,7 +828,7 @@ enum TaskJSONTransfer {
       switch t.status {
       case .open: box = "[ ]"
       case .done, .checklistChecked: box = "[x]"
-      case .cancelled: box = "[-]"
+      case .cancelled, .repeatExpired: box = "[-]"
       }
       var meta: [String] = []
       if t.today && t.status == .open { meta.append("today") }

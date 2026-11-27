@@ -40,6 +40,7 @@ import type {
   AttachmentRow,
   ChecklistItemRow,
   ConvoRow,
+  MissedRepeatBehavior,
   NotSyncedItem,
   OrdinalWeekday,
   OutboxOp,
@@ -375,11 +376,14 @@ export class WebSyncEngine {
     task: TaskRow,
     completedOn: string,
     now: string,
+    calendarDay?: string,
   ): { mutations: LocalMutation[]; ops: OutboxOp[]; spawnedTaskId: string | null } {
-    if (!task.recurrenceUnit || task.recurrencePaused) {
+    if (!task.recurrenceUnit || task.recurrencePaused ||
+        (!calendarDay && !task.recurrenceAfterCompletion &&
+          (task.recurrenceMissed === "startFresh" || task.recurrenceMissed === "keepEach"))) {
       return { mutations: [], ops: [], spawnedTaskId: null };
     }
-    const nextDay = nextScheduledDate({
+    const nextDay = calendarDay ?? nextScheduledDate({
       completedOn,
       scheduled: task.scheduled ?? null,
       logicalScheduled: task.recurrenceAnchorDate ?? null,
@@ -394,7 +398,7 @@ export class WebSyncEngine {
     });
     if (!nextDay) return { mutations: [], ops: [], spawnedTaskId: null };
 
-    const newTaskID = occurrenceId(task.id, nextDay);
+    const newTaskID = occurrenceId(calendarDay ? task.recurrenceSeriesID ?? task.id : task.id, nextDay);
     const dateFields = nextOccurrenceDates(task, nextDay, now);
     const shiftedReminder = shiftReminderForRecurrence({
       sourceReminderAt: task.reminderAt ?? null,
@@ -418,6 +422,8 @@ export class WebSyncEngine {
       recurrenceUnit: task.recurrenceUnit,
       recurrenceInterval: Math.max(1, task.recurrenceInterval ?? 1),
       recurrenceAfterCompletion: Boolean(task.recurrenceAfterCompletion),
+      recurrenceMissed: task.recurrenceMissed ?? null,
+      recurrenceMissedFrom: task.recurrenceMissedFrom ?? null,
       recurrencePaused: false,
       recurrenceSeriesID: seriesId,
       recurrenceAnchorDate: nextDay,
@@ -501,6 +507,69 @@ export class WebSyncEngine {
     });
 
     return { mutations, ops, spawnedTaskId: newTaskID };
+  }
+
+  private windowPending: Promise<void> | null = null;
+
+  reconcileRepeatWindows(): Promise<void> {
+    if (this.windowPending) return this.windowPending;
+    this.windowPending = this.advanceRepeatWindows().finally(() => { this.windowPending = null; });
+    return this.windowPending;
+  }
+
+  private async advanceRepeatWindows(): Promise<void> {
+    await ensureCoreReady();
+    const now = new Date();
+    const stamp = now.toISOString();
+    const snap = this.state.snapshot;
+    const ids = new Set(snap.tasks.map((task) => task.id));
+    const groups = new Map<string, TaskRow[]>();
+    const slot = (task: TaskRow) => task.recurrenceAnchorDate ?? task.scheduled ?? "";
+    for (const row of snap.tasks) {
+      if (row.deletedAt || row.kind === "heading" || !row.recurrenceMissed || !row.recurrenceUnit) continue;
+      const series = row.recurrenceSeriesID ?? row.id;
+      const members = groups.get(series) ?? [];
+      members.push(row);
+      groups.set(series, members);
+    }
+    const mutations: LocalMutation[] = [];
+    const ops: OutboxOp[] = [];
+    for (const [id, members] of groups) {
+      const head = members.reduce((latest, candidate) =>
+        slot(candidate) > slot(latest) || (slot(candidate) === slot(latest) && candidate.id > latest.id) ? candidate : latest);
+      if (this.isChecklistItem(head) || head.status === "cancelled" || head.recurrencePaused || head.recurrenceAfterCompletion ||
+          (head.recurrenceMissed !== "startFresh" && head.recurrenceMissed !== "keepEach") || !slot(head)) continue;
+
+      const local = new Intl.DateTimeFormat("sv-SE", {
+        timeZone: head.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
+        dateStyle: "short", timeStyle: "short", hourCycle: "h23",
+      }).formatToParts(now);
+      const part = (kind: Intl.DateTimeFormatPartTypes) => local.find((value) => value.type === kind)?.value;
+      const today = `${part("year")}-${part("month")}-${part("day")}`;
+      const plan = callCore<{ create: string[]; expireBefore: string | null }>("recurrenceWindow", {
+        mode: head.recurrenceMissed, lastSlot: slot(head), today,
+        localTime: `${part("hour")}:${part("minute")}`, startTime: head.startTime,
+        rule: {
+          unit: head.recurrenceUnit, interval: head.recurrenceInterval ?? 1, afterCompletion: false,
+          weekdays: head.recurrenceWeekdays, monthDay: head.recurrenceMonthDay, ordinalWeekday: head.recurrenceOrdinalWeekday,
+        },
+      });
+      const starts = head.recurrenceMissedFrom ?? "";
+      for (const day of plan.create) {
+        if (day < starts || ids.has(occurrenceId(id, day))) continue;
+        const copy = this.buildNextRecurrenceMutations(head, today, stamp, day);
+        mutations.push(...copy.mutations);
+        ops.push(...copy.ops);
+      }
+      if (!plan.expireBefore) continue;
+      for (const row of members) {
+        if (row.status !== "open" || slot(row) < starts || slot(row) >= plan.expireBefore) continue;
+        const fields = { status: "repeatExpired" };
+        mutations.push({ entity: "task", action: "put", id: row.id, row: { ...row, ...fields } });
+        ops.push({ clientOpId: newClientOpId(), op: "upsert", entity: "task", id: row.id, fields, queuedAt: Date.now() });
+      }
+    }
+    if (ops.length) await this.commit(mutations, ops);
   }
 
   /** The rows and ops that complete one task. In Review, completing accepts (docs/REVIEW_SPEC.md §4). */
@@ -898,6 +967,7 @@ export class WebSyncEngine {
       unit: "day" | "week" | "month" | "year" | null;
       interval?: number;
       afterCompletion?: boolean;
+      missed?: MissedRepeatBehavior | null;
       paused?: boolean;
       weekdays?: number[] | null;
       monthDay?: number | null;
@@ -912,6 +982,8 @@ export class WebSyncEngine {
         recurrenceUnit: null,
         recurrenceInterval: null,
         recurrenceAfterCompletion: false,
+        recurrenceMissed: null,
+        recurrenceMissedFrom: null,
         recurrencePaused: false,
         recurrenceAnchorDate: null,
         recurrenceWeekdays: null,
@@ -921,18 +993,36 @@ export class WebSyncEngine {
       });
       return;
     }
-    const anchor = task.scheduled ?? todayYMD;
+    const anchor = task.recurrenceAnchorDate ?? task.scheduled ?? todayYMD;
+    const afterCompletion = Boolean(rule.afterCompletion);
+    const missed = afterCompletion ? null : rule.missed ?? task.recurrenceMissed ?? (!task.recurrenceUnit ? "keepOneOpen" : null);
+    const starts = missed === task.recurrenceMissed
+      ? task.recurrenceMissedFrom ?? null
+      : missed != null && task.recurrenceUnit
+        ? nextScheduledDate({
+            completedOn: todayYMD,
+            scheduled: task.scheduled ?? anchor,
+            logicalScheduled: anchor,
+            rule: { unit: rule.unit, interval: rule.interval ?? 1, afterCompletion: false,
+              weekdays: rule.weekdays, monthDay: rule.monthDay, ordinalWeekday: rule.ordinalWeekday },
+          })
+        : missed != null ? anchor : null;
     await this.patchTask(task, {
       recurrenceUnit: rule.unit,
       recurrenceInterval: Math.max(1, rule.interval ?? 1),
-      recurrenceAfterCompletion: Boolean(rule.afterCompletion),
+      recurrenceAfterCompletion: afterCompletion,
+      recurrenceMissed: missed,
+      recurrenceMissedFrom: starts,
+      ...(missed === "startFresh" || missed === "keepEach"
+        ? { timeZone: task.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone }
+        : {}),
       recurrencePaused: Boolean(rule.paused),
       recurrenceSeriesID: task.recurrenceSeriesID ?? task.id,
       recurrenceAnchorDate: anchor,
       scheduled: task.scheduled ?? anchor,
-      recurrenceWeekdays: rule.weekdays ?? null,
-      recurrenceMonthDay: rule.monthDay ?? null,
-      recurrenceOrdinalWeekday: rule.ordinalWeekday ?? null,
+      recurrenceWeekdays: rule.weekdays ?? task.recurrenceWeekdays ?? null,
+      recurrenceMonthDay: rule.monthDay ?? task.recurrenceMonthDay ?? null,
+      recurrenceOrdinalWeekday: rule.ordinalWeekday ?? task.recurrenceOrdinalWeekday ?? null,
       touchedAt: now,
     });
   }
@@ -1531,6 +1621,8 @@ export class WebSyncEngine {
         recurrenceUnit: task.recurrenceUnit ?? null,
         recurrenceInterval: task.recurrenceInterval ?? null,
         recurrenceAfterCompletion: Boolean(task.recurrenceAfterCompletion),
+        recurrenceMissed: task.recurrenceMissed ?? null,
+        recurrenceMissedFrom: task.recurrenceMissedFrom ?? null,
         recurrencePaused: Boolean(task.recurrencePaused),
       };
       mutations.push({ entity: "task", action: "put", id: task.id, row: { ...task, ...fields } });

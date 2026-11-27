@@ -118,6 +118,9 @@ final class SeptenaServices {
         SeptaskSyncedSettings.seedIfNeeded(from: SettingsMirror.loadCloudKitSettingsRow(context: context))
       }
       bindWriteBoundary()
+      DayClock.onMinute = { [weak self] instant in
+        self?.taskMutator.reconcileRepeatWindows(at: instant)
+      }
 
       DoStore.shared.start()
 

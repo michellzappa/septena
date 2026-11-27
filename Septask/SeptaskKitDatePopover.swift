@@ -98,6 +98,7 @@ struct SeptaskKitRepeatSelection {
   var unit: Recurrence.Unit?
   var interval: Int?
   var afterCompletion: Bool?
+  var missed: MissedRepeatBehavior?
   var paused: Bool?
   /// Agreed V2 schedule details across the selection (nil when absent or mixed).
   var weekdays: [Int]?
@@ -125,6 +126,7 @@ struct SeptaskKitRepeatSelection {
     unit = Self.agreed(rules.map { $0?.unit })
     interval = Self.agreed(rules.map { $0?.interval })
     afterCompletion = Self.agreed(rules.map { $0?.afterCompletion })
+    missed = Self.agreed(rules.map { $0?.missed })
     paused = Self.agreed(tasks.map { $0.recurrence == nil ? nil : $0.recurrencePaused })
     weekdays = Self.agreed(rules.map { $0?.weekdays })
     monthDay = Self.agreed(rules.map { $0?.monthDay })
@@ -162,6 +164,7 @@ struct SeptaskKitRecurrencePanelResult {
   var unit: Recurrence.Unit?
   var interval: Int?
   var afterCompletion: Bool?
+  var missed: MissedRepeatBehavior?
   var paused: Bool?
   /// True when the user explicitly edited a V2 fixed-schedule detail (weekday
   /// set, day of month, or ordinal weekday) or chose the Weekdays preset.
@@ -177,6 +180,7 @@ struct SeptaskKitRecurrencePanelResult {
     Recurrence(unit: unit ?? current?.unit ?? .week,
                interval: interval ?? current?.interval ?? 1,
                afterCompletion: afterCompletion ?? current?.afterCompletion ?? true,
+               missed: missed ?? current?.missed ?? (current == nil && afterCompletion == false ? .keepOneOpen : nil),
                weekdays: setsScheduleDetail ? weekdays : current?.weekdays,
                monthDay: setsScheduleDetail ? monthDay : current?.monthDay,
                ordinalWeekday: setsScheduleDetail ? ordinalWeekday : current?.ordinalWeekday)
@@ -266,6 +270,7 @@ private final class KitRepeatBoard: NSView {
   /// multi-selection fix: a nil axis is not written.
   private var unit: Recurrence.Unit?
   private var afterCompletion: Bool?
+  private var missed: MissedRepeatBehavior?
   private var paused: Bool?
   private var weekdays: Set<Int>
   private enum MonthlyMode: Int { case anchor = 0, dayOfMonth = 1, ordinal = 2 }
@@ -286,6 +291,8 @@ private final class KitRepeatBoard: NSView {
   private var unitCells: [KitDateCell] = []
   private var weekdaysPresetCell: KitDateCell?
   private var anchorCells: [KitDateCell] = []
+  private let missedHeading = NSTextField(labelWithString: RegistrySurfaces.missedRepeatLabel)
+  private var missedCells: [KitDateCell] = []
   private var customToggleCell: KitDateCell?
   private let customContainer = NSStackView()
   private let weekdaySection = NSStackView()
@@ -373,6 +380,7 @@ private final class KitRepeatBoard: NSView {
     // and `setRecurrence` then dropped its `recurrenceAnchorDate` too.
     self.unit = selection.unit
     self.afterCompletion = selection.afterCompletion
+    self.missed = selection.missed
     self.paused = selection.paused
     self.weekdays = Set(selection.weekdays ?? [])
     let sampleDate = Self.anchorDate(for: selection.sampleScheduled)
@@ -450,6 +458,7 @@ private final class KitRepeatBoard: NSView {
     guard unit != selection.unit
             || interval != selection.interval
             || afterCompletion != selection.afterCompletion
+            || missed != selection.missed
             || paused != selection.paused
             || nextWeekdays != selection.weekdays
             || nextMonthDay != selection.monthDay
@@ -458,6 +467,7 @@ private final class KitRepeatBoard: NSView {
       unit: unit,
       interval: interval,
       afterCompletion: afterCompletion,
+      missed: missed,
       paused: paused,
       setsScheduleDetail: didEditScheduleDetail,
       weekdays: resolvedWeekdays,
@@ -492,6 +502,20 @@ private final class KitRepeatBoard: NSView {
 
     views.append(KitSurface.separator())
     views.append(contentsOf: buildAnchorCells())
+    if canPickFixedSchedule {
+      missedHeading.textColor = SeptaskKitTheme.inkSecondary
+      views.append(missedHeading)
+      for choice in MissedRepeatBehavior.allCases {
+        let cell = KitDateCell(radius: 8, height: Self.rowHeight) { [weak self] in
+          self?.missed = choice
+          self?.didEdit = true
+          self?.updateValues()
+        }
+        cell.fillRow(symbol: "arrow.clockwise", tint: SeptaskKitTheme.inkSecondary, title: choice.title)
+        missedCells.append(cell)
+        views.append(cell)
+      }
+    }
 
     if canPickFixedSchedule {
       let toggle = KitDateCell(radius: 8, height: Self.rowHeight) { [weak self] in
@@ -782,6 +806,7 @@ private final class KitRepeatBoard: NSView {
     if let preset = weekdaysPresetCell { walkable.append(preset) }
     walkable.append(anchorCells[0])
     if canPickFixedSchedule { walkable.append(anchorCells[1]) }
+    walkable.append(contentsOf: missedCells.filter { !$0.isHidden })
     if let toggle = customToggleCell, !toggle.isHidden {
       walkable.append(toggle)
       if !customContainer.isHidden {
@@ -846,6 +871,11 @@ private final class KitRepeatBoard: NSView {
     weekdaysPresetCell?.isCurrentValue = isWeekdaysPreset
     anchorCells[0].isCurrentValue = afterCompletion == true
     anchorCells[1].isCurrentValue = afterCompletion == false
+    missedHeading.isHidden = afterCompletion != false
+    for (choice, cell) in zip(MissedRepeatBehavior.allCases, missedCells) {
+      cell.isHidden = afterCompletion != false
+      cell.isCurrentValue = choice == (missed ?? .keepOneOpen)
+    }
 
     let showCustom = supportsCustomOptions
     customToggleCell?.isHidden = !showCustom

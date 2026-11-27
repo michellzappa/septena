@@ -513,6 +513,10 @@ final class TaskMutator {
   /// Idempotent and cheap to repeat — see `TasksBackend.catchUpFixedSchedules`
   /// for why it is safe on every launch, foreground, and day rollover.
   @discardableResult
+  func reconcileRepeatWindows(at now: Date) {
+    _ = cloudBackend?.reconcileRepeatWindows(at: now)
+  }
+
   func catchUpFixedSchedules() -> Int {
     guard let cloudBackend else {
       SeptenaLog.error("[TaskMutator] catchUpFixedSchedules called before CK bound — dropping", nil)

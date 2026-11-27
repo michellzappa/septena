@@ -199,7 +199,7 @@ export function parseImportJson(rawText: string): ParsedBackupPreview {
     .map((t) => ({
       id: String(t.id),
       title: String(t.title).trim(),
-      status: t.status === "done" || t.status === "cancelled" || t.status === "checklistChecked" ? t.status : "open",
+      status: t.status === "done" || t.status === "cancelled" || (t.status === "checklistChecked" || t.status === "repeatExpired") ? t.status : "open",
       kind: t.kind === "heading" ? "heading" : null,
       heading: typeof t.heading === "string" ? t.heading : null,
       area: typeof t.area === "string" ? t.area : null,
@@ -220,6 +220,9 @@ export function parseImportJson(rawText: string): ParsedBackupPreview {
       completedAt: typeof t.completedAt === "string" ? t.completedAt : null,
       recurrenceUnit: typeof t.recurrenceUnit === "string" ? t.recurrenceUnit : null,
       recurrenceInterval: typeof t.recurrenceInterval === "number" ? t.recurrenceInterval : null,
+      recurrenceMissed: t.recurrenceMissed === "keepOneOpen" || t.recurrenceMissed === "startFresh" || t.recurrenceMissed === "keepEach"
+        ? t.recurrenceMissed : null,
+      recurrenceMissedFrom: typeof t.recurrenceMissedFrom === "string" ? t.recurrenceMissedFrom : null,
       recurrenceAfterCompletion: Boolean(t.recurrenceAfterCompletion),
       recurrencePaused: Boolean(t.recurrencePaused),
     }));

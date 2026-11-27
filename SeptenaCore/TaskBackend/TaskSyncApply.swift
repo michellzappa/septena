@@ -639,6 +639,8 @@ extension TaskSyncEngine {
     take("recurrencePaused") { t.recurrencePaused = Self.bool($0) ?? false }
     take("recurrenceSeriesID") { t.recurrenceSeriesID = $0.stringValue }
     take("recurrenceAnchorDate") { t.recurrenceAnchorDate = $0.stringValue }
+    take("recurrenceMissed") { t.recurrenceMissed = $0.stringValue }
+    take("recurrenceMissedFrom") { t.recurrenceMissedFrom = $0.stringValue }
     take("recurrenceWeekdays") { v in
       if case .array(let list) = v {
         let nums = list.compactMap(Self.int).filter { (1...7).contains($0) }

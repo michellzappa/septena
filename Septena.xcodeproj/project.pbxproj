@@ -43,6 +43,7 @@
 		10F0FF6B9477964B929DA6B2 /* TasksWidgetSnapshotStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21FC87654F413302D31832AE /* TasksWidgetSnapshotStore.swift */; };
 		111C3EBE9422F484AB1CD8D8 /* InfoPlist.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = D58B70E608D9B1182421B9B1 /* InfoPlist.xcstrings */; };
 		11266810DAB72F3FB198E03A /* SeptaskKitReview.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECB4F9345EF991AD81B85073 /* SeptaskKitReview.swift */; };
+		115399B5074D99C418993C02 /* RepeatWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AA6EBFA17198321484D1170 /* RepeatWindow.swift */; };
 		1188E8E3252FE3E9AA28E19C /* HeaderWashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC3D588A9AAEF5E39F490485 /* HeaderWashView.swift */; };
 		11C2676FDB2A394806AB4A49 /* PlusStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B62E6FAA796EFF9D03C71C9 /* PlusStore.swift */; };
 		12700B9642E0695E4FBC00CE /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A55EEB8DD5398251511DAEF /* Theme.swift */; };
@@ -322,6 +323,7 @@
 		863CF29EE74C2A5927F3A143 /* FoundationModels.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9E48AFEC976A22FEF321AE70 /* FoundationModels.framework */; };
 		86A912D92FA28478C0CF3B22 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CD038CA592ABBBE534D29BB /* SidebarView.swift */; };
 		86B10FA26DC181024D121B3C /* ResponseCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9D6916E979E5B0D7497CAEF /* ResponseCache.swift */; };
+		86EFDB4FFBF38B417366768D /* RepeatWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AA6EBFA17198321484D1170 /* RepeatWindow.swift */; };
 		8717A679989DBAD819B58967 /* InboxZeroMotion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F953BF39B6F5DE399F5B433 /* InboxZeroMotion.swift */; };
 		8806DFB6B81DCE27EC7902EF /* SeptaskPushNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = C39970A193FE3B989D142F21 /* SeptaskPushNotifications.swift */; };
 		88790104556643072214C419 /* CalendarEventRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = E76BB68C1E939296A1D7857C /* CalendarEventRow.swift */; };
@@ -783,6 +785,7 @@
 		4A37E705BB6BFCBB59D3B000 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		4A55EEB8DD5398251511DAEF /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		4A9817D170EC2D624AFF8E73 /* TaskBackendClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskBackendClient.swift; sourceTree = "<group>"; };
+		4AA6EBFA17198321484D1170 /* RepeatWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepeatWindow.swift; sourceTree = "<group>"; };
 		4B18EDB9E7BAD9DBAEE25B42 /* SeptaskKitDatePopover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeptaskKitDatePopover.swift; sourceTree = "<group>"; };
 		4B62E6FAA796EFF9D03C71C9 /* PlusStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlusStore.swift; sourceTree = "<group>"; };
 		4D86ABACD9C48916AECBEA66 /* RegistryMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegistryMenu.swift; sourceTree = "<group>"; };
@@ -1550,6 +1553,7 @@
 				C641220AFE9A17115F46A97C /* ReasoningProvider.swift */,
 				9CD9146BBCC0DD5365AB3868 /* RegistryCopy.swift */,
 				561130AE996F0E92FE02767D /* RemindersBridge.swift */,
+				4AA6EBFA17198321484D1170 /* RepeatWindow.swift */,
 				C9D6916E979E5B0D7497CAEF /* ResponseCache.swift */,
 				0CCB7FC718FE03FDE35241D1 /* SectionSkill.swift */,
 				C03DC46C772E45B60ECB7343 /* SectionTheme.swift */,
@@ -2262,6 +2266,7 @@
 				572797742CE7736D60B0B33C /* RemindersBridge.swift in Sources */,
 				4AF2E232C7CC68B8CFFACFF8 /* RemindersInboxSection.swift in Sources */,
 				F2B8CA414333732F4E092D3D /* RemoteTaskSync.swift in Sources */,
+				86EFDB4FFBF38B417366768D /* RepeatWindow.swift in Sources */,
 				1DCE8D405513EDB908405C5D /* ResponseCache.swift in Sources */,
 				20055D6FD6E5A99037B80A53 /* ReviewTaskRow.swift in Sources */,
 				0D9C10065E72EB0C6F25B8E5 /* SectionDrawer.swift in Sources */,
@@ -2562,6 +2567,7 @@
 				DFB1ADA84A611A7714BD7D27 /* RemindersBridge.swift in Sources */,
 				3D73119D83ADBD289E363E76 /* RemindersInboxSection.swift in Sources */,
 				7D26E770C5D06F4014FCFFB8 /* RemoteTaskSync.swift in Sources */,
+				115399B5074D99C418993C02 /* RepeatWindow.swift in Sources */,
 				86B10FA26DC181024D121B3C /* ResponseCache.swift in Sources */,
 				9577B533C6A68596B58E4450 /* ReviewTaskRow.swift in Sources */,
 				F98BDA7660CCB5A5E1323416 /* SectionDrawer.swift in Sources */,

@@ -1678,6 +1678,15 @@
       "back": "Back"
     }
   },
+  "missedRepeat": {
+    "id": "missedRepeat",
+    "label": "If missed",
+    "options": [
+      { "id": "keepOneOpen", "title": "Keep one open" },
+      { "id": "startFresh", "title": "Start fresh next time" },
+      { "id": "keepEach", "title": "Keep each occurrence" }
+    ]
+  },
   "checklistProjects": {
     "id": "checklistProjects",
     "useAsChecklist": "Use as Checklist",

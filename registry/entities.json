@@ -48,7 +48,8 @@
     "turnNoteMax": 100000
   },
   "enums": {
-    "taskStatus": ["open", "done", "cancelled", "checklistChecked"],
+    "taskStatus": ["open", "done", "cancelled", "checklistChecked", "repeatExpired"],
+    "recurrenceMissed": ["keepOneOpen", "startFresh", "keepEach"],
     "checklistMode": ["plain", "groceries"],
     "taskSource": ["app", "mcp"],
     "projectStatus": ["active", "done", "cancelled"],
@@ -110,6 +111,8 @@
         "recurrenceUnit": { "kind": "text", "max": 16, "nullable": true },
         "recurrenceInterval": { "kind": "int", "nullable": true },
         "recurrenceAfterCompletion": { "kind": "bool", "default": 0 },
+        "recurrenceMissed": { "kind": "text", "enum": "recurrenceMissed", "nullable": true },
+        "recurrenceMissedFrom": { "kind": "text", "format": "day", "nullable": true },
         "recurrencePaused": { "kind": "bool", "default": 0 },
         "recurrenceSeriesID": { "kind": "text", "max": 128, "nullable": true },
         "recurrenceAnchorDate": { "kind": "text", "format": "day", "nullable": true },
