@@ -65,7 +65,7 @@ const CSS = `
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 -apple-system, BlinkMacSystemFont, system-ui, sans-serif; }
   a { color: var(--accent); text-decoration: none; } a:hover { text-decoration: underline; }
-  .top { position: sticky; top: 0; z-index: 2; background: color-mix(in oklab, var(--bg) 88%, transparent); backdrop-filter: blur(12px); border-bottom: 1px solid var(--line); }
+  .top { position: sticky; top: 0; z-index: 2; background: var(--bg); border-bottom: 1px solid var(--line); }
   .top .in { max-width: 1180px; margin: 0 auto; padding: 12px 16px 0; }
   .brand { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
   .brand h1 { font-size: 17px; margin: 0; display: flex; gap: 8px; align-items: center; }
@@ -358,7 +358,7 @@ function clientsSection(v: AdminView): string {
   const mix = clientMix(v.accounts, v.now);
   const mac = v.releases === null ? `<div class="blist"><h3>Mac downloads</h3><p class="warn">GitHub does not answer.</p></div>`
     : tallyList("Mac downloads by release", v.releases.map((r) => ({ name: r.tag, n: r.installs })));
-  return `<div class="cols">${tallyList("Devices, 30 days", mix.platforms)}${tallyList("Versions, 30 days", mix.versions)}${tallyList("Agents", agentMix(v.accounts), " accounts")}${tallyList("Sign-in", providerMix(v.accounts), " accounts")}${mac}</div>
+  return `<div class="cols">${tallyList("Devices, 30 days", mix.platforms)}${tallyList("Versions, 30 days", mix.versions)}${tallyList("Agents, accounts using each", agentMix(v.accounts))}${tallyList("Sign-in, accounts", providerMix(v.accounts))}${mac}</div>
   <p class="dim">Store installs and revenue come with RevenueCat (#644, #645).</p>`;
 }
 
