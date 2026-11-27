@@ -500,7 +500,7 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
   /// Do goes on.
   func newTask() {
     if doScreen == nil {
-      list?.createTask()
+      list?.createTaskFromCommand()
     } else {
       SeptaskKitQuickEntry.show()
     }
