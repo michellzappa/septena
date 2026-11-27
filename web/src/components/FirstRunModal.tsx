@@ -421,7 +421,7 @@ export function FirstRunModal({
                   onClick={() => setStepIdx((i) => Math.min(steps.length - 1, i + 1))}
                   className="rounded-lg bg-[var(--bg-hover)] px-3.5 py-1.5 font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                 >
-                  {registryText("secondary" in step ? step.secondary.title : "Later", language)}
+                  {registryText("secondary" in step ? step.secondary.title : "Skip", language)}
                 </button>
               )
             ) : (
