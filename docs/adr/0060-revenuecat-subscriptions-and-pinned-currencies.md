@@ -15,16 +15,16 @@ At the same time, Septena uses a EUR baseline (€7 / €60 for Plus; €14 / �
 ## Decision
 
 1. **Standardize on RevenueCat across all stores.** RevenueCat (free up to $2,500 USD Monthly Tracked Revenue, 1% above) manages subscriptions across Apple App Store, Google Play and Web/Windows (Stripe / RevenueCat Web Billing). Every purchase binds to the Septena backend user id (`u_…`) as RevenueCat's `app_user_id`. RevenueCat webhooks sync entitlement state (`plus` / `pro`, status, expiry, source) into the user's Durable Object `entitlements` table, so the server plan table and every limit gate remain unchanged.
-2. **Pin EUR, USD and GBP; auto-equalize the rest from EUR.** Clean `.00` price points apply on Apple App Store, Google Play and Web/Windows checkout:
+2. **Pin EUR, USD, GBP and BRL; auto-equalize the rest from EUR.** Clean `.00` price points apply on Apple App Store, Google Play and Web/Windows checkout (BRL uses Brazil PPP pricing, added 2026-11-27):
 
-   | Plan | EUR (base, incl. VAT) | USD (+ applicable tax) | GBP (incl. VAT) | Other storefronts |
-   |---|---|---|---|---|
-   | **Plus** | €7/month · €60/year | $7/month · $60/year | £6/month · £50/year | Auto-equalized from EUR |
-   | **Pro** | €14/month · €120/year | $14/month · $120/year | £12/month · £100/year | Auto-equalized from EUR |
+   | Plan | EUR (base, incl. VAT) | USD (+ applicable tax) | GBP (incl. VAT) | BRL (PPP, incl. taxes) | Other storefronts |
+   |---|---|---|---|---|---|
+   | **Plus** | €7/month · €60/year | $7/month · $60/year | £6/month · £50/year | R$ 29/month · R$ 240/year | Auto-equalized from EUR |
+   | **Pro** | €14/month · €120/year | $14/month · $120/year | £12/month · £100/year | R$ 58/month · R$ 480/year | Auto-equalized from EUR |
 
-   - **App Store & Google Play:** Pin EUR, USD and GBP to the table above; let the store auto-equalize all other storefronts from the EUR base. Regional PPP tiers are deferred until post-launch.
-   - **Web & Windows checkout:** Charge fixed EUR, USD or GBP prices matching the table above. Do not use dynamic FX conversion (such as Stripe Adaptive Pricing) on subscriptions.
-   - **Website (`/pricing`):** Geo-default to EUR, USD or GBP with a small currency switcher and currency-aware tax footnotes (VAT included in EU/UK; plus applicable local tax in US and other tax-exclusive markets).
+   - **App Store & Google Play:** Pin EUR, USD, GBP and BRL to the table above; let the store auto-equalize all other storefronts from the EUR base. Additional regional PPP tiers are deferred until post-launch.
+   - **Web & Windows checkout:** Charge fixed EUR, USD, GBP or BRL prices matching the table above. Do not use dynamic FX conversion (such as Stripe Adaptive Pricing) on subscriptions.
+   - **Website (`/pricing` and home plan cards):** Geo-default to EUR, USD, GBP or BRL via Cloudflare `CF-IPCountry` (`/api/geo`) with a quiet inline currency switcher directly above the plan cards (not in the footer) and currency-aware tax footnotes (VAT/tax included in EUR/GBP/BRL; plus applicable local sales tax in USD).
 3. **Annual signup price guarantee currency and tax rule.** A subscriber's protected annual renewal price is locked in the **purchase currency within the same store** (never re-converted to EUR at renewal). The guarantee protects Septena's subscription price tier; statutory VAT or sales tax changes are excluded and disclosed plainly. Switching store or storefront currency starts a new subscription at current public pricing.
 
 ## Consequences

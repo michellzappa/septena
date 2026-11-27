@@ -637,13 +637,15 @@ on every device.
 - **Currencies (ADR 0060):** EUR is the baseline. Top markets are pinned to
   clean `.00` prices on App Store Connect, Google Play and Web/Windows
   checkout; all other store storefronts auto-equalize from the EUR base:
-  - **Plus:** `€7 / €60` (incl. VAT), `$7 / $60` (+ applicable tax), `£6 / £50` (incl. VAT)
-  - **Pro:** `€14 / €120` (incl. VAT), `$14 / $120` (+ applicable tax), `£12 / £100` (incl. VAT)
-  - **Web & Windows:** Fixed EUR, USD and GBP prices matching the pinned store
-    numbers (no dynamic FX conversion on subscriptions). Stripe Tax calculates
-    VAT; Envisioning Technology files EU VAT through the One Stop Shop.
-  - **Pricing page (`/pricing`):** Geo-defaults to EUR, USD or GBP with a small
-    currency switcher and currency-aware tax footnotes.
+  - **Plus:** `€7 / €60` (incl. VAT), `$7 / $60` (+ applicable tax), `£6 / £50` (incl. VAT), `R$ 29 / R$ 240` (BRL PPP, incl. taxes)
+  - **Pro:** `€14 / €120` (incl. VAT), `$14 / $120` (+ applicable tax), `£12 / £100` (incl. VAT), `R$ 58 / R$ 480` (BRL PPP, incl. taxes)
+  - **Web & Windows:** Fixed EUR, USD, GBP and BRL prices matching the pinned
+    store numbers (no dynamic FX conversion on subscriptions). Stripe Tax
+    calculates VAT; Envisioning Technology files EU VAT through the One Stop
+    Shop.
+  - **Pricing page (`/pricing` and home plan cards):** Geo-defaults to EUR,
+    USD, GBP or BRL via `/api/geo` (`CF-IPCountry`) with a quiet inline
+    currency switcher above the plan cards and currency-aware tax footnotes.
   - **Annual price lock:** Locked in purchase currency within the same store;
     protects Septena's subscription price tier, excluding statutory tax changes.
 - **No double payment:** an account on Plus or Pro from any source sees no buy
