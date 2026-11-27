@@ -85,6 +85,54 @@
         }
       }
     },
+    "$5 a month. You save $24 against paying monthly." : {
+      "comment" : "Generated from registry plans.currencies.1.plus.year.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "$7 a month" : {
+      "comment" : "Generated from registry plans.currencies.1.plus.month.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "$10 a month. You save $48 against paying monthly." : {
+      "comment" : "Generated from registry plans.currencies.1.pro.year.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "$14 a month" : {
+      "comment" : "Generated from registry plans.currencies.1.pro.month.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "$60 a year" : {
+      "comment" : "Generated from registry plans.currencies.1.plus.year.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "$120 a year" : {
+      "comment" : "Generated from registry plans.currencies.1.pro.year.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "£4.17 a month. You save £22 against paying monthly." : {
+      "comment" : "Generated from registry plans.currencies.2.plus.year.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "£6 a month" : {
+      "comment" : "Generated from registry plans.currencies.2.plus.month.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "£8.33 a month. You save £44 against paying monthly." : {
+      "comment" : "Generated from registry plans.currencies.2.pro.year.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "£12 a month" : {
+      "comment" : "Generated from registry plans.currencies.2.pro.month.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "£50 a year" : {
+      "comment" : "Generated from registry plans.currencies.2.plus.year.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "£100 a year" : {
+      "comment" : "Generated from registry plans.currencies.2.pro.year.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "€10 a month. You save €48 against paying monthly." : {
       "comment" : "Generated from registry plans.proPrices.pro_annual.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
@@ -28685,6 +28733,22 @@
         }
       }
     },
+    "Prices exclude applicable local sales tax. Outside EUR, USD, GBP and BRL, the App Store and Google Play charge their matching local price." : {
+      "comment" : "Generated from registry plans.currencies.1.footnote. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Prices include applicable local taxes. Outside EUR, USD, GBP and BRL, the App Store and Google Play charge their matching local price." : {
+      "comment" : "Generated from registry plans.currencies.3.footnote. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Prices include UK VAT. Outside EUR, USD, GBP and BRL, the App Store and Google Play charge their matching local price." : {
+      "comment" : "Generated from registry plans.currencies.2.footnote. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Prices include VAT where it applies. Outside EUR, USD, GBP and BRL, the App Store and Google Play charge their matching local price." : {
+      "comment" : "Generated from registry plans.currencies.0.footnote. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Prices include VAT where it applies. Outside the euro area, the App Store charges its matching local price." : {
       "comment" : "Generated from registry plans.priceFootnote. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -29679,6 +29743,30 @@
           }
         }
       }
+    },
+    "R$ 20 a month. You save R$ 108 against paying monthly." : {
+      "comment" : "Generated from registry plans.currencies.3.plus.year.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "R$ 29 a month" : {
+      "comment" : "Generated from registry plans.currencies.3.plus.month.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "R$ 40 a month. You save R$ 216 against paying monthly." : {
+      "comment" : "Generated from registry plans.currencies.3.pro.year.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "R$ 58 a month" : {
+      "comment" : "Generated from registry plans.currencies.3.pro.month.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "R$ 240 a year" : {
+      "comment" : "Generated from registry plans.currencies.3.plus.year.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "R$ 480 a year" : {
+      "comment" : "Generated from registry plans.currencies.3.pro.year.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Read-only agenda in Today and Upcoming" : {
       "comment" : "Generated from registry settings.copy.calendar_detail.deviceToggleDetail.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
