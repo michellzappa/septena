@@ -1336,6 +1336,32 @@ export class WebSyncEngine {
     if (mutations.length > 0) await this.commit(mutations, ops);
   }
 
+  /** Undo for `reorderTasks`: put back each task's order value as it was before the drop. */
+  async restoreTaskOrder(
+    entries: readonly { id: string; value: number | null }[],
+    field: "position" | "todayPosition",
+  ): Promise<void> {
+    const byId = new Map(this.state.snapshot.tasks.map((t) => [t.id, t]));
+    const mutations: LocalMutation[] = [];
+    const ops: OutboxOp[] = [];
+    const queuedAt = Date.now();
+    entries.forEach(({ id, value }, index) => {
+      const task = byId.get(id);
+      if (!task || (task[field] ?? null) === value) return;
+      const patch = { [field]: value };
+      mutations.push({ entity: "task", action: "put", id, row: { ...task, ...patch } });
+      ops.push({
+        clientOpId: newClientOpId(),
+        op: "upsert",
+        entity: "task",
+        id,
+        fields: patch,
+        queuedAt: queuedAt + index,
+      });
+    });
+    if (mutations.length > 0) await this.commit(mutations, ops);
+  }
+
   async bulkUpdateTasks(tasks: TaskRow[], fields: Record<string, unknown>): Promise<void> {
     await this.patchTasks(tasks, { ...fields, touchedAt: new Date().toISOString() });
   }

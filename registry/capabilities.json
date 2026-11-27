@@ -828,6 +828,18 @@
       "linux": "planned",
       "watchos": "not_applicable"
     },
+    "system.shortcuts": {
+      "title": "Siri and Shortcuts actions",
+      "agent": "none",
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "not_applicable",
+      "android": "not_applicable",
+      "windows": "not_applicable",
+      "linux": "not_applicable",
+      "watchos": "not_applicable"
+    },
     "watch.app": {
       "title": "Apple Watch app",
       "agent": "none",

@@ -51,6 +51,7 @@ import {
   BADGE_GROUP_IDS,
   destinationGroups,
   destinationInfo,
+  newTaskTargetOf,
   reviewGroupOf,
   type SidebarDestination,
 } from "@/lib/destinations";
@@ -71,7 +72,7 @@ import {
   PLAN_UI,
 } from "@/lib/generated/registries";
 import { hexWithAlpha, type HeaderTextureStyle } from "@/lib/headerWash";
-import { groupTasksByList, orderByPosition } from "@/lib/listOrder";
+import { groupTasksByList, moveIdToTarget, orderByPosition, positionAbove, positionBelow } from "@/lib/listOrder";
 import {
   LIST_SORT_OPTIONS,
   LIST_SORT_SURFACE,
@@ -122,7 +123,7 @@ import type {
 } from "@/lib/types";
 import { nextIsoDay } from "@/lib/upcomingGroups";
 import { AccountSwitchDialog, type AccountSwitchChoice } from "./AccountSwitchDialog";
-import { ContextMenu, type ContextMenuState } from "./ContextMenu";
+import { ContextMenu, type ContextMenuEntry, type ContextMenuState } from "./ContextMenu";
 import { DateBoardPopover, anchorOf, type DateBoardAnchor } from "./DateBoard";
 import { FadeSweepModal } from "./FadeSweepModal";
 import { FirstRunModal } from "./FirstRunModal";
@@ -267,6 +268,9 @@ export function SeptenaApp() {
   const [tagFilterId, setTagFilterId] = useState<string | null>(null);
   const [assigneeFilter, setAssigneeFilter] = useState<string | null>(null);
   const [composerTitle, setComposerTitle] = useState("");
+  // New Task in Section (registry section.newTask): an inline composer under one heading.
+  // A task is created only on submit with a title, so there is no empty draft row to purge.
+  const [sectionComposer, setSectionComposer] = useState<{ headingId: string; title: string } | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Modals & notices
@@ -341,6 +345,10 @@ export function SeptenaApp() {
     | null
   >(null);
   const [dropTargetTaskId, setDropTargetTaskId] = useState<string | null>(null);
+  // A project heading in drag. Kept apart from draggedTaskId so a heading never lands on a
+  // task row or on the sidebar: it only reorders among the project's headings.
+  const [draggedHeadingId, setDraggedHeadingId] = useState<string | null>(null);
+  const [dropTargetHeadingId, setDropTargetHeadingId] = useState<string | null>(null);
   const [dropTargetSidebar, setDropTargetSidebar] = useState<string | null>(null);
 
   // Reminders
@@ -1735,24 +1743,132 @@ export function SeptenaApp() {
     [showToast],
   );
 
+  // A manual reorder by drag, on the shared undo stack (recorded here, at the gesture, never in
+  // the engine: a sync apply must not land on the stack). Undo puts back each value as it was.
+  // A manual reorder by drag, on the shared undo stack (recorded here, at the gesture, never in
+  // the engine: a sync apply must not land on the stack). Undo puts back each value as it was.
+  // `refile` is a section change that rides in the same entry (a drop into another section).
+  const reorderWithUndo = useCallback(
+    async (
+      reordered: string[] | null,
+      field: "position" | "todayPosition",
+      movedId: string,
+      refile?: { task: TaskRow; heading: string | null },
+    ) => {
+      const byId = new Map(syncState.snapshot.tasks.map((t) => [t.id, t]));
+      const before = (reordered ?? []).map((id) => ({ id, value: byId.get(id)?.[field] ?? null }));
+      const prevHeading = refile ? (refile.task.heading ?? null) : null;
+      const apply = async () => {
+        if (refile) await engine.updateTaskFields(refile.task, { heading: refile.heading });
+        if (reordered) await engine.reorderTasks(reordered, field);
+      };
+      await apply();
+      undoStack.record({
+        label: `Moved “${byId.get(movedId)?.title ?? ""}”`,
+        undo: async () => {
+          if (reordered) await engine.restoreTaskOrder(before, field);
+          if (refile) await engine.updateTaskFields(refile.task, { heading: prevHeading });
+        },
+        redo: apply,
+      });
+    },
+    [engine, syncState.snapshot.tasks, undoStack],
+  );
+
+  // A task row can take a drop when the list reorders, or, on a project page, when the drop
+  // moves the task into another section (that files it even in a sorted project, as the Mac list
+  // files a drop into another group: docs/DRAG_AND_DROP.md section 1).
+  const canDropOnTaskRow = useCallback(
+    (target: TaskRow) => {
+      if (canReorderRows) return true;
+      if (destination.kind !== "project" || !draggedTaskId) return false;
+      const source = syncState.snapshot.tasks.find((t) => t.id === draggedTaskId);
+      return Boolean(source) && (source?.heading ?? null) !== (target.heading ?? null);
+    },
+    [canReorderRows, destination, draggedTaskId, syncState.snapshot.tasks],
+  );
+
   const handleDropOnTask = useCallback(
     async (targetId: string) => {
       const sourceId = draggedTaskId;
       setDraggedTaskId(null);
       setDropTargetTaskId(null);
-      if (!sourceId || sourceId === targetId || !canReorderRows) return;
-      const ids = visibleTasks.map((v) => v.task.id);
-      const fromIdx = ids.indexOf(sourceId);
-      const toIdx = ids.indexOf(targetId);
-      if (fromIdx < 0 || toIdx < 0) return;
-      const reordered = [...ids];
-      const [moved] = reordered.splice(fromIdx, 1);
-      reordered.splice(toIdx, 0, moved);
+      if (!sourceId || sourceId === targetId) return;
+      const source = syncState.snapshot.tasks.find((t) => t.id === sourceId);
+      const target = syncState.snapshot.tasks.find((t) => t.id === targetId);
+      if (!source || !target) return;
+      // Apple handleGroupedTaskDrop: the dragged task joins the target's section (or the
+      // un-headed block) and takes the target's slot there.
+      const targetHeading = target.heading ?? null;
+      const refile =
+        destination.kind === "project" && (source.heading ?? null) !== targetHeading
+          ? { task: source, heading: targetHeading }
+          : undefined;
       const field =
         destination.kind === "smart" && destination.id === "today" ? "todayPosition" : "position";
-      await engine.reorderTasks(reordered, field);
+      if (!canReorderRows) {
+        if (refile) await reorderWithUndo(null, field, sourceId, refile);
+        return;
+      }
+      const reordered = moveIdToTarget(
+        visibleTasks.map((v) => v.task.id),
+        sourceId,
+        targetId,
+      );
+      if (!reordered) return;
+      await reorderWithUndo(reordered, field, sourceId, refile);
     },
-    [canReorderRows, destination, draggedTaskId, engine, visibleTasks],
+    [canReorderRows, destination, draggedTaskId, reorderWithUndo, syncState.snapshot.tasks, visibleTasks],
+  );
+
+  // A project heading dropped on another heading: reorder the project's headings. Its tasks
+  // follow, because they point at the heading. Headings keep their manual order in a sorted
+  // project too (docs/LIST_SORT_SPEC.md §6), so this does not check canReorderRows.
+  const handleDropOnHeading = useCallback(
+    async (targetId: string) => {
+      const sourceId = draggedHeadingId;
+      setDraggedHeadingId(null);
+      setDropTargetHeadingId(null);
+      if (!sourceId) return;
+      const reordered = moveIdToTarget(
+        projectHeadings.map((h) => h.id),
+        sourceId,
+        targetId,
+      );
+      if (!reordered) return;
+      await reorderWithUndo(reordered, "position", sourceId);
+    },
+    [draggedHeadingId, projectHeadings, reorderWithUndo],
+  );
+
+  // A task dropped on a section header files it into that section, at the top of its tasks
+  // (Apple handleHeadingDrop). A sorted project shows the sort, so the drop files only and
+  // writes no position (docs/DRAG_AND_DROP.md §1). One undo entry puts heading and position back.
+  const handleTaskDropOnHeading = useCallback(
+    async (headingId: string) => {
+      const sourceId = draggedTaskId;
+      setDraggedTaskId(null);
+      setDropTargetHeadingId(null);
+      if (!sourceId) return;
+      const task = syncState.snapshot.tasks.find((t) => t.id === sourceId);
+      const heading = projectHeadings.find((h) => h.id === headingId);
+      if (!task || !heading || task.kind === "heading") return;
+      const prev = { heading: task.heading ?? null, position: task.position ?? null };
+      const next: { heading: string; position?: number } = { heading: headingId };
+      if (currentListSort === "manual") {
+        const first = visibleTasks.find((v) => v.task.heading === headingId && v.task.id !== sourceId);
+        next.position = positionAbove(first?.task.position);
+      }
+      // projectHeadings holds only this project's headings, and the dragged row is on this
+      // project page, so the task stays in its project: only heading and position change.
+      await engine.updateTaskFields(task, next);
+      undoStack.record({
+        label: `Moved “${task.title}” to ${heading.title}`,
+        undo: () => engine.updateTaskFields(task, prev),
+        redo: () => engine.updateTaskFields(task, next),
+      });
+    },
+    [currentListSort, draggedTaskId, engine, projectHeadings, syncState.snapshot.tasks, undoStack, visibleTasks],
   );
 
   const handleDropOnSidebarSmart = useCallback(
@@ -1802,6 +1918,27 @@ export function SeptenaApp() {
     },
     [draggedTaskId, engine, showToast, syncState.snapshot.tasks],
   );
+
+  // New task from the open list, routed by registry newTaskTarget (iOS triggerInlineNewTask):
+  // "here" and "tomorrow" focus this list's add field (Upcoming's add field schedules tomorrow);
+  // "today" opens Today and focuses the add field there once Today has rendered.
+  const newTaskTarget = newTaskTargetOf(destination);
+  const [pendingTodayNewTask, setPendingTodayNewTask] = useState(false);
+  const startNewTask = useCallback(() => {
+    if (newTaskTarget === "today" && !(destination.kind === "smart" && destination.id === "today")) {
+      setPendingTodayNewTask(true);
+      navigateTo({ kind: "smart", id: "today" });
+      return;
+    }
+    composerRef.current?.focus();
+  }, [destination, navigateTo, newTaskTarget]);
+  useEffect(() => {
+    if (!pendingTodayNewTask) return;
+    if (!(destination.kind === "smart" && destination.id === "today")) return;
+    setPendingTodayNewTask(false);
+    const frame = requestAnimationFrame(() => composerRef.current?.focus());
+    return () => cancelAnimationFrame(frame);
+  }, [destination, pendingTodayNewTask]);
 
   // Full registry keyboard shortcuts (registry/actions.json + registry/destinations.json).
   useEffect(() => {
@@ -1892,12 +2029,12 @@ export function SeptenaApp() {
 
       if (primary && !e.shiftKey && !e.altKey && key === "n") {
         e.preventDefault();
-        composerRef.current?.focus();
+        startNewTask();
         return;
       }
       if (!primary && !e.altKey && key === "n") {
         e.preventDefault();
-        composerRef.current?.focus();
+        startNewTask();
         return;
       }
       if (!primary && !e.altKey && e.key === "/") {
@@ -2054,6 +2191,7 @@ export function SeptenaApp() {
     shortcutsOpen,
     showToast,
     sidebarDestinations.all,
+    startNewTask,
     sweepTasks,
     taskPageId,
     toggleDone,
@@ -2082,7 +2220,6 @@ export function SeptenaApp() {
         subtitle: null as string | null,
         emptyTitle: empty?.title ?? GENERIC_EMPTY_STATE.title,
         emptyDetail: empty?.detail ?? GENERIC_EMPTY_STATE.detail,
-        supportsInlineCreate: reg?.supportsInlineCreate ?? false,
       };
     }
     if (destination.kind === "area") {
@@ -2092,7 +2229,6 @@ export function SeptenaApp() {
         subtitle: "Area",
         emptyTitle: GENERIC_EMPTY_STATE.title,
         emptyDetail: GENERIC_EMPTY_STATE.detail,
-        supportsInlineCreate: true,
       };
     }
     const proj = projectById.get(destination.id);
@@ -2102,9 +2238,87 @@ export function SeptenaApp() {
       subtitle: parentArea ? parentArea.title : "Project",
       emptyTitle: GENERIC_EMPTY_STATE.title,
       emptyDetail: GENERIC_EMPTY_STATE.detail,
-      supportsInlineCreate: true,
     };
   }, [areaById, destination, lang, logbookTab, projectById]);
+
+  // A new task on the shared undo stack (Apple TaskUndo.recordCreate): undo deletes it for good,
+  // the same two steps as Delete Permanently (delete, then purge the local tombstone), so it
+  // leaves no Recently Deleted entry. Redo creates it again, with a new id, as on Apple.
+  const createTaskWithUndo = async (input: Parameters<WebSyncEngine["createTask"]>[0]) => {
+    const created = await engine.createTask(input);
+    let currentId = created.id;
+    undoStack.record({
+      label: `${registryText(ACTIONS_CATALOG.actions["app.newTask"].title, lang)} “${created.title}”`,
+      undo: async () => {
+        const live = engine.getState().snapshot.tasks.find((t) => t.id === currentId);
+        if (!live) return;
+        if (!live.deletedAt) await engine.deleteTask(live);
+        const tomb = engine.getState().snapshot.tasks.find((t) => t.id === currentId);
+        if (tomb) await engine.purgeDeletedTasks([tomb]);
+      },
+      redo: async () => {
+        currentId = (await engine.createTask(input)).id;
+      },
+    });
+  };
+
+  // Apple startCreateUnderHeading: the new task joins the section at the bottom of the project.
+  const submitSectionComposer = async (e: React.FormEvent, heading: TaskRow) => {
+    e.preventDefault();
+    const title = sectionComposer?.title.trim();
+    setSectionComposer(null);
+    if (!title || !heading.project) return;
+    const last = syncState.snapshot.tasks.reduce<number | null>((max, t) => {
+      if (t.deletedAt || t.project !== heading.project || t.kind === "heading") return max;
+      const p = t.position;
+      return typeof p === "number" && Number.isFinite(p) && (max === null || p > max) ? p : max;
+    }, null);
+    await createTaskWithUndo({
+      title,
+      project: heading.project,
+      area: projectById.get(heading.project)?.area ?? null,
+      heading: heading.id,
+      position: positionBelow(last),
+    });
+  };
+
+  // The section header's context menu, rendered from registry/actions.json "project.heading".
+  const headingMenuItems = (h: TaskRow): ContextMenuEntry[] => {
+    const handlers: Record<string, { onSelect: () => void; destructive?: boolean }> = {
+      "section.rename": {
+        onSelect: () => {
+          const next = window.prompt(registryText(ACTIONS_CATALOG.actions["section.rename"].title, lang), h.title)?.trim();
+          if (next && next !== h.title) void engine.updateTaskFields(h, { title: next });
+        },
+      },
+      "section.newTask": { onSelect: () => setSectionComposer({ headingId: h.id, title: "" }) },
+      "section.delete": {
+        destructive: true,
+        onSelect: () => {
+          if (window.confirm("Delete this section? Its tasks stay in the project.")) {
+            void engine.deleteTask(h);
+          }
+        },
+      },
+    };
+    const actions = ACTIONS_CATALOG.actions as Record<string, { title: string }>;
+    const items: ContextMenuEntry[] = [];
+    for (const entry of ACTIONS_CATALOG.contextMenus["project.heading"]) {
+      if (entry.kind === "divider") {
+        if (items.length > 0 && items[items.length - 1].kind !== "divider") items.push({ kind: "divider" });
+        continue;
+      }
+      const handler = handlers[entry.id];
+      if (!handler) continue;
+      items.push({
+        kind: "item",
+        label: registryText(actions[entry.id]?.title ?? entry.id, lang),
+        destructive: handler.destructive,
+        onSelect: handler.onSelect,
+      });
+    }
+    return items;
+  };
 
   const handleQuickAddInline = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -2125,7 +2339,7 @@ export function SeptenaApp() {
       const proj = projectById.get(destination.id);
       if (proj?.area) opts.area = proj.area;
     }
-    await engine.createTask(opts);
+    await createTaskWithUndo(opts);
   };
 
   const activeAreaId = useMemo(() => {
@@ -2621,7 +2835,7 @@ export function SeptenaApp() {
         e.dataTransfer.setData("text/plain", task.id);
       },
       onDragOver: (e) => {
-        if (!draggedTaskId || !canReorderRows) return;
+        if (!draggedTaskId || !canDropOnTaskRow(task)) return;
         e.preventDefault();
         setDropTargetTaskId(task.id);
       },
@@ -2748,6 +2962,7 @@ export function SeptenaApp() {
     muted = false,
     collapse,
     onContextMenu,
+    drag,
   }: {
     leading?: React.ReactNode;
     title: string;
@@ -2756,6 +2971,15 @@ export function SeptenaApp() {
     muted?: boolean;
     collapse?: { expanded: boolean; onToggle: () => void };
     onContextMenu?: (e: React.MouseEvent) => void;
+    /** A header the user reorders by drag (a project heading). Same drop mark as a task row. */
+    drag?: {
+      isDropTarget: boolean;
+      onDragStart: (e: React.DragEvent) => void;
+      onDragEnd: () => void;
+      onDragOver: (e: React.DragEvent) => void;
+      onDragLeave: () => void;
+      onDrop: (e: React.DragEvent) => void;
+    };
   }) => {
     const Chevron = collapse?.expanded ? ChevronDown : ChevronRight;
     const inner = (
@@ -2797,6 +3021,22 @@ export function SeptenaApp() {
         >
           {inner}
         </button>
+      );
+    }
+    if (drag) {
+      return (
+        <div
+          draggable
+          onDragStart={drag.onDragStart}
+          onDragEnd={drag.onDragEnd}
+          onDragOver={drag.onDragOver}
+          onDragLeave={drag.onDragLeave}
+          onDrop={drag.onDrop}
+          onContextMenu={onContextMenu}
+          className={`${className} cursor-grab ${drag.isDropTarget ? "border-t-2 border-[var(--accent)]" : ""}`}
+        >
+          {inner}
+        </div>
       );
     }
     return (
@@ -2988,7 +3228,7 @@ export function SeptenaApp() {
 
     // Global commands
     items.push(
-      makeCmd("app.newTask", () => composerRef.current?.focus(), {
+      makeCmd("app.newTask", startNewTask, {
         keywords: ["add", "create", "task"],
       }),
       makeCmd(
@@ -3083,6 +3323,7 @@ export function SeptenaApp() {
     shareForTask,
     showToast,
     sidebarOpen,
+    startNewTask,
     taskPageId,
     toggleDone,
     undoSnap.canUndo,
@@ -3175,7 +3416,13 @@ export function SeptenaApp() {
     // account's tasks are still on this device, ready to export.
     return (
       <>
-        <SignInScreen api={api} language={prefs.language} onSignedIn={(s) => void handleSignedIn(s)} />
+        <SignInScreen
+          api={api}
+          language={prefs.language}
+          isDark={isDark}
+          dayISO={todayYMD}
+          onSignedIn={(s) => void handleSignedIn(s)}
+        />
         {settingsModal}
       </>
     );
@@ -4253,7 +4500,7 @@ export function SeptenaApp() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => composerRef.current?.focus()}
+                      onClick={startNewTask}
                       className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left hover:bg-[var(--bg-hover)]"
                     >
                       <span>Add your first task — Lands in Inbox at the top of Today</span>
@@ -4467,7 +4714,9 @@ export function SeptenaApp() {
               )}
 
             {/* Inline Quick-Add Composer — aligned on the same 22px leading axis as task checkboxes */}
-            {pageMeta.supportsInlineCreate && !checklistProject?.checklistMode && (
+            {/* Shown where a new task lands in this list (registry newTaskTarget "here" or
+                "tomorrow"); a "today" list sends N and New Task to Today instead. */}
+            {newTaskTarget !== "today" && !checklistProject?.checklistMode && (
               <form
                 onSubmit={(e) => void handleQuickAddInline(e)}
                 className={`mb-5 flex items-center gap-2.5 rounded-[14px] border border-[var(--border-subtle)]/75 px-3 py-2.5 focus-within:border-[var(--accent)] ${
@@ -4675,37 +4924,66 @@ export function SeptenaApp() {
                     <section key={h.id}>
                       {renderSectionHeader({
                         title: h.title,
+                        drag: {
+                          isDropTarget: dropTargetHeadingId === h.id && draggedHeadingId !== h.id,
+                          onDragStart: (e) => {
+                            setDraggedHeadingId(h.id);
+                            e.dataTransfer.effectAllowed = "move";
+                            e.dataTransfer.setData("text/plain", h.id);
+                          },
+                          onDragEnd: () => {
+                            setDraggedHeadingId(null);
+                            setDropTargetHeadingId(null);
+                          },
+                          onDragOver: (e) => {
+                            if (!draggedHeadingId && !draggedTaskId) return;
+                            e.preventDefault();
+                            setDropTargetHeadingId(h.id);
+                          },
+                          onDragLeave: () => {
+                            setDropTargetHeadingId((prev) => (prev === h.id ? null : prev));
+                          },
+                          onDrop: (e) => {
+                            e.preventDefault();
+                            if (draggedTaskId) void handleTaskDropOnHeading(h.id);
+                            else void handleDropOnHeading(h.id);
+                          },
+                        },
                         onContextMenu: (e) => {
                           e.preventDefault();
-                          setContextMenu({
-                            x: e.clientX,
-                            y: e.clientY,
-                            items: [
-                              {
-                                kind: "item",
-                                label: "Rename Section",
-                                onSelect: () => {
-                                  const next = window.prompt("Rename Section", h.title)?.trim();
-                                  if (next && next !== h.title) void engine.updateTaskFields(h, { title: next });
-                                },
-                              },
-                              { kind: "divider" },
-                              {
-                                kind: "item",
-                                label: "Delete Section",
-                                destructive: true,
-                                onSelect: () => {
-                                  if (window.confirm("Delete this section? Its tasks stay in the project.")) {
-                                    void engine.deleteTask(h);
-                                  }
-                                },
-                              },
-                            ],
-                          });
+                          setContextMenu({ x: e.clientX, y: e.clientY, items: headingMenuItems(h) });
                         },
                       })}
                       {under.length > 0 && (
                         <div className={taskCardClass}>{under.map((i) => renderTaskRow(i))}</div>
+                      )}
+                      {sectionComposer?.headingId === h.id && (
+                        <form
+                          onSubmit={(e) => void submitSectionComposer(e, h)}
+                          className={`mt-2 flex items-center gap-2.5 rounded-[14px] border border-[var(--accent)] px-3 py-2.5 ${
+                            canvasTexture !== "none"
+                              ? "bg-[var(--bg-card-glass)] backdrop-blur-md"
+                              : "bg-[var(--bg-card)]"
+                          }`}
+                        >
+                          <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center text-[var(--text-muted)]">
+                            <Plus className="h-[17px] w-[17px]" />
+                          </span>
+                          <input
+                            type="text"
+                            autoFocus
+                            value={sectionComposer.title}
+                            onChange={(e) => setSectionComposer({ headingId: h.id, title: e.target.value })}
+                            onKeyDown={(e) => {
+                              if (e.key === "Escape") setSectionComposer(null);
+                            }}
+                            onBlur={() => {
+                              if (!sectionComposer.title.trim()) setSectionComposer(null);
+                            }}
+                            placeholder={`New task in ${h.title}…`}
+                            className="min-w-0 flex-1 bg-transparent text-[15px] text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)]"
+                          />
+                        </form>
                       )}
                     </section>
                   );

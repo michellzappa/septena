@@ -918,7 +918,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     let after = prefs.snapshot()
     guard after != before else { return true }
     recordStructure(
-      name: String(localized: "Reorder Smart Lists", comment: "SeptaskKit: undo action"),
+      name: String(localized: "Reorder Lists", comment: "SeptaskKit: undo action"),
       undo: { SmartListPreferences.shared.restore(before) },
       redo: { SmartListPreferences.shared.restore(after) })
     return true
@@ -1457,7 +1457,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
       // Smart-list placement + show/hide (SmartListPreferences) rides on top of
       // the registry menu: Move Above/Below, Hide <list>, then Customize.
       menu.insertItem(.separator(), at: 0)
-      menu.insertItem(smartListMenuItem(String(localized: "Customize Smart Lists…",
+      menu.insertItem(smartListMenuItem(String(localized: "Customize Lists…",
                                                comment: "SeptaskKit: sidebar context menu"),
                                         #selector(openSmartListsSettings)), at: 0)
       if case .filter(let filter, let title, _)? = node?.content,

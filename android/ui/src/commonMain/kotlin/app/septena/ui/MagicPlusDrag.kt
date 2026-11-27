@@ -297,13 +297,27 @@ class MagicPlusDragState {
 fun insertionPosition(positions: List<Double?>, index: Int, before: Boolean): Double {
     val target = positions.getOrNull(index)
     val neighbor = positions.getOrNull(if (before) index - 1 else index + 1)
-    return when {
+    val slot = when {
         target != null && neighbor != null -> (target + neighbor) / 2.0
         target != null -> if (before) target - 1.0 else target + 1.0
         neighbor != null -> if (before) neighbor + 1.0 else neighbor - 1.0
         else -> if (before) index - 0.5 else index + 0.5
     }
+    if (slot != 0.0) return slot
+    // `position == 0` means "never ordered" on Apple: nudge half a step, as `TaskOrder.positions` does.
+    return when {
+        target != null && neighbor != null -> slot + (maxOf(target, neighbor) - slot) / 2.0
+        target != null -> if (before) target - 0.5 else target + 0.5
+        neighbor != null -> if (before) neighbor + 0.5 else neighbor - 0.5
+        else -> slot
+    }
 }
+
+/**
+ * A position just above [top] (the first row of a group), or null when the group
+ * is empty. Never 0, which Apple reads as "never ordered".
+ */
+fun positionAbove(top: Double?): Double? = top?.let { if (it - 1.0 == 0.0) it - 0.5 else it - 1.0 }
 
 /** Active Magic Plus drag coordinator, or null on hosts that do not use it. */
 val LocalMagicPlusDrag = compositionLocalOf<MagicPlusDragState?> { null }

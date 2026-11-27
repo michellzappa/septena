@@ -74,78 +74,7 @@
     "rateDetail": "€30 a year for 7 years. Half the annual rate.",
     "action": "Get 7-Year Pass"
   },
-  "priceFootnote": "Prices include VAT where it applies. Outside the euro area, the App Store charges its matching local price.",
-  "defaultCurrency": "EUR",
-  "currencies": [
-    {
-      "code": "EUR",
-      "symbol": "€",
-      "countries": [],
-      "taxInclusive": true,
-      "freeLabel": "€0",
-      "plus": {
-        "year": { "amountMinor": 6000, "label": "€60 a year", "detail": "€5 a month. You save €24 against paying monthly." },
-        "month": { "amountMinor": 700, "label": "€7 a month", "detail": "Cancel at any time." },
-        "pass": { "amountMinor": 21000, "label": "€210 once", "detail": "€30 a year for 7 years. Half the annual rate." }
-      },
-      "pro": {
-        "year": { "amountMinor": 12000, "label": "€120 a year", "detail": "€10 a month. You save €48 against paying monthly." },
-        "month": { "amountMinor": 1400, "label": "€14 a month", "detail": "Cancel at any time." }
-      },
-      "footnote": "Prices include VAT where it applies. Outside EUR, USD, GBP and BRL, the App Store and Google Play charge their matching local price."
-    },
-    {
-      "code": "USD",
-      "symbol": "$",
-      "countries": ["US"],
-      "taxInclusive": false,
-      "freeLabel": "$0",
-      "plus": {
-        "year": { "amountMinor": 6000, "label": "$60 a year", "detail": "$5 a month. You save $24 against paying monthly." },
-        "month": { "amountMinor": 700, "label": "$7 a month", "detail": "Cancel at any time." },
-        "pass": { "amountMinor": 21000, "label": "$210 once", "detail": "$30 a year for 7 years. Half the annual rate." }
-      },
-      "pro": {
-        "year": { "amountMinor": 12000, "label": "$120 a year", "detail": "$10 a month. You save $48 against paying monthly." },
-        "month": { "amountMinor": 1400, "label": "$14 a month", "detail": "Cancel at any time." }
-      },
-      "footnote": "Prices exclude applicable local sales tax. Outside EUR, USD, GBP and BRL, the App Store and Google Play charge their matching local price."
-    },
-    {
-      "code": "GBP",
-      "symbol": "£",
-      "countries": ["GB"],
-      "taxInclusive": true,
-      "freeLabel": "£0",
-      "plus": {
-        "year": { "amountMinor": 5000, "label": "£50 a year", "detail": "£4.17 a month. You save £22 against paying monthly." },
-        "month": { "amountMinor": 600, "label": "£6 a month", "detail": "Cancel at any time." },
-        "pass": { "amountMinor": 17500, "label": "£175 once", "detail": "£25 a year for 7 years. Half the annual rate." }
-      },
-      "pro": {
-        "year": { "amountMinor": 10000, "label": "£100 a year", "detail": "£8.33 a month. You save £44 against paying monthly." },
-        "month": { "amountMinor": 1200, "label": "£12 a month", "detail": "Cancel at any time." }
-      },
-      "footnote": "Prices include UK VAT. Outside EUR, USD, GBP and BRL, the App Store and Google Play charge their matching local price."
-    },
-    {
-      "code": "BRL",
-      "symbol": "R$",
-      "countries": ["BR"],
-      "taxInclusive": true,
-      "freeLabel": "R$ 0",
-      "plus": {
-        "year": { "amountMinor": 24000, "label": "R$ 240 a year", "detail": "R$ 20 a month. You save R$ 108 against paying monthly." },
-        "month": { "amountMinor": 2900, "label": "R$ 29 a month", "detail": "Cancel at any time." },
-        "pass": { "amountMinor": 84000, "label": "R$ 840 once", "detail": "R$ 120 a year for 7 years. Half the annual rate." }
-      },
-      "pro": {
-        "year": { "amountMinor": 48000, "label": "R$ 480 a year", "detail": "R$ 40 a month. You save R$ 216 against paying monthly." },
-        "month": { "amountMinor": 5800, "label": "R$ 58 a month", "detail": "Cancel at any time." }
-      },
-      "footnote": "Prices include applicable local taxes. Outside EUR, USD, GBP and BRL, the App Store and Google Play charge their matching local price."
-    }
-  ],
+  "priceFootnote": "Prices include VAT where it applies. Outside the euro area, the App Store and Google Play charge their matching local price.",
   "levels": [
     { "id": "free", "title": "Free", "detail": "€0" },
     { "id": "plus", "title": "Plus", "detail": "€60 a year or €7 a month" },

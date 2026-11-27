@@ -21,7 +21,7 @@ import app.septena.core.SmartListSection
 import app.septena.core.generated.RegistrySettingKeys
 
 /**
- * Surface `smart_lists_editor` (Settings ▸ Smart Lists): show, hide, order and place the
+ * Surface `smart_lists_editor` (Settings ▸ General ▸ Lists): show, hide, order and place the
  * smart lists above or below Areas & Projects, like iOS `SeptaskSmartListsPane`. iOS drags
  * to reorder; Android moves a list with the arrows. The three keys sync per account.
  */

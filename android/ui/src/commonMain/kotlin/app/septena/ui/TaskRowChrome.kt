@@ -785,6 +785,8 @@ private fun Modifier.draggableTaskRow(
     onOpen: (String) -> Unit,
     onMenu: () -> Unit,
 ): Modifier {
+    // While an inline editor is open the row is dimmed and a tap only folds it (InlineEditDim.kt).
+    if (LocalInlineEditDim.current.isActive) return this
     val density = LocalDensity.current.density
     val dragSlopPx = with(LocalDensity.current) { 10.dp.toPx() }
     val haptics = LocalHapticFeedback.current

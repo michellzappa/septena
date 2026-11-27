@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -77,7 +78,11 @@ import app.septena.ui.TaskListItem
 import app.septena.ui.TaskRowMenuAction
 import app.septena.ui.TaskSelection
 import app.septena.ui.cardPosition
+import app.septena.ui.headingReorderDragSource
+import app.septena.ui.headingReorderDrop
 import app.septena.ui.insertionPosition
+import app.septena.ui.positionAbove
+import app.septena.ui.positionsAbove
 import app.septena.ui.magicPlusRowDrop
 import app.septena.ui.magicPlusSectionDrop
 import app.septena.ui.rememberTaskContainerDropTarget
@@ -105,6 +110,8 @@ fun AreasProjectsScreen(
     onTaskAction: (String, String) -> Unit = { _, _ -> },
     selection: TaskSelection = TaskSelection(),
     newSectionTrigger: Int = 0,
+    /** Magic Plus menu on an area page: New Project in Area opens the new-project prompt. */
+    newProjectTrigger: Int = 0,
     onLeftProject: () -> Unit = {},
     onMagicPlusDrop: ((QuickAddDraft) -> Unit)? = null,
     expandedTaskId: String? = null,
@@ -139,6 +146,11 @@ fun AreasProjectsScreen(
     LaunchedEffect(newSectionTrigger) {
         if (newSectionTrigger > 0 && destination is AreasProjectsDestination.Project) {
             dialog = PlacesDialog.CreateSection
+        }
+    }
+    LaunchedEffect(newProjectTrigger) {
+        if (newProjectTrigger > 0 && destination is AreasProjectsDestination.Area) {
+            dialog = PlacesDialog.CreateProject
         }
     }
 
@@ -518,7 +530,7 @@ fun AreasProjectsScreen(
                                         onMagicPlusDrop?.invoke(
                                             QuickAddDraft(
                                                 areaId = destination.id,
-                                                position = visibleAreaTasks.firstOrNull()?.position?.let { it - 1.0 },
+                                                position = visibleAreaTasks.firstOrNull()?.position.let(::positionAbove),
                                             ),
                                         )
                                     },
@@ -528,7 +540,7 @@ fun AreasProjectsScreen(
                                     enabled = true,
                                     onDrop = { ids ->
                                         val topPos = visibleAreaTasks.firstOrNull()?.position ?: 0.0
-                                        val newPositions = List(ids.size) { i -> topPos - (ids.size - i).toDouble() }
+                                        val newPositions = positionsAbove(topPos, ids.size)
                                         viewModel.reorderTasks(ids, newPositions)
                                     },
                                 )
@@ -554,7 +566,7 @@ fun AreasProjectsScreen(
                         itemsIndexed(visibleAreaTasks, key = { _, it -> "task:${it.id}" }) { index, task ->
                             val slicePosition = cardPosition(index, visibleAreaTasks.size)
                             if (expandedTaskId == task.id && expandedTaskContent != null) {
-                                expandedTaskContent(task.item, slicePosition, taskListMotion())
+                                expandedTaskContent(task.item, slicePosition, taskListMotion(dimsForInlineEdit = false))
                             } else {
                                 PlaceTaskItem(
                                     task = task,
@@ -630,7 +642,7 @@ fun AreasProjectsScreen(
                                         onMagicPlusDrop?.invoke(
                                             QuickAddDraft(
                                                 projectId = destination.id,
-                                                position = visibleUnsectioned.firstOrNull()?.position?.let { it - 1.0 },
+                                                position = visibleUnsectioned.firstOrNull()?.position.let(::positionAbove),
                                             ),
                                         )
                                     },
@@ -640,7 +652,7 @@ fun AreasProjectsScreen(
                                     enabled = true,
                                     onDrop = { ids ->
                                         val topPos = visibleUnsectioned.firstOrNull()?.position ?: 0.0
-                                        val positions = List(ids.size) { i -> topPos - (ids.size - i).toDouble() }
+                                        val positions = positionsAbove(topPos, ids.size)
                                         viewModel.reorderTasks(ids, positions, targetHeadingId = null, updateHeading = true)
                                     },
                                 )
@@ -667,7 +679,7 @@ fun AreasProjectsScreen(
                         itemsIndexed(visibleUnsectioned, key = { _, it -> "task:${it.id}" }) { index, task ->
                             val slicePosition = cardPosition(index, visibleUnsectioned.size)
                             if (expandedTaskId == task.id && expandedTaskContent != null) {
-                                expandedTaskContent(task.item, slicePosition, taskListMotion())
+                                expandedTaskContent(task.item, slicePosition, taskListMotion(dimsForInlineEdit = false))
                             } else {
                                 PlaceTaskItem(
                                     task = task,
@@ -762,8 +774,23 @@ fun AreasProjectsScreen(
                                 onReorderToSection = { ids, newPositions ->
                                     viewModel.reorderTasks(ids, newPositions, targetHeadingId = section.id, updateHeading = true)
                                 },
+                                // Headings reorder by drag in a sorted project too (LIST_SORT_SPEC §6).
+                                onReorderHeadings = { ids -> viewModel.reorderSections(ids, beforeHeadingId = section.id) },
                                 expandedTaskId = expandedTaskId,
                                 expandedTaskContent = expandedTaskContent,
+                            )
+                        }
+                        // The slot after the last section: a heading dropped here moves to the end.
+                        item(key = "sections-end") {
+                            Spacer(
+                                modifier = taskListMotion()
+                                    .fillMaxWidth()
+                                    .height(16.dp)
+                                    .headingReorderDrop(
+                                        id = "reorder-heading-end-${destination.id}",
+                                        headingId = null,
+                                        onDrop = { ids -> viewModel.reorderSections(ids, beforeHeadingId = null) },
+                                    ),
                             )
                         }
                     }
@@ -934,6 +961,8 @@ private fun LazyListScope.placeSection(
     onMagicPlusDrop: ((QuickAddDraft) -> Unit)? = null,
     orderedDragIds: List<String> = emptyList(),
     onReorderToSection: (ids: List<String>, positions: List<Double>) -> Unit = { _, _ -> },
+    /** A heading drag dropped just above this section's heading. */
+    onReorderHeadings: (ids: List<String>) -> Unit = {},
     /** False on a sorted page: a drop between two rows does not reorder. */
     reorderBetweenRows: Boolean = true,
     expandedTaskId: String? = null,
@@ -949,6 +978,7 @@ private fun LazyListScope.placeSection(
             onDelete = onDelete,
             onMagicPlusDrop = onMagicPlusDrop,
             onReorderToSection = onReorderToSection,
+            onReorderHeadings = onReorderHeadings,
             modifier = taskListMotion(),
         )
     }
@@ -966,7 +996,7 @@ private fun LazyListScope.placeSection(
         itemsIndexed(section.tasks, key = { _, it -> "task:${it.id}" }) { index, task ->
             val slicePosition = cardPosition(index, section.tasks.size)
             if (expandedTaskId == task.id && expandedTaskContent != null) {
-                expandedTaskContent(task.item, slicePosition, taskListMotion())
+                expandedTaskContent(task.item, slicePosition, taskListMotion(dimsForInlineEdit = false))
             } else {
                 PlaceTaskItem(
                     task = task,
@@ -1024,6 +1054,7 @@ private fun PlaceSectionHeader(
     onDelete: () -> Unit,
     onMagicPlusDrop: ((QuickAddDraft) -> Unit)?,
     onReorderToSection: (ids: List<String>, positions: List<Double>) -> Unit,
+    onReorderHeadings: (ids: List<String>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var menuOpen by remember(section.id) { mutableStateOf(false) }
@@ -1043,7 +1074,7 @@ private fun PlaceSectionHeader(
                         QuickAddDraft(
                             projectId = projectId,
                             headingId = section.id,
-                            position = section.tasks.firstOrNull()?.position?.let { it - 1.0 },
+                            position = section.tasks.firstOrNull()?.position.let(::positionAbove),
                         ),
                     )
                 },
@@ -1053,10 +1084,17 @@ private fun PlaceSectionHeader(
                 enabled = true,
                 onDrop = { ids ->
                     val topPos = section.tasks.firstOrNull()?.position ?: 0.0
-                    val positions = List(ids.size) { i -> topPos - (ids.size - i).toDouble() }
+                    val positions = positionsAbove(topPos, ids.size)
                     onReorderToSection(ids, positions)
                 },
             )
+            // A heading drag lands above this heading; long-press and slide the header to move the section.
+            .headingReorderDrop(
+                id = "reorder-heading-slot-${section.id}",
+                headingId = section.id,
+                onDrop = onReorderHeadings,
+            )
+            .headingReorderDragSource(headingId = section.id, title = section.title)
             .padding(
                 start = TaskCardMetrics.HeaderLeading,
                 end = TaskCardMetrics.Margin,

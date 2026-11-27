@@ -292,6 +292,9 @@ function validateSettings(settings, entities, icons, caps) {
     if (item.platforms !== undefined) {
       for (const p of item.platforms) assert(validPlatforms.has(p), `settings.json: ${ctx} unknown platform "${p}"`);
     }
+    if (item.platformsReason !== undefined) {
+      assert(Array.isArray(item.platforms) && typeof item.platformsReason === "string" && item.platformsReason.trim().length > 0, `settings.json: ${ctx} platformsReason needs platforms and a non-empty reason`);
+    }
     if (item.visibility !== undefined) {
       assert(validVisibilities.has(item.visibility), `settings.json: ${ctx} invalid visibility "${item.visibility}"`);
     }
@@ -333,12 +336,27 @@ function validateSettings(settings, entities, icons, caps) {
     assert(!seenGroupIds.has(grp.id), `settings.json: duplicate rootGroup "${grp.id}"`);
     seenGroupIds.add(grp.id);
     assert(validPresentations.has(grp.mobilePresentation), `settings.json: rootGroup ${grp.id} invalid mobilePresentation`);
-    if (grp.desktopTab !== null) {
-      assert(tabIds.has(grp.desktopTab), `settings.json: rootGroup ${grp.id} unknown desktopTab "${grp.desktopTab}"`);
-    }
+    assert(grp.desktopTab === undefined, `settings.json: rootGroup ${grp.id} desktopTab is removed; each desktop tab is the depth-1 page with its id`);
     assert(Array.isArray(grp.items) && grp.items.length > 0, `settings.json: rootGroup ${grp.id} must have >= 1 item`);
-    for (const item of grp.items) validateItem(`rootGroup.${grp.id}`, item, new Set([1]));
+    for (const item of grp.items) {
+      // mz (2026-11-27): the top level holds only navigation rows, one per
+      // place. Every setting lives on a page.
+      assert(item.kind === "pageLink", `settings.json: rootGroup ${grp.id} holds a ${item.kind}; the top level holds only page links`);
+      validateItem(`rootGroup.${grp.id}`, item, new Set([1]));
+    }
   }
+  // The mobile root and the desktop sidebar list the same places in the same
+  // order: each desktop tab is the depth-1 page with its id, and the root
+  // rows link those pages in tab order.
+  const rootPages = settings.rootGroups.flatMap((g) => g.items.map((i) => i.page));
+  const tabOrder = settings.desktopTabs.map((t) => t.id);
+  assert(JSON.stringify(rootPages) === JSON.stringify(tabOrder), `settings.json: root rows (${rootPages.join(", ")}) must match desktopTabs order (${tabOrder.join(", ")})`);
+  for (const page of settings.pages) {
+    if (page.depth === 1) assert(tabIds.has(page.id), `settings.json: depth-1 page "${page.id}" is not a desktop tab`);
+  }
+  const cardGroups = settings.rootGroups.filter((g) => g.mobilePresentation === "card");
+  const identityTabs = settings.desktopTabs.filter((t) => t.group === "identity").map((t) => t.id);
+  assert(JSON.stringify(cardGroups.flatMap((g) => g.items.map((i) => i.page))) === JSON.stringify(identityTabs), "settings.json: the card root group must link exactly the identity desktop tabs");
 
   for (const page of settings.pages) {
     const allowedChildDepths = page.depth === 1 ? new Set([2]) : new Set();
@@ -398,6 +416,9 @@ function validateDestinations(dests, icons, caps) {
     }
     assert(typeof d.canHide === "boolean", `destinations.json: ${d.id} missing boolean canHide`);
     assert(typeof d.canMoveSection === "boolean", `destinations.json: ${d.id} missing boolean canMoveSection`);
+    // Where Magic Plus / app.newTask makes a task from this list: an inline draft
+    // here, an inline draft here on tomorrow, or a jump to Today and a draft there.
+    assert(["here", "tomorrow", "today"].includes(d.newTaskTarget), `destinations.json: ${d.id} newTaskTarget must be here, tomorrow or today`);
     assert(typeof d.emptyState?.title === "string" && typeof d.emptyState?.detail === "string", `destinations.json: ${d.id} needs emptyState.title and .detail`);
     assert(d.icon in icons.icons, `destinations.json: ${d.id} unknown icon "${d.icon}"`);
     assert(d.featureId in caps.capabilities, `destinations.json: ${d.id} unknown featureId "${d.featureId}"`);
@@ -844,46 +865,6 @@ function validatePlans(plans, icons, caps, importSources) {
   for (const f of ["title", "detail", "label", "rateDetail", "action"]) assert(typeof pass[f] === "string" && pass[f].length > 0, `plans.json: pass.${f} missing`);
   assert(pass.label.includes(String(pass.amountMinor / 100)), `plans.json: pass.label must state ${pass.amountMinor / 100}`);
 
-  // ADR 0060: pinned currencies (EUR baseline + USD, GBP, BRL) for the pricing
-  // page and web checkout. EUR amounts must stay in lockstep with prices/proPrices.
-  assert(plans.defaultCurrency === "EUR", "plans.json: defaultCurrency must be EUR (ADR 0060)");
-  assert(Array.isArray(plans.currencies) && plans.currencies.length > 0, "plans.json: currencies missing (ADR 0060)");
-  const curCodes = new Set();
-  const curCountries = new Set();
-  for (const cur of plans.currencies) {
-    assert(/^[A-Z]{3}$/.test(cur.code) && !curCodes.has(cur.code), `plans.json: bad or duplicate currency "${cur.code}"`);
-    curCodes.add(cur.code);
-    assert(typeof cur.symbol === "string" && cur.symbol.length > 0, `plans.json: currency ${cur.code} needs symbol`);
-    assert(typeof cur.taxInclusive === "boolean", `plans.json: currency ${cur.code} needs taxInclusive boolean`);
-    assert(typeof cur.freeLabel === "string" && cur.freeLabel.includes("0"), `plans.json: currency ${cur.code} needs freeLabel`);
-    assert(typeof cur.footnote === "string" && cur.footnote.length > 0, `plans.json: currency ${cur.code} needs footnote`);
-    assert(Array.isArray(cur.countries), `plans.json: currency ${cur.code} countries must be an array`);
-    for (const cc of cur.countries) {
-      assert(/^[A-Z]{2}$/.test(cc) && !curCountries.has(cc), `plans.json: currency ${cur.code} bad or duplicate country "${cc}"`);
-      curCountries.add(cc);
-    }
-    for (const tier of ["plus", "pro"]) {
-      for (const iv of ["year", "month"]) {
-        const entry = cur[tier]?.[iv];
-        assert(entry && Number.isInteger(entry.amountMinor) && entry.amountMinor > 0, `plans.json: currency ${cur.code}.${tier}.${iv} needs positive integer amountMinor`);
-        const whole = String(entry.amountMinor / 100);
-        assert(typeof entry.label === "string" && entry.label.includes(whole), `plans.json: currency ${cur.code}.${tier}.${iv} label must state ${whole}`);
-        assert(typeof entry.detail === "string" && entry.detail.length > 0, `plans.json: currency ${cur.code}.${tier}.${iv} needs detail`);
-      }
-    }
-    const curPass = cur.plus?.pass;
-    assert(curPass && Number.isInteger(curPass.amountMinor) && curPass.amountMinor > 0, `plans.json: currency ${cur.code}.plus.pass needs positive integer amountMinor`);
-    const passWhole = String(curPass.amountMinor / 100);
-    assert(typeof curPass.label === "string" && curPass.label.includes(passWhole), `plans.json: currency ${cur.code}.plus.pass label must state ${passWhole}`);
-    assert(typeof curPass.detail === "string" && curPass.detail.length > 0, `plans.json: currency ${cur.code}.plus.pass needs detail`);
-    assert(cur.pro?.pass === undefined, `plans.json: currency ${cur.code}.pro must not have a pass (ADR 0061)`);
-  }
-  const eurCur = plans.currencies.find((c) => c.code === plans.defaultCurrency);
-  assert(eurCur, "plans.json: defaultCurrency must exist in currencies");
-  for (const pr of plans.prices) assert(eurCur.plus[pr.interval].amountMinor === pr.amountMinor, `plans.json: EUR plus.${pr.interval} must match prices.${pr.id}`);
-  for (const pr of plans.proPrices) assert(eurCur.pro[pr.interval].amountMinor === pr.amountMinor, `plans.json: EUR pro.${pr.interval} must match proPrices.${pr.id}`);
-  assert(eurCur.plus.pass.amountMinor === plans.pass.amountMinor, "plans.json: EUR plus.pass must match pass.amountMinor");
-
   assert(JSON.stringify(plans.levels.map((l) => l.id)) === JSON.stringify(PLAN_LEVELS), `plans.json: levels must be ${PLAN_LEVELS.join(", ")}`);
   assert(JSON.stringify(plans.cards.map((c) => c.id)) === JSON.stringify(PLAN_LEVELS), `plans.json: cards must be ${PLAN_LEVELS.join(", ")}`);
   // ADR 0059: Pro sells like Plus, so no card carries a status: every card is on sale.
@@ -1297,7 +1278,6 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  let id: String");
   lines.push("  let header: String?");
   lines.push("  let mobilePresentation: String");
-  lines.push("  let desktopTab: String?");
   lines.push("  let items: [RegistrySettingsItem]");
   lines.push("}");
   lines.push("");
@@ -1376,7 +1356,7 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("");
   lines.push("  static let rootGroups: [RegistrySettingsGroup] = [");
   for (const grp of settings.rootGroups) {
-    lines.push(`    RegistrySettingsGroup(id: ${swiftStr(grp.id)}, header: ${LOpt(grp.header, grp, "header")}, mobilePresentation: ${swiftStr(grp.mobilePresentation)}, desktopTab: ${optStr(grp.desktopTab)}, items: [`);
+    lines.push(`    RegistrySettingsGroup(id: ${swiftStr(grp.id)}, header: ${LOpt(grp.header, grp, "header")}, mobilePresentation: ${swiftStr(grp.mobilePresentation)}, items: [`);
     for (const item of grp.items) {
       lines.push(`      ${emitItem(item, null)},`);
     }
@@ -1457,6 +1437,9 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  let canMoveSection: Bool");
   lines.push("  /// The list keeps a manual order and takes a Sort By (docs/LIST_SORT_SPEC.md).");
   lines.push("  let supportsManualOrder: Bool");
+  lines.push("  /// Where a Magic Plus tap creates the draft on this list: `here`, `tomorrow`");
+  lines.push("  /// (here, on tomorrow) or `today` (opens Today first).");
+  lines.push("  let newTaskTarget: String");
   lines.push("  let emptyTitle: String");
   lines.push("  let emptyDetail: String");
   lines.push("  let featureId: String");
@@ -1482,7 +1465,7 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  static let all: [RegistryDestination] = [");
   for (const d of dests.destinations) {
     lines.push(
-      `    RegistryDestination(id: ${swiftCaseRef(d.id)}, navigationKey: ${swiftStr(d.navigationKey)}, serverView: ${swiftStr(d.serverView)}, title: ${L(d.title, d, "title")}, iconId: ${swiftStr(d.icon)}, sfSymbol: ${swiftStr(icons.icons[d.icon].sfSymbol)}, sidebarSection: ${swiftStr(d.sidebarSection ?? "top")}, visibility: ${swiftStr(d.visibility)}, canHide: ${d.canHide ? "true" : "false"}, canMoveSection: ${d.canMoveSection ? "true" : "false"}, supportsManualOrder: ${d.supportsManualOrder ? "true" : "false"}, emptyTitle: ${L(d.emptyState.title, d.emptyState, "title")}, emptyDetail: ${L(d.emptyState.detail, d.emptyState, "detail")}, featureId: ${swiftStr(d.featureId)}),`
+      `    RegistryDestination(id: ${swiftCaseRef(d.id)}, navigationKey: ${swiftStr(d.navigationKey)}, serverView: ${swiftStr(d.serverView)}, title: ${L(d.title, d, "title")}, iconId: ${swiftStr(d.icon)}, sfSymbol: ${swiftStr(icons.icons[d.icon].sfSymbol)}, sidebarSection: ${swiftStr(d.sidebarSection ?? "top")}, visibility: ${swiftStr(d.visibility)}, canHide: ${d.canHide ? "true" : "false"}, canMoveSection: ${d.canMoveSection ? "true" : "false"}, supportsManualOrder: ${d.supportsManualOrder ? "true" : "false"}, newTaskTarget: ${swiftStr(d.newTaskTarget)}, emptyTitle: ${L(d.emptyState.title, d.emptyState, "title")}, emptyDetail: ${L(d.emptyState.detail, d.emptyState, "detail")}, featureId: ${swiftStr(d.featureId)}),`
     );
   }
   lines.push("  ]");

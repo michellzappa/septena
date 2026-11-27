@@ -70,7 +70,11 @@ internal fun MagicPlusOrb(
     onNewTask: () -> Unit,
     onNewSection: () -> Unit,
     modifier: Modifier = Modifier,
+    /** On an area page a tap opens New Task / New Project in Area (iPhone `opensQuickMenuOnTap`). */
+    isViewingArea: Boolean = false,
+    onNewProjectInArea: () -> Unit = {},
 ) {
+    val opensMenuOnTap = isViewingProject || isViewingArea
     val colors = LocalMagicPlusColors.current
     val fill = if (colors.fill != Color.Unspecified) colors.fill else MaterialTheme.colorScheme.primary
     val ink = if (colors.ink != Color.Unspecified) colors.ink else MaterialTheme.colorScheme.onPrimary
@@ -133,6 +137,9 @@ internal fun MagicPlusOrb(
     val newSectionTitle = remember(languageTag) {
         RegistryCatalog.actionTitle(RegistryActionIds.SECTION_NEW, languageTag = languageTag).orEmpty()
     }
+    val newProjectInAreaTitle = remember(languageTag) {
+        RegistryCatalog.actionTitle(RegistryActionIds.AREA_NEW_PROJECT, languageTag = languageTag).orEmpty()
+    }
 
     Box(
         modifier = modifier
@@ -149,7 +156,7 @@ internal fun MagicPlusOrb(
                 contentDescription = accessibilityLabel
                 role = Role.Button
             }
-            .pointerInput(drag, isViewingProject, onNewTask) {
+            .pointerInput(drag, opensMenuOnTap, onNewTask) {
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
                     val downPos = down.position
@@ -166,7 +173,7 @@ internal fun MagicPlusOrb(
                                 } else {
                                     view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
                                     popTick += 1
-                                    if (isViewingProject) showingMenu = true else onNewTask()
+                                    if (opensMenuOnTap) showingMenu = true else onNewTask()
                                 }
                                 break
                             }
@@ -239,7 +246,7 @@ internal fun MagicPlusOrb(
             CancelGlyph(ink = cancelInk)
         }
 
-        if (isViewingProject) {
+        if (opensMenuOnTap) {
             DropdownMenu(
                 expanded = showingMenu,
                 onDismissRequest = { showingMenu = false },
@@ -252,10 +259,10 @@ internal fun MagicPlusOrb(
                     },
                 )
                 DropdownMenuItem(
-                    text = { Text(newSectionTitle) },
+                    text = { Text(if (isViewingProject) newSectionTitle else newProjectInAreaTitle) },
                     onClick = {
                         showingMenu = false
-                        onNewSection()
+                        if (isViewingProject) onNewSection() else onNewProjectInArea()
                     },
                 )
             }

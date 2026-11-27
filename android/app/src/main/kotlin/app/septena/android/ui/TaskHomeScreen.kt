@@ -58,6 +58,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -129,7 +130,11 @@ import app.septena.ui.TaskHomeContent
 import app.septena.ui.TaskMenuActionIcon
 import app.septena.ui.TaskRowMenuAction
 import app.septena.ui.TaskSelection
+import app.septena.ui.InlineEditDim
+import app.septena.ui.LocalInlineEditDim
 import app.septena.ui.insertionPosition
+import app.septena.ui.positionAbove
+import app.septena.ui.positionsAbove
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -163,6 +168,7 @@ fun TaskHomeScreen(
     var logbookShowingDeleted by rememberSaveable { mutableStateOf(false) }
     var pendingPurgeRequest by remember { mutableStateOf<PurgeTasksRequest?>(null) }
     var homeQuickAddDraft by remember { mutableStateOf<QuickAddDraft?>(null) }
+    var inlineDraftIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     val factory = remember(graph) { TaskHomeViewModelFactory(graph) }
     val homeViewModel: TaskHomeViewModel = viewModel(factory = factory)
     val state by homeViewModel.state.collectAsStateWithLifecycle()
@@ -234,6 +240,38 @@ fun TaskHomeScreen(
     val shareTitle = RegistryCatalog.actionTitle(RegistryActionIds.TASK_SHARE, languageTag = languageTag).orEmpty()
     val toggleExpandTask: (String) -> Unit = { id ->
         expandedTaskId = if (expandedTaskId == id) null else id
+    }
+    // Inline create (InlineDraft.kt): the new row opens in place with its title focused.
+    val startInlineDraft: (QuickAddDraft) -> Unit = { draft ->
+        homeViewModel.createInlineDraft(draft) { id ->
+            inlineDraftIds = inlineDraftIds + id
+            expandedTaskId = id
+        }
+    }
+    // Magic Plus tap / app.newTask from this list (`newTaskTarget` in destinations.json,
+    // Apple `triggerInlineNewTask`): a draft here, a draft here on tomorrow, or a jump
+    // to Today, where the draft opens once Today has loaded.
+    var pendingTodayNewTask by remember { mutableStateOf(false) }
+    val newTaskFromHere: () -> Unit = {
+        val destId = (state.location as? TaskHomeLocation.SmartList)?.destinationId
+        val target = destId?.let(RegistryCatalog::destinationNewTaskTarget) ?: RegistryCatalog.NEW_TASK_HERE
+        when {
+            target == RegistryCatalog.NEW_TASK_TOMORROW -> startInlineDraft(
+                QuickAddDraft(whenDay = graph.clock.today(graph.clock.now()).plusDays(1).toString()),
+            )
+            target == RegistryCatalog.NEW_TASK_TODAY && destId != RegistryDestinationIds.TODAY -> {
+                pendingTodayNewTask = true
+                selectHomeLocation(TaskHomeLocation.SmartList(RegistryDestinationIds.TODAY))
+            }
+            else -> startInlineDraft(inlineNewTaskDraft(state))
+        }
+    }
+    LaunchedEffect(pendingTodayNewTask, state.location, state.hasLoaded) {
+        val onToday = (state.location as? TaskHomeLocation.SmartList)?.destinationId == RegistryDestinationIds.TODAY
+        if (pendingTodayNewTask && onToday && state.hasLoaded) {
+            pendingTodayNewTask = false
+            startInlineDraft(inlineNewTaskDraft(state))
+        }
     }
     val openTaskWithAttribute: (String, String?) -> Unit = { id, attribute ->
         expandedTaskId = null
@@ -523,7 +561,8 @@ fun TaskHomeScreen(
                 quickFindOpen = false
                 openedTaskId = null
                 expandedTaskId = null
-                homeQuickAddDraft = defaultQuickAddDraft(state.location)
+                // app.newTask (⌘N): the same new task as a Magic Plus tap.
+                newTaskFromHere()
                 true
             }
             primary && event.key == Key.K -> {
@@ -685,6 +724,9 @@ fun TaskHomeScreen(
                         expandedTaskId = expandedTaskId,
                         onToggleExpandTask = toggleExpandTask,
                         onCollapseExpandedTask = { expandedTaskId = null },
+                        inlineDraftIds = inlineDraftIds,
+                        onStartInlineDraft = startInlineDraft,
+                        onNewTaskHere = newTaskFromHere,
                         onOpenFullPage = { openTaskWithAttribute(it, null) },
                         onSendBackReview = openTaskSendBack,
                         onTaskAction = onTaskAction,
@@ -787,6 +829,9 @@ fun TaskHomeScreen(
                     expandedTaskId = expandedTaskId,
                     onToggleExpandTask = toggleExpandTask,
                     onCollapseExpandedTask = { expandedTaskId = null },
+                    inlineDraftIds = inlineDraftIds,
+                    onStartInlineDraft = startInlineDraft,
+                    onNewTaskHere = newTaskFromHere,
                     onOpenFullPage = { openTaskWithAttribute(it, null) },
                     onSendBackReview = openTaskSendBack,
                     onTaskAction = onTaskAction,
@@ -1136,9 +1181,16 @@ private fun TaskHomeScaffold(
     onLogbookShowingDeletedChange: (Boolean) -> Unit = {},
     onRequestEmptyTrash: () -> Unit = {},
     snackbarVisible: Boolean = false,
+    /** Ids of inline-create drafts made in this session (InlineDraft.kt). */
+    inlineDraftIds: Set<String> = emptySet(),
+    /** Magic Plus: make a draft row in a place and open it inline. */
+    onStartInlineDraft: (QuickAddDraft) -> Unit = {},
+    /** Magic Plus tap: the new task this list makes (`newTaskTarget`). */
+    onNewTaskHere: () -> Unit = {},
 ) {
-    var quickAddDraft by remember { mutableStateOf<QuickAddDraft?>(null) }
-    var newSectionTrigger by remember { mutableIntStateOf(0) }
+    // Keyed on the place, so a count from another page never opens a prompt here.
+    var newSectionTrigger by remember(state.location) { mutableIntStateOf(0) }
+    var newProjectTrigger by remember(state.location) { mutableIntStateOf(0) }
     var selectionPicker by remember { mutableStateOf<SelectionPicker?>(null) }
     var pendingFixedReschedule by remember { mutableStateOf<PendingFixedReschedule?>(null) }
     var allOnToday by remember { mutableStateOf(false) }
@@ -1156,7 +1208,6 @@ private fun TaskHomeScaffold(
     val appearance = LocalAppearance.current
     val selecting = state.selectedIds.isNotEmpty()
     val destinationId = (state.location as? TaskHomeLocation.SmartList)?.destinationId
-    val canCreateHere = state.location !is TaskHomeLocation.SmartList || state.canQuickAdd
     val showStarFilterButton = destinationId != RegistryDestinationIds.STARRED &&
         destinationId != RegistryDestinationIds.RECENTLY_DELETED &&
         !(destinationId == RegistryDestinationIds.LOGBOOK && logbookShowingDeleted)
@@ -1250,10 +1301,9 @@ private fun TaskHomeScaffold(
     }
     BackHandler(enabled = selecting) { homeViewModel.clearSelection() }
 
-    val openDefaultQuickAdd: () -> Unit = {
-        quickAddDraft = defaultQuickAddDraft(state.location)
-    }
-    magicPlusDrag.fallbackDrop = { if (canCreateHere) openDefaultQuickAdd() }
+    // A Magic Plus drop on no target makes the same task as a tap (Apple `fallbackDrop`).
+    val newTaskHere: () -> Unit = onNewTaskHere
+    magicPlusDrag.fallbackDrop = { newTaskHere() }
 
     val openGroupTarget: (String) -> Unit = { targetKey ->
         when {
@@ -1272,19 +1322,6 @@ private fun TaskHomeScaffold(
         }
     }
 
-    quickAddDraft?.let { initial ->
-        QuickAddSheet(
-            today = graph.clock.today(graph.clock.now()),
-            errorMessage = state.errorMessage,
-            areas = state.areas,
-            projects = state.projects,
-            languageTag = languageTag,
-            initialDraft = initial,
-            onDismiss = { quickAddDraft = null },
-            onAdd = { draft -> homeViewModel.quickAdd(draft) { quickAddDraft = null } },
-            onAddAndDo = addAndDo(graph, homeViewModel) { quickAddDraft = null },
-        )
-    }
     pendingFixedReschedule?.let { pending ->
         RescheduleFixedRepeatDialog(
             languageTag = languageTag,
@@ -1508,6 +1545,8 @@ private fun TaskHomeScaffold(
     CompositionLocalProvider(
         LocalMagicPlusDrag provides magicPlusDrag,
         LocalTaskReorderDrag provides reorderDrag,
+        // An open inline editor dims the rest of the list; a tap there folds it (Apple inlineEditDimmed).
+        LocalInlineEditDim provides InlineEditDim(isActive = expandedTaskId != null, onDismiss = onCollapseExpandedTask),
     ) {
         Box(modifier = Modifier.fillMaxSize().background(canvasBackground)) {
             HeaderWashBackdrop()
@@ -1636,6 +1675,7 @@ private fun TaskHomeScaffold(
                     },
                     modifier = Modifier.fillMaxSize().padding(contentPadding),
                 ) {
+                    val currentExpandedTaskId by rememberUpdatedState(expandedTaskId)
                     val expandedTaskContent: @Composable (TaskListItem, TaskCardPosition, Modifier) -> Unit = { task, position, rowModifier ->
                         TaskInlineFoldout(
                             graph = graph,
@@ -1651,6 +1691,8 @@ private fun TaskHomeScaffold(
                             },
                             onCollapse = onCollapseExpandedTask,
                             modifier = rowModifier,
+                            isDraft = task.id in inlineDraftIds,
+                            isStillOpen = { currentExpandedTaskId == task.id },
                         )
                     }
                     when (val location = state.location) {
@@ -1675,7 +1717,8 @@ private fun TaskHomeScaffold(
                                 onSelectHomeLocation(project)
                             },
                             onOpenTask = onToggleExpandTask,
-                            onMagicPlusDrop = { draft -> quickAddDraft = draft },
+                            onMagicPlusDrop = onStartInlineDraft,
+                            newProjectTrigger = newProjectTrigger,
                             expandedTaskId = expandedTaskId,
                             expandedTaskContent = expandedTaskContent,
                         )
@@ -1698,7 +1741,7 @@ private fun TaskHomeScaffold(
                             onLeftProject = {
                                 onSelectHomeLocation(TaskHomeLocation.SmartList(RegistryDestinationIds.TODAY))
                             },
-                            onMagicPlusDrop = { draft -> quickAddDraft = draft },
+                            onMagicPlusDrop = onStartInlineDraft,
                             expandedTaskId = expandedTaskId,
                             expandedTaskContent = expandedTaskContent,
                         )
@@ -1769,17 +1812,21 @@ private fun TaskHomeScaffold(
                             onOpenGroupTarget = openGroupTarget,
                             onDropInboxHeader = if (isTodayList && state.canQuickAdd) {
                                 {
-                                    quickAddDraft = QuickAddDraft(
-                                        today = false,
-                                        position = inboxPositions.firstOrNull()?.let { it - 1.0 },
+                                    onStartInlineDraft(
+                                        QuickAddDraft(
+                                            today = false,
+                                            position = positionAbove(inboxPositions.firstOrNull()),
+                                        ),
                                     )
                                 }
                             } else null,
                             onDropInboxRow = if (isTodayList && state.canQuickAdd) {
                                 { index, before ->
-                                    quickAddDraft = QuickAddDraft(
-                                        today = false,
-                                        position = insertionPosition(inboxPositions, index, before),
+                                    onStartInlineDraft(
+                                        QuickAddDraft(
+                                            today = false,
+                                            position = insertionPosition(inboxPositions, index, before),
+                                        ),
                                     )
                                 }
                             } else null,
@@ -1788,18 +1835,20 @@ private fun TaskHomeScaffold(
                                     val dayIso = if (isUpcomingList) {
                                         displayedTasks.getOrNull(index)?.group?.key?.removePrefix("day:")
                                     } else null
-                                    quickAddDraft = defaultQuickAddDraft(location).copy(
-                                        whenDay = dayIso,
-                                        position = if (isUpcomingList) null else insertionPosition(taskPositions, index, before),
-                                        useTodayPosition = isTodayList,
+                                    onStartInlineDraft(
+                                        defaultQuickAddDraft(location).copy(
+                                            whenDay = dayIso,
+                                            position = if (isUpcomingList) null else insertionPosition(taskPositions, index, before),
+                                            useTodayPosition = isTodayList,
+                                        ),
                                     )
                                 }
                             } else null,
                             onDropGroupHeader = if (state.canQuickAdd || isUpcomingList) {
                                 { targetLocationKey ->
                                     if (targetLocationKey.startsWith("day:")) {
-                                        quickAddDraft = QuickAddDraft(
-                                            whenDay = targetLocationKey.removePrefix("day:"),
+                                        onStartInlineDraft(
+                                            QuickAddDraft(whenDay = targetLocationKey.removePrefix("day:")),
                                         )
                                     } else {
                                         val firstInGroupPos = displayedTasks
@@ -1809,11 +1858,13 @@ private fun TaskHomeScaffold(
                                             .takeIf { targetLocationKey.startsWith("area:") }
                                         val projectId = targetLocationKey.removePrefix("project:")
                                             .takeIf { targetLocationKey.startsWith("project:") }
-                                        quickAddDraft = defaultQuickAddDraft(location).copy(
-                                            areaId = areaId,
-                                            projectId = projectId,
-                                            position = firstInGroupPos?.let { it - 1.0 },
-                                            useTodayPosition = isTodayList,
+                                        onStartInlineDraft(
+                                            defaultQuickAddDraft(location).copy(
+                                                areaId = areaId,
+                                                projectId = projectId,
+                                                position = positionAbove(firstInGroupPos),
+                                                useTodayPosition = isTodayList,
+                                            ),
                                         )
                                     }
                                 }
@@ -1823,7 +1874,7 @@ private fun TaskHomeScaffold(
                             onReorderInboxHeader = if (isTodayList) {
                                 { ids ->
                                     val topPos = inboxPositions.firstOrNull() ?: 0.0
-                                    val newPositions = List(ids.size) { i -> topPos - (ids.size - i).toDouble() }
+                                    val newPositions = positionsAbove(topPos, ids.size)
                                     homeViewModel.reorderTasks(
                                         ids = ids,
                                         positions = newPositions,
@@ -1874,7 +1925,7 @@ private fun TaskHomeScaffold(
                                         val firstInGroupPos = displayedTasks
                                             .firstOrNull { it.group?.targetLocationKey == targetLocationKey }
                                             ?.position ?: 0.0
-                                        val newPositions = List(ids.size) { i -> firstInGroupPos - (ids.size - i).toDouble() }
+                                        val newPositions = positionsAbove(firstInGroupPos, ids.size)
                                         homeViewModel.reorderTasks(
                                             ids = ids,
                                             positions = newPositions,
@@ -1907,14 +1958,21 @@ private fun TaskHomeScaffold(
             // Round Magic Plus orb (matches iPhone `MagicPlusOrb`): visible on
             // creatable smart lists, areas and projects; hides during multi-select,
             // while an inline foldout is open, while a snackbar is up, or when the software keyboard is showing.
-            if (canCreateHere && !selecting && expandedTaskId == null && !snackbarVisible && !imeVisible && !reorderDrag.isDragging) {
+            // Shown on every list, as on iPhone: a list that cannot hold a new task sends it to Today.
+            if (!selecting && expandedTaskId == null && !snackbarVisible && !imeVisible && !reorderDrag.isDragging) {
                 MagicPlusOrb(
                     drag = magicPlusDrag,
                     isViewingProject = state.location is TaskHomeLocation.Project,
-                    accessibilityLabel = quickAddTitle,
+                    // The orb makes a new task in place (app.newTask), not Quick Add.
+                    accessibilityLabel = RegistryCatalog.actionTitle(
+                        RegistryActionIds.APP_NEW_TASK,
+                        languageTag = languageTag,
+                    ).orEmpty(),
                     languageTag = languageTag,
-                    onNewTask = openDefaultQuickAdd,
+                    onNewTask = newTaskHere,
                     onNewSection = { newSectionTrigger += 1 },
+                    isViewingArea = state.location is TaskHomeLocation.Area,
+                    onNewProjectInArea = { newProjectTrigger += 1 },
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
                         .navigationBarsPadding()
@@ -1928,6 +1986,20 @@ private fun TaskHomeScaffold(
                 modifier = Modifier.fillMaxSize(),
             )
         }
+    }
+}
+
+/**
+ * The draft a Magic Plus tap or app.newTask makes (Apple `startCreate`): the
+ * list's own fields, at its foot. On Today with Inbox rows it is an Inbox task
+ * at the foot of the Inbox band.
+ */
+private fun inlineNewTaskDraft(state: TaskHomeUiState): QuickAddDraft {
+    val destinationId = (state.location as? TaskHomeLocation.SmartList)?.destinationId
+    return if (destinationId == RegistryDestinationIds.TODAY && state.inboxTasks.isNotEmpty()) {
+        QuickAddDraft()
+    } else {
+        defaultQuickAddDraft(state.location)
     }
 }
 

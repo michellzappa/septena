@@ -205,10 +205,8 @@ struct TaskListView: View {
     var pinned = draftEditIds
     if let expandedEditId { pinned.insert(expandedEditId) }
     if let quickAddDraftId { pinned.insert(quickAddDraftId) }
-    let keepsInbox = filter == .today
     return ListSort.ordered(
-      rows, sort: sort,
-      isSortable: { $0.status == .open && !$0.isHeading && !(keepsInbox && $0.isUnfiled) },
+      rows, in: filter, sort: sort,
       pinned: pinned,
       onScreen: storageFilter == filter ? itemsStorage.map(\.id) : [])
   }
@@ -2862,7 +2860,7 @@ struct TaskListView: View {
       startCreate()
     case .connectAI, .importTasks:
       let pageID = id == .connectAI
-        ? RegistrySettings.PageID.claudePairing
+        ? RegistrySettings.PageID.agents
         : RegistrySettings.PageID.importExport
       SeptaskSettingsLink.request(pageID)
       nav.showSettings = true
@@ -3249,22 +3247,41 @@ struct TaskListView: View {
   /// `TaskEntity.isHeading`).
   @ViewBuilder
   private var projectGroupedRows: some View {
-    let headings = projectHeadingList
-    let headingIds = Set(headings.map(\.id))
-    let unheaded = visibleItems.filter { t in
-      guard let h = t.heading else { return true }
-      return !headingIds.contains(h)
-    }
-    cardedRows(unheaded,
+    let layout = projectLayout
+    cardedRows(layout.unheaded,
                quickMenu: { model.filingSuggestions[$0.id] != nil },
                appendQuickAdd: attachesQuickAddToVisibleCard,
                reorderable: true,
                grouped: true)
-    ForEach(headings) { heading in
-      AnyView(headingRow(heading))
-      let members = visibleItems.filter { $0.heading == heading.id }
-      cardedRows(members, reorderable: true, grouped: true, magicContext: heading.title)
+    ForEach(layout.sections) { section in
+      AnyView(headingRow(section.heading))
+      cardedRows(section.members, reorderable: true, grouped: true,
+                 magicContext: section.heading.title)
     }
+  }
+
+  /// One heading of a project page and the open rows filed under it.
+  private struct ProjectSection: Identifiable {
+    let heading: SeptenaTask
+    let members: [SeptenaTask]
+    var id: String { heading.id }
+  }
+
+  /// The project page as it renders: the un-headed block, then each heading
+  /// with its members, every block in `visibleItems` order (so in the list's
+  /// Sort By). `projectGroupedRows` draws it and `keyboardOrderedTaskIds`
+  /// walks it, so ↑/↓ follow the rows on screen.
+  private var projectLayout: (unheaded: [SeptenaTask], sections: [ProjectSection]) {
+    let headings = projectHeadingList
+    let headingIds = Set(headings.map(\.id))
+    let rows = visibleItems
+    let unheaded = rows.filter { t in
+      guard let h = t.heading else { return true }
+      return !headingIds.contains(h)
+    }
+    let byHeading = Dictionary(grouping: rows.filter { $0.heading.map(headingIds.contains) ?? false },
+                               by: { $0.heading! })
+    return (unheaded, headings.map { ProjectSection(heading: $0, members: byHeading[$0.id] ?? []) })
   }
 
   private var isProjectFilter: Bool {
@@ -3735,8 +3752,20 @@ struct TaskListView: View {
       // Upcoming has no inline trigger (`allowsInlineCreate` false) → sentinel empty.
       return upcomingBuckets().flatMap { $0.tasks.map(\.id) }
     case .project, .area:
-      // Foot-of-card quick-add sits after the open rows, before the faded & logged scopes.
-      var ids = visibleItems.map(\.id) + quickAddOrderedIds
+      // The rows in the order they render. A project page draws the
+      // un-headed block first (its card carries the foot quick-add), then
+      // each heading's members (`projectLayout`); `visibleItems` alone
+      // interleaves headed and un-headed rows. Faded & logged scopes follow.
+      var ids: [String]
+      if isProjectFilter {
+        let layout = projectLayout
+        let attached = attachesQuickAddToVisibleCard
+        ids = layout.unheaded.map(\.id) + (attached ? quickAddOrderedIds : [])
+        for section in layout.sections { ids.append(contentsOf: section.members.map(\.id)) }
+        if !attached { ids.append(contentsOf: quickAddOrderedIds) }
+      } else {
+        ids = visibleItems.map(\.id) + quickAddOrderedIds
+      }
       if isScopeFadedExpanded {
         ids.append(contentsOf: fadedScopeItems.map(\.id))
       }

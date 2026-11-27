@@ -540,7 +540,7 @@ final class SeptaskKitTaskListController: NSViewController {
     tableView.onOpenNotes = { [weak self] in self?.beginComposingSelectedRowInNotes() }
     tableView.onOpenComposer = { [weak self] in self?.beginComposingSelectedRow() }
     tableView.onDelete = { [weak self] in self?.deleteSelection() }
-    tableView.onNewTask = { [weak self] in self?.createTask() }
+    tableView.onNewTask = { [weak self] in self?.createTaskFromCommand() }
     tableView.onToggleInspector = { [weak self] in self?.onToggleInspector?() }
     tableView.onQuickFind = { [weak self] in self?.onQuickFind?() }
     tableView.onWhen = { [weak self] in self?.presentDatePopover(kind: .when) }
@@ -1485,10 +1485,8 @@ final class SeptaskKitTaskListController: NSViewController {
     guard sort != ListSort.manual else { return rows }
     var pinned = liveEditorIDs
     if let editingTaskId { pinned.insert(editingTaskId) }
-    let keepsInbox = filter == .today
     return ListSort.ordered(
-      rows, sort: sort,
-      isSortable: { $0.status == .open && !$0.isHeading && !(keepsInbox && $0.isUnfiled) },
+      rows, in: filter, sort: sort,
       pinned: pinned,
       onScreen: self.rows.compactMap { $0.task?.id })
   }
@@ -1729,7 +1727,7 @@ final class SeptaskKitTaskListController: NSViewController {
       SeptaskKitQuickEntry.show()
     case .connectAI, .importTasks:
       let pageID = id == .connectAI
-        ? RegistrySettings.PageID.claudePairing
+        ? RegistrySettings.PageID.agents
         : RegistrySettings.PageID.importExport
       SeptaskSettingsLink.request(pageID)
       SeptaskKitSettingsWindow.show()
@@ -4084,6 +4082,23 @@ final class SeptaskKitTaskListController: NSViewController {
   /// into that list and drop it straight out of the Inbox band the user just
   /// clicked in. ⌘N (inInbox: false) keeps inheriting, which is what makes it
   /// land in the group you are working in.
+  /// ⌘N (the menu and the table's key equivalent). Where the draft lands is
+  /// the list's `newTaskTarget` (registry/destinations.json), the same rule
+  /// as the iPhone and iPad Magic Plus orb and Android: `here` creates on
+  /// this list, `tomorrow` creates here scheduled tomorrow (Upcoming,
+  /// `creationContext`), `today` opens Today first and creates there.
+  /// Project and area pages create here.
+  func createTaskFromCommand() {
+    if filter.registryDestination?.newTaskTarget == "today", filter != .today {
+      commitOpenEdits()
+      onNavigate?(.filter(.today, title: TaskFilter.today.title))
+      // The sidebar selection shows Today synchronously. If it did not, do
+      // not create on the old list.
+      guard filter == .today else { return }
+    }
+    createTask()
+  }
+
   func createTask(inInbox: Bool = false) {
     if case .project(let project) = filter, let mode = checklistMode(project) {
       presentChecklistAdd(project: project, mode: mode)
@@ -4219,8 +4234,9 @@ final class SeptaskKitTaskListController: NSViewController {
       }
     case .triage: break
     // Repeating lists the templates that already carry a recurrence rule;
-    // a plain new task can't join it, so ⌘N stays off there — same as the
-    // two read-only lists.
+    // a plain new task can't join it, so no create here — same as the
+    // read-only lists. ⌘N on these lists opens Today first
+    // (`createTaskFromCommand`, `newTaskTarget`).
     case .review, .repeating, .logbook, .faded, .recentlyDeleted: return nil
     }
     return (area, project, today, scheduled)

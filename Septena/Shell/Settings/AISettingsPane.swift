@@ -3,15 +3,15 @@ import SwiftUI
 import UIKit
 #endif
 
-// Consumer AI Preferences (`ai_preferences`, docs/SETTINGS_UX_SPEC.md):
+// AI on this device (`ai_preferences`, docs/SETTINGS_UX_SPEC.md):
 // Apple Intelligence availability, the global reach dial (`AIMode`), and the
 // plain-language explainer. Beta/developer controls (`showModelLabels`, PCC
 // entitlement routing) live in `About ▸ Advanced`; `MCP Skills` lives in
-// `AI & Agents ▸ Connect an Agent`.
+// `Agents` (section "Connect an agent").
 //
 // `SeptaskAIPreferencesSections` renders as Form sections inside
-// `SeptaskAIPreferencesPane`, the On-Device AI page that every platform
-// pushes from AI & Agents (registry/settings.json `ai_preferences`).
+// `SeptaskAIPreferencesPane`, the AI on this device page that every platform
+// pushes from General (registry/settings.json `ai_preferences`).
 struct SeptaskAIPreferencesSections: View {
   @AppStorage(AIPolicy.modeKey) private var mode: AIMode = .auto
   @State private var showExplainer = false
@@ -82,8 +82,6 @@ struct SeptaskAIPreferencesSections: View {
       if aiStatus == .notEnabled {
         Button("Open Settings", action: openSystemSettings)
       }
-    } header: {
-      Text(RegistrySettings.section("on_device", page: RegistrySettings.PageID.aiPreferences)?.header ?? "")
     } footer: {
       Text(statusFooter)
     }

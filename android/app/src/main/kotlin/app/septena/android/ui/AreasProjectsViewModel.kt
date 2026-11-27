@@ -23,6 +23,7 @@ import app.septena.core.generated.RegistryEntityNames
 import app.septena.core.generated.RegistryPlacesScreenIds
 import app.septena.core.stringValue
 import app.septena.ui.TaskListItem
+import app.septena.ui.headingReorderPositions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -63,7 +64,13 @@ data class PlaceTaskRow(
     val assignedTo: String? = null,
     val item: TaskListItem = TaskListItem(id = id, title = title, isStarred = isStarred, position = position),
 )
-data class PlaceSectionRow(val id: String, val title: String, val tasks: List<PlaceTaskRow>)
+data class PlaceSectionRow(
+    val id: String,
+    val title: String,
+    val tasks: List<PlaceTaskRow>,
+    /** The heading's stored manual position; a heading reorder writes it. */
+    val position: Double? = null,
+)
 
 data class PlaceAreaOption(
     val id: String,
@@ -375,6 +382,32 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         }
     }
 
+    /**
+     * Moves [ids] (headings of this project) just above [beforeHeadingId], or to
+     * the end when it is null, as one undoable edit. Only the headings' own
+     * positions change: their tasks keep `heading`, so the section moves with
+     * them. Works in a sorted page too (docs/LIST_SORT_SPEC.md §6).
+     */
+    fun reorderSections(ids: List<String>, beforeHeadingId: String?) {
+        val selected = destination.value as? AreasProjectsDestination.Project ?: return
+        val headings = state.value.sections.map { it.id to it.position }
+        val writes = headingReorderPositions(headings, ids, beforeHeadingId)
+        if (writes.isEmpty()) return
+        mutate {
+            for ((id, _) in writes) requireHeading(id, selected.id)
+            val byId = writes.toMap()
+            // A heading does not fade, so a reorder does not touch it.
+            graph.captureTaskEdits(byId.keys, touches = false) { id ->
+                val pos = byId[id] ?: return@captureTaskEdits
+                graph.taskMutator.updateFields(
+                    id,
+                    linkedMapOf<String, JsonValue>(RegistryEntityFields.Task.POSITION to JsonValue.DecimalValue(pos)),
+                )
+            }
+            true
+        }
+    }
+
     fun clearError() {
         errorMessage.value = null
     }
@@ -613,6 +646,7 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                     PlaceSectionRow(
                         id = heading.recordId,
                         title = heading.row.title,
+                        position = heading.position,
                         tasks = visibleTasks.filter { it.headingId == heading.recordId }
                             .sortedWith(compareBy({ it.position ?: Double.MAX_VALUE }, { it.row.title.lowercase() }))
                             .map(ProjectTask::row),

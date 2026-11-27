@@ -94,4 +94,11 @@ describe("PWA install and Home Screen metadata", () => {
       assert.ok(sw.includes(`"${asset}"`), `sw.js SHELL_URLS must include ${asset}`);
     }
   });
+
+  it("ships a full-resolution, filter-free vector icon.svg so Safari never pixelates it", () => {
+    const svg = fs.readFileSync(path.join(PUBLIC_DIR, "icon.svg"), "utf8");
+    assert.match(svg, /viewBox="0 0 1024 1024"/);
+    assert.match(svg, /width="1024"\s+height="1024"/);
+    assert.doesNotMatch(svg, /<filter\b|filter="url\(/);
+  });
 });

@@ -36,7 +36,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 /**
- * Settings ▸ Account ▸ Sign-in methods (ADR 0047 decision 6, #643): lists linked
+ * Surface `sign_in_methods` (Settings ▸ Account, ADR 0047 decision 6, #643): lists linked
  * methods on the signed-in account, lets the user add email or enabled OIDC
  * providers, and remove any method except the last one.
  */
