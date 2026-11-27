@@ -61,7 +61,12 @@ export interface SupportConversation {
   messages: SupportMessage[];
   unread: number;
 }
-export const CLIENT_HEADER = "web 0.2.0";
+/// `X-Septena-Client` and `X-Septena-Version` (docs/ADMIN_CONSOLE_SPEC.md §4).
+/// The version is "<package.json version> (<git commit count>)", set at build
+/// time in next.config.ts, the same form as the other clients.
+export const CLIENT_HEADER = "septena-web";
+export const CLIENT_VERSION = process.env.NEXT_PUBLIC_SEPTENA_VERSION ?? "0.0.0 (0)";
+export const CLIENT_HEADERS = { "X-Septena-Client": CLIENT_HEADER, "X-Septena-Version": CLIENT_VERSION } as const;
 
 export class ApiError extends Error {
   readonly status: number;
@@ -118,7 +123,7 @@ export class SeptenaApiClient {
         credentials: "include",
         headers: {
           "Content-Type": "application/json",
-          "X-Septena-Client": CLIENT_HEADER,
+          ...CLIENT_HEADERS,
         },
         body: "{}",
       });
@@ -144,7 +149,7 @@ export class SeptenaApiClient {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Septena-Client": CLIENT_HEADER,
+        ...CLIENT_HEADERS,
       },
       body: JSON.stringify({ clientName }),
       signal,
@@ -166,7 +171,7 @@ export class SeptenaApiClient {
       credentials: "include",
       headers: {
         "Content-Type": "application/json",
-        "X-Septena-Client": CLIENT_HEADER,
+        ...CLIENT_HEADERS,
       },
       body: JSON.stringify({ code, pollSecret, sessionMode: "cookie" }),
     });
@@ -188,7 +193,7 @@ export class SeptenaApiClient {
   /** The sign-in methods this server has turned on (with web/native capability flags). */
   async authMethodEntries(signal?: AbortSignal): Promise<AuthMethodEntry[]> {
     const res = await fetch(`${this.apiBase}/v1/auth/methods`, {
-      headers: { "X-Septena-Client": CLIENT_HEADER },
+      headers: { ...CLIENT_HEADERS },
       signal,
     });
     if (!res.ok) throw new ApiError(res.status, "auth_methods_failed");
@@ -214,7 +219,7 @@ export class SeptenaApiClient {
       credentials: "include",
       headers: {
         "Content-Type": "application/json",
-        "X-Septena-Client": CLIENT_HEADER,
+        ...CLIENT_HEADERS,
       },
       body: JSON.stringify({ code, sessionMode: "cookie" }),
       signal,
@@ -254,7 +259,7 @@ export class SeptenaApiClient {
       credentials: "include",
       headers: {
         "Content-Type": "application/json",
-        "X-Septena-Client": CLIENT_HEADER,
+        ...CLIENT_HEADERS,
       },
       body: JSON.stringify({ linkToken, code, sessionMode: "cookie" }),
       signal,
@@ -360,7 +365,7 @@ export class SeptenaApiClient {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Septena-Client": CLIENT_HEADER,
+        ...CLIENT_HEADERS,
       },
       body: JSON.stringify({ email }),
       signal,
@@ -383,7 +388,7 @@ export class SeptenaApiClient {
       credentials: "include",
       headers: {
         "Content-Type": "application/json",
-        "X-Septena-Client": CLIENT_HEADER,
+        ...CLIENT_HEADERS,
       },
       body: JSON.stringify({ email, code, sessionMode: "cookie" }),
       signal,
@@ -405,7 +410,7 @@ export class SeptenaApiClient {
         credentials: "include",
         headers: {
           "Content-Type": "application/json",
-          "X-Septena-Client": CLIENT_HEADER,
+          ...CLIENT_HEADERS,
         },
         body: "{}",
       });
@@ -431,7 +436,7 @@ export class SeptenaApiClient {
         headers: {
           ...(init.headers ?? {}),
           Authorization: `Bearer ${bearer}`,
-          "X-Septena-Client": CLIENT_HEADER,
+          ...CLIENT_HEADERS,
         },
       });
 
@@ -452,7 +457,7 @@ export class SeptenaApiClient {
     if (this.isAuthenticated) return this.authedFetch(path, { ...init, headers });
     return fetch(`${this.apiBase}${path}`, {
       ...init,
-      headers: { ...headers, "X-Septena-Client": CLIENT_HEADER },
+      headers: { ...headers, ...CLIENT_HEADERS },
     });
   }
 
