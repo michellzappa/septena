@@ -158,6 +158,7 @@ See [ADR 0007](adr/0007-septena-is-the-task-app.md).
 | Doc | Status |
 |---|---|
 | [DesignSpec.md](DesignSpec.md) | canonical |
+| [PREMIUM_LANGUAGE.md](PREMIUM_LANGUAGE.md) | canonical: plan mark, wordmark, benefit rows for every paid surface |
 | [FEATURE_MAP.md](FEATURE_MAP.md) | generated: feature status per platform |
 | [PAGE_CHROME_SPEC.md](PAGE_CHROME_SPEC.md), [GLASS_DOTS_SPEC.md](GLASS_DOTS_SPEC.md) | mixed: see each status line |
 | [SETTINGS_UX_SPEC.md](SETTINGS_UX_SPEC.md) | proposal (task app Settings IA + `registry/settings.json` v2, S0–S3) |

@@ -62,6 +62,73 @@
     }
   ],
   "priceFootnote": "Prices include VAT where it applies. Outside the euro area, the App Store charges its matching local price.",
+  "defaultCurrency": "EUR",
+  "currencies": [
+    {
+      "code": "EUR",
+      "symbol": "€",
+      "countries": [],
+      "taxInclusive": true,
+      "freeLabel": "€0",
+      "plus": {
+        "year": { "amountMinor": 6000, "label": "€60 a year", "detail": "€5 a month. You save €24 against paying monthly." },
+        "month": { "amountMinor": 700, "label": "€7 a month", "detail": "Cancel at any time." }
+      },
+      "pro": {
+        "year": { "amountMinor": 12000, "label": "€120 a year", "detail": "€10 a month. You save €48 against paying monthly." },
+        "month": { "amountMinor": 1400, "label": "€14 a month", "detail": "Cancel at any time." }
+      },
+      "footnote": "Prices include VAT where it applies. Outside EUR, USD, GBP and BRL, the App Store and Google Play charge their matching local price."
+    },
+    {
+      "code": "USD",
+      "symbol": "$",
+      "countries": ["US"],
+      "taxInclusive": false,
+      "freeLabel": "$0",
+      "plus": {
+        "year": { "amountMinor": 6000, "label": "$60 a year", "detail": "$5 a month. You save $24 against paying monthly." },
+        "month": { "amountMinor": 700, "label": "$7 a month", "detail": "Cancel at any time." }
+      },
+      "pro": {
+        "year": { "amountMinor": 12000, "label": "$120 a year", "detail": "$10 a month. You save $48 against paying monthly." },
+        "month": { "amountMinor": 1400, "label": "$14 a month", "detail": "Cancel at any time." }
+      },
+      "footnote": "Prices exclude applicable local sales tax. Outside EUR, USD, GBP and BRL, the App Store and Google Play charge their matching local price."
+    },
+    {
+      "code": "GBP",
+      "symbol": "£",
+      "countries": ["GB"],
+      "taxInclusive": true,
+      "freeLabel": "£0",
+      "plus": {
+        "year": { "amountMinor": 5000, "label": "£50 a year", "detail": "£4.17 a month. You save £22 against paying monthly." },
+        "month": { "amountMinor": 600, "label": "£6 a month", "detail": "Cancel at any time." }
+      },
+      "pro": {
+        "year": { "amountMinor": 10000, "label": "£100 a year", "detail": "£8.33 a month. You save £44 against paying monthly." },
+        "month": { "amountMinor": 1200, "label": "£12 a month", "detail": "Cancel at any time." }
+      },
+      "footnote": "Prices include UK VAT. Outside EUR, USD, GBP and BRL, the App Store and Google Play charge their matching local price."
+    },
+    {
+      "code": "BRL",
+      "symbol": "R$",
+      "countries": ["BR"],
+      "taxInclusive": true,
+      "freeLabel": "R$ 0",
+      "plus": {
+        "year": { "amountMinor": 24000, "label": "R$ 240 a year", "detail": "R$ 20 a month. You save R$ 108 against paying monthly." },
+        "month": { "amountMinor": 2900, "label": "R$ 29 a month", "detail": "Cancel at any time." }
+      },
+      "pro": {
+        "year": { "amountMinor": 48000, "label": "R$ 480 a year", "detail": "R$ 40 a month. You save R$ 216 against paying monthly." },
+        "month": { "amountMinor": 5800, "label": "R$ 58 a month", "detail": "Cancel at any time." }
+      },
+      "footnote": "Prices include applicable local taxes. Outside EUR, USD, GBP and BRL, the App Store and Google Play charge their matching local price."
+    }
+  ],
   "levels": [
     { "id": "free", "title": "Free", "detail": "€0" },
     { "id": "plus", "title": "Plus", "detail": "€60 a year or €7 a month" },
@@ -69,6 +136,21 @@
   ],
   "ladderHeadline": "One device free. All devices on Plus. All your agents on Pro.",
   "cardRows": ["devices", "connected", "files", "history"],
+  "compareURL": "https://septena.app/pricing",
+  "benefits": {
+    "description": "What each paid plan gives, one line per benefit, for the plan page, the plan sheet and onboarding (docs/PREMIUM_LANGUAGE.md). A benefit with a limit must state that plan's value. Pro lists only what it adds, then Everything in Plus.",
+    "plus": [
+      { "id": "devices", "icon": "plans.devices", "limit": "devices", "title": "Every device, always current", "detail": "Your list on all your devices, updated as you type." },
+      { "id": "agents", "icon": "plans.agents", "limit": "connectedAgents", "title": "Three agents at work", "detail": "Connect Claude and two more. Each one asks before it acts." },
+      { "id": "files", "icon": "plans.files", "limit": "attachmentsGB", "title": "10 GB of synced files", "detail": "Attach a file once and it opens on every device." },
+      { "id": "history", "icon": "plans.history", "limit": "changeLogDays", "title": "A year of history", "detail": "See who changed what, and bring back what you deleted." }
+    ],
+    "pro": [
+      { "id": "agents", "icon": "plans.agents", "limit": "connectedAgents", "title": "No limit on agents", "detail": "Run as many agents on your list as your work needs." },
+      { "id": "files", "icon": "plans.files", "limit": "attachmentsGB", "title": "50 GB of synced files", "detail": "Room for scans, screenshots and long documents." },
+      { "id": "everything", "icon": "plans.plus", "title": "Everything in Plus", "detail": "Every device, a year of history and shared projects." }
+    ]
+  },
   "accountNote": "Backup, history and your agent need a free account. The app does not.",
   "agentNote": "An agent is an AI you connect to your list, such as Claude.",
   "fullApp": {
@@ -237,6 +319,8 @@
     "youGet": "With {plan}",
     "upgradeNote": "Pro starts right away. The App Store refunds the unused part of your Plus.",
     "upgradeElsewhere": "To move to Pro, change your plan in the store where you bought Plus.",
+    "yourPlanIncludes": "Your plan includes",
+    "compareAll": "Compare every plan",
     "buyElsewhere": "This copy of Septena does not sell plans. Buy Plus or Pro in the App Store version on any device. It turns on here when you sign in to the same account."
   },
   "status": {

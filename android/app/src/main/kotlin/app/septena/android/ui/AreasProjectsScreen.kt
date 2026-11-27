@@ -65,6 +65,7 @@ import app.septena.ui.TaskCardMetrics
 import app.septena.ui.TaskCardPosition
 import app.septena.ui.TaskCardRow
 import app.septena.ui.TaskCardSlice
+import app.septena.ui.TaskListItem
 import app.septena.ui.TaskRowMenuAction
 import app.septena.ui.TaskSelection
 import app.septena.ui.cardPosition
@@ -98,6 +99,8 @@ fun AreasProjectsScreen(
     newSectionTrigger: Int = 0,
     onLeftProject: () -> Unit = {},
     onMagicPlusDrop: ((QuickAddDraft) -> Unit)? = null,
+    expandedTaskId: String? = null,
+    expandedTaskContent: (@Composable (task: TaskListItem, position: TaskCardPosition, modifier: Modifier) -> Unit)? = null,
 ) {
     val factory = remember(graph) { AreasProjectsViewModel.Factory(graph) }
     val viewModel: AreasProjectsViewModel = viewModel(key = destination.key, factory = factory)
@@ -492,46 +495,51 @@ fun AreasProjectsScreen(
                     } else {
                         val areaPositions = visibleAreaTasks.map(PlaceTaskRow::position)
                         itemsIndexed(visibleAreaTasks, key = { _, it -> "task:${it.id}" }) { index, task ->
-                            PlaceTaskItem(
-                                task = task,
-                                position = cardPosition(index, visibleAreaTasks.size),
-                                completeTitle = completeTitle,
-                                todayTitle = todayTitle,
-                                todayTint = todayTint,
-                                fadedTitle = fadedTitle,
-                                isDark = isDark,
-                                hasActiveTexture = hasActiveTexture,
-                                rowMenuGroups = rowMenuGroups,
-                                rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
-                                selection = selection,
-                                onComplete = onComplete,
-                                onOpenTask = onOpenTask,
-                                onTaskAction = onTaskAction,
-                                canReorder = true,
-                                orderedDragIds = orderedPlaceDragIds,
-                                dropModifier = taskListMotion()
-                                    .magicPlusRowDrop(
-                                        id = "mp-area-row-${task.id}",
-                                        enabled = onMagicPlusDrop != null,
-                                        onDrop = { before ->
-                                            onMagicPlusDrop?.invoke(
-                                                QuickAddDraft(
-                                                    areaId = destination.id,
-                                                    position = insertionPosition(areaPositions, index, before),
-                                                ),
-                                            )
-                                        },
-                                    )
-                                    .taskReorderRowDrop(
-                                        id = "reorder-area-row-${task.id}",
-                                        taskId = task.id,
-                                        enabled = true,
-                                        onDrop = { ids, before ->
-                                            val newPositions = reorderPositions(areaPositions, index, before, ids.size)
-                                            viewModel.reorderTasks(ids, newPositions)
-                                        },
-                                    ),
-                            )
+                            val slicePosition = cardPosition(index, visibleAreaTasks.size)
+                            if (expandedTaskId == task.id && expandedTaskContent != null) {
+                                expandedTaskContent(task.item, slicePosition, taskListMotion())
+                            } else {
+                                PlaceTaskItem(
+                                    task = task,
+                                    position = slicePosition,
+                                    completeTitle = completeTitle,
+                                    todayTitle = todayTitle,
+                                    todayTint = todayTint,
+                                    fadedTitle = fadedTitle,
+                                    isDark = isDark,
+                                    hasActiveTexture = hasActiveTexture,
+                                    rowMenuGroups = rowMenuGroups,
+                                    rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
+                                    selection = selection,
+                                    onComplete = onComplete,
+                                    onOpenTask = onOpenTask,
+                                    onTaskAction = onTaskAction,
+                                    canReorder = true,
+                                    orderedDragIds = orderedPlaceDragIds,
+                                    dropModifier = taskListMotion()
+                                        .magicPlusRowDrop(
+                                            id = "mp-area-row-${task.id}",
+                                            enabled = onMagicPlusDrop != null,
+                                            onDrop = { before ->
+                                                onMagicPlusDrop?.invoke(
+                                                    QuickAddDraft(
+                                                        areaId = destination.id,
+                                                        position = insertionPosition(areaPositions, index, before),
+                                                    ),
+                                                )
+                                            },
+                                        )
+                                        .taskReorderRowDrop(
+                                            id = "reorder-area-row-${task.id}",
+                                            taskId = task.id,
+                                            enabled = true,
+                                            onDrop = { ids, before ->
+                                                val newPositions = reorderPositions(areaPositions, index, before, ids.size)
+                                                viewModel.reorderTasks(ids, newPositions)
+                                            },
+                                        ),
+                                )
+                            }
                         }
                     }
                 }
@@ -587,46 +595,51 @@ fun AreasProjectsScreen(
                     if (visibleUnsectioned.isNotEmpty()) {
                         val projectPositions = visibleUnsectioned.map(PlaceTaskRow::position)
                         itemsIndexed(visibleUnsectioned, key = { _, it -> "task:${it.id}" }) { index, task ->
-                            PlaceTaskItem(
-                                task = task,
-                                position = cardPosition(index, visibleUnsectioned.size),
-                                completeTitle = completeTitle,
-                                todayTitle = todayTitle,
-                                todayTint = todayTint,
-                                fadedTitle = fadedTitle,
-                                isDark = isDark,
-                                hasActiveTexture = hasActiveTexture,
-                                rowMenuGroups = rowMenuGroups,
-                                rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
-                                selection = selection,
-                                onComplete = onComplete,
-                                onOpenTask = onOpenTask,
-                                onTaskAction = onTaskAction,
-                                canReorder = true,
-                                orderedDragIds = orderedPlaceDragIds,
-                                dropModifier = taskListMotion()
-                                    .magicPlusRowDrop(
-                                        id = "mp-project-row-${task.id}",
-                                        enabled = onMagicPlusDrop != null,
-                                        onDrop = { before ->
-                                            onMagicPlusDrop?.invoke(
-                                                QuickAddDraft(
-                                                    projectId = destination.id,
-                                                    position = insertionPosition(projectPositions, index, before),
-                                                ),
-                                            )
-                                        },
-                                    )
-                                    .taskReorderRowDrop(
-                                        id = "reorder-project-row-${task.id}",
-                                        taskId = task.id,
-                                        enabled = true,
-                                        onDrop = { ids, before ->
-                                            val newPositions = reorderPositions(projectPositions, index, before, ids.size)
-                                            viewModel.reorderTasks(ids, newPositions, targetHeadingId = null, updateHeading = true)
-                                        },
-                                    ),
-                            )
+                            val slicePosition = cardPosition(index, visibleUnsectioned.size)
+                            if (expandedTaskId == task.id && expandedTaskContent != null) {
+                                expandedTaskContent(task.item, slicePosition, taskListMotion())
+                            } else {
+                                PlaceTaskItem(
+                                    task = task,
+                                    position = slicePosition,
+                                    completeTitle = completeTitle,
+                                    todayTitle = todayTitle,
+                                    todayTint = todayTint,
+                                    fadedTitle = fadedTitle,
+                                    isDark = isDark,
+                                    hasActiveTexture = hasActiveTexture,
+                                    rowMenuGroups = rowMenuGroups,
+                                    rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
+                                    selection = selection,
+                                    onComplete = onComplete,
+                                    onOpenTask = onOpenTask,
+                                    onTaskAction = onTaskAction,
+                                    canReorder = true,
+                                    orderedDragIds = orderedPlaceDragIds,
+                                    dropModifier = taskListMotion()
+                                        .magicPlusRowDrop(
+                                            id = "mp-project-row-${task.id}",
+                                            enabled = onMagicPlusDrop != null,
+                                            onDrop = { before ->
+                                                onMagicPlusDrop?.invoke(
+                                                    QuickAddDraft(
+                                                        projectId = destination.id,
+                                                        position = insertionPosition(projectPositions, index, before),
+                                                    ),
+                                                )
+                                            },
+                                        )
+                                        .taskReorderRowDrop(
+                                            id = "reorder-project-row-${task.id}",
+                                            taskId = task.id,
+                                            enabled = true,
+                                            onDrop = { ids, before ->
+                                                val newPositions = reorderPositions(projectPositions, index, before, ids.size)
+                                                viewModel.reorderTasks(ids, newPositions, targetHeadingId = null, updateHeading = true)
+                                            },
+                                        ),
+                                )
+                            }
                         }
                     }
                     item(key = "sections-heading") {
@@ -677,6 +690,8 @@ fun AreasProjectsScreen(
                                 onReorderToSection = { ids, newPositions ->
                                     viewModel.reorderTasks(ids, newPositions, targetHeadingId = section.id, updateHeading = true)
                                 },
+                                expandedTaskId = expandedTaskId,
+                                expandedTaskContent = expandedTaskContent,
                             )
                         }
                     }
@@ -847,6 +862,8 @@ private fun LazyListScope.placeSection(
     onMagicPlusDrop: ((QuickAddDraft) -> Unit)? = null,
     orderedDragIds: List<String> = emptyList(),
     onReorderToSection: (ids: List<String>, positions: List<Double>) -> Unit = { _, _ -> },
+    expandedTaskId: String? = null,
+    expandedTaskContent: (@Composable (task: TaskListItem, position: TaskCardPosition, modifier: Modifier) -> Unit)? = null,
 ) {
     item(key = "section:${section.id}") {
         PlaceSectionHeader(
@@ -873,47 +890,52 @@ private fun LazyListScope.placeSection(
     } else {
         val sectionPositions = section.tasks.map(PlaceTaskRow::position)
         itemsIndexed(section.tasks, key = { _, it -> "task:${it.id}" }) { index, task ->
-            PlaceTaskItem(
-                task = task,
-                position = cardPosition(index, section.tasks.size),
-                completeTitle = completeTitle,
-                todayTitle = todayTitle,
-                todayTint = todayTint,
-                fadedTitle = fadedTitle,
-                isDark = isDark,
-                hasActiveTexture = hasActiveTexture,
-                rowMenuGroups = rowMenuGroups,
-                rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
-                selection = selection,
-                onComplete = onComplete,
-                onOpenTask = onOpenTask,
-                onTaskAction = onTaskAction,
-                canReorder = true,
-                orderedDragIds = orderedDragIds,
-                dropModifier = taskListMotion()
-                    .magicPlusRowDrop(
-                        id = "mp-section-row-${task.id}",
-                        enabled = onMagicPlusDrop != null,
-                        onDrop = { before ->
-                            onMagicPlusDrop?.invoke(
-                                QuickAddDraft(
-                                    projectId = projectId,
-                                    headingId = section.id,
-                                    position = insertionPosition(sectionPositions, index, before),
-                                ),
-                            )
-                        },
-                    )
-                    .taskReorderRowDrop(
-                        id = "reorder-section-row-${task.id}",
-                        taskId = task.id,
-                        enabled = true,
-                        onDrop = { ids, before ->
-                            val newPositions = reorderPositions(sectionPositions, index, before, ids.size)
-                            onReorderToSection(ids, newPositions)
-                        },
-                    ),
-            )
+            val slicePosition = cardPosition(index, section.tasks.size)
+            if (expandedTaskId == task.id && expandedTaskContent != null) {
+                expandedTaskContent(task.item, slicePosition, taskListMotion())
+            } else {
+                PlaceTaskItem(
+                    task = task,
+                    position = slicePosition,
+                    completeTitle = completeTitle,
+                    todayTitle = todayTitle,
+                    todayTint = todayTint,
+                    fadedTitle = fadedTitle,
+                    isDark = isDark,
+                    hasActiveTexture = hasActiveTexture,
+                    rowMenuGroups = rowMenuGroups,
+                    rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
+                    selection = selection,
+                    onComplete = onComplete,
+                    onOpenTask = onOpenTask,
+                    onTaskAction = onTaskAction,
+                    canReorder = true,
+                    orderedDragIds = orderedDragIds,
+                    dropModifier = taskListMotion()
+                        .magicPlusRowDrop(
+                            id = "mp-section-row-${task.id}",
+                            enabled = onMagicPlusDrop != null,
+                            onDrop = { before ->
+                                onMagicPlusDrop?.invoke(
+                                    QuickAddDraft(
+                                        projectId = projectId,
+                                        headingId = section.id,
+                                        position = insertionPosition(sectionPositions, index, before),
+                                    ),
+                                )
+                            },
+                        )
+                        .taskReorderRowDrop(
+                            id = "reorder-section-row-${task.id}",
+                            taskId = task.id,
+                            enabled = true,
+                            onDrop = { ids, before ->
+                                val newPositions = reorderPositions(sectionPositions, index, before, ids.size)
+                                onReorderToSection(ids, newPositions)
+                            },
+                        ),
+                )
+            }
         }
     }
 }

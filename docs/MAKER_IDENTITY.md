@@ -44,7 +44,7 @@ of the arc. The June 2026 life-OS story below is superseded.
 | The task engine is the same code | The tasks / areas / projects engine from that first build is the task app today. The repo was renamed, not restarted. |
 | Septena is the task app | ADR 0007 (2026-11-19): the task app takes the name Septena. ADR 0017 (2026-11-21): the life OS moved to its own private repo as Septena Life. |
 | Agents work tasks, the human holds the stop | Ships (2026-11-19/20, ADR 0008): assign a task to Claude, the agent claims it with a lease, asks in the app with choice buttons, and mz can stop one task or pause all agents. The server enforces the stop; no agent can clear it. |
-| Unattended runner | **Planned**, not shipped (ADR 0005, issue #5): a runner on the Mac mini works tasks while devices sleep. Say "next" or "planned". |
+| Unattended runner | Ships (ADR 0005, issue #5, closed 2026-11-25): the agent is woken when you assign a task, answer its question or resume it, and a scheduled runner works tasks while your devices sleep. |
 | The repo teaches its agents | `AGENTS.md` holds the rules, the traps earlier sessions fell into, and what an agent may not do alone. Most "Known traps" entries record an agent mistake. |
 | Built in the open | Public repo (`github.com/michellzappa/septena`), MIT: apps and server (`backend/`). |
 | Self-hosting | **Planned** (ADR 0011, #119): the server on your own Cloudflare account, unsupported by design. |
@@ -87,7 +87,6 @@ thesis: lead with it, not with "AI".
 - ❌ "never at night" / "zero commits after 1am" — **no longer true** (2026-11-21: 9 commits between 1am and 4am, 39 in the midnight hour; some may be travel time zones). Make no claim about hours.
 - ❌ "your data lives only in your iCloud" — untrue since ADR 0002.
 - ❌ the life-OS arc (logging habit, webapp pilot, "everything I track") as Septena's story — it is Septena Life's (decided 2026-11-21).
-- ❌ "agents work while you sleep" as shipped — the runner is planned (#5).
 - ❌ "fueled by coffee/caffeine" as a grind trope (the caffeine data is real, but it's "two cups, never past three" — a *restraint* story, not a hustle one; see the journal post of that name)
 - ❌ "team", "we", "our engineers" — it's one person; "I" or "Septena"
 - ❌ hype: "revolutionary", "game-changing", "the only app you'll ever need"
@@ -244,7 +243,7 @@ drift word by word. Humanizer pass done.
    reading, writing and accountability; Block G's day-two fields; six months of
    dogfooding; Block H with a link to the centaur essay.
 3. **How I use it:** brain dumps, accountability, prioritizing, sharing ideas;
-   all agents on one list; the stop; the runner is next.
+   all agents on one list; the stop; agents keep working while I sleep.
 4. **How it's made:** vibe coding with the models in §1; AGENTS.md.
 5. **Why it's open:** unchanged; signed with michellzappa.com and envisioning.com.
 6. **The name:** "a made-up word. It refers to seven, as in the days of a week."

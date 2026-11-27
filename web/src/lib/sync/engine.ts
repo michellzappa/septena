@@ -20,6 +20,7 @@ import {
 } from "../core";
 import { evaluateConversation, groupTurnsByTask } from "../conversation";
 import { fadeInput, fadeSettings, isProposal, type FadeClock } from "../fade";
+import { nextStructurePosition } from "../listOrder";
 import { clearWaitingFields, isAssignedToOther, projectShareOf, setWaitingFields, sharedWaitingTarget, waitingName } from "../waiting";
 import {
   needsFixedRepeatPrompt,
@@ -1528,7 +1529,7 @@ export class WebSyncEngine {
     const trimmed = title.trim();
     if (!trimmed) throw new Error("Area title is required");
     const id = newId("area");
-    const position = this.state.snapshot.areas.filter((a) => !a.deletedAt).length;
+    const position = nextStructurePosition(this.state.snapshot.areas.filter((a) => !a.deletedAt));
     const fields: Record<string, unknown> = { title: trimmed, emoji, position };
     const row: AreaRow = { id, title: trimmed, emoji, position };
     await this.commit(
@@ -1557,7 +1558,10 @@ export class WebSyncEngine {
     const trimmed = title.trim();
     if (!trimmed) throw new Error("Project title is required");
     const id = newId("proj");
-    const position = this.state.snapshot.projects.filter((p) => !p.deletedAt).length;
+    const siblings = this.state.snapshot.projects.filter(
+      (p) => !p.deletedAt && p.status === "active" && (p.area ?? null) === areaId,
+    );
+    const position = nextStructurePosition(siblings);
     const fields: Record<string, unknown> = {
       title: trimmed,
       status: "active",

@@ -789,6 +789,24 @@ function validatePlans(plans, icons, caps, importSources) {
     assert(pr.label.includes(whole), `plans.json: price ${pr.id} label must state ${whole}`);
   }
   assert(plans.prices.filter((x) => x.highlighted).length === 1, "plans.json: exactly one price must be highlighted");
+  // Benefits (docs/PREMIUM_LANGUAGE.md): each states its plan's value, so the
+  // words cannot drift from the server's plan table.
+  const WORDS = { 1: "one", 2: "two", 3: "three", 365: "year" };
+  for (const tier of ["plus", "pro"]) {
+    const list = plans.benefits?.[tier];
+    assert(Array.isArray(list) && list.length > 0, `plans.json: benefits.${tier} missing`);
+    for (const b of list) {
+      assert(b.id && b.icon && b.title && b.detail, `plans.json: benefits.${tier}.${b.id} needs id, icon, title, detail`);
+      assert(b.icon in icons.icons, `plans.json: benefits.${tier}.${b.id} unknown icon "${b.icon}"`);
+      if (!b.limit) continue;
+      assert(b.limit in plans.limits[tier], `plans.json: benefits.${tier}.${b.id} unknown limit "${b.limit}"`);
+      const v = plans.limits[tier][b.limit];
+      const t = b.title.toLowerCase();
+      if (v === null) assert(/no limit|every|all/.test(t), `plans.json: benefits.${tier}.${b.id} must say there is no limit`);
+      else assert(t.includes(String(v)) || (WORDS[v] && t.includes(WORDS[v])), `plans.json: benefits.${tier}.${b.id} must state ${v}`);
+    }
+  }
+  assert(/^https:\/\//.test(plans.compareURL ?? ""), "plans.json: compareURL must be an https URL");
   // An upsell moment names the plan that answers it, so the paywall opens on that plan.
   for (const u of plans.upsells) assert(["plus", "pro"].includes(u.plan), `plans.json: upsell ${u.id} needs plan "plus" or "pro"`);
   // ADR 0059: Pro sells like Plus, in the same subscription group. Its prices
@@ -806,6 +824,39 @@ function validatePlans(plans, icons, caps, importSources) {
     assert(proLevel.detail.includes(whole), `plans.json: the pro level detail must state ${whole}`);
   }
   assert(Array.isArray(plans.proPrices) && plans.proPrices.length > 0, "plans.json: proPrices missing (ADR 0059)");
+
+  // ADR 0060: pinned currencies (EUR baseline + USD, GBP, BRL) for the pricing
+  // page and web checkout. EUR amounts must stay in lockstep with prices/proPrices.
+  assert(plans.defaultCurrency === "EUR", "plans.json: defaultCurrency must be EUR (ADR 0060)");
+  assert(Array.isArray(plans.currencies) && plans.currencies.length > 0, "plans.json: currencies missing (ADR 0060)");
+  const curCodes = new Set();
+  const curCountries = new Set();
+  for (const cur of plans.currencies) {
+    assert(/^[A-Z]{3}$/.test(cur.code) && !curCodes.has(cur.code), `plans.json: bad or duplicate currency "${cur.code}"`);
+    curCodes.add(cur.code);
+    assert(typeof cur.symbol === "string" && cur.symbol.length > 0, `plans.json: currency ${cur.code} needs symbol`);
+    assert(typeof cur.taxInclusive === "boolean", `plans.json: currency ${cur.code} needs taxInclusive boolean`);
+    assert(typeof cur.freeLabel === "string" && cur.freeLabel.includes("0"), `plans.json: currency ${cur.code} needs freeLabel`);
+    assert(typeof cur.footnote === "string" && cur.footnote.length > 0, `plans.json: currency ${cur.code} needs footnote`);
+    assert(Array.isArray(cur.countries), `plans.json: currency ${cur.code} countries must be an array`);
+    for (const cc of cur.countries) {
+      assert(/^[A-Z]{2}$/.test(cc) && !curCountries.has(cc), `plans.json: currency ${cur.code} bad or duplicate country "${cc}"`);
+      curCountries.add(cc);
+    }
+    for (const tier of ["plus", "pro"]) {
+      for (const iv of ["year", "month"]) {
+        const entry = cur[tier]?.[iv];
+        assert(entry && Number.isInteger(entry.amountMinor) && entry.amountMinor > 0, `plans.json: currency ${cur.code}.${tier}.${iv} needs positive integer amountMinor`);
+        const whole = String(entry.amountMinor / 100);
+        assert(typeof entry.label === "string" && entry.label.includes(whole), `plans.json: currency ${cur.code}.${tier}.${iv} label must state ${whole}`);
+        assert(typeof entry.detail === "string" && entry.detail.length > 0, `plans.json: currency ${cur.code}.${tier}.${iv} needs detail`);
+      }
+    }
+  }
+  const eurCur = plans.currencies.find((c) => c.code === plans.defaultCurrency);
+  assert(eurCur, "plans.json: defaultCurrency must exist in currencies");
+  for (const pr of plans.prices) assert(eurCur.plus[pr.interval].amountMinor === pr.amountMinor, `plans.json: EUR plus.${pr.interval} must match prices.${pr.id}`);
+  for (const pr of plans.proPrices) assert(eurCur.pro[pr.interval].amountMinor === pr.amountMinor, `plans.json: EUR pro.${pr.interval} must match proPrices.${pr.id}`);
 
   assert(JSON.stringify(plans.levels.map((l) => l.id)) === JSON.stringify(PLAN_LEVELS), `plans.json: levels must be ${PLAN_LEVELS.join(", ")}`);
   assert(JSON.stringify(plans.cards.map((c) => c.id)) === JSON.stringify(PLAN_LEVELS), `plans.json: cards must be ${PLAN_LEVELS.join(", ")}`);
@@ -2179,6 +2230,15 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  let rows: [RegistryPlanRow]");
   lines.push("}");
   lines.push("");
+  lines.push("/// One benefit of a paid plan (`benefits` in plans.json, docs/PREMIUM_LANGUAGE.md).");
+  lines.push("struct RegistryPlanBenefit: Sendable, Hashable, Identifiable {");
+  lines.push("  let id: String");
+  lines.push("  /// Registry icon id (icons.json); its tile color is `AppearancePreferences.glyphSwiftUIColor`.");
+  lines.push("  let icon: String");
+  lines.push("  let title: String");
+  lines.push("  let detail: String");
+  lines.push("}");
+  lines.push("");
   lines.push("struct RegistryPlanNote: Sendable, Hashable, Identifiable {");
   lines.push("  let id: String");
   lines.push("  let title: String");
@@ -2203,6 +2263,13 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  static var proPrices: [RegistryPlanPrice] { [");
   for (const pr of P.proPrices) lines.push(`    RegistryPlanPrice(id: ${swiftStr(pr.id)}, productId: ${swiftStr(pr.productId)}, amountMinor: ${pr.amountMinor}, currency: ${swiftStr(pr.currency)}, interval: ${swiftStr(pr.interval)}, highlighted: ${pr.highlighted}, label: ${L(pr.label, pr, "label")}, detail: ${L(pr.detail, pr, "detail")}),`);
   lines.push("  ] }");
+  for (const tier of ["plus", "pro"]) {
+    lines.push(`  static var ${tier}Benefits: [RegistryPlanBenefit] { [`);
+    for (const b of P.benefits[tier]) lines.push(`    RegistryPlanBenefit(id: ${swiftStr(b.id)}, icon: ${swiftStr(b.icon)}, title: ${L(b.title, b, "title")}, detail: ${L(b.detail, b, "detail")}),`);
+    lines.push("  ] }");
+  }
+  lines.push("  /// The full comparison of every plan, on the website.");
+  lines.push(`  static let compareURL = URL(string: ${swiftStr(P.compareURL)})!`);
   lines.push("  /// The rows every plan card lists (`cardRows`), in order.");
   lines.push(`  static let cardRowIDs: [String] = [${P.cardRows.map(swiftStr).join(", ")}]`);
   lines.push("  static var cards: [RegistryPlanCard] { [");

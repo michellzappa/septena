@@ -25,8 +25,8 @@ millions of accounts. It never shows what a user wrote (ADR 0043).
 
 ## 3. Layout (UX)
 
-The console is six pages under one top bar: the Septena mark, the admin's
-email, Refresh counts, and a tab per page. The tab of the open page carries
+The console is six pages under one top bar: the Septena icon, the admin's
+email, Refresh counts, and a tab per page. The icon is the app icon, loaded from septena.app/icon.svg. The tab of the open page carries
 the brand accent (Persimmon, `registry/tokens.json`). Each page loads only the
 data it shows, so a page with the account table is the only one that reads
 every account row.
@@ -43,8 +43,9 @@ every account row.
 Rules for the layout: every block is a titled card with one line that says
 what it counts. A number has its label and its window ("7 days", "30 days",
 "every account"). The accent marks the open tab, the primary button of a
-form, links, chart marks and the funnel meters. Green and red mean only up
-and down. An empty state says what is missing and the one step that fixes
+form, links, chart marks and a rise (▲). A drop (▼) is
+gray. Red is only for a fault: a lapsed plan, a failing webhook, a source
+that does not answer. An empty state says what is missing and the one step that fixes
 it. The pages work at phone width.
 
 ## 4. Definitions

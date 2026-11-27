@@ -14,10 +14,17 @@ object ConformanceTestRunner {
             taskFadeVectors()
             taskViewVectors()
             conversationVectors()
+            taskPageBlocksVectors()
         }
         ReviewGroupTest().run {
             registryOrder()
             waitingOrder()
+        }
+        StructureOrderTest().run {
+            positionZeroAndNullSinkToBottom()
+            allUnpositionedFallsBackToCaseInsensitiveAlphabetical()
+            tiedPositionsBreakByTitle()
+            nextAppendPositionAndReorderAreOneBased()
         }
         SyncEngineConformanceTest().run {
             pullPageVectors()

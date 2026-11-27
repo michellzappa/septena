@@ -12,6 +12,42 @@
       "plans.outcomes.agents.rows.connected.cells.plus"
     ]
   },
+  "$10 a month. You save $48 against paying monthly.": {
+    "text": "$10 a month. You save $48 against paying monthly.",
+    "paths": [
+      "plans.currencies.1.pro.year.detail"
+    ]
+  },
+  "$120 a year": {
+    "text": "$120 a year",
+    "paths": [
+      "plans.currencies.1.pro.year.label"
+    ]
+  },
+  "$14 a month": {
+    "text": "$14 a month",
+    "paths": [
+      "plans.currencies.1.pro.month.label"
+    ]
+  },
+  "$5 a month. You save $24 against paying monthly.": {
+    "text": "$5 a month. You save $24 against paying monthly.",
+    "paths": [
+      "plans.currencies.1.plus.year.detail"
+    ]
+  },
+  "$60 a year": {
+    "text": "$60 a year",
+    "paths": [
+      "plans.currencies.1.plus.year.label"
+    ]
+  },
+  "$7 a month": {
+    "text": "$7 a month",
+    "paths": [
+      "plans.currencies.1.plus.month.label"
+    ]
+  },
   "1 change was not sent yet and will be lost.": {
     "text": "1 change was not sent yet and will be lost.",
     "paths": [
@@ -22,6 +58,12 @@
     "text": "1 task is on this device.",
     "paths": [
       "surfaces.accountSwitch.copy.tasksOne.label"
+    ]
+  },
+  "10 GB of synced files": {
+    "text": "10 GB of synced files",
+    "paths": [
+      "plans.benefits.plus.files.title"
     ]
   },
   "10 GB synced": {
@@ -70,6 +112,12 @@
       "surfaces.taskDetail.ordinals.3.title"
     ]
   },
+  "50 GB of synced files": {
+    "text": "50 GB of synced files",
+    "paths": [
+      "plans.benefits.pro.files.title"
+    ]
+  },
   "50 GB synced": {
     "text": "50 GB synced",
     "paths": [
@@ -92,6 +140,12 @@
     "text": "A free account syncs one device. Plus syncs all of them. You can also move your free account to this device.",
     "paths": [
       "plans.upsells.second_device.detail"
+    ]
+  },
+  "A year of history": {
+    "text": "A year of history",
+    "paths": [
+      "plans.benefits.plus.history.title"
     ]
   },
   "ABCD-EFGH": {
@@ -505,6 +559,12 @@
       "actions.contextMenus.task.row.assign.title"
     ]
   },
+  "Attach a file once and it opens on every device.": {
+    "text": "Attach a file once and it opens on every device.",
+    "paths": [
+      "plans.benefits.plus.files.detail"
+    ]
+  },
   "Attachments": {
     "text": "Attachments",
     "paths": [
@@ -645,7 +705,15 @@
     "text": "Cancel at any time.",
     "paths": [
       "plans.prices.monthly.detail",
-      "plans.proPrices.pro_monthly.detail"
+      "plans.proPrices.pro_monthly.detail",
+      "plans.currencies.0.plus.month.detail",
+      "plans.currencies.0.pro.month.detail",
+      "plans.currencies.1.plus.month.detail",
+      "plans.currencies.1.pro.month.detail",
+      "plans.currencies.2.plus.month.detail",
+      "plans.currencies.2.pro.month.detail",
+      "plans.currencies.3.plus.month.detail",
+      "plans.currencies.3.pro.month.detail"
     ]
   },
   "Capture": {
@@ -811,6 +879,12 @@
       "actions.actions.app.quickFind.desktopTitle"
     ]
   },
+  "Compare every plan": {
+    "text": "Compare every plan",
+    "paths": [
+      "plans.paywall.compareAll"
+    ]
+  },
   "Complete": {
     "text": "Complete",
     "paths": [
@@ -842,6 +916,12 @@
       "settings.pages.claude_pairing.title",
       "settings.pages.claude_pairing.sections.connector.header",
       "surfaces.firstRun.steps.connectClaude.title"
+    ]
+  },
+  "Connect Claude and two more. Each one asks before it acts.": {
+    "text": "Connect Claude and two more. Each one asks before it acts.",
+    "paths": [
+      "plans.benefits.plus.agents.detail"
     ]
   },
   "Connect Claude or another agent to your list. It asks before it acts, and you can stop it at any time.": {
@@ -1483,6 +1563,18 @@
       "surfaces.prompts.error.title"
     ]
   },
+  "Every device, a year of history and shared projects.": {
+    "text": "Every device, a year of history and shared projects.",
+    "paths": [
+      "plans.benefits.pro.everything.detail"
+    ]
+  },
+  "Every device, always current": {
+    "text": "Every device, always current",
+    "paths": [
+      "plans.benefits.plus.devices.title"
+    ]
+  },
   "Every list, from Today to the Logbook": {
     "text": "Every list, from Today to the Logbook",
     "paths": [
@@ -1511,6 +1603,12 @@
     "text": "Everything in Free is included.",
     "paths": [
       "plans.cards.plus.footnote"
+    ]
+  },
+  "Everything in Plus": {
+    "text": "Everything in Plus",
+    "paths": [
+      "plans.benefits.pro.everything.title"
     ]
   },
   "Everything in Plus is included.": {
@@ -2552,6 +2650,12 @@
       "plans.outcomes.agents.rows.connected.cells.pro"
     ]
   },
+  "No limit on agents": {
+    "text": "No limit on agents",
+    "paths": [
+      "plans.benefits.pro.agents.title"
+    ]
+  },
   "No matches": {
     "text": "No matches",
     "paths": [
@@ -3063,10 +3167,34 @@
       "settings.copy.import_export.importJsonDetail.label"
     ]
   },
+  "Prices exclude applicable local sales tax. Outside EUR, USD, GBP and BRL, the App Store and Google Play charge their matching local price.": {
+    "text": "Prices exclude applicable local sales tax. Outside EUR, USD, GBP and BRL, the App Store and Google Play charge their matching local price.",
+    "paths": [
+      "plans.currencies.1.footnote"
+    ]
+  },
+  "Prices include UK VAT. Outside EUR, USD, GBP and BRL, the App Store and Google Play charge their matching local price.": {
+    "text": "Prices include UK VAT. Outside EUR, USD, GBP and BRL, the App Store and Google Play charge their matching local price.",
+    "paths": [
+      "plans.currencies.2.footnote"
+    ]
+  },
+  "Prices include VAT where it applies. Outside EUR, USD, GBP and BRL, the App Store and Google Play charge their matching local price.": {
+    "text": "Prices include VAT where it applies. Outside EUR, USD, GBP and BRL, the App Store and Google Play charge their matching local price.",
+    "paths": [
+      "plans.currencies.0.footnote"
+    ]
+  },
   "Prices include VAT where it applies. Outside the euro area, the App Store charges its matching local price.": {
     "text": "Prices include VAT where it applies. Outside the euro area, the App Store charges its matching local price.",
     "paths": [
       "plans.priceFootnote"
+    ]
+  },
+  "Prices include applicable local taxes. Outside EUR, USD, GBP and BRL, the App Store and Google Play charge their matching local price.": {
+    "text": "Prices include applicable local taxes. Outside EUR, USD, GBP and BRL, the App Store and Google Play charge their matching local price.",
+    "paths": [
+      "plans.currencies.3.footnote"
     ]
   },
   "Print / Ink": {
@@ -3188,6 +3316,42 @@
     "text": "Quick Find…",
     "paths": [
       "actions.actions.app.quickFind.title"
+    ]
+  },
+  "R$ 20 a month. You save R$ 108 against paying monthly.": {
+    "text": "R$ 20 a month. You save R$ 108 against paying monthly.",
+    "paths": [
+      "plans.currencies.3.plus.year.detail"
+    ]
+  },
+  "R$ 240 a year": {
+    "text": "R$ 240 a year",
+    "paths": [
+      "plans.currencies.3.plus.year.label"
+    ]
+  },
+  "R$ 29 a month": {
+    "text": "R$ 29 a month",
+    "paths": [
+      "plans.currencies.3.plus.month.label"
+    ]
+  },
+  "R$ 40 a month. You save R$ 216 against paying monthly.": {
+    "text": "R$ 40 a month. You save R$ 216 against paying monthly.",
+    "paths": [
+      "plans.currencies.3.pro.year.detail"
+    ]
+  },
+  "R$ 480 a year": {
+    "text": "R$ 480 a year",
+    "paths": [
+      "plans.currencies.3.pro.year.label"
+    ]
+  },
+  "R$ 58 a month": {
+    "text": "R$ 58 a month",
+    "paths": [
+      "plans.currencies.3.pro.month.label"
     ]
   },
   "Read-only agenda in Today and Upcoming": {
@@ -3442,6 +3606,12 @@
       "tokens.textures.ridges.name"
     ]
   },
+  "Room for scans, screenshots and long documents.": {
+    "text": "Room for scans, screenshots and long documents.",
+    "paths": [
+      "plans.benefits.pro.files.detail"
+    ]
+  },
   "Rotate Calendar Feed Link?": {
     "text": "Rotate Calendar Feed Link?",
     "paths": [
@@ -3458,6 +3628,12 @@
     "text": "Rotating replaces your private feed link immediately. Existing calendar subscriptions will stop updating until you re-subscribe with the new URL.",
     "paths": [
       "settings.copy.calendar_detail.rotateMessage.label"
+    ]
+  },
+  "Run as many agents on your list as your work needs.": {
+    "text": "Run as many agents on your list as your work needs.",
+    "paths": [
+      "plans.benefits.pro.agents.detail"
     ]
   },
   "Same day": {
@@ -3562,6 +3738,12 @@
     "text": "See who changed what and bring back what you deleted. Your files open on every device.",
     "paths": [
       "plans.outcomes.nothing_lost.detail"
+    ]
+  },
+  "See who changed what, and bring back what you deleted.": {
+    "text": "See who changed what, and bring back what you deleted.",
+    "paths": [
+      "plans.benefits.plus.history.detail"
     ]
   },
   "Select": {
@@ -4521,6 +4703,12 @@
       "settings.keys.tasksTitleLines.options.2.title"
     ]
   },
+  "Three agents at work": {
+    "text": "Three agents at work",
+    "paths": [
+      "plans.benefits.plus.agents.title"
+    ]
+  },
   "Thursday": {
     "text": "Thursday",
     "paths": [
@@ -5129,6 +5317,12 @@
       "plans.outcomes.everywhere.title"
     ]
   },
+  "Your list on all your devices, updated as you type.": {
+    "text": "Your list on all your devices, updated as you type.",
+    "paths": [
+      "plans.benefits.plus.devices.detail"
+    ]
+  },
   "Your list on every device, updated live.": {
     "text": "Your list on every device, updated live.",
     "paths": [
@@ -5152,6 +5346,12 @@
     "text": "Your plan",
     "paths": [
       "plans.labels.yourPlan"
+    ]
+  },
+  "Your plan includes": {
+    "text": "Your plan includes",
+    "paths": [
+      "plans.paywall.yourPlanIncludes"
     ]
   },
   "Your synced settings": {
@@ -5448,6 +5648,42 @@
       "surfaces.prompts.items.disconnectAgent.message"
     ]
   },
+  "£100 a year": {
+    "text": "£100 a year",
+    "paths": [
+      "plans.currencies.2.pro.year.label"
+    ]
+  },
+  "£12 a month": {
+    "text": "£12 a month",
+    "paths": [
+      "plans.currencies.2.pro.month.label"
+    ]
+  },
+  "£4.17 a month. You save £22 against paying monthly.": {
+    "text": "£4.17 a month. You save £22 against paying monthly.",
+    "paths": [
+      "plans.currencies.2.plus.year.detail"
+    ]
+  },
+  "£50 a year": {
+    "text": "£50 a year",
+    "paths": [
+      "plans.currencies.2.plus.year.label"
+    ]
+  },
+  "£6 a month": {
+    "text": "£6 a month",
+    "paths": [
+      "plans.currencies.2.plus.month.label"
+    ]
+  },
+  "£8.33 a month. You save £44 against paying monthly.": {
+    "text": "£8.33 a month. You save £44 against paying monthly.",
+    "paths": [
+      "plans.currencies.2.pro.year.detail"
+    ]
+  },
   "“{title}” deleted": {
     "text": "“{title}” deleted",
     "placeholders": [
@@ -5467,13 +5703,15 @@
   "€10 a month. You save €48 against paying monthly.": {
     "text": "€10 a month. You save €48 against paying monthly.",
     "paths": [
-      "plans.proPrices.pro_annual.detail"
+      "plans.proPrices.pro_annual.detail",
+      "plans.currencies.0.pro.year.detail"
     ]
   },
   "€120 a year": {
     "text": "€120 a year",
     "paths": [
       "plans.proPrices.pro_annual.label",
+      "plans.currencies.0.pro.year.label",
       "plans.cards.pro.priceLabel"
     ]
   },
@@ -5486,19 +5724,22 @@
   "€14 a month": {
     "text": "€14 a month",
     "paths": [
-      "plans.proPrices.pro_monthly.label"
+      "plans.proPrices.pro_monthly.label",
+      "plans.currencies.0.pro.month.label"
     ]
   },
   "€5 a month. You save €24 against paying monthly.": {
     "text": "€5 a month. You save €24 against paying monthly.",
     "paths": [
-      "plans.prices.annual.detail"
+      "plans.prices.annual.detail",
+      "plans.currencies.0.plus.year.detail"
     ]
   },
   "€60 a year": {
     "text": "€60 a year",
     "paths": [
-      "plans.prices.annual.label"
+      "plans.prices.annual.label",
+      "plans.currencies.0.plus.year.label"
     ]
   },
   "€60 a year or €7 a month": {
@@ -5510,7 +5751,8 @@
   "€7 a month": {
     "text": "€7 a month",
     "paths": [
-      "plans.prices.monthly.label"
+      "plans.prices.monthly.label",
+      "plans.currencies.0.plus.month.label"
     ]
   }
 }

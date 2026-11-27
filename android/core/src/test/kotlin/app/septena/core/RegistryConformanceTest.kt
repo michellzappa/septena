@@ -194,4 +194,52 @@ class RegistryConformanceTest {
             assertEquals(expected.requiredBoolean("pendingReasoning"), actual.pendingReasoning, case.requiredString("name"))
         }
     }
+
+    fun taskPageBlocksVectors() {
+        val inlineKinds = RegistryCatalog.taskPageBlocks(TaskPageDepths.INLINE).map(TaskPageBlock::kind)
+        assertEquals(
+            listOf(
+                TaskPageBlockKinds.HEADER,
+                TaskPageBlockKinds.NOTES,
+                TaskPageBlockKinds.ATTRIBUTES,
+                TaskPageBlockKinds.CHECKLIST,
+                TaskPageBlockKinds.ATTACHMENTS,
+                TaskPageBlockKinds.REFERENCES,
+            ),
+            inlineKinds,
+            "inline task page blocks",
+        )
+
+        val pageKinds = RegistryCatalog.taskPageBlocks(TaskPageDepths.PAGE).map(TaskPageBlock::kind)
+        assertEquals(
+            listOf(
+                TaskPageBlockKinds.HEADER,
+                TaskPageBlockKinds.NOTES,
+                TaskPageBlockKinds.ATTRIBUTES,
+                TaskPageBlockKinds.CHECKLIST,
+                TaskPageBlockKinds.ATTACHMENTS,
+                TaskPageBlockKinds.REFERENCES,
+                TaskPageBlockKinds.CONVERSATION,
+                TaskPageBlockKinds.PROVENANCE,
+                TaskPageBlockKinds.HISTORY,
+            ),
+            pageKinds,
+            "full task page blocks",
+        )
+
+        val reviewKinds = RegistryCatalog.taskPageBlocks(TaskPageDepths.REVIEW).map(TaskPageBlock::kind)
+        assertEquals(
+            listOf(
+                TaskPageBlockKinds.HEADER,
+                TaskPageBlockKinds.NOTES,
+                TaskPageBlockKinds.CONVERSATION,
+                TaskPageBlockKinds.PROVENANCE,
+            ),
+            reviewKinds,
+            "review task page blocks",
+        )
+
+        assertTrue(RegistryCatalog.dateBoardRows("when").isNotEmpty(), "when date board rows")
+        assertTrue(RegistryCatalog.dateBoardRows("deadline").isNotEmpty(), "deadline date board rows")
+    }
 }

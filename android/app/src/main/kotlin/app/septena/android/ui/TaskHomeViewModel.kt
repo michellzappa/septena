@@ -11,6 +11,7 @@ import app.septena.core.RegistryCatalog
 import app.septena.core.ReviewGroupIds
 import app.septena.core.SmartListResolver
 import app.septena.core.SmartListSection
+import app.septena.core.StructureOrder
 import app.septena.core.SyncRecord
 import app.septena.core.TaskConversation
 import app.septena.core.TaskFadeRules
@@ -267,20 +268,20 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         viewModelScope.launch {
             runCatching {
                 withContext(Dispatchers.IO) {
-                    val existingIds = graph.taskStore.records(EntityNames.AREA)
-                        .filter { it.deletedAt == null }
-                        .sortedWith(
-                            compareBy(
-                                { it.fields[RegistryEntityFields.Area.POSITION].numberValue() ?: Double.MAX_VALUE },
-                                { it.fields[RegistryEntityFields.Area.TITLE].stringValue().orEmpty().lowercase() },
-                            ),
-                        )
-                        .map { it.id }
+                    val existing = StructureOrder.orderByPosition(
+                        items = graph.taskStore.records(EntityNames.AREA).filter { it.deletedAt == null },
+                        position = { it.fields[RegistryEntityFields.Area.POSITION].numberValue() },
+                        label = { it.fields[RegistryEntityFields.Area.TITLE].stringValue().orEmpty() },
+                    )
+                    val existingIds = existing.map { it.id }
+                    val appendPos = StructureOrder.nextAppendPosition(
+                        existing.map { it.fields[RegistryEntityFields.Area.POSITION].numberValue() },
+                    )
                     val created = graph.registryEntityMutator.create(
                         EntityNames.AREA,
                         mapOf(
                             RegistryEntityFields.Area.TITLE to JsonValue.StringValue(trimmed),
-                            RegistryEntityFields.Area.POSITION to JsonValue.IntegerValue(existingIds.size.toLong()),
+                            RegistryEntityFields.Area.POSITION to JsonValue.IntegerValue(appendPos),
                         ),
                     )
                     if (insertIndex != null) {
@@ -290,7 +291,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                             graph.registryEntityMutator.update(
                                 EntityNames.AREA,
                                 id,
-                                mapOf(RegistryEntityFields.Area.POSITION to JsonValue.IntegerValue(idx.toLong())),
+                                mapOf(RegistryEntityFields.Area.POSITION to JsonValue.IntegerValue(StructureOrder.reorderPosition(idx))),
                             )
                         }
                     }
@@ -315,23 +316,24 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         viewModelScope.launch {
             runCatching {
                 withContext(Dispatchers.IO) {
-                    val siblingIds = graph.taskStore.records(EntityNames.PROJECT)
-                        .filter {
+                    val siblings = StructureOrder.orderByPosition(
+                        items = graph.taskStore.records(EntityNames.PROJECT).filter {
+                            val status = it.fields[RegistryEntityFields.Project.STATUS].stringValue()
                             it.deletedAt == null &&
-                                it.fields[RegistryEntityFields.Project.STATUS].stringValue() == RegistryEntityEnums.ProjectStatus.ACTIVE &&
+                                (status == null || status == RegistryEntityEnums.ProjectStatus.ACTIVE) &&
                                 it.fields[RegistryEntityFields.Project.AREA].stringValue() == areaId
-                        }
-                        .sortedWith(
-                            compareBy(
-                                { it.fields[RegistryEntityFields.Project.POSITION].numberValue() ?: Double.MAX_VALUE },
-                                { it.fields[RegistryEntityFields.Project.TITLE].stringValue().orEmpty().lowercase() },
-                            ),
-                        )
-                        .map { it.id }
+                        },
+                        position = { it.fields[RegistryEntityFields.Project.POSITION].numberValue() },
+                        label = { it.fields[RegistryEntityFields.Project.TITLE].stringValue().orEmpty() },
+                    )
+                    val siblingIds = siblings.map { it.id }
+                    val appendPos = StructureOrder.nextAppendPosition(
+                        siblings.map { it.fields[RegistryEntityFields.Project.POSITION].numberValue() },
+                    )
                     val fields = buildMap<String, JsonValue> {
                         put(RegistryEntityFields.Project.TITLE, JsonValue.StringValue(trimmed))
                         put(RegistryEntityFields.Project.STATUS, JsonValue.StringValue(RegistryEntityEnums.ProjectStatus.ACTIVE))
-                        put(RegistryEntityFields.Project.POSITION, JsonValue.IntegerValue(siblingIds.size.toLong()))
+                        put(RegistryEntityFields.Project.POSITION, JsonValue.IntegerValue(appendPos))
                         areaId?.let { put(RegistryEntityFields.Project.AREA, JsonValue.StringValue(it)) }
                     }
                     val created = graph.registryEntityMutator.create(EntityNames.PROJECT, fields)
@@ -342,7 +344,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                             graph.registryEntityMutator.update(
                                 EntityNames.PROJECT,
                                 id,
-                                mapOf(RegistryEntityFields.Project.POSITION to JsonValue.IntegerValue(idx.toLong())),
+                                mapOf(RegistryEntityFields.Project.POSITION to JsonValue.IntegerValue(StructureOrder.reorderPosition(idx))),
                             )
                         }
                     }
@@ -456,7 +458,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                         graph.registryEntityMutator.update(
                             EntityNames.AREA,
                             id,
-                            mapOf(RegistryEntityFields.Area.POSITION to JsonValue.IntegerValue(idx.toLong())),
+                            mapOf(RegistryEntityFields.Area.POSITION to JsonValue.IntegerValue(StructureOrder.reorderPosition(idx))),
                         )
                     }
                 }
@@ -476,7 +478,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                         graph.registryEntityMutator.update(
                             EntityNames.PROJECT,
                             id,
-                            mapOf(RegistryEntityFields.Project.POSITION to JsonValue.IntegerValue(idx.toLong())),
+                            mapOf(RegistryEntityFields.Project.POSITION to JsonValue.IntegerValue(StructureOrder.reorderPosition(idx))),
                         )
                     }
                 }
@@ -934,49 +936,53 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         } else {
             graph.taskStore.activeTasks()
         }
-        val areaRecords = graph.taskStore.records(EntityNames.AREA)
-            .filter { it.deletedAt == null }
-            .mapNotNull { record ->
-                record.fields[RegistryEntityFields.Area.TITLE].stringValue()?.let { title ->
-                    val position = record.fields[RegistryEntityFields.Area.POSITION].numberValue()
-                    Triple(
-                        position,
-                        title.lowercase(),
-                        TaskHomeNavigationItem(
-                            location = TaskHomeLocation.Area(record.id, title),
-                            title = title,
-                            emoji = record.fields[RegistryEntityFields.Area.EMOJI].stringValue()?.takeIf(String::isNotBlank),
-                        ),
-                    )
+        val areaRecords = StructureOrder.orderByPosition(
+            items = graph.taskStore.records(EntityNames.AREA)
+                .filter { it.deletedAt == null }
+                .mapNotNull { record ->
+                    record.fields[RegistryEntityFields.Area.TITLE].stringValue()?.let { title ->
+                        val position = record.fields[RegistryEntityFields.Area.POSITION].numberValue()
+                        Triple(
+                            position,
+                            title,
+                            TaskHomeNavigationItem(
+                                location = TaskHomeLocation.Area(record.id, title),
+                                title = title,
+                                emoji = record.fields[RegistryEntityFields.Area.EMOJI].stringValue()?.takeIf(String::isNotBlank),
+                            ),
+                        )
+                    }
+                },
+            position = { it.first },
+            label = { it.second },
+        ).map { it.third }
+        val projectRecords = StructureOrder.orderByPosition(
+            items = graph.taskStore.records(EntityNames.PROJECT)
+                .filter { it.deletedAt == null }
+                .filter {
+                    val status = it.fields[RegistryEntityFields.Project.STATUS].stringValue()
+                    status == null || status == RegistryEntityEnums.ProjectStatus.ACTIVE
                 }
-            }
-            .sortedWith(compareBy<Triple<Double?, String, TaskHomeNavigationItem>>({ it.first ?: Double.MAX_VALUE }, { it.second }))
-            .map { it.third }
-        val projectRecords = graph.taskStore.records(EntityNames.PROJECT)
-            .filter { it.deletedAt == null }
-            .filter {
-                val status = it.fields[RegistryEntityFields.Project.STATUS].stringValue()
-                status == null || status == RegistryEntityEnums.ProjectStatus.ACTIVE
-            }
-            .mapNotNull { record ->
-                record.fields[RegistryEntityFields.Project.TITLE].stringValue()?.let { title ->
-                    val position = record.fields[RegistryEntityFields.Project.POSITION].numberValue()
-                    val parentAreaId = record.fields[RegistryEntityFields.Project.AREA].stringValue()
-                        ?.takeIf(String::isNotBlank)
-                    Triple(
-                        position,
-                        title.lowercase(),
-                        TaskHomeNavigationItem(
-                            location = TaskHomeLocation.Project(record.id, title),
-                            title = title,
-                            parentAreaId = parentAreaId,
-                            share = ProjectShare.of(record),
-                        ),
-                    )
-                }
-            }
-            .sortedWith(compareBy<Triple<Double?, String, TaskHomeNavigationItem>>({ it.first ?: Double.MAX_VALUE }, { it.second }))
-            .map { it.third }
+                .mapNotNull { record ->
+                    record.fields[RegistryEntityFields.Project.TITLE].stringValue()?.let { title ->
+                        val position = record.fields[RegistryEntityFields.Project.POSITION].numberValue()
+                        val parentAreaId = record.fields[RegistryEntityFields.Project.AREA].stringValue()
+                            ?.takeIf(String::isNotBlank)
+                        Triple(
+                            position,
+                            title,
+                            TaskHomeNavigationItem(
+                                location = TaskHomeLocation.Project(record.id, title),
+                                title = title,
+                                parentAreaId = parentAreaId,
+                                share = ProjectShare.of(record),
+                            ),
+                        )
+                    }
+                },
+            position = { it.first },
+            label = { it.second },
+        ).map { it.third }
 
         val agentsPaused = graph.syncedSettings.value(RegistrySettingKeys.AGENTS_PAUSED).booleanValue() ?: false
 
@@ -1445,13 +1451,13 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             destinationId != RegistryDestinationIds.RECENTLY_DELETED
         val groupByList = (destinationId == RegistryDestinationIds.TODAY &&
             graph.deviceSettings.bool(RegistrySettingKeys.TODAY_GROUP_BY_LIST)) ||
-            destinationId == RegistryDestinationIds.ANYTIME
+            destinationId == RegistryDestinationIds.ANYTIME ||
+            destinationId == RegistryDestinationIds.STARRED
         val orderedTasks = if (groupByList) {
             groupByAreaAndProject(
                 tasks = visible,
                 areas = areaRecords,
                 projects = projectRecords,
-                destinationId = destinationId,
             )
         } else {
             val items = visible.sortedTaskItems(destinationId)
@@ -1593,25 +1599,29 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         tasks: List<PositionedTask>,
         areas: List<TaskHomeNavigationItem>,
         projects: List<TaskHomeNavigationItem>,
-        destinationId: String?,
     ): List<TaskListItem> {
         val sorted = tasks.sortedWith(
             compareBy<PositionedTask>({ it.position ?: Double.MAX_VALUE }, { it.item.title.lowercase() }),
         )
-        val byProject = sorted.filter { it.projectId != null }.groupBy { it.projectId!! }
-        val byArea = sorted.filter { it.projectId == null && it.areaId != null }.groupBy { it.areaId!! }
+        val areaIds = areas.mapNotNull { (it.location as? TaskHomeLocation.Area)?.id }.toSet()
+        val projectIds = projects.mapNotNull { (it.location as? TaskHomeLocation.Project)?.id }.toSet()
+        fun knownProjectId(entry: PositionedTask): String? = entry.projectId?.takeIf { it in projectIds }
+        fun knownAreaId(entry: PositionedTask): String? = entry.areaId?.takeIf { it in areaIds }
+
+        val byProject = sorted.mapNotNull { entry -> knownProjectId(entry)?.let { it to entry } }
+            .groupBy({ it.first }, { it.second })
+        val byArea = sorted.mapNotNull { entry ->
+            if (knownProjectId(entry) == null) knownAreaId(entry)?.let { it to entry } else null
+        }.groupBy({ it.first }, { it.second })
         val emitted = mutableSetOf<String>()
         val result = mutableListOf<TaskListItem>()
 
-        // Unfiled tasks (headerless) on Anytime; on Today loose tasks live in the Inbox band above.
-        if (destinationId != RegistryDestinationIds.TODAY) {
-            sorted.filter { it.projectId == null && it.areaId == null }.forEach { entry ->
-                emitted += entry.item.id
-                result += entry.item.copy(group = null, groupTitle = null)
-            }
+        // Unfiled tasks (headerless) come first, matching Apple `TaskListOrder.byList` and Web `groupTasksByList`.
+        // On Today, pure Inbox tasks already live in `inboxTasks`; any remaining unfiled committed task stays above groups.
+        sorted.filter { knownProjectId(it) == null && knownAreaId(it) == null }.forEach { entry ->
+            emitted += entry.item.id
+            result += entry.item.copy(group = null, groupTitle = null)
         }
-
-        val areaIds = areas.mapNotNull { (it.location as? TaskHomeLocation.Area)?.id }.toSet()
         for (areaItem in areas) {
             val area = areaItem.location as? TaskHomeLocation.Area ?: continue
             val areaHeader = TaskGroupHeader(
