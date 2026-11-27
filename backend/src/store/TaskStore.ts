@@ -941,8 +941,9 @@ export class TaskStore extends DurableObject<Env> {
 
     const spec: EntitySpec = ENTITIES[op.entity];
     const row = this.sql.exec(`SELECT * FROM ${spec.table} WHERE id = ?`, op.id).toArray()[0];
-    // Timing and a person's explicit completion can race across devices.
-    if (op.op === "upsert" && op.entity === "task" && op.fields.status === "repeatExpired" && row?.status !== "open") {
+    // A stale offline expiry cannot overwrite a completion or a newer policy.
+    if (op.op === "upsert" && op.entity === "task" && op.fields.status === "repeatExpired" &&
+        (row?.status !== "open" || row.recurrenceMissed !== "startFresh" || row.recurrencePaused === 1)) {
       return { clientOpId: op.clientOpId, status: "noop" };
     }
 
