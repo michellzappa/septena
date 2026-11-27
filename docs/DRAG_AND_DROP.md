@@ -71,8 +71,9 @@ reorder path, which never writes 0.
 A task dropped on a section header files into that section
 (`handleTaskDropOnHeading`): at the top of its tasks in Manual
 (`positionAbove`, a port of `TaskOrder.between`), with no `position` in a
-sorted project. Row reorder, section reorder and filing each record one entry
-on the web `UndoStack` at the drop.
+sorted project. A task dropped on a row in another section joins that section
+at the row's slot, or files only in a sorted project. Row reorder, section
+reorder and filing each record one entry on the web `UndoStack` at the drop.
 
 ---
 

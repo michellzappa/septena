@@ -2219,6 +2219,27 @@ export function SeptenaApp() {
     };
   }, [areaById, destination, lang, logbookTab, projectById]);
 
+  // A new task on the shared undo stack (Apple TaskUndo.recordCreate): undo deletes it for good,
+  // the same two steps as Delete Permanently (delete, then purge the local tombstone), so it
+  // leaves no Recently Deleted entry. Redo creates it again, with a new id, as on Apple.
+  const createTaskWithUndo = async (input: Parameters<WebSyncEngine["createTask"]>[0]) => {
+    const created = await engine.createTask(input);
+    let currentId = created.id;
+    undoStack.record({
+      label: `${registryText(ACTIONS_CATALOG.actions["app.newTask"].title, lang)} “${created.title}”`,
+      undo: async () => {
+        const live = engine.getState().snapshot.tasks.find((t) => t.id === currentId);
+        if (!live) return;
+        if (!live.deletedAt) await engine.deleteTask(live);
+        const tomb = engine.getState().snapshot.tasks.find((t) => t.id === currentId);
+        if (tomb) await engine.purgeDeletedTasks([tomb]);
+      },
+      redo: async () => {
+        currentId = (await engine.createTask(input)).id;
+      },
+    });
+  };
+
   // Apple startCreateUnderHeading: the new task joins the section at the bottom of the project.
   const submitSectionComposer = async (e: React.FormEvent, heading: TaskRow) => {
     e.preventDefault();
@@ -2230,7 +2251,7 @@ export function SeptenaApp() {
       const p = t.position;
       return typeof p === "number" && Number.isFinite(p) && (max === null || p > max) ? p : max;
     }, null);
-    await engine.createTask({
+    await createTaskWithUndo({
       title,
       project: heading.project,
       area: projectById.get(heading.project)?.area ?? null,
@@ -2296,7 +2317,7 @@ export function SeptenaApp() {
       const proj = projectById.get(destination.id);
       if (proj?.area) opts.area = proj.area;
     }
-    await engine.createTask(opts);
+    await createTaskWithUndo(opts);
   };
 
   const activeAreaId = useMemo(() => {
