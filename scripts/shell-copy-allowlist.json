@@ -623,11 +623,6 @@
       "reasonId": "predates-rule"
     },
     {
-      "file": "Septask/SeptaskSignIn.swift",
-      "literal": "Your tasks sync through Septena's own server at api.septena.app. Sign in with Apple once on each device.",
-      "reasonId": "predates-rule"
-    },
-    {
       "file": "Septask/SeptaskWatchSettings.swift",
       "literal": "Never",
       "reasonId": "predates-rule"

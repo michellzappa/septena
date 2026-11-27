@@ -1830,7 +1830,6 @@
   "Get a sign-in code": {
     "text": "Get a sign-in code",
     "paths": [
-      "surfaces.firstRun.steps.accountDevice.primary.title",
       "surfaces.deviceSignIn.copy.start.label"
     ]
   },
@@ -4038,6 +4037,8 @@
     "text": "Sign in",
     "paths": [
       "settings.copy.syncStatus.needsSignIn.label",
+      "surfaces.firstRun.steps.account.primary.title",
+      "surfaces.firstRun.steps.accountDevice.primary.title",
       "signIn.email.signIn"
     ]
   },
@@ -4081,23 +4082,18 @@
       "settings.copy.claude_connector.signInHeader.label"
     ]
   },
+  "Sign in to keep your tasks in sync on all your devices and let your agents connect. Your first sign-in creates your account.": {
+    "text": "Sign in to keep your tasks in sync on all your devices and let your agents connect. Your first sign-in creates your account.",
+    "paths": [
+      "surfaces.firstRun.steps.account.body",
+      "surfaces.firstRun.steps.accountDevice.body"
+    ]
+  },
   "Sign in to sync": {
     "text": "Sign in to sync",
     "paths": [
       "surfaces.firstRun.steps.account.title",
       "surfaces.firstRun.steps.accountDevice.title"
-    ]
-  },
-  "Sign in with Apple": {
-    "text": "Sign in with Apple",
-    "paths": [
-      "surfaces.firstRun.steps.account.primary.title"
-    ]
-  },
-  "Sign in with Apple to keep your tasks on all your devices and to let Claude connect. Septena never sees your Apple password.": {
-    "text": "Sign in with Apple to keep your tasks on all your devices and to let Claude connect. Septena never sees your Apple password.",
-    "paths": [
-      "surfaces.firstRun.steps.account.body"
     ]
   },
   "Sign in with {email}, then add {provider} in Settings.": {
@@ -4905,12 +4901,6 @@
     "text": "Use a device where Septena is already signed in.",
     "paths": [
       "surfaces.deviceSignIn.copy.intro.label"
-    ]
-  },
-  "Use a device where Septena is already signed in. It approves this one with a code, and your tasks sync here.": {
-    "text": "Use a device where Septena is already signed in. It approves this one with a code, and your tasks sync here.",
-    "paths": [
-      "surfaces.firstRun.steps.accountDevice.body"
     ]
   },
   "Use a different email": {

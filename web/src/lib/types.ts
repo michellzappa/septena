@@ -104,6 +104,8 @@ export const zAccessSummary = z.object({
     z.object({
       sid: z.string(),
       client: z.string().nullable().optional(),
+      firstSeen: z.number().optional(),
+      lastSeen: z.number().optional(),
       createdAt: z.number().optional(),
       lastUsedAt: z.number().optional(),
       current: z.boolean().optional(),
@@ -116,7 +118,9 @@ export const zAccessSummary = z.object({
       clientId: z.string().optional(),
       name: z.string().nullable().optional(),
       clientName: z.string().optional(),
+      scope: z.string().optional(),
       createdAt: z.number().optional(),
+      lastUsed: z.number().nullable().optional(),
       lastUsedAt: z.number().nullable().optional(),
       active: z.boolean().optional(),
     }),

@@ -17494,7 +17494,7 @@
       }
     },
     "Get a sign-in code" : {
-      "comment" : "Generated from registry surfaces.firstRun.steps.accountDevice.primary.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry surfaces.deviceSignIn.copy.start.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
@@ -35537,6 +35537,10 @@
     },
     "Sign in to connect an agent" : {
       "comment" : "Generated from registry settings.copy.claude_connector.signInHeader.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Sign in to keep your tasks in sync on all your devices and let your agents connect. Your first sign-in creates your account." : {
+      "comment" : "Generated from registry surfaces.firstRun.steps.account.body. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
     "Sign in to Septena" : {
