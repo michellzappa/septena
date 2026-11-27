@@ -65,6 +65,7 @@ internal fun TaskAttachmentsSection(
     heading: String?,
     canEdit: Boolean,
     control: (String) -> String,
+    embedded: Boolean = false,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -137,52 +138,52 @@ internal fun TaskAttachmentsSection(
     val mutedInk = MaterialTheme.colorScheme.onSurfaceVariant
 
     Column(modifier = Modifier.fillMaxWidth()) {
-        heading?.let {
-            Text(
-                text = it,
-                fontSize = 18.sp,
-                lineHeight = 22.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(
-                    start = TaskCardMetrics.HeaderLeading,
-                    end = TaskCardMetrics.Margin,
-                    top = 14.dp,
-                    bottom = 6.dp,
-                ),
-            )
+        if (!embedded) {
+            heading?.let {
+                Text(
+                    text = it,
+                    fontSize = 18.sp,
+                    lineHeight = 22.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(
+                        start = TaskCardMetrics.HeaderLeading,
+                        end = TaskCardMetrics.Margin,
+                        top = 14.dp,
+                        bottom = 6.dp,
+                    ),
+                )
+            }
         }
         rows.forEachIndexed { index, record ->
             val name = graph.attachments.filename(record)
             val removeLabel = control(RegistryTaskDetail.Controls.ATTACHMENT_REMOVE).replace("{name}", name)
-            TaskCardSlice(
-                position = cardPosition(index, totalSlices),
-                isSelected = false,
-                isDark = isDark,
-                hasActiveTexture = hasActiveTexture,
-            ) {
+            val rowContent: @Composable () -> Unit = {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable(enabled = !busy) { open(record) }
-                        .padding(horizontal = TaskCardMetrics.ContentInset, vertical = 10.dp),
+                        .padding(
+                            horizontal = if (embedded) 0.dp else TaskCardMetrics.ContentInset,
+                            vertical = if (embedded) 6.dp else 10.dp,
+                        ),
                 ) {
                     Box(
                         contentAlignment = Alignment.Center,
-                        modifier = Modifier.width(TaskCardMetrics.LeadingColumnWidth),
+                        modifier = Modifier.width(if (embedded) 20.dp else TaskCardMetrics.LeadingColumnWidth),
                     ) {
-                        AttachmentSmallGlyph(tint = mutedInk, size = 15.dp)
+                        AttachmentSmallGlyph(tint = mutedInk, size = 14.dp)
                     }
-                    Spacer(modifier = Modifier.width(TaskCardMetrics.IconTextGap))
+                    Spacer(modifier = Modifier.width(if (embedded) 8.dp else TaskCardMetrics.IconTextGap))
                     Column(
                         verticalArrangement = Arrangement.spacedBy(1.dp),
                         modifier = Modifier.weight(1f),
                     ) {
                         Text(
                             text = name,
-                            fontSize = 15.sp,
-                            lineHeight = 20.sp,
+                            fontSize = if (embedded) 14.sp else 15.sp,
+                            lineHeight = if (embedded) 18.sp else 20.sp,
                             color = MaterialTheme.colorScheme.onSurface,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -200,52 +201,75 @@ internal fun TaskAttachmentsSection(
                             onClick = { remove(record) },
                             enabled = !busy,
                             modifier = Modifier
-                                .size(32.dp)
+                                .size(30.dp)
                                 .semantics { contentDescription = removeLabel },
                         ) {
-                            CloseSmallGlyph(tint = mutedInk.copy(alpha = 0.75f), size = 13.dp)
+                            CloseSmallGlyph(tint = mutedInk.copy(alpha = 0.75f), size = 12.dp)
                         }
                     }
                 }
             }
+            if (embedded) {
+                rowContent()
+            } else {
+                TaskCardSlice(
+                    position = cardPosition(index, totalSlices),
+                    isSelected = false,
+                    isDark = isDark,
+                    hasActiveTexture = hasActiveTexture,
+                    content = rowContent,
+                )
+            }
         }
-        TaskCardSlice(
-            position = cardPosition(rows.size, totalSlices),
-            isSelected = false,
-            isDark = isDark,
-            hasActiveTexture = hasActiveTexture,
-        ) {
+        val addRowContent: @Composable () -> Unit = {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable(enabled = canEdit && !busy) { picker.launch(arrayOf(ANY_TYPE)) }
-                    .padding(horizontal = TaskCardMetrics.ContentInset, vertical = 12.dp),
+                    .padding(
+                        horizontal = if (embedded) 0.dp else TaskCardMetrics.ContentInset,
+                        vertical = if (embedded) 6.dp else 12.dp,
+                    ),
             ) {
                 Box(
                     contentAlignment = Alignment.Center,
-                    modifier = Modifier.width(TaskCardMetrics.LeadingColumnWidth),
+                    modifier = Modifier.width(if (embedded) 20.dp else TaskCardMetrics.LeadingColumnWidth),
                 ) {
-                    PlusSmallGlyph(tint = MaterialTheme.colorScheme.primary, size = 15.dp)
+                    PlusSmallGlyph(tint = MaterialTheme.colorScheme.primary, size = 14.dp)
                 }
-                Spacer(modifier = Modifier.width(TaskCardMetrics.IconTextGap))
+                Spacer(modifier = Modifier.width(if (embedded) 8.dp else TaskCardMetrics.IconTextGap))
                 Text(
                     text = control(
                         if (rows.isEmpty()) RegistryTaskDetail.Controls.ATTACHMENT_CHOOSE
                         else RegistryTaskDetail.Controls.ATTACHMENT_ADD_ANOTHER,
                     ),
-                    fontSize = 15.sp,
-                    lineHeight = 20.sp,
+                    fontSize = if (embedded) 14.sp else 15.sp,
+                    lineHeight = if (embedded) 18.sp else 20.sp,
                     color = MaterialTheme.colorScheme.primary,
                 )
             }
+        }
+        if (embedded) {
+            addRowContent()
+        } else {
+            TaskCardSlice(
+                position = cardPosition(rows.size, totalSlices),
+                isSelected = false,
+                isDark = isDark,
+                hasActiveTexture = hasActiveTexture,
+                content = addRowContent,
+            )
         }
         error?.let {
             Text(
                 text = it,
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(horizontal = TaskCardMetrics.HeaderLeading, vertical = 4.dp),
+                modifier = Modifier.padding(
+                    horizontal = if (embedded) 0.dp else TaskCardMetrics.HeaderLeading,
+                    vertical = 4.dp,
+                ),
             )
         }
     }

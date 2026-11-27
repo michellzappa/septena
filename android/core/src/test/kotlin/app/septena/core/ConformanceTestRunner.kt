@@ -14,6 +14,7 @@ object ConformanceTestRunner {
             taskFadeVectors()
             taskViewVectors()
             conversationVectors()
+            taskPageBlocksVectors()
         }
         ReviewGroupTest().run {
             registryOrder()

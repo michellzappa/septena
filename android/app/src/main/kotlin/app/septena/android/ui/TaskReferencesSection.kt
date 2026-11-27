@@ -86,6 +86,7 @@ internal fun TaskReferencesSection(
     showAddDialog: Boolean,
     onShowAddDialogChange: (Boolean) -> Unit,
     onOpenTask: (String) -> Unit,
+    embedded: Boolean = false,
 ) {
     val languageTag = LocalConfiguration.current.locales[0].toLanguageTag()
     val context = LocalContext.current
@@ -158,13 +159,14 @@ internal fun TaskReferencesSection(
         )
     }
 
-    if (refs.isEmpty() && others.isEmpty() && !canEdit) return
-
     val accent = MaterialTheme.colorScheme.primary
     val mutedInk = MaterialTheme.colorScheme.onSurfaceVariant
     val canAddMore = canEdit && refs.size < RegistryEntityLimits.MAX_REFS_PER_TASK.toInt()
     val shownSuggestions = if (canAddMore) suggestions.filter { offer -> refs.none { it.key == offer.key } } else emptyList()
-    val totalSlices = refs.size + shownSuggestions.size + others.size + if (canAddMore) 1 else 0
+    if (embedded && refs.isEmpty() && shownSuggestions.isEmpty() && others.isEmpty()) return
+    if (!embedded && refs.isEmpty() && others.isEmpty() && !canEdit) return
+    val showAddRow = !embedded && canAddMore
+    val totalSlices = refs.size + shownSuggestions.size + others.size + if (showAddRow) 1 else 0
 
     fun takeSuggestion(offer: TaskRefOffer) {
         scope.launch {
@@ -178,14 +180,16 @@ internal fun TaskReferencesSection(
         }
     }
 
-    heading?.let {
-        Text(
-            text = it,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = mutedInk,
-            modifier = Modifier.padding(start = TaskCardMetrics.HeaderLeading, top = 12.dp, bottom = 6.dp),
-        )
+    if (!embedded) {
+        heading?.let {
+            Text(
+                text = it,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = mutedInk,
+                modifier = Modifier.padding(start = TaskCardMetrics.HeaderLeading, top = 12.dp, bottom = 6.dp),
+            )
+        }
     }
 
     refs.forEachIndexed { index, ref ->
@@ -226,12 +230,7 @@ internal fun TaskReferencesSection(
             }
         }
 
-        TaskCardSlice(
-            position = cardPosition(index, totalSlices),
-            isSelected = false,
-            isDark = isDark,
-            hasActiveTexture = hasActiveTexture,
-        ) {
+        val refContent: @Composable () -> Unit = {
             Box(modifier = Modifier.fillMaxWidth()) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -241,27 +240,30 @@ internal fun TaskReferencesSection(
                             onClick = ::openTarget,
                             onLongClick = { menuOpen = true },
                         )
-                        .padding(horizontal = TaskCardMetrics.ContentInset, vertical = 11.dp),
+                        .padding(
+                            horizontal = if (embedded) 0.dp else TaskCardMetrics.ContentInset,
+                            vertical = if (embedded) 6.dp else 11.dp,
+                        ),
                 ) {
                     Box(
                         contentAlignment = Alignment.Center,
-                        modifier = Modifier.width(TaskCardMetrics.LeadingColumnWidth),
+                        modifier = Modifier.width(if (embedded) 20.dp else TaskCardMetrics.LeadingColumnWidth),
                     ) {
                         Text(
                             text = kindGlyph(ref.kind),
-                            fontSize = 15.sp,
+                            fontSize = if (embedded) 14.sp else 15.sp,
                             color = if (target != null) accent else mutedInk,
                         )
                     }
-                    Spacer(modifier = Modifier.width(TaskCardMetrics.IconTextGap))
+                    Spacer(modifier = Modifier.width(if (embedded) 8.dp else TaskCardMetrics.IconTextGap))
                     Column(
                         modifier = Modifier.weight(1f),
                         verticalArrangement = Arrangement.spacedBy(2.dp),
                     ) {
                         Text(
                             text = title,
-                            fontSize = 15.sp,
-                            lineHeight = 20.sp,
+                            fontSize = if (embedded) 14.sp else 15.sp,
+                            lineHeight = if (embedded) 18.sp else 20.sp,
                             color = MaterialTheme.colorScheme.onSurface,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
@@ -269,8 +271,8 @@ internal fun TaskReferencesSection(
                         if (subtitle != null) {
                             Text(
                                 text = subtitle,
-                                fontSize = 12.5.sp,
-                                lineHeight = 16.sp,
+                                fontSize = 12.sp,
+                                lineHeight = 15.sp,
                                 color = mutedInk,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
@@ -317,76 +319,105 @@ internal fun TaskReferencesSection(
                 }
             }
         }
+        if (embedded) {
+            refContent()
+        } else {
+            TaskCardSlice(
+                position = cardPosition(index, totalSlices),
+                isSelected = false,
+                isDark = isDark,
+                hasActiveTexture = hasActiveTexture,
+                content = refContent,
+            )
+        }
     }
 
     shownSuggestions.forEachIndexed { index, offer ->
         val label = suggestionFormat.replace("{name}", offer.title)
-        TaskCardSlice(
-            position = cardPosition(refs.size + index, totalSlices),
-            isSelected = false,
-            isDark = isDark,
-            hasActiveTexture = hasActiveTexture,
-        ) {
+        val suggestionContent: @Composable () -> Unit = {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .fillMaxWidth()
                     .combinedClickable(onClickLabel = label, onClick = { takeSuggestion(offer) })
-                    .padding(horizontal = TaskCardMetrics.ContentInset, vertical = 12.dp),
+                    .padding(
+                        horizontal = if (embedded) 0.dp else TaskCardMetrics.ContentInset,
+                        vertical = if (embedded) 6.dp else 12.dp,
+                    ),
             ) {
                 Box(
                     contentAlignment = Alignment.Center,
-                    modifier = Modifier.width(TaskCardMetrics.LeadingColumnWidth),
+                    modifier = Modifier.width(if (embedded) 20.dp else TaskCardMetrics.LeadingColumnWidth),
                 ) {
                     PlusSmallGlyph(tint = mutedInk.copy(alpha = 0.7f), size = 13.dp)
                 }
-                Spacer(modifier = Modifier.width(TaskCardMetrics.IconTextGap))
+                Spacer(modifier = Modifier.width(if (embedded) 8.dp else TaskCardMetrics.IconTextGap))
                 Text(
                     text = offer.title,
-                    fontSize = 14.sp,
-                    lineHeight = 20.sp,
+                    fontSize = 13.5.sp,
+                    lineHeight = 18.sp,
                     color = mutedInk,
                     maxLines = 1,
                     overflow = TextOverflow.MiddleEllipsis,
                 )
             }
         }
+        if (embedded) {
+            suggestionContent()
+        } else {
+            TaskCardSlice(
+                position = cardPosition(refs.size + index, totalSlices),
+                isSelected = false,
+                isDark = isDark,
+                hasActiveTexture = hasActiveTexture,
+                content = suggestionContent,
+            )
+        }
     }
 
     others.forEachIndexed { index, other ->
-        TaskCardSlice(
-            position = cardPosition(refs.size + shownSuggestions.size + index, totalSlices),
-            isSelected = false,
-            isDark = isDark,
-            hasActiveTexture = hasActiveTexture,
-        ) {
+        val otherContent: @Composable () -> Unit = {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .fillMaxWidth()
                     .combinedClickable(onClick = { onOpenTask(other.id) })
-                    .padding(horizontal = TaskCardMetrics.ContentInset, vertical = 12.dp),
+                    .padding(
+                        horizontal = if (embedded) 0.dp else TaskCardMetrics.ContentInset,
+                        vertical = if (embedded) 6.dp else 12.dp,
+                    ),
             ) {
                 Box(
                     contentAlignment = Alignment.Center,
-                    modifier = Modifier.width(TaskCardMetrics.LeadingColumnWidth),
+                    modifier = Modifier.width(if (embedded) 20.dp else TaskCardMetrics.LeadingColumnWidth),
                 ) {
                     Text(text = kindGlyph("task"), fontSize = 14.sp, color = mutedInk)
                 }
-                Spacer(modifier = Modifier.width(TaskCardMetrics.IconTextGap))
+                Spacer(modifier = Modifier.width(if (embedded) 8.dp else TaskCardMetrics.IconTextGap))
                 Text(
                     text = alsoInFormat.replace("{name}", other.title),
-                    fontSize = 14.sp,
-                    lineHeight = 20.sp,
+                    fontSize = 13.5.sp,
+                    lineHeight = 18.sp,
                     color = mutedInk,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
         }
+        if (embedded) {
+            otherContent()
+        } else {
+            TaskCardSlice(
+                position = cardPosition(refs.size + shownSuggestions.size + index, totalSlices),
+                isSelected = false,
+                isDark = isDark,
+                hasActiveTexture = hasActiveTexture,
+                content = otherContent,
+            )
+        }
     }
 
-    if (canAddMore) {
+    if (showAddRow) {
         TaskCardSlice(
             position = cardPosition(refs.size + shownSuggestions.size + others.size, totalSlices),
             isSelected = false,

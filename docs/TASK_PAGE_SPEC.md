@@ -47,7 +47,7 @@ The registry holds no geometry, spacing, focus or motion.
 | iPad | expand in row | trailing inspector pane | popover or sheet |
 | Mac (Septena window) | AppKit inline composer | native split-view inspector, ⌥⌘I | popover |
 | Mac (classic window) | expand in row | docked SwiftUI inspector | popover |
-| Android | (none yet) | pushed `TaskDetailScreen` | dialog or bottom sheet |
+| Android | expand in row | pushed `TaskDetailScreen` | dialog or bottom sheet |
 | Watch | none | `TaskDetailView`: the blocks the watch capability allows | none |
 
 Rules:
