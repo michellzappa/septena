@@ -1190,7 +1190,6 @@
       "sections": [
         {
           "id": "diagnostics",
-          "header": "Diagnostics",
           "items": [
             { "kind": "customSurface", "surface": "sync_diagnostics", "label": "Sync & storage diagnostics", "detail": "Changes the server refused appear here, newest first. The server kept its own version of each.", "icon": "settings.diagnostics", "featureId": "sync.backend" }
           ]

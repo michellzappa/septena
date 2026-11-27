@@ -1396,12 +1396,6 @@
       "plans.outcomes.everywhere.rows.devices.label"
     ]
   },
-  "Diagnostics": {
-    "text": "Diagnostics",
-    "paths": [
-      "settings.pages.advanced.sections.diagnostics.header"
-    ]
-  },
   "Disconnect": {
     "text": "Disconnect",
     "paths": [

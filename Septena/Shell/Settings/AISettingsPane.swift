@@ -6,11 +6,12 @@ import UIKit
 // Consumer AI Preferences (`ai_preferences`, docs/SETTINGS_UX_SPEC.md):
 // Apple Intelligence availability, the global reach dial (`AIMode`), and the
 // plain-language explainer. Beta/developer controls (`showModelLabels`, PCC
-// entitlement routing) and raw `MCP Skills` live in `About ▸ Advanced`.
+// entitlement routing) live in `About ▸ Advanced`; `MCP Skills` lives in
+// `AI & Agents ▸ Connect an Agent`.
 //
-// `SeptaskAIPreferencesSections` renders as Form sections so macOS can inline
-// them directly inside `AI & Agents` (`desktopInline: true`), while iOS pushes
-// `SeptaskAIPreferencesPane` (1 tap from the root AI & Agents section).
+// `SeptaskAIPreferencesSections` renders as Form sections inside
+// `SeptaskAIPreferencesPane`, the On-Device AI page that every platform
+// pushes from AI & Agents (registry/settings.json `ai_preferences`).
 struct SeptaskAIPreferencesSections: View {
   @AppStorage(AIPolicy.modeKey) private var mode: AIMode = .auto
   @State private var showExplainer = false
