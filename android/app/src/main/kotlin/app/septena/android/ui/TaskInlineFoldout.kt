@@ -391,7 +391,6 @@ internal fun TaskInlineFoldout(
             }
         }
     }
-    val tomorrowLabel = RegistryCatalog.tomorrowLabel(languageTag)
     val chipDayFormat = remember(languageTag) {
         java.time.format.DateTimeFormatter.ofPattern("MMM d", java.util.Locale.forLanguageTag(languageTag))
     }
