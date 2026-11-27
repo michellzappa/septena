@@ -2132,22 +2132,26 @@ struct TaskListView: View {
     }
   }
 
+  /// Every part is type-erased. The header nests each `@ViewBuilder` branch
+  /// into one generic type, and once it grew past the iOS main-thread stack
+  /// the app crashed at launch in `swift_getTypeByMangledName` (build 3231,
+  /// `logbookSubViewBar`). AGENTS.md "A deep SwiftUI view type overflows the
+  /// iOS main-thread stack at launch". Keep new header parts behind `AnyView`.
   @ViewBuilder
   private var taskListHeader: some View {
-    titleRow
+    AnyView(titleRow)
     // "Sorted by …" under the title while the list is not in manual order.
-    // Type-erased like the rows: keeps the header's generic type shallow.
     if isSortedList {
       AnyView(ListSortIndicator(filter: filter)
         .plainListChrome()
         .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit))
     }
-    logbookSubViewBar
-    noticesRow
-    todayCalendarRow
-    remindersRow
-    if showsQuickAddAtTop { quickAddTopRow }
-    emptyStateRow
+    AnyView(logbookSubViewBar)
+    AnyView(noticesRow)
+    AnyView(todayCalendarRow)
+    AnyView(remindersRow)
+    if showsQuickAddAtTop { AnyView(quickAddTopRow) }
+    AnyView(emptyStateRow)
   }
 
   /// The Inbox — the unratified layer (agent proposals + loose captures) —
@@ -4731,141 +4735,157 @@ struct TaskListView: View {
   /// `.contextMenu` AND the batch action bar — `target` selects which.
   /// Folding both callers through here means new actions land in both
   /// surfaces at once.
-  @ViewBuilder
-  private func rowActionsMenu(target: ActionTarget) -> some View {
-    if showingRecentlyDeleted {
-      // Recently Deleted (registry `task.recentlyDeleted`): only Restore and
-      // Delete Permanently — no scheduling, no move, no normal task lifecycle
-      // actions apply to trashed rows.
-      RegistryMenuContent(nodes: RegistryMenuResolver.resolve(
-        RegistryActions.menu(.taskRecentlyDeleted)) { id in
-          switch id {
-          case .taskRestore:
-            return .init { restoreTasks(target.ids) }
-          case .taskDeletePermanently:
-            return .init { requestPurge(ids: target.ids) }
-          default: return nil
-          }
-        })
-    } else if !target.tasks.isEmpty && target.tasks.allSatisfy(\.isFaded) {
-      // Faded pile (registry `task.faded`, `docs/TASK_FADE_SPEC.md` §4): Keep
-      // restores to the task's original list with undo; Let Go cancels with
-      // dropReason = "faded".
-      RegistryMenuContent(nodes: RegistryMenuResolver.resolve(
-        RegistryActions.menu(.taskFaded)) { id in
-          switch id {
-          case .taskKeepFaded: return .init { keepFadedTasks(target.ids) }
-          case .taskLetGoFaded: return .init { dropFadedTasks(target.ids) }
-          case .taskDelete:
-            return .init(variant: target.count > 1 ? .plural : .base) {
-              Haptics.warning()
-              for id in target.ids { applyDelete(id) }
-            }
-          default: return nil
-          }
-        })
-    } else {
-      TaskListRowContextMenu(
-        target: target,
-        filter: filter,
-        rankedSuggestions: rankedSuggestions(for: target),
-        filingChip: {
-          guard case let .single(task) = target else { return nil }
-          return filingChipSuggestion(for: task)
-        }(),
-        onDo: { task in beginDo(task) },
-        onDuplicate: { target in duplicate(target.ids) },
-        onSelect: allowsTouchMultiSelect && !touchSelectionActive
-          ? { task in beginTouchSelection(task.id) } : nil,
-        onOpenDetail: { task in openPage(task) },
-        onApplySuggestion: applySuggestion,
-        onMoveToToday: { ids, today in
-          if today {
-            Haptics.commit()
-            noteInboxGesture(ids: ids)
-            promoteToToday(ids)
-            for id in ids { mutator.acknowledge(id: id) }
-            Task { await load() }
-          } else {
-            applyRemoveFromToday(ids)
-          }
-        },
-        onToggleStar: { ids, starred in
-          Haptics.commit()
-          recordingSchedule(starred
-                            ? RegistryActions.title(.taskToggleStar, .add)
-                            : RegistryActions.title(.taskToggleStar, .remove),
-                            ids) {
-            for id in ids { mutator.setStarred(id: id, starred: starred) }
-          }
-          Task { await load() }
-        },
-        onToggleComplete: { ids in
-          for id in ids {
-            if let task = currentTask(id: id) { toggle(task) }
-          }
-        },
-        onOpenWhen: { target in
-          whenSheet = WhenSheet(taskIds: target.ids, kind: .scheduled)
-        },
-        onOpenDeadline: { target in
-          whenSheet = WhenSheet(taskIds: target.ids, kind: .deadline)
-        },
-        onOpenReminder: { task in
-          reminderTargetId = task.id
-        },
-        onOpenTags: { target in
-          tagsTargetIds = target.ids
-        },
-        onAddReference: TaskRefActions.canAdd ? { task in referenceTargetId = task.id } : nil,
-        onClearSchedule: { ids in clearSchedule(ids) },
-        onOpenMove: { target in
-          moveTargetIds = target.ids
-          showingMoveSheet = true
-        },
-        onMoveTo: { target, areaId, projectId in
-          Haptics.commit()
-          applyMove(target.ids, areaId: areaId, projectId: projectId)
-        },
-        moveAreas: areas,
-        moveTopProjects: projects.filter { $0.area == nil && $0.status == .active },
-        sections: sectionMoveTargets,
-        onMoveToSection: { heading in fileIntoHeading(target.ids, heading: heading) },
-        onOpenRepeat: { task in
-          repeatTargetId = task.id
-          showingRepeatSheet = true
-        },
-        onSetRepeatPaused: { ids, paused in
-          Haptics.commit()
-          for id in ids { mutator.setRecurrencePaused(id: id, paused: paused) }
-          Task { await load() }
-        },
-        onCreateNextCopy: { task in
-          Haptics.commit()
-          _ = mutator.createNextOccurrence(id: task.id)
-          Task { await load() }
-        },
-        onCancel: { ids in
-          for id in ids { applyCancel(id) }
-        },
-        onDelete: { target in
-          Haptics.warning()
-          for id in target.ids { applyDelete(id) }
-        },
-        onShare: { target in TaskSharePresenter.present(target.tasks) },
-        onAcceptReview: { task in acceptReview(task) },
-        onSendBackReview: { task in
-          // Send back needs a note: open the page with its field ready.
-          AgentPromptRequests.shared.sendBackTaskID = task.id
-          openPage(task)
-        },
-        onWaitingOn: { task in waitingTargetId = task.id },
-        onGotItBack: { ids in
-          TaskWaitingActions.gotItBack(ids: ids)
-          Task { await load() }
-        }
-      )
+  // Each branch is its own function behind AnyView. Inlined into one body,
+  // the standard menu's closures gave this function a stack frame that
+  // overflowed the iOS main thread when a context menu opened (build 3198,
+  // "Thread stack size exceeded" in rowActionsMenu from reviewRows).
+  private func rowActionsMenu(target: ActionTarget) -> AnyView {
+    if showingRecentlyDeleted { return AnyView(recentlyDeletedRowMenu(target: target)) }
+    if !target.tasks.isEmpty && target.tasks.allSatisfy(\.isFaded) {
+      return AnyView(fadedRowMenu(target: target))
     }
+    return AnyView(standardRowMenu(target: target))
+  }
+
+  @inline(never) @ViewBuilder
+  private func recentlyDeletedRowMenu(target: ActionTarget) -> some View {
+    // Recently Deleted (registry `task.recentlyDeleted`): only Restore and
+    // Delete Permanently — no scheduling, no move, no normal task lifecycle
+    // actions apply to trashed rows.
+    RegistryMenuContent(nodes: RegistryMenuResolver.resolve(
+      RegistryActions.menu(.taskRecentlyDeleted)) { id in
+        switch id {
+        case .taskRestore:
+          return .init { restoreTasks(target.ids) }
+        case .taskDeletePermanently:
+          return .init { requestPurge(ids: target.ids) }
+        default: return nil
+        }
+      })
+  }
+
+  @inline(never) @ViewBuilder
+  private func fadedRowMenu(target: ActionTarget) -> some View {
+    // Faded pile (registry `task.faded`, `docs/TASK_FADE_SPEC.md` §4): Keep
+    // restores to the task's original list with undo; Let Go cancels with
+    // dropReason = "faded".
+    RegistryMenuContent(nodes: RegistryMenuResolver.resolve(
+      RegistryActions.menu(.taskFaded)) { id in
+        switch id {
+        case .taskKeepFaded: return .init { keepFadedTasks(target.ids) }
+        case .taskLetGoFaded: return .init { dropFadedTasks(target.ids) }
+        case .taskDelete:
+          return .init(variant: target.count > 1 ? .plural : .base) {
+            Haptics.warning()
+            for id in target.ids { applyDelete(id) }
+          }
+        default: return nil
+        }
+      })
+  }
+
+  @inline(never) @ViewBuilder
+  private func standardRowMenu(target: ActionTarget) -> some View {
+    TaskListRowContextMenu(
+      target: target,
+      filter: filter,
+      rankedSuggestions: rankedSuggestions(for: target),
+      filingChip: {
+        guard case let .single(task) = target else { return nil }
+        return filingChipSuggestion(for: task)
+      }(),
+      onDo: { task in beginDo(task) },
+      onDuplicate: { target in duplicate(target.ids) },
+      onSelect: allowsTouchMultiSelect && !touchSelectionActive
+        ? { task in beginTouchSelection(task.id) } : nil,
+      onOpenDetail: { task in openPage(task) },
+      onApplySuggestion: applySuggestion,
+      onMoveToToday: { ids, today in
+        if today {
+          Haptics.commit()
+          noteInboxGesture(ids: ids)
+          promoteToToday(ids)
+          for id in ids { mutator.acknowledge(id: id) }
+          Task { await load() }
+        } else {
+          applyRemoveFromToday(ids)
+        }
+      },
+      onToggleStar: { ids, starred in
+        Haptics.commit()
+        recordingSchedule(starred
+                          ? RegistryActions.title(.taskToggleStar, .add)
+                          : RegistryActions.title(.taskToggleStar, .remove),
+                          ids) {
+          for id in ids { mutator.setStarred(id: id, starred: starred) }
+        }
+        Task { await load() }
+      },
+      onToggleComplete: { ids in
+        for id in ids {
+          if let task = currentTask(id: id) { toggle(task) }
+        }
+      },
+      onOpenWhen: { target in
+        whenSheet = WhenSheet(taskIds: target.ids, kind: .scheduled)
+      },
+      onOpenDeadline: { target in
+        whenSheet = WhenSheet(taskIds: target.ids, kind: .deadline)
+      },
+      onOpenReminder: { task in
+        reminderTargetId = task.id
+      },
+      onOpenTags: { target in
+        tagsTargetIds = target.ids
+      },
+      onAddReference: TaskRefActions.canAdd ? { task in referenceTargetId = task.id } : nil,
+      onClearSchedule: { ids in clearSchedule(ids) },
+      onOpenMove: { target in
+        moveTargetIds = target.ids
+        showingMoveSheet = true
+      },
+      onMoveTo: { target, areaId, projectId in
+        Haptics.commit()
+        applyMove(target.ids, areaId: areaId, projectId: projectId)
+      },
+      moveAreas: areas,
+      moveTopProjects: projects.filter { $0.area == nil && $0.status == .active },
+      sections: sectionMoveTargets,
+      onMoveToSection: { heading in fileIntoHeading(target.ids, heading: heading) },
+      onOpenRepeat: { task in
+        repeatTargetId = task.id
+        showingRepeatSheet = true
+      },
+      onSetRepeatPaused: { ids, paused in
+        Haptics.commit()
+        for id in ids { mutator.setRecurrencePaused(id: id, paused: paused) }
+        Task { await load() }
+      },
+      onCreateNextCopy: { task in
+        Haptics.commit()
+        _ = mutator.createNextOccurrence(id: task.id)
+        Task { await load() }
+      },
+      onCancel: { ids in
+        for id in ids { applyCancel(id) }
+      },
+      onDelete: { target in
+        Haptics.warning()
+        for id in target.ids { applyDelete(id) }
+      },
+      onShare: { target in TaskSharePresenter.present(target.tasks) },
+      onAcceptReview: { task in acceptReview(task) },
+      onSendBackReview: { task in
+        // Send back needs a note: open the page with its field ready.
+        AgentPromptRequests.shared.sendBackTaskID = task.id
+        openPage(task)
+      },
+      onWaitingOn: { task in waitingTargetId = task.id },
+      onGotItBack: { ids in
+        TaskWaitingActions.gotItBack(ids: ids)
+        Task { await load() }
+      }
+    )
   }
 
   @ViewBuilder
