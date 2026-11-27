@@ -1001,6 +1001,9 @@ internal fun ListsHomeContent(
                     isDark = isDark,
                     hasActiveTexture = hasActiveTexture,
                     onClick = { onSelect(loc) },
+                    // Bottom smart lists always draw the title in secondary ink
+                    // (docs/DesignSpec.md, "Sidebar ink").
+                    titleColor = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
@@ -1623,6 +1626,7 @@ private fun CompactSidebarSmartRow(
     isDark: Boolean,
     hasActiveTexture: Boolean,
     onClick: () -> Unit,
+    titleColor: Color = MaterialTheme.colorScheme.onSurface,
 ) {
     TaskCardSlice(
         position = position,
@@ -1650,7 +1654,7 @@ private fun CompactSidebarSmartRow(
                 fontSize = 16.sp,
                 lineHeight = 20.sp,
                 fontWeight = FontWeight.Normal,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = titleColor,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
