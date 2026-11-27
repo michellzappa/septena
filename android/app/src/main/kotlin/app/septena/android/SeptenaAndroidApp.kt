@@ -348,8 +348,9 @@ class AndroidAppGraph(application: Application) {
     suspend fun completeTask(taskId: String): Boolean = completeTasks(listOf(taskId))
 
     /** Reopens a completed or cancelled task (e.g. unchecking during the completion settle window). */
-    suspend fun reopenTask(taskId: String): Boolean =
-        captureTaskEdit(taskId) { taskMutator.reopen(taskId) != null }
+    suspend fun reopenTask(taskId: String) {
+        captureTaskEdit(taskId) { taskMutator.reopen(taskId) }
+    }
 
     /** The task, with its fade clock, and its conversation around [write]; null when [write] did nothing. */
     private suspend fun captureTaskAndConvo(taskId: String, write: suspend () -> Boolean): TaskUndoHistory.Edit? {

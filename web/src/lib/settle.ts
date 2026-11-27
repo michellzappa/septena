@@ -4,7 +4,6 @@
 // then smoothly fades out of the open list.
 
 import { DESIGN_TOKENS } from "./generated/registries.ts";
-import type { ReviewGroupId } from "./destinations.ts";
 
 export const COMPLETION_MOTION = DESIGN_TOKENS.motion.completion;
 
@@ -12,7 +11,7 @@ export interface SettleEntry {
   /** Whether the row is in the final fade-out beat (`fadeOutMs`). */
   fadingOut: boolean;
   /** Review group held while settling in Review (so accepted rows don't jump). */
-  reviewGroup?: ReviewGroupId | null;
+  reviewGroup?: string | null;
 }
 
 export interface SettleSnapshot {
@@ -38,8 +37,8 @@ export class CompletionSettleController {
   private readonly fadeOutMs: number;
 
   constructor(
-    settleDelayMs = COMPLETION_MOTION.settleDelayMs,
-    fadeOutMs = COMPLETION_MOTION.fadeOutMs,
+    settleDelayMs: number = COMPLETION_MOTION.settleDelayMs,
+    fadeOutMs: number = COMPLETION_MOTION.fadeOutMs,
   ) {
     this.settleDelayMs = settleDelayMs;
     this.fadeOutMs = fadeOutMs;
@@ -62,11 +61,11 @@ export class CompletionSettleController {
     return this.entries.get(id)?.fadingOut === true;
   }
 
-  reviewGroupOf(id: string): ReviewGroupId | null | undefined {
+  reviewGroupOf(id: string): string | null | undefined {
     return this.entries.get(id)?.reviewGroup;
   }
 
-  start(id: string, opts?: { reviewGroup?: ReviewGroupId | null }): void {
+  start(id: string, opts?: { reviewGroup?: string | null }): void {
     this.clearTimers(id);
     this.entries.set(id, { fadingOut: false, reviewGroup: opts?.reviewGroup });
     const fadeTimer = setTimeout(() => {
