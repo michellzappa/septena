@@ -21,9 +21,9 @@ Android Custom Tabs, a top-level redirect on the web).
 | iPhone, iPad (App Store) | native | web | web | yes | yes | Apple, email, device |
 | Mac (App Store) | native | web | web | yes | yes | Apple, email, device |
 | Mac (Developer ID) | web | web | web | yes | yes | email, device |
-| Android | web | native (Credential Manager) | web | yes | yes | device only |
-| Web app | web | web | web | yes | yes | device only |
-| Claude connector authorize page | web | web | web | yes | yes (today's code) | device only |
+| Android | web | native (Credential Manager) | web | yes | yes | email, device |
+| Web app | web | web | web | yes | yes | email, device |
+| Claude connector authorize page | web | web | web | yes | yes (today's code) | email, device |
 | Windows | web | web | web | yes | yes | not built (#136) |
 | Apple Watch | through the phone | | | | | through the phone |
 | Website | no sign-in; links to the web app and downloads | | | | | |
@@ -87,7 +87,7 @@ Email limits: 3 codes per address per 10 minutes; 5 wrong codes lock the
 address until the window ends (a new code does not unlock it); 20 starts and
 30 failed verifies per IP per 10 minutes. Codes are stored hashed in
 `AccountStore` and spent on first use. The switch is `EMAIL_SIGNIN` in
-`backend/wrangler.toml`; it stays `"false"` until #564 ships, and the
+`backend/wrangler.toml`; it is `"true"` since 2026-11-27 (#564 shipped), and the
 `EMAIL` send binding uses Cloudflare Email Service on `septena.app`.
 
 ## 5. Clients
