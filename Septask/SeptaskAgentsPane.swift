@@ -141,8 +141,14 @@ struct SeptaskAgentsSections: View {
   private var agentsFullRow: some View {
     if let moment = agentsFullMoment {
       VStack(alignment: .leading, spacing: 6) {
-        Text(moment.title).font(.body.weight(.medium))
-        Text(moment.detail).font(.subheadline).foregroundStyle(.secondary)
+        HStack(alignment: .top, spacing: 12) {
+          PlanMark(tier: moment.plan == "pro" ? .pro : .plus, size: 30)
+          VStack(alignment: .leading, spacing: 2) {
+            Text(moment.title).font(.body.weight(.semibold))
+            Text(moment.detail).font(.subheadline).foregroundStyle(.secondary)
+          }
+          .fixedSize(horizontal: false, vertical: true)
+        }
         Button(moment.plan == "pro" ? RegistryPlans.Paywall.seePro : RegistryPlans.Paywall.seePlus) {
           plansMoment = moment.id
           showingPlans = true

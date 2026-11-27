@@ -60,6 +60,12 @@
       "surfaces.accountSwitch.copy.tasksOne.label"
     ]
   },
+  "10 GB of synced files": {
+    "text": "10 GB of synced files",
+    "paths": [
+      "plans.benefits.plus.files.title"
+    ]
+  },
   "10 GB synced": {
     "text": "10 GB synced",
     "paths": [
@@ -106,6 +112,12 @@
       "surfaces.taskDetail.ordinals.3.title"
     ]
   },
+  "50 GB of synced files": {
+    "text": "50 GB of synced files",
+    "paths": [
+      "plans.benefits.pro.files.title"
+    ]
+  },
   "50 GB synced": {
     "text": "50 GB synced",
     "paths": [
@@ -128,6 +140,12 @@
     "text": "A free account syncs one device. Plus syncs all of them. You can also move your free account to this device.",
     "paths": [
       "plans.upsells.second_device.detail"
+    ]
+  },
+  "A year of history": {
+    "text": "A year of history",
+    "paths": [
+      "plans.benefits.plus.history.title"
     ]
   },
   "ABCD-EFGH": {
@@ -541,6 +559,12 @@
       "actions.contextMenus.task.row.assign.title"
     ]
   },
+  "Attach a file once and it opens on every device.": {
+    "text": "Attach a file once and it opens on every device.",
+    "paths": [
+      "plans.benefits.plus.files.detail"
+    ]
+  },
   "Attachments": {
     "text": "Attachments",
     "paths": [
@@ -855,6 +879,12 @@
       "actions.actions.app.quickFind.desktopTitle"
     ]
   },
+  "Compare every plan": {
+    "text": "Compare every plan",
+    "paths": [
+      "plans.paywall.compareAll"
+    ]
+  },
   "Complete": {
     "text": "Complete",
     "paths": [
@@ -886,6 +916,12 @@
       "settings.pages.claude_pairing.title",
       "settings.pages.claude_pairing.sections.connector.header",
       "surfaces.firstRun.steps.connectClaude.title"
+    ]
+  },
+  "Connect Claude and two more. Each one asks before it acts.": {
+    "text": "Connect Claude and two more. Each one asks before it acts.",
+    "paths": [
+      "plans.benefits.plus.agents.detail"
     ]
   },
   "Connect Claude or another agent to your list. It asks before it acts, and you can stop it at any time.": {
@@ -1527,6 +1563,18 @@
       "surfaces.prompts.error.title"
     ]
   },
+  "Every device, a year of history and shared projects.": {
+    "text": "Every device, a year of history and shared projects.",
+    "paths": [
+      "plans.benefits.pro.everything.detail"
+    ]
+  },
+  "Every device, always current": {
+    "text": "Every device, always current",
+    "paths": [
+      "plans.benefits.plus.devices.title"
+    ]
+  },
   "Every list, from Today to the Logbook": {
     "text": "Every list, from Today to the Logbook",
     "paths": [
@@ -1555,6 +1603,12 @@
     "text": "Everything in Free is included.",
     "paths": [
       "plans.cards.plus.footnote"
+    ]
+  },
+  "Everything in Plus": {
+    "text": "Everything in Plus",
+    "paths": [
+      "plans.benefits.pro.everything.title"
     ]
   },
   "Everything in Plus is included.": {
@@ -2596,6 +2650,12 @@
       "plans.outcomes.agents.rows.connected.cells.pro"
     ]
   },
+  "No limit on agents": {
+    "text": "No limit on agents",
+    "paths": [
+      "plans.benefits.pro.agents.title"
+    ]
+  },
   "No matches": {
     "text": "No matches",
     "paths": [
@@ -3546,6 +3606,12 @@
       "tokens.textures.ridges.name"
     ]
   },
+  "Room for scans, screenshots and long documents.": {
+    "text": "Room for scans, screenshots and long documents.",
+    "paths": [
+      "plans.benefits.pro.files.detail"
+    ]
+  },
   "Rotate Calendar Feed Link?": {
     "text": "Rotate Calendar Feed Link?",
     "paths": [
@@ -3562,6 +3628,12 @@
     "text": "Rotating replaces your private feed link immediately. Existing calendar subscriptions will stop updating until you re-subscribe with the new URL.",
     "paths": [
       "settings.copy.calendar_detail.rotateMessage.label"
+    ]
+  },
+  "Run as many agents on your list as your work needs.": {
+    "text": "Run as many agents on your list as your work needs.",
+    "paths": [
+      "plans.benefits.pro.agents.detail"
     ]
   },
   "Same day": {
@@ -3666,6 +3738,12 @@
     "text": "See who changed what and bring back what you deleted. Your files open on every device.",
     "paths": [
       "plans.outcomes.nothing_lost.detail"
+    ]
+  },
+  "See who changed what, and bring back what you deleted.": {
+    "text": "See who changed what, and bring back what you deleted.",
+    "paths": [
+      "plans.benefits.plus.history.detail"
     ]
   },
   "Select": {
@@ -4625,6 +4703,12 @@
       "settings.keys.tasksTitleLines.options.2.title"
     ]
   },
+  "Three agents at work": {
+    "text": "Three agents at work",
+    "paths": [
+      "plans.benefits.plus.agents.title"
+    ]
+  },
   "Thursday": {
     "text": "Thursday",
     "paths": [
@@ -5233,6 +5317,12 @@
       "plans.outcomes.everywhere.title"
     ]
   },
+  "Your list on all your devices, updated as you type.": {
+    "text": "Your list on all your devices, updated as you type.",
+    "paths": [
+      "plans.benefits.plus.devices.detail"
+    ]
+  },
   "Your list on every device, updated live.": {
     "text": "Your list on every device, updated live.",
     "paths": [
@@ -5256,6 +5346,12 @@
     "text": "Your plan",
     "paths": [
       "plans.labels.yourPlan"
+    ]
+  },
+  "Your plan includes": {
+    "text": "Your plan includes",
+    "paths": [
+      "plans.paywall.yourPlanIncludes"
     ]
   },
   "Your synced settings": {
