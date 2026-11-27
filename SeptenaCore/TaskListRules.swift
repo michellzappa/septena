@@ -31,7 +31,7 @@ enum TaskListRules {
                        project: String?, created: String?, createdAt: Date, scheduled: String?,
                        deadline: String?, deferredDeadline: String?, today: Bool, todaySetOn: String?, source: String?,
                        acknowledgedAt: Date?, starred: Bool, recurrence: Recurrence?,
-                       deletedAt: String?, fadedAt: Date?) -> SeptenaSharedCore.TaskSnapshot {
+                       deletedAt: String?, fadedAt: Date?, assignedToOther: Bool = false) -> SeptenaSharedCore.TaskSnapshot {
     SeptenaSharedCore.TaskSnapshot(
       id: id, title: title, status: status,
       kind: kind.isEmpty ? nil : kind,
@@ -44,7 +44,8 @@ enum TaskListRules {
       deletedAt: deletedAt, fadedAt: fadedAt.map(SharedCoreValues.instant),
       startTime: nil, durationMinutes: nil, timeZone: nil,
       reminderAt: nil, reminderSnoozedUntil: nil, reminderDismissedAt: nil,
-      recurrenceAfterCompletion: recurrence?.afterCompletion, recurrenceAnchorDate: nil)
+      recurrenceAfterCompletion: recurrence?.afterCompletion, recurrenceAnchorDate: nil,
+      assignedToOther: assignedToOther)
   }
 }
 
@@ -56,7 +57,8 @@ extension SeptenaTask {
         id: id, title: title, status: status.rawValue, kind: kind, area: area, project: project,
         created: created, createdAt: createdAt, scheduled: scheduled, deadline: deadline,
         deferredDeadline: deferredDeadline, today: self.today, todaySetOn: todaySetOn, source: source, acknowledgedAt: acknowledgedAt,
-        starred: starred, recurrence: recurrence, deletedAt: deletedAt, fadedAt: fadedAt),
+        starred: starred, recurrence: recurrence, deletedAt: deletedAt, fadedAt: fadedAt,
+        assignedToOther: isAssignedToOther),
       today: today, now: now)
   }
 }
@@ -69,7 +71,8 @@ extension TaskEntity {
         id: id, title: title, status: statusRaw, kind: kind, area: area, project: project,
         created: created, createdAt: createdAt, scheduled: scheduled, deadline: deadline,
         deferredDeadline: deferredDeadline, today: self.today, todaySetOn: todaySetOn, source: source, acknowledgedAt: acknowledgedAt,
-        starred: starred, recurrence: recurrence, deletedAt: deletedAt, fadedAt: fadedAt),
+        starred: starred, recurrence: recurrence, deletedAt: deletedAt, fadedAt: fadedAt,
+        assignedToOther: isAssignedToOther),
       today: today, now: now)
   }
 }

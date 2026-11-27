@@ -126,6 +126,7 @@ enum TaskUndo {
     /// The wait (docs/REVIEW_SPEC.md §6): Waiting On… changes it with When.
     let waitingOn: String?
     let waitingSince: String?
+    let assignedTo: String?
     let recurrence: Recurrence?
     let recurrencePaused: Bool
     let reminder: TaskReminder?
@@ -142,6 +143,7 @@ enum TaskUndo {
       deferredDeadline = task.deferredDeadline
       waitingOn = task.waitingOn
       waitingSince = task.waitingSince
+      assignedTo = task.assignedTo
       recurrence = task.recurrence
       recurrencePaused = task.recurrencePaused
       reminder = task.reminder
@@ -173,6 +175,7 @@ enum TaskUndo {
       mutator.setDeadline(id: snapshot.id, date: snapshot.deadline)
       mutator.setDeferredDeadline(id: snapshot.id, day: snapshot.deferredDeadline)
       mutator.restoreWaiting(id: snapshot.id, on: snapshot.waitingOn, since: snapshot.waitingSince)
+      mutator.setAssignee(id: snapshot.id, memberID: snapshot.assignedTo)
       mutator.setRecurrence(id: snapshot.id, recurrence: snapshot.recurrence)
       if snapshot.recurrence != nil {
         mutator.setRecurrencePaused(id: snapshot.id, paused: snapshot.recurrencePaused)
@@ -322,13 +325,34 @@ enum TaskUndo {
   }
 
   /// Got It Back (docs/REVIEW_SPEC.md §6): ends the wait on every waiting task
-  /// in `ids`; the tasks stay open where they are. One undo step.
+  /// in `ids`; the tasks stay open where they are. On a shared task you
+  /// assigned to another member, takes ownership back (`assignedTo = me`).
   static func gotItBack(ids: [String], context: ModelContext, mutator: TaskMutator) {
-    let before = LocalCache.liveTasks(ids: Set(ids), in: context)
-      .filter(\.isWaiting).map(ScheduleSnapshot.init)
+    let tasks = LocalCache.liveTasks(ids: Set(ids), in: context).filter(\.isWaiting)
+    let before = tasks.map(ScheduleSnapshot.init)
     guard !before.isEmpty else { return }
-    for snapshot in before { mutator.setWaiting(id: snapshot.id, on: nil) }
+    for task in tasks {
+      if TaskWaiting.isWaiting(task.waitingOn) {
+        mutator.setWaiting(id: task.id, on: nil)
+      }
+      if task.sharedWaitingTarget != nil, let me = task.projectShare?.me {
+        mutator.setAssignee(id: task.id, memberID: me)
+      }
+    }
     recordScheduleChange(name: RegistryActions.title(.taskGotItBack),
+                         before: before, context: context, mutator: mutator)
+  }
+
+  /// Assign To (docs/PROJECT_SHARING_SPEC.md §8): sets `assignedTo` on `ids`
+  /// as one undoable step.
+  static func setAssignee(ids: [String], memberID: String?,
+                          context: ModelContext, mutator: TaskMutator) {
+    let before = LocalCache.liveTasks(ids: Set(ids), in: context).map(ScheduleSnapshot.init)
+    guard !before.isEmpty else { return }
+    for snapshot in before {
+      mutator.setAssignee(id: snapshot.id, memberID: memberID)
+    }
+    recordScheduleChange(name: SharedProjects.assignTitle,
                          before: before, context: context, mutator: mutator)
   }
 

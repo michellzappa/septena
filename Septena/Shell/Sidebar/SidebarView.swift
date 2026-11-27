@@ -1623,7 +1623,7 @@ struct SidebarRootView: View {
       if t.isInTriageBand { triage += 1 }
       if !t.isInTriageBand, t.isOnToday { todayN += 1 }
       if t.isUpcoming { upcoming += 1 }
-      if !t.today, t.scheduled == nil, t.deadline == nil { unscheduled += 1 }
+      if t.isAnytime { unscheduled += 1 }
     }
     // Lump the today-screen sum into `todayCount` and leave `reviewCount`
     // at 0 — the sidebar shows the sum, so the tile looks identical

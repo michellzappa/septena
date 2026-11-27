@@ -153,6 +153,8 @@ internal data class TaskDetailData(
     val attachmentCount: Int = 0,
     /** The task's conversation hands it to the user for review (`needs_verify`). */
     val needsReview: Boolean = false,
+    /** Shared project metadata for the task's project, if shared. */
+    val projectShare: app.septena.core.ProjectShare? = null,
 )
 
 internal data class RepeatUnitOption(val value: String, val title: String)
@@ -243,6 +245,7 @@ fun TaskDetailScreen(
     var showAddReferenceDialog by remember(taskId) { mutableStateOf(false) }
     var doTitleEditing by remember(taskId) { mutableStateOf(false) }
     var waitingSheetOpen by remember(taskId) { mutableStateOf(false) }
+    var assignDialogOpen by remember(taskId) { mutableStateOf(false) }
 
     LaunchedEffect(graph, taskId, dataVersion) {
         val loaded = withContext(Dispatchers.IO) { loadTaskDetail(graph, taskId) }
@@ -702,6 +705,20 @@ fun TaskDetailScreen(
         )
     }
 
+    if (assignDialogOpen) {
+        AssignTaskDialog(
+            graph = graph,
+            taskId = taskId,
+            title = RegistryCatalog.submenuTitle("task.row", "assign", languageTag).orEmpty(),
+            languageTag = languageTag,
+            onDismiss = { assignDialogOpen = false },
+            onPick = { memberId ->
+                assignDialogOpen = false
+                write { check(graph.taskMutator.assign(taskId, memberId) != null) }
+            },
+        )
+    }
+
     Box(modifier = modifier.fillMaxSize().background(canvasBackground)) {
         HeaderWashBackdrop()
         Scaffold(
@@ -878,10 +895,21 @@ fun TaskDetailScreen(
                                                 }
                                             }
 
-                                            // Waiting On… / Got It Back (docs/REVIEW_SPEC.md §6).
+                                            // Waiting On… / Got It Back (docs/REVIEW_SPEC.md §6) + shared Assign To.
                                             if (isTaskOpen && !isDoPage) {
-                                                val waitingOn = taskFields[RegistryEntityFields.Task.WAITING_ON]
+                                                val manualWaitingOn = taskFields[RegistryEntityFields.Task.WAITING_ON]
                                                     .stringValue()?.trim()?.takeIf(String::isNotEmpty)
+                                                val share = data?.projectShare
+                                                val assignedTo = taskFields[RegistryEntityFields.Task.ASSIGNED_TO].stringValue()
+                                                val assignedBy = taskFields[RegistryEntityFields.Task.ASSIGNED_BY].stringValue()
+                                                val assignedAt = taskFields[RegistryEntityFields.Task.ASSIGNED_AT].stringValue()
+                                                val sharedWaitingOn = if (share != null && !assignedTo.isNullOrBlank() && assignedTo != share.me && assignedBy == share.me) {
+                                                    share.member(assignedTo)?.name ?: assignedTo
+                                                } else null
+                                                val activeWaitingOn = manualWaitingOn ?: sharedWaitingOn
+                                                val activeWaitingSince = if (manualWaitingOn != null) {
+                                                    taskFields[RegistryEntityFields.Task.WAITING_SINCE].stringValue()
+                                                } else assignedAt
                                                 FlowRow(
                                                     verticalArrangement = Arrangement.Center,
                                                     modifier = Modifier.padding(
@@ -889,11 +917,11 @@ fun TaskDetailScreen(
                                                         top = 4.dp,
                                                     ),
                                                 ) {
-                                                    if (waitingOn != null) {
+                                                    if (activeWaitingOn != null) {
                                                         Text(
                                                             text = WaitingCopy.label(
-                                                                waitingOn,
-                                                                taskFields[RegistryEntityFields.Task.WAITING_SINCE].stringValue(),
+                                                                activeWaitingOn,
+                                                                activeWaitingSince,
                                                                 todayDate,
                                                                 languageTag,
                                                             ),
@@ -902,17 +930,19 @@ fun TaskDetailScreen(
                                                             modifier = Modifier.align(Alignment.CenterVertically),
                                                         )
                                                     }
-                                                    TextButton(onClick = { waitingSheetOpen = true }, enabled = canEdit) {
-                                                        Text(
-                                                            RegistryCatalog.actionTitle(
-                                                                RegistryActionIds.TASK_WAITING_ON,
-                                                                languageTag = languageTag,
-                                                            ).orEmpty(),
-                                                        )
+                                                    if (activeWaitingOn == null || manualWaitingOn != null) {
+                                                        TextButton(onClick = { waitingSheetOpen = true }, enabled = canEdit) {
+                                                            Text(
+                                                                RegistryCatalog.actionTitle(
+                                                                    RegistryActionIds.TASK_WAITING_ON,
+                                                                    languageTag = languageTag,
+                                                                ).orEmpty(),
+                                                            )
+                                                        }
                                                     }
-                                                    if (waitingOn != null) {
+                                                    if (activeWaitingOn != null) {
                                                         TextButton(
-                                                            onClick = { write { check(graph.taskMutator.setWaiting(taskId, null) != null) } },
+                                                            onClick = { write { check(graph.taskMutator.gotItBack(taskId) != null) } },
                                                             enabled = canEdit,
                                                         ) {
                                                             Text(
@@ -921,6 +951,18 @@ fun TaskDetailScreen(
                                                                     languageTag = languageTag,
                                                                 ).orEmpty(),
                                                             )
+                                                        }
+                                                    }
+                                                    if (share != null) {
+                                                        val assignLabel = when {
+                                                            assignedTo.isNullOrBlank() ->
+                                                                RegistryCatalog.submenuTitle("task.row", "assign", languageTag).orEmpty()
+                                                            assignedTo == share.me -> sharingCopy(SharingCopy.you, languageTag)
+                                                            else -> share.member(assignedTo)?.name
+                                                                ?: RegistryCatalog.submenuTitle("task.row", "assign", languageTag).orEmpty()
+                                                        }
+                                                        TextButton(onClick = { assignDialogOpen = true }, enabled = canEdit) {
+                                                            Text(assignLabel)
                                                         }
                                                     }
                                                 }
@@ -2203,6 +2245,8 @@ internal suspend fun loadTaskDetail(graph: AndroidAppGraph, taskId: String): Tas
     val conversation = graph.taskStore.record(RegistryEntityNames.CONVO, taskId)?.let { record ->
         TaskConversation.from(record, graph.taskStore.turns(taskId))
     }
+    val projectShare = task.fields[RegistryEntityFields.Task.PROJECT].stringValue()
+        ?.let { app.septena.core.ProjectShare.of(graph.taskStore.record(RegistryEntityNames.PROJECT, it)) }
     return TaskDetailData(
         task = task,
         areas = areas,
@@ -2211,6 +2255,7 @@ internal suspend fun loadTaskDetail(graph: AndroidAppGraph, taskId: String): Tas
         tags = tags,
         attachmentCount = attachmentCount,
         needsReview = conversation?.needsHumanReview == true,
+        projectShare = projectShare,
     )
 }
 

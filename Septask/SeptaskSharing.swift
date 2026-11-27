@@ -32,10 +32,8 @@ enum SeptaskSharing {
     return SharedProjects.assignees(for: tasks, in: context).map { person in
       RegistryMenuEntry.slot(id: "assignee.\(person.id)", title: person.name,
                              isOn: current == [person.memberID]) {
-        for task in tasks {
-          SeptenaServices.shared.taskMutator.setAssignee(id: task.id, memberID: person.memberID)
-        }
-        SeptenaServices.shared.taskMutator.touch(ids: tasks.map(\.id))
+        TaskUndo.setAssignee(ids: tasks.map(\.id), memberID: person.memberID,
+                             context: context, mutator: SeptenaServices.shared.taskMutator)
       }
     }
   }

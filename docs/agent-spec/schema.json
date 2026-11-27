@@ -706,6 +706,15 @@
               "type": "null"
             }
           ]
+        },
+        "assignedBy": {
+          "type": "string",
+          "maxLength": 64,
+          "readOnly": true
+        },
+        "assignedAt": {
+          "$ref": "#/$defs/day",
+          "readOnly": true
         }
       }
     },

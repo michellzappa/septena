@@ -116,7 +116,8 @@ extension TaskEntity {
       reminderSnoozedUntil: reminderSnoozedUntil,
       reminderDismissedAt: reminderDismissedAt,
       recurrenceAfterCompletion: recurrence?.afterCompletion,
-      recurrenceAnchorDate: recurrenceAnchorDate)
+      recurrenceAnchorDate: recurrenceAnchorDate,
+      assignedToOther: isAssignedToOther)
   }
 
   /// Write the fields the core changed. The core stamps the agent cue with

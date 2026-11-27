@@ -29,6 +29,12 @@ export interface TaskOut {
   // Who the task waits on, and since which day (docs/REVIEW_SPEC.md §6).
   waitingOn?: string;
   waitingSince?: string;
+  // Shared project assignment (docs/PROJECT_SHARING_SPEC.md §3).
+  assignedTo?: string;
+  assignedBy?: string;
+  assignedAt?: string;
+  // Internal for core view membership; stripped before MCP output.
+  assignedToOther?: boolean;
   area?: string;
   project?: string;
   // The id of the project heading the task is filed under (a heading row).
@@ -162,6 +168,7 @@ export function coreTask(t: TaskOut): CoreTask {
     timeZone: t.timeZone ?? null,
     reminderAt: t.reminderAt ?? null,
     reminderSnoozedUntil: t.reminderSnoozedUntil ?? null,
+    assignedToOther: t.assignedToOther === true,
   };
 }
 

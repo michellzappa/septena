@@ -3,6 +3,7 @@ package app.septena.android.widgets
 import app.septena.android.ui.formatShortLocalDay
 import app.septena.core.DayClock
 import app.septena.core.JsonValue
+import app.septena.core.ProjectShare
 import app.septena.core.RegistryCatalog
 import app.septena.core.TaskFadeRules
 import app.septena.core.TaskSnapshot
@@ -58,10 +59,11 @@ internal object SeptenaWidgetLoader {
             val pos: Double,
         )
 
+        val shares = ProjectShare.byProject(store)
         val candidates = mutableListOf<Candidate>()
         for (record in store.records(RegistryEntityNames.TASK)) {
             if (record.deletedAt != null) continue
-            val snap = runCatching { TaskSnapshot.from(record) }.getOrNull() ?: continue
+            val snap = runCatching { TaskSnapshot.from(record, shares) }.getOrNull() ?: continue
             if (snap.isHeading || snap.status != RegistryEntityEnums.TaskStatus.OPEN) continue
             val membership = membershipFor(snap, today, now)
             if (membership.matchesView[RegistryDestinationIds.TODAY] != true) continue
@@ -121,10 +123,11 @@ internal object SeptenaWidgetLoader {
             val pos: Double,
         )
 
+        val shares = ProjectShare.byProject(store)
         val candidates = mutableListOf<Candidate>()
         for (record in store.records(RegistryEntityNames.TASK)) {
             if (record.deletedAt != null) continue
-            val snap = runCatching { TaskSnapshot.from(record) }.getOrNull() ?: continue
+            val snap = runCatching { TaskSnapshot.from(record, shares) }.getOrNull() ?: continue
             if (snap.isHeading || snap.status != RegistryEntityEnums.TaskStatus.OPEN) continue
             if (TaskFadeRules.isFaded(snap.fadedAt)) continue
             val membership = membershipFor(snap, today, now)

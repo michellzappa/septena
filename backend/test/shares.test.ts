@@ -542,3 +542,68 @@ test("random edits by three members over a bad network: every store ends equal a
     }
   }
 });
+
+test("assignedBy and assignedAt are server-stamped, power shared waiting, and hide others' tasks from Anytime", async () => {
+  const { w, join } = await shared();
+  const ben = await join("ben", "Ben");
+  const cat = await join("cat", "Cat");
+  const annMemberId = w.store("ann").listShares()[0].memberId;
+
+  // Create an undated shared task so it would normally sit in Anytime.
+  w.push("ann", up("task", "t2", { title: "Fix sink", status: "open", project: "home" }));
+  await w.settle();
+
+  // Ann assigns it to Ben.
+  w.push("ann", up("task", "t2", { assignedTo: ben.memberId }));
+  await w.settle();
+
+  const annRow = replica(w, "ann", "Fix sink")!;
+  const benRow = replica(w, "ben", "Fix sink")!;
+  const catRow = replica(w, "cat", "Fix sink")!;
+  assert.equal(annRow.assignedTo, ben.memberId);
+  assert.equal(annRow.assignedBy, annMemberId);
+  assert.match(String(annRow.assignedAt), /^\d{4}-\d{2}-\d{2}$/);
+  assert.equal(benRow.assignedBy, annMemberId);
+  assert.equal(benRow.assignedAt, annRow.assignedAt);
+  assert.equal(catRow.assignedBy, annMemberId);
+
+  // Editing title does not clobber assignedBy / assignedAt.
+  w.push("ben", up("task", benRow.id as string, { title: "Fix kitchen sink" }));
+  await w.settle();
+  assert.equal(replica(w, "ann", "Fix kitchen sink")!.assignedBy, annMemberId);
+
+  // Agent cannot close a shared task Ann is waiting on, but Ben's agent is not blocked by Ann's wait.
+  const agentRefused = w.store("ann").push(
+    [{ clientOpId: "op-agent-close-01", op: "upsert", entity: "task", id: "t2", fields: { status: "done" } }],
+    "mcp:claude",
+  ).result.results[0];
+  assert.equal(agentRefused.status, "rejected");
+  assert.equal(agentRefused.reason, "in_review");
+
+  // MCP listTasks: Ann sees it in waiting, NOT in anytime; Ben sees it in anytime, NOT in waiting; Cat sees it in neither.
+  const { listTasks } = await import("../src/shadow/mcp.ts");
+  const annAnytime = await listTasks(w.store("ann") as never, "UTC", "anytime", 100);
+  const annWaiting = await listTasks(w.store("ann") as never, "UTC", "waiting", 100);
+  const benAnytime = await listTasks(w.store("ben") as never, "UTC", "anytime", 100);
+  const benWaiting = await listTasks(w.store("ben") as never, "UTC", "waiting", 100);
+  const catAnytime = await listTasks(w.store("cat") as never, "UTC", "anytime", 100);
+  const catWaiting = await listTasks(w.store("cat") as never, "UTC", "waiting", 100);
+  assert.ok(!annAnytime.tasks.some((t) => t.title === "Fix kitchen sink"));
+  assert.equal(annWaiting.tasks.find((t) => t.title === "Fix kitchen sink")?.waitingOn, "Ben");
+  assert.ok(benAnytime.tasks.some((t) => t.title === "Fix kitchen sink"));
+  assert.ok(!benWaiting.tasks.some((t) => t.title === "Fix kitchen sink"));
+  assert.ok(!catAnytime.tasks.some((t) => t.title === "Fix kitchen sink"));
+  assert.ok(!catWaiting.tasks.some((t) => t.title === "Fix kitchen sink"));
+
+  // Reassigning updates assignedBy; unassigning clears assignedBy and assignedAt.
+  w.push("cat", up("task", catRow.id as string, { assignedTo: cat.memberId }));
+  await w.settle();
+  assert.equal(replica(w, "ann", "Fix kitchen sink")!.assignedBy, cat.memberId);
+
+  w.push("cat", up("task", catRow.id as string, { assignedTo: null }));
+  await w.settle();
+  const cleared = replica(w, "ann", "Fix kitchen sink")!;
+  assert.equal(cleared.assignedTo, null);
+  assert.equal(cleared.assignedBy, null);
+  assert.equal(cleared.assignedAt, null);
+});

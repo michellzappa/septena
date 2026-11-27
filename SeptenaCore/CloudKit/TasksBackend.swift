@@ -1103,7 +1103,7 @@ final class CloudKitTasksBackend {
     if let s = entity.scheduled, s <= SeptenaDate.today {
       entity.scheduled = nil
     }
-    if let d = entity.deadline, d <= SeptenaDate.today {
+    if !entity.isAssignedToOther, let d = entity.deadline, d <= SeptenaDate.today {
       entity.deadline = nil
     }
     entity.pendingSync = true
@@ -1433,6 +1433,13 @@ final class CloudKitTasksBackend {
   func setAssignee(id: String, memberID: String?) {
     guard let entity = fetch(id: id), entity.assignedTo != memberID else { return }
     entity.assignedTo = memberID
+    if let memberID, !memberID.isEmpty, let share = entity.projectShare {
+      entity.assignedBy = share.me
+      entity.assignedAt = DayClock.appToday
+    } else {
+      entity.assignedBy = nil
+      entity.assignedAt = nil
+    }
     entity.pendingSync = true
     commitAndPush(entity, op: "setAssignee")
   }

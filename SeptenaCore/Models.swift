@@ -145,6 +145,12 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
   var effort: String? = nil
   /// Shared projects: the member who does this task (`TaskEntity.assignedTo`).
   var assignedTo: String? = nil
+  /// Shared projects: who set `assignedTo`, server-stamped (`TaskEntity.assignedBy`).
+  var assignedBy: String? = nil
+  /// Shared projects: the day `assignedTo` was set, `YYYY-MM-DD` (`TaskEntity.assignedAt`).
+  var assignedAt: String? = nil
+  /// Shared project metadata for this task's project (non-wire, hydrated from `ProjectEntity.share`).
+  var projectShare: ProjectShare? = nil
   /// Row shape (`TaskKind`). `""`/absent = task, `"heading"` = a project
   /// section divider. Rides alongside the entity, not the wire. Read `isHeading`.
   var kind: String = ""
@@ -169,13 +175,40 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     return conversation.reviewGroup(waiting: isWaiting) ?? (isFaded ? .faded : nil)
   }
 
-  /// True when the task waits on a person (`waitingOn` is set).
-  var isWaiting: Bool { TaskWaiting.isWaiting(waitingOn) }
+  /// True when this shared task is assigned to another member (`assignedTo != share.me`).
+  var isAssignedToOther: Bool {
+    guard let assignedTo, !assignedTo.isEmpty, let share = projectShare else { return false }
+    return assignedTo != share.me
+  }
+
+  /// Shared-project Waiting target (ADR 0053, #672): non-nil only when this
+  /// user assigned the task to another member.
+  var sharedWaitingTarget: (name: String, since: String?)? {
+    SharedProjects.sharedWaiting(
+      share: projectShare,
+      assignedTo: assignedTo,
+      assignedBy: assignedBy,
+      assignedAt: assignedAt
+    )
+  }
+
+  /// True when the task waits on a person (`waitingOn` or a shared task you
+  /// assigned to another member, docs/REVIEW_SPEC.md §6).
+  var isWaiting: Bool { TaskWaiting.isWaiting(waitingOn) || sharedWaitingTarget != nil }
+
+  /// Start day of the active wait (`YYYY-MM-DD`), for oldest-first sorting in Review ▸ Waiting.
+  var effectiveWaitingSince: String? {
+    TaskWaiting.isWaiting(waitingOn) ? waitingSince : sharedWaitingTarget?.since
+  }
 
   /// "Waiting on Anna · 5 days" for the row, or nil when the task does not
   /// wait (docs/REVIEW_SPEC.md §6).
   func waitingLabel(today: String = SeptenaDate.today) -> String? {
-    TaskWaiting.label(on: waitingOn, since: waitingSince, today: today)
+    if let manual = TaskWaiting.label(on: waitingOn, since: waitingSince, today: today) {
+      return manual
+    }
+    guard let shared = sharedWaitingTarget else { return nil }
+    return TaskWaiting.label(on: shared.name, since: shared.since, today: today)
   }
 
   /// True when the task sits in a Review group about agent work (every group
@@ -200,7 +233,7 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
       hasRecurrence: recurrence != nil,
       isAgentTurn: conversation.isAgentTurn(at: Date()),
       isAssignedToClaude: conversation.assignee == .claude,
-      isAwaitingHuman: conversation.awaitsHuman,
+      isAwaitingHuman: conversation.awaitsHuman || isWaiting,
       showsAgentCue: showsAgentCue(now: now),
       isProposal: isUnacceptedProposal,
       touchedAt: touchedAt,
@@ -452,6 +485,9 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     dropReason: String? = nil,
     effort: String? = nil,
     assignedTo: String? = nil,
+    assignedBy: String? = nil,
+    assignedAt: String? = nil,
+    projectShare: ProjectShare? = nil,
     kind: String = "",
     heading: String? = nil,
     conversation: TaskConvo = TaskConvo()
@@ -494,6 +530,9 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     self.dropReason = dropReason
     self.effort = effort
     self.assignedTo = assignedTo
+    self.assignedBy = assignedBy
+    self.assignedAt = assignedAt
+    self.projectShare = projectShare
     self.kind = kind
     self.heading = heading
     self.conversation = conversation

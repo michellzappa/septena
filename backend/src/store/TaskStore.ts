@@ -44,6 +44,7 @@ import {
 import { projectStoreFor } from "./ProjectStore.js";
 import {
   SEED_FIELDS,
+  SERVER_SHARED_FIELDS,
   SHARED_FIELDS,
   SHARED_PROJECT_ROW,
   ShareBook,
@@ -455,6 +456,55 @@ export class TaskStore extends DurableObject<Env> {
     }
   }
 
+  /// Shared assignment (docs/PROJECT_SHARING_SPEC.md §3, #672): optimistically
+  /// stamps `assignedBy` and `assignedAt` on local write (ProjectStore stamps
+  /// them authoritatively on echo), and clears all three when unassigned or
+  /// moved out of a shared project.
+  private stampAssignment(row: Record<string, unknown> | null, fields: Record<string, unknown>, names: string[]): void {
+    const add = (f: string) => { if (!names.includes(f)) names.push(f); };
+    const prevProject = typeof row?.project === "string" ? row.project : null;
+    const nextProject = ("project" in fields ? fields.project : prevProject) as string | null | undefined;
+    if (prevProject && prevProject !== nextProject && this.shares.forProject(prevProject)) {
+      if (!("assignedTo" in fields) || !fields.assignedTo) {
+        fields.assignedTo = null;
+        fields.assignedBy = null;
+        fields.assignedAt = null;
+        add("assignedTo");
+        add("assignedBy");
+        add("assignedAt");
+      }
+    }
+    if (!("assignedTo" in fields)) return;
+    const who = typeof fields.assignedTo === "string" ? fields.assignedTo.trim() : "";
+    const share = this.shares.forProject(nextProject);
+    if (!who || !share) {
+      fields.assignedTo = null;
+      fields.assignedBy = null;
+      fields.assignedAt = null;
+      add("assignedBy");
+      add("assignedAt");
+      return;
+    }
+    fields.assignedTo = who;
+    if (who !== (row?.assignedTo ?? null) || !row?.assignedBy || !row?.assignedAt) {
+      fields.assignedBy = share.memberId;
+      fields.assignedAt = new Date().toISOString().slice(0, 10);
+      add("assignedBy");
+      add("assignedAt");
+    }
+  }
+
+  /// Shared task waiting (ADR 0053, #672): this user assigned an open shared
+  /// task to another member.
+  private isSharedWaiting(task: Record<string, unknown>): boolean {
+    const project = typeof task.project === "string" ? task.project : null;
+    const assignedTo = typeof task.assignedTo === "string" ? task.assignedTo : null;
+    const assignedBy = typeof task.assignedBy === "string" ? task.assignedBy : null;
+    if (!project || !assignedTo || !assignedBy) return false;
+    const share = this.shares.forProject(project);
+    return !!share && assignedTo !== share.memberId && assignedBy === share.memberId;
+  }
+
   /// True when an open row is marked faded and may not be
   /// (docs/TASK_FADE_SPEC.md §4.1): it has a deadline, or a touch is newer
   /// than the fade. The second case is a device that pushes an old fade over
@@ -462,7 +512,7 @@ export class TaskStore extends DurableObject<Env> {
   private fadeEnds(task: Record<string, unknown>): boolean {
     if (!task.fadedAt || task.status !== "open") return false;
     // A task that waits on a person never fades (ADR 0053).
-    if (task.waitingOn) return true;
+    if (task.waitingOn || this.isSharedWaiting(task)) return true;
     // An unaccepted proposal expires with or without a date (ADR 0039).
     if (task.deadline && !(task.source === "mcp" && !task.acknowledgedAt)) return true;
     return !!task.touchedAt && Date.parse(task.touchedAt as string) > Date.parse(task.fadedAt as string);
@@ -485,7 +535,7 @@ export class TaskStore extends DurableObject<Env> {
     const convo = this.sql.exec<{ assignee: string | null; endState: string | null }>(
       "SELECT assignee, endState FROM convos WHERE id = ? AND deletedAt IS NULL", taskId,
     ).toArray()[0];
-    return !!row.waitingOn || convo?.assignee === "claude" || convo?.endState === "needs_verify" || this.awaitsHuman(taskId);
+    return !!row.waitingOn || this.isSharedWaiting(row) || convo?.assignee === "claude" || convo?.endState === "needs_verify" || this.awaitsHuman(taskId);
   }
 
   /// One time: ends the fade of every row `fadeEnds` is true for, so rows
@@ -1022,6 +1072,9 @@ export class TaskStore extends DurableObject<Env> {
       );
     }
     if (op.entity === "task" && "waitingOn" in op.fields) this.stampWaiting(row as Record<string, unknown> | null, op.fields, names);
+    if (op.entity === "task" && ("assignedTo" in op.fields || "project" in op.fields)) {
+      this.stampAssignment(row as Record<string, unknown> | null, op.fields, names);
+    }
     if (op.entity === "task"
       && ((row && this.fadeIsStale(op.id, row as Record<string, unknown>, op.fields)) || this.fadeEnds({ ...row, ...op.fields }))) {
       if (!names.includes("fadedAt")) names.push("fadedAt");
@@ -1156,7 +1209,7 @@ export class TaskStore extends DurableObject<Env> {
     if (mapping && mapping.shareId !== share?.id) this.shareMovedOut(id, mapping);
     if (!share) return;
     if (mapping && mapping.shareId === share.id) {
-      const fields = names.filter((n) => SHARED_FIELDS.task.includes(n));
+      const fields = names.filter((n) => SHARED_FIELDS.task.includes(n) && !SERVER_SHARED_FIELDS.has(n));
       if (fields.length) this.shares.enqueue(share.id, "task", mapping.sharedId, false, this.outFields("task", row, fields), baseNotes);
       return;
     }
@@ -1192,8 +1245,9 @@ export class TaskStore extends DurableObject<Env> {
       }
     }
     this.shares.map(shareId, "task", sharedId, id);
+    const out = SHARED_FIELDS.task.filter((n) => !SERVER_SHARED_FIELDS.has(n));
     this.shares.enqueue(shareId, "task", sharedId, false,
-      this.outFields("task", row, repeats ? [...SHARED_FIELDS.task, ...SEED_FIELDS] : SHARED_FIELDS.task));
+      this.outFields("task", row, repeats ? [...out, ...SEED_FIELDS] : out));
     for (const item of this.sql.exec<{ id: string }>("SELECT id FROM checklist_items WHERE taskId = ? AND deletedAt IS NULL", id).toArray()) {
       this.shareOutItem(item.id, []);
     }
@@ -1532,8 +1586,8 @@ export class TaskStore extends DurableObject<Env> {
     const before = this.rowOf("task", taskId)!;
     const now = new Date().toISOString();
     const rev = this.nextRev();
-    const next = { project: null, heading: null, assignedTo: null };
-    this.sql.exec("UPDATE tasks SET project = NULL, heading = NULL, assignedTo = NULL, rev = ?, updatedAt = ? WHERE id = ?", rev, now, taskId);
+    const next = { project: null, heading: null, assignedTo: null, assignedBy: null, assignedAt: null };
+    this.sql.exec("UPDATE tasks SET project = NULL, heading = NULL, assignedTo = NULL, assignedBy = NULL, assignedAt = NULL, rev = ?, updatedAt = ? WHERE id = ?", rev, now, taskId);
     this.log(rev, "task", taskId, "upsert", Object.keys(next), null, `member:${by}`, now, this.diffFor(before, next));
   }
 
@@ -1566,8 +1620,10 @@ export class TaskStore extends DurableObject<Env> {
       // Only the user ends a wait (ADR 0053): an agent may set one, never
       // clear it or close the task while it waits.
       if (this.isWaiting(op.id)) {
-        const clears = op.op === "upsert" && "waitingOn" in op.fields
-          && !(typeof op.fields.waitingOn === "string" && op.fields.waitingOn.trim());
+        const clears = op.op === "upsert" && (
+          ("waitingOn" in op.fields && !(typeof op.fields.waitingOn === "string" && op.fields.waitingOn.trim()))
+          || "assignedTo" in op.fields
+        );
         if (ends || clears) return "in_review";
       }
     }
@@ -1608,9 +1664,11 @@ export class TaskStore extends DurableObject<Env> {
   }
 
   private isWaiting(taskId: string): boolean {
-    return this.sql.exec(
-      "SELECT 1 FROM tasks WHERE id = ? AND deletedAt IS NULL AND status = 'open' AND waitingOn IS NOT NULL", taskId,
-    ).toArray().length > 0;
+    const row = this.sql.exec<{ project: string | null; waitingOn: string | null; assignedTo: string | null; assignedBy: string | null }>(
+      "SELECT project, waitingOn, assignedTo, assignedBy FROM tasks WHERE id = ? AND deletedAt IS NULL AND status = 'open'", taskId,
+    ).toArray()[0];
+    if (!row) return false;
+    return !!row.waitingOn || this.isSharedWaiting(row);
   }
 
   private convoStopped(taskId: string): boolean {

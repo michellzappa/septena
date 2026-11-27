@@ -83,6 +83,8 @@ Required on create: `title`, `status`. Can be deleted.
 | `dropReason` | text, ≤ 16 | may be null |
 | `effort` | text, ≤ 16 | may be null |
 | `assignedTo` | text, ≤ 64 | may be null |
+| `assignedBy` | text, ≤ 64 | server-owned |
+| `assignedAt` | day | server-owned |
 
 ### `area`
 
@@ -394,7 +396,7 @@ The conformance vectors are the cases every Septena implementation passes: the a
 | [`sync-engine.json`](https://septena.app/spec/conformance/sync-engine.json) | `pullPage` (7), `pullRow` (13), `pushResponse` (7), `rejectionReason` (7) |
 | [`task-dates.json`](https://septena.app/spec/conformance/task-dates.json) | `actions` (53), `normalize` (13), `nextOccurrence` (2) |
 | [`task-fade.json`](https://septena.app/spec/conformance/task-fade.json) | `rowOpacity` (6), `shouldFade` (15) |
-| [`task-views.json`](https://septena.app/spec/conformance/task-views.json) | `cases` (27) |
+| [`task-views.json`](https://septena.app/spec/conformance/task-views.json) | `cases` (31) |
 
 To check your own client, write a module that exports one object per file, with one function per suite you implement. The object's name is the file name without `.json`, in camel case: `task-dates.json` is `taskDates`. Each function takes the case and the file's context and returns what your code computes:
 

@@ -21,7 +21,7 @@ import {
 import { evaluateConversation, groupTurnsByTask } from "../conversation";
 import { fadeInput, fadeSettings, isProposal, type FadeClock } from "../fade";
 import { nextStructurePosition } from "../listOrder";
-import { clearWaitingFields, setWaitingFields } from "../waiting";
+import { clearWaitingFields, isAssignedToOther, projectShareOf, setWaitingFields, sharedWaitingTarget, waitingName } from "../waiting";
 import {
   needsFixedRepeatPrompt,
   planFixedSeriesRebase,
@@ -670,17 +670,60 @@ export class WebSyncEngine {
     await this.setTaskScheduled(next, scheduled);
   }
 
-  /** Got It Back: the wait ends, the task stays open in its list. */
-  async clearTaskWaiting(task: TaskRow): Promise<void> {
+  private shareForTask(task: TaskRow) {
+    const project = task.project ? this.state.snapshot.projects.find((p) => p.id === task.project) : null;
+    return projectShareOf(project);
+  }
+
+  private taskForCore(task: TaskRow): TaskRow {
+    const share = this.shareForTask(task);
+    return { ...task, assignedToOther: isAssignedToOther(task, share) };
+  }
+
+  /** Assign To (PROJECT_SHARING_SPEC §8): sets `assignedTo` and optimistically stamps local `assignedBy`/`assignedAt`. */
+  async assignTask(task: TaskRow, memberId: string | null): Promise<void> {
+    const live = this.liveTask(task.id) ?? task;
+    const normalized = memberId && memberId.trim() ? memberId.trim() : null;
     const now = new Date().toISOString();
-    await this.patchTask(this.liveTask(task.id) ?? task, { ...clearWaitingFields(), touchedAt: now });
+    const share = this.shareForTask(live);
+    const wireFields: Record<string, unknown> = { assignedTo: normalized, touchedAt: now };
+    const localRow: TaskRow = {
+      ...live,
+      ...wireFields,
+      assignedBy: normalized && share ? share.me : null,
+      assignedAt: normalized && share ? localTodayYMD() : null,
+    };
+    const op: OutboxOp = {
+      clientOpId: newClientOpId(),
+      op: "upsert",
+      entity: "task",
+      id: live.id,
+      fields: wireFields,
+      queuedAt: Date.now(),
+    };
+    await this.commit([{ entity: "task", action: "put", id: live.id, row: localRow }], [op]);
+  }
+
+  /** Got It Back: ends manual waiting and/or takes back a shared task you assigned. */
+  async clearTaskWaiting(task: TaskRow): Promise<void> {
+    const live = this.liveTask(task.id) ?? task;
+    const now = new Date().toISOString();
+    if (waitingName(live)) {
+      await this.patchTask(live, { ...clearWaitingFields(), touchedAt: now });
+    }
+    const latest = this.liveTask(task.id) ?? live;
+    const project = latest.project ? this.state.snapshot.projects.find((p) => p.id === latest.project) : null;
+    const share = projectShareOf(project);
+    if (share && sharedWaitingTarget(latest, share)) {
+      await this.assignTask(latest, share.me);
+    }
   }
 
   async toggleTaskToday(task: TaskRow, mode: RescheduleMode = "makeException"): Promise<void> {
     await ensureCoreReady();
     const now = new Date().toISOString();
     const todayYMD = localTodayYMD();
-    const datePatch = applyDateAction(task, { type: "toggleToday", mode }, todayYMD, now);
+    const datePatch = applyDateAction(this.taskForCore(task), { type: "toggleToday", mode }, todayYMD, now);
     if (Object.keys(datePatch).length === 0) return;
     await this.patchTask(task, {
       ...datePatch,
@@ -712,8 +755,8 @@ export class WebSyncEngine {
     const now = new Date().toISOString();
     const todayYMD = localTodayYMD();
     const datePatch = day
-      ? applyDateAction(task, { type: "scheduleFor", day, mode }, todayYMD, now)
-      : applyDateAction(task, { type: "clearWhenDate" }, todayYMD, now);
+      ? applyDateAction(this.taskForCore(task), { type: "scheduleFor", day, mode }, todayYMD, now)
+      : applyDateAction(this.taskForCore(task), { type: "clearWhenDate" }, todayYMD, now);
     if (Object.keys(datePatch).length === 0) return;
 
     const shiftedReminder = shiftReminderOnReschedule({
@@ -776,7 +819,7 @@ export class WebSyncEngine {
     await ensureCoreReady();
     const now = new Date().toISOString();
     const todayYMD = localTodayYMD();
-    const datePatch = applyDateAction(task, { type: "setDeadline", day }, todayYMD, now);
+    const datePatch = applyDateAction(this.taskForCore(task), { type: "setDeadline", day }, todayYMD, now);
     if (Object.keys(datePatch).length === 0) return;
     await this.patchTask(task, {
       ...datePatch,
@@ -789,7 +832,7 @@ export class WebSyncEngine {
   async clearTaskWhen(task: TaskRow): Promise<void> {
     await ensureCoreReady();
     const now = new Date().toISOString();
-    const datePatch = applyDateAction(task, { type: "clearWhen" }, localTodayYMD(), now);
+    const datePatch = applyDateAction(this.taskForCore(task), { type: "clearWhen" }, localTodayYMD(), now);
     if (Object.keys(datePatch).length === 0) return;
     await this.patchTask(task, {
       ...datePatch,
@@ -808,7 +851,7 @@ export class WebSyncEngine {
     const todayYMD = localTodayYMD();
     const timeZone = startTime ? Intl.DateTimeFormat().resolvedOptions().timeZone : null;
     const datePatch = applyDateAction(
-      task,
+      this.taskForCore(task),
       { type: "setTimeSlot", startTime, durationMinutes, timeZone },
       todayYMD,
       now,
@@ -874,7 +917,7 @@ export class WebSyncEngine {
     const todayYMD = localTodayYMD();
     const filePatch =
       target.area || target.project
-        ? applyDateAction(task, { type: "fileFromTriage" }, todayYMD, now)
+        ? applyDateAction(this.taskForCore(task), { type: "fileFromTriage" }, todayYMD, now)
         : {};
     await this.patchTask(task, {
       ...filePatch,
@@ -1283,7 +1326,7 @@ export class WebSyncEngine {
     const toRebase: Array<{ task: TaskRow; newAnchor: string }> = [];
     tasks.forEach((task, idx) => {
       const datePatch = applyDateAction(
-        task,
+        this.taskForCore(task),
         putOnToday ? { type: "putOnToday", mode } : { type: "removeFromToday" },
         todayYMD,
         now,

@@ -273,6 +273,46 @@
         "matchesView": { "today": true, "inbox": false, "upcoming": false, "anytime": false },
         "dueState": "dueToday", "deadlineRed": true, "upcomingDay": null, "arrivedOnOwn": false
       }
+    },
+    {
+      "name": "shared task assigned to another member with no dates stays out of personal Anytime",
+      "task": { "id": "s1", "title": "Call plumber", "status": "open", "today": false, "project": "p1", "source": "app", "created": "2026-11-15", "assignedToOther": true },
+      "expected": {
+        "isUnfiled": false, "isInboxMember": false, "inTriageBand": false, "isOnToday": false, "inInbox": false,
+        "daysOnToday": 0,
+        "matchesView": { "today": false, "inbox": false, "upcoming": false, "anytime": false },
+        "dueState": null, "deadlineRed": false, "upcomingDay": null, "arrivedOnOwn": false
+      }
+    },
+    {
+      "name": "shared task assigned to another member with arrived deadline stays off personal Today, deadline still red",
+      "task": { "id": "s2", "title": "Pay rent", "status": "open", "today": false, "project": "p1", "source": "app", "deadline": "2026-11-21", "created": "2026-11-15", "assignedToOther": true },
+      "expected": {
+        "isUnfiled": false, "isInboxMember": false, "inTriageBand": false, "isOnToday": false, "inInbox": false,
+        "daysOnToday": 0,
+        "matchesView": { "today": false, "inbox": false, "upcoming": false, "anytime": false },
+        "dueState": "dueToday", "deadlineRed": true, "upcomingDay": null, "arrivedOnOwn": false
+      }
+    },
+    {
+      "name": "shared task assigned to another member with future deadline stays out of personal Upcoming",
+      "task": { "id": "s3", "title": "Book flights", "status": "open", "today": false, "project": "p1", "source": "app", "deadline": "2026-11-28", "created": "2026-11-15", "assignedToOther": true },
+      "expected": {
+        "isUnfiled": false, "isInboxMember": false, "inTriageBand": false, "isOnToday": false, "inInbox": false,
+        "daysOnToday": 0,
+        "matchesView": { "today": false, "inbox": false, "upcoming": false, "anytime": false },
+        "dueState": null, "deadlineRed": false, "upcomingDay": null, "arrivedOnOwn": false
+      }
+    },
+    {
+      "name": "shared task assigned to another member still honors personal When chase date",
+      "task": { "id": "s4", "title": "Check with Ben", "status": "open", "today": false, "project": "p1", "source": "app", "scheduled": "2026-11-25", "deadline": "2026-11-23", "created": "2026-11-15", "assignedToOther": true },
+      "expected": {
+        "isUnfiled": false, "isInboxMember": false, "inTriageBand": false, "isOnToday": false, "inInbox": false,
+        "daysOnToday": 0,
+        "matchesView": { "today": false, "inbox": false, "upcoming": true, "anytime": false },
+        "dueState": null, "deadlineRed": false, "upcomingDay": "2026-11-25", "arrivedOnOwn": false
+      }
     }
   ]
 }

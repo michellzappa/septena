@@ -59,8 +59,8 @@ extension ReviewGroup {
     if let waiting = byGroup[.waiting] {
       byGroup[.waiting] = waiting.enumerated().sorted { a, b in
         // A wait with no start day sorts last; ties keep the list's order.
-        let da = a.element.waitingSince ?? "9999-12-31"
-        let db = b.element.waitingSince ?? "9999-12-31"
+        let da = a.element.effectiveWaitingSince ?? "9999-12-31"
+        let db = b.element.effectiveWaitingSince ?? "9999-12-31"
         return da == db ? a.offset < b.offset : da < db
       }.map(\.element)
     }

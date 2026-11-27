@@ -29,11 +29,15 @@ export const SHARED_FIELDS: Record<SharedEntity, readonly string[]> = {
     "title", "status", "kind", "heading", "created", "deadline", "completedAt", "notes", "position",
     "recurrenceUnit", "recurrenceInterval", "recurrenceAfterCompletion", "recurrencePaused",
     "recurrenceSeriesID", "recurrenceAnchorDate", "recurrenceWeekdays", "recurrenceMonthDay",
-    "recurrenceOrdinalWeekday", "createdAt", "dropReason", "assignedTo",
+    "recurrenceOrdinalWeekday", "createdAt", "dropReason", "assignedTo", "assignedBy", "assignedAt",
   ],
   project: ["title", "status", "created", "completedAt", "notes"],
   checklistItem: ["taskId", "title", "checked", "checkedAt", "position", "createdAt"],
 };
+
+/// Shared fields stamped by ProjectStore itself, never accepted in a member's
+/// ShareOp and never enqueued in share_outbox.
+export const SERVER_SHARED_FIELDS: ReadonlySet<string> = new Set(["assignedBy", "assignedAt"]);
 
 /// A repeating task starts on the same day for every member. After that each
 /// member's When is their own.
@@ -41,8 +45,10 @@ export const SEED_FIELDS = ["scheduled", "startTime", "durationMinutes", "timeZo
 
 /// Every field the ProjectStore accepts for an entity. A write that names
 /// anything else is cut to this list (fail closed).
-export const acceptedFields = (entity: SharedEntity): readonly string[] =>
-  entity === "task" ? [...SHARED_FIELDS.task, ...SEED_FIELDS] : SHARED_FIELDS[entity];
+export const acceptedFields = (entity: SharedEntity): readonly string[] => {
+  const base = SHARED_FIELDS[entity].filter((f) => !SERVER_SHARED_FIELDS.has(f));
+  return entity === "task" ? [...base, ...SEED_FIELDS] : base;
+};
 
 const RETIRED = "retired:";
 
@@ -162,10 +168,10 @@ export class ShareBook {
     ).toArray()[0] ?? null;
   }
 
-  forProject(localProjectId: string | null | undefined): { id: string; role: "owner" | "editor" } | null {
+  forProject(localProjectId: string | null | undefined): { id: string; role: "owner" | "editor"; memberId: string } | null {
     if (!localProjectId) return null;
-    return this.sql.exec<{ id: string; role: "owner" | "editor" }>(
-      "SELECT id, role FROM shares WHERE localProjectId = ?", localProjectId,
+    return this.sql.exec<{ id: string; role: "owner" | "editor"; memberId: string }>(
+      "SELECT id, role, memberId FROM shares WHERE localProjectId = ?", localProjectId,
     ).toArray()[0] ?? null;
   }
 

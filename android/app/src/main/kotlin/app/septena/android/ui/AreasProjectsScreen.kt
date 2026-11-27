@@ -142,17 +142,23 @@ fun AreasProjectsScreen(
         }
     }
 
+    // Shared-project person filter: null = all, "" = unassigned (Nobody), else member id.
+    var assigneeFilter by remember(destination.key) { mutableStateOf<String?>(null) }
+    fun matchesAssignee(row: PlaceTaskRow): Boolean = when (val f = assigneeFilter) {
+        null -> true
+        "" -> row.assignedTo.isNullOrBlank()
+        else -> row.assignedTo == f
+    }
+
     val visibleAreaTasks = remember(state.areaTasks, starredOnly) {
         if (starredOnly) state.areaTasks.filter(PlaceTaskRow::isStarred) else state.areaTasks
     }
-    val visibleUnsectioned = remember(state.unsectionedTasks, starredOnly) {
-        if (starredOnly) state.unsectionedTasks.filter(PlaceTaskRow::isStarred) else state.unsectionedTasks
+    val visibleUnsectioned = remember(state.unsectionedTasks, starredOnly, assigneeFilter) {
+        state.unsectionedTasks.filter { (!starredOnly || it.isStarred) && matchesAssignee(it) }
     }
-    val visibleSections = remember(state.sections, starredOnly) {
-        if (starredOnly) {
-            state.sections.map { it.copy(tasks = it.tasks.filter(PlaceTaskRow::isStarred)) }
-        } else {
-            state.sections
+    val visibleSections = remember(state.sections, starredOnly, assigneeFilter) {
+        state.sections.map { section ->
+            section.copy(tasks = section.tasks.filter { (!starredOnly || it.isStarred) && matchesAssignee(it) })
         }
     }
     val orderedPlaceDragIds = remember(selection.selectedIds, visibleAreaTasks, visibleUnsectioned, visibleSections) {
@@ -317,6 +323,37 @@ fun AreasProjectsScreen(
                                             menuOpen = false
                                             shareOpen = true
                                         },
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (destination is AreasProjectsDestination.Project) {
+                    state.share?.let { share ->
+                        item(key = "project-assignee-filter") {
+                            androidx.compose.foundation.lazy.LazyRow(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = TaskCardMetrics.Margin, vertical = 2.dp),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                items(share.members.size, key = { share.members[it].id }) { idx ->
+                                    val member = share.members[idx]
+                                    val selected = assigneeFilter == member.id
+                                    androidx.compose.material3.FilterChip(
+                                        selected = selected,
+                                        onClick = { assigneeFilter = if (selected) null else member.id },
+                                        label = { Text(if (member.id == share.me) sharingCopy(SharingCopy.you, languageTag) else member.name) },
+                                    )
+                                }
+                                item(key = "assignee-nobody") {
+                                    val selected = assigneeFilter == ""
+                                    androidx.compose.material3.FilterChip(
+                                        selected = selected,
+                                        onClick = { assigneeFilter = if (selected) null else "" },
+                                        label = { Text(sharingCopy(SharingCopy.nobody, languageTag)) },
                                     )
                                 }
                             }
