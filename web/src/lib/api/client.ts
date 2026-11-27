@@ -64,7 +64,7 @@ export interface SupportConversation {
 /// time in next.config.ts, the same form as the other clients.
 export const CLIENT_HEADER = "septena-web";
 export const CLIENT_VERSION = process.env.NEXT_PUBLIC_SEPTENA_VERSION ?? "0.0.0 (0)";
-export const CLIENT_HEADERS = { ...CLIENT_HEADERS, "X-Septena-Version": CLIENT_VERSION } as const;
+export const CLIENT_HEADERS = { "X-Septena-Client": CLIENT_HEADER, "X-Septena-Version": CLIENT_VERSION } as const;
 
 export class ApiError extends Error {
   readonly status: number;
