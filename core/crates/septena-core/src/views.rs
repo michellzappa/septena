@@ -104,9 +104,8 @@ pub(crate) fn date_facts(task: &TaskSnapshot, today: Day) -> DateFacts {
     let active = open && !is_heading && task.deleted_at.is_none() && task.faded_at.is_none();
     let scheduled = parse_day(&task.scheduled);
     let deadline = parse_day(&task.deadline);
-    let holding_deadline = deadline.filter(|_| {
-        !task.assigned_to_other && !is_deferred(parse_day(&task.deferred_deadline), scheduled, deadline)
-    });
+    let holding_deadline = deadline
+        .filter(|_| !task.assigned_to_other && !is_deferred(parse_day(&task.deferred_deadline), scheduled, deadline));
     let is_on_today =
         active && (task.today || scheduled.is_some_and(|d| d <= today) || holding_deadline.is_some_and(|d| d <= today));
     DateFacts {
