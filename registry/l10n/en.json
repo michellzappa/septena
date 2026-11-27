@@ -271,8 +271,8 @@
       "signIn.manage.footer"
     ]
   },
-  "Add as a custom MCP connector in Claude or any MCP client": {
-    "text": "Add as a custom MCP connector in Claude or any MCP client",
+  "Add as a custom MCP server in any MCP client": {
+    "text": "Add as a custom MCP server in any MCP client",
     "paths": [
       "settings.copy.claude_connector.connectorUrlDetail.label"
     ]
@@ -283,8 +283,8 @@
       "signIn.manage.addEmail"
     ]
   },
-  "Add the connector URL to Claude or any MCP client, or paste the setup prompt into Claude. When your browser shows an 8-character code, enter it above. Only enter a code from a browser window you opened yourself.": {
-    "text": "Add the connector URL to Claude or any MCP client, or paste the setup prompt into Claude. When your browser shows an 8-character code, enter it above. Only enter a code from a browser window you opened yourself.",
+  "Add the MCP server URL to any MCP client, or paste the setup prompt into your agent. When your browser shows an 8-character code, enter it above. Only enter a code from a window you opened yourself.": {
+    "text": "Add the MCP server URL to any MCP client, or paste the setup prompt into your agent. When your browser shows an 8-character code, enter it above. Only enter a code from a window you opened yourself.",
     "paths": [
       "settings.copy.claude_connector.footer.label"
     ]
@@ -567,6 +567,12 @@
       "tokens.fruitAccents.acai.name"
     ]
   },
+  "Back": {
+    "text": "Back",
+    "paths": [
+      "surfaces.firstRun.chrome.back.label"
+    ]
+  },
   "Backup on our server": {
     "text": "Backup on our server",
     "paths": [
@@ -770,24 +776,6 @@
       "actions.actions.app.classicWindow.title"
     ]
   },
-  "Claude reads and changes your tasks through your Septena account. You decide which tasks it works on.": {
-    "text": "Claude reads and changes your tasks through your Septena account. You decide which tasks it works on.",
-    "paths": [
-      "surfaces.firstRun.steps.connectClaude.body"
-    ]
-  },
-  "Claude setup prompt": {
-    "text": "Claude setup prompt",
-    "paths": [
-      "settings.copy.claude_connector.setupPrompt.label"
-    ]
-  },
-  "Claude starter prompt": {
-    "text": "Claude starter prompt",
-    "paths": [
-      "settings.copy.claude_connector.firstPrompt.label"
-    ]
-  },
   "Clear": {
     "text": "Clear",
     "paths": [
@@ -897,12 +885,6 @@
       "settings.copy.ai_explainer.confirmTitle.label"
     ]
   },
-  "Connect Claude": {
-    "text": "Connect Claude",
-    "paths": [
-      "surfaces.firstRun.steps.connectClaude.title"
-    ]
-  },
   "Connect Claude and two more. Each one asks before it acts.": {
     "text": "Connect Claude and two more. Each one asks before it acts.",
     "paths": [
@@ -918,7 +900,14 @@
   "Connect an agent": {
     "text": "Connect an agent",
     "paths": [
-      "settings.pages.agents.sections.connect.header"
+      "settings.pages.agents.sections.connect.header",
+      "surfaces.firstRun.steps.agentSetup.title"
+    ]
+  },
+  "Connect the agent you already use. You choose what it works on, and only you mark work done.": {
+    "text": "Connect the agent you already use. You choose what it works on, and only you mark work done.",
+    "paths": [
+      "surfaces.firstRun.steps.agentSetup.body"
     ]
   },
   "Connect your agent": {
@@ -950,12 +939,6 @@
       "settings.pages.connections.title"
     ]
   },
-  "Connector URL": {
-    "text": "Connector URL",
-    "paths": [
-      "settings.copy.claude_connector.connectorUrl.label"
-    ]
-  },
   "Contact Support": {
     "text": "Contact Support",
     "paths": [
@@ -974,7 +957,7 @@
     "paths": [
       "settings.copy.sign_in_approval.continue.label",
       "surfaces.firstRun.steps.welcome.primary.title",
-      "surfaces.firstRun.steps.connectClaude.afterDone.title"
+      "surfaces.firstRun.steps.agentSetup.afterDone.title"
     ]
   },
   "Continue with Apple": {
@@ -1052,22 +1035,10 @@
       "settings.copy.calendar_detail.copyUrl.label"
     ]
   },
-  "Copy first prompt": {
-    "text": "Copy first prompt",
-    "paths": [
-      "surfaces.firstRun.steps.connectClaude.tertiary.title"
-    ]
-  },
   "Copy setup prompt": {
     "text": "Copy setup prompt",
     "paths": [
-      "surfaces.firstRun.steps.connectClaude.primary.title"
-    ]
-  },
-  "Copy the setup prompt and paste it into Claude.": {
-    "text": "Copy the setup prompt and paste it into Claude.",
-    "paths": [
-      "surfaces.firstRun.steps.connectClaude.instructions.0"
+      "surfaces.firstRun.steps.agentSetup.primary.title"
     ]
   },
   "Could not add sign-in method.": {
@@ -1481,8 +1452,8 @@
       "surfaces.sharing.copy.inviteNote.label"
     ]
   },
-  "Each project has notes, so you and Claude know what it’s for.": {
-    "text": "Each project has notes, so you and Claude know what it’s for.",
+  "Each project has notes, so you and your agents know what it’s for.": {
+    "text": "Each project has notes, so you and your agents know what it’s for.",
     "paths": [
       "surfaces.firstRun.steps.welcome.points.2.detail"
     ]
@@ -1905,6 +1876,12 @@
       "tokens.fruitAccents.haskap.name"
     ]
   },
+  "Have a connection code?": {
+    "text": "Have a connection code?",
+    "paths": [
+      "settings.copy.claude_connector.haveCode.label"
+    ]
+  },
   "Header Texture": {
     "text": "Header Texture",
     "paths": [
@@ -2006,6 +1983,12 @@
     "text": "If you subscribe during the trial, billing starts on the day you subscribe.",
     "paths": [
       "plans.paywall.trialBilling"
+    ]
+  },
+  "If your browser showed an 8-character code, enter it here. Only enter a code from a window you opened yourself.": {
+    "text": "If your browser showed an 8-character code, enter it here. Only enter a code from a window you opened yourself.",
+    "paths": [
+      "settings.copy.claude_connector.codeHint.label"
     ]
   },
   "Import": {
@@ -2231,7 +2214,7 @@
   "Later": {
     "text": "Later",
     "paths": [
-      "surfaces.firstRun.steps.connectClaude.secondary.title"
+      "surfaces.firstRun.steps.agentSetup.secondary.title"
     ]
   },
   "Later…": {
@@ -2258,16 +2241,16 @@
       "surfaces.doing.screen.length.title"
     ]
   },
-  "Let Claude or your own agent work your list": {
-    "text": "Let Claude or your own agent work your list",
-    "paths": [
-      "surfaces.notices.items.getStarted.steps.connectAI.detail"
-    ]
-  },
   "Let Go": {
     "text": "Let Go",
     "paths": [
       "actions.actions.task.letGoFaded.title"
+    ]
+  },
+  "Let your agent work from your list": {
+    "text": "Let your agent work from your list",
+    "paths": [
+      "surfaces.notices.items.getStarted.steps.connectAI.detail"
     ]
   },
   "Light": {
@@ -2324,6 +2307,12 @@
     "text": "MCP Skills",
     "paths": [
       "settings.pages.agents.sections.connect.items.1.label"
+    ]
+  },
+  "MCP server URL": {
+    "text": "MCP server URL",
+    "paths": [
+      "settings.copy.claude_connector.connectorUrl.label"
     ]
   },
   "MIT License": {
@@ -3064,22 +3053,16 @@
       "surfaces.taskReferences.add.placeholder"
     ]
   },
-  "Paste into Claude to start connecting": {
-    "text": "Paste into Claude to start connecting",
-    "paths": [
-      "settings.copy.claude_connector.setupPromptDetail.label"
-    ]
-  },
   "Paste into a model's context to teach it the task tools without connecting MCP.": {
     "text": "Paste into a model's context to teach it the task tools without connecting MCP.",
     "paths": [
       "settings.copy.mcp_skills.copyFooter.label"
     ]
   },
-  "Paste the first prompt. Claude sets up your areas and projects with you.": {
-    "text": "Paste the first prompt. Claude sets up your areas and projects with you.",
+  "Paste into your agent to connect your account": {
+    "text": "Paste into your agent to connect your account",
     "paths": [
-      "surfaces.firstRun.steps.connectClaude.instructions.2"
+      "settings.copy.claude_connector.setupPromptDetail.label"
     ]
   },
   "Pause Repeat": {
@@ -3938,6 +3921,12 @@
       "actions.actions.app.settings.title"
     ]
   },
+  "Setup prompt": {
+    "text": "Setup prompt",
+    "paths": [
+      "settings.copy.claude_connector.setupPrompt.label"
+    ]
+  },
   "Share Project": {
     "text": "Share Project",
     "paths": [
@@ -4089,8 +4078,8 @@
       "settings.copy.sign_in_approval.confirmDevice.label"
     ]
   },
-  "Sign in so Claude or another MCP agent can connect to your tasks through your private Septena account.": {
-    "text": "Sign in so Claude or another MCP agent can connect to your tasks through your private Septena account.",
+  "Sign in so your agent can connect to your tasks through your private Septena account.": {
+    "text": "Sign in so your agent can connect to your tasks through your private Septena account.",
     "paths": [
       "settings.copy.claude_connector.signInBody.label"
     ]
@@ -4252,6 +4241,12 @@
     "text": "Starlings record",
     "paths": [
       "surfaces.taskReferences.kinds.door.label"
+    ]
+  },
+  "Starter prompt": {
+    "text": "Starter prompt",
+    "paths": [
+      "settings.copy.claude_connector.firstPrompt.label"
     ]
   },
   "Still on It": {
@@ -5099,12 +5094,6 @@
     "paths": [
       "settings.keys.listSort.options.1.title",
       "surfaces.taskAttributes.when.label"
-    ]
-  },
-  "When Claude shows a code, enter it below.": {
-    "text": "When Claude shows a code, enter it below.",
-    "paths": [
-      "surfaces.firstRun.steps.connectClaude.instructions.1"
     ]
   },
   "When dates, deadlines and repeats": {

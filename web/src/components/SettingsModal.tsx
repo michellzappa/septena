@@ -153,7 +153,7 @@ const KEY_CREATED_PROMPT = SURFACES_CATALOG.prompts.items.find((p) => p.id === "
 const SUPPORT_UNREAD_LABEL =
   SURFACES_CATALOG.support.copy.find((c) => c.id === "unreadReply")?.label ?? SURFACES_CATALOG.support.title;
 const CUSTOMIZABLE_SMART_LISTS: SmartDestination[] = SIDEBAR_DESTINATIONS.map((d) => d.id);
-const CONNECTOR_URL = "https://api.septena.app/mcp";
+const CONNECTOR_URL = FIRST_RUN.connectorUrl;
 
 const LUCIDE_BY_NAME: Record<string, ComponentType<{ className?: string }>> = {
   "user-circle": UserCircle,
