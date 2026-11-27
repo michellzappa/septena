@@ -139,7 +139,9 @@ pub(crate) fn recurrence_window(input: &Value) -> Result<Value, CoreError> {
     let today = input["today"].as_str().and_then(Day::parse);
     let anchor = input["lastSlot"].as_str().and_then(Day::parse);
     let Some((mut through, anchor)) = today.zip(anchor) else {
-        return Err(CoreError::invalid("recurrenceWindow requires a local day and last slot"));
+        return Err(CoreError::invalid(
+            "recurrenceWindow requires a local day and last slot",
+        ));
     };
     if let Some(start) = input["startTime"].as_str() {
         let now = input["localTime"]
@@ -163,8 +165,11 @@ pub(crate) fn recurrence_window(input: &Value) -> Result<Value, CoreError> {
     if !rule.after_completion && (fresh || each) && anchor <= through {
         for _ in 0..10_000 {
             let slot = last.to_string();
-            let next = next_scheduled_date(slot.clone(), Some(slot), None, rule.clone()).and_then(|next| Day::parse(&next));
-            let Some(next) = next.filter(|next| *next <= through) else { break };
+            let next =
+                next_scheduled_date(slot.clone(), Some(slot), None, rule.clone()).and_then(|next| Day::parse(&next));
+            let Some(next) = next.filter(|next| *next <= through) else {
+                break;
+            };
             if each && dates.len() == 256 {
                 more = true;
                 break;
