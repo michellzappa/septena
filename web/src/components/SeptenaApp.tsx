@@ -1737,6 +1737,22 @@ export function SeptenaApp() {
     [showToast],
   );
 
+  // A manual reorder by drag, on the shared undo stack (recorded here, at the gesture, never in
+  // the engine: a sync apply must not land on the stack). Undo puts back each value as it was.
+  const reorderWithUndo = useCallback(
+    async (reordered: string[], field: "position" | "todayPosition", movedId: string) => {
+      const byId = new Map(syncState.snapshot.tasks.map((t) => [t.id, t]));
+      const before = reordered.map((id) => ({ id, value: byId.get(id)?.[field] ?? null }));
+      await engine.reorderTasks(reordered, field);
+      undoStack.record({
+        label: `Moved “${byId.get(movedId)?.title ?? ""}”`,
+        undo: () => engine.restoreTaskOrder(before, field),
+        redo: () => engine.reorderTasks(reordered, field),
+      });
+    },
+    [engine, syncState.snapshot.tasks, undoStack],
+  );
+
   const handleDropOnTask = useCallback(
     async (targetId: string) => {
       const sourceId = draggedTaskId;
@@ -1751,9 +1767,9 @@ export function SeptenaApp() {
       if (!reordered) return;
       const field =
         destination.kind === "smart" && destination.id === "today" ? "todayPosition" : "position";
-      await engine.reorderTasks(reordered, field);
+      await reorderWithUndo(reordered, field, sourceId);
     },
-    [canReorderRows, destination, draggedTaskId, engine, visibleTasks],
+    [canReorderRows, destination, draggedTaskId, reorderWithUndo, visibleTasks],
   );
 
   // A project heading dropped on another heading: reorder the project's headings. Its tasks
@@ -1771,9 +1787,9 @@ export function SeptenaApp() {
         targetId,
       );
       if (!reordered) return;
-      await engine.reorderTasks(reordered, "position");
+      await reorderWithUndo(reordered, "position", sourceId);
     },
-    [draggedHeadingId, engine, projectHeadings],
+    [draggedHeadingId, projectHeadings, reorderWithUndo],
   );
 
   const handleDropOnSidebarSmart = useCallback(
