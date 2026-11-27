@@ -266,11 +266,12 @@ function checkShipsClaims(repo, allowed) {
       || (swiftCases[id] ?? []).some((n) => new RegExp(`\\.${esc(n)}\\b`).test(swiftApp)),
     android: (id) => kotlinReader(ktApp, id),
     windows: (id) => kotlinReader(windowsApp, id),
+    linux: (id) => kotlinReader(windowsApp, id),
     web: (id) => quoted(webApp, id) || (/^\w+$/.test(id) && new RegExp(`\\.${id}\\b`).test(webApp)),
   };
   const seen = new Set();
   for (const [featureId, claim] of Object.entries(capabilities)) {
-    for (const platform of [...SWIFT_PLATFORMS, "android", "web", "windows"]) {
+    for (const platform of [...SWIFT_PLATFORMS, "android", "web", "windows", "linux"]) {
       if (claim[platform] !== "ships" && claim[platform] !== "partial") continue;
       const ids = (entries[featureId] ?? [])
         .filter((e) => e.platforms.length === 0 || e.platforms.includes(platform))

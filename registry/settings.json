@@ -9,7 +9,7 @@
       "type": "string",
       "maxLength": 200,
       "default": "",
-      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows", "linux"],
       "featureId": "sync.backend"
     },
     "telemetryLevel": {
@@ -19,7 +19,7 @@
       "enum": "telemetryLevel",
       "default": "balanced",
       "ui": false,
-      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows", "linux"],
       "featureId": "settings.display"
     },
     "calendarHiddenTitles": {
@@ -28,7 +28,7 @@
       "maxItems": 500,
       "itemMaxLength": 500,
       "default": [],
-      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows", "linux"],
       "featureId": "calendar.events"
     },
     "rolledInDismissedOn": {
@@ -38,7 +38,7 @@
       "format": "day",
       "default": null,
       "ui": false,
-      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows", "linux"],
       "featureId": "lists.today"
     },
     "homeTimezone": {
@@ -47,14 +47,14 @@
       "maxLength": 64,
       "default": null,
       "ui": false,
-      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows", "linux"],
       "featureId": "sync.backend"
     },
     "agentsPaused": {
       "scope": "synced",
       "type": "bool",
       "default": false,
-      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows", "linux"],
       "featureId": "agents.stop-pause"
     },
     "getStartedDismissed": {
@@ -62,7 +62,7 @@
       "type": "bool",
       "default": false,
       "ui": false,
-      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows", "linux"],
       "featureId": "lists.today"
     },
     "getStartedSteps": {
@@ -72,7 +72,7 @@
       "itemMaxLength": 64,
       "default": [],
       "ui": false,
-      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows", "linux"],
       "featureId": "lists.today"
     },
     "upsellsSeen": {
@@ -82,7 +82,7 @@
       "itemMaxLength": 64,
       "default": [],
       "ui": false,
-      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows", "linux"],
       "featureId": "sync.backend"
     },
     "onboardedAt": {
@@ -91,7 +91,7 @@
       "format": "stamp",
       "default": null,
       "ui": false,
-      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows", "linux"],
       "featureId": "onboarding.first-run"
     },
     "accentColor": {
@@ -101,7 +101,7 @@
       "enum": "accentColor",
       "default": "colorful",
       "ui": false,
-      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows", "linux"],
       "featureId": "appearance.accents"
     },
     "canvasTexture": {
@@ -111,7 +111,7 @@
       "enum": "canvasTexture",
       "default": "none",
       "ui": false,
-      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows", "linux"],
       "featureId": "appearance.textures"
     },
     "textureIntensity": {
@@ -122,7 +122,7 @@
       "max": 100,
       "default": 55,
       "ui": false,
-      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows", "linux"],
       "featureId": "appearance.textures"
     },
     "textureMotion": {
@@ -132,7 +132,7 @@
       "enum": "textureMotion",
       "default": "still",
       "ui": false,
-      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows", "linux"],
       "featureId": "appearance.textures"
     },
     "smartListOrder": {
@@ -142,7 +142,7 @@
       "maxItems": 32,
       "itemMaxLength": 64,
       "default": [],
-      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows", "linux"],
       "featureId": "settings.display"
     },
     "smartListHidden": {
@@ -152,7 +152,7 @@
       "maxItems": 32,
       "itemMaxLength": 64,
       "default": [],
-      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows", "linux"],
       "featureId": "settings.display"
     },
     "smartListPlacement": {
@@ -163,7 +163,7 @@
       "keyMaxLength": 64,
       "values": ["top", "bottom"],
       "default": {},
-      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows", "linux"],
       "featureId": "settings.display"
     },
     "appearanceMode": {
@@ -178,7 +178,7 @@
         { "value": "dark", "title": "Dark" }
       ],
       "ui": false,
-      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows", "linux"],
       "featureId": "appearance.mode"
     },
     "syncTheme": {
@@ -187,7 +187,7 @@
       "type": "bool",
       "default": true,
       "ui": false,
-      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows", "linux"],
       "featureId": "appearance.mode"
     },
     "appIconFinish": {
@@ -205,7 +205,7 @@
       "storageKey": "septena.today.showCompleted",
       "type": "bool",
       "default": true,
-      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows", "linux"],
       "featureId": "lists.today"
     },
     "todayGroupByList": {
@@ -213,7 +213,7 @@
       "storageKey": "septena.today.groupByList",
       "type": "bool",
       "default": true,
-      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows", "linux"],
       "featureId": "lists.today"
     },
     "tasksShowAging": {
@@ -221,7 +221,7 @@
       "storageKey": "septena.tasks.showAging",
       "type": "bool",
       "default": true,
-      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows", "linux"],
       "featureId": "task.aging"
     },
     "fadeSweptAt": {
@@ -230,7 +230,7 @@
       "format": "stamp",
       "default": null,
       "ui": false,
-      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows", "linux"],
       "featureId": "fade.sweep"
     },
     "fadeSweepDismissedOn": {
@@ -239,7 +239,7 @@
       "format": "day",
       "default": null,
       "ui": false,
-      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows", "linux"],
       "featureId": "fade.sweep"
     },
     "tasksShowFaded": {
@@ -247,7 +247,7 @@
       "storageKey": "septena.tasks.showFaded",
       "type": "bool",
       "default": true,
-      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows", "linux"],
       "featureId": "task.aging"
     },
     "tasksTitleLines": {
@@ -270,7 +270,7 @@
       "storageKey": "septena.tasks.filingSuggestions",
       "type": "bool",
       "default": true,
-      "platforms": ["ios", "ipados", "macos", "android", "windows"],
+      "platforms": ["ios", "ipados", "macos", "android", "windows", "linux"],
       "featureId": "edit.filing-suggestion"
     },
     "tasksShowCalendarEvents": {
@@ -278,7 +278,7 @@
       "storageKey": "septena.tasks.showCalendarEvents",
       "type": "bool",
       "default": true,
-      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows", "linux"],
       "featureId": "calendar.events"
     },
     "badgeShowOverdue": {
@@ -295,7 +295,7 @@
       "storageKey": "septena.ui.loggingAnimations",
       "type": "bool",
       "default": true,
-      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows", "linux"],
       "featureId": "settings.display"
     },
     "inboxZeroMotionEnabled": {
@@ -313,7 +313,7 @@
       "min": -2,
       "max": 2,
       "default": 0,
-      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows", "linux"],
       "featureId": "appearance.text-size"
     },
     "sidebarCounts": {
@@ -321,7 +321,7 @@
       "storageKey": "septena.septask.sidebarCounts",
       "type": "bool",
       "default": true,
-      "platforms": ["macos", "web", "windows"],
+      "platforms": ["macos", "web", "windows", "linux"],
       "featureId": "settings.display"
     },
     "aiMode": {
@@ -335,7 +335,7 @@
         { "value": "auto", "title": "Automatic" },
         { "value": "useMyClaude", "title": "Use my Claude" }
       ],
-      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows", "linux"],
       "featureId": "ai.reach-dial"
     },
     "diagnosticsEnabled": {
@@ -344,7 +344,7 @@
       "storageKey": "septask.diagnostics.enabled",
       "type": "bool",
       "default": false,
-      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows", "linux"],
       "featureId": "settings.display"
     },
     "showModelLabels": {
@@ -1167,7 +1167,7 @@
           "items": [
             { "kind": "customSurface", "surface": "open_help", "label": "Help", "icon": "settings.help" },
             { "kind": "customSurface", "surface": "keyboard_shortcuts", "label": "Keyboard Shortcuts", "icon": "settings.shortcuts", "platforms": ["web"], "featureId": "mac.keyboard" },
-            { "kind": "customSurface", "surface": "check_updates", "label": "Check for Updates…", "platforms": ["macos", "windows"], "featureId": "mac.updates" },
+            { "kind": "customSurface", "surface": "check_updates", "label": "Check for Updates…", "platforms": ["macos", "windows", "linux"], "featureId": "mac.updates" },
             { "kind": "customSurface", "surface": "reset_get_started", "label": "Show Get Started Again" },
             { "kind": "customSurface", "surface": "reset_first_run", "label": "Show Welcome Again", "featureId": "onboarding.first-run" },
             { "kind": "customSurface", "surface": "contact_support", "label": "Contact Support", "icon": "settings.feedback", "featureId": "support.contact" }

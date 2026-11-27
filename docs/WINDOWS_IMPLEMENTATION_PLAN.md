@@ -45,6 +45,24 @@ Once the live x64 build is green, run the Win365 checklist with a sync-enabled t
 
 A green CI run closes the fixture checkpoint. W1 closes after the live Win365 run passes, with the exact tested artifact recorded.
 
+## Shared desktop seam for Linux (ADR 0062, #773)
+
+The native Linux client shares this Compose Desktop codebase, Kotlin modules, and released Rust core (`linux-x86-64/libseptena_core.so` is already inside `septena-core-jvm-natives-*.jar`). Keep all shared desktop code (`account/`, `workspace/`, `ui/`, `agents/`) free of Windows-specific imports so the upcoming Linux worker only plugs in its host adapter and packaging.
+
+Introduce one `platform/` boundary before wiring live DPAPI or `%LOCALAPPDATA%` persistence:
+
+- **`DesktopHost`** (injected at `Main.kt` startup via `DesktopHost.current()`):
+  - **`DesktopPaths`**: `accountDirectory(accountId)` and `cacheDirectory()` (`%LOCALAPPDATA%\Septena` in `platform/windows/`; XDG `$XDG_DATA_HOME/septena` in `platform/linux/`).
+  - **`SecretVault`**: `read(accountId)`, `write(accountId, payload)`, `delete(accountId)` (current-user DPAPI in `platform/windows/`; freedesktop Secret Service / `libsecret` in `platform/linux/`).
+  - **`ClientIdentity`**: `platformId` (`"windows"` or `"linux"`), `userAgent`, and `defaultDeviceName`, passed into `android/transport` (`JsonHttp`, `SyncLiveSocket`).
+  - **`SystemBridge`**: `openExternalUrl(url)` (`Desktop.browse` / `xdg-open`) and future OS hooks (notifications, tray).
+
+Rules for Windows lanes:
+1. Never call Win32/DPAPI JNA or read `LOCALAPPDATA` outside `platform/windows/`.
+2. Keep `android/transport` client identity parameterized by `ClientIdentity`, not hardcoded to Windows.
+3. Keep `.github/workflows/windows-spike.yml` green on **both** `windows-2025` and `ubuntu-latest` on every PR. (If DPAPI tests require Windows, guard them to Windows or put them behind a `SecretVault` contract test suite run on both OSes with an in-memory vault plus Windows-only DPAPI integration tests.)
+4. Keep the Gradle project directory at `windows/` through W1 to avoid churn; rename to `desktop/` in one mechanical PR once W1 lands.
+
 ## Implementation assignments
 
 Use GPT-6 Luna at x-high for each implementation lane. Give each worker its row, the accepted spike commit, the shared interfaces, and the relevant verification commands. Use one worktree and a `wt/windows-*` branch per lane so pushes trigger the Windows workflow. The coordinator owns the integration branch, reviews boundaries, queues CI, and records Win365 acceptance. The Windows source packages in the table are relative to `windows/src/main/kotlin/app/septena/windows/`.

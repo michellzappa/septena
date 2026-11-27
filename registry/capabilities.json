@@ -8,6 +8,7 @@
     "web",
     "android",
     "windows",
+    "linux",
     "watchos"
   ],
   "statuses": [
@@ -28,6 +29,7 @@
       "web": "ships",
       "android": "ships",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "partial"
     },
     "lists.today": {
@@ -42,6 +44,7 @@
       "web": "ships",
       "android": "ships",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "partial"
     },
     "lists.review": {
@@ -56,6 +59,7 @@
       "web": "ships",
       "android": "ships",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "not_applicable"
     },
     "review.waiting": {
@@ -70,6 +74,7 @@
       "web": "ships",
       "android": "ships",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "not_applicable"
     },
     "lists.agent": {
@@ -87,6 +92,7 @@
       "web": "ships",
       "android": "ships",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "not_applicable"
     },
     "lists.upcoming": {
@@ -101,6 +107,7 @@
       "web": "ships",
       "android": "ships",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "not_applicable"
     },
     "lists.anytime": {
@@ -114,6 +121,7 @@
       "web": "ships",
       "android": "ships",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "not_applicable"
     },
     "lists.repeating": {
@@ -125,6 +133,7 @@
       "web": "ships",
       "android": "ships",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "not_applicable"
     },
     "lists.logbook": {
@@ -139,6 +148,7 @@
       "web": "ships",
       "android": "ships",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "not_applicable"
     },
     "lists.faded": {
@@ -152,6 +162,7 @@
       "web": "ships",
       "android": "ships",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "not_applicable"
     },
     "lists.starred": {
@@ -166,6 +177,7 @@
       "web": "ships",
       "android": "ships",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "not_applicable"
     },
     "lists.recently-deleted": {
@@ -177,6 +189,7 @@
       "web": "ships",
       "android": "ships",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "not_applicable"
     },
     "places.areas": {
@@ -194,6 +207,7 @@
       "web": "ships",
       "android": "ships",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "not_applicable"
     },
     "places.projects": {
@@ -214,6 +228,7 @@
       "web": "ships",
       "android": "ships",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "not_applicable"
     },
     "places.sections": {
@@ -228,6 +243,7 @@
       "web": "ships",
       "android": "ships",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "not_applicable"
     },
     "task.when-deadline": {
@@ -243,6 +259,7 @@
       "web": "ships",
       "android": "ships",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "not_applicable"
     },
     "task.repeat": {
@@ -258,6 +275,7 @@
       "web": "ships",
       "android": "ships",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "not_applicable"
     },
     "task.notes": {
@@ -273,6 +291,7 @@
       "web": "ships",
       "android": "ships",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "not_applicable"
     },
     "task.attachments": {
@@ -287,6 +306,7 @@
       "web": "ships",
       "android": "ships",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "not_applicable"
     },
     "task.do": {
@@ -298,6 +318,7 @@
       "web": "planned",
       "android": "ships",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "planned"
     },
     "task.references": {
@@ -313,6 +334,7 @@
       "web": "ships",
       "android": "ships",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "not_applicable"
     },
     "task.history": {
@@ -327,6 +349,7 @@
       "web": "ships",
       "android": "ships",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "not_applicable"
     },
     "task.provenance": {
@@ -341,6 +364,7 @@
       "web": "ships",
       "android": "ships",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "not_applicable"
     },
     "task.aging": {
@@ -352,6 +376,7 @@
       "web": "ships",
       "android": "ships",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "not_applicable"
     },
     "task.checklists": {
@@ -367,6 +392,7 @@
       "web": "ships",
       "android": "ships",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "not_applicable"
     },
     "task.tags": {
@@ -382,6 +408,7 @@
       "web": "ships",
       "android": "ships",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "not_applicable"
     },
     "task.share": {
@@ -393,6 +420,7 @@
       "web": "ships",
       "android": "ships",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "not_applicable"
     },
     "task.alerts": {
@@ -407,6 +435,7 @@
       "web": "ships",
       "android": "ships",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "not_applicable"
     },
     "fade.sweep": {
@@ -418,6 +447,7 @@
       "web": "ships",
       "android": "ships",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "not_applicable"
     },
     "capture.quick-add": {
@@ -429,6 +459,7 @@
       "web": "ships",
       "android": "ships",
       "windows": "not_applicable",
+      "linux": "not_applicable",
       "watchos": "not_applicable"
     },
     "sharing.projects": {
@@ -440,6 +471,7 @@
       "web": "planned",
       "android": "ships",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "not_applicable"
     },
     "capture.share-target": {
@@ -451,6 +483,7 @@
       "web": "ships",
       "android": "ships",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "not_applicable"
     },
     "capture.quick-entry": {
@@ -462,6 +495,7 @@
       "web": "not_applicable",
       "android": "not_applicable",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "not_applicable"
     },
     "edit.filing-suggestion": {
@@ -473,6 +507,7 @@
       "web": "not_applicable",
       "android": "ships",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "not_applicable"
     },
     "edit.undo": {
@@ -484,6 +519,7 @@
       "web": "ships",
       "android": "ships",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "not_applicable"
     },
     "edit.multi-select": {
@@ -495,6 +531,7 @@
       "web": "ships",
       "android": "ships",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "not_applicable"
     },
     "find.quick-find": {
@@ -508,6 +545,7 @@
       "web": "ships",
       "android": "ships",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "not_applicable"
     },
     "task.page": {
@@ -522,6 +560,7 @@
       "web": "partial",
       "android": "partial",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "partial"
     },
     "mac.keyboard": {
@@ -533,6 +572,7 @@
       "web": "ships",
       "android": "ships",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "not_applicable"
     },
     "mac.updates": {
@@ -544,6 +584,7 @@
       "web": "not_applicable",
       "android": "not_applicable",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "not_applicable"
     },
     "calendar.events": {
@@ -555,6 +596,7 @@
       "web": "planned",
       "android": "ships",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "not_applicable"
     },
     "import.reminders": {
@@ -566,6 +608,7 @@
       "web": "not_applicable",
       "android": "not_applicable",
       "windows": "not_applicable",
+      "linux": "not_applicable",
       "watchos": "not_applicable"
     },
     "import.things": {
@@ -577,6 +620,7 @@
       "web": "not_applicable",
       "android": "not_applicable",
       "windows": "not_applicable",
+      "linux": "not_applicable",
       "watchos": "not_applicable"
     },
     "ai.discuss": {
@@ -594,6 +638,7 @@
       "web": "ships",
       "android": "partial",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "not_applicable"
     },
     "ai.reach-dial": {
@@ -605,6 +650,7 @@
       "web": "ships",
       "android": "ships",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "not_applicable"
     },
     "agents.connector": {
@@ -618,6 +664,7 @@
       "web": "ships",
       "android": "ships",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "not_applicable"
     },
     "onboarding.first-run": {
@@ -629,6 +676,7 @@
       "web": "ships",
       "android": "ships",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "not_applicable"
     },
     "agents.stop-pause": {
@@ -642,6 +690,7 @@
       "web": "ships",
       "android": "ships",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "not_applicable"
     },
     "sync.backend": {
@@ -653,6 +702,7 @@
       "web": "ships",
       "android": "ships",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "planned"
     },
     "account.delete": {
@@ -664,6 +714,7 @@
       "web": "ships",
       "android": "ships",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "not_applicable"
     },
     "account.sign-in-apple": {
@@ -675,6 +726,7 @@
       "web": "planned",
       "android": "planned",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "not_applicable"
     },
     "account.sign-in-google": {
@@ -686,6 +738,7 @@
       "web": "planned",
       "android": "planned",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "not_applicable"
     },
     "account.sign-in-microsoft": {
@@ -697,6 +750,7 @@
       "web": "planned",
       "android": "planned",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "not_applicable"
     },
     "account.sign-in-email": {
@@ -708,6 +762,7 @@
       "web": "ships",
       "android": "ships",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "not_applicable"
     },
     "account.sign-in-device": {
@@ -719,6 +774,7 @@
       "web": "ships",
       "android": "ships",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "not_applicable"
     },
     "task.times": {
@@ -733,6 +789,7 @@
       "web": "ships",
       "android": "ships",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "not_applicable"
     },
     "calendar.feed": {
@@ -744,6 +801,7 @@
       "web": "ships",
       "android": "ships",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "not_applicable"
     },
     "widgets.tasks": {
@@ -755,6 +813,7 @@
       "web": "not_applicable",
       "android": "ships",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "not_applicable"
     },
     "watch.app": {
@@ -766,6 +825,7 @@
       "web": "not_applicable",
       "android": "not_applicable",
       "windows": "not_applicable",
+      "linux": "not_applicable",
       "watchos": "ships"
     },
     "data.import-export": {
@@ -777,6 +837,7 @@
       "web": "ships",
       "android": "ships",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "not_applicable"
     },
     "agents.list": {
@@ -788,6 +849,7 @@
       "web": "ships",
       "android": "ships",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "not_applicable"
     },
     "settings.display": {
@@ -799,6 +861,7 @@
       "web": "ships",
       "android": "ships",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "not_applicable"
     },
     "support.contact": {
@@ -810,6 +873,7 @@
       "web": "ships",
       "android": "ships",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "not_applicable"
     },
     "appearance.accents": {
@@ -821,6 +885,7 @@
       "web": "ships",
       "android": "ships",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "not_applicable"
     },
     "appearance.textures": {
@@ -832,6 +897,7 @@
       "web": "ships",
       "android": "ships",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "not_applicable"
     },
     "appearance.mode": {
@@ -843,6 +909,7 @@
       "web": "ships",
       "android": "ships",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "not_applicable"
     },
     "appearance.text-size": {
@@ -854,6 +921,7 @@
       "web": "ships",
       "android": "ships",
       "windows": "planned",
+      "linux": "planned",
       "watchos": "not_applicable"
     }
   }

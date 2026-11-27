@@ -82,3 +82,31 @@ jobs:
           if-no-files-found: error
           include-hidden-files: true
           retention-days: 14
+
+  linux-x64:
+    name: Linux x64 shared desktop check
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          architecture: x64
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Run the core, store and offline sync checks on Linux
+        run: ./android/gradlew -p windows --no-daemon :core:test :store:test smokeTest
+
+      - name: Build the self-contained Linux desktop image
+        run: ./android/gradlew -p windows --no-daemon createDistributable
+
+      - name: Verify the Linux launcher and bundled shared core native library
+        run: |
+          image="windows/build/compose/binaries/main/app/SeptenaSpike"
+          test -x "$image/bin/SeptenaSpike" || { echo "Linux desktop launcher missing"; exit 1; }
+          test -d "$image/lib/runtime" || { echo "Bundled Java runtime missing"; exit 1; }
+          core_jar="$(find "$image/lib/app" -maxdepth 1 -name '*septena-core-jvm-natives*.jar' -type f)"
+          test "$(printf '%s\n' "$core_jar" | grep -c .)" -eq 1 || { echo "Expected one bundled shared core natives JAR"; exit 1; }
+          jar tf "$core_jar" | grep -qx 'linux-x86-64/libseptena_core.so' || { echo "Linux x64 shared core .so missing from app image"; exit 1; }
