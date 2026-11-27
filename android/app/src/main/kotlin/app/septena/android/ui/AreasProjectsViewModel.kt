@@ -8,6 +8,7 @@ import app.septena.core.JsonValue
 import app.septena.core.NotesBase
 import app.septena.core.ProjectShare
 import app.septena.core.RegistryCatalog
+import app.septena.core.StructureOrder
 import app.septena.core.TaskFadeRules
 import app.septena.core.TaskSnapshot
 import app.septena.core.TaskViewRules
@@ -179,9 +180,15 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         if (trimmed.isEmpty()) return
         mutate {
             val projects = graph.taskStore.records(RegistryEntityNames.PROJECT)
-                .filter { it.deletedAt == null && it.fields[RegistryEntityFields.Project.AREA].stringValue() == selected.id }
-            val nextPosition = (projects.mapNotNull { it.fields[RegistryEntityFields.Project.POSITION].numberValue() }
-                .maxOrNull() ?: -1.0) + 1.0
+                .filter {
+                    val status = it.fields[RegistryEntityFields.Project.STATUS].stringValue()
+                    it.deletedAt == null &&
+                        (status == null || status == RegistryEntityEnums.ProjectStatus.ACTIVE) &&
+                        it.fields[RegistryEntityFields.Project.AREA].stringValue() == selected.id
+                }
+            val nextPosition = StructureOrder.nextAppendPosition(
+                projects.map { it.fields[RegistryEntityFields.Project.POSITION].numberValue() },
+            )
             graph.registryEntityMutator.create(
                 RegistryEntityNames.PROJECT,
                 linkedMapOf(
@@ -189,7 +196,7 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                     RegistryEntityFields.Project.STATUS to JsonValue.StringValue(RegistryEntityEnums.ProjectStatus.ACTIVE),
                     RegistryEntityFields.Project.AREA to JsonValue.StringValue(selected.id),
                     RegistryEntityFields.Project.CREATED to JsonValue.StringValue(graph.clock.today(graph.clock.now()).toString()),
-                    RegistryEntityFields.Project.POSITION to JsonValue.IntegerValue(nextPosition.toLong()),
+                    RegistryEntityFields.Project.POSITION to JsonValue.IntegerValue(nextPosition),
                 ),
             )
             true
@@ -384,24 +391,27 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                         RegistryEntityEnums.TaskStatus.DONE -> projectStats[pid] = prev.first to (prev.second + 1)
                     }
                 }
-                val projects = graph.taskStore.records(RegistryEntityNames.PROJECT)
-                    .asSequence()
-                    .filter { it.deletedAt == null }
-                    .filter { it.fields[RegistryEntityFields.Project.STATUS].stringValue() == RegistryEntityEnums.ProjectStatus.ACTIVE }
-                    .filter { it.fields[RegistryEntityFields.Project.AREA].stringValue() == selected.id }
-                    .mapNotNull { record ->
-                        record.fields[RegistryEntityFields.Project.TITLE].stringValue()?.let { name ->
-                            val (open, done) = projectStats[record.id] ?: (0 to 0)
-                            val total = open + done
-                            val progress = if (total > 0) done.toFloat() / total.toFloat() else 0f
-                            record to PlaceProjectRow(
-                                record.id, name, progress = progress, openCount = open, share = ProjectShare.of(record),
-                            )
+                val projects = StructureOrder.orderByPosition(
+                    items = graph.taskStore.records(RegistryEntityNames.PROJECT)
+                        .filter { it.deletedAt == null }
+                        .filter {
+                            val status = it.fields[RegistryEntityFields.Project.STATUS].stringValue()
+                            status == null || status == RegistryEntityEnums.ProjectStatus.ACTIVE
                         }
-                    }
-                    .sortedWith(compareBy({ it.first.fields[RegistryEntityFields.Project.POSITION].numberValue() ?: Double.MAX_VALUE }, { it.second.title.lowercase() }))
-                    .map { it.second }
-                    .toList()
+                        .filter { it.fields[RegistryEntityFields.Project.AREA].stringValue() == selected.id }
+                        .mapNotNull { record ->
+                            record.fields[RegistryEntityFields.Project.TITLE].stringValue()?.let { name ->
+                                val (open, done) = projectStats[record.id] ?: (0 to 0)
+                                val total = open + done
+                                val progress = if (total > 0) done.toFloat() / total.toFloat() else 0f
+                                record to PlaceProjectRow(
+                                    record.id, name, progress = progress, openCount = open, share = ProjectShare.of(record),
+                                )
+                            }
+                        },
+                    position = { it.first.fields[RegistryEntityFields.Project.POSITION].numberValue() },
+                    label = { it.second.title },
+                ).map { it.second }
                 val tasks = taskRows.asSequence()
                     .filter { (_, task) -> task.area == selected.id && task.project == null && !task.isHeading }
                     .map { (record, task) ->
@@ -455,21 +465,21 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                             .map(ProjectTask::row),
                     )
                 }
-                val availableAreas = graph.taskStore.records(RegistryEntityNames.AREA)
-                    .asSequence()
-                    .filter { it.deletedAt == null }
-                    .mapNotNull { record ->
-                        record.fields[RegistryEntityFields.Area.TITLE].stringValue()?.let { areaTitle ->
-                            record to PlaceAreaOption(
-                                id = record.id,
-                                title = areaTitle,
-                                emoji = record.fields[RegistryEntityFields.Area.EMOJI].stringValue()?.takeIf(String::isNotBlank),
-                            )
-                        }
-                    }
-                    .sortedWith(compareBy({ it.first.fields[RegistryEntityFields.Area.POSITION].numberValue() ?: Double.MAX_VALUE }, { it.second.title.lowercase() }))
-                    .map { it.second }
-                    .toList()
+                val availableAreas = StructureOrder.orderByPosition(
+                    items = graph.taskStore.records(RegistryEntityNames.AREA)
+                        .filter { it.deletedAt == null }
+                        .mapNotNull { record ->
+                            record.fields[RegistryEntityFields.Area.TITLE].stringValue()?.let { areaTitle ->
+                                record to PlaceAreaOption(
+                                    id = record.id,
+                                    title = areaTitle,
+                                    emoji = record.fields[RegistryEntityFields.Area.EMOJI].stringValue()?.takeIf(String::isNotBlank),
+                                )
+                            }
+                        },
+                    position = { it.first.fields[RegistryEntityFields.Area.POSITION].numberValue() },
+                    label = { it.second.title },
+                ).map { it.second }
                 val currentAreaId = container.fields[RegistryEntityFields.Project.AREA].stringValue()?.takeIf(String::isNotBlank)
                 AreasProjectsUiState(
                     destination = selected,

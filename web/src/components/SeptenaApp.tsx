@@ -1850,11 +1850,11 @@ export function SeptenaApp() {
   }, [destination, projectById]);
 
   const reorderAreaList = async (ordered: AreaRow[]) => {
-    await Promise.all(ordered.map((a, idx) => engine.updateArea(a, { position: idx })));
+    await Promise.all(ordered.map((a, idx) => engine.updateArea(a, { position: idx + 1 })));
   };
 
   const reorderProjectList = async (ordered: ProjectRow[]) => {
-    await Promise.all(ordered.map((p, idx) => engine.updateProject(p, { position: idx })));
+    await Promise.all(ordered.map((p, idx) => engine.updateProject(p, { position: idx + 1 })));
   };
 
   const handleMoveProjectToArea = async (proj: ProjectRow, targetAreaId: string | null, insertBeforeId?: string) => {

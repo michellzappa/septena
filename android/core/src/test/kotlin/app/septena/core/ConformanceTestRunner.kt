@@ -19,6 +19,12 @@ object ConformanceTestRunner {
             registryOrder()
             waitingOrder()
         }
+        StructureOrderTest().run {
+            positionZeroAndNullSinkToBottom()
+            allUnpositionedFallsBackToCaseInsensitiveAlphabetical()
+            tiedPositionsBreakByTitle()
+            nextAppendPositionAndReorderAreOneBased()
+        }
         SyncEngineConformanceTest().run {
             pullPageVectors()
             pushResponseVectors()
