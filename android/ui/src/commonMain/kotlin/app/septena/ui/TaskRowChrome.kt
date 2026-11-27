@@ -1,5 +1,12 @@
 package app.septena.ui
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -38,10 +45,12 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -57,6 +66,8 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.scale
+import kotlinx.coroutines.launch
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.collapse
 import androidx.compose.ui.semantics.contentDescription
@@ -212,9 +223,23 @@ fun TaskCardSlice(
 }
 
 /**
+ * Standard completion motion parameters (`registry/tokens.json` `motion.completion`).
+ * Populated by the Android host from `RegistryCompletionMotion`.
+ */
+data class CompletionMotionConfig(
+    val fadeOutMs: Int = 350,
+    val checkPopMs: Int = 280,
+    val pulseRingMs: Int = 400,
+    val animationsEnabled: Boolean = true,
+)
+
+val LocalCompletionMotion = staticCompositionLocalOf { CompletionMotionConfig() }
+
+/**
  * Custom iOS-aligned checkbox: slightly smaller (`17.dp`) and calmer, lower-contrast
  * stroke than Material's default Checkbox, optically centered inside
- * [TaskCardMetrics.LeadingColumnWidth].
+ * [TaskCardMetrics.LeadingColumnWidth]. Plays the canonical `.stamp` pop + outward
+ * pulse ring on a live check (`docs/DesignSpec.md` §9).
  */
 @Composable
 fun SeptenaTaskCheckbox(
@@ -226,6 +251,7 @@ fun SeptenaTaskCheckbox(
     onToggle: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val motion = LocalCompletionMotion.current
     val fillColor = MaterialTheme.colorScheme.primary
     val checkColor = MaterialTheme.colorScheme.onPrimary
     val strokeColor = MaterialTheme.colorScheme.onSurface.copy(
@@ -235,6 +261,49 @@ fun SeptenaTaskCheckbox(
             else -> 0.28f
         },
     )
+    val fillScale by animateFloatAsState(
+        targetValue = if (checked) 1f else 0.55f,
+        animationSpec = if (!motion.animationsEnabled) {
+            snap()
+        } else if (checked) {
+            spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMedium)
+        } else {
+            tween(durationMillis = (motion.checkPopMs * 0.7f).toInt().coerceAtLeast(100))
+        },
+        label = "checkboxFillScale",
+    )
+    val fillAlpha by animateFloatAsState(
+        targetValue = if (checked) 1f else 0f,
+        animationSpec = if (!motion.animationsEnabled) snap() else tween(durationMillis = 160),
+        label = "checkboxFillAlpha",
+    )
+    val ringScale = remember { Animatable(1f) }
+    val ringAlpha = remember { Animatable(0f) }
+    var wasChecked by remember { mutableStateOf(checked) }
+    LaunchedEffect(checked, motion.animationsEnabled, isSelectionCircle) {
+        val becameChecked = !wasChecked && checked
+        wasChecked = checked
+        if (becameChecked && motion.animationsEnabled && !isSelectionCircle) {
+            ringScale.snapTo(0.9f)
+            ringAlpha.snapTo(0.55f)
+            launch {
+                ringScale.animateTo(
+                    targetValue = 1.9f,
+                    animationSpec = tween(durationMillis = motion.pulseRingMs, easing = FastOutSlowInEasing),
+                )
+            }
+            launch {
+                ringAlpha.animateTo(
+                    targetValue = 0f,
+                    animationSpec = tween(durationMillis = motion.pulseRingMs, easing = FastOutSlowInEasing),
+                )
+            }
+        } else if (!checked) {
+            ringScale.snapTo(1f)
+            ringAlpha.snapTo(0f)
+        }
+    }
+
     val interactionSource = remember { MutableInteractionSource() }
     Box(
         contentAlignment = Alignment.Center,
@@ -254,39 +323,63 @@ fun SeptenaTaskCheckbox(
             val strokePx = 1.35.dp.toPx()
             val inset = strokePx / 2f
             val boxSize = Size(size.width - strokePx, size.height - strokePx)
+            val corner = CornerRadius(4.5.dp.toPx(), 4.5.dp.toPx())
+            if (ringAlpha.value > 0.01f && !isSelectionCircle) {
+                scale(scale = ringScale.value) {
+                    drawRoundRect(
+                        color = fillColor.copy(alpha = ringAlpha.value),
+                        topLeft = Offset(inset, inset),
+                        size = boxSize,
+                        cornerRadius = corner,
+                        style = Stroke(width = 1.5.dp.toPx()),
+                    )
+                }
+            }
             if (isSelectionCircle) {
                 val radius = (size.minDimension - strokePx) / 2f
                 val center = Offset(size.width / 2f, size.height / 2f)
-                if (checked) {
-                    drawCircle(color = fillColor, radius = size.minDimension / 2f, center = center)
-                } else {
-                    drawCircle(color = strokeColor, radius = radius, center = center, style = Stroke(width = strokePx))
+                if (fillAlpha < 0.99f) {
+                    drawCircle(
+                        color = strokeColor.copy(alpha = strokeColor.alpha * (1f - fillAlpha)),
+                        radius = radius,
+                        center = center,
+                        style = Stroke(width = strokePx),
+                    )
+                }
+                if (fillAlpha > 0.01f) {
+                    scale(scale = fillScale) {
+                        drawCircle(color = fillColor.copy(alpha = fillAlpha), radius = size.minDimension / 2f, center = center)
+                    }
                 }
             } else {
-                val corner = CornerRadius(4.5.dp.toPx(), 4.5.dp.toPx())
-                if (checked) {
-                    drawRoundRect(color = fillColor, cornerRadius = corner)
-                } else {
+                if (fillAlpha < 0.99f) {
                     drawRoundRect(
-                        color = strokeColor,
+                        color = strokeColor.copy(alpha = strokeColor.alpha * (1f - fillAlpha)),
                         topLeft = Offset(inset, inset),
                         size = boxSize,
                         cornerRadius = corner,
                         style = Stroke(width = strokePx),
                     )
                 }
-            }
-            if (checked) {
-                val checkPath = Path().apply {
-                    moveTo(size.width * 0.26f, size.height * 0.52f)
-                    lineTo(size.width * 0.43f, size.height * 0.69f)
-                    lineTo(size.width * 0.75f, size.height * 0.33f)
+                if (fillAlpha > 0.01f) {
+                    scale(scale = fillScale) {
+                        drawRoundRect(color = fillColor.copy(alpha = fillAlpha), cornerRadius = corner)
+                    }
                 }
-                drawPath(
-                    path = checkPath,
-                    color = checkColor,
-                    style = Stroke(width = 1.8.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round),
-                )
+            }
+            if (fillAlpha > 0.05f) {
+                scale(scale = fillScale) {
+                    val checkPath = Path().apply {
+                        moveTo(size.width * 0.26f, size.height * 0.52f)
+                        lineTo(size.width * 0.43f, size.height * 0.69f)
+                        lineTo(size.width * 0.75f, size.height * 0.33f)
+                    }
+                    drawPath(
+                        path = checkPath,
+                        color = checkColor.copy(alpha = fillAlpha),
+                        style = Stroke(width = 1.8.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round),
+                    )
+                }
             }
         }
     }
@@ -432,12 +525,27 @@ fun TaskCardRow(
     val showSubtitleLine = task.subtitle != null || task.assigneeName != null || task.waitingText != null || task.tagNames.isNotEmpty() || task.filingSuggestionLabel != null
     val hasLeadingSlot = selecting || canComplete || task.isCompleted
 
+    val motion = LocalCompletionMotion.current
+    val rowAlpha by animateFloatAsState(
+        targetValue = when {
+            task.isFadingOut -> 0f
+            isBeingDragged -> 0.32f
+            else -> task.opacity
+        },
+        animationSpec = if (!motion.animationsEnabled) {
+            snap()
+        } else {
+            tween(durationMillis = if (task.isFadingOut) motion.fadeOutMs else 150)
+        },
+        label = "taskRowAlpha",
+    )
+
     TaskCardSlice(
         position = position,
         isSelected = selected,
         isDark = isDark,
         hasActiveTexture = hasActiveTexture,
-        modifier = dropModifier,
+        modifier = dropModifier.alpha(if (task.isFadingOut) rowAlpha else 1f),
     ) {
         Box {
             val rowInteraction = if (canReorder && reorderDrag != null) {
@@ -461,7 +569,7 @@ fun TaskCardRow(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .alpha(if (isBeingDragged) 0.32f else task.opacity)
+                    .alpha(if (task.isFadingOut) 1f else rowAlpha)
                     .then(rowInteraction)
                     .padding(
                         horizontal = TaskCardMetrics.ContentInset,
@@ -485,10 +593,10 @@ fun TaskCardRow(
                         } else {
                             SeptenaTaskCheckbox(
                                 checked = task.isCompleted,
-                                enabled = canComplete && !task.isCompleted,
+                                enabled = canComplete && (!task.isCompleted || task.isSettling),
                                 accessibilityLabel = completeTitle,
                                 isDark = isDark,
-                                onToggle = { if (!task.isCompleted) onComplete(task.id) },
+                                onToggle = { if (!task.isCompleted || task.isSettling) onComplete(task.id) },
                             )
                         }
                         Spacer(modifier = Modifier.width(TaskCardMetrics.IconTextGap))

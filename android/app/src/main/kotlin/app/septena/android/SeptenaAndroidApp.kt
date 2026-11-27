@@ -213,6 +213,7 @@ class AndroidAppGraph(application: Application) {
     }
 
     val reminders = TaskReminderScheduler(application, taskStore)
+    val completionSettle = app.septena.android.ui.CompletionSettleStore(appScope)
     val doing = DoController(
         context = application,
         store = taskStore,
@@ -345,6 +346,10 @@ class AndroidAppGraph(application: Application) {
     }
 
     suspend fun completeTask(taskId: String): Boolean = completeTasks(listOf(taskId))
+
+    /** Reopens a completed or cancelled task (e.g. unchecking during the completion settle window). */
+    suspend fun reopenTask(taskId: String): Boolean =
+        captureTaskEdit(taskId) { taskMutator.reopen(taskId) != null }
 
     /** The task, with its fade clock, and its conversation around [write]; null when [write] did nothing. */
     private suspend fun captureTaskAndConvo(taskId: String, write: suspend () -> Boolean): TaskUndoHistory.Edit? {

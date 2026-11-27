@@ -460,11 +460,16 @@ enum Theme {
     /// Settle: a checked item fades out of the open list after lingering
     /// (see `SettleStore`). Gentle enough to read as "drifting away", not a
     /// snap. Paired with `TaskListRowExit` on the open-list rows.
-    static let settle: Animation = .easeInOut(duration: 0.35)
+    static let settle: Animation = .easeInOut(
+      duration: Double(RegistryTokens.CompletionMotion.fadeOutMs) / 1000.0
+    )
     /// Check: the checkbox fill + checkmark popping in (`TaskCheckbox`).
     /// A quick spring with a touch of overshoot — fast enough that rapid
     /// checking never waits on it, springy enough to feel like a stamp.
-    static let check: Animation = .spring(response: 0.28, dampingFraction: 0.55)
+    static let check: Animation = .spring(
+      response: Double(RegistryTokens.CompletionMotion.checkPopMs) / 1000.0,
+      dampingFraction: 0.55
+    )
     /// Gauge fill: a tile's progress bar sweeping to a new value after a log
     /// (`ModuleTile.ProgressRow`). Slower and looser than `.check` so the bar
     /// visibly *travels* and settles with a touch of overshoot — the motion

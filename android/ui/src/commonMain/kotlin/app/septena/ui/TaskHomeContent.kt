@@ -66,6 +66,10 @@ data class TaskListItem(
     val waitingText: String? = null,
     val subtitle: String? = null,
     val isCompleted: Boolean = false,
+    /** True while a just-completed row lingers in place during the standard settle window. */
+    val isSettling: Boolean = false,
+    /** True during the final fade-out beat of the settle window. */
+    val isFadingOut: Boolean = false,
     val isOnToday: Boolean = false,
     val isStarred: Boolean = false,
     val isFaded: Boolean = false,

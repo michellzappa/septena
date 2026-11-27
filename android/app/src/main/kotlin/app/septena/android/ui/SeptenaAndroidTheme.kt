@@ -27,8 +27,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.septena.core.JsonValue
 import app.septena.core.RegistryCatalog
 import app.septena.core.booleanValue
+import app.septena.core.generated.RegistryCompletionMotion
 import app.septena.core.generated.RegistryIconIds
 import app.septena.core.stringValue
+import app.septena.ui.CompletionMotionConfig
+import app.septena.ui.LocalCompletionMotion
 import app.septena.ui.LocalMagicPlusColor
 
 /** The appearance store, for the Settings picker. Null outside [SeptenaAndroidTheme]. */
@@ -104,6 +107,11 @@ fun SeptenaAndroidTheme(store: AppearanceStore, content: @Composable () -> Unit)
         LocalSeptenaDarkTheme provides darkTheme,
         LocalMagicPlusColors provides MagicPlusColors(themeColors.magicPlus, themeColors.magicPlusInk),
         LocalMagicPlusColor provides themeColors.magicPlus,
+        LocalCompletionMotion provides CompletionMotionConfig(
+            fadeOutMs = RegistryCompletionMotion.FADE_OUT_MS,
+            checkPopMs = RegistryCompletionMotion.CHECK_POP_MS,
+            pulseRingMs = RegistryCompletionMotion.PULSE_RING_MS,
+        ),
     ) {
         MaterialTheme(colorScheme = colors, content = content)
     }
