@@ -102,6 +102,11 @@ const CSS = `
   .note.warn { border-left-color: var(--bad); background: color-mix(in oklab, var(--bad) 10%, transparent); color: var(--text); }
   .cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
   .cols > div > b { display: block; margin-bottom: 4px; }
+  .blist h3 { margin: 0 0 6px; } .blist ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
+  .blist li { position: relative; display: flex; justify-content: space-between; gap: 10px; padding: 5px 8px; border-radius: 6px; overflow: hidden; }
+  .bfill { position: absolute; inset: 0 auto 0 0; background: color-mix(in oklab, var(--accent) 18%, transparent); border-radius: 6px; }
+  .bname, .bn { position: relative; } .bname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bn { font-variant-numeric: tabular-nums; white-space: nowrap; }
   .kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px; }
   .kpi { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: grid; gap: 2px; }
   .kpi b { font-size: 26px; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
@@ -180,8 +185,7 @@ function linkRow(l: PlusLink, uses: PlusLinkUse[]): string {
     <td><span class="${state === "open" ? "ok" : "dim"}">${state}</span></td><td>${day(l.createdAt)}</td><td>${people}</td><td>${close}${revoke}</td></tr>`;
 }
 
-const counts = (title: string, rows: { name: string; n: number }[]) =>
-  `<div><b>${esc(title)}</b>${rows.map((r) => `<div>${esc(String(r.name))} <span class="dim">${r.n}</span></div>`).join("") || '<div class="dim">none</div>'}</div>`;
+const counts = (title: string, rows: { name: string; n: number }[]) => tallyList(title, rows);
 
 const signupTable = (rows: SignupRow[]) => table(["Email", "List", "Screens", "Task apps", "AI", "Page", "Date"], rows.map((r) =>
   `<tr>${[r.email, r.list, r.platforms, r.tools, r.agents, r.source, r.created_at.slice(0, 10)].map((x) => `<td>${esc(x.replace(/[[\]"]/g, ""))}</td>`).join("")}</tr>`), "No signups.");
@@ -238,8 +242,15 @@ function funnel(title: string, steps: { name: string; n: number }[]): string {
   return `<div><h3 style="margin-top:0">${esc(title)}</h3>${table(["Step", "Count", "Of step before", "Of first step"], rows, "No data.")}</div>`;
 }
 
-const tallyList = (title: string, rows: (Tally | TrafficRow)[], unit = "") =>
-  `<div><b>${esc(title)}</b>${rows.slice(0, 12).map((r) => `<div>${esc(String(r.name))} <span class="dim">${fmt("visitors" in r ? r.visitors : r.n)}${unit}</span></div>`).join("") || '<div class="dim">none</div>'}</div>`;
+/// A ranked list: one line per row, a bar behind it in the accent, the count
+/// and its share on the right. Plausible draws its breakdowns the same way.
+const tallyList = (title: string, rows: (Tally | TrafficRow)[], unit = "") => {
+  const top = rows.slice(0, 10).map((r) => ({ name: String(r.name), n: "visitors" in r ? r.visitors : r.n }));
+  const max = Math.max(1, ...top.map((r) => r.n));
+  const sum = rows.reduce((t, r) => t + ("visitors" in r ? r.visitors : r.n), 0);
+  const items = top.map((r) => `<li><span class="bfill" style="width:${((r.n / max) * 100).toFixed(1)}%"></span><span class="bname">${esc(r.name)}</span><span class="bn">${fmt(r.n)}${esc(unit)}<span class="dim"> ${pct(ratio(r.n, sum))}</span></span></li>`).join("");
+  return `<div class="blist"><h3>${esc(title)}</h3>${items ? `<ol>${items}</ol>` : '<p class="dim">None yet.</p>'}</div>`;
+}
 
 const duration = (s: number) => (s >= 60 ? `${Math.floor(s / 60)}m ${Math.round(s % 60)}s` : `${Math.round(s)}s`);
 
@@ -273,7 +284,7 @@ function websiteSection(t: TrafficResult, signupsByDay: Map<string, number>): st
   <h3>Calls to action, 30 days</h3>
   ${table(["Goal", "Visitors", "Events", "Conversion"], goalRows, "No goals counted.")}
   ${v.missingGoals.length ? `<p class="dim">No events in 30 days: ${esc(v.missingGoals.join(", "))}. Plausible leaves a goal out when it has no events, so a goal that stays here may also be missing in Plausible ▸ Goals.</p>` : ""}
-  <h3>Where they come from</h3><div class="cols">${tallyList("Sources", v.sources)}${tallyList("Pages", v.pages)}${tallyList("Countries", v.countries)}${tallyList("Download clicks by platform", v.downloads)}${tallyList("List-keeper CTA by placement", v.ctaPlacements)}</div>
+  <div class="grid2" style="margin-top:18px">${tallyList("Sources", v.sources)}${tallyList("Pages", v.pages)}</div><div class="cols" style="margin-top:18px">${tallyList("Countries", v.countries)}${tallyList("Download clicks by platform", v.downloads)}${tallyList("List-keeper CTA by placement", v.ctaPlacements)}</div>
   <p class="dim" style="margin-bottom:0">From Plausible, ${esc(v.site)}, ${esc(when(v.fetchedAt, Date.now()))}; cached for 10 minutes. <a href="https://plausible.io/${esc(v.site)}">Open Plausible</a></p>`;
 }
 
@@ -345,9 +356,8 @@ function retentionSection(v: AdminView): string {
 
 function clientsSection(v: AdminView): string {
   const mix = clientMix(v.accounts, v.now);
-  const mac = v.releases === null ? `<div><b>Mac downloads</b><div class="warn">GitHub does not answer</div></div>`
-    : `<div><b>Mac downloads</b>${v.releases.map((r) => `<div>${esc(r.tag)} <span class="dim">${fmt(r.installs)} downloads, ${fmt(r.appcast)} update checks</span></div>`).join("") || '<div class="dim">no releases</div>'}
-      <div class="dim">${fmt(v.releases.reduce((n, r) => n + r.installs, 0))} in all</div></div>`;
+  const mac = v.releases === null ? `<div class="blist"><h3>Mac downloads</h3><p class="warn">GitHub does not answer.</p></div>`
+    : tallyList("Mac downloads by release", v.releases.map((r) => ({ name: r.tag, n: r.installs })));
   return `<div class="cols">${tallyList("Devices, 30 days", mix.platforms)}${tallyList("Versions, 30 days", mix.versions)}${tallyList("Agents", agentMix(v.accounts), " accounts")}${tallyList("Sign-in", providerMix(v.accounts), " accounts")}${mac}</div>
   <p class="dim">Store installs and revenue come with RevenueCat (#644, #645).</p>`;
 }
