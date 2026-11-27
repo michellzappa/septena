@@ -393,3 +393,118 @@ describe("agent comment loop: claims, stop and pause", () => {
     }
   });
 });
+
+describe("agent wake webhooks: durable outbox on DO alarm (#748)", () => {
+  it("survives DO eviction/restart and delivers with exponential backoff on alarm()", async () => {
+    const realNow = Date.now;
+    let clock = 1_770_000_000_000;
+    Date.now = () => clock;
+    // Fail twice (503, network error), then succeed on attempt 3 after a simulated DO restart.
+    let attempt = 0;
+    const hook = mockFetch(() => {
+      attempt++;
+      if (attempt === 1) return new Response("busy", { status: 503 });
+      if (attempt === 2) return Promise.reject(new TypeError("network reset"));
+      return new Response(null, { status: 204 });
+    });
+    try {
+      const first = await createTestTaskStore();
+      first.store.createAgentWebhook("https://hooks.example.com/durable", SECRET, true);
+      assignTask(first.store, "d1");
+      await first.flushWaitUntil();
+
+      assert.equal(hook.calls.length, 1, "initial attempt fired immediately");
+      assert.equal(first.store.listAgentWebhooks()[0].failureCount, 0, "still retrying; has not given up");
+      const firstRetryAt = first.alarmAt();
+      assert.ok(firstRetryAt !== null && firstRetryAt === clock + 5_000, `expected 5s backoff alarm, got ${firstRetryAt}`);
+
+      // Simulate DO eviction & cold restart on the same SQLite database before alarm fires.
+      const restarted = await createTestTaskStore(first.db);
+      clock += 5_000;
+      await restarted.store.alarm();
+
+      assert.equal(hook.calls.length, 2, "alarm delivered retry #1 after DO restart");
+      assert.equal(restarted.store.listAgentWebhooks()[0].failureCount, 0);
+      const secondRetryAt = restarted.alarmAt();
+      assert.ok(secondRetryAt !== null && secondRetryAt === clock + 30_000, `expected 30s backoff alarm, got ${secondRetryAt}`);
+
+      // Advance past second backoff: attempt 3 succeeds and clears outbox.
+      clock += 30_000;
+      await restarted.store.alarm();
+      assert.equal(hook.calls.length, 3);
+      const revs = new Set(hook.calls.map((c) => (JSON.parse(c.body) as { rev: number }).rev));
+      assert.equal(revs.size, 1, "all retries carry the same rev for receiver dedupe");
+      const wh = restarted.store.listAgentWebhooks()[0];
+      assert.equal(wh.enabled, true);
+      assert.equal(wh.lastStatus, 204);
+      assert.equal(wh.failureCount, 0);
+      const queued = restarted.db.prepare("SELECT COUNT(*) AS n FROM agent_webhook_outbox").get() as { n: number };
+      assert.equal(queued.n, 0, "outbox row deleted on success");
+    } finally {
+      Date.now = realNow;
+      hook.restore();
+    }
+  });
+
+  it("drops queued outbox rows when a webhook is deleted", async () => {
+    const realNow = Date.now;
+    let clock = 1_770_100_000_000;
+    Date.now = () => clock;
+    const hook = mockFetch(() => new Response("down", { status: 503 }));
+    try {
+      const { store, db, flushWaitUntil } = await createTestTaskStore();
+      const created = store.createAgentWebhook("https://hooks.example.com/del", SECRET, true);
+      assert.equal(created.ok, true);
+      assignTask(store, "d2");
+      await flushWaitUntil();
+      assert.equal(hook.calls.length, 1);
+      assert.equal((db.prepare("SELECT COUNT(*) AS n FROM agent_webhook_outbox").get() as { n: number }).n, 1);
+
+      assert.equal(store.deleteAgentWebhook(created.webhook.id), true);
+      assert.equal((db.prepare("SELECT COUNT(*) AS n FROM agent_webhook_outbox").get() as { n: number }).n, 0);
+
+      clock += 60_000;
+      await store.alarm();
+      assert.equal(hook.calls.length, 1, "deleted webhook receives no further attempts");
+    } finally {
+      Date.now = realNow;
+      hook.restore();
+    }
+  });
+
+  it("disables a webhook (enabled = 0) after N consecutive failed deliveries and clears its outbox", async () => {
+    const hook = mockFetch(() => new Response("gone", { status: 410 }));
+    try {
+      const { store, db, flushWaitUntil } = await createTestTaskStore();
+      (store as unknown as { webhookDisableAfterFailures: number }).webhookDisableAfterFailures = 3;
+      const created = store.createAgentWebhook("https://hooks.example.com/dead", SECRET, true);
+      assert.equal(created.ok, true);
+
+      // Three consecutive non-retryable 410 deliveries -> auto-disabled.
+      assignTask(store, "f1");
+      await flushWaitUntil();
+      assert.equal(store.listAgentWebhooks()[0].enabled, true);
+      assert.equal(store.listAgentWebhooks()[0].failureCount, 1);
+
+      assignTask(store, "f2");
+      await flushWaitUntil();
+      assert.equal(store.listAgentWebhooks()[0].enabled, true);
+      assert.equal(store.listAgentWebhooks()[0].failureCount, 2);
+
+      assignTask(store, "f3");
+      await flushWaitUntil();
+      const disabled = store.listAgentWebhooks()[0];
+      assert.equal(disabled.enabled, false, "webhook auto-disabled after 3 consecutive failures");
+      assert.equal(disabled.failureCount, 3);
+      assert.equal((db.prepare("SELECT COUNT(*) AS n FROM agent_webhook_outbox").get() as { n: number }).n, 0);
+
+      // Subsequent wake events are not enqueued or sent to the disabled webhook.
+      const beforeCalls = hook.calls.length;
+      assignTask(store, "f4");
+      await flushWaitUntil();
+      assert.equal(hook.calls.length, beforeCalls);
+    } finally {
+      hook.restore();
+    }
+  });
+});
