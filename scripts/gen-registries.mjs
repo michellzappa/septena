@@ -1579,7 +1579,7 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  ]");
   lines.push("");
   const altFields = ["desktopTitle", "activeTitle", "pluralTitle", "addTitle", "removeTitle", "shortTitle"];
-  lines.push("  /// Other titles of an action: `desktopTitle`, `activeTitle` (state on), `pluralTitle`, `addTitle`, `removeTitle`, `shortTitle` (swipe buttons).");
+  lines.push("  /// Other titles of an action: `desktopTitle`, `activeTitle` (state on), `pluralTitle`, `addTitle`, `removeTitle`, `shortTitle` (compact buttons).");
   lines.push("  static let alternateTitles: [RegistryActionID: [String: String]] = [");
   for (const [id, a] of Object.entries(actions.actions)) {
     const pairs = altFields.filter((f) => typeof a[f] === "string").map((f) => `${swiftStr(f)}: ${L(a[f], a, f)}`);
@@ -1611,7 +1611,7 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("    opensAttribute.first(where: { $0.value == attributeId })?.key");
   lines.push("  }");
   lines.push("");
-  lines.push("  /// Actions whose `role` is `destructive` (red in menus and swipes).");
+  lines.push("  /// Actions whose `role` is `destructive` (red in menus).");
   lines.push("  static let destructive: Set<RegistryActionID> = [");
   for (const [id, a] of Object.entries(actions.actions)) {
     if (a.role === "destructive") lines.push(`    ${swiftCaseRef(id)},`);

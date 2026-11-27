@@ -105,7 +105,6 @@ These keys remain in `registry/settings.json` so `SYNCED_SETTING_KEYS` / `SETTIN
 |---|---|---|
 | Today rollover mode (`ask` / `cleanSlate`) | ADR 0014 (`#139`, `#54`) | `lists` group (inline on iOS / `general` tab on desktop), `scope: synced` |
 | Day-start hour | `#140` | `lists` group, `scope: synced` |
-| iOS swipe action customization | `#132` (`IOS_SWIPE_ACTIONS_SPEC.md`) | `lists` group, `platforms: ["ios", "ipados"]`, `depth: 1` subpage |
 | Timed reminders / Notifications | `#97` (`TIMED_REMINDERS_SPEC.md`) | `lists` group (or promoted `notifications` section once ≥2 controls exist) |
 | Sync subscription / Plus billing | `#46`, `#43` | `account` page (`subscription_status` surface) |
 | Additional sign-in methods / device approval | ADR 0016 (`#168`–`#171`) | `account` page |

@@ -122,7 +122,7 @@ On a shared task the two fields are personal, like When *(default)*.
 
 ### Actions
 
-Row menu, swipe and task page, from `registry/actions.json`:
+Row menu and task page, from `registry/actions.json`:
 
 | Action | Writes |
 |---|---|

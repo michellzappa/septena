@@ -294,6 +294,14 @@ commit on the branch first (or let the cron do it).
   golden fixture in `registry/conformance/`, never re-implemented per shell.
   `.github/workflows/parity.yml` gates every PR on `gen-registries.mjs --check`
   (covering Apple, Android, and Web) and `scripts/lint-design.sh`.
+- **No task-row swipe actions on phones, tablets, or desktop.** Task-row swipes
+  were dropped on 2026-11-23 (`f3861931`, `docs/IOS_SWIPE_ACTIONS_SPEC.md`)
+  because horizontal pan gestures fought vertical scrolling, drag-reorder, and
+  edge back-swipe. Never add or propose swipe actions on task rows on iOS,
+  iPadOS, macOS, Android, or Web — row actions live in the row context menu
+  (long-press / right-click), inline foldout, and task page, and touch
+  multi-select starts from `Select` in the row menu. Only watchOS keeps native
+  `List` `.swipeActions`.
 
 ## The Septask targets
 
@@ -335,7 +343,7 @@ The product is Septena; the code targets keep the working names `Septask` (iOS),
   complete = `⌘K`, move = `⌘M` / `⌘⇧M`); double-click / right-click for mouse.
   Do NOT bind unmodified Space/Return. The shared shortcut map is
   the registry (`registry/actions.json`, `RegistryActions.shortcuts`): every
-  context menu, swipe and menu-bar item on both shells renders from it through
+  context menu and menu-bar item on both shells renders from it through
   `RegistryMenuResolver` (`Septena/Shell/UI/RegistryMenu.swift`); a shell only
   binds action IDs to handlers. Bare `⌘M`
   is intentionally reclaimed by the focused task list; bare `⌘.` remains the
@@ -548,7 +556,7 @@ The product is Septena; the code targets keep the working names `Septask` (iOS),
   first-party, idiomatic API every time — `List(selection:)` for selection and
   arrow-key nav, `@FocusState`/`.focused()` for focus, `.onSubmit` / a focused
   `TextField` for inline editing, `.commands` + a *modifier* `keyboardShortcut`
-  for global keys, native `.contextMenu` / `.swipeActions`, `NavigationSplitView`
+  for global keys, native `.contextMenu`, `NavigationSplitView`
   for sidebar+detail. If something "needs" an `NSEvent` monitor, a hidden
   zero-frame shortcut button, a hand-rolled tap-gesture selection, an AppKit
   bridge, or any clever workaround to behave, **stop** — that's the signal the

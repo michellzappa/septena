@@ -40,7 +40,7 @@ Pick the verb by what the gesture **means**. The feel is decided once, in
 | `press()` | A touch that starts something | Lift a drag, open the composer, open a When or Move sheet, Magic Plus | soft impact |
 | `selection()` | Choose among options; move between targets | Picker row, calendar day, fold or unfold a section, drag over a new drop target, touch-select a row, navigation | selection |
 | `commit()` | A write landed | Rename, schedule, move, reorder, star, add, copy, duplicate, restore, reply | light impact |
-| `threshold()` | A gesture crossed its commit point | Full swipe armed, pull-to-add armed, spring-load fired | medium impact |
+| `threshold()` | A gesture crossed its commit point | Pull-to-add armed, spring-load fired | medium impact |
 | `success()` | Something finished | Project done, review accepted, task completed from a menu, the planned length of a Do | success notification |
 | `warning()` | A destructive or cancelling write | Delete, delete permanently, cancel, let faded tasks go, clear the logbook | warning notification |
 | `play(_:)` | A composed pattern | Task checkbox stamp, commit flourishes (`CommitMotion`) | CoreHaptics |

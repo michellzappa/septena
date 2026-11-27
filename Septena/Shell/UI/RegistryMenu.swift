@@ -24,7 +24,7 @@ enum RegistryPlatform {
     #if os(macOS)
     return "macos"
     #elseif os(iOS)
-    // Menus and swipes resolve on the main thread; `UIDevice` is main-actor.
+    // Menus resolve on the main thread; `UIDevice` is main-actor.
     guard Thread.isMainThread else { return "ios" }
     let isPad = MainActor.assumeIsolated { UIDevice.current.userInterfaceIdiom == .pad }
     return isPad ? "ipados" : "ios"
