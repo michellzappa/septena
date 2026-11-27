@@ -1,13 +1,13 @@
 name: Site rebuild
 
-# The website (michellzappa/septena-site) copies registry/, skills/, the
+# The website (septena/site) copies registry/, skills/, the
 # changelog and the connector's tool list from this repo's main. When one of them changes on
 # main, this job asks the site to build and deploy again, so septena.app never
 # shows a stale registry. The site runs its Deploy workflow on the
 # `app-registry-changed` repository_dispatch event.
 #
 # SITE_DISPATCH_TOKEN: a fine-grained token with Contents read and write on
-# michellzappa/septena-site (repository_dispatch needs write). Without the
+# septena/site (repository_dispatch needs write). Without the
 # secret the job skips with a notice.
 
 on:
@@ -31,14 +31,14 @@ jobs:
     steps:
       - name: Skip without the dispatch token
         if: env.SITE_DISPATCH_TOKEN == ''
-        run: echo "::notice::SITE_DISPATCH_TOKEN is not set on michellzappa/septena; the site was not asked to rebuild."
+        run: echo "::notice::SITE_DISPATCH_TOKEN is not set on septena/septena; the site was not asked to rebuild."
 
       - name: Send repository_dispatch to septena-site
         if: env.SITE_DISPATCH_TOKEN != ''
         env:
           GH_TOKEN: ${{ secrets.SITE_DISPATCH_TOKEN }}
         run: |
-          gh api repos/michellzappa/septena-site/dispatches \
+          gh api repos/septena/site/dispatches \
             -f event_type=app-registry-changed \
             -F "client_payload[sha]=${{ github.sha }}"
           echo "Asked septena-site to rebuild for ${{ github.sha }}."

@@ -3,7 +3,7 @@
 - Status: accepted (2026-11-26)
 - Date: 2026-11-26
 - Deciders: mz
-- Issue: [#85](https://github.com/michellzappa/septena/issues/85)
+- Issue: [#85](https://github.com/septena/septena/issues/85)
 - Code: `backend/src/shadow/reviewer.ts`, `POST /oauth/pair/reviewer`,
   `POST /v1/admin/reviewer/prepare`, `backend/scripts/reviewer-seed.mjs`
 

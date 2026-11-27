@@ -12,7 +12,7 @@ let package = Package(
     targets: [
         .binaryTarget(
             name: "SeptenaSharedCoreFFI",
-            url: "https://github.com/michellzappa/septena/releases/download/core-v0.11.0/SeptenaSharedCoreFFI-0.11.0.xcframework.zip",
+            url: "https://github.com/septena/septena/releases/download/core-v0.11.0/SeptenaSharedCoreFFI-0.11.0.xcframework.zip",
             checksum: "a2bc568a0592b3c2ff803f4bb5705a0b2fac4634500055828639f2db08374c9a"
         ),
         .target(

@@ -34,7 +34,7 @@ Someday; sections, not headings; When for the start date). Claim only what
 the App Store build does. Apple's rules keep other platforms and self-hosting
 out of App Store copy. The screenshots must prove **a focused task UI**, **today is your call**
 (the Inbox waits above Today), and **your own agent can work a task**. Screens come from the website's scene builder
-(`../septena-site/lib/task-ui/model.ts`), not from the simulator. See
+(`../site/lib/task-ui/model.ts`), not from the simulator. See
 `## Screenshots`.
 
 **Character limits** (validated by `appstore/validate.mjs`): name 30, subtitle
@@ -238,7 +238,7 @@ One row is one App Store panel, in store order. `appstore/panels.septask.mjs`
 reads this table; `appstore/validate.mjs` checks it.
 
 - `scene` is `<scene id>/<step>` in the scene builder
-  (`../septena-site/lib/task-ui/model.ts`, `SCENES`). The phone layout of that
+  (`../site/lib/task-ui/model.ts`, `SCENES`). The phone layout of that
   step is the screen in the panel.
 - `callout` is an element id from that step's `.elements.json`, or `-`. The
   callout repeats the element's own on-screen text, larger, with a line to it.
@@ -290,10 +290,10 @@ same screens. Each screen comes with an `.elements.json`, and callouts anchor on
 it.
 
 ```bash
-cd ../septena-site && npx next build                 # 1. build the site (scene pages)
+cd ../site && npx next build                 # 1. build the site (scene pages)
 cd ../septena/appstore && node export-scenes.mjs     # 2. export phone screens at 3x, one set per panel accent
 cd ../septena/appstore && npm run all:septask        # 3. metadata + render + validate
-cd ../../_/septena-site && node scripts/sync-appstore.mjs && npm run dev
+cd ../../site && node scripts/sync-appstore.mjs && npm run dev
                                                      # 4. review at localhost:3000/about/brand#app-store
 appstore/upload.sh septask ios --screenshots-only    # 5. upload (from the repo root)
 ```
@@ -333,7 +333,7 @@ upload; mz never drags screenshots into App Store Connect by hand.
   (`validate.mjs` writes `review.septask.json`, `sync-appstore.mjs` copies it).
   The old local viz page and `serve.mjs` are gone (2026-11-23): never add a
   second viewer here.
-- Re-export when a scene changes in `../septena-site/lib/task-ui/model.ts` or
+- Re-export when a scene changes in `../site/lib/task-ui/model.ts` or
   when a table row points at a new scene step.
 - A new panel: add a row to the table above, pick its `scene` from the
   `/scenes` page on the site, and pick a `callout` id from that step's

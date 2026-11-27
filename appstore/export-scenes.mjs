@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Exports the phone screens the Septena App Store panels use, from the
-// website's scene builder (SEPTENA_SITE, default ../../_/septena-site).
+// website's scene builder (SEPTENA_SITE, default ../../site).
 // Each panel's screen is captured in the panel's own fruit accent
 // (SCENE_ACCENT), so the app's accent matches the panel fill; a shot with
 // `accent: null` keeps the scene's own colours (the looks scene).
@@ -14,7 +14,7 @@ import { fileURLToPath } from "node:url";
 
 process.env.SEPTENA_APP ??= "septask";
 const ROOT = dirname(fileURLToPath(import.meta.url));
-const SITE = process.env.SEPTENA_SITE ?? join(ROOT, "../../_/septena-site");
+const SITE = process.env.SEPTENA_SITE ?? join(ROOT, "../../site");
 if (!existsSync(join(SITE, "out", "scenes.html"))) throw new Error(`Build the site first: cd ${SITE} && npx next build`);
 const { septaskPanels } = await import("./panels.septask.mjs");
 

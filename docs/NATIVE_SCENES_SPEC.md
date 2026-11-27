@@ -1,6 +1,6 @@
 # Native marketing scenes
 
-> **Superseded 2026-11-22.** ADR 0022 is rejected: the website draws scenes in code from the app's registries, not from native captures. Kept for history. Remaining work: michellzappa/septena-site#10.
+> **Superseded 2026-11-22.** ADR 0022 is rejected: the website draws scenes in code from the app's registries, not from native captures. Kept for history. Remaining work: septena/site#10.
 
 Status: superseded. Owner: mz.
 

@@ -139,7 +139,7 @@ Run workflow** and select:
   `https://septena.app/android/download` to the latest `android-v*` release's
   `Septena.apk` asset (or read `android-release.json`), keeping
   `https://septena.app/mac/appcast.xml` pinned to `/releases/latest`.
-- **Obtainium:** users can track `https://github.com/michellzappa/septena` with
+- **Obtainium:** users can track `https://github.com/septena/septena` with
   release filter `^android-v` and APK regex `^Septena-.*\.apk$`.
 
 ---

@@ -10,7 +10,7 @@ Referenced from:
 
 - `CLAUDE.md` → Conventions (one pointer line)
 - `docs/DesignSpec.md` → a "Voice" note (one pointer line)
-- `../septena-site/docs/marketing.md` → the marketing source of truth (one pointer line)
+- `../site/docs/marketing.md` → the marketing source of truth (one pointer line)
 
 **Division of ownership:** this doc owns the *maker voice & identity* — who mz is,
 the build story, the reusable copy blocks. **Audience, positioning, taglines, and
@@ -28,7 +28,7 @@ In public copy, round fluid counts ("about two thousand commits", "more than
 half"): mz dislikes over-specific figures. Exact numbers stay in this table.
 
 Every maker claim must trace to a row here. Numbers are a **snapshot** (git as of
-2026-11-21, `michellzappa/septena`); they're for storytelling, not a live
+2026-11-21, `septena/septena`); they're for storytelling, not a live
 readout. Restamp when you cite fresh ones.
 
 **Scope (decided by mz, 2026-11-21):** Septena is the task app (ADR 0007). The
@@ -46,7 +46,7 @@ of the arc. The June 2026 life-OS story below is superseded.
 | Agents work tasks, the human holds the stop | Ships (2026-11-19/20, ADR 0008): assign a task to Claude, the agent claims it with a lease, asks in the app with choice buttons, and mz can stop one task or pause all agents. The server enforces the stop; no agent can clear it. |
 | Unattended runner | Ships (ADR 0005, issue #5, closed 2026-11-25): the agent is woken when you assign a task, answer its question or resume it, and a scheduled runner works tasks while your devices sleep. |
 | The repo teaches its agents | `AGENTS.md` holds the rules, the traps earlier sessions fell into, and what an agent may not do alone. Most "Known traps" entries record an agent mistake. |
-| Built in the open | Public repo (`github.com/michellzappa/septena`), MIT: apps and server (`backend/`). |
+| Built in the open | Public repo (`github.com/septena/septena`), MIT: apps and server (`backend/`). |
 | Self-hosting | **Planned** (ADR 0011, #119): the server on your own Cloudflare account, unsupported by design. |
 | Private by design | One private store per user at `api.septena.app` (ADR 0002). No ads, no investors. The iCloud-only claim is **gone**; never use it. |
 | Weekends | Saturday is the biggest commit day (401), then Sunday (329) and Friday (328). |
@@ -201,7 +201,7 @@ where the arc gets told in full.
 ## 2. The voice
 
 Codify what the existing journal already does well (see
-`../septena-site/content/journal/`). Hold every surface to it.
+`../site/content/journal/`). Hold every surface to it.
 
 - **First person, signed.** "I built this." Sign maker moments `— mz` or
   `— Michell`. Never corporate third-person about myself.
@@ -276,7 +276,7 @@ is API spend, not server farms or salaries. Keep it dry; don't oversell it.
 ### Block D — Built in the open (trust pillar, reusable one-liner)
 
 > A thousand-plus commits, all public. You can read every line that touches your
-> data — `github.com/michellzappa/septena`.
+> data — `github.com/septena/septena`.
 
 ### Block E — Changelog & journal sign-off voice
 
@@ -383,4 +383,4 @@ Keep each to one line so the hotspot files don't bloat.
 
 - **`CLAUDE.md`** (Conventions): `Maker voice & identity (the "made by mz" story across app/site/support/journal) is specified in docs/MAKER_IDENTITY.md — pull facts and copy blocks from there, never invent maker claims.`
 - **`docs/DesignSpec.md`** (a short Voice note): `For maker/first-person voice and the data-backed claims behind it, see docs/MAKER_IDENTITY.md.`
-- **`../septena-site/docs/marketing.md`**: `Maker identity & the data-supported claims are canonical in the app repo at docs/MAKER_IDENTITY.md — marketing copy about "made by one person" derives from there.`
+- **`../site/docs/marketing.md`**: `Maker identity & the data-supported claims are canonical in the app repo at docs/MAKER_IDENTITY.md — marketing copy about "made by one person" derives from there.`

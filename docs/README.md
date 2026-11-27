@@ -12,7 +12,7 @@ Four kinds of record. Each has one job.
 | **ADR** | `docs/adr/NNNN-title.md` | Records one decision and why. Short. | No. A new ADR supersedes it. |
 | **Spec** | `docs/<NAME>_SPEC.md` | Describes how one feature works: data, rules, surfaces, phases. | Yes, until the feature ships. Then it is frozen as *historical*. |
 | **Roadmap** | `docs/ROADMAP.md` | Order of the work: tracks and milestones. | Yes, every time the plan changes. |
-| **Issue** | GitHub `michellzappa/septena` | One unit of work an agent or mz can pick up. Links its spec and milestone. | Closed when done. |
+| **Issue** | GitHub `septena/septena` | One unit of work an agent or mz can pick up. Links its spec and milestone. | Closed when done. |
 
 Rules:
 

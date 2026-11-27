@@ -5,7 +5,7 @@
 // devices" or "another device", never a list of platforms and never which
 // platform lacks something. Per-platform detail lives only in per-platform
 // data (registry/capabilities.json, the site's comparison table, the
-// changelog). The site (michellzappa/septena-site) runs the same rule on
+// changelog). The site (septena/site) runs the same rule on
 // its pages.
 //
 // Scans:

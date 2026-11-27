@@ -139,7 +139,7 @@ notes. It is consumed in two places that must never diverge:
      releases newer than the version the user last saw (gated on the welcome
      being done; a fresh install adopts the current version silently). State key:
      `SettingsKey.lastSeenChangelogVersion`.
-2. **On the website** — `../septena-site/scripts/sync-changelog.mjs` copies the
+2. **On the website** — `../site/scripts/sync-changelog.mjs` copies the
    file into `septena-site/content/changelog.json` at build time (wired into
    `predev`/`prebuild`), and `app/changelog/page.tsx` renders it at `/changelog`.
    If the app repo isn't checked out beside the site, the sync keeps the last

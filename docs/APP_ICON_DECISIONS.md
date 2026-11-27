@@ -1,6 +1,6 @@
 # Septena App Icon & Appearance Decisions
 
-Locked on 2026-11-21 and shipped to `main` in `michellzappa/septena`.
+Locked on 2026-11-21 and shipped to `main` in `septena/septena`.
 
 ## 1. Locked Brand Mark — The Septena Upright Compass
 

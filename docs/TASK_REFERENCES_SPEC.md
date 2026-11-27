@@ -14,7 +14,7 @@ Defaults that this doc adds are marked *(new)* in §13.
 **Builds on:** `registry/entities.json`, `registry/surfaces.json` (`taskPage`),
 `core/crates/septena-core`, `backend/src/store/TaskStore.ts`,
 `backend/src/shadow/mcp.ts`, `SeptenaCore/ConvoDerived.swift`.
-**Tracking issue:** [#296](https://github.com/michellzappa/septena/issues/296).
+**Tracking issue:** [#296](https://github.com/septena/septena/issues/296).
 **Owner of decisions:** mz.
 
 ## 1. What a reference is

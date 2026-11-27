@@ -19,7 +19,7 @@ trap 'rm -rf "$tmp"' EXIT
 
 wasm_name="septena-core-wasm-web-$version.tgz"
 kotlin_name="septena-core-kotlin-$version.zip"
-gh release download "$tag" --repo michellzappa/septena --dir "$tmp" \
+gh release download "$tag" --repo septena/septena --dir "$tmp" \
   --pattern release.json --pattern "SeptenaSharedCore-$version.swift" --pattern "$wasm_name" \
   --pattern "$kotlin_name"
 

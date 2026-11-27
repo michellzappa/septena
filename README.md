@@ -7,7 +7,8 @@ Septena is a private, local-first task app for you and your agents, on iPhone, i
 In Claude Code, install the Septena plugin. It adds the tasks connector and the agent loop skill:
 
 ```
-/plugin install septena --marketplace michellzappa/septena
+/plugin marketplace add septena/septena
+/plugin install septena@septena
 ```
 
 Then type `/mcp`, pick septena and sign in. Other agents: [septena.app/agents](https://septena.app/agents).
@@ -27,7 +28,7 @@ The app was once a life operating system. That product moved to its own reposito
 ## Quick start
 
 ```bash
-git clone https://github.com/michellzappa/septena.git
+git clone https://github.com/septena/septena.git
 cd septena
 brew install xcodegen
 xcodegen generate

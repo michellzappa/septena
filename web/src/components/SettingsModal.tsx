@@ -2023,7 +2023,7 @@ export function SettingsModal({
       case "open_source":
         return (
           <a
-            href="https://github.com/michellzappa/septena"
+            href="https://github.com/septena/septena"
             target="_blank"
             rel="noreferrer"
             className="flex w-full items-center gap-2.5 py-2.5 text-left text-xs text-[var(--text-primary)] hover:opacity-80"

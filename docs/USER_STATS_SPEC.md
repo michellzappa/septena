@@ -105,7 +105,7 @@ Tested read-only against mz's real Septena account (785 inspected tasks across T
 
 ## 8. Roadmap & factory plan (phases and build tickets)
 
-**Milestone:** `M5 Breadth` · **Track:** `track:fade` · **Intake rule:** Not labelled `ready-for-agent` until mz promotes it (per `docs/ROADMAP.md` factory intake order). Each phase becomes one GitHub issue in `michellzappa/septena` (ST2 updates or replaces `#56`).
+**Milestone:** `M5 Breadth` · **Track:** `track:fade` · **Intake rule:** Not labelled `ready-for-agent` until mz promotes it (per `docs/ROADMAP.md` factory intake order). Each phase becomes one GitHub issue in `septena/septena` (ST2 updates or replaces `#56`).
 
 | Phase | Issue | Issue scope (What → Where → Done when) | Depends on |
 |---|---|---|---|
