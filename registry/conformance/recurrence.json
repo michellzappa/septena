@@ -4,37 +4,37 @@
   "missedWindows": [
     {
       "name": "an overdue chore keeps its existing row open",
-      "input": {"seriesId": "laundry", "mode": "keepOneOpen", "lastSlot": "2026-11-03", "today": "2026-11-24", "rule": {"unit": "week", "interval": 1, "afterCompletion": false}},
+      "input": {"mode": "keepOneOpen", "lastSlot": "2026-11-03", "today": "2026-11-24", "rule": {"unit": "week", "interval": 1, "afterCompletion": false}},
       "expected": {"create": [], "expireBefore": null, "hasMore": false}
     },
     {
       "name": "a daily habit skips missed slots and opens only the latest one",
-      "input": {"seriesId": "stretch", "mode": "startFresh", "lastSlot": "2026-11-03", "today": "2026-11-07", "rule": {"unit": "day", "interval": 1, "afterCompletion": false}},
-      "expected": {"create": [{"id": "recur-8468153964f09809", "scheduled": "2026-11-07"}], "expireBefore": "2026-11-07", "hasMore": false}
+      "input": {"mode": "startFresh", "lastSlot": "2026-11-03", "today": "2026-11-07", "rule": {"unit": "day", "interval": 1, "afterCompletion": false}},
+      "expected": {"create": ["2026-11-07"], "expireBefore": "2026-11-07", "hasMore": false}
     },
     {
       "name": "a timely reconciliation keeps the existing habit and expires older slots",
-      "input": {"seriesId": "stretch", "mode": "startFresh", "lastSlot": "2026-11-07", "today": "2026-11-07", "rule": {"unit": "day", "interval": 1, "afterCompletion": false}},
+      "input": {"mode": "startFresh", "lastSlot": "2026-11-07", "today": "2026-11-07", "rule": {"unit": "day", "interval": 1, "afterCompletion": false}},
       "expected": {"create": [], "expireBefore": "2026-11-07", "hasMore": false}
     },
     {
       "name": "a timed habit expires only once its next slot begins",
-      "input": {"seriesId": "stretch", "mode": "startFresh", "lastSlot": "2026-11-06", "today": "2026-11-07", "rule": {"unit": "day", "interval": 1, "afterCompletion": false}, "startTime": "09:00", "localTime": "08:59"},
+      "input": {"mode": "startFresh", "lastSlot": "2026-11-06", "today": "2026-11-07", "rule": {"unit": "day", "interval": 1, "afterCompletion": false}, "startTime": "09:00", "localTime": "08:59"},
       "expected": {"create": [], "expireBefore": "2026-11-06", "hasMore": false}
     },
     {
       "name": "a timed habit opens at the scheduled minute",
-      "input": {"seriesId": "stretch", "mode": "startFresh", "lastSlot": "2026-11-06", "today": "2026-11-07", "rule": {"unit": "day", "interval": 1, "afterCompletion": false}, "startTime": "09:00", "localTime": "09:00"},
-      "expected": {"create": [{"id": "recur-8468153964f09809", "scheduled": "2026-11-07"}], "expireBefore": "2026-11-07", "hasMore": false}
+      "input": {"mode": "startFresh", "lastSlot": "2026-11-06", "today": "2026-11-07", "rule": {"unit": "day", "interval": 1, "afterCompletion": false}, "startTime": "09:00", "localTime": "09:00"},
+      "expected": {"create": ["2026-11-07"], "expireBefore": "2026-11-07", "hasMore": false}
     },
     {
-      "name": "every owed timesheet receives an independent stable id",
-      "input": {"seriesId": "timesheet", "mode": "keepEach", "lastSlot": "2026-11-03", "today": "2026-11-25", "rule": {"unit": "week", "interval": 1, "afterCompletion": false}},
-      "expected": {"create": [{"id": "recur-4387a5a2ad100caa", "scheduled": "2026-11-10"}, {"id": "recur-4387a0a2ad10042b", "scheduled": "2026-11-17"}, {"id": "recur-438423a2ad0cf9ed", "scheduled": "2026-11-24"}], "expireBefore": null, "hasMore": false}
+      "name": "every owed timesheet has its own due date",
+      "input": {"mode": "keepEach", "lastSlot": "2026-11-03", "today": "2026-11-25", "rule": {"unit": "week", "interval": 1, "afterCompletion": false}},
+      "expected": {"create": ["2026-11-10", "2026-11-17", "2026-11-24"], "expireBefore": null, "hasMore": false}
     },
     {
       "name": "a completion-anchored repeat cannot generate from the calendar",
-      "input": {"seriesId": "filter", "mode": "keepEach", "lastSlot": "2026-11-03", "today": "2026-11-27", "rule": {"unit": "month", "interval": 1, "afterCompletion": true}},
+      "input": {"mode": "keepEach", "lastSlot": "2026-11-03", "today": "2026-11-27", "rule": {"unit": "month", "interval": 1, "afterCompletion": true}},
       "expected": {"create": [], "expireBefore": null, "hasMore": false}
     }
   ],

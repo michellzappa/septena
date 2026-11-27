@@ -25,7 +25,7 @@ on a listed issue without the label). Feature IDs: Starlings Docs
 | Project sharing | `docs/PROJECT_SHARING_SPEC.md`, ADR 0004 | `track:sharing` |
 | Switcher essentials, moving in & other clients (web, Android) | Starlings `/strategy/product-roadmap`, `docs/ANDROID_CLIENT_SPEC.md`, ADR 0016 sign-in | `track:clients` |
 | Companion devices (watch, desk orb) | `docs/COMPANION_DEVICES_SPEC.md`, ADR 0034, ADR 0035 | `track:clients` |
-| Task fade | `docs/TASK_FADE_SPEC.md`, ADR 0006 | `track:fade` |
+| Task fade & user stats | `docs/TASK_FADE_SPEC.md` (ADR 0006), `docs/USER_STATS_SPEC.md` (ADR 0063) | `track:fade` |
 | Do (one task now) | `docs/DO_SPEC.md`, ADR 0041 | `track:clients` |
 | Project notes as agent context | `docs/PROJECT_NOTES_SPEC.md`, ADR 0012 | `track:factory` |
 | Launch — Septena name, free tier, paid sync, rate lock | `docs/SYNC_SUBSCRIPTION_SPEC.md`, ADR 0007, ADR 0010 | `track:launch` |
@@ -226,6 +226,10 @@ GitHub milestone: `"M5 Breadth"`.
 - F4 `factory-day` routes questions to Septena; daily digest
 - #28, #53–#56 Task fade (T1–T4: touch/defer, weekly sweep, carry-over, stuck
   question, done-first week)
+- User stats & foundations (`docs/USER_STATS_SPEC.md`, ADR 0063, held off
+  `ready-for-agent`): #817 ST0 core + `registry/stats.json` → #820 ST1
+  `stat_days` store, sync & export → #56 ST2 Weekly Reflection → #818 ST3
+  Logbook Rhythm (open defaults: #819)
 - #88 Packaged agent installs (Claude Code, Gemini CLI, OpenClaw)
 - #89 Siri, Shortcuts and App Intents · #90 Public API with keys
 - Companion devices: #430 CD0 added feed · #424 CD1 needs-you feed → #358 CD2 limited session →

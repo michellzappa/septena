@@ -78,6 +78,14 @@ export const zRefSnapshot = zRefSnapshotFields.refine(snapshotFits, "snapshot to
 // typed column. A new setting is a new line here: no table change. Settings
 // are never deleted (a tombstone would drop every later write, §6.4); a
 // cleared setting is `value: null`. Device-only preferences never come here.
+export const AGENT_COMMENT_NOTIFICATION_MODES = [
+  "every_comment",
+  "needs_input",
+  "daily_digest",
+  "off",
+] as const;
+export type AgentCommentNotificationMode = (typeof AGENT_COMMENT_NOTIFICATION_MODES)[number];
+
 export const SETTING_VALUES = {
   /// Profile name (Settings ▸ Account).
   welcomeName: z.string().max(200),
@@ -93,6 +101,11 @@ export const SETTING_VALUES = {
   /// "Pause all agents" (docs/TASK_FACTORY_SPEC.md §10). While true, the
   /// store refuses every agent write and claim, and the agent queue reads as empty.
   agentsPaused: z.boolean(),
+  /// Global mode for agent comment push notifications (#743).
+  agentCommentNotifications: z.enum(AGENT_COMMENT_NOTIFICATION_MODES),
+  /// Per-agent notification override keyed by agent connection name (#743).
+  agentCommentNotificationsByAgent: z.record(z.string().min(1).max(120), z.enum(AGENT_COMMENT_NOTIFICATION_MODES))
+    .refine((r) => Object.keys(r).length <= 64, "too many agent notification overrides"),
   /// "Fade inactive tasks" (docs/TASK_FADE_SPEC.md §4). Off on one device is
   /// off on all: a fade is account data.
   tasksShowAging: z.boolean(),

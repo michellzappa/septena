@@ -164,6 +164,11 @@ function validateTokens(tokens) {
     }
   }
   assert(Array.isArray(tokens.textScale?.steps) && tokens.textScale.steps.length === 5, "tokens.json: textScale must have 5 steps");
+  const cm = tokens.motion?.completion;
+  assert(cm && typeof cm === "object", "tokens.json: missing motion.completion");
+  for (const k of ["settleDelayMs", "fadeOutMs", "checkPopMs", "pulseRingMs"]) {
+    assert(Number.isInteger(cm[k]) && cm[k] > 0, `tokens.json: motion.completion.${k} must be a positive integer`);
+  }
 }
 
 function validateCapabilities(caps) {
@@ -520,7 +525,7 @@ function validateActions(actions, icons, caps, destIds) {
 // renders. `kind` picks the view; `action` is the only behavior a button may
 // name, so a client implements a closed set and the registry stays data.
 const FIRST_RUN_KINDS = new Set(["intro", "account", "choices", "connectAgent", "finish"]);
-const FIRST_RUN_ACTIONS = new Set(["next", "finish", "signIn", "importThings", "importReminders", "copySetupPrompt", "copyFirstPrompt"]);
+const FIRST_RUN_ACTIONS = new Set(["next", "finish", "signIn", "importThings", "importReminders", "copySetupPrompt"]);
 const FIRST_RUN_CONDITIONS = new Set(["signedIn"]);
 
 function validateFirstRun(surfaces, icons, caps, settings) {
@@ -529,6 +534,7 @@ function validateFirstRun(surfaces, icons, caps, settings) {
   assert(fr.featureId in caps.capabilities, `surfaces.json: firstRun unknown featureId "${fr.featureId}"`);
   const done = settings.keys[fr.completionSetting];
   assert(done && done.scope === "synced", `surfaces.json: firstRun.completionSetting "${fr.completionSetting}" must be a synced settings key`);
+  assert(typeof fr.connectorUrl === "string" && fr.connectorUrl.startsWith("https://"), "surfaces.json: firstRun.connectorUrl must be an https URL");
   assert(typeof fr.prompts?.setup === "string" && typeof fr.prompts?.first === "string", "surfaces.json: firstRun.prompts needs setup and first");
   const getStarted = surfaces.notices.items.find((n) => n.id === "getStarted");
   const stepIds = new Set((getStarted?.steps ?? []).map((st) => st.id));
@@ -563,7 +569,6 @@ function validateFirstRun(surfaces, icons, caps, settings) {
     }
     checkButton(`${st.id}.primary`, st.primary);
     checkButton(`${st.id}.secondary`, st.secondary);
-    checkButton(`${st.id}.tertiary`, st.tertiary);
     checkButton(`${st.id}.afterDone`, st.afterDone);
     if (st.kind === "choices") assert((st.choices ?? []).length > 0, `surfaces.json: firstRun ${st.id} needs choices`);
   }
@@ -1181,6 +1186,12 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push(`    static let maxInset: Double = ${tokens.desktopColumn.maxInset}`);
   lines.push(`    static let verticalInset: Double = ${tokens.desktopColumn.verticalInset}`);
   lines.push(`    static let titleBarGap: Double = ${tokens.desktopColumn.titleBarGap}`);
+  lines.push("  }");
+  lines.push("  enum CompletionMotion {");
+  lines.push(`    static let settleDelayMs: Int = ${tokens.motion.completion.settleDelayMs}`);
+  lines.push(`    static let fadeOutMs: Int = ${tokens.motion.completion.fadeOutMs}`);
+  lines.push(`    static let checkPopMs: Int = ${tokens.motion.completion.checkPopMs}`);
+  lines.push(`    static let pulseRingMs: Int = ${tokens.motion.completion.pulseRingMs}`);
   lines.push("  }");
   lines.push(`  static let accentPalette: [String] = [${tokens.accentPalette.map(swiftStr).join(", ")}]`);
   lines.push("  static let fruitAccents: [RegistryFruitAccent] = [");
@@ -2190,10 +2201,8 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  let featureId: String?");
   lines.push("  let points: [RegistryFirstRunPoint]");
   lines.push("  let choices: [RegistryFirstRunChoice]");
-  lines.push("  let instructions: [String]");
   lines.push("  let primary: RegistryFirstRunButton?");
   lines.push("  let secondary: RegistryFirstRunButton?");
-  lines.push("  let tertiary: RegistryFirstRunButton?");
   lines.push("  /// Replaces `secondary` once the step's work is done (paired, imported).");
   lines.push("  let afterDone: RegistryFirstRunButton?");
   lines.push("}");
@@ -2202,14 +2211,16 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push(`  static let featureId: String = ${swiftStr(fr.featureId)}`);
   lines.push(`  /// The synced setting that records a finished first run, so a second device skips it.`);
   lines.push(`  static let completionSetting: String = ${swiftStr(fr.completionSetting)}`);
+  lines.push(`  static let connectorUrl: String = ${swiftStr(fr.connectorUrl)}`);
+  const frBack = fr.chrome.find((c) => c.id === "back");
+  lines.push(`  static let backTitle: String = ${L(frBack.label, frBack, "label")}`);
   lines.push(`  static let setupPrompt: String = ${L(fr.prompts.setup, fr.prompts, "setup")}`);
   lines.push(`  static let firstPrompt: String = ${L(fr.prompts.first, fr.prompts, "first")}`);
   lines.push("  static let steps: [RegistryFirstRunStep] = [");
   for (const st of fr.steps) {
     const points = (st.points ?? []).map((pt) => `RegistryFirstRunPoint(icon: ${swiftStr(pt.icon)}, title: ${L(pt.title, pt, "title")}, detail: ${L(pt.detail, pt, "detail")})`).join(", ");
     const choices = (st.choices ?? []).map((ch) => `RegistryFirstRunChoice(id: ${swiftStr(ch.id)}, icon: ${swiftStr(ch.icon)}, title: ${L(ch.title, ch, "title")}, detail: ${L(ch.detail, ch, "detail")}, action: ${swiftCaseRef(ch.action)}, platforms: [${(ch.platforms ?? []).map(swiftStr).join(", ")}])`).join(", ");
-    const instructions = (st.instructions ?? []).map((s) => L(s)).join(", ");
-    lines.push(`    RegistryFirstRunStep(id: ${swiftCaseRef(st.id)}, kind: ${swiftStr(st.kind)}, icon: ${swiftStr(st.icon)}, title: ${L(st.title, st, "title")}, body: ${st.body === undefined ? '""' : L(st.body, st, "body")}, footnote: ${LOpt(st.footnote, st, "footnote")}, returningTitle: ${LOpt(st.returningTitle, st, "returningTitle")}, returningBody: ${LOpt(st.returningBody, st, "returningBody")}, skipWhen: ${swiftOptStr(st.skipWhen)}, requires: ${swiftOptStr(st.requires)}, completesGetStartedStep: ${swiftOptStr(st.completesGetStartedStep)}, platforms: [${(st.platforms ?? []).map(swiftStr).join(", ")}], featureId: ${swiftOptStr(st.featureId)}, points: [${points}], choices: [${choices}], instructions: [${instructions}], primary: ${frButton(st.primary)}, secondary: ${frButton(st.secondary)}, tertiary: ${frButton(st.tertiary)}, afterDone: ${frButton(st.afterDone)}),`);
+    lines.push(`    RegistryFirstRunStep(id: ${swiftCaseRef(st.id)}, kind: ${swiftStr(st.kind)}, icon: ${swiftStr(st.icon)}, title: ${L(st.title, st, "title")}, body: ${st.body === undefined ? '""' : L(st.body, st, "body")}, footnote: ${LOpt(st.footnote, st, "footnote")}, returningTitle: ${LOpt(st.returningTitle, st, "returningTitle")}, returningBody: ${LOpt(st.returningBody, st, "returningBody")}, skipWhen: ${swiftOptStr(st.skipWhen)}, requires: ${swiftOptStr(st.requires)}, completesGetStartedStep: ${swiftOptStr(st.completesGetStartedStep)}, platforms: [${(st.platforms ?? []).map(swiftStr).join(", ")}], featureId: ${swiftOptStr(st.featureId)}, points: [${points}], choices: [${choices}], primary: ${frButton(st.primary)}, secondary: ${frButton(st.secondary)}, afterDone: ${frButton(st.afterDone)}),`);
   }
   lines.push("  ]");
   lines.push("}");
@@ -2537,7 +2548,7 @@ function generateTS({ entities, rules, icons, tokens, caps, settings, dests, act
   lines.push(`export const DESTINATIONS = ${JSON.stringify(dests.destinations)} as const;`);
   lines.push(`export const GENERIC_EMPTY_STATE = ${JSON.stringify(dests.genericEmptyState)} as const;`);
   lines.push(`export const ICONS = ${JSON.stringify(icons.icons)} as const;`);
-  lines.push(`export const DESIGN_TOKENS = ${JSON.stringify({ accentPolicy: tokens.accentPolicy, fruitAccents: tokens.fruitAccents ?? [], textures: tokens.textures ?? [], selection: tokens.selection, colors: tokens.colors, multicolorGlyphs: tokens.multicolorGlyphs?.glyphs ?? {}, accentPalette: tokens.accentPalette, radii: tokens.radii, spacing: tokens.spacing, desktopColumn: tokens.desktopColumn, textScale: tokens.textScale })} as const;`);
+  lines.push(`export const DESIGN_TOKENS = ${JSON.stringify({ accentPolicy: tokens.accentPolicy, fruitAccents: tokens.fruitAccents ?? [], textures: tokens.textures ?? [], selection: tokens.selection, colors: tokens.colors, multicolorGlyphs: tokens.multicolorGlyphs?.glyphs ?? {}, accentPalette: tokens.accentPalette, radii: tokens.radii, spacing: tokens.spacing, desktopColumn: tokens.desktopColumn, textScale: tokens.textScale, motion: tokens.motion })} as const;`);
   lines.push(`export const CAPABILITIES = ${JSON.stringify(caps.capabilities)} as const;`);
   lines.push(`export const ACTIONS_CATALOG = ${JSON.stringify({ actions: actions.actions, contextMenus: actions.contextMenus, menuBar: actions.menuBar, shortcutsSheet: actions.shortcutsSheet })} as const;`);
   lines.push(`export const SURFACES_CATALOG = ${JSON.stringify({ notices: surfaces.notices, prompts: surfaces.prompts, toasts: surfaces.toasts, taskAttributes: surfaces.taskAttributes, taskDateBoard: surfaces.taskDateBoard, taskPage: surfaces.taskPage, waiting: surfaces.waiting, sharing: surfaces.sharing, accountSwitch: surfaces.accountSwitch, deviceSignIn: surfaces.deviceSignIn, quickFind: surfaces.quickFind, checklistProjects: surfaces.checklistProjects, missedRepeat: surfaces.missedRepeat, listSort: surfaces.listSort, support: surfaces.support })} as const;`);
@@ -2716,6 +2727,14 @@ function generateKotlinCore(bundle) {
     const literal = Number.isInteger(value) ? `${value}L` : `${value}`;
     lines.push(`    const val ${kotlinConstName(key)}: ${type} = ${literal}`);
   }
+  lines.push("}");
+  lines.push("");
+  lines.push("/** Standard task-completion settle and checkbox motion (`registry/tokens.json` `motion.completion`). */");
+  lines.push("object RegistryCompletionMotion {");
+  lines.push(`    const val SETTLE_DELAY_MS: Long = ${tokens.motion.completion.settleDelayMs}L`);
+  lines.push(`    const val FADE_OUT_MS: Int = ${tokens.motion.completion.fadeOutMs}`);
+  lines.push(`    const val CHECK_POP_MS: Int = ${tokens.motion.completion.checkPopMs}`);
+  lines.push(`    const val PULSE_RING_MS: Int = ${tokens.motion.completion.pulseRingMs}`);
   lines.push("}");
   lines.push("");
 

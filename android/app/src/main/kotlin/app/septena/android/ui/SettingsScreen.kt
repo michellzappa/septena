@@ -416,7 +416,13 @@ private fun SettingsRegistryRow(
                     }
                 }
                 "access_devices" -> AccessDevicesList(accessModel, signedIn, languageTag)
-                "access_agents" -> AccessAgentsList(accessModel, signedIn, languageTag, surfaceEnv.plans)
+                "access_agents" -> {
+                    val overrides = (values[RegistrySettingKeys.AGENT_COMMENT_NOTIFICATIONS_BY_AGENT]
+                        as? JsonValue.ObjectValue)?.fields.orEmpty()
+                        .mapNotNull { (k, v) -> v.stringValue()?.let { k to it } }
+                        .toMap()
+                    AccessAgentsList(accessModel, signedIn, languageTag, surfaceEnv.plans, overrides)
+                }
                 APPEARANCE_PICKER_SURFACE -> AppearancePicker(languageTag)
                 "account_profile_editor" -> {
                     val key = item.ownsKeys.firstOrNull() ?: return

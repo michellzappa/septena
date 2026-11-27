@@ -5359,6 +5359,111 @@
                               "const": "setting"
                             },
                             "id": {
+                              "const": "agentCommentNotifications"
+                            },
+                            "fields": {
+                              "type": "object",
+                              "properties": {
+                                "value": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "every_comment",
+                                        "needs_input",
+                                        "daily_digest",
+                                        "off"
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "value"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": [
+                            "clientOpId",
+                            "op",
+                            "entity",
+                            "id",
+                            "fields"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "clientOpId": {
+                              "type": "string",
+                              "pattern": "^[A-Za-z0-9_-]{8,64}$"
+                            },
+                            "op": {
+                              "const": "upsert"
+                            },
+                            "entity": {
+                              "const": "setting"
+                            },
+                            "id": {
+                              "const": "agentCommentNotificationsByAgent"
+                            },
+                            "fields": {
+                              "type": "object",
+                              "properties": {
+                                "value": {
+                                  "anyOf": [
+                                    {
+                                      "type": "object",
+                                      "additionalProperties": {
+                                        "type": "string",
+                                        "enum": [
+                                          "every_comment",
+                                          "needs_input",
+                                          "daily_digest",
+                                          "off"
+                                        ]
+                                      }
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "value"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": [
+                            "clientOpId",
+                            "op",
+                            "entity",
+                            "id",
+                            "fields"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "clientOpId": {
+                              "type": "string",
+                              "pattern": "^[A-Za-z0-9_-]{8,64}$"
+                            },
+                            "op": {
+                              "const": "upsert"
+                            },
+                            "entity": {
+                              "const": "setting"
+                            },
+                            "id": {
                               "const": "tasksShowAging"
                             },
                             "fields": {

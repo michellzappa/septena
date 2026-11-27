@@ -180,9 +180,9 @@ func a11yAnimate<R>(_ animation: Animation? = .default, _ body: () -> R) -> R {
 @Observable
 final class SettleStore {
   /// How long a checked item lingers, struck through, before it fades out.
-  /// This doubles as the "undo a completion" window — un-checking inside it
-  /// aborts the fade — so it's kept generous rather than snappy.
-  static let delay: Duration = .milliseconds(7000)
+  /// Doubles as the accidental-tap undo window — un-checking inside it aborts
+  /// the fade. Canonical across Apple, Android, and Web (`tokens.json` `motion.completion`).
+  static let delay: Duration = .milliseconds(RegistryTokens.CompletionMotion.settleDelayMs)
 
   /// Ids currently lingering (checked, not yet faded). Read by views that need
   /// to keep a just-completed row on screen during the window.

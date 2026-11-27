@@ -6571,7 +6571,7 @@ enum KitMotion {
   /// leaves the list. Long enough to read as "yes, that one" and to undo by
   /// eye; the pause itself isn't motion, so it survives Reduce Motion and only
   /// the fade afterwards collapses.
-  static let settleDelay: TimeInterval = 2.5
+  static let settleDelay: TimeInterval = TimeInterval(RegistryTokens.CompletionMotion.settleDelayMs) / 1000.0
   /// Inline composer expand/collapse — `Theme.Motion.quick`-adjacent. Zero
   /// under Reduce Motion so `noteHeightOfRows` jumps.
   static let composerDuration: TimeInterval = 0.22

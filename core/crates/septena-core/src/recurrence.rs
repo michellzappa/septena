@@ -3,7 +3,7 @@
 //! Weekdays use the Apple convention: 1 = Sunday … 7 = Saturday.
 
 use serde::Deserialize;
-use serde_json::{Value, json};
+use serde_json::Value;
 
 use crate::date::{Day, YearMonth};
 use crate::error::CoreError;
@@ -139,7 +139,9 @@ pub(crate) fn recurrence_window(input: &Value) -> Result<Value, CoreError> {
     let today = input["today"].as_str().and_then(Day::parse);
     let anchor = input["lastSlot"].as_str().and_then(Day::parse);
     let Some((mut through, anchor)) = today.zip(anchor) else {
-        return Err(CoreError::invalid("recurrenceWindow requires a local day and last slot"));
+        return Err(CoreError::invalid(
+            "recurrenceWindow requires a local day and last slot",
+        ));
     };
     if let Some(start) = input["startTime"].as_str() {
         let now = input["localTime"]
@@ -163,8 +165,11 @@ pub(crate) fn recurrence_window(input: &Value) -> Result<Value, CoreError> {
     if !rule.after_completion && (fresh || each) && anchor <= through {
         for _ in 0..10_000 {
             let slot = last.to_string();
-            let next = next_scheduled_date(slot.clone(), Some(slot), None, rule.clone()).and_then(|next| Day::parse(&next));
-            let Some(next) = next.filter(|next| *next <= through) else { break };
+            let next =
+                next_scheduled_date(slot.clone(), Some(slot), None, rule.clone()).and_then(|next| Day::parse(&next));
+            let Some(next) = next.filter(|next| *next <= through) else {
+                break;
+            };
             if each && dates.len() == 256 {
                 more = true;
                 break;
@@ -178,19 +183,15 @@ pub(crate) fn recurrence_window(input: &Value) -> Result<Value, CoreError> {
             dates.push(last);
         }
     }
-    let series = input["seriesId"]
-        .as_str()
-        .filter(|id| !id.is_empty())
-        .ok_or_else(|| CoreError::invalid("recurrenceWindow requires a series id"))?;
-    let create: Vec<_> = dates
-        .into_iter()
-        .map(|date| {
-            let scheduled = date.to_string();
-            json!({ "id": occurrence_id(series.into(), scheduled.clone()), "scheduled": scheduled })
-        })
-        .collect();
     let expiry = (fresh && !rule.after_completion && anchor <= through).then(|| last.to_string());
-    Ok(json!({ "create": create, "expireBefore": expiry, "hasMore": more }))
+    let mut out = serde_json::Map::new();
+    out.insert(
+        "create".into(),
+        Value::Array(dates.into_iter().map(|day| Value::String(day.to_string())).collect()),
+    );
+    out.insert("expireBefore".into(), expiry.map_or(Value::Null, Value::String));
+    out.insert("hasMore".into(), Value::Bool(more));
+    Ok(Value::Object(out))
 }
 
 /// The stable record id of one occurrence: FNV-1a 64 over `"<id>|<date>"`.

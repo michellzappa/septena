@@ -100,6 +100,8 @@ struct SeptaskAgentsSections: View {
   private var roster: AgentRoster { .shared }
   private static let pauseSection = RegistrySettings.section("pause", page: RegistrySettings.PageID.agents)
   private static let pauseItem = RegistrySettings.itemByKey["agentsPaused"]
+  private static let notificationsSection = RegistrySettings.section("notifications", page: RegistrySettings.PageID.agents)
+  private static let notificationsItem = RegistrySettings.itemByKey["agentCommentNotifications"]
   private static let section = RegistrySettings.section("agents", page: RegistrySettings.PageID.agents)
   private static let renamePrompt = RegistryPrompts.text[.renameAgent]
   private static let newKeyPrompt = RegistryPrompts.text[.newAgentKey]
@@ -135,6 +137,24 @@ struct SeptaskAgentsSections: View {
         }
       } footer: {
         if let footer = Self.pauseSection?.footer { Text(footer) }
+      }
+
+      Section {
+        Picker(
+          Self.notificationsItem?.label ?? RegistrySettings.label(key: "agentCommentNotifications"),
+          selection: Binding(
+            get: { store.agentCommentNotifications },
+            set: { store.setAgentCommentNotifications($0, context: modelContext, engine: ckEngine) }
+          )
+        ) {
+          ForEach(RegistrySettings.optionsByKey["agentCommentNotifications"] ?? []) { opt in
+            Text(opt.title).tag(opt.value)
+          }
+        }
+      } header: {
+        if let header = Self.notificationsSection?.header { Text(header) }
+      } footer: {
+        if let footer = Self.notificationsSection?.footer { Text(footer) }
       }
     }
 
@@ -262,20 +282,34 @@ struct SeptaskAgentsSections: View {
 
   private func agentRow(_ agent: BackendAccess.Connection) -> some View {
     let disconnectTitle = RegistryPrompts.disconnectAgent(name: agent.displayName).confirmTitle ?? ""
-    return LabeledContent {
-      Button(disconnectTitle, role: .destructive) { pendingDisconnect = agent }
-        .buttonStyle(.borderless)
-    } label: {
-      Label {
-        VStack(alignment: .leading, spacing: 2) {
-          Text(agent.displayName)
-          Text(Self.detailLine(agent))
-            .font(.caption)
-            .foregroundStyle(.secondary)
+    let overrideBinding = Binding<String>(
+      get: { store.agentNotificationOverride(for: agent.displayName) ?? "" },
+      set: { store.setAgentNotificationOverride($0.isEmpty ? nil : $0, for: agent.displayName, context: modelContext, engine: ckEngine) }
+    )
+    return VStack(alignment: .leading, spacing: 6) {
+      LabeledContent {
+        Button(disconnectTitle, role: .destructive) { pendingDisconnect = agent }
+          .buttonStyle(.borderless)
+      } label: {
+        Label {
+          VStack(alignment: .leading, spacing: 2) {
+            Text(agent.displayName)
+            Text(Self.detailLine(agent))
+              .font(.caption)
+              .foregroundStyle(.secondary)
+          }
+        } icon: {
+          Image(systemName: RegistryIcons.sfSymbols["settings.agents"] ?? "person.2")
         }
-      } icon: {
-        Image(systemName: RegistryIcons.sfSymbols["settings.agents"] ?? "person.2")
       }
+      Picker(RegistrySettings.copy("access_agents", "notificationsLabel"), selection: overrideBinding) {
+        Text(RegistrySettings.copy("access_agents", "notificationsDefault")).tag("")
+        ForEach(RegistrySettings.optionsByKey["agentCommentNotifications"] ?? []) { opt in
+          Text(opt.title).tag(opt.value)
+        }
+      }
+      .font(.caption)
+      .foregroundStyle(.secondary)
     }
     .contextMenu {
       Button(Self.renamePrompt?.confirmTitle ?? "") { startRename(agent) }
