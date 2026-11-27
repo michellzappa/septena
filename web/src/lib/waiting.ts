@@ -16,11 +16,27 @@ export function sharingCopy(id: string, lang: string): string {
 }
 
 export function projectShareOf(project: ProjectRow | null | undefined): ProjectShareInfo | null {
-  const raw = project?.share;
-  if (!raw || typeof raw !== "object" || typeof raw.id !== "string" || typeof raw.me !== "string" || !Array.isArray(raw.members)) {
+  let raw: unknown = project?.share;
+  if (typeof raw === "string") {
+    try {
+      raw = JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+  if (!raw || typeof raw !== "object") return null;
+  const obj = raw as Partial<ProjectShareInfo>;
+  if (typeof obj.id !== "string" || typeof obj.me !== "string" || !Array.isArray(obj.members)) {
     return null;
   }
-  return raw;
+  return obj as ProjectShareInfo;
+}
+
+/** Localized "Members: Ann, Ben" tooltip/label matching Apple's `ProjectShare.membersLabel`. */
+export function shareMembersLabel(share: ProjectShareInfo, lang: string): string {
+  const names = share.members.map((m) => m.name).filter(Boolean).join(", ");
+  const prefix = sharingCopy("members", lang);
+  return names ? `${prefix}: ${names}` : prefix;
 }
 
 /** True when this shared task is assigned to another member (`assignedTo != share.me`). */

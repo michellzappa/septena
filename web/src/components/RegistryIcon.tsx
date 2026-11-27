@@ -31,6 +31,10 @@ import {
   Star,
   Sun,
   Trash2,
+  Undo2,
+  User,
+  UserPlus,
+  Users,
   type LucideIcon,
   type LucideProps,
 } from "lucide-react";
@@ -70,6 +74,10 @@ const LUCIDE: Record<string, LucideIcon> = {
   star: Star,
   sun: Sun,
   "trash-2": Trash2,
+  "undo-2": Undo2,
+  user: User,
+  "user-plus": UserPlus,
+  users: Users,
 };
 
 const REGISTRY_ICONS: Record<string, { lucide: string } | undefined> = ICONS;
