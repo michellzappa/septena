@@ -605,6 +605,7 @@ struct TaskComposerCard: View {
       if presentation == .page || presentation == .drawer, !deferredCreate,
          let task = editingTask, task.status == .open, task.deletedAt == nil {
         TaskWaitingStrip(task: task, offersNewWait: pageDepth == .page)
+        TaskAssigneeStrip(task: task)
       }
 
       VStack(alignment: .leading, spacing: inline ? 10 : 14) {

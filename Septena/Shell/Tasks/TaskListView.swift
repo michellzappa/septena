@@ -542,6 +542,8 @@ struct TaskListView: View {
   /// Review row whose Send Back… alert is open (row menu).
   @State private var starredOnlyFilter = false
   @State private var selectedTagIDs: Set<String> = []
+  /// Shared project person filter (`docs/PROJECT_SHARING_SPEC.md` §8).
+  @State private var selectedAssigneeFilter: TaskAssigneeFilter? = nil
   @State private var tagsByID: [String: TaskTag] = [:]
   @State private var checklistCounts: [String: (done: Int, total: Int)] = [:]
   @State private var fromRefKinds: [String: String] = [:]
@@ -1082,6 +1084,7 @@ struct TaskListView: View {
         logbookDeletedCount = 0
       }
       model.resetSession()
+      selectedAssigneeFilter = nil
       resetInboxZeroMotionForFilterChange()
       clearSelection()
       expandedEditId = nil
@@ -2358,14 +2361,46 @@ struct TaskListView: View {
     #endif
   }
 
+  /// Shared project metadata for the current project scope, if shared.
+  private var activeProjectShare: ProjectShare? {
+    guard case .project(let pid) = filter else { return nil }
+    return SharedProjects.share(ofProject: pid, in: LocalStore.shared.container.mainContext)
+  }
+
   @ViewBuilder
   private var starFilterBar: some View {
     let listTags = availableTagsInList
+    let share = activeProjectShare
     let starChip = showsStarFilterPill && !starFilterInToolbar
-    let hasActiveFilter = (starredOnlyFilter && starChip) || !selectedTagIDs.isEmpty
-    if starChip || !listTags.isEmpty {
+    let hasActiveFilter = (starredOnlyFilter && starChip) || !selectedTagIDs.isEmpty || selectedAssigneeFilter != nil
+    if starChip || !listTags.isEmpty || share != nil {
       ScrollView(.horizontal, showsIndicators: false) {
         HStack(spacing: 6) {
+          if let share {
+            ForEach(share.members) { member in
+              let target = TaskAssigneeFilter.member(member.id)
+              let isOn = selectedAssigneeFilter == target
+              SelectableChip(isSelected: isOn, tint: theme.color(for: "tasks"), onCanvas: true) {
+                a11yAnimate(.snappy(duration: 0.18)) {
+                  selectedAssigneeFilter = isOn ? nil : target
+                }
+              } label: {
+                HStack(spacing: 4) {
+                  Image(systemName: RegistryIcons.sfSymbol(for: "action.assign"))
+                    .scaledFont(size: 11)
+                  Text(member.id == share.me ? RegistrySharing.you : member.name)
+                }
+              }
+            }
+            let unassignedOn = selectedAssigneeFilter == .unassigned
+            SelectableChip(isSelected: unassignedOn, tint: theme.color(for: "tasks"), onCanvas: true) {
+              a11yAnimate(.snappy(duration: 0.18)) {
+                selectedAssigneeFilter = unassignedOn ? nil : .unassigned
+              }
+            } label: {
+              Text(RegistrySharing.nobody)
+            }
+          }
           if starChip {
             SelectableChip(isSelected: starredOnlyFilter, tint: Theme.todayAccent, onCanvas: true) {
               a11yAnimate(.snappy(duration: 0.18)) { starredOnlyFilter.toggle() }
@@ -2402,6 +2437,7 @@ struct TaskListView: View {
               a11yAnimate(.snappy(duration: 0.18)) {
                 if starChip { starredOnlyFilter = false }
                 selectedTagIDs.removeAll()
+                selectedAssigneeFilter = nil
               }
             } label: {
               Text("Clear")
@@ -4527,6 +4563,10 @@ struct TaskListView: View {
       isListSelected: selection.contains(task.id),
       checkboxDimmed: touchSelectionActive,
       isSettling: model.settle.isSettling(task.id),
+      showsOwnAssignee: {
+        if case .project = filter { return true }
+        return false
+      }(),
       accessory: accessory,
       checklistSummary: checklistCounts[task.id],
       fromKind: fromRefKinds[task.id].map(RegistryTaskReferences.kind),
@@ -5282,6 +5322,9 @@ struct TaskListView: View {
     }
     if !selectedTagIDs.isEmpty {
       result = result.filter { selectedTagIDs.isSubset(of: Set($0.tags)) }
+    }
+    if let assigneeFilter = selectedAssigneeFilter {
+      result = result.filter { assigneeFilter.matches($0) }
     }
     return result
   }

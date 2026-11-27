@@ -3,8 +3,8 @@
 
 import { DESTINATIONS } from "./generated/registries.ts";
 import type { CoreConversationState } from "./core/index.ts";
-import type { SmartDestination, TaskRow } from "./types";
-import { waitingName } from "./waiting.ts";
+import type { ProjectShareInfo, SmartDestination, TaskRow } from "./types";
+import { isWaitingTask } from "./waiting.ts";
 
 export interface DestinationGroup {
   id: string;
@@ -47,7 +47,7 @@ export function destinationGroups(id: "review"): readonly DestinationGroup[] {
   return destinationInfo(id)?.groups ?? [];
 }
 
-type ReviewTask = Pick<TaskRow, "status" | "kind" | "deletedAt" | "fadedAt" | "waitingOn">;
+type ReviewTask = Pick<TaskRow, "status" | "kind" | "deletedAt" | "fadedAt" | "waitingOn" | "assignedTo" | "assignedBy" | "assignedAt">;
 
 /** Review groups that hold agent work in progress (ADR 0046): the core's agent stages of the same id. */
 const IN_PROGRESS_GROUP_IDS = new Set(["working", "queued", "stopped"]);
@@ -63,10 +63,11 @@ export const BADGE_GROUP_IDS: ReadonlySet<string> = new Set(["questions", "finis
 export function reviewGroupOf(
   task: ReviewTask,
   convoState: Pick<CoreConversationState, "reviewGroup" | "agentStage"> | null,
+  share?: ProjectShareInfo | null,
 ): string | null {
   if (task.status !== "open" || task.deletedAt || task.kind === "heading") return null;
   if (convoState?.reviewGroup) return convoState.reviewGroup;
-  if (waitingName(task)) return "waiting";
+  if (isWaitingTask(task, share)) return "waiting";
   const stage = convoState?.agentStage;
   if (stage && IN_PROGRESS_GROUP_IDS.has(stage)) return stage;
   return task.fadedAt ? "faded" : null;

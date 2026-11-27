@@ -570,9 +570,10 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         if (ids.isEmpty()) return@withContext false
         val now = graph.clock.now()
         val today = graph.clock.today(now)
+        val shares = ProjectShare.byProject(graph.taskStore)
         ids.all { id ->
             val record = graph.taskStore.record(EntityNames.TASK, id) ?: return@all false
-            val snapshot = runCatching { TaskSnapshot.from(record) }.getOrNull() ?: return@all false
+            val snapshot = runCatching { TaskSnapshot.from(record, shares) }.getOrNull() ?: return@all false
             TaskViewRules.membership(snapshot, today, now).isOnToday
         }
     }
@@ -749,8 +750,8 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
     fun setWaiting(id: String, name: String, checkBack: String?) =
         editTask(id) { graph.taskMutator.setWaiting(id, name, checkBack, changesWhen = true) }
 
-    /** Got It Back: the wait ends; the task stays open in its list. */
-    fun gotItBack(id: String) = editTask(id) { graph.taskMutator.setWaiting(id, null) }
+    /** Got It Back: ends manual waiting and/or takes back a shared task you assigned. */
+    fun gotItBack(id: String) = editTask(id) { graph.taskMutator.gotItBack(id) }
 
     fun letGoFaded(id: String) = editTask(id, touches = false) { graph.taskMutator.letGoFaded(id) }
 
@@ -988,10 +989,10 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             project.id to project.title
         }.toMap()
 
-        val allSnapshots = taskRecords.mapNotNull { record ->
-            runCatching { record to TaskSnapshot.from(record) }.getOrNull()
-        }
         val metadataCatalog = TaskRowMetadataCatalog.load(graph.taskStore)
+        val allSnapshots = taskRecords.mapNotNull { record ->
+            runCatching { record to TaskSnapshot.from(record, metadataCatalog.shares) }.getOrNull()
+        }
         val now = graph.clock.now()
         val today = graph.clock.today(now)
         // Load all turns in 2 bulk queries (cached) and evaluate only relevant conversations ONCE.
@@ -1371,7 +1372,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                         areaId = snapshot.area,
                         projectId = snapshot.project,
                         // Review ▸ Waiting lists the oldest wait first.
-                        waitingSince = snapshot.waitingSince.takeIf {
+                        waitingSince = snapshot.effectiveWaitingSince.takeIf {
                             groupHeader != null && groupHeader == reviewGroups[ReviewGroupIds.WAITING]
                         },
                     )
@@ -1537,6 +1538,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             now = now,
             showTodayIndicator = showTodayIndicator,
             isLogbook = isLogbook,
+            showsOwnAssignee = selected is TaskHomeLocation.Project,
         )
     }
 

@@ -357,7 +357,19 @@ export class ProjectStore extends DurableObject<Env> {
     const accepted = acceptedFields(op.entity);
     const fields: ShareFields = row ? (JSON.parse(row.fields) as ShareFields) : {};
     const stored = (fields.notes ?? null) as string | null;
+    const prevAssignedTo = typeof fields.assignedTo === "string" && fields.assignedTo.trim() ? fields.assignedTo.trim() : null;
     for (const [k, v] of Object.entries(op.fields)) if (accepted.includes(k)) fields[k] = v;
+    if (op.entity === "task" && "assignedTo" in op.fields) {
+      const nextAssignedTo = typeof fields.assignedTo === "string" && fields.assignedTo.trim() ? fields.assignedTo.trim() : null;
+      fields.assignedTo = nextAssignedTo;
+      if (!nextAssignedTo) {
+        fields.assignedBy = null;
+        fields.assignedAt = null;
+      } else if (nextAssignedTo !== prevAssignedTo || !fields.assignedBy || !fields.assignedAt) {
+        fields.assignedBy = m.memberId;
+        fields.assignedAt = new Date(now).toISOString().slice(0, 10);
+      }
+    }
     if (row && op.baseNotes !== undefined && "notes" in op.fields && accepted.includes("notes")) {
       fields.notes = mergeNotes(op.baseNotes, stored, (op.fields.notes ?? null) as string | null, ENTITY_LIMITS.notesMax);
     }

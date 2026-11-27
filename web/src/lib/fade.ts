@@ -5,7 +5,8 @@
 import { localTodayYMD, type CoreFadeInput } from "./core/index.ts";
 import { DOMAIN_RULES } from "./generated/registries.ts";
 import type { EvaluatedConversation } from "./conversation.ts";
-import type { ConvoRow, TaskRow } from "./types";
+import type { ConvoRow, ProjectShareInfo, TaskRow } from "./types";
+import { isWaitingTask } from "./waiting.ts";
 
 export interface FadeClock {
   now: string;
@@ -23,6 +24,7 @@ export function fadeInput(
   convo: ConvoRow | null,
   conversation: EvaluatedConversation | null,
   clock: FadeClock,
+  share?: ProjectShareInfo | null,
 ): CoreFadeInput {
   return {
     isOpen: task.status === "open",
@@ -34,7 +36,7 @@ export function fadeInput(
     hasRecurrence: Boolean(task.recurrenceUnit),
     isAgentTurn: Boolean(conversation?.state.isClaimed || conversation?.projection.badge === "working"),
     isAssignedToClaude: convo?.assignee === "claude",
-    isAwaitingHuman: Boolean(conversation?.state.awaitsHuman),
+    isAwaitingHuman: Boolean(conversation?.state.awaitsHuman || isWaitingTask(task, share)),
     showsAgentCue: isProposal(task),
     isProposal: isProposal(task),
     touchedAt: task.touchedAt ?? null,

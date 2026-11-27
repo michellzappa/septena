@@ -86,6 +86,7 @@ function toCoreTask(task: TaskRow) {
     reminderDismissedAt: task.reminderDismissedAt ?? null,
     recurrenceAfterCompletion: task.recurrenceAfterCompletion ?? null,
     recurrenceAnchorDate: task.recurrenceAnchorDate ?? null,
+    assignedToOther: Boolean(task.assignedToOther),
   };
 }
 

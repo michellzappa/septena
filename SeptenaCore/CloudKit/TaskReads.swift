@@ -194,10 +194,9 @@ enum TaskReads {
       if e.isOnToday && !e.isInTriageBand { todayN += 1 }
       switch e.status {
       case .open:
-        let undated = e.scheduled == nil && e.deadline == nil
         if e.isInInbox { inbox += 1 }
         if e.isUpcoming { upcoming += 1 }
-        if !e.today, undated { unscheduled += 1 }
+        if e.isAnytime { unscheduled += 1 }
       default:
         break
       }

@@ -129,7 +129,9 @@
         "waitingSince": { "kind": "text", "format": "day", "nullable": true },
         "dropReason": { "kind": "text", "max": 16, "nullable": true },
         "effort": { "kind": "text", "max": 16, "nullable": true },
-        "assignedTo": { "kind": "text", "max": 64, "nullable": true }
+        "assignedTo": { "kind": "text", "max": 64, "nullable": true },
+        "assignedBy": { "kind": "text", "max": 64, "serverOwned": true },
+        "assignedAt": { "kind": "text", "format": "day", "serverOwned": true }
       }
     },
     "area": {

@@ -2074,6 +2074,14 @@ public struct TaskSnapshot {
      * The logical slot of a fixed repeat.
      */
     public var recurrenceAnchorDate: String?
+    /**
+     * Shared projects: true when this task is assigned to another member
+     * (`assignedTo != nil && assignedTo != share.me`). Keeps another member's
+     * task out of personal Anytime, and keeps its shared deadline from pulling
+     * it into personal Today or Upcoming unless the user sets a personal When
+     * or Today pin (`docs/PROJECT_SHARING_SPEC.md` §8).
+     */
+    public var assignedToOther: Bool
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -2089,7 +2097,14 @@ public struct TaskSnapshot {
          */recurrenceAfterCompletion: Bool?, 
         /**
          * The logical slot of a fixed repeat.
-         */recurrenceAnchorDate: String?) {
+         */recurrenceAnchorDate: String?, 
+        /**
+         * Shared projects: true when this task is assigned to another member
+         * (`assignedTo != nil && assignedTo != share.me`). Keeps another member's
+         * task out of personal Anytime, and keeps its shared deadline from pulling
+         * it into personal Today or Upcoming unless the user sets a personal When
+         * or Today pin (`docs/PROJECT_SHARING_SPEC.md` §8).
+         */assignedToOther: Bool) {
         self.id = id
         self.title = title
         self.status = status
@@ -2117,6 +2132,7 @@ public struct TaskSnapshot {
         self.reminderDismissedAt = reminderDismissedAt
         self.recurrenceAfterCompletion = recurrenceAfterCompletion
         self.recurrenceAnchorDate = recurrenceAnchorDate
+        self.assignedToOther = assignedToOther
     }
 }
 
@@ -2208,6 +2224,9 @@ extension TaskSnapshot: Equatable, Hashable {
         if lhs.recurrenceAnchorDate != rhs.recurrenceAnchorDate {
             return false
         }
+        if lhs.assignedToOther != rhs.assignedToOther {
+            return false
+        }
         return true
     }
 
@@ -2239,6 +2258,7 @@ extension TaskSnapshot: Equatable, Hashable {
         hasher.combine(reminderDismissedAt)
         hasher.combine(recurrenceAfterCompletion)
         hasher.combine(recurrenceAnchorDate)
+        hasher.combine(assignedToOther)
     }
 }
 
@@ -2277,7 +2297,8 @@ public struct FfiConverterTypeTaskSnapshot: FfiConverterRustBuffer {
                 reminderSnoozedUntil: FfiConverterOptionString.read(from: &buf), 
                 reminderDismissedAt: FfiConverterOptionString.read(from: &buf), 
                 recurrenceAfterCompletion: FfiConverterOptionBool.read(from: &buf), 
-                recurrenceAnchorDate: FfiConverterOptionString.read(from: &buf)
+                recurrenceAnchorDate: FfiConverterOptionString.read(from: &buf), 
+                assignedToOther: FfiConverterBool.read(from: &buf)
         )
     }
 
@@ -2309,6 +2330,7 @@ public struct FfiConverterTypeTaskSnapshot: FfiConverterRustBuffer {
         FfiConverterOptionString.write(value.reminderDismissedAt, into: &buf)
         FfiConverterOptionBool.write(value.recurrenceAfterCompletion, into: &buf)
         FfiConverterOptionString.write(value.recurrenceAnchorDate, into: &buf)
+        FfiConverterBool.write(value.assignedToOther, into: &buf)
     }
 }
 

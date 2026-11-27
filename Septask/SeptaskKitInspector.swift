@@ -108,6 +108,9 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   private let waitingValue = NSTextField(labelWithString: "")
   private let waitingEditButton = NSButton()
   private let gotItBackButton = NSButton()
+  /// Shared project assignee control (`docs/PROJECT_SHARING_SPEC.md` §8).
+  private let assigneeLine = NSStackView()
+  private let assigneeButton = NSButton()
   /// The pane's own close control — the VISIBLE twin of `cancelOperation`'s
   /// Escape handling. The inspector is a plain split-view item with no title
   /// bar of its own, so without this the only ways out are Escape and ⌥⌘I,
@@ -430,7 +433,74 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     form.setCustomSpacing(14, after: titleField)
     guard placement == .pane else { return reviewListLabel }
     addWaitingLine()
-    return waitingLine
+    addAssigneeLine()
+    return assigneeLine
+  }
+
+  private func addAssigneeLine() {
+    let glyph = NSImageView()
+    glyph.image = NSImage(systemSymbolName: RegistryIcons.sfSymbol(for: "action.assign"),
+                          accessibilityDescription: nil)?
+      .withSymbolConfiguration(.init(pointSize: 11, weight: .regular))
+    glyph.contentTintColor = SeptaskKitTheme.inkSecondary
+    glyph.kitA11yIgnore()
+    assigneeButton.bezelStyle = .accessoryBarAction
+    assigneeButton.controlSize = .small
+    assigneeButton.target = self
+    assigneeButton.action = #selector(openAssigneeMenu)
+    let spacer = NSView()
+    spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
+    for view in [glyph, assigneeButton, spacer] {
+      assigneeLine.addArrangedSubview(view)
+    }
+    assigneeLine.orientation = .horizontal
+    assigneeLine.alignment = .centerY
+    assigneeLine.spacing = 5
+    assigneeLine.isHidden = true
+    form.addArrangedSubview(assigneeLine)
+    fillWidth(assigneeLine)
+  }
+
+  private func refreshAssignee(_ next: SeptenaTask) {
+    guard placement == .pane else { return }
+    guard next.status == .open, let share = next.projectShare else {
+      assigneeLine.isHidden = true
+      return
+    }
+    let name: String = {
+      guard let assigned = next.assignedTo else { return RegistrySharing.nobody }
+      if assigned == share.me { return RegistrySharing.you }
+      return share.name(of: assigned) ?? RegistrySharing.nobody
+    }()
+    assigneeButton.title = "\(SharedProjects.assignTitle): \(name)"
+    assigneeLine.isHidden = false
+  }
+
+  @objc private func openAssigneeMenu() {
+    guard let current = task, let share = current.projectShare else { return }
+    let menu = NSMenu()
+    let nobody = NSMenuItem(title: RegistrySharing.nobody, action: #selector(pickAssignee(_:)), keyEquivalent: "")
+    nobody.target = self
+    nobody.representedObject = nil
+    nobody.state = current.assignedTo == nil ? .on : .off
+    menu.addItem(nobody)
+    for member in share.members {
+      let title = member.id == share.me ? "\(member.name) (\(RegistrySharing.you))" : member.name
+      let item = NSMenuItem(title: title, action: #selector(pickAssignee(_:)), keyEquivalent: "")
+      item.target = self
+      item.representedObject = member.id
+      item.state = current.assignedTo == member.id ? .on : .off
+      menu.addItem(item)
+    }
+    menu.popUp(positioning: nil, at: NSPoint(x: 0, y: assigneeButton.bounds.height + 2), in: assigneeButton)
+  }
+
+  @objc private func pickAssignee(_ sender: NSMenuItem) {
+    guard let current = task else { return }
+    let memberID = sender.representedObject as? String
+    TaskUndo.setAssignee(ids: [current.id], memberID: memberID, context: context, mutator: mutator)
+    NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+    refresh()
   }
 
   private func addWaitingLine() {
@@ -471,7 +541,9 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     guard placement == .pane else { return }
     let label = next.status == .open ? next.waitingLabel() : nil
     waitingValue.stringValue = label ?? ""
+    waitingEditButton.isHidden = !TaskWaiting.isWaiting(next.waitingOn)
     waitingLine.isHidden = label == nil
+    refreshAssignee(next)
   }
 
   @objc private func editWaiting() {

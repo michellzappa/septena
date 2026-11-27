@@ -215,6 +215,10 @@ export const ENTITIES = {
       // Shared projects: the member id of the person who does this task
       // (docs/PROJECT_SHARING_SPEC.md §3). Null = nobody in particular.
       assignedTo: text(64),
+      // Shared projects: who set `assignedTo` and on which day (`YYYY-MM-DD`).
+      // Stamped by ProjectStore (server-owned), cleared when `assignedTo` clears.
+      assignedBy: { kind: "text", zod: z.never() },
+      assignedAt: { kind: "text", zod: z.never() },
       // Waiting on a person (docs/REVIEW_SPEC.md §6, ADR 0053): who, free
       // text. The task's When date is the day to chase.
       waitingOn: text(80),

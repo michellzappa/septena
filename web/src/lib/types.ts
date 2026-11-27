@@ -210,6 +210,14 @@ export interface TaskRow {
   waitingOn?: string | null;
   /** The day the wait began, YYYY-MM-DD, or null. Cleared with `waitingOn`. */
   waitingSince?: string | null;
+  /** Shared projects: member id of who does this task. */
+  assignedTo?: string | null;
+  /** Shared projects: member id of who set `assignedTo` (server-owned). */
+  assignedBy?: string | null;
+  /** Shared projects: day `assignedTo` was set, YYYY-MM-DD (server-owned). */
+  assignedAt?: string | null;
+  /** Derived input for core view membership; never stored or pushed. */
+  assignedToOther?: boolean;
   effort?: string | null;
   deletedAt?: string | null;
   updatedAt?: string | null;
@@ -238,6 +246,19 @@ export interface AreaRow {
   [key: string]: unknown;
 }
 
+export interface ShareMember {
+  id: string;
+  name: string;
+  role: string;
+}
+
+export interface ProjectShareInfo {
+  id: string;
+  role: string;
+  me: string;
+  members: ShareMember[];
+}
+
 export interface ProjectRow {
   id: string;
   title: string;
@@ -250,6 +271,7 @@ export interface ProjectRow {
   notesProposal?: NotesProposal | null;
   githubRepo?: string | null;
   position?: number | null;
+  share?: ProjectShareInfo | null;
   deletedAt?: string | null;
   updatedAt?: string | null;
   rev?: number;

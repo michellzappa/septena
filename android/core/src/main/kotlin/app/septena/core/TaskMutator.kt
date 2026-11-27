@@ -171,10 +171,48 @@ class TaskMutator(
     )
 
     /** Who does the task in a shared project: a member id, or null for nobody. */
-    suspend fun assign(id: String, memberId: String?): TaskRecord? = updateFields(
-        id,
-        mapOf(RegistryEntityFields.Task.ASSIGNED_TO to JsonValue.stringOrNull(memberId)),
-    )
+    suspend fun assign(id: String, memberId: String?): TaskRecord? {
+        val existing = store.record(RegistryEntityNames.TASK, id)?.asTaskRecord() ?: return null
+        if (existing.deletedAt != null) return null
+        val normalized = memberId?.trim()?.takeIf(String::isNotEmpty)
+        val wireChanges = linkedMapOf<String, JsonValue>(
+            RegistryEntityFields.Task.ASSIGNED_TO to JsonValue.stringOrNull(normalized),
+        )
+        RegistryValidator.requireValidUpsert(RegistryEntityNames.TASK, id, wireChanges, insert = false)
+        val projectId = existing.fields[RegistryEntityFields.Task.PROJECT].stringValue()
+        val share = projectId?.let { ProjectShare.of(store.record(RegistryEntityNames.PROJECT, it)) }
+        val localChanges = LinkedHashMap<String, JsonValue>(wireChanges)
+        if (normalized != null && share != null) {
+            localChanges[RegistryEntityFields.Task.ASSIGNED_BY] = JsonValue.StringValue(share.me)
+            localChanges[RegistryEntityFields.Task.ASSIGNED_AT] = JsonValue.StringValue(clock.today(clock.now()).toString())
+        } else {
+            localChanges[RegistryEntityFields.Task.ASSIGNED_BY] = JsonValue.Null
+            localChanges[RegistryEntityFields.Task.ASSIGNED_AT] = JsonValue.Null
+        }
+        val updated = existing.changing(localChanges)
+        val operation = SyncOperation.Upsert(ids.nextClientOpId(), RegistryEntityNames.TASK, id, wireChanges)
+        store.writeLocalAndEnqueue(updated.asSyncRecord(), operation)
+        return updated
+    }
+
+    /** Got It Back (docs/REVIEW_SPEC.md §6): clears manual waiting and takes back shared tasks you assigned. */
+    suspend fun gotItBack(id: String): TaskRecord? {
+        val existing = store.record(RegistryEntityNames.TASK, id)?.asTaskRecord() ?: return null
+        if (existing.deletedAt != null) return null
+        var result: TaskRecord? = existing
+        val hasManualWait = !existing.fields[RegistryEntityFields.Task.WAITING_ON].stringValue().isNullOrBlank()
+        if (hasManualWait) {
+            result = setWaiting(id, null) ?: return null
+        }
+        val projectId = existing.fields[RegistryEntityFields.Task.PROJECT].stringValue()
+        val assignedTo = existing.fields[RegistryEntityFields.Task.ASSIGNED_TO].stringValue()
+        val assignedBy = existing.fields[RegistryEntityFields.Task.ASSIGNED_BY].stringValue()
+        val share = projectId?.let { ProjectShare.of(store.record(RegistryEntityNames.PROJECT, it)) }
+        if (share != null && !assignedTo.isNullOrBlank() && assignedTo != share.me && assignedBy == share.me) {
+            result = assign(id, share.me) ?: return null
+        }
+        return result
+    }
 
     /** A2 for a day (a day on or before today is A1), A5 for none. */
     suspend fun schedule(
@@ -211,8 +249,9 @@ class TaskMutator(
         val existing = store.record(RegistryEntityNames.TASK, id)?.asTaskRecord() ?: return null
         if (existing.deletedAt != null) return null
         val now = clock.now()
+        val shares = ProjectShare.byProject(store)
         val patch = coreApplyDateAction(
-            existing.toCoreSnapshot(),
+            existing.toCoreSnapshot(shares),
             action,
             clock.today(now).toString(),
             WireTimestamp.format(now),
@@ -645,10 +684,11 @@ class TaskMutator(
     suspend fun runFadePass(conversations: Map<String, TaskConversation>): Int {
         val now = clock.now()
         val today = clock.today(now).toString()
+        val shares = ProjectShare.byProject(store)
         var faded = 0
         for (record in store.records(RegistryEntityNames.TASK)) {
             if (record.deletedAt != null) continue
-            val task = runCatching { TaskSnapshot.from(record) }.getOrNull() ?: continue
+            val task = runCatching { TaskSnapshot.from(record, shares) }.getOrNull() ?: continue
             if (task.status != app.septena.core.generated.RegistryEntityEnums.TaskStatus.OPEN || task.fadedAt != null) continue
             // A waiting task never fades (docs/REVIEW_SPEC.md §6).
             if (task.isWaiting) continue
@@ -742,8 +782,10 @@ class TaskMutator(
 }
 
 /** The task as the shared core reads it, every date field included. */
-internal fun TaskRecord.toCoreSnapshot(): CoreTaskSnapshot {
-    val base = TaskSnapshot.from(asSyncRecord()).toCore()
+internal fun TaskRecord.toCoreSnapshot(
+    shares: Map<String, ProjectShare> = emptyMap(),
+): CoreTaskSnapshot {
+    val base = TaskSnapshot.from(asSyncRecord(), shares).toCore()
     val f = fields
     return base.copy(
         startTime = f[RegistryEntityFields.Task.START_TIME].stringValue(),

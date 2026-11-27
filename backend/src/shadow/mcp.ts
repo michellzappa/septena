@@ -16,6 +16,7 @@ import {
 import { HELP_URL, TURN_FIELDS } from "../generated/registries.js";
 import { zId } from "../store/columns.js";
 import type { Doing, Row, TaskLinkRow } from "../store/TaskStore.js";
+import type { ShareInfo } from "../store/shares.js";
 import { isValidTz, todayYMD } from "../tz.js";
 import { TASK_TOOLS } from "../tools/taskTools.js";
 import {
@@ -435,8 +436,9 @@ async function dispatchTool(
     case "tasks_get": {
       const r = await store.readTask(a.id as string);
       if (!r || r.task.kind === "heading") throw new Refusal("not_found", `Task not found: ${a.id}`);
-      const tagMap = tagNameMap(await store.readTags());
-      const t = annotate(taskOut(r.task, tagMap), todayYMD(timeZone), Date.now());
+      const [tagRows, shares] = await Promise.all([store.readTags(), shareMap(store)]);
+      const tagMap = tagNameMap(tagRows);
+      const t = annotate(taskOut(r.task, tagMap, shares), todayYMD(timeZone), Date.now());
       const [checklistRows, refRows, attachmentRows, backlinks, doing] = await Promise.all([
         store.readChecklistItems(t.id),
         store.readTaskRefs(t.id),
@@ -460,6 +462,8 @@ async function dispatchTool(
         ...(t.durationMinutes !== undefined ? { durationMinutes: t.durationMinutes } : {}),
         ...(t.timeZone ? { timeZone: t.timeZone } : {}),
         deadline: t.deadline, area: t.area, project: t.project,
+        ...(t.waitingOn ? { waitingOn: t.waitingOn, ...(t.waitingSince ? { waitingSince: t.waitingSince } : {}) } : {}),
+        ...(t.assignedTo ? { assignedTo: t.assignedTo, ...(t.assignedBy ? { assignedBy: t.assignedBy } : {}), ...(t.assignedAt ? { assignedAt: t.assignedAt } : {}) } : {}),
         completedAt: t.completedAt, source: t.source, notes: t.notes, notesRev: notesRev(t.notes),
         ...(doing && !doing.isStale && doing.taskId === t.id ? { doing: true } : {}),
         ...(checklist.length > 0 ? { checklist } : {}),
@@ -629,11 +633,12 @@ export async function listTasks(
   const requiredTags = (rawTag === undefined ? [] : Array.isArray(rawTag) ? rawTag : [rawTag])
     .map((t) => t.trim().toLowerCase())
     .filter((t) => t.length > 0);
-  const [counts, tagRows, links, doing] = await Promise.all([
+  const [counts, tagRows, links, doing, shares] = await Promise.all([
     store.readChecklistCounts(),
     store.readTags(),
     taskLinkMap(store),
     store.readDoing(),
+    shareMap(store),
   ]);
   const tagMap = tagNameMap(tagRows);
   // Checklist counts, then the references, `issue` and `endState`.
@@ -647,7 +652,7 @@ export async function listTasks(
   if (view === "completed") {
     const { rows, total } = await store.readTasks("done", requiredTags.length > 0 ? 500 : limit);
     const mapped = rows
-      .map((r) => withChecklist(taskOut(r, tagMap)))
+      .map((r) => withChecklist(taskOut(r, tagMap, shares)))
       .filter((t) => matchesTagFilter(t.tags, requiredTags));
     const effectiveTotal = requiredTags.length > 0 ? mapped.length : total;
     return {
@@ -659,7 +664,7 @@ export async function listTasks(
   if (view === "review") {
     const { rows, notes, ats, total } = await store.readReviewTasks(limit);
     const tasks = rows.map((row) => {
-      const out = withChecklist(taskOut(row));
+      const out = withChecklist(taskOut(row, tagMap, shares));
       const note = notes[out.id];
       const at = ats[out.id];
       return stripDays({ ...out, ...(note ? { reviewNote: note } : {}), ...(at ? { reviewAt: at } : {}) });
@@ -667,13 +672,14 @@ export async function listTasks(
     return { tasks, total, truncated: total > rows.length };
   }
   if (view === "waiting") {
-    // Review ▸ Waiting (docs/REVIEW_SPEC.md §6): oldest wait first.
+    // Review ▸ Waiting (docs/REVIEW_SPEC.md §6): manual waitingOn plus shared
+    // tasks this user assigned to another member, oldest wait first.
     const { rows } = await store.readTasks("open", 500);
     const waiting = rows
-      .filter((r) => str(r.waitingOn) && str(r.kind) !== "heading")
-      .map((r) => withChecklist(taskOut(r, tagMap)))
+      .filter((r) => str(r.kind) !== "heading" && (!!str(r.waitingOn) || !!sharedWaitingOf(r, shares)))
+      .map((r) => withChecklist(taskOut(r, tagMap, shares)))
       .filter((t) => matchesTagFilter(t.tags, requiredTags))
-      .sort((a, b) => (a.waitingSince ?? "").localeCompare(b.waitingSince ?? ""));
+      .sort((a, b) => (a.waitingSince ?? "9999-12-31").localeCompare(b.waitingSince ?? "9999-12-31"));
     return { tasks: waiting.slice(0, limit).map(stripDays), total: waiting.length, truncated: waiting.length > limit };
   }
   // Open rows arrive ordered by scheduled, then position. Today re-sorts by
@@ -682,7 +688,7 @@ export async function listTasks(
   const today = todayYMD(timeZone);
   const nowMs = Date.now();
   let matched = rows
-    .map((row) => ({ row, out: withChecklist(taskOut(row, tagMap)) }))
+    .map((row) => ({ row, out: withChecklist(taskOut(row, tagMap, shares)) }))
     .filter(({ out }) => matchesView(out, view, today, nowMs) && matchesTagFilter(out.tags, requiredTags));
   let tasks = matched.map((m) => m.out);
   if (view === "today") {
@@ -758,9 +764,25 @@ export async function searchTasks(store: StoreRpc, timeZone: string, a: SearchAr
   };
 }
 
+async function shareMap(store: StoreRpc): Promise<Map<string, ShareInfo>> {
+  const list = typeof store.listShares === "function" ? await store.listShares() : [];
+  return new Map(list.map((s) => [s.projectId, s.info]));
+}
+
+function sharedWaitingOf(r: Row, shares?: Map<string, ShareInfo>): { who: string; since?: string } | null {
+  const project = str(r.project);
+  const assignedTo = str(r.assignedTo);
+  const assignedBy = str(r.assignedBy);
+  if (!project || !assignedTo || !assignedBy || !shares) return null;
+  const share = shares.get(project);
+  if (!share || assignedTo === share.me || assignedBy !== share.me) return null;
+  const member = share.members.find((m) => m.id === assignedTo);
+  return { who: member?.name ?? assignedTo, since: str(r.assignedAt) };
+}
+
 /// A TaskStore task row in the live `tasks_list` shape (tools/taskShared.ts
 /// TaskOut), key order included.
-export function taskOut(r: Row, tagMap?: Map<string, string>): TaskOut {
+export function taskOut(r: Row, tagMap?: Map<string, string>, shares?: Map<string, ShareInfo>): TaskOut {
   const unit = str(r.recurrenceUnit);
   const resolvedTags = Array.isArray(r.tags) && tagMap
     ? (r.tags as unknown[])
@@ -768,6 +790,16 @@ export function taskOut(r: Row, tagMap?: Map<string, string>): TaskOut {
       .map((id) => tagMap.get(id))
       .filter((name): name is string => typeof name === "string" && name.length > 0)
     : [];
+  const project = str(r.project);
+  const share = project ? shares?.get(project) : undefined;
+  const assignedTo = str(r.assignedTo);
+  const assignedBy = str(r.assignedBy);
+  const assignedAt = str(r.assignedAt);
+  const assignedToOther = !!(share && assignedTo && assignedTo !== share.me);
+  const manualWaiting = str(r.waitingOn);
+  const sharedWaiting = manualWaiting ? null : sharedWaitingOf(r, shares);
+  const waitingOn = manualWaiting ?? sharedWaiting?.who;
+  const waitingSince = manualWaiting ? str(r.waitingSince) : sharedWaiting?.since;
   return {
     id: r.id as string,
     title: str(r.title) ?? "",
@@ -781,9 +813,11 @@ export function taskOut(r: Row, tagMap?: Map<string, string>): TaskOut {
     ...(str(r.timeZone) ? { timeZone: str(r.timeZone) } : {}),
     deadline: str(r.deadline),
     ...(str(r.deferredDeadline) ? { deferredDeadline: str(r.deferredDeadline) } : {}),
-    ...(str(r.waitingOn) ? { waitingOn: str(r.waitingOn), ...(str(r.waitingSince) ? { waitingSince: str(r.waitingSince) } : {}) } : {}),
+    ...(waitingOn ? { waitingOn, ...(waitingSince ? { waitingSince } : {}) } : {}),
+    ...(assignedTo ? { assignedTo, ...(assignedBy ? { assignedBy } : {}), ...(assignedAt ? { assignedAt } : {}) } : {}),
+    ...(assignedToOther ? { assignedToOther: true } : {}),
     area: str(r.area),
-    project: str(r.project),
+    project,
     ...(str(r.heading) ? { heading: str(r.heading) } : {}),
     completedAt: str(r.completedAt),
     notes: str(r.notes),
@@ -857,9 +891,10 @@ function turnOut(r: Row): ConvoTurn {
   return t as unknown as ConvoTurn;
 }
 
-/// `created` / `todaySetOn` feed `daysOnToday` and `deferredDeadline` feeds
-/// list membership. They are not part of the `tasks_list` result shape.
-function stripDays({ created: _c, todaySetOn: _t, deferredDeadline: _d, ...t }: TaskOut): TaskOut {
+/// `created` / `todaySetOn` feed `daysOnToday`, `deferredDeadline` and
+/// `assignedToOther` feed list membership. They are not part of the `tasks_list`
+/// result shape.
+function stripDays({ created: _c, todaySetOn: _t, deferredDeadline: _d, assignedToOther: _o, ...t }: TaskOut): TaskOut {
   return t;
 }
 
