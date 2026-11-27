@@ -18,7 +18,9 @@ publish = false
 # core.yml strips a copy before it measures a slice.
 [profile.release-small]
 inherits = "release"
-opt-level = "s"
+# "z", not "s": with sortTasks (#779) the x86_64 Android slice went 15 KiB
+# over the 1 MiB budget at "s".
+opt-level = "z"
 strip = "debuginfo"
 lto = true
 codegen-units = 1
