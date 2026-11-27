@@ -179,10 +179,11 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         location,
         graph.sync.dataVersion,
         graph.deviceSettings.changes,
-    ) { selected, _, _ ->
-        selected
-    }.mapLatest { selected ->
-        withContext(Dispatchers.IO) { load(selected) }
+        graph.completionSettle.state,
+    ) { selected, _, _, settle ->
+        selected to settle
+    }.mapLatest { (selected, settle) ->
+        withContext(Dispatchers.IO) { load(selected, settle) }
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(stopTimeoutMillis = 5_000),
@@ -242,6 +243,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
     fun select(location: TaskHomeLocation) {
         selectedIds.value = emptySet()
         starredOnly.value = false
+        graph.completionSettle.clearAll()
         val opensFaded = location == TaskHomeLocation.SmartList(RegistryDestinationIds.FADED)
         val opensAgent = location == TaskHomeLocation.SmartList(RegistryDestinationIds.AGENT)
         if (opensFaded) graph.fadeSweepStore.setFadedGroupExpanded(true)
@@ -688,7 +690,18 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         mode: app.septena.sharedcore.RescheduleMode = app.septena.sharedcore.RescheduleMode.MAKE_EXCEPTION,
     ) {
         if (actionId == RegistryActionIds.TASK_TOGGLE_COMPLETE) {
-            batchGesture { ids -> graph.completeTasks(ids) }
+            val isLogbook = (location.value as? TaskHomeLocation.SmartList)?.destinationId == RegistryDestinationIds.LOGBOOK
+            val reviewKeys = if ((location.value as? TaskHomeLocation.SmartList)?.destinationId == RegistryDestinationIds.REVIEW) {
+                loaded.value.tasks.associate { it.id to it.group?.key }
+            } else {
+                emptyMap()
+            }
+            batchGesture { ids ->
+                if (!isLogbook) {
+                    for (id in ids) graph.completionSettle.start(id, reviewGroupId = reviewKeys[id])
+                }
+                graph.completeTasks(ids)
+            }
             return
         }
         batch { id ->
@@ -797,6 +810,29 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
     }
 
     fun complete(id: String) {
+        if (graph.completionSettle.isSettling(id)) {
+            graph.completionSettle.cancel(id)
+            viewModelScope.launch {
+                runCatching {
+                    withContext(Dispatchers.IO) { graph.reopenTask(id) }
+                }
+                    .onSuccess {
+                        errorMessage.value = null
+                        noteLocalChangeAndSync()
+                    }
+                    .onFailure { errorMessage.value = it.message }
+            }
+            return
+        }
+        val destId = (location.value as? TaskHomeLocation.SmartList)?.destinationId
+        if (destId != RegistryDestinationIds.LOGBOOK) {
+            val reviewGroupKey = if (destId == RegistryDestinationIds.REVIEW) {
+                loaded.value.tasks.firstOrNull { it.id == id }?.group?.key
+            } else {
+                null
+            }
+            graph.completionSettle.start(id, reviewGroupId = reviewGroupKey)
+        }
         viewModelScope.launch {
             runCatching {
                 withContext(Dispatchers.IO) { graph.completeTask(id) }
@@ -805,7 +841,10 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                     errorMessage.value = null
                     noteLocalChangeAndSync()
                 }
-                .onFailure { errorMessage.value = it.message }
+                .onFailure {
+                    graph.completionSettle.cancel(id)
+                    errorMessage.value = it.message
+                }
         }
     }
 
@@ -1028,14 +1067,27 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         agentsPaused = false,
     )
 
-    private suspend fun load(selected: TaskHomeLocation): LoadedTaskHome {
+    private suspend fun load(
+        selected: TaskHomeLocation,
+        settle: CompletionSettleState = CompletionSettleState(),
+    ): LoadedTaskHome {
         val selectedDestId = (selected as? TaskHomeLocation.SmartList)?.destinationId
         val needsFullHistory = selectedDestId == RegistryDestinationIds.LOGBOOK
-        // Fast path for Today / active lists: read only open + soft-deleted tasks (skips thousands of Logbook rows).
+        // Fast path for Today / active lists: read only open + soft-deleted tasks (skips thousands of Logbook rows),
+        // plus any rows currently lingering in the completion settle window.
         val taskRecords = if (needsFullHistory) {
             graph.taskStore.records(EntityNames.TASK)
         } else {
-            graph.taskStore.activeTasks()
+            val active = graph.taskStore.activeTasks()
+            if (settle.entries.isEmpty()) {
+                active
+            } else {
+                val present = active.mapTo(HashSet(active.size), SyncRecord::id)
+                val settlingExtra = settle.entries.keys
+                    .filter { it !in present }
+                    .mapNotNull { id -> graph.taskStore.record(EntityNames.TASK, id) }
+                if (settlingExtra.isEmpty()) active else active + settlingExtra
+            }
         }
         val areaRecords = StructureOrder.orderByPosition(
             items = graph.taskStore.records(EntityNames.AREA)
@@ -1227,6 +1279,13 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                     snapshot.project?.let { projId ->
                         projectDoneCounts[projId] = (projectDoneCounts[projId] ?: 0) + 1
                     }
+                    if (snapshot.id in settle.entries) {
+                        memberships[snapshot.id] = TaskViewRules.membership(
+                            snapshot.copy(status = RegistryEntityEnums.TaskStatus.OPEN),
+                            today,
+                            now,
+                        )
+                    }
                 }
             }
         }
@@ -1370,17 +1429,25 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                         )
                         continue
                     }
+                    val settleEntry = settle.entries[snapshot.id]
+                    val isSettling = settleEntry != null && resolvedLocation.destinationId != RegistryDestinationIds.LOGBOOK
                     val conversation = conversations[snapshot.id]
                     val convoState = convoStates[snapshot.id]
+                    val matchSnapshot = if (isSettling && snapshot.status != RegistryEntityEnums.TaskStatus.OPEN) {
+                        snapshot.copy(status = RegistryEntityEnums.TaskStatus.OPEN)
+                    } else {
+                        snapshot
+                    }
                     // The group header of a Review row; a task with no group there is not in the list.
                     val groupHeader = when (resolvedLocation.destinationId) {
                         RegistryDestinationIds.REVIEW ->
-                            reviewGroups[TaskViewRules.reviewGroup(snapshot, convoState?.reviewGroup, convoState?.agentStage)]
+                            (if (isSettling) settleEntry?.reviewGroupId?.let { key -> reviewGroups.values.firstOrNull { it.key == key } } else null)
+                                ?: reviewGroups[TaskViewRules.reviewGroup(matchSnapshot, convoState?.reviewGroup, convoState?.agentStage)]
                         else -> null
                     }
                     val listed = when (resolvedLocation.destinationId) {
                         RegistryDestinationIds.REVIEW -> groupHeader != null
-                        else -> TaskViewRules.matchesView(snapshot, membership, resolvedLocation.destinationId)
+                        else -> TaskViewRules.matchesView(matchSnapshot, membership, resolvedLocation.destinationId)
                     }
                     if (!listed) continue
                     val inTodayInbox = resolvedLocation.destinationId == RegistryDestinationIds.TODAY && membership.inTodayInbox
@@ -1417,7 +1484,10 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                         isLogbook = resolvedLocation.destinationId == RegistryDestinationIds.LOGBOOK,
                     ).withFade(snapshot, conversation, now, today, showAging)
                         .let { base ->
-                            if (suggestedTarget != null) base.copy(filingSuggestionLabel = suggestedTarget.title) else base
+                            var out = base
+                            if (suggestedTarget != null) out = out.copy(filingSuggestionLabel = suggestedTarget.title)
+                            if (isSettling) out = out.copy(isSettling = true, isFadingOut = settleEntry?.fadingOut == true)
+                            out
                         }
                     val rowPosition = record.fields[positionField(resolvedLocation.destinationId)].numberValue()
                         ?: record.fields[RegistryEntityFields.Task.POSITION].numberValue()
@@ -1491,7 +1561,9 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                     }
                 }
                 is TaskHomeLocation.Area -> {
-                    if (snapshot.area != resolvedLocation.id || !isOpenVisible(snapshot)) continue
+                    val settleEntry = settle.entries[snapshot.id]
+                    val visibleHere = isOpenVisible(snapshot) || (settleEntry != null && !snapshot.isHeading && snapshot.deletedAt == null)
+                    if (snapshot.area != resolvedLocation.id || !visibleHere) continue
                     visible += PositionedTask(
                         taskListItem(
                             record = record,
@@ -1504,12 +1576,15 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                             today = today,
                             now = now,
                             showTodayIndicator = true,
-                        ).withFade(snapshot, conversations[snapshot.id], now, today, showAging),
+                        ).withFade(snapshot, conversations[snapshot.id], now, today, showAging)
+                            .copy(isSettling = settleEntry != null, isFadingOut = settleEntry?.fadingOut == true),
                         record.fields[RegistryEntityFields.Task.POSITION].numberValue(),
                     )
                 }
                 is TaskHomeLocation.Project -> {
-                    if (snapshot.project != resolvedLocation.id || !isOpenVisible(snapshot)) continue
+                    val settleEntry = settle.entries[snapshot.id]
+                    val visibleHere = isOpenVisible(snapshot) || (settleEntry != null && !snapshot.isHeading && snapshot.deletedAt == null)
+                    if (snapshot.project != resolvedLocation.id || !visibleHere) continue
                     visible += PositionedTask(
                         taskListItem(
                             record = record,
@@ -1522,7 +1597,8 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                             today = today,
                             now = now,
                             showTodayIndicator = true,
-                        ).withFade(snapshot, conversations[snapshot.id], now, today, showAging),
+                        ).withFade(snapshot, conversations[snapshot.id], now, today, showAging)
+                            .copy(isSettling = settleEntry != null, isFadingOut = settleEntry?.fadingOut == true),
                         record.fields[RegistryEntityFields.Task.POSITION].numberValue(),
                     )
                 }

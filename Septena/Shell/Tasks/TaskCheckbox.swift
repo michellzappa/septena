@@ -331,7 +331,7 @@ struct TaskCheckbox: View {
     ringScale = 0.9
     ringOpacity = 0.55
     ringDrift = 0
-    a11yAnimate(.easeOut(duration: 0.4)) {
+    a11yAnimate(.easeOut(duration: Double(RegistryTokens.CompletionMotion.pulseRingMs) / 1000.0)) {
       ringScale = reach
       ringOpacity = 0
     }

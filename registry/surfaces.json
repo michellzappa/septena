@@ -609,11 +609,11 @@
         ],
         "icon": "onboarding.account",
         "title": "Sign in to sync",
-        "body": "Sign in with Apple to keep your tasks on all your devices and connect your agents. Septena never sees your Apple password.",
+        "body": "Sign in to keep your tasks in sync on all your devices and let your agents connect. Your first sign-in creates your account.",
         "footnote": "If you skip this, your tasks stay on this device until you sign in.",
         "skipWhen": "signedIn",
         "primary": {
-          "title": "Sign in with Apple",
+          "title": "Sign in",
           "action": "signIn"
         },
         "secondary": {
@@ -629,10 +629,10 @@
         ],
         "icon": "onboarding.account",
         "title": "Sign in to sync",
-        "body": "Use a device where Septena is already signed in. It approves this one with a code, and your tasks sync here.",
+        "body": "Sign in to keep your tasks in sync on all your devices and let your agents connect. Your first sign-in creates your account.",
         "skipWhen": "signedIn",
         "primary": {
-          "title": "Get a sign-in code",
+          "title": "Sign in",
           "action": "signIn"
         }
       },

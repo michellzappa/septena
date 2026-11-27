@@ -42,6 +42,7 @@ import {
   type CoreProjection,
 } from "@/lib/core";
 import { agentStageTitle } from "@/lib/destinations";
+import { COMPLETION_MOTION } from "@/lib/settle";
 import { assigneeLabel, sharedWaitingTarget, sharingCopy, waitingLabel, waitingName } from "@/lib/waiting";
 import type {
   AreaRow,
@@ -82,6 +83,10 @@ export interface TaskRowItemProps {
   onAssignMember?: (memberId: string | null) => void;
   isColorfulAccent?: boolean;
   animateCompletion?: boolean;
+  /** True while this completed/cancelled row lingers in place during the standard settle window. */
+  isSettling?: boolean;
+  /** True during the final fade-out beat of the settle window. */
+  isFadingOut?: boolean;
   draggable?: boolean;
   isDropTarget?: boolean;
   checklistItems: ChecklistItemRow[];
@@ -257,7 +262,13 @@ function TaskCheckboxControl({
         }`}
         style={isDone ? { color: "var(--accent-check)" } : undefined}
       >
-        {isDone && <Check className="h-[11px] w-[11px] stroke-[3]" />}
+        {justChecked && (
+          <span
+            aria-hidden="true"
+            className="animate-check-ring pointer-events-none absolute inset-[-1.4px] rounded-[4.5px] border-[1.5px] border-[var(--accent)]"
+          />
+        )}
+        {isDone && <Check className={`h-[11px] w-[11px] stroke-[3] ${justChecked ? "animate-check-mark" : ""}`} />}
         {isCancelled && <X className="h-[11px] w-[11px] stroke-[2.5]" />}
         {hasCornerDot && (
           <span
@@ -1180,6 +1191,7 @@ export function TaskRowItem(props: TaskRowItemProps) {
     todayYMD,
     isColorfulAccent = true,
     animateCompletion = true,
+    isFadingOut = false,
     draggable = false,
     isDropTarget = false,
     checklistItems,
@@ -1189,13 +1201,25 @@ export function TaskRowItem(props: TaskRowItemProps) {
     convoState,
   } = props;
 
+  const isDone = task.status === "done";
   const [justChecked, setJustChecked] = useState(false);
+  const prevIsDoneRef = useRef(isDone);
+
+  useEffect(() => {
+    const wasDone = prevIsDoneRef.current;
+    prevIsDoneRef.current = isDone;
+    if (!wasDone && isDone && animateCompletion) {
+      setJustChecked(true);
+      const timer = setTimeout(() => setJustChecked(false), COMPLETION_MOTION.pulseRingMs + 40);
+      return () => clearTimeout(timer);
+    }
+    if (!isDone) setJustChecked(false);
+  }, [animateCompletion, isDone]);
 
   if (expanded) {
     return <TaskDetailEditor props={props} />;
   }
 
-  const isDone = task.status === "done";
   const isCancelled = task.status === "cancelled";
   const isInactive = isDone || isCancelled;
   const isToday = membership.isOnToday;
@@ -1246,47 +1270,48 @@ export function TaskRowItem(props: TaskRowItemProps) {
 
   return (
     <div
-      data-task-id={task.id}
-      draggable={draggable && !isDeletedView}
-      onDragStart={props.onDragStart}
-      onDragOver={props.onDragOver}
-      onDragLeave={props.onDragLeave}
-      onDrop={props.onDrop}
-      onClick={props.onRowClick}
-      onContextMenu={props.onContextMenu}
-      role="button"
-      tabIndex={0}
-      style={{ opacity }}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") {
-          props.onRowClick(e as unknown as React.MouseEvent);
-        }
-      }}
-      className={`group relative flex w-full cursor-pointer items-center gap-2.5 px-3 py-2.5 text-left transition-colors ${
-        isDropTarget ? "border-t-2 border-[var(--accent)]" : ""
-      } ${
-        selected || multiSelected
-          ? "bg-[var(--bg-selected)]"
-          : "hover:bg-[var(--bg-hover)]"
-      }`}
+      className="septena-settle-row"
+      data-fading-out={isFadingOut ? "true" : undefined}
     >
-      {!isDeletedView && (
-        <TaskCheckboxControl
-          isDone={isDone}
-          isCancelled={isCancelled}
-          isProposal={isProposal}
-          hasCornerDot={hasCornerDot}
-          justChecked={justChecked}
-          onToggle={(e) => {
-            e.stopPropagation();
-            if (animateCompletion && !isDone) {
-              setJustChecked(true);
-              setTimeout(() => setJustChecked(false), 260);
+      <div className="septena-settle-row-inner">
+        <div
+          data-task-id={task.id}
+          draggable={draggable && !isDeletedView}
+          onDragStart={props.onDragStart}
+          onDragOver={props.onDragOver}
+          onDragLeave={props.onDragLeave}
+          onDrop={props.onDrop}
+          onClick={props.onRowClick}
+          onContextMenu={props.onContextMenu}
+          role="button"
+          tabIndex={0}
+          style={{ opacity }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              props.onRowClick(e as unknown as React.MouseEvent);
             }
-            props.onToggleDone();
           }}
-        />
-      )}
+          className={`group relative flex w-full cursor-pointer items-center gap-2.5 px-3 py-2.5 text-left transition-colors ${
+            isDropTarget ? "border-t-2 border-[var(--accent)]" : ""
+          } ${
+            selected || multiSelected
+              ? "bg-[var(--bg-selected)]"
+              : "hover:bg-[var(--bg-hover)]"
+          }`}
+        >
+          {!isDeletedView && (
+            <TaskCheckboxControl
+              isDone={isDone}
+              isCancelled={isCancelled}
+              isProposal={isProposal}
+              hasCornerDot={hasCornerDot}
+              justChecked={justChecked}
+              onToggle={(e) => {
+                e.stopPropagation();
+                props.onToggleDone();
+              }}
+            />
+          )}
 
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
@@ -1508,6 +1533,8 @@ export function TaskRowItem(props: TaskRowItemProps) {
             aria-label={`Added by ${task.sourceClient || "agent"}`}
           />
         )}
+          </div>
+        </div>
       </div>
     </div>
   );

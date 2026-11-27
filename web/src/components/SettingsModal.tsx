@@ -980,13 +980,13 @@ export function SettingsModal({
                       </span>
                     )}
                   </p>
-                  {dev.lastUsedAt && (
+                  {(dev.lastSeen ?? dev.lastUsedAt) && (
                     <p className="text-[11px] text-[var(--text-muted)]">
                       {settingsCopy(
                         "access_devices",
                         dev.syncing === false ? "activeNotSyncing" : "active",
                         lang,
-                        { time: new Date(dev.lastUsedAt).toLocaleDateString() },
+                        { time: new Date((dev.lastSeen ?? dev.lastUsedAt)!).toLocaleDateString() },
                       )}
                     </p>
                   )}
@@ -1431,9 +1431,9 @@ export function SettingsModal({
                           <div>
                             <p className="font-medium text-[var(--text-primary)]">{displayName}</p>
                             <p className="text-[11px] text-[var(--text-muted)]">
-                              {conn.lastUsedAt
+                              {(conn.lastUsed ?? conn.lastUsedAt)
                                 ? settingsCopy("access_agents", "lastUsed", lang, {
-                                    time: new Date(conn.lastUsedAt).toLocaleDateString(),
+                                    time: new Date((conn.lastUsed ?? conn.lastUsedAt)!).toLocaleDateString(),
                                   })
                                 : "Connected"}
                             </p>
