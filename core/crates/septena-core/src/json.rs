@@ -88,7 +88,9 @@ pub(crate) fn invoke_value(function: &str, input: Value) -> Result<Value, CoreEr
         }
         "projectChecklist" => project_checklist(&input),
         "checklistCheckPatch" => {
-            let checked = input["checked"].as_bool().ok_or_else(|| parse("checked must be a boolean"))?;
+            let checked = input["checked"]
+                .as_bool()
+                .ok_or_else(|| parse("checked must be a boolean"))?;
             Ok(checklist_check_patch(checked))
         }
         "taskViewMembership" => {

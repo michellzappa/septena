@@ -60,7 +60,11 @@ pub(crate) fn project_checklist(input: &Value) -> Result<Value, CoreError> {
         }
     }
     exact.extend(prefix);
-    let suggested_group = if input["groceries"] == true { grocery_group(&query) } else { None };
+    let suggested_group = if input["groceries"] == true {
+        grocery_group(&query)
+    } else {
+        None
+    };
     Ok(json!({
         "ungrouped": ungrouped,
         "groups": groups,
