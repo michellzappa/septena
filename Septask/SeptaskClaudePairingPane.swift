@@ -14,7 +14,7 @@ struct SeptaskClaudePairingSections: View {
 
   private var sync: TaskSyncEngine { .shared }
   @State private var copied: CopiedTarget?
-  private static let connectorURL = "https://api.septena.app/mcp"
+  private static let connectorURL = RegistryFirstRun.connectorUrl
   // One copy of each prompt, shared with the first run (`registry/surfaces.json`).
   private static let setupPrompt = RegistryFirstRun.setupPrompt
   private static let starterPrompt = RegistryFirstRun.firstPrompt

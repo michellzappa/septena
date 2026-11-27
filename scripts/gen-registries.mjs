@@ -520,7 +520,7 @@ function validateActions(actions, icons, caps, destIds) {
 // renders. `kind` picks the view; `action` is the only behavior a button may
 // name, so a client implements a closed set and the registry stays data.
 const FIRST_RUN_KINDS = new Set(["intro", "account", "choices", "connectAgent", "finish"]);
-const FIRST_RUN_ACTIONS = new Set(["next", "finish", "signIn", "importThings", "importReminders", "copySetupPrompt", "copyFirstPrompt"]);
+const FIRST_RUN_ACTIONS = new Set(["next", "finish", "signIn", "importThings", "importReminders", "copySetupPrompt"]);
 const FIRST_RUN_CONDITIONS = new Set(["signedIn"]);
 
 function validateFirstRun(surfaces, icons, caps, settings) {
@@ -529,6 +529,7 @@ function validateFirstRun(surfaces, icons, caps, settings) {
   assert(fr.featureId in caps.capabilities, `surfaces.json: firstRun unknown featureId "${fr.featureId}"`);
   const done = settings.keys[fr.completionSetting];
   assert(done && done.scope === "synced", `surfaces.json: firstRun.completionSetting "${fr.completionSetting}" must be a synced settings key`);
+  assert(typeof fr.connectorUrl === "string" && fr.connectorUrl.startsWith("https://"), "surfaces.json: firstRun.connectorUrl must be an https URL");
   assert(typeof fr.prompts?.setup === "string" && typeof fr.prompts?.first === "string", "surfaces.json: firstRun.prompts needs setup and first");
   const getStarted = surfaces.notices.items.find((n) => n.id === "getStarted");
   const stepIds = new Set((getStarted?.steps ?? []).map((st) => st.id));
@@ -563,7 +564,6 @@ function validateFirstRun(surfaces, icons, caps, settings) {
     }
     checkButton(`${st.id}.primary`, st.primary);
     checkButton(`${st.id}.secondary`, st.secondary);
-    checkButton(`${st.id}.tertiary`, st.tertiary);
     checkButton(`${st.id}.afterDone`, st.afterDone);
     if (st.kind === "choices") assert((st.choices ?? []).length > 0, `surfaces.json: firstRun ${st.id} needs choices`);
   }
@@ -2174,10 +2174,8 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  let featureId: String?");
   lines.push("  let points: [RegistryFirstRunPoint]");
   lines.push("  let choices: [RegistryFirstRunChoice]");
-  lines.push("  let instructions: [String]");
   lines.push("  let primary: RegistryFirstRunButton?");
   lines.push("  let secondary: RegistryFirstRunButton?");
-  lines.push("  let tertiary: RegistryFirstRunButton?");
   lines.push("  /// Replaces `secondary` once the step's work is done (paired, imported).");
   lines.push("  let afterDone: RegistryFirstRunButton?");
   lines.push("}");
@@ -2186,14 +2184,14 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push(`  static let featureId: String = ${swiftStr(fr.featureId)}`);
   lines.push(`  /// The synced setting that records a finished first run, so a second device skips it.`);
   lines.push(`  static let completionSetting: String = ${swiftStr(fr.completionSetting)}`);
+  lines.push(`  static let connectorUrl: String = ${swiftStr(fr.connectorUrl)}`);
   lines.push(`  static let setupPrompt: String = ${L(fr.prompts.setup, fr.prompts, "setup")}`);
   lines.push(`  static let firstPrompt: String = ${L(fr.prompts.first, fr.prompts, "first")}`);
   lines.push("  static let steps: [RegistryFirstRunStep] = [");
   for (const st of fr.steps) {
     const points = (st.points ?? []).map((pt) => `RegistryFirstRunPoint(icon: ${swiftStr(pt.icon)}, title: ${L(pt.title, pt, "title")}, detail: ${L(pt.detail, pt, "detail")})`).join(", ");
     const choices = (st.choices ?? []).map((ch) => `RegistryFirstRunChoice(id: ${swiftStr(ch.id)}, icon: ${swiftStr(ch.icon)}, title: ${L(ch.title, ch, "title")}, detail: ${L(ch.detail, ch, "detail")}, action: ${swiftCaseRef(ch.action)}, platforms: [${(ch.platforms ?? []).map(swiftStr).join(", ")}])`).join(", ");
-    const instructions = (st.instructions ?? []).map((s) => L(s)).join(", ");
-    lines.push(`    RegistryFirstRunStep(id: ${swiftCaseRef(st.id)}, kind: ${swiftStr(st.kind)}, icon: ${swiftStr(st.icon)}, title: ${L(st.title, st, "title")}, body: ${st.body === undefined ? '""' : L(st.body, st, "body")}, footnote: ${LOpt(st.footnote, st, "footnote")}, returningTitle: ${LOpt(st.returningTitle, st, "returningTitle")}, returningBody: ${LOpt(st.returningBody, st, "returningBody")}, skipWhen: ${swiftOptStr(st.skipWhen)}, requires: ${swiftOptStr(st.requires)}, completesGetStartedStep: ${swiftOptStr(st.completesGetStartedStep)}, platforms: [${(st.platforms ?? []).map(swiftStr).join(", ")}], featureId: ${swiftOptStr(st.featureId)}, points: [${points}], choices: [${choices}], instructions: [${instructions}], primary: ${frButton(st.primary)}, secondary: ${frButton(st.secondary)}, tertiary: ${frButton(st.tertiary)}, afterDone: ${frButton(st.afterDone)}),`);
+    lines.push(`    RegistryFirstRunStep(id: ${swiftCaseRef(st.id)}, kind: ${swiftStr(st.kind)}, icon: ${swiftStr(st.icon)}, title: ${L(st.title, st, "title")}, body: ${st.body === undefined ? '""' : L(st.body, st, "body")}, footnote: ${LOpt(st.footnote, st, "footnote")}, returningTitle: ${LOpt(st.returningTitle, st, "returningTitle")}, returningBody: ${LOpt(st.returningBody, st, "returningBody")}, skipWhen: ${swiftOptStr(st.skipWhen)}, requires: ${swiftOptStr(st.requires)}, completesGetStartedStep: ${swiftOptStr(st.completesGetStartedStep)}, platforms: [${(st.platforms ?? []).map(swiftStr).join(", ")}], featureId: ${swiftOptStr(st.featureId)}, points: [${points}], choices: [${choices}], primary: ${frButton(st.primary)}, secondary: ${frButton(st.secondary)}, afterDone: ${frButton(st.afterDone)}),`);
   }
   lines.push("  ]");
   lines.push("}");

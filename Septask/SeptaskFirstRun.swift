@@ -77,6 +77,8 @@ struct SeptaskFirstRunView: View {
   /// Step ids whose work is done (paired, imported): they show `afterDone`.
   @State private var doneSteps: Set<RegistryFirstRunStepID> = []
   @State private var copiedAction: RegistryFirstRunActionID?
+  @State private var copiedURL = false
+  @State private var codeExpanded = false
   @State private var showingThings = false
   @State private var showingReminders = false
   @State private var taskCountBeforeImport = 0
@@ -223,20 +225,54 @@ struct SeptaskFirstRunView: View {
       .padding(.top, 8)
     case "connectAgent":
       VStack(alignment: .leading, spacing: 14) {
-        ForEach(Array(step.instructions.enumerated()), id: \.offset) { index, line in
-          HStack(alignment: .firstTextBaseline, spacing: 10) {
-            Text("\(index + 1).").font(.headline.monospacedDigit()).foregroundStyle(.secondary)
-            Text(line).font(.body)
+        if doneSteps.contains(step.id) {
+          HStack(alignment: .top, spacing: 10) {
+            Image(systemName: RegistryIcons.sfSymbol(for: "onboarding.done"))
+              .foregroundStyle(.green)
+            Text(RegistrySettings.copy("sign_in_approval", "doneConnector"))
+              .font(.subheadline)
           }
-        }
-        if let tertiary = step.tertiary {
-          Button(copiedAction == tertiary.action ? "Copied" : tertiary.title) {
-            perform(tertiary.action, in: step)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .padding(14)
+          .background(Theme.cardSurface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        } else {
+          VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 12) {
+              VStack(alignment: .leading, spacing: 2) {
+                Text(RegistrySettings.copy("claude_connector", "connectorUrl"))
+                  .font(.headline)
+                Text(RegistryFirstRun.connectorUrl)
+                  .font(.caption.monospaced())
+                  .foregroundStyle(.secondary)
+                  .textSelection(.enabled)
+              }
+              Spacer(minLength: 12)
+              Button(copiedURL ? RegistrySettings.copy("claude_connector", "copied") : RegistrySettings.copy("claude_connector", "copy")) {
+                SeptaskClipboard.copy(RegistryFirstRun.connectorUrl)
+                copiedURL = true
+                copiedAction = nil
+              }
+              .buttonStyle(.bordered)
+            }
+            Text(RegistrySettings.copy("claude_connector", "connectorUrlDetail"))
+              .font(.caption)
+              .foregroundStyle(.secondary)
           }
-          .buttonStyle(.bordered)
+          .padding(14)
+          .background(Theme.cardSurface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+
+          DisclosureGroup(RegistrySettings.copy("claude_connector", "haveCode"), isExpanded: $codeExpanded) {
+            VStack(alignment: .leading, spacing: 10) {
+              Text(RegistrySettings.copy("claude_connector", "codeHint"))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+              SeptaskPairingCodeField { doneSteps.insert(step.id) }
+            }
+            .padding(.top, 8)
+          }
+          .padding(14)
+          .background(Theme.cardSurface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
-        SeptaskPairingCodeField { doneSteps.insert(step.id) }
-          .padding(.top, 4)
       }
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(.top, 8)
@@ -257,16 +293,22 @@ struct SeptaskFirstRunView: View {
           SeptaskSignInButton()
             .frame(maxWidth: 400)
         }
+      } else if doneSteps.contains(step.id), let afterDone = step.afterDone {
+        Button { perform(afterDone.action, in: step) } label: {
+          Text(afterDone.title)
+            .frame(maxWidth: 400)
+        }
+        .buttonStyle(.borderedProminent)
+        .controlSize(.large)
       } else if let primary = step.primary {
         Button { perform(primary.action, in: step) } label: {
-          Text(copiedAction == primary.action ? "Copied" : primary.title)
+          Text(copiedAction == primary.action ? RegistrySettings.copy("claude_connector", "copied") : primary.title)
             .frame(maxWidth: 400)
         }
         .buttonStyle(.borderedProminent)
         .controlSize(.large)
       }
-      let secondary = doneSteps.contains(step.id) ? (step.afterDone ?? step.secondary) : step.secondary
-      if let secondary {
+      if !doneSteps.contains(step.id), let secondary = step.secondary {
         Button(secondary.title) { perform(secondary.action, in: step) }
           .buttonStyle(.borderless)
           .controlSize(.large)
@@ -306,9 +348,7 @@ struct SeptaskFirstRunView: View {
     case .copySetupPrompt:
       SeptaskClipboard.copy(RegistryFirstRun.setupPrompt)
       copiedAction = action
-    case .copyFirstPrompt:
-      SeptaskClipboard.copy(RegistryFirstRun.firstPrompt)
-      copiedAction = action
+      copiedURL = false
     }
   }
 
@@ -323,6 +363,8 @@ struct SeptaskFirstRunView: View {
       TaskNotices.completeStep(id, context: modelContext)
     }
     copiedAction = nil
+    copiedURL = false
+    codeExpanded = false
     a11yAnimate(.easeInOut(duration: 0.2)) {
       history.append(step.id)
       currentID = next.id
@@ -400,12 +442,7 @@ struct SeptaskFirstRunView: View {
 
   @ViewBuilder
   private func stepIcon(_ id: String) -> some View {
-    if id == "settings.claude" {
-      // Claude's mark is an asset, not an SF Symbol (same as Settings).
-      Image("ClaudeMark").renderingMode(.template).resizable().scaledToFit()
-    } else {
-      Image(systemName: RegistryIcons.sfSymbol(for: id)).resizable().scaledToFit()
-    }
+    Image(systemName: RegistryIcons.sfSymbol(for: id)).resizable().scaledToFit()
   }
 
   private func taskCount() -> Int {

@@ -4980,6 +4980,48 @@
       "comment" : "Generated from registry settings.copy.claude_connector.connectorUrlDetail.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
+    "Add as a custom MCP server in any MCP client" : {
+      "comment" : "Generated from registry settings.copy.claude_connector.connectorUrlDetail.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Als eigenen MCP-Server in einem beliebigen MCP-Client hinzufügen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Añádela como servidor MCP personalizado en cualquier cliente MCP"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajoutez-la comme serveur MCP personnalisé dans n’importe quel client MCP"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiungilo come server MCP personalizzato in qualsiasi client MCP"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voeg toe als aangepaste MCP-server in elke MCP-client"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicione como servidor MCP personalizado em qualquer cliente MCP"
+          }
+        }
+      }
+    },
     "Add Checklist Item" : {
       "comment" : "Generated from registry actions.actions.task.addChecklistItem.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -5230,6 +5272,48 @@
     "Add the connector URL to Claude or any MCP client, or paste the setup prompt into Claude. When your browser shows an 8-character code, enter it above. Only enter a code from a browser window you opened yourself." : {
       "comment" : "Generated from registry settings.copy.claude_connector.footer.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
+    },
+    "Add the MCP server URL to any MCP client, or paste the setup prompt into your agent. When your browser shows an 8-character code, enter it above. Only enter a code from a window you opened yourself." : {
+      "comment" : "Generated from registry settings.copy.claude_connector.footer.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Füge die MCP-Server-URL in einem beliebigen MCP-Client hinzu oder füge den Einrichtungs-Prompt in deinen Agenten ein. Wenn dein Browser einen 8-stelligen Code anzeigt, gib ihn oben ein. Gib nur einen Code aus einem Fenster ein, das du selbst geöffnet hast."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Añade la URL del servidor MCP en cualquier cliente MCP o pega el prompt de configuración en tu agente. Cuando tu navegador muestre un código de 8 caracteres, introdúcelo arriba. Introduce solo un código de una ventana que hayas abierto tú."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajoutez l’URL du serveur MCP dans n’importe quel client MCP ou collez le prompt de configuration dans votre agent. Quand votre navigateur affiche un code de 8 caractères, saisissez-le ci-dessus. Ne saisissez un code que depuis une fenêtre que vous avez ouverte vous-même."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiungi l’URL del server MCP a qualsiasi client MCP oppure incolla il prompt di configurazione nel tuo agente. Quando il browser mostra un codice di 8 caratteri, inseriscilo sopra. Inserisci solo un codice da una finestra che hai aperto tu."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voeg de MCP-server-URL toe aan een MCP-client of plak de instelprompt in je agent. Als je browser een code van 8 tekens toont, vul die dan hierboven in. Vul alleen een code in uit een venster dat je zelf hebt geopend."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicione a URL do servidor MCP em qualquer cliente MCP ou cole o prompt de configuração no seu agente. Quando o navegador mostrar um código de 8 caracteres, digite-o acima. Só digite um código de uma janela que você mesmo abriu."
+          }
+        }
+      }
     },
     "Add time" : {
       "comment" : "Generated from registry surfaces.taskDateBoard.rows.dateBoard.time.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -10658,6 +10742,48 @@
         }
       }
     },
+    "Connect the agent you already use. You choose what it works on, and only you mark work done." : {
+      "comment" : "Generated from registry surfaces.firstRun.steps.agentSetup.body. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verbinde den Agenten, den du bereits nutzt. Du wählst aus, woran er arbeitet, und nur du hakst Aufgaben ab."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conecta el agente que ya usas. Tú eliges en qué trabaja y solo tú marcas el trabajo como hecho."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connectez l’agent que vous utilisez déjà. Vous choisissez ce sur quoi il travaille, et vous seul marquez le travail comme terminé."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connetti l’agente che usi già. Scegli tu su cosa lavora e solo tu segni il lavoro come completato."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verbind de agent die je al gebruikt. Jij kiest waar hij aan werkt, en alleen jij vinkt werk af."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conecte o agente que você já usa. Você escolhe em que ele trabalha, e só você marca o trabalho como concluído."
+          }
+        }
+      }
+    },
     "Connect your agent" : {
       "comment" : "Generated from registry surfaces.notices.items.getStarted.steps.connectAI.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -11404,7 +11530,7 @@
       }
     },
     "Copy setup prompt" : {
-      "comment" : "Generated from registry surfaces.firstRun.steps.connectClaude.primary.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry surfaces.firstRun.steps.agentSetup.primary.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
@@ -14687,6 +14813,48 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cada projeto tem notas, para você e o Claude saberem para que ele serve."
+          }
+        }
+      }
+    },
+    "Each project has notes, so you and your agents know what it’s for." : {
+      "comment" : "Generated from registry surfaces.firstRun.steps.welcome.points.2.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jedes Projekt hat Notizen, damit du und deine Agenten wissen, wofür es da ist."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cada proyecto tiene notas para que tú y tus agentes sepan para qué sirve."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chaque projet a des notes pour que vous et vos agents sachiez à quoi il sert."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ogni progetto ha delle note, così tu e i tuoi agenti sapete a cosa serve."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elk project heeft notities, zodat jij en je agents weten waar het voor is."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cada projeto tem notas para que você e seus agentes saibam para que ele serve."
           }
         }
       }
@@ -18237,6 +18405,48 @@
         }
       }
     },
+    "Have a connection code?" : {
+      "comment" : "Generated from registry settings.copy.claude_connector.haveCode.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hast du einen Verbindungscode?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Tienes un código de conexión?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vous avez un code de connexion ?"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hai un codice di connessione?"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Heb je een verbindingscode?"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tem um código de conexão?"
+          }
+        }
+      }
+    },
     "Header Texture" : {
       "comment" : "Generated from registry settings.pages.appearance.sections.appearance.items.0.parts.texture.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -19191,6 +19401,48 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Se você assinar durante o período de teste, a cobrança começa no dia da assinatura."
+          }
+        }
+      }
+    },
+    "If your browser showed an 8-character code, enter it here. Only enter a code from a window you opened yourself." : {
+      "comment" : "Generated from registry settings.copy.claude_connector.codeHint.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wenn dein Browser einen 8-stelligen Code angezeigt hat, gib ihn hier ein. Gib nur einen Code aus einem Fenster ein, das du selbst geöffnet hast."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Si tu navegador mostró un código de 8 caracteres, introdúcelo aquí. Introduce solo un código de una ventana que hayas abierto tú."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Si votre navigateur a affiché un code de 8 caractères, saisissez-le ici. Ne saisissez un code que depuis une fenêtre que vous avez ouverte vous-même."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se il browser ha mostrato un codice di 8 caratteri, inseriscilo qui. Inserisci solo un codice da una finestra che hai aperto tu."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Als je browser een code van 8 tekens heeft getoond, vul die dan hier in. Vul alleen een code in uit een venster dat je zelf hebt geopend."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se o navegador mostrou um código de 8 caracteres, digite-o aqui. Só digite um código de uma janela que você mesmo abriu."
           }
         }
       }
@@ -21030,7 +21282,7 @@
       }
     },
     "Later" : {
-      "comment" : "Generated from registry surfaces.firstRun.steps.connectClaude.secondary.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry surfaces.firstRun.steps.agentSetup.secondary.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
@@ -21269,6 +21521,48 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Descartar"
+          }
+        }
+      }
+    },
+    "Let your agent work from your list" : {
+      "comment" : "Generated from registry surfaces.notices.items.getStarted.steps.connectAI.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lass deinen Agenten auf deiner Liste arbeiten"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deja que tu agente trabaje desde tu lista"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Laissez votre agent travailler sur votre liste"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lascia che il tuo agente lavori sulla tua lista"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Laat je agent vanuit je lijst werken"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deixe seu agente trabalhar na sua lista"
           }
         }
       }
@@ -22045,6 +22339,48 @@
     "MCP connector" : {
       "comment" : "Generated from registry settings.pages.claude_pairing.sections.connector.header. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
+    },
+    "MCP server URL" : {
+      "comment" : "Generated from registry settings.copy.claude_connector.connectorUrl.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MCP-Server-URL"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "URL del servidor MCP"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "URL du serveur MCP"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "URL del server MCP"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MCP-server-URL"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "URL do servidor MCP"
+          }
+        }
+      }
     },
     "MCP Skills" : {
       "comment" : "Generated from registry settings.pages.agents.sections.connect.items.1.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -28122,6 +28458,48 @@
     "Paste into Claude to start connecting" : {
       "comment" : "Generated from registry settings.copy.claude_connector.setupPromptDetail.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
+    },
+    "Paste into your agent to connect your account" : {
+      "comment" : "Generated from registry settings.copy.claude_connector.setupPromptDetail.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In deinen Agenten einfügen, um dein Konto zu verbinden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pégalo en tu agente para conectar tu cuenta"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Collez-le dans votre agent pour connecter votre compte"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Incollalo nel tuo agente per connettere il tuo account"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plak in je agent om je account te verbinden"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cole no seu agente para conectar sua conta"
+          }
+        }
+      }
     },
     "Paste the first prompt. Claude sets up your areas and projects with you." : {
       "comment" : "Generated from registry surfaces.firstRun.steps.connectClaude.instructions.2. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -34397,13 +34775,13 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Einrichtungsanweisung"
+            "value" : "Einrichtungs-Prompt"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mensaje de configuración"
+            "value" : "Prompt de configuración"
           }
         },
         "fr" : {
@@ -34421,7 +34799,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Installatieprompt"
+            "value" : "Instelprompt"
           }
         },
         "pt-BR" : {
@@ -35535,6 +35913,48 @@
       "comment" : "Generated from registry settings.copy.claude_connector.signInBody.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
+    "Sign in so your agent can connect to your tasks through your private Septena account." : {
+      "comment" : "Generated from registry settings.copy.claude_connector.signInBody.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Melde dich an, damit sich dein Agent über dein privates Septena-Konto mit deinen Aufgaben verbinden kann."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inicia sesión para que tu agente pueda conectarse a tus tareas mediante tu cuenta privada de Septena."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connectez-vous pour que votre agent puisse accéder à vos tâches via votre compte Septena privé."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accedi così il tuo agente può connettersi alle tue attività tramite il tuo account Septena privato."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Log in zodat je agent via je eigen Septena-account verbinding kan maken met je taken."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entre para que seu agente possa se conectar às suas tarefas pela sua conta privada do Septena."
+          }
+        }
+      }
+    },
     "Sign in to connect an agent" : {
       "comment" : "Generated from registry settings.copy.claude_connector.signInHeader.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
@@ -35873,6 +36293,48 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Entrar com a Apple"
+          }
+        }
+      }
+    },
+    "Sign in with Apple to keep your tasks on all your devices and connect your agents. Septena never sees your Apple password." : {
+      "comment" : "Generated from registry surfaces.firstRun.steps.account.body. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Melde dich mit Apple an, um deine Aufgaben auf allen Geräten zu synchronisieren und deine Agenten zu verbinden. Septena sieht dein Apple-Passwort nie."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inicia sesión con Apple para mantener tus tareas en todos tus dispositivos y conectar tus agentes. Septena nunca ve tu contraseña de Apple."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connectez-vous avec Apple pour garder vos tâches sur tous vos appareils et connecter vos agents. Septena ne voit jamais votre mot de passe Apple."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accedi con Apple per mantenere le tue attività su tutti i tuoi dispositivi e connettere i tuoi agenti. Septena non vede mai la tua password Apple."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Log in met Apple om je taken op al je apparaten gelijk te houden en je agents te verbinden. Septena ziet je Apple-wachtwoord nooit."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entre com a Apple para manter suas tarefas em todos os seus dispositivos e conectar seus agentes. O Septena nunca vê sua senha da Apple."
           }
         }
       }
@@ -36680,6 +37142,48 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Preferite"
+          }
+        }
+      }
+    },
+    "Starter prompt" : {
+      "comment" : "Generated from registry settings.copy.claude_connector.firstPrompt.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start-Prompt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prompt inicial"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prompt de départ"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prompt iniziale"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Startprompt"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prompt inicial"
           }
         }
       }
