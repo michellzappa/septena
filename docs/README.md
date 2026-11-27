@@ -133,8 +133,8 @@ See [ADR 0007](adr/0007-septena-is-the-task-app.md).
 | [ORDERING_AND_HEADINGS_PLAN.md](ORDERING_AND_HEADINGS_PLAN.md), [DRAG_AND_DROP.md](DRAG_AND_DROP.md) | shipped — historical |
 | [RECENTLY_DELETED_SPEC.md](RECENTLY_DELETED_SPEC.md), [TASK_LIST_OBSERVATION_PLAN.md](TASK_LIST_OBSERVATION_PLAN.md) | proposal |
 | [SEPTASK_APPKIT_PARITY.md](SEPTASK_APPKIT_PARITY.md), [SEPTASK_APPKIT_SURFACES.md](SEPTASK_APPKIT_SURFACES.md), [SEPTASK_APPKIT_LOCALIZATION_HANDOFF.md](SEPTASK_APPKIT_LOCALIZATION_HANDOFF.md) | AppKit shell notes |
-| [APPSTORE-SEPTASK.md](APPSTORE-SEPTASK.md), [RELEASING-MAC.md](RELEASING-MAC.md), [PLAYSTORE.md](PLAYSTORE.md), [RELEASING-ANDROID.md](RELEASING-ANDROID.md) | current |
-| [photo-composite/SKILL.md](photo-composite/SKILL.md), [photo-studio/SKILL.md](photo-studio/SKILL.md), [3d-studio/SKILL.md](3d-studio/SKILL.md) | current: marketing image skills |
+| [RELEASING-MAC.md](RELEASING-MAC.md), [RELEASING-ANDROID.md](RELEASING-ANDROID.md); store copy and panels are in the private `septena/studio` repo | current |
+| Marketing image skills (photo, composite, 3D, bento) | moved to `septena/studio` on 2026-11-27 |
 | [NATIVE_SCENES_SPEC.md](NATIVE_SCENES_SPEC.md) | superseded (ADR 0022 rejected): website scenes draw from the registries |
 | [PLATFORM_CHROME.md](PLATFORM_CHROME.md) | draft spec: what each OS draws on a marketing screen (iOS 27, iPadOS 27, macOS 27, Android 17, Windows 11) |
 
@@ -178,6 +178,6 @@ rule 4, because the product left the repo). They are in
 ### Product and identity
 
 [MESSAGING.md](MESSAGING.md) (moved to the Septena Starlings workspace), [MAKER_IDENTITY.md](MAKER_IDENTITY.md),
-[APPSTORE.md](APPSTORE.md), [feedback.md](feedback.md),
+[feedback.md](feedback.md),
 [BACKLOG.md](BACKLOG.md) (historical: open items moved to GitHub issues on
 2026-11-20).

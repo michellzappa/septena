@@ -273,4 +273,4 @@ jobs:
           mappingFile: dist/mapping-${{ steps.meta.outputs.version }}.txt
           track: ${{ inputs.play_track }}
           status: ${{ inputs.play_status }}
-          whatsNewDirectory: appstore/playstore/whatsnew
+          whatsNewDirectory: android/playstore/whatsnew

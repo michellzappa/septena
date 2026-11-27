@@ -1,6 +1,6 @@
 // Draws the canonical devices in registry/device-frames.json as SVG. The one
 // implementation every renderer uses: the website scenes (septena-site syncs
-// this file) and the App Store panels (appstore/components.mjs). No renderer
+// this file) and the App Store panels (septena/studio appstore/components.mjs). No renderer
 // draws device corners with CSS border-radius: Safari has no corner-shape, and
 // circular arcs are not Apple's continuous corners.
 //

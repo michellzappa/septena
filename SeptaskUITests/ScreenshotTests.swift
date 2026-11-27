@@ -2,14 +2,14 @@ import XCTest
 
 /// Captures App Store / marketing screenshots for **Septask** (the focused tasks
 /// app) from the demo-seeded build. Run via `SEPTENA_APP=septask
-/// appstore/capture.sh iphone69`, or:
+/// appstore/capture.sh iphone69` (in septena/studio), or:
 ///   xcodebuild test -scheme Septask \
 ///     -destination 'platform=iOS Simulator,name=iPhone 17 Pro Max,OS=26.0' \
 ///     -only-testing:SeptaskUITests
 ///
 /// On compact iPhone there is no tab bar (ADR 0024): the list is the root of
 /// one navigation stack and the app opens on Today. Navigation goes Back to
-/// the list and taps a row. Only the task screens are shot. Basenames are the contract with appstore/panels.septask.mjs:
+/// the list and taps a row. Only the task screens are shot. Basenames are the contract with septena/studio appstore/panels.septask.mjs:
 /// tasks-today · tasks-upcoming · tasks-project. Every navigation is best-effort.
 final class ScreenshotTests: XCTestCase {
   override func setUpWithError() throws { continueAfterFailure = false }
