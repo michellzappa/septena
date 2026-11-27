@@ -1886,12 +1886,6 @@
       "actions.actions.task.gotItBack.title"
     ]
   },
-  "Groceries": {
-    "text": "Groceries",
-    "paths": [
-      "surfaces.checklistProjects.groceries"
-    ]
-  },
   "Group Today by list": {
     "text": "Group Today by list",
     "paths": [
@@ -5018,12 +5012,6 @@
     "text": "Use default",
     "paths": [
       "settings.copy.access_agents.notificationsDefault.label"
-    ]
-  },
-  "Use for Groceries": {
-    "text": "Use for Groceries",
-    "paths": [
-      "surfaces.checklistProjects.useForGroceries"
     ]
   },
   "Use my Claude": {

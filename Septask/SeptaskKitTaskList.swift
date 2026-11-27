@@ -1320,8 +1320,8 @@ final class SeptaskKitTaskListController: NSViewController {
       let faded = showsFadedInLists ? LocalCache.fadedTasks(in: context, scope: filter) : []
       let notesRows = containerNotesRows()
       if case .project(let projectId) = filter {
-        if let mode = checklistMode(projectId) {
-          newRows = titleRows + notesRows + checklistRows(pool: pool, projectId: projectId, mode: mode)
+        if checklistMode(projectId) != nil {
+          newRows = titleRows + notesRows + checklistRows(pool: pool, projectId: projectId)
         } else {
           newRows = titleRows + notesRows + projectGrouped(open: open, projectId: projectId)
             + fadedFooterRows(faded: faded)
@@ -2616,9 +2616,9 @@ final class SeptaskKitTaskListController: NSViewController {
     StructureCache.snapshot(in: context).projects.first { $0.id == project }?.checklistMode
   }
 
-  private func checklistRows(pool: [SeptenaTask], projectId: String, mode: ProjectChecklistMode) -> [Row] {
+  private func checklistRows(pool: [SeptenaTask], projectId: String) -> [Row] {
     let tasks = LocalCache.headings(inProject: projectId, in: context) + pool
-    guard let layout = ProjectChecklist.layout(rows: tasks, mode: mode) else { return [] }
+    guard let layout = ProjectChecklist.layout(rows: tasks) else { return [] }
     let byID = Dictionary(uniqueKeysWithValues: tasks.map { ($0.id, $0) })
     var result = layout.ungrouped.compactMap { byID[$0] }.map(unchipped)
     for group in layout.groups {
@@ -2636,14 +2636,14 @@ final class SeptaskKitTaskListController: NSViewController {
     return result
   }
 
-  private func presentChecklistAdd(project: String, mode: ProjectChecklistMode, anchor: NSView? = nil) {
+  private func presentChecklistAdd(project: String, anchor: NSView? = nil) {
     let headings = LocalCache.headings(inProject: project, in: context)
     let tasks = LocalCache.tasks(in: context, filter: .project(project))
     let handle = checklistAddPopover
     let mutator = self.mutator
-    let content = ProjectChecklistAddView(rows: headings + tasks, mode: mode, initialHeading: focusedTaskForCreate()?.heading) {
+    let content = ProjectChecklistAddView(rows: headings + tasks, initialHeading: focusedTaskForCreate()?.heading) {
       title, heading in
-      ProjectChecklist.add(title: title, project: project, mode: mode, heading: heading, headings: headings, mutator: mutator)
+      ProjectChecklist.add(title: title, project: project, heading: heading, headings: headings, mutator: mutator)
       handle.close()
     } reopen: { id in
       TaskUndo.toggleProjectChecklist(id: id, mutator: mutator)
@@ -4100,8 +4100,8 @@ final class SeptaskKitTaskListController: NSViewController {
   }
 
   func createTask(inInbox: Bool = false) {
-    if case .project(let project) = filter, let mode = checklistMode(project) {
-      presentChecklistAdd(project: project, mode: mode)
+    if case .project(let project) = filter, checklistMode(project) != nil {
+      presentChecklistAdd(project: project)
       return
     }
     // Save and close whatever is open FIRST, synchronously — a live ⌘R
@@ -5374,13 +5374,11 @@ final class SeptaskKitTaskListController: NSViewController {
   private func buildProjectOverflowMenu(_ projectID: String) -> NSMenu {
     var checklistOptions: [RegistryMenuNode] = []
     if checklistMode(projectID) == nil {
-      for (mode, title) in [(ProjectChecklistMode.plain, RegistrySurfaces.checklistUseAsChecklist),
-                            (.groceries, RegistrySurfaces.checklistUseForGroceries)] {
-        checklistOptions.append(RegistryMenuEntry.slot(id: "project.checklist.\(mode.rawValue)",
-                                                       title: title, sfSymbol: "checklist") {
-          Task { try await SeptenaServices.shared.projectsMutator.useAsChecklist(id: projectID, mode: mode) }
-        })
-      }
+      checklistOptions.append(RegistryMenuEntry.slot(id: "project.checklist.plain",
+                                                     title: RegistrySurfaces.checklistUseAsChecklist,
+                                                     sfSymbol: "checklist") {
+        Task { try await SeptenaServices.shared.projectsMutator.useAsChecklist(id: projectID) }
+      })
     }
     return KitRegistryMenu.build(checklistOptions + [
       RegistryMenuEntry.slot(
@@ -6355,10 +6353,10 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       let identifier = NSUserInterfaceItemIdentifier("newTaskCell")
       let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? KitNewTaskCell
         ?? KitNewTaskCell(identifier: identifier)
-      if case .project(let project) = filter, let mode = checklistMode(project) {
+      if case .project(let project) = filter, checklistMode(project) != nil {
         cell.configure(kind: .checklist)
         cell.onTap = { [weak self, weak cell] in
-          self?.presentChecklistAdd(project: project, mode: mode, anchor: cell)
+          self?.presentChecklistAdd(project: project, anchor: cell)
         }
       } else {
         cell.configure(kind: .task)

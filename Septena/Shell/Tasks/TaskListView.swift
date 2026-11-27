@@ -2539,8 +2539,8 @@ struct TaskListView: View {
     case .project:
       return AnyView(Group {
         AnyView(starFilterBar)
-        if let mode = checklistMode {
-          AnyView(checklistRows(mode: mode))
+        if checklistMode != nil {
+          AnyView(checklistRows())
         } else {
           AnyView(projectGroupedRows)
         }
@@ -3188,14 +3188,14 @@ struct TaskListView: View {
   }
 
   @ViewBuilder
-  private func checklistRows(mode: ProjectChecklistMode) -> some View {
+  private func checklistRows() -> some View {
     if case .project(let id) = filter {
       let headings = projectHeadingList
       let rows = headings + items
       let byID = Dictionary(uniqueKeysWithValues: rows.map { ($0.id, $0) })
-      if let layout = ProjectChecklist.layout(rows: rows, mode: mode) {
-        ProjectChecklistAddView(rows: rows, mode: mode, initialHeading: checklistAddHeading) { title, heading in
-          ProjectChecklist.add(title: title, project: id, mode: mode, heading: heading,
+      if let layout = ProjectChecklist.layout(rows: rows) {
+        ProjectChecklistAddView(rows: rows, initialHeading: checklistAddHeading) { title, heading in
+          ProjectChecklist.add(title: title, project: id, heading: heading,
                                headings: headings, mutator: mutator)
         } reopen: { item in
           TaskUndo.toggleProjectChecklist(id: item, mutator: mutator)

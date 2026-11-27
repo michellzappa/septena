@@ -1677,7 +1677,6 @@
   "checklistProjects": {
     "id": "checklistProjects",
     "useAsChecklist": "Use as Checklist",
-    "useForGroceries": "Use for Groceries",
     "addItem": "Add item",
     "addItemToGroup": "Add item to {group}",
     "onList": "On list",
@@ -1687,8 +1686,7 @@
     "ungrouped": "Ungrouped",
     "projectType": "Project type",
     "project": "Project",
-    "checklist": "Checklist",
-    "groceries": "Groceries"
+    "checklist": "Checklist"
   },
   "listSort": {
     "id": "listSort",

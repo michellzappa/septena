@@ -336,7 +336,7 @@ export function SeptenaApp() {
   } | null>(null);
 
   // Inline creation & container notes
-  const [creatingChecklistMode, setCreatingChecklistMode] = useState<"plain" | "groceries" | null>(null);
+  const [creatingChecklistMode, setCreatingChecklistMode] = useState<"plain" | null>(null);
   const [creatingKind, setCreatingKind] = useState<"area" | "project" | "heading" | null>(null);
   const [creatingAreaId, setCreatingAreaId] = useState<string | null>(null);
   const [creatingInsertIndex, setCreatingInsertIndex] = useState<number | null>(null);
@@ -2567,7 +2567,6 @@ export function SeptenaApp() {
         { kind: "divider" },
         ...(!proj.checklistMode ? [
           { kind: "item" as const, label: "Use as Checklist", onSelect: () => void engine.updateProject(proj, { checklistMode: "plain" }) },
-          { kind: "item" as const, label: "Use for Groceries", onSelect: () => void engine.updateProject(proj, { checklistMode: "groceries" }) },
         ] : []),
         {
           kind: "item",
@@ -4076,13 +4075,11 @@ export function SeptenaApp() {
                 <select
                   aria-label="Project type"
                   value={creatingChecklistMode ?? ""}
-                  onChange={(e) => setCreatingChecklistMode(e.target.value === "groceries" ? "groceries" :
-                    e.target.value === "plain" ? "plain" : null)}
+                  onChange={(e) => setCreatingChecklistMode(e.target.value === "plain" ? "plain" : null)}
                   className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-elevated)] px-2 py-1 text-[11px] text-[var(--text-secondary)]"
                 >
                   <option value="">Project</option>
                   <option value="plain">Checklist</option>
-                  <option value="groceries">Groceries</option>
                 </select>
               )}
               {creatingKind === "project" && activeAreas.length > 0 && (

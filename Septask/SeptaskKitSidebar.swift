@@ -1646,8 +1646,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     Task { [weak self] in
       guard let self,
             let project = try? await self.projectsMutator.create(
-              title: mode.map { $0 == .groceries ? RegistrySurfaces.groceriesProjectTitle : RegistrySurfaces.checklistProjectTitle }
-                ?? RegistryActions.title(.sidebarNewProject),
+              title: mode == nil ? RegistryActions.title(.sidebarNewProject) : RegistrySurfaces.checklistProjectTitle,
               area: areaId, checklistMode: mode)
       else { return }
       if let index {
@@ -1759,9 +1758,8 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     magicDropBadge.isHidden = true
   }
 
-  @objc private func newChecklistFromFooter(_ sender: NSMenuItem) {
-    guard let raw = sender.representedObject as? String, let mode = ProjectChecklistMode(rawValue: raw) else { return }
-    newProject(inArea: selectedAreaID, atIndex: nil, mode: mode)
+  @objc private func newChecklistFromFooter() {
+    newProject(inArea: selectedAreaID, atIndex: nil, mode: .plain)
   }
 
   private func presentMagicPlusMenu(from button: NSView) {
@@ -1785,14 +1783,11 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     looseProject.target = self
     looseProject.image = NSImage(systemSymbolName: "number", accessibilityDescription: nil)
     menu.addItem(looseProject)
-    for (mode, title) in [(ProjectChecklistMode.plain, RegistrySurfaces.checklistProjectTitle),
-                          (.groceries, RegistrySurfaces.groceriesProjectTitle)] {
-      let item = NSMenuItem(title: title, action: #selector(newChecklistFromFooter(_:)), keyEquivalent: "")
-      item.target = self
-      item.representedObject = mode.rawValue
-      item.image = NSImage(systemSymbolName: "checklist", accessibilityDescription: nil)
-      menu.addItem(item)
-    }
+    let checklist = NSMenuItem(title: RegistrySurfaces.checklistProjectTitle,
+                               action: #selector(newChecklistFromFooter), keyEquivalent: "")
+    checklist.target = self
+    checklist.image = NSImage(systemSymbolName: "checklist", accessibilityDescription: nil)
+    menu.addItem(checklist)
 
     let areaItem = NSMenuItem(
       title: RegistryActions.title(.sidebarNewArea),

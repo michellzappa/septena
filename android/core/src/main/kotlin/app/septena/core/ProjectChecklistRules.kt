@@ -12,7 +12,7 @@ object ProjectChecklistRules {
         val suggestedGroup: String?,
     )
 
-    fun layout(rows: List<SyncRecord>, query: String = "", groceries: Boolean = false): Layout {
+    fun layout(rows: List<SyncRecord>, query: String = ""): Layout {
         val output = call(
             "projectChecklist",
             mapOf(
@@ -20,7 +20,7 @@ object ProjectChecklistRules {
                     JsonValue.ObjectValue(row.fields + ("id" to JsonValue.StringValue(row.id)))
                 }),
                 "query" to JsonValue.StringValue(query),
-                "groceries" to JsonValue.BooleanValue(groceries),
+                "groceries" to JsonValue.BooleanValue(query.isNotBlank()),
             ),
         )
         return Layout(

@@ -44,8 +44,8 @@ export function ProjectChecklist({
   const layout = useMemo(() => callCore<Layout>("projectChecklist", {
     rows,
     query: title,
-    groceries: project.checklistMode === "groceries",
-  }), [project.checklistMode, rows, title]);
+    groceries: true,
+  }), [rows, title]);
 
   const perform = async (write: () => Promise<unknown>) => {
     if (busy) return;
