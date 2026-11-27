@@ -650,7 +650,7 @@
           "action": "copySetupPrompt"
         },
         "secondary": {
-          "title": "Later",
+          "title": "Skip",
           "action": "next"
         },
         "afterDone": {
