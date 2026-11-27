@@ -2245,12 +2245,6 @@
       "settings.copy.access_agents.lastUsed.label"
     ]
   },
-  "Later": {
-    "text": "Later",
-    "paths": [
-      "surfaces.firstRun.steps.agentSetup.secondary.title"
-    ]
-  },
   "Later…": {
     "text": "Later…",
     "paths": [
@@ -4235,6 +4229,7 @@
   "Skip": {
     "text": "Skip",
     "paths": [
+      "surfaces.firstRun.steps.agentSetup.secondary.title",
       "surfaces.doing.stopNote.dismissTitle"
     ]
   },
