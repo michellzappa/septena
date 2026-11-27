@@ -681,6 +681,8 @@ extension TaskSyncEngine {
     take("dropReason") { t.dropReason = $0.stringValue }
     take("effort") { t.effort = $0.stringValue }
     take("assignedTo") { t.assignedTo = $0.stringValue }
+    take("assignedBy") { t.assignedBy = $0.stringValue }
+    take("assignedAt") { t.assignedAt = $0.stringValue }
     return applied
   }
 

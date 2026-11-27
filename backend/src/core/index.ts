@@ -88,6 +88,7 @@ export interface CoreTask {
   reminderDismissedAt?: string | null;
   recurrenceAfterCompletion?: boolean | null;
   recurrenceAnchorDate?: string | null;
+  assignedToOther?: boolean;
 }
 
 export interface CoreMembership {

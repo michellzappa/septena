@@ -702,11 +702,11 @@
     "account.sign-in-email": {
       "title": "Sign in with an email code (creates an account)",
       "agent": "none",
-      "ios": "planned",
-      "ipados": "planned",
-      "macos": "planned",
-      "web": "planned",
-      "android": "planned",
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "ships",
+      "android": "ships",
       "windows": "planned",
       "watchos": "not_applicable"
     },

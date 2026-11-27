@@ -40,23 +40,62 @@ data class TaskSnapshot(
     val waitingOn: String? = null,
     /** The day the wait started (`YYYY-MM-DD`), or null. */
     val waitingSince: String? = null,
+    /** Shared projects: the member id of the person who does this task. */
+    val assignedTo: String? = null,
+    /** Shared projects: the member id who set `assignedTo` (server-owned). */
+    val assignedBy: String? = null,
+    /** Shared projects: the day `assignedTo` was set (`YYYY-MM-DD`, server-owned). */
+    val assignedAt: String? = null,
+    /** True when this shared task is assigned to another member (`assignedTo != share.me`). */
+    val assignedToOther: Boolean = false,
+    /** Shared-project Waiting target name when this user assigned the task to another member. */
+    val sharedWaitingOn: String? = null,
+    /** Shared-project Waiting start day (`assignedAt`). */
+    val sharedWaitingSince: String? = null,
 ) {
     val isHeading: Boolean get() = kind == RegistryEntityEnums.TaskKind.HEADING
 
-    /** The task waits on a person (docs/REVIEW_SPEC.md §6). */
-    val isWaiting: Boolean get() = !waitingOn.isNullOrBlank()
+    /** The task waits on a person (docs/REVIEW_SPEC.md §6): manual `waitingOn` or shared assignment by me. */
+    val isWaiting: Boolean get() = !waitingOn.isNullOrBlank() || !sharedWaitingOn.isNullOrBlank()
+
+    /** Active wait target name, manual `waitingOn` first. */
+    val effectiveWaitingOn: String?
+        get() = waitingOn?.trim()?.takeIf(String::isNotEmpty) ?: sharedWaitingOn
+
+    /** Active wait start day (`YYYY-MM-DD`), for oldest-first sorting in Review ▸ Waiting. */
+    val effectiveWaitingSince: String?
+        get() = if (!waitingOn.isNullOrBlank()) waitingSince else sharedWaitingSince
 
     companion object {
-        fun from(record: SyncRecord): TaskSnapshot {
+        fun from(record: SyncRecord, shares: Map<String, ProjectShare> = emptyMap()): TaskSnapshot {
             require(record.entity == RegistryEntityNames.TASK) { "Expected a task record" }
             val f = record.fields
+            val project = f[RegistryEntityFields.Task.PROJECT].stringValue()
+            val assignedTo = f[RegistryEntityFields.Task.ASSIGNED_TO].stringValue()
+            val assignedBy = f[RegistryEntityFields.Task.ASSIGNED_BY].stringValue()
+            val assignedAt = f[RegistryEntityFields.Task.ASSIGNED_AT].stringValue()
+            val share = project?.let(shares::get)
+            val assignedToOther = if (share != null) {
+                !assignedTo.isNullOrBlank() && assignedTo != share.me
+            } else {
+                f["assignedToOther"].booleanValue() ?: false
+            }
+            val isSharedWaiting = share != null &&
+                !assignedTo.isNullOrBlank() &&
+                assignedTo != share.me &&
+                assignedBy == share.me
+            val sharedWaitingOn = if (isSharedWaiting) {
+                share.member(assignedTo.orEmpty())?.name ?: assignedTo
+            } else {
+                null
+            }
             return TaskSnapshot(
                 id = record.id,
                 title = f[RegistryEntityFields.Task.TITLE].stringValue().orEmpty(),
                 status = f[RegistryEntityFields.Task.STATUS].stringValue().orEmpty(),
                 kind = f[RegistryEntityFields.Task.KIND].stringValue(),
                 area = f[RegistryEntityFields.Task.AREA].stringValue(),
-                project = f[RegistryEntityFields.Task.PROJECT].stringValue(),
+                project = project,
                 created = f[RegistryEntityFields.Task.CREATED].stringValue(),
                 createdAt = f[RegistryEntityFields.Task.CREATED_AT].stringValue(),
                 scheduled = f[RegistryEntityFields.Task.SCHEDULED].stringValue(),
@@ -81,6 +120,12 @@ data class TaskSnapshot(
                 timeZone = f[RegistryEntityFields.Task.TIME_ZONE].stringValue(),
                 waitingOn = f[RegistryEntityFields.Task.WAITING_ON].stringValue(),
                 waitingSince = f[RegistryEntityFields.Task.WAITING_SINCE].stringValue(),
+                assignedTo = assignedTo,
+                assignedBy = assignedBy,
+                assignedAt = assignedAt,
+                assignedToOther = assignedToOther,
+                sharedWaitingOn = sharedWaitingOn,
+                sharedWaitingSince = if (isSharedWaiting) assignedAt else null,
             )
         }
     }
@@ -280,4 +325,5 @@ internal fun TaskSnapshot.toCore(): CoreTaskSnapshot = CoreTaskSnapshot(
     reminderDismissedAt = null,
     recurrenceAfterCompletion = null,
     recurrenceAnchorDate = null,
+    assignedToOther = assignedToOther,
 )

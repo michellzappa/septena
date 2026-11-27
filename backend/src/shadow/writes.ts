@@ -69,6 +69,7 @@ type StoreMethod =
   | "readDoing" | "readDoSession" | "readDoSessions"
   | "addUsage" | "connectionName"
   | "readNote" | "noteRevisions" | "readContainer" | "readContainerTasks" | "readHeadings"
+  | "listShares"
   | "idempotencyBegin" | "idempotencyFinish" | "idempotencyAbandon";
 export type StoreRpc = {
   [K in StoreMethod]: (...a: Parameters<TaskStore[K]>) => Promise<ReturnType<TaskStore[K]>>;

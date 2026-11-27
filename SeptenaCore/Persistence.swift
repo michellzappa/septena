@@ -135,6 +135,10 @@ final class TaskEntity {
   var effort: String?
   /// Shared projects: the member id of the person who does this task.
   var assignedTo: String?
+  /// Shared projects: the member id who set `assignedTo` (server-owned).
+  var assignedBy: String?
+  /// Shared projects: the day `assignedTo` was set (`YYYY-MM-DD`, server-owned).
+  var assignedAt: String?
   /// Legacy FastAPI-era optimistic-write guard; no longer consulted on the
   /// CloudKit path. Retained as a schema field pending Phase-2 cleanup.
   var pendingSync: Bool = false
@@ -319,8 +323,28 @@ final class TaskEntity {
   /// count, Next, and the badge.
   var isFaded: Bool { status == .open && fadedAt != nil }
 
-  /// True when the task waits on a person (docs/REVIEW_SPEC.md §6).
-  var isWaiting: Bool { TaskWaiting.isWaiting(waitingOn) }
+  /// Shared project metadata for this task's project, if any.
+  var projectShare: ProjectShare? {
+    guard let project, let ctx = modelContext else { return nil }
+    return SharedProjects.share(ofProject: project, in: ctx)
+  }
+
+  /// True when this shared task is assigned to another member.
+  var isAssignedToOther: Bool {
+    guard let assignedTo, !assignedTo.isEmpty, let share = projectShare else { return false }
+    return assignedTo != share.me
+  }
+
+  /// True when the task waits on a person (docs/REVIEW_SPEC.md §6): either
+  /// `waitingOn` is set, or this user assigned a shared task to another member.
+  var isWaiting: Bool {
+    TaskWaiting.isWaiting(waitingOn) || SharedProjects.sharedWaiting(
+      share: projectShare,
+      assignedTo: assignedTo,
+      assignedBy: assignedBy,
+      assignedAt: assignedAt
+    ) != nil
+  }
 
   var isOnToday: Bool { listMembership()?.isOnToday ?? false }
 
@@ -328,6 +352,10 @@ final class TaskEntity {
   /// deadline after today. A task is never on Today and in Upcoming at once
   /// (decision Q3). Every Upcoming list and count reads this.
   var isUpcoming: Bool { listMembership()?.matchesUpcoming ?? false }
+
+  /// Open, dateless, not pinned to Today, and not assigned to another member
+  /// (the shared core's rule in `views.rs`).
+  var isAnytime: Bool { listMembership()?.matchesAnytime ?? false }
 
   /// Filed nowhere: no area, no project. See `TaskInbox`.
   var isUnfiled: Bool { TaskInbox.isUnfiled(area: area, project: project) }
@@ -666,6 +694,9 @@ extension SeptenaTask {
       dropReason: e.dropReason,
       effort: e.effort,
       assignedTo: e.assignedTo,
+      assignedBy: e.assignedBy,
+      assignedAt: e.assignedAt,
+      projectShare: e.projectShare,
       kind: e.kind,
       heading: e.heading,
       conversation: conversation
@@ -1532,9 +1563,7 @@ enum LocalCache {
       guard e.status == .open, e.recurrence != nil else { return nil }
       return SeptenaTask(e)
     case .unscheduled:
-      guard e.status == .open, !e.today,
-            e.scheduled == nil, e.deadline == nil else { return nil }
-      return SeptenaTask(e)
+      return e.isAnytime ? SeptenaTask(e) : nil
     case .starred:
       guard e.status == .open, e.starred else { return nil }
       return SeptenaTask(e)

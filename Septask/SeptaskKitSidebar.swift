@@ -527,9 +527,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
       .review: reviewCount,
       .upcoming: open.filter(\.isUpcoming).count,
       .repeating: open.filter { $0.recurrenceUnit != nil && $0.recurrence != nil }.count,
-      .unscheduled: open.filter {
-        !$0.today && $0.scheduled == nil && $0.deadline == nil
-      }.count,
+      .unscheduled: open.filter(\.isAnytime).count,
       .starred: starredCount,
     ]
     let openByProject = Dictionary(grouping: open.compactMap(\.project), by: { $0 })

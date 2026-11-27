@@ -4856,6 +4856,10 @@
         }
       }
     },
+    "Add a device" : {
+      "comment" : "Generated from registry settings.pages.devices_access.sections.sign_in_approval.header. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Add a task or move one here when you want to work on it today." : {
       "comment" : "Generated from registry destinations.destinations.today.emptyState.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -4904,6 +4908,10 @@
     },
     "Add another sign-in method to open this same account on any device. You cannot remove your last method." : {
       "comment" : "Generated from registry signIn.manage.footer. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Add as a custom MCP connector in Claude or any MCP client" : {
+      "comment" : "Generated from registry settings.copy.claude_connector.connectorUrlDetail.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
     "Add Checklist Item" : {
@@ -5152,6 +5160,10 @@
           }
         }
       }
+    },
+    "Add the connector URL to Claude or any MCP client, or paste the setup prompt into Claude. When your browser shows an 8-character code, enter it above. Only enter a code from a browser window you opened yourself." : {
+      "comment" : "Generated from registry settings.copy.claude_connector.footer.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Add time" : {
       "comment" : "Generated from registry surfaces.taskDateBoard.rows.dateBoard.time.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -5577,6 +5589,10 @@
         }
       }
     },
+    "Agent connected. Go back to your browser to finish." : {
+      "comment" : "Generated from registry settings.copy.sign_in_approval.doneConnector.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Agent name" : {
       "comment" : "Generated from registry surfaces.prompts.text.renameAgent.placeholder. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -5662,7 +5678,7 @@
       }
     },
     "Agents" : {
-      "comment" : "Generated from registry settings.rootGroups.ai_agents_root.items.1.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry plans.outcomes.agents.rows.connected.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
@@ -6802,7 +6818,7 @@
       }
     },
     "Appearance" : {
-      "comment" : "Generated from registry settings.rootGroups.appearance_root.items.0.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.desktopTabs.appearance.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
@@ -7001,6 +7017,10 @@
         }
       }
     },
+    "Approve a device sign-in" : {
+      "comment" : "Generated from registry settings.copy.sign_in_approval.title.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Approve a sign-in" : {
       "comment" : "Generated from registry settings.copy.sign_in_approval.title.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -7042,6 +7062,10 @@
           }
         }
       }
+    },
+    "Approve connection code" : {
+      "comment" : "Generated from registry settings.copy.claude_connector.approveHeader.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Approving…" : {
       "comment" : "Generated from registry settings.copy.sign_in_approval.approving.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -9025,7 +9049,7 @@
       }
     },
     "Check for Updates…" : {
-      "comment" : "Generated from registry settings.pages.about.sections.actions.items.1.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.pages.about.sections.actions.items.2.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
@@ -9395,6 +9419,14 @@
           }
         }
       }
+    },
+    "Claude setup prompt" : {
+      "comment" : "Generated from registry settings.copy.claude_connector.setupPrompt.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Claude starter prompt" : {
+      "comment" : "Generated from registry settings.copy.claude_connector.firstPrompt.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Clear" : {
       "comment" : "Generated from registry surfaces.prompts.items.clearLogged.confirmTitle. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -10384,8 +10416,12 @@
         }
       }
     },
+    "Connect an Agent" : {
+      "comment" : "Generated from registry settings.rootGroups.ai_agents_root.items.1.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Connect Claude" : {
-      "comment" : "Generated from registry settings.rootGroups.ai_agents_root.items.0.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry surfaces.firstRun.steps.connectClaude.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
@@ -10596,6 +10632,10 @@
         }
       }
     },
+    "Connected Agents" : {
+      "comment" : "Generated from registry settings.rootGroups.ai_agents_root.items.0.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Connection" : {
       "localizations" : {
         "pt-BR" : {
@@ -10713,7 +10753,7 @@
       }
     },
     "Contact Support" : {
-      "comment" : "Generated from registry settings.pages.about.sections.actions.items.4.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.pages.about.sections.actions.items.5.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
@@ -14859,6 +14899,10 @@
       "comment" : "Generated from registry signIn.errors.invalidEmail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
+    "Enter the 8-character code shown on the new device." : {
+      "comment" : "Generated from registry settings.copy.sign_in_approval.enterFooter.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Enter the code from the other device. If you're connecting Claude, the code is in your browser." : {
       "comment" : "Generated from registry settings.copy.sign_in_approval.enterFooter.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -16789,6 +16833,48 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Acompanhamento de"
+          }
+        }
+      }
+    },
+    "For people who hand a lot of work to agents." : {
+      "comment" : "Generated from registry plans.cards.pro.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Für alle, die Agenten viel Arbeit übergeben."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Para quienes delegan mucho trabajo en agentes."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pour celles et ceux qui confient beaucoup de travail à des agents."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Per chi affida molto lavoro agli agenti."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voor wie veel werk aan agents overlaat."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Para quem passa muito trabalho para agentes."
           }
         }
       }
@@ -20529,7 +20615,7 @@
       }
     },
     "Keyboard Shortcuts" : {
-      "comment" : "Generated from registry actions.actions.app.keyboardShortcuts.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.pages.about.sections.actions.items.1.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
@@ -20609,6 +20695,10 @@
           }
         }
       }
+    },
+    "Language" : {
+      "comment" : "Generated from registry settings.rootGroups.language_root.header. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Large" : {
       "extractionState" : "manual",
@@ -21785,6 +21875,10 @@
           }
         }
       }
+    },
+    "MCP connector" : {
+      "comment" : "Generated from registry settings.pages.claude_pairing.sections.connector.header. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "MCP Skills" : {
       "comment" : "Generated from registry settings.pages.claude_pairing.sections.agent_tools.items.0.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -25906,6 +26000,10 @@
         }
       }
     },
+    "Notifications" : {
+      "comment" : "Generated from registry settings.rootGroups.notifications_root.header. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "now" : {
       "localizations" : {
         "nl" : {
@@ -26758,6 +26856,10 @@
           }
         }
       }
+    },
+    "On-Device AI" : {
+      "comment" : "Generated from registry settings.rootGroups.ai_agents_root.items.2.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "On-device intelligence" : {
       "localizations" : {
@@ -27809,6 +27911,10 @@
         }
       }
     },
+    "Paste into Claude to start connecting" : {
+      "comment" : "Generated from registry settings.copy.claude_connector.setupPromptDetail.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Paste the first prompt. Claude sets up your areas and projects with you." : {
       "comment" : "Generated from registry surfaces.firstRun.steps.connectClaude.instructions.2. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -27894,7 +28000,7 @@
       }
     },
     "Pause all agents" : {
-      "comment" : "Generated from registry settings.rootGroups.ai_agents_root.items.2.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.pages.agents.sections.pause.items.0.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
@@ -27976,6 +28082,10 @@
           }
         }
       }
+    },
+    "Paused" : {
+      "comment" : "Generated from registry settings.copy.access_agents.paused.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Persimmon" : {
       "comment" : "Generated from registry tokens.fruitAccents.persimmon.name. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -33923,6 +34033,10 @@
         }
       }
     },
+    "Set up your areas, projects, and tasks" : {
+      "comment" : "Generated from registry settings.copy.claude_connector.firstPromptDetail.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Settings" : {
       "comment" : "Phase 0 spike — test string, not a real translation pass",
       "localizations" : {
@@ -34767,7 +34881,7 @@
       }
     },
     "Show Get Started Again" : {
-      "comment" : "Generated from registry settings.pages.about.sections.actions.items.2.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.pages.about.sections.actions.items.3.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
@@ -34975,6 +35089,10 @@
         }
       }
     },
+    "Show sidebar counts" : {
+      "comment" : "Generated from registry settings.rootGroups.lists_root.items.7.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Show Sidebar Counts" : {
       "comment" : "Generated from registry actions.actions.app.toggleSidebarCounts.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -35018,7 +35136,7 @@
       }
     },
     "Show Welcome Again" : {
-      "comment" : "Generated from registry settings.pages.about.sections.actions.items.3.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.pages.about.sections.actions.items.4.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
@@ -35142,6 +35260,14 @@
           }
         }
       }
+    },
+    "Sign in so Claude or another MCP agent can connect to your tasks through your private Septena account." : {
+      "comment" : "Generated from registry settings.copy.claude_connector.signInBody.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Sign in to connect an agent" : {
+      "comment" : "Generated from registry settings.copy.claude_connector.signInHeader.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Sign in to Septena" : {
       "comment" : "Generated from registry surfaces.deviceSignIn.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -39701,6 +39827,10 @@
         }
       }
     },
+    "Timed reminders" : {
+      "comment" : "Generated from registry settings.rootGroups.notifications_root.items.0.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Timed tasks only" : {
       "comment" : "Generated from registry settings.copy.calendar_detail.scopeTimed.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -42543,8 +42673,12 @@
         }
       }
     },
+    "While paused, no agent can pick up or work on a task. Stop one task from its conversation instead. Agents never close assigned tasks on their own; finished work lands in Review for you to accept or send back." : {
+      "comment" : "Generated from registry settings.pages.agents.sections.pause.footer. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "While paused, no agent can start or work on a task." : {
-      "comment" : "Generated from registry settings.rootGroups.ai_agents_root.items.2.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry settings.pages.agents.sections.pause.items.0.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
@@ -44519,6 +44653,10 @@
           }
         }
       }
+    },
+    "Your tasks, areas, projects, and conversations stay on this device until you sign in. When signed in, they sync through Septena’s private server at api.septena.app, encrypted at rest (not end-to-end, so connected agents can read them when you choose). AI on your device stays on your device. Connect an agent under AI & Agents." : {
+      "comment" : "Generated from registry settings.pages.privacy.sections.data_locality.items.0.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Your tasks, areas, projects, and conversations stay on this device until you sign in. When signed in, they sync through Septena’s private server at api.septena.app, encrypted at rest (not end-to-end, so connected agents can read them when you choose). AI on your device stays on your device. Connect Claude under AI & Agents." : {
       "comment" : "Generated from registry settings.pages.privacy.sections.data_locality.items.0.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",

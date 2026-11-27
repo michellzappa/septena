@@ -116,17 +116,7 @@ internal fun DiscussStart(
  * the fade clock (docs/TASK_FADE_SPEC.md §3).
  */
 internal suspend fun appendUserTurn(graph: AndroidAppGraph, taskId: String, fields: Map<String, JsonValue>) {
-    graph.conversationMutator.appendTurn(taskId, fields)
-    val chosen = fields["chosen"].stringValue()
-    if (chosen != null && fields["step"].stringValue() == RegistryEntityEnums.ConvoTurnStep.CONFIRM) {
-        graph.conversationMutator.update(
-            taskId,
-            mapOf(
-                RegistryEntityFields.Convo.CONFIRMED_INTENT to
-                    JsonValue.StringValue(fields["note"].stringValue() ?: chosen),
-            ),
-        )
-    }
+    graph.conversationMutator.appendUserTurn(taskId, fields)
     graph.touchTask(taskId)
 }
 

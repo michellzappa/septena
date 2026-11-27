@@ -347,7 +347,15 @@ private fun SettingsRegistryRow(
                 return
             }
             val status = when (item.statusKey) {
-                AccessSettingsModel.AGENTS_STATUS_KEY -> accessModel.agentsStatus(languageTag)
+                AccessSettingsModel.AGENTS_STATUS_KEY -> {
+                    val base = accessModel.agentsStatus(languageTag)
+                    if (values[RegistrySettingKeys.AGENTS_PAUSED].booleanValue() == true) {
+                        val paused = settingsCopy("access_agents", "paused", languageTag)
+                        if (base != null) "$base · $paused" else paused
+                    } else {
+                        base
+                    }
+                }
                 PlanSettingsModel.PLAN_STATUS_KEY -> surfaceEnv.plans.statusLine(languageTag)
                 SYNC_STATUS_KEY -> syncStatusLine(signedIn, surfaceEnv.syncState, languageTag)
                 AI_MODE_STATUS_KEY -> optionTitle(definitions[RegistrySettingKeys.AI_MODE], values[RegistrySettingKeys.AI_MODE], languageTag)

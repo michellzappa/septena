@@ -79,7 +79,14 @@ import {
   type RescheduleMode,
   type SyncState,
 } from "@/lib/sync/engine";
-import { compareWaiting, waitingName } from "@/lib/waiting";
+import {
+  compareWaiting,
+  isAssignedToOther,
+  isWaitingTask,
+  projectShareOf,
+  sharingCopy,
+  waitingName,
+} from "@/lib/waiting";
 import { UndoStack, type UndoSnapshot } from "@/lib/sync/undo";
 import type {
   ActiveDestination,
@@ -234,6 +241,7 @@ export function SeptenaApp() {
   const [scopeLoggedExpandedIds, setScopeLoggedExpandedIds] = useState<Set<string>>(() => new Set());
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [tagFilterId, setTagFilterId] = useState<string | null>(null);
+  const [assigneeFilter, setAssigneeFilter] = useState<string | null>(null);
   const [composerTitle, setComposerTitle] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -689,20 +697,30 @@ export function SeptenaApp() {
   // Synced fade settings: the "Fade inactive tasks" switch and the weekly sweep state.
   const fade = useMemo(() => fadeSettings(syncState.snapshot.settings), [syncState.snapshot.settings]);
 
+  const shareForTask = useCallback(
+    (task: TaskRow) => projectShareOf(task.project ? projectById.get(task.project) : null),
+    [projectById],
+  );
+
   // Evaluate membership, fade opacity, and conversation projection/state via the shared Rust WASM core.
   const evaluatedTasks = useMemo((): EvaluatedTask[] => {
     if (bootPhase !== "signed_in") return [];
     return syncState.snapshot.tasks
       .filter((t) => t.kind !== "heading")
       .map((task) => {
-        const membership = taskViewMembership(task, todayYMD, nowIso);
+        const share = shareForTask(task);
+        const membership = taskViewMembership(
+          { ...task, assignedToOther: isAssignedToOther(task, share) },
+          todayYMD,
+          nowIso,
+        );
         const convo = convoByTask.get(task.id) ?? null;
         const turns = turnsByTask.get(task.id) ?? [];
 
         const conversation = evaluateConversation(convo, turns, nowIso);
         const fill = fade.enabled
           ? fadeFill(
-              fadeInput(task, convo, conversation, { now: nowIso, today: todayYMD, utcOffsetSeconds }),
+              fadeInput(task, convo, conversation, { now: nowIso, today: todayYMD, utcOffsetSeconds }, share),
             )
           : null;
 
@@ -714,7 +732,7 @@ export function SeptenaApp() {
           convoState: conversation?.state ?? null,
         };
       });
-  }, [bootPhase, convoByTask, fade.enabled, nowIso, syncState.snapshot.tasks, todayYMD, turnsByTask, utcOffsetSeconds]);
+  }, [bootPhase, convoByTask, fade.enabled, nowIso, shareForTask, syncState.snapshot.tasks, todayYMD, turnsByTask, utcOffsetSeconds]);
 
   // A new app day syncs, and the engine's daily fade pass follows the sync.
   const syncedDayRef = useRef(todayYMD);
@@ -813,7 +831,7 @@ export function SeptenaApp() {
       if (membership.matchesView.today) counts.today++;
       // Review holds agent work in progress and Waiting too (ADR 0046, ADR 0053); only what waits on the
       // user is in its badge. The other groups (Faded aside) keep Review in the sidebar through `agent`.
-      const reviewGroup = reviewGroupOf(task, convoState);
+      const reviewGroup = reviewGroupOf(task, convoState, shareForTask(task));
       if (reviewGroup && BADGE_GROUP_IDS.has(reviewGroup)) counts.review++;
       else if (reviewGroup && reviewGroup !== "faded") counts.agent++;
       if (membership.matchesView.upcoming) counts.upcoming++;
@@ -823,7 +841,7 @@ export function SeptenaApp() {
       if (task.fadedAt) counts.faded++;
     }
     return { counts, deletedCount };
-  }, [evaluatedTasks, todayYMD]);
+  }, [evaluatedTasks, shareForTask, todayYMD]);
 
   // Sidebar smart lists from registry/destinations.json + synced user customization.
   const sidebarDestinations = useMemo(() => {
@@ -899,7 +917,7 @@ export function SeptenaApp() {
         if (task.deletedAt || task.status !== "open") return false;
         switch (destination.id) {
           case "today": return membership.matchesView.today;
-          case "review": return reviewGroupOf(task, convoState) !== null;
+          case "review": return reviewGroupOf(task, convoState, shareForTask(task)) !== null;
           case "agent": return false; // a group of Review: navigateTo opens Review
           case "upcoming": return membership.matchesView.upcoming;
           case "repeating": return Boolean(task.recurrenceUnit);
@@ -918,7 +936,7 @@ export function SeptenaApp() {
       }
       return task.project === destination.id;
     });
-  }, [destination, evaluatedTasks, logbookTab, prefs.tasksShowFaded, projectById]);
+  }, [destination, evaluatedTasks, logbookTab, prefs.tasksShowFaded, projectById, shareForTask]);
 
   // Progressive disclosure (matching iOS TaskListView.swift): only surface tags
   // that actually appear on tasks in the current list; empty → zero chrome.
@@ -933,12 +951,18 @@ export function SeptenaApp() {
   }, [activeTags, destinationTasks]);
 
   const listedTasks = useMemo(() => {
-    const filtered = tagFilterId
+    const tagFiltered = tagFilterId
       ? destinationTasks.filter(({ task }) => {
           const tags = Array.isArray(task.tags) ? task.tags : [];
           return tags.includes(tagFilterId);
         })
       : destinationTasks;
+    const filtered =
+      destination.kind === "project" && assigneeFilter !== null
+        ? tagFiltered.filter(({ task }) =>
+            assigneeFilter === "" ? !task.assignedTo : task.assignedTo === assigneeFilter,
+          )
+        : tagFiltered;
 
     return [...filtered].sort((a, b) => {
       if (destination.kind === "smart" && destination.id === "logbook") {
@@ -959,7 +983,7 @@ export function SeptenaApp() {
       if (pa !== pb) return pa - pb;
       return String(b.task.createdAt ?? "").localeCompare(String(a.task.createdAt ?? ""));
     });
-  }, [destination, destinationTasks, logbookTab, tagFilterId]);
+  }, [assigneeFilter, destination, destinationTasks, logbookTab, tagFilterId]);
 
   // Review grouped by what waits on the user, then agent work in progress (docs/REVIEW_SPEC.md §1), in registry order.
   const reviewGroups = useMemo(() => {
@@ -968,13 +992,15 @@ export function SeptenaApp() {
       .map((group) => ({
         ...group,
         items: (() => {
-          const items = listedTasks.filter((i) => reviewGroupOf(i.task, i.convoState) === group.id);
+          const items = listedTasks.filter((i) => reviewGroupOf(i.task, i.convoState, shareForTask(i.task)) === group.id);
           // Waiting: oldest wait first (REVIEW_SPEC §6).
-          return group.id === "waiting" ? [...items].sort((a, b) => compareWaiting(a.task, b.task)) : items;
+          return group.id === "waiting"
+            ? [...items].sort((a, b) => compareWaiting(a.task, b.task, shareForTask(a.task), shareForTask(b.task)))
+            : items;
         })(),
       }))
       .filter((g) => g.items.length > 0);
-  }, [destination, listedTasks]);
+  }, [destination, listedTasks, shareForTask]);
 
   // The rows on screen, in order: what the keyboard and the selection work on.
   const visibleTasks = useMemo(() => {
@@ -1080,9 +1106,9 @@ export function SeptenaApp() {
   const fadedTasks = useMemo(
     () =>
       evaluatedTasks
-        .filter((i) => reviewGroupOf(i.task, i.convoState) === "faded")
+        .filter((i) => reviewGroupOf(i.task, i.convoState, shareForTask(i.task)) === "faded")
         .map((i) => i.task),
-    [evaluatedTasks],
+    [evaluatedTasks, shareForTask],
   );
   const sweepCandidates = useMemo(
     () => fadedTasks.filter((t) => isInCurrentSweep(t.fadedAt, fade.sweptAt)),
@@ -1233,6 +1259,7 @@ export function SeptenaApp() {
     setShowContainerNotes(false);
     setSelectedIds(new Set());
     setTagFilterId(null);
+    setAssigneeFilter(null);
     if (destination.kind === "area") {
       setContainerNotesDraft(areaById.get(destination.id)?.context ?? "");
     } else if (destination.kind === "project") {
@@ -1394,9 +1421,14 @@ export function SeptenaApp() {
 
   const gotItBack = useCallback(
     async (tasks: TaskRow[]) => {
-      const waiting = findTasks(tasks.map((t) => t.id)).filter((t) => waitingName(t));
+      const waiting = findTasks(tasks.map((t) => t.id)).filter((t) => isWaitingTask(t, shareForTask(t)));
       if (waiting.length === 0) return;
-      const before = waiting.map((t) => ({ id: t.id, fields: waitingFields(t) }));
+      const before = waiting.map((t) => ({
+        id: t.id,
+        fields: waitingFields(t),
+        assignedTo: t.assignedTo ?? null,
+        hadManualWait: Boolean(waitingName(t)),
+      }));
       for (const t of waiting) await engine.clearTaskWaiting(t);
       undoStack.record({
         label:
@@ -1406,11 +1438,41 @@ export function SeptenaApp() {
         undo: async () => {
           for (const b of before) {
             const [live] = findTasks([b.id]);
-            if (live) await engine.updateTaskFields(live, b.fields);
+            if (!live) continue;
+            if (b.hadManualWait) await engine.updateTaskFields(live, b.fields);
+            const after = findTasks([b.id])[0] ?? live;
+            if ((after.assignedTo ?? null) !== b.assignedTo) await engine.assignTask(after, b.assignedTo);
           }
         },
         redo: async () => {
           for (const live of findTasks(before.map((b) => b.id))) await engine.clearTaskWaiting(live);
+        },
+      });
+    },
+    [engine, findTasks, prefs.language, shareForTask, undoStack],
+  );
+
+  const assignMember = useCallback(
+    async (task: TaskRow, memberId: string | null) => {
+      const [before] = findTasks([task.id]);
+      const live = before ?? task;
+      const prev = live.assignedTo ?? null;
+      const next = memberId && memberId.trim() ? memberId.trim() : null;
+      if (prev === next) return;
+      await engine.assignTask(live, next);
+      const assignMenu = ACTIONS_CATALOG.contextMenus["task.row"].find(
+        (i) => "id" in i && i.id === "assign",
+      );
+      const assignTitle = assignMenu && "title" in assignMenu ? registryText(assignMenu.title, prefs.language) : "Assign To";
+      undoStack.record({
+        label: `${assignTitle}: “${live.title}”`,
+        undo: async () => {
+          const [cur] = findTasks([live.id]);
+          if (cur) await engine.assignTask(cur, prev);
+        },
+        redo: async () => {
+          const [cur] = findTasks([live.id]);
+          if (cur) await engine.assignTask(cur, next);
         },
       });
     },
@@ -2063,12 +2125,13 @@ export function SeptenaApp() {
       }
     }
 
+    const taskShare = shareForTask(task);
     const isDeletedView =
       destination.kind === "smart" && destination.id === "logbook" && logbookTab === "deleted";
     const isFadedView =
       destination.kind === "smart" &&
       destination.id === "review" &&
-      reviewGroupOf(task, convoState) === "faded";
+      reviewGroupOf(task, convoState, taskShare) === "faded";
     const showsTodayIndicator = !(destination.kind === "smart" && destination.id === "today");
     const showsFadedIndicator = destination.kind === "area" || destination.kind === "project";
 
@@ -2085,6 +2148,9 @@ export function SeptenaApp() {
       isFadedView,
       showsTodayIndicator,
       showsFadedIndicator,
+      projectShare: taskShare,
+      showsOwnAssignee: destination.kind === "project",
+      onAssignMember: taskShare ? (memberId) => void assignMember(task, memberId) : undefined,
       todayYMD,
       lang,
       isColorfulAccent,
@@ -2195,7 +2261,7 @@ export function SeptenaApp() {
                   { kind: "divider" as const },
                 ]
               : []),
-            ...(waitingName(task)
+            ...(isWaitingTask(task, taskShare)
               ? [
                   {
                     kind: "item" as const,
@@ -2515,7 +2581,7 @@ export function SeptenaApp() {
     if (activeSelectedTasks.length > 0) {
       const single = activeSelectedTasks[0];
       const singleOnly = activeSelectedTasks.length === 1;
-      const anyWaiting = activeSelectedTasks.some((t) => waitingName(t));
+      const anyWaiting = activeSelectedTasks.some((t) => isWaitingTask(t, shareForTask(t)));
 
       items.push(
         makeCmd(
@@ -2735,6 +2801,7 @@ export function SeptenaApp() {
     openTask,
     requestBulkToggleToday,
     requestToggleToday,
+    shareForTask,
     showToast,
     sidebarOpen,
     taskPageId,
@@ -3943,6 +4010,59 @@ export function SeptenaApp() {
                 </button>
               </form>
             )}
+
+            {/* Person filter strip on shared projects (PROJECT_SHARING_SPEC §8) */}
+            {destination.kind === "project" && (() => {
+              const share = projectShareOf(projectById.get(destination.id));
+              if (!share || share.members.length === 0) return null;
+              const orderedMembers = [
+                ...share.members.filter((m) => m.id === share.me),
+                ...share.members.filter((m) => m.id !== share.me),
+              ];
+              return (
+                <div className="mb-3 flex flex-wrap items-center gap-1.5 px-1 text-xs">
+                  <RegistryIcon token="action.assign" className="h-3 w-3 text-[var(--text-muted)]" />
+                  {assigneeFilter !== null && (
+                    <button
+                      type="button"
+                      onClick={() => setAssigneeFilter(null)}
+                      className="inline-flex items-center gap-1 rounded-full bg-[var(--bg-pill)] px-2.5 py-0.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                    >
+                      All <X className="h-3 w-3" />
+                    </button>
+                  )}
+                  {orderedMembers.map((member) => {
+                    const active = assigneeFilter === member.id;
+                    const label = member.id === share.me ? sharingCopy("you", lang) : member.name;
+                    return (
+                      <button
+                        key={member.id}
+                        type="button"
+                        onClick={() => setAssigneeFilter(active ? null : member.id)}
+                        className={`rounded-full px-2.5 py-0.5 transition-colors ${
+                          active
+                            ? "bg-[var(--bg-selected)] font-medium text-[var(--text-primary)]"
+                            : "bg-[var(--bg-pill)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    onClick={() => setAssigneeFilter(assigneeFilter === "" ? null : "")}
+                    className={`rounded-full px-2.5 py-0.5 transition-colors ${
+                      assigneeFilter === ""
+                        ? "bg-[var(--bg-selected)] font-medium text-[var(--text-primary)]"
+                        : "bg-[var(--bg-pill)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                    }`}
+                  >
+                    {sharingCopy("nobody", lang)}
+                  </button>
+                </div>
+              );
+            })()}
 
             {/* Tag filter strip — progressive disclosure (only tags present in this list) */}
             {availableTagsInList.length > 0 &&

@@ -32,6 +32,7 @@ struct SeptaskDevicesAccessPane: View {
             Button("Try Again") { Task { await load() } }
           }
         }
+        SeptaskSignInApprovalSection()
       }
 
       #if os(iOS)

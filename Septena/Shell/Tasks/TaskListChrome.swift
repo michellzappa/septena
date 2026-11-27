@@ -1141,8 +1141,6 @@ struct TaskDragStackPreview: View {
   let title: String
   let count: Int
   var accent: Color = .accentColor
-  var destination: String? = nil
-  var destinationTint: Color? = nil
 
   var body: some View {
     ZStack(alignment: .topTrailing) {
@@ -1176,17 +1174,6 @@ struct TaskDragStackPreview: View {
             .foregroundStyle(Theme.inkPrimary)
             .lineLimit(1)
             .truncationMode(.tail)
-          if let destination {
-            let tint = destinationTint ?? accent
-            Text(destination)
-              .scaledFont(size: 11, weight: .semibold)
-              .foregroundStyle(tint)
-              .lineLimit(1)
-              .padding(.horizontal, 7)
-              .padding(.vertical, 2)
-              .background(tint.opacity(0.14), in: Capsule())
-              .layoutPriority(-1)
-          }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)

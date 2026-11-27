@@ -103,7 +103,7 @@ final class SeptaskKitTaskListController: NSViewController {
     case header(id: String, title: String, icon: GroupIcon, count: Int)
     case screenTitle(title: String, icon: GroupIcon, share: ProjectShare? = nil)
     case logbookBar(tab: LogbookTab, deletedCount: Int, showsSegmented: Bool, canEmptyTrash: Bool)
-    case tagFilterBar(tags: [TaskTag], active: [String])
+    case tagFilterBar(tags: [TaskTag], active: [String], share: ProjectShare? = nil, activeAssignee: TaskAssigneeFilter? = nil)
     case projectTarget(id: String, title: String, progress: Double, count: Int)
     case task(SeptenaTask, chip: Chip?, suggestion: SuggestionEngine.Suggestion?)
     case event(Event)
@@ -330,6 +330,7 @@ final class SeptaskKitTaskListController: NSViewController {
   private var issueRefs: [String: TaskRefRow] = [:]
   private var tagsByID: [String: TaskTag] = [:]
   private var activeTagFilterIDs: Set<String> = []
+  private var activeAssigneeFilter: TaskAssigneeFilter? = nil
 
   /// The inspector follows the selection; the window owns the wiring.
   var onSelectionChange: ((SeptenaTask?) -> Void)?
@@ -944,6 +945,7 @@ final class SeptaskKitTaskListController: NSViewController {
     cancelSettle()
     resetInboxZeroMotionForFilterChange()
     activeTagFilterIDs.removeAll()
+    activeAssigneeFilter = nil
     logbookTab = .completed
     self.filter = filter
     if case .project(let id) = filter {
@@ -1194,12 +1196,24 @@ final class SeptaskKitTaskListController: NSViewController {
           return lhs.id < rhs.id
         }
     }()
+    let activeProjectShare: ProjectShare? = {
+      guard case .project(let pid) = filter else { return nil }
+      return SharedProjects.share(ofProject: pid, in: context)
+    }()
     if !activeTagFilterIDs.isEmpty {
       activeTagFilterIDs = activeTagFilterIDs.intersection(Set(listTags.map(\.id)))
     }
-    let pool = activeTagFilterIDs.isEmpty
-      ? rawPool
-      : rawPool.filter { $0.isHeading || activeTagFilterIDs.isSubset(of: Set($0.tags)) }
+    if case .member(let memberID) = activeAssigneeFilter,
+       activeProjectShare?.members.contains(where: { $0.id == memberID }) != true {
+      activeAssigneeFilter = nil
+    }
+    if activeProjectShare == nil { activeAssigneeFilter = nil }
+    let pool = rawPool.filter { task in
+      if task.isHeading { return true }
+      if !activeTagFilterIDs.isEmpty && !activeTagFilterIDs.isSubset(of: Set(task.tags)) { return false }
+      if let af = activeAssigneeFilter, !af.matches(task) { return false }
+      return true
+    }
     // Capsules first: `chipped()` reads the snapshot, so it has to be current
     // before any row is built. Includes the triage band, which `pool` omits on
     // Today — the band is exactly where most suggestions land.
@@ -1215,9 +1229,10 @@ final class SeptaskKitTaskListController: NSViewController {
                      showsSegmented: showsLogbookSegmented,
                      canEmptyTrash: showingRecentlyDeleted && !rawPool.isEmpty)]
       : []
-    let tagBarRows: [Row] = listTags.isEmpty
+    let tagBarRows: [Row] = (listTags.isEmpty && activeProjectShare == nil)
       ? []
-      : [.tagFilterBar(tags: listTags, active: Array(activeTagFilterIDs).sorted())]
+      : [.tagFilterBar(tags: listTags, active: Array(activeTagFilterIDs).sorted(),
+                       share: activeProjectShare, activeAssignee: activeAssigneeFilter)]
     let doRows = KitDoNotice.current().map(Row.doNotice)
     let titleRows: [Row] = (screenTitleRow().map { [$0] } ?? []) + doRows + logbookBarRows + tagBarRows
     var newRows: [Row]
@@ -3139,10 +3154,16 @@ final class SeptaskKitTaskListController: NSViewController {
     reload(animated: true)
   }
 
+  private func toggleAssigneeFilter(_ target: TaskAssigneeFilter) {
+    activeAssigneeFilter = activeAssigneeFilter == target ? nil : target
+    reload(animated: true)
+  }
+
   @discardableResult
   private func clearTagFilterIfActive() -> Bool {
-    guard !activeTagFilterIDs.isEmpty else { return false }
+    guard !activeTagFilterIDs.isEmpty || activeAssigneeFilter != nil else { return false }
     activeTagFilterIDs.removeAll()
+    activeAssigneeFilter = nil
     reload(animated: true)
     return true
   }
@@ -6081,12 +6102,13 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       cell.onEmptyTrash = { [weak self] in self?.emptyTrash() }
       return cell
 
-    case .tagFilterBar(let tags, let active):
+    case .tagFilterBar(let tags, let active, let share, let activeAssignee):
       let identifier = NSUserInterfaceItemIdentifier("tagFilterBarCell")
       let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? KitTagFilterBarCell
         ?? KitTagFilterBarCell(identifier: identifier)
-      cell.configure(tags: tags, activeIDs: Set(active))
+      cell.configure(tags: tags, activeIDs: Set(active), share: share, activeAssignee: activeAssignee)
       cell.onToggleTag = { [weak self] id in self?.toggleTagFilter(id) }
+      cell.onToggleAssignee = { [weak self] target in self?.toggleAssigneeFilter(target) }
       cell.onClear = { [weak self] in _ = self?.clearTagFilterIfActive() }
       return cell
 
@@ -6782,14 +6804,21 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
       chip.isHidden = true
     }
 
-    if !done, task.deletedAt == nil, let waiting = task.waitingLabel() {
+    let waitingLabel = (!done && task.deletedAt == nil) ? task.waitingLabel() : nil
+    if let waiting = waitingLabel {
       waitingChip.isHidden = false
       waitingChip.configure(symbol: RegistryIcons.sfSymbol(for: "action.waiting"), title: waiting)
     } else {
       waitingChip.isHidden = true
     }
 
-    if let name = SharedProjects.assigneeName(of: task, in: LocalStore.shared.container.mainContext) {
+    let inProjectScope: Bool = {
+      if case .project = filter { return true }
+      return false
+    }()
+    let waitingCoversAssignee = waitingLabel != nil && !TaskWaiting.isWaiting(task.waitingOn) && task.sharedWaitingTarget != nil
+    if !waitingCoversAssignee,
+       let name = SharedProjects.assigneeName(of: task, includeSelf: inProjectScope, in: LocalStore.shared.container.mainContext) {
       assigneeChip.isHidden = false
       assigneeChip.configure(symbol: RegistryIcons.sfSymbol(for: "action.assign"), title: name)
     } else {
@@ -8826,6 +8855,7 @@ private final class KitTagChipView: NSView {
 @MainActor
 private final class KitTagFilterBarCell: NSTableCellView {
   var onToggleTag: ((String) -> Void)?
+  var onToggleAssignee: ((TaskAssigneeFilter) -> Void)?
   var onClear: (() -> Void)?
 
   private let stack = NSStackView()
@@ -8860,10 +8890,25 @@ private final class KitTagFilterBarCell: NSTableCellView {
     super.layout()
   }
 
-  func configure(tags: [TaskTag], activeIDs: Set<String>) {
+  func configure(tags: [TaskTag], activeIDs: Set<String>, share: ProjectShare? = nil, activeAssignee: TaskAssigneeFilter? = nil) {
     for v in stack.arrangedSubviews {
       stack.removeArrangedSubview(v)
       v.removeFromSuperview()
+    }
+    if let share {
+      for member in share.members {
+        let target = TaskAssigneeFilter.member(member.id)
+        let pill = KitPillButton()
+        pill.title = member.id == share.me ? RegistrySharing.you : member.name
+        pill.isOn = activeAssignee == target
+        pill.onPress = { [weak self] _ in self?.onToggleAssignee?(target) }
+        stack.addArrangedSubview(pill)
+      }
+      let nobodyPill = KitPillButton()
+      nobodyPill.title = RegistrySharing.nobody
+      nobodyPill.isOn = activeAssignee == .unassigned
+      nobodyPill.onPress = { [weak self] _ in self?.onToggleAssignee?(.unassigned) }
+      stack.addArrangedSubview(nobodyPill)
     }
     for tag in tags {
       let isOn = activeIDs.contains(tag.id)
@@ -8873,7 +8918,7 @@ private final class KitTagFilterBarCell: NSTableCellView {
       pill.onPress = { [weak self] _ in self?.onToggleTag?(tag.id) }
       stack.addArrangedSubview(pill)
     }
-    if !activeIDs.isEmpty {
+    if !activeIDs.isEmpty || activeAssignee != nil {
       let clear = NSButton()
       clear.isBordered = false
       clear.bezelStyle = .inline

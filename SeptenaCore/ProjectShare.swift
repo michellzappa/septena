@@ -63,8 +63,25 @@ struct TaskAssignee: Identifiable, Hashable {
   var id: String { memberID ?? "nobody" }
 }
 
-@MainActor
+/// Filter on a shared project's list: one member or unassigned ("Nobody").
+enum TaskAssigneeFilter: Hashable, Sendable {
+  case member(String)
+  case unassigned
+
+  func matches(_ task: SeptenaTask) -> Bool {
+    switch self {
+    case .member(let id): return task.assignedTo == id
+    case .unassigned: return task.assignedTo == nil
+    }
+  }
+}
+
 enum SharedProjects {
+  /// Localized "Assign To" title from `registry/actions.json`.
+  static var assignTitle: String {
+    RegistryActions.contextMenus[.taskRow]?.first { $0.id == "assign" }?.title ?? "Assign To"
+  }
+
   static func share(ofProject id: String?, in context: ModelContext) -> ProjectShare? {
     guard let id else { return nil }
     var descriptor = FetchDescriptor<ProjectEntity>(predicate: #Predicate { $0.id == id })
@@ -72,11 +89,38 @@ enum SharedProjects {
     return (try? context.fetch(descriptor).first)?.share
   }
 
-  /// The name on a row: who does this task, when that is somebody else.
-  static func assigneeName(of task: SeptenaTask, in context: ModelContext) -> String? {
+  /// True when a shared task is assigned to another member (`assignedTo != me`).
+  static func isAssignedToOther(project: String?, assignedTo: String?, in context: ModelContext?) -> Bool {
+    guard let assignedTo, !assignedTo.isEmpty,
+          let context, let share = share(ofProject: project, in: context) else { return false }
+    return assignedTo != share.me
+  }
+
+  /// Shared-project Waiting target (ADR 0053, #672): non-nil only when THIS
+  /// user assigned the task to another member.
+  static func sharedWaiting(
+    share: ProjectShare?,
+    assignedTo: String?,
+    assignedBy: String?,
+    assignedAt: String?
+  ) -> (name: String, since: String?)? {
+    guard let share,
+          let assignedTo, !assignedTo.isEmpty,
+          let assignedBy, !assignedBy.isEmpty,
+          assignedTo != share.me,
+          assignedBy == share.me else { return nil }
+    return (share.name(of: assignedTo) ?? assignedTo, assignedAt)
+  }
+
+  /// The name on a row: who does this task. Inside a shared project
+  /// (`includeSelf: true`), shows "You" for tasks assigned to you so Mine vs.
+  /// Unassigned is scannable; outside the project, shows only others.
+  static func assigneeName(of task: SeptenaTask, includeSelf: Bool = false, in context: ModelContext) -> String? {
     guard let assigned = task.assignedTo,
-          let share = share(ofProject: task.project, in: context),
-          assigned != share.me else { return nil }
+          let share = task.projectShare ?? share(ofProject: task.project, in: context) else { return nil }
+    if assigned == share.me {
+      return includeSelf ? RegistrySharing.you : nil
+    }
     return share.name(of: assigned)
   }
 

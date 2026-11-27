@@ -132,7 +132,8 @@ internal const val SYNC_STATUS_KEY = "syncStatus"
 
 /**
  * Surface `account_profile_card`: the root row that opens Account. The name the user
- * gave, the plan, and the sync state; signed out, "On this device · Sign in to sync".
+ * gave and the plan badge; sync state appears only when offline or not syncing.
+ * Signed out, "On this device · Sign in to sync".
  */
 @Composable
 internal fun AccountProfileCard(
@@ -150,7 +151,12 @@ internal fun AccountProfileCard(
             plans.isPlus -> plansText(languageTag, "shortName")
             else -> plansText(languageTag, "status", "free")
         }
-        "$plan · ${syncStatusLine(signedIn = true, state = syncState, languageTag = languageTag)}"
+        val alert = when (syncState) {
+            SyncState.NotSyncing, is SyncState.Failed, SyncState.NeedsSignIn ->
+                syncStatusLine(signedIn = true, state = syncState, languageTag = languageTag)
+            SyncState.Idle, is SyncState.Synced, SyncState.Syncing -> null
+        }
+        if (alert != null) "$plan · $alert" else plan
     } else {
         settingsCopy(ACCOUNT_CARD, "signInToSync", languageTag)
     }

@@ -86,6 +86,7 @@ internal fun buildTaskListItem(
     now: Instant,
     showTodayIndicator: Boolean,
     isLogbook: Boolean = false,
+    showsOwnAssignee: Boolean = false,
     languageTag: String = Locale.getDefault().toLanguageTag(),
     zoneId: ZoneId = ZoneId.systemDefault(),
 ): TaskListItem {
@@ -182,17 +183,25 @@ internal fun buildTaskListItem(
         null
     }
 
-    val share = snapshot.project?.let(catalog.shares::get)
-    val assignee = record.fields[RegistryEntityFields.Task.ASSIGNED_TO].stringValue()
-        ?.takeIf { it != share?.me }
-        ?.let { share?.member(it)?.name }
-
     // "Waiting on Anna · 5 days" (docs/REVIEW_SPEC.md §6): only an open task waits.
     val isWaiting = isOpen && !isDeleted && snapshot.isWaiting
     val waitingText = if (isWaiting) {
-        WaitingCopy.label(snapshot.waitingOn.orEmpty().trim(), snapshot.waitingSince, today, languageTag)
+        snapshot.effectiveWaitingOn?.let { who ->
+            WaitingCopy.label(who, snapshot.effectiveWaitingSince, today, languageTag)
+        }
     } else {
         null
+    }
+
+    val share = snapshot.project?.let(catalog.shares::get)
+    val waitingCoversAssignee = waitingText != null && snapshot.waitingOn.isNullOrBlank() && snapshot.sharedWaitingOn != null
+    val assignedId = record.fields[RegistryEntityFields.Task.ASSIGNED_TO].stringValue()
+    val assignee = if (waitingCoversAssignee || share == null || assignedId.isNullOrBlank()) {
+        null
+    } else if (assignedId == share.me) {
+        if (showsOwnAssignee) sharingCopy(SharingCopy.you, languageTag) else null
+    } else {
+        share.member(assignedId)?.name
     }
 
     return TaskListItem(
@@ -299,29 +308,6 @@ internal fun formatShortLocalDay(
         val pattern = if (day.year == today.year) "MMM d" else "MMM d, yyyy"
         DateTimeFormatter.ofPattern(pattern, locale).format(day)
     }
-}
-
-/**
- * Upcoming day header matching Apple `SeptenaDate.scheduleHeaderLabel`:
- * Today, Tomorrow (from registry), full weekday (`EEEE`) within 6 days,
- * else short weekday + month + day (`EEE, MMM d`).
- */
-internal fun formatUpcomingDayHeader(
-    day: LocalDate,
-    today: LocalDate,
-    languageTag: String = Locale.getDefault().toLanguageTag(),
-): String {
-    val diff = java.time.temporal.ChronoUnit.DAYS.between(today, day)
-    if (diff == 0L) {
-        return RegistryCatalog.destinationTitle(RegistryDestinationIds.TODAY, languageTag).orEmpty()
-    }
-    if (diff == 1L) {
-        return RegistryCatalog.tomorrowLabel(languageTag)
-    }
-    val locale = Locale.forLanguageTag(languageTag)
-    val pattern = if (diff in 2L..6L) "EEEE" else if (day.year == today.year) "EEE, MMM d" else "EEE, MMM d, yyyy"
-    val formatted = DateTimeFormatter.ofPattern(pattern, locale).format(day)
-    return formatted.replaceFirstChar { ch -> if (ch.isLowerCase()) ch.titlecase(locale) else ch.toString() }
 }
 
 private fun formatShortInstantDay(

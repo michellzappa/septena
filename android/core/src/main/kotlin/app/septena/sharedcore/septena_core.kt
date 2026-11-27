@@ -2163,7 +2163,15 @@ data class TaskSnapshot (
     /**
      * The logical slot of a fixed repeat.
      */
-    var `recurrenceAnchorDate`: kotlin.String?
+    var `recurrenceAnchorDate`: kotlin.String?, 
+    /**
+     * Shared projects: true when this task is assigned to another member
+     * (`assignedTo != nil && assignedTo != share.me`). Keeps another member's
+     * task out of personal Anytime, and keeps its shared deadline from pulling
+     * it into personal Today or Upcoming unless the user sets a personal When
+     * or Today pin (`docs/PROJECT_SHARING_SPEC.md` §8).
+     */
+    var `assignedToOther`: kotlin.Boolean
 ) {
     
     companion object
@@ -2202,6 +2210,7 @@ public object FfiConverterTypeTaskSnapshot: FfiConverterRustBuffer<TaskSnapshot>
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalBoolean.read(buf),
             FfiConverterOptionalString.read(buf),
+            FfiConverterBoolean.read(buf),
         )
     }
 
@@ -2232,7 +2241,8 @@ public object FfiConverterTypeTaskSnapshot: FfiConverterRustBuffer<TaskSnapshot>
             FfiConverterOptionalString.allocationSize(value.`reminderSnoozedUntil`) +
             FfiConverterOptionalString.allocationSize(value.`reminderDismissedAt`) +
             FfiConverterOptionalBoolean.allocationSize(value.`recurrenceAfterCompletion`) +
-            FfiConverterOptionalString.allocationSize(value.`recurrenceAnchorDate`)
+            FfiConverterOptionalString.allocationSize(value.`recurrenceAnchorDate`) +
+            FfiConverterBoolean.allocationSize(value.`assignedToOther`)
     )
 
     override fun write(value: TaskSnapshot, buf: ByteBuffer) {
@@ -2263,6 +2273,7 @@ public object FfiConverterTypeTaskSnapshot: FfiConverterRustBuffer<TaskSnapshot>
             FfiConverterOptionalString.write(value.`reminderDismissedAt`, buf)
             FfiConverterOptionalBoolean.write(value.`recurrenceAfterCompletion`, buf)
             FfiConverterOptionalString.write(value.`recurrenceAnchorDate`, buf)
+            FfiConverterBoolean.write(value.`assignedToOther`, buf)
     }
 }
 

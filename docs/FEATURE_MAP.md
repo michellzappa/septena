@@ -8,9 +8,9 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 
 | Status | iPhone | iPad | Mac | Web | Android | Windows | Watch |
 |---|---|---|---|---|---|---|---|
-| ships | 59 | 60 | 60 | 52 | 56 | 0 | 1 |
+| ships | 60 | 61 | 61 | 53 | 57 | 0 | 1 |
 | partial | 1 | 1 | 1 | 1 | 2 | 0 | 3 |
-| planned | 3 | 3 | 3 | 7 | 4 | 63 | 2 |
+| planned | 2 | 2 | 2 | 6 | 3 | 63 | 2 |
 | - | 4 | 3 | 3 | 7 | 5 | 4 | 61 |
 
 **Agent** lists the MCP tools at `api.septena.app/mcp` that reach the feature; **none** means an agent cannot reach it.
@@ -70,7 +70,7 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 | `account.sign-in-apple` | Sign in with Apple (creates an account) | ships | ships | ships | planned | planned | planned | - | none |
 | `account.sign-in-google` | Sign in with Google (creates an account) | planned | planned | planned | planned | planned | planned | - | none |
 | `account.sign-in-microsoft` | Sign in with Microsoft (creates an account) | planned | planned | planned | planned | planned | planned | - | none |
-| `account.sign-in-email` | Sign in with an email code (creates an account) | planned | planned | planned | planned | planned | planned | - | none |
+| `account.sign-in-email` | Sign in with an email code (creates an account) | ships | ships | ships | ships | ships | planned | - | none |
 | `account.sign-in-device` | Sign in by approval from another signed-in device | ships | ships | ships | ships | ships | planned | - | none |
 | `task.times` | Start time and duration on a task | ships | ships | ships | ships | ships | planned | - | `tasks_create`, `tasks_update` |
 | `calendar.feed` | Private read-only calendar feed (.ics) | ships | ships | ships | ships | ships | planned | - | none |

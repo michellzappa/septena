@@ -637,6 +637,9 @@ struct TaskRow: View {
   /// trailing cluster stays as it was, so the title never rewraps and the rows
   /// below do not move until the row leaves.
   var isSettling: Bool = false
+  /// True inside a shared project so rows also show "You" for your own tasks
+  /// (`docs/PROJECT_SHARING_SPEC.md` §8). Outside the project, hides yours.
+  var showsOwnAssignee: Bool = false
   /// Optional inboard-most trailing accessory — the deep list passes the Inbox
   /// "file here" capsule here so it sits left of the date (a variable-width
   /// element kept inboard of the fixed glyphs). Nil on every other surface.
@@ -756,10 +759,13 @@ struct TaskRow: View {
                      title: TaskFilter.today.title)
     }
     // "Waiting on Anna · 5 days" (docs/REVIEW_SPEC.md §6).
-    if task.status == .open, task.deletedAt == nil, let waiting = task.waitingLabel(today: clock.today) {
+    let waitingLabel = (task.status == .open && task.deletedAt == nil) ? task.waitingLabel(today: clock.today) : nil
+    if let waiting = waitingLabel {
       TaskStatusPill(symbol: RegistryIcons.sfSymbol(for: "action.waiting"), title: waiting)
     }
-    if let name = SharedProjects.assigneeName(of: task, in: LocalStore.shared.container.mainContext) {
+    let waitingCoversAssignee = waitingLabel != nil && !TaskWaiting.isWaiting(task.waitingOn) && task.sharedWaitingTarget != nil
+    if !waitingCoversAssignee,
+       let name = SharedProjects.assigneeName(of: task, includeSelf: showsOwnAssignee, in: LocalStore.shared.container.mainContext) {
       TaskStatusPill(symbol: RegistryIcons.sfSymbol(for: "action.assign"), title: name)
     }
     trailingDate

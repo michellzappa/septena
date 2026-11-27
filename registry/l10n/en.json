@@ -151,7 +151,8 @@
   "ABCD-EFGH": {
     "text": "ABCD-EFGH",
     "paths": [
-      "settings.copy.sign_in_approval.codePlaceholder.label"
+      "settings.copy.sign_in_approval.codePlaceholder.label",
+      "settings.copy.claude_connector.codePlaceholder.label"
     ]
   },
   "AI & Agents": {
@@ -165,13 +166,6 @@
     "text": "AI Mode",
     "paths": [
       "settings.pages.ai_preferences.sections.reach.items.0.label"
-    ]
-  },
-  "AI Preferences": {
-    "text": "AI Preferences",
-    "paths": [
-      "settings.rootGroups.ai_agents_root.items.3.label",
-      "settings.pages.ai_preferences.title"
     ]
   },
   "AI asks what you mean. Nothing happens until you answer.": {
@@ -289,6 +283,12 @@
       "actions.actions.task.reminder.addTitle"
     ]
   },
+  "Add a device": {
+    "text": "Add a device",
+    "paths": [
+      "settings.pages.devices_access.sections.sign_in_approval.header"
+    ]
+  },
   "Add a task or move one here when you want to work on it today.": {
     "text": "Add a task or move one here when you want to work on it today.",
     "paths": [
@@ -313,10 +313,22 @@
       "signIn.manage.footer"
     ]
   },
+  "Add as a custom MCP connector in Claude or any MCP client": {
+    "text": "Add as a custom MCP connector in Claude or any MCP client",
+    "paths": [
+      "settings.copy.claude_connector.connectorUrlDetail.label"
+    ]
+  },
   "Add email": {
     "text": "Add email",
     "paths": [
       "signIn.manage.addEmail"
+    ]
+  },
+  "Add the connector URL to Claude or any MCP client, or paste the setup prompt into Claude. When your browser shows an 8-character code, enter it above. Only enter a code from a browser window you opened yourself.": {
+    "text": "Add the connector URL to Claude or any MCP client, or paste the setup prompt into Claude. When your browser shows an 8-character code, enter it above. Only enter a code from a browser window you opened yourself.",
+    "paths": [
+      "settings.copy.claude_connector.footer.label"
     ]
   },
   "Add time": {
@@ -374,6 +386,12 @@
       "destinations.destinations.agent.title"
     ]
   },
+  "Agent connected. Go back to your browser to finish.": {
+    "text": "Agent connected. Go back to your browser to finish.",
+    "paths": [
+      "settings.copy.sign_in_approval.doneConnector.label"
+    ]
+  },
   "Agent name": {
     "text": "Agent name",
     "paths": [
@@ -391,8 +409,6 @@
   "Agents": {
     "text": "Agents",
     "paths": [
-      "settings.rootGroups.ai_agents_root.items.1.label",
-      "settings.pages.agents.title",
       "plans.outcomes.agents.rows.connected.label"
     ]
   },
@@ -487,6 +503,7 @@
   "Appearance": {
     "text": "Appearance",
     "paths": [
+      "settings.desktopTabs.appearance.title",
       "settings.rootGroups.appearance_root.items.0.label",
       "settings.pages.appearance.title",
       "settings.pages.appearance.sections.appearance.items.0.parts.mode.label"
@@ -510,10 +527,16 @@
       "settings.copy.sign_in_approval.approve.label"
     ]
   },
-  "Approve a sign-in": {
-    "text": "Approve a sign-in",
+  "Approve a device sign-in": {
+    "text": "Approve a device sign-in",
     "paths": [
       "settings.copy.sign_in_approval.title.label"
+    ]
+  },
+  "Approve connection code": {
+    "text": "Approve connection code",
+    "paths": [
+      "settings.copy.claude_connector.approveHeader.label"
     ]
   },
   "Approving…": {
@@ -755,7 +778,7 @@
   "Check for Updates…": {
     "text": "Check for Updates…",
     "paths": [
-      "settings.pages.about.sections.actions.items.1.label"
+      "settings.pages.about.sections.actions.items.2.label"
     ]
   },
   "Checking the code…": {
@@ -782,16 +805,22 @@
       "actions.actions.app.classicWindow.title"
     ]
   },
-  "Claude is connected. Go back to your browser to finish.": {
-    "text": "Claude is connected. Go back to your browser to finish.",
-    "paths": [
-      "settings.copy.sign_in_approval.doneConnector.label"
-    ]
-  },
   "Claude reads and changes your tasks through your Septena account. You decide which tasks it works on.": {
     "text": "Claude reads and changes your tasks through your Septena account. You decide which tasks it works on.",
     "paths": [
       "surfaces.firstRun.steps.connectClaude.body"
+    ]
+  },
+  "Claude setup prompt": {
+    "text": "Claude setup prompt",
+    "paths": [
+      "settings.copy.claude_connector.setupPrompt.label"
+    ]
+  },
+  "Claude starter prompt": {
+    "text": "Claude starter prompt",
+    "paths": [
+      "settings.copy.claude_connector.firstPrompt.label"
     ]
   },
   "Clear": {
@@ -861,12 +890,6 @@
       "signIn.email.codeLabel"
     ]
   },
-  "Code from the browser page": {
-    "text": "Code from the browser page",
-    "paths": [
-      "settings.copy.claude_connector.codePlaceholder.label"
-    ]
-  },
   "Colorful": {
     "text": "Colorful",
     "paths": [
@@ -912,9 +935,6 @@
   "Connect Claude": {
     "text": "Connect Claude",
     "paths": [
-      "settings.rootGroups.ai_agents_root.items.0.label",
-      "settings.pages.claude_pairing.title",
-      "settings.pages.claude_pairing.sections.connector.header",
       "surfaces.firstRun.steps.connectClaude.title"
     ]
   },
@@ -930,6 +950,13 @@
       "plans.outcomes.agents.detail"
     ]
   },
+  "Connect an Agent": {
+    "text": "Connect an Agent",
+    "paths": [
+      "settings.rootGroups.ai_agents_root.items.1.label",
+      "settings.pages.claude_pairing.title"
+    ]
+  },
   "Connect your agent": {
     "text": "Connect your agent",
     "paths": [
@@ -943,6 +970,13 @@
     ],
     "paths": [
       "settings.copy.sign_in_approval.confirmConnector.label"
+    ]
+  },
+  "Connected Agents": {
+    "text": "Connected Agents",
+    "paths": [
+      "settings.rootGroups.ai_agents_root.items.0.label",
+      "settings.pages.agents.title"
     ]
   },
   "Connected agents": {
@@ -967,7 +1001,7 @@
   "Contact Support": {
     "text": "Contact Support",
     "paths": [
-      "settings.pages.about.sections.actions.items.4.label",
+      "settings.pages.about.sections.actions.items.5.label",
       "surfaces.support.title"
     ]
   },
@@ -1545,8 +1579,8 @@
       "signIn.errors.invalidEmail"
     ]
   },
-  "Enter the code from the other device. If you're connecting Claude, the code is in your browser.": {
-    "text": "Enter the code from the other device. If you're connecting Claude, the code is in your browser.",
+  "Enter the 8-character code shown on the new device.": {
+    "text": "Enter the 8-character code shown on the new device.",
     "paths": [
       "settings.copy.sign_in_approval.enterFooter.label"
     ]
@@ -1770,20 +1804,14 @@
       "destinations.destinations.review.groups.finished.title"
     ]
   },
-  "First prompt": {
-    "text": "First prompt",
-    "paths": [
-      "settings.copy.claude_connector.firstPrompt.label"
-    ]
-  },
   "Follow-up to": {
     "text": "Follow-up to",
     "paths": [
       "surfaces.taskReferences.roles.follow_up.label"
     ]
   },
-  "For people who run many agents on one list.": {
-    "text": "For people who run many agents on one list.",
+  "For people who hand a lot of work to agents.": {
+    "text": "For people who hand a lot of work to agents.",
     "paths": [
       "plans.cards.pro.detail"
     ]
@@ -2178,7 +2206,15 @@
   "Keyboard Shortcuts": {
     "text": "Keyboard Shortcuts",
     "paths": [
+      "settings.pages.about.sections.actions.items.1.label",
       "actions.actions.app.keyboardShortcuts.title"
+    ]
+  },
+  "Language": {
+    "text": "Language",
+    "paths": [
+      "settings.rootGroups.language_root.header",
+      "settings.rootGroups.language_root.items.0.label"
     ]
   },
   "Large": {
@@ -2303,6 +2339,12 @@
     "text": "MCP Skills",
     "paths": [
       "settings.pages.claude_pairing.sections.agent_tools.items.0.label"
+    ]
+  },
+  "MCP connector": {
+    "text": "MCP connector",
+    "paths": [
+      "settings.pages.claude_pairing.sections.connector.header"
     ]
   },
   "MIT License": {
@@ -2807,6 +2849,12 @@
       "surfaces.prompts.items.agentReplaces.options.none.title"
     ]
   },
+  "Notifications": {
+    "text": "Notifications",
+    "paths": [
+      "settings.rootGroups.notifications_root.header"
+    ]
+  },
   "OK": {
     "text": "OK",
     "paths": [
@@ -2871,6 +2919,13 @@
     "text": "On your device",
     "paths": [
       "plans.outcomes.nothing_lost.rows.files.cells.free"
+    ]
+  },
+  "On-Device AI": {
+    "text": "On-Device AI",
+    "paths": [
+      "settings.rootGroups.ai_agents_root.items.2.label",
+      "settings.pages.ai_preferences.title"
     ]
   },
   "On-device": {
@@ -3011,6 +3066,12 @@
       "surfaces.taskReferences.add.placeholder"
     ]
   },
+  "Paste into Claude to start connecting": {
+    "text": "Paste into Claude to start connecting",
+    "paths": [
+      "settings.copy.claude_connector.setupPromptDetail.label"
+    ]
+  },
   "Paste into a model's context to teach it the task tools without connecting MCP.": {
     "text": "Paste into a model's context to teach it the task tools without connecting MCP.",
     "paths": [
@@ -3023,12 +3084,6 @@
       "surfaces.firstRun.steps.connectClaude.instructions.2"
     ]
   },
-  "Paste the setup prompt into Claude, or add the connector URL to Claude as a custom connector. When your browser shows a code, enter it here. Once connected, paste the first prompt to set up your areas, projects and tasks. Only enter a code from a browser window you opened yourself.": {
-    "text": "Paste the setup prompt into Claude, or add the connector URL to Claude as a custom connector. When your browser shows a code, enter it here. Once connected, paste the first prompt to set up your areas, projects and tasks. Only enter a code from a browser window you opened yourself.",
-    "paths": [
-      "settings.copy.claude_connector.footer.label"
-    ]
-  },
   "Pause Repeat": {
     "text": "Pause Repeat",
     "paths": [
@@ -3038,8 +3093,14 @@
   "Pause all agents": {
     "text": "Pause all agents",
     "paths": [
-      "settings.rootGroups.ai_agents_root.items.2.label",
+      "settings.pages.agents.sections.pause.items.0.label",
       "actions.actions.app.pauseAgents.title"
+    ]
+  },
+  "Paused": {
+    "text": "Paused",
+    "paths": [
+      "settings.copy.access_agents.paused.label"
     ]
   },
   "Persimmon": {
@@ -3909,16 +3970,16 @@
       "surfaces.firstRun.prompts.first"
     ]
   },
+  "Set up your areas, projects, and tasks": {
+    "text": "Set up your areas, projects, and tasks",
+    "paths": [
+      "settings.copy.claude_connector.firstPromptDetail.label"
+    ]
+  },
   "Settings…": {
     "text": "Settings…",
     "paths": [
       "actions.actions.app.settings.title"
-    ]
-  },
-  "Setup prompt": {
-    "text": "Setup prompt",
-    "paths": [
-      "settings.copy.claude_connector.setupPrompt.label"
     ]
   },
   "Share Project": {
@@ -3973,7 +4034,7 @@
   "Show Get Started Again": {
     "text": "Show Get Started Again",
     "paths": [
-      "settings.pages.about.sections.actions.items.2.label"
+      "settings.pages.about.sections.actions.items.3.label"
     ]
   },
   "Show Info": {
@@ -4003,7 +4064,7 @@
   "Show Welcome Again": {
     "text": "Show Welcome Again",
     "paths": [
-      "settings.pages.about.sections.actions.items.3.label"
+      "settings.pages.about.sections.actions.items.4.label"
     ]
   },
   "Show calendar events": {
@@ -4042,6 +4103,12 @@
       "surfaces.placeNotes.showMore.title"
     ]
   },
+  "Show sidebar counts": {
+    "text": "Show sidebar counts",
+    "paths": [
+      "settings.rootGroups.lists_root.items.7.label"
+    ]
+  },
   "Shown when non-empty": {
     "text": "Shown when non-empty",
     "paths": [
@@ -4064,8 +4131,8 @@
       "settings.copy.sign_in_approval.confirmDevice.label"
     ]
   },
-  "Sign in so Claude can connect to your tasks through your private Septena account.": {
-    "text": "Sign in so Claude can connect to your tasks through your private Septena account.",
+  "Sign in so Claude or another MCP agent can connect to your tasks through your private Septena account.": {
+    "text": "Sign in so Claude or another MCP agent can connect to your tasks through your private Septena account.",
     "paths": [
       "settings.copy.claude_connector.signInBody.label"
     ]
@@ -4089,8 +4156,8 @@
       "settings.copy.calendar_detail.feedSignIn.label"
     ]
   },
-  "Sign in to connect Claude": {
-    "text": "Sign in to connect Claude",
+  "Sign in to connect an agent": {
+    "text": "Sign in to connect an agent",
     "paths": [
       "settings.copy.claude_connector.signInHeader.label"
     ]
@@ -4716,6 +4783,12 @@
       "surfaces.taskDetail.calendarWeekdays.4.title"
     ]
   },
+  "Timed reminders": {
+    "text": "Timed reminders",
+    "paths": [
+      "settings.rootGroups.notifications_root.items.0.label"
+    ]
+  },
   "Timed tasks only": {
     "text": "Timed tasks only",
     "paths": [
@@ -5093,10 +5166,16 @@
       "surfaces.doing.screen.lastTime.title"
     ]
   },
+  "While paused, no agent can pick up or work on a task. Stop one task from its conversation instead. Agents never close assigned tasks on their own; finished work lands in Review for you to accept or send back.": {
+    "text": "While paused, no agent can pick up or work on a task. Stop one task from its conversation instead. Agents never close assigned tasks on their own; finished work lands in Review for you to accept or send back.",
+    "paths": [
+      "settings.pages.agents.sections.pause.footer"
+    ]
+  },
   "While paused, no agent can start or work on a task.": {
     "text": "While paused, no agent can start or work on a task.",
     "paths": [
-      "settings.rootGroups.ai_agents_root.items.2.detail"
+      "settings.pages.agents.sections.pause.items.0.detail"
     ]
   },
   "Whose turn?": {
@@ -5378,8 +5457,8 @@
       "settings.copy.delete_account.tasks.label"
     ]
   },
-  "Your tasks, areas, projects, and conversations stay on this device until you sign in. When signed in, they sync through Septena’s private server at api.septena.app, encrypted at rest (not end-to-end, so connected agents can read them when you choose). AI on your device stays on your device. Connect Claude under AI & Agents.": {
-    "text": "Your tasks, areas, projects, and conversations stay on this device until you sign in. When signed in, they sync through Septena’s private server at api.septena.app, encrypted at rest (not end-to-end, so connected agents can read them when you choose). AI on your device stays on your device. Connect Claude under AI & Agents.",
+  "Your tasks, areas, projects, and conversations stay on this device until you sign in. When signed in, they sync through Septena’s private server at api.septena.app, encrypted at rest (not end-to-end, so connected agents can read them when you choose). AI on your device stays on your device. Connect an agent under AI & Agents.": {
+    "text": "Your tasks, areas, projects, and conversations stay on this device until you sign in. When signed in, they sync through Septena’s private server at api.septena.app, encrypted at rest (not end-to-end, so connected agents can read them when you choose). AI on your device stays on your device. Connect an agent under AI & Agents.",
     "paths": [
       "settings.pages.privacy.sections.data_locality.items.0.detail"
     ]

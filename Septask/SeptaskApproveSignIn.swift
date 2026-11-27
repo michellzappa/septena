@@ -293,10 +293,11 @@ private struct RequestSummary: View {
   }
 }
 
-/// Settings ▸ Account ▸ Approve a sign-in (`registry/settings.json`,
+/// Settings ▸ Account ▸ Devices ▸ Add a device (`registry/settings.json`,
 /// surface `sign_in_approval`). Shown only when this device is signed in.
 struct SeptaskSignInApprovalSection: View {
   @State private var showingFlow = false
+  private static let section = RegistrySettings.section("sign_in_approval", page: RegistrySettings.PageID.devicesAccess)
 
   var body: some View {
     if TaskSyncEngine.shared.signedIn {
@@ -309,6 +310,10 @@ struct SeptaskSignInApprovalSection: View {
         }
         .sheet(isPresented: $showingFlow) {
           SeptaskApproveSignInFlow()
+        }
+      } header: {
+        if let header = Self.section?.header {
+          Text(header)
         }
       } footer: {
         Text(RegistrySettings.copy("sign_in_approval", "footer"))

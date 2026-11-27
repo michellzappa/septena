@@ -118,6 +118,7 @@ See [ADR 0007](adr/0007-septena-is-the-task-app.md).
 | [WEB_CLIENT_SPEC.md](WEB_CLIENT_SPEC.md) | proposal (#21); WB2 uses the Rust core's WASM (ADR 0025) |
 | [CLOUDFLARE_ACCOUNT_MOVE.md](CLOUDFLARE_ACCOUNT_MOVE.md) | accepted; ADR 0018 |
 | [ANDROID_CLIENT_SPEC.md](ANDROID_CLIENT_SPEC.md) | accepted (#20); shared Kotlin core for Windows; rules move to the Rust core in C1 (ADR 0025) |
+| [WINDOWS_IMPLEMENTATION_PLAN.md](WINDOWS_IMPLEMENTATION_PLAN.md) | building (#136); fixture spike, Win365 acceptance and implementation assignments |
 | [SHARED_CORE_SPEC.md](SHARED_CORE_SPEC.md) | accepted (ADR 0025); C0 and C5 done, C4 in progress (#250): one Rust core for rules and sync decisions |
 | [HAPTICS_SPEC.md](HAPTICS_SPEC.md) | building: H1–H4 done, H5 (device tuning) open |
 | [TASK_DATES_SPEC.md](TASK_DATES_SPEC.md) | accepted (ADR 0027): When, deadline, Today and overdue as core actions + one read model |

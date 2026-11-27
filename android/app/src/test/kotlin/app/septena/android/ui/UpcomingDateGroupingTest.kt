@@ -1,5 +1,6 @@
 package app.septena.android.ui
 
+import app.septena.core.formatUpcomingDayHeader
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.time.LocalDate

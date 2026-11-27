@@ -295,6 +295,7 @@ function validateSettings(settings, entities, icons, caps) {
     if (item.visibility !== undefined) {
       assert(validVisibilities.has(item.visibility), `settings.json: ${ctx} invalid visibility "${item.visibility}"`);
     }
+    assert(item.desktopInline === undefined, `settings.json: ${ctx} desktopInline is removed; every surface shares the same subpages`);
     if (item.kind === "setting") {
       assert(item.key in settings.keys, `settings.json: ${ctx} references unknown setting "${item.key}"`);
       assert(settings.keys[item.key].ui !== false, `settings.json: ${ctx} references internal ui:false setting "${item.key}"`);
@@ -1224,7 +1225,7 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   const emitItem = (item, onPage) => {
     const iconId = item.icon ?? null;
     const sf = iconId ? icons.icons[iconId].sfSymbol : null;
-    return `RegistrySettingsItem(kind: ${swiftStr(item.kind)}, key: ${optStr(item.key)}, page: ${optStr(item.page)}, surface: ${optStr(item.surface)}, label: ${itemText(item, "label")}, detail: ${itemText(item, "detail")}, iconId: ${optStr(iconId)}, sfSymbol: ${optStr(sf)}, statusKey: ${optStr(item.statusKey)}, desktopInline: ${Boolean(item.desktopInline)}, visibility: ${swiftStr(item.visibility ?? "always")}, platforms: ${optArr(item.platforms)}, featureId: ${optStr(itemFeature(item, onPage))})`;
+    return `RegistrySettingsItem(kind: ${swiftStr(item.kind)}, key: ${optStr(item.key)}, page: ${optStr(item.page)}, surface: ${optStr(item.surface)}, label: ${itemText(item, "label")}, detail: ${itemText(item, "detail")}, iconId: ${optStr(iconId)}, sfSymbol: ${optStr(sf)}, statusKey: ${optStr(item.statusKey)}, visibility: ${swiftStr(item.visibility ?? "always")}, platforms: ${optArr(item.platforms)}, featureId: ${optStr(itemFeature(item, onPage))})`;
   };
 
   lines.push("/// Desktop Settings sidebar tab descriptor (`registry/settings.json`).");
@@ -1258,7 +1259,6 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  let iconId: String?");
   lines.push("  let sfSymbol: String?");
   lines.push("  let statusKey: String?");
-  lines.push("  let desktopInline: Bool");
   lines.push("  let visibility: String");
   lines.push("  let platforms: [String]?");
   lines.push("  let featureId: String?");
@@ -2491,7 +2491,7 @@ function generateTS({ entities, rules, icons, tokens, caps, settings, dests, act
   lines.push(`export const DESIGN_TOKENS = ${JSON.stringify({ accentPolicy: tokens.accentPolicy, fruitAccents: tokens.fruitAccents ?? [], textures: tokens.textures ?? [], selection: tokens.selection, colors: tokens.colors, multicolorGlyphs: tokens.multicolorGlyphs?.glyphs ?? {}, accentPalette: tokens.accentPalette, radii: tokens.radii, spacing: tokens.spacing, desktopColumn: tokens.desktopColumn, textScale: tokens.textScale })} as const;`);
   lines.push(`export const CAPABILITIES = ${JSON.stringify(caps.capabilities)} as const;`);
   lines.push(`export const ACTIONS_CATALOG = ${JSON.stringify({ actions: actions.actions, contextMenus: actions.contextMenus, menuBar: actions.menuBar, shortcutsSheet: actions.shortcutsSheet })} as const;`);
-  lines.push(`export const SURFACES_CATALOG = ${JSON.stringify({ notices: surfaces.notices, prompts: surfaces.prompts, toasts: surfaces.toasts, taskAttributes: surfaces.taskAttributes, taskDateBoard: surfaces.taskDateBoard, taskPage: surfaces.taskPage, waiting: surfaces.waiting, accountSwitch: surfaces.accountSwitch, deviceSignIn: surfaces.deviceSignIn, quickFind: surfaces.quickFind, support: surfaces.support })} as const;`);
+  lines.push(`export const SURFACES_CATALOG = ${JSON.stringify({ notices: surfaces.notices, prompts: surfaces.prompts, toasts: surfaces.toasts, taskAttributes: surfaces.taskAttributes, taskDateBoard: surfaces.taskDateBoard, taskPage: surfaces.taskPage, waiting: surfaces.waiting, sharing: surfaces.sharing, accountSwitch: surfaces.accountSwitch, deviceSignIn: surfaces.deviceSignIn, quickFind: surfaces.quickFind, support: surfaces.support })} as const;`);
   lines.push(`export const FIRST_RUN = ${JSON.stringify(surfaces.firstRun)} as const;`);
   lines.push("/** Plan limits (registry/plans.json). The server's plan table: every gate reads these, never a plan name. */");
   lines.push(`export const PLAN_LIMITS = ${JSON.stringify(plans.limits)} as const;`);

@@ -5,10 +5,9 @@ import AppKit
 import UIKit
 #endif
 
-/// Connect Claude pairing sections, driven by `registry/settings.json`
-/// (`claude_pairing`, docs/SETTINGS_UX_SPEC.md). Rendered inline at the top of
-/// macOS Settings ▸ AI & Agents (`desktopInline: true`), and as a 1-tap pushed
-/// page on iOS (`SeptaskClaudePairingPane`).
+/// Connect an Agent sections, driven by `registry/settings.json`
+/// (`claude_pairing`, docs/SETTINGS_UX_SPEC.md). Rendered as a pushed subpage
+/// on every platform (iOS, macOS, Web, Android).
 struct SeptaskClaudePairingSections: View {
   private enum CopiedTarget: Equatable { case url, setupPrompt, starterPrompt }
 
@@ -18,6 +17,7 @@ struct SeptaskClaudePairingSections: View {
   // One copy of each prompt, shared with the first run (`registry/surfaces.json`).
   private static let setupPrompt = RegistryFirstRun.setupPrompt
   private static let starterPrompt = RegistryFirstRun.firstPrompt
+  private static let connectorSection = RegistrySettings.section("connector", page: RegistrySettings.PageID.claudePairing)
   private static let agentTools = RegistrySettings.section("agent_tools", page: RegistrySettings.PageID.claudePairing)
   private static let skills = RegistrySettings.itemBySurface["mcp_skills"]
 
@@ -34,29 +34,37 @@ struct SeptaskClaudePairingSections: View {
     }
 
     Section {
-      LabeledContent(RegistrySettings.copy("claude_connector", "setupPrompt")) {
-        Button(copied == .setupPrompt ? RegistrySettings.copy("claude_connector", "copied") : RegistrySettings.copy("claude_connector", "copy")) {
-          copyText(Self.setupPrompt, target: .setupPrompt)
-        }
-      }
-      LabeledContent(RegistrySettings.copy("claude_connector", "firstPrompt")) {
-        Button(copied == .starterPrompt ? RegistrySettings.copy("claude_connector", "copied") : RegistrySettings.copy("claude_connector", "copy")) {
-          copyText(Self.starterPrompt, target: .starterPrompt)
-        }
-      }
-      LabeledContent(RegistrySettings.copy("claude_connector", "connectorUrl")) {
-        HStack {
-          Text(Self.connectorURL)
-            .font(.callout.monospaced())
-            .textSelection(.enabled)
-          Button(copied == .url ? RegistrySettings.copy("claude_connector", "copied") : RegistrySettings.copy("claude_connector", "copy")) {
-            copyText(Self.connectorURL, target: .url)
-          }
-        }
-      }
+      copyRow(
+        title: RegistrySettings.copy("claude_connector", "connectorUrl"),
+        subtitle: Self.connectorURL,
+        monospacedSubtitle: true,
+        target: .url,
+        value: Self.connectorURL
+      )
+      copyRow(
+        title: RegistrySettings.copy("claude_connector", "setupPrompt"),
+        subtitle: RegistrySettings.copy("claude_connector", "setupPromptDetail"),
+        monospacedSubtitle: false,
+        target: .setupPrompt,
+        value: Self.setupPrompt
+      )
+      copyRow(
+        title: RegistrySettings.copy("claude_connector", "firstPrompt"),
+        subtitle: RegistrySettings.copy("claude_connector", "firstPromptDetail"),
+        monospacedSubtitle: false,
+        target: .starterPrompt,
+        value: Self.starterPrompt
+      )
+    } header: {
+      if let header = Self.connectorSection?.header { Text(header) }
+    } footer: {
+      Text(RegistrySettings.copy("claude_connector", "connectorUrlDetail"))
+    }
+
+    Section {
       SeptaskPairingCodeField()
     } header: {
-      Text("Connect Claude")
+      Text(RegistrySettings.copy("claude_connector", "approveHeader"))
     } footer: {
       Text(RegistrySettings.copy("claude_connector", "footer"))
     }
@@ -72,6 +80,28 @@ struct SeptaskClaudePairingSections: View {
       Text(Self.agentTools?.header ?? "")
     } footer: {
       if let footer = Self.agentTools?.footer { Text(footer) }
+    }
+  }
+
+  private func copyRow(
+    title: String,
+    subtitle: String,
+    monospacedSubtitle: Bool,
+    target: CopiedTarget,
+    value: String
+  ) -> some View {
+    HStack(spacing: 12) {
+      VStack(alignment: .leading, spacing: 2) {
+        Text(title)
+        Text(subtitle)
+          .font(monospacedSubtitle ? .caption.monospaced() : .caption)
+          .foregroundStyle(.secondary)
+          .textSelection(.enabled)
+      }
+      Spacer(minLength: 12)
+      Button(copied == target ? RegistrySettings.copy("claude_connector", "copied") : RegistrySettings.copy("claude_connector", "copy")) {
+        copyText(value, target: target)
+      }
     }
   }
 
@@ -94,11 +124,10 @@ enum SeptaskClipboard {
   }
 }
 
-/// The code field for a sign-in code, on Settings ▸ Connect Claude and in the
-/// first run. Continue opens `SeptaskApproveSignInFlow`, which looks the code
-/// up and shows who asks before the user approves; so a device code typed
-/// here reads "Sign in on <device>?", never "Connect Claude". `onApproved`
-/// runs after an approval of either kind.
+/// The code field for a connection code, on Settings ▸ Connect an Agent and in
+/// the first run. Continue opens `SeptaskApproveSignInFlow`, which looks the
+/// code up and shows who asks before the user approves. `onApproved` runs after
+/// an approval of either kind.
 struct SeptaskPairingCodeField: View {
   var onApproved: (() -> Void)?
   private var sync: TaskSyncEngine { .shared }
@@ -111,19 +140,27 @@ struct SeptaskPairingCodeField: View {
   }
 
   var body: some View {
-    HStack {
+    HStack(spacing: 10) {
       TextField(RegistrySettings.copy("claude_connector", "codePlaceholder"), text: $pairCode)
         .font(.body.monospaced())
+        .autocorrectionDisabled()
+        #if os(macOS)
+        .textFieldStyle(.roundedBorder)
+        #else
+        .textInputAutocapitalization(.characters)
+        #endif
         .onSubmit(review)
         .disabled(!sync.signedIn)
-      Button("Continue", action: review)
+      Button(RegistrySettings.copy("sign_in_approval", "continue"), action: review)
         .disabled(!sync.signedIn || SeptaskApproveSignInFlow.normalized(pairCode) == nil)
+      #if os(iOS)
       if sync.signedIn {
         SeptaskScanCodeButton { scanned in
           reviewing = ReviewedCode(code: scanned)
         }
         .labelStyle(.iconOnly)
       }
+      #endif
     }
     .sheet(item: $reviewing) { reviewed in
       SeptaskApproveSignInFlow(initialCode: reviewed.code) { _ in

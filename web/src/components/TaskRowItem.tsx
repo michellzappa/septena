@@ -42,7 +42,7 @@ import {
   type CoreProjection,
 } from "@/lib/core";
 import { agentStageTitle } from "@/lib/destinations";
-import { waitingLabel } from "@/lib/waiting";
+import { assigneeLabel, sharedWaitingTarget, sharingCopy, waitingLabel, waitingName } from "@/lib/waiting";
 import type {
   AreaRow,
   AttachmentRow,
@@ -50,6 +50,7 @@ import type {
   ChecklistItemRow,
   ConvoRow,
   ProjectRow,
+  ProjectShareInfo,
   TagRow,
   TaskRefRow,
   TaskRow,
@@ -73,6 +74,12 @@ export interface TaskRowItemProps {
   showsTodayIndicator?: boolean;
   /** True on Projects/Areas when faded tasks are shown inline. */
   showsFadedIndicator?: boolean;
+  /** Shared project metadata for this task's project, if shared. */
+  projectShare?: ProjectShareInfo | null;
+  /** True inside a shared project so rows also show "You" for your own tasks. */
+  showsOwnAssignee?: boolean;
+  /** Assign To (PROJECT_SHARING_SPEC §8): memberId or null for nobody. */
+  onAssignMember?: (memberId: string | null) => void;
   isColorfulAccent?: boolean;
   animateCompletion?: boolean;
   draggable?: boolean;
@@ -320,7 +327,7 @@ export function TaskDetailEditor({
   const isCancelled = task.status === "cancelled";
   const isToday = membership.isOnToday;
   const taskTagIds = Array.isArray(task.tags) ? task.tags : [];
-  const editorWaitingLabel = waitingLabel(task, props.todayYMD, props.lang);
+  const editorWaitingLabel = waitingLabel(task, props.todayYMD, props.lang, props.projectShare);
 
   const commitTitle = () => {
     const trimmed = titleDraft.trim();
@@ -1080,7 +1087,7 @@ export function TaskDetailEditor({
               <Share2 className="h-3.5 w-3.5" />
               Share
             </button>
-            {!isDone && !isCancelled && props.onWaitingOn && (
+            {!isDone && !isCancelled && props.onWaitingOn && (!editorWaitingLabel || Boolean(waitingName(task))) && (
               <button
                 type="button"
                 onClick={props.onWaitingOn}
@@ -1101,6 +1108,24 @@ export function TaskDetailEditor({
               >
                 {registryText(ACTIONS_CATALOG.actions["task.gotItBack"].title, props.lang)}
               </button>
+            )}
+            {!isDone && !isCancelled && props.projectShare && props.onAssignMember && (
+              <label className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]">
+                <RegistryIcon token="action.assign" className="h-3.5 w-3.5 shrink-0" />
+                <select
+                  aria-label="Assign To"
+                  value={task.assignedTo ?? ""}
+                  onChange={(e) => props.onAssignMember?.(e.target.value || null)}
+                  className="bg-transparent text-xs text-inherit focus:outline-none"
+                >
+                  <option value="">{sharingCopy("nobody", props.lang)}</option>
+                  {props.projectShare.members.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.id === props.projectShare?.me ? `${m.name} (${sharingCopy("you", props.lang)})` : m.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
             )}
 
             <div className="ml-auto flex items-center gap-1.5">
@@ -1185,7 +1210,11 @@ export function TaskRowItem(props: TaskRowItemProps) {
   const checkedCount = checklistItems.filter((c) => c.checked).length;
   const todayColor = isColorfulAccent ? "var(--today-gold)" : "var(--accent)";
   const hasActiveReminder = Boolean(task.reminderAt && !task.reminderDismissedAt);
-  const rowWaitingLabel = isDone || isCancelled ? null : waitingLabel(task, props.todayYMD, props.lang);
+  const rowWaitingLabel = isDone || isCancelled ? null : waitingLabel(task, props.todayYMD, props.lang, props.projectShare);
+  const waitingCoversAssignee = Boolean(rowWaitingLabel && !waitingName(task) && sharedWaitingTarget(task, props.projectShare));
+  const rowAssigneeLabel = waitingCoversAssignee
+    ? null
+    : assigneeLabel(task, props.projectShare, Boolean(props.showsOwnAssignee), props.lang);
   const reminderPastDue =
     hasActiveReminder &&
     Number.isFinite(Date.parse(task.reminderSnoozedUntil || task.reminderAt!)) &&
@@ -1360,6 +1389,13 @@ export function TaskRowItem(props: TaskRowItemProps) {
           <span className="inline-flex min-w-0 items-center gap-1 rounded-full bg-[var(--bg-pill)] px-2 py-0.5 text-[11px] font-medium text-[var(--text-secondary)]">
             <RegistryIcon token="action.waiting" className="h-[11px] w-[11px] shrink-0" />
             <span className="truncate">{rowWaitingLabel}</span>
+          </span>
+        )}
+
+        {rowAssigneeLabel && !isDeletedView && (
+          <span className="inline-flex min-w-0 items-center gap-1 rounded-full bg-[var(--bg-pill)] px-2 py-0.5 text-[11px] font-medium text-[var(--text-secondary)]">
+            <RegistryIcon token="action.assign" className="h-[11px] w-[11px] shrink-0" />
+            <span className="truncate">{rowAssigneeLabel}</span>
           </span>
         )}
 

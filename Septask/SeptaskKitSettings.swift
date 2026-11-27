@@ -36,8 +36,11 @@ enum SeptaskKitSettingsWindow {
     let host = NSHostingController(rootView: AnyView(root))
     let window = NSWindow(contentViewController: host)
     window.title = String(localized: "Settings", comment: "Settings window title")
-    window.styleMask = [.titled, .closable, .fullSizeContentView]
-    window.titlebarAppearsTransparent = true
+    window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
+    window.toolbar = NSToolbar(identifier: "SeptaskSettingsToolbar")
+    window.toolbarStyle = .unified
+    window.setContentSize(NSSize(width: 820, height: 600))
+    window.minSize = NSSize(width: 720, height: 480)
     window.center()
     let windowController = NSWindowController(window: window)
     controller = windowController

@@ -54,6 +54,7 @@ data class PlaceTaskRow(
     val title: String,
     val isStarred: Boolean = false,
     val position: Double? = null,
+    val assignedTo: String? = null,
     val item: TaskListItem = TaskListItem(id = id, title = title, isStarred = isStarred, position = position),
 )
 data class PlaceSectionRow(val id: String, val title: String, val tasks: List<PlaceTaskRow>)
@@ -71,6 +72,7 @@ data class AreasProjectsUiState(
     val emoji: String? = null,
     val notes: String = "",
     val currentAreaId: String? = null,
+    val share: ProjectShare? = null,
     val availableAreas: List<PlaceAreaOption> = emptyList(),
     val projects: List<PlaceProjectRow> = emptyList(),
     val areaTasks: List<PlaceTaskRow> = emptyList(),
@@ -352,7 +354,7 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             .asSequence()
             .filter { it.deletedAt == null }
             .mapNotNull { record ->
-                runCatching { record to TaskSnapshot.from(record) }.getOrNull()
+                runCatching { record to TaskSnapshot.from(record, metadataCatalog.shares) }.getOrNull()
             }
             .toList()
         val taskRows = allTaskRecords
@@ -369,6 +371,7 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                 today = today,
                 now = now,
                 showTodayIndicator = true,
+                showsOwnAssignee = selected is AreasProjectsDestination.Project,
             ).copy(position = pos)
                 .withFade(task, conversations[record.id], now, today, showAging)
             return PlaceTaskRow(
@@ -376,6 +379,7 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                 title = task.title,
                 isStarred = task.starred,
                 position = pos,
+                assignedTo = task.assignedTo,
                 item = base,
             )
         }
@@ -489,6 +493,7 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                     title = title,
                     notes = notes,
                     currentAreaId = currentAreaId,
+                    share = ProjectShare.of(container),
                     availableAreas = availableAreas,
                     unsectionedTasks = unsectioned,
                     sections = sections,

@@ -9,6 +9,8 @@ kotlin {
     jvmToolchain(17)
 }
 
+val coreJvmNatives = project(":core").layout.buildDirectory.file("core-natives/septena-core-jvm-natives.jar")
+
 dependencies {
     implementation(project(":core"))
     implementation(libs.sqldelight.runtime)
@@ -17,8 +19,7 @@ dependencies {
     testImplementation(libs.sqldelight.jvm.driver)
     testImplementation(libs.jna)
     testRuntimeOnly(
-        files(rootProject.file("core/build/core-natives/septena-core-jvm-natives.jar"))
-            .builtBy(":core:fetchCoreJvmNatives"),
+        files(coreJvmNatives).builtBy(":core:fetchCoreJvmNatives"),
     )
 }
 

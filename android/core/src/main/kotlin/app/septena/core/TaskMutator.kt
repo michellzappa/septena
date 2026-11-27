@@ -1,6 +1,7 @@
 package app.septena.core
 
 import app.septena.core.generated.RegistryEntityFields
+import app.septena.core.generated.RegistryEntityEnums
 import app.septena.core.generated.RegistryEntityLimits
 import app.septena.core.generated.RegistryEntityNames
 import app.septena.sharedcore.DateAction
@@ -17,6 +18,7 @@ class TaskMutator(
     private val ids: TaskIdGenerator,
     /** Ends the open Do of a task that this mutator closes. Null in hosts without Do. */
     private val doSessions: DoSessionMutator? = null,
+    private val sourceClient: String = "Septena Android",
 ) {
     suspend fun create(
         title: String,
@@ -86,6 +88,7 @@ class TaskMutator(
             todaySetOn = if (today) todayString else null,
             notes = notes,
             source = source,
+            sourceClient = sourceClient,
             kind = kind,
             heading = heading,
             position = position,
@@ -171,10 +174,48 @@ class TaskMutator(
     )
 
     /** Who does the task in a shared project: a member id, or null for nobody. */
-    suspend fun assign(id: String, memberId: String?): TaskRecord? = updateFields(
-        id,
-        mapOf(RegistryEntityFields.Task.ASSIGNED_TO to JsonValue.stringOrNull(memberId)),
-    )
+    suspend fun assign(id: String, memberId: String?): TaskRecord? {
+        val existing = store.record(RegistryEntityNames.TASK, id)?.asTaskRecord() ?: return null
+        if (existing.deletedAt != null) return null
+        val normalized = memberId?.trim()?.takeIf(String::isNotEmpty)
+        val wireChanges = linkedMapOf<String, JsonValue>(
+            RegistryEntityFields.Task.ASSIGNED_TO to JsonValue.stringOrNull(normalized),
+        )
+        RegistryValidator.requireValidUpsert(RegistryEntityNames.TASK, id, wireChanges, insert = false)
+        val projectId = existing.fields[RegistryEntityFields.Task.PROJECT].stringValue()
+        val share = projectId?.let { ProjectShare.of(store.record(RegistryEntityNames.PROJECT, it)) }
+        val localChanges = LinkedHashMap<String, JsonValue>(wireChanges)
+        if (normalized != null && share != null) {
+            localChanges[RegistryEntityFields.Task.ASSIGNED_BY] = JsonValue.StringValue(share.me)
+            localChanges[RegistryEntityFields.Task.ASSIGNED_AT] = JsonValue.StringValue(clock.today(clock.now()).toString())
+        } else {
+            localChanges[RegistryEntityFields.Task.ASSIGNED_BY] = JsonValue.Null
+            localChanges[RegistryEntityFields.Task.ASSIGNED_AT] = JsonValue.Null
+        }
+        val updated = existing.changing(localChanges)
+        val operation = SyncOperation.Upsert(ids.nextClientOpId(), RegistryEntityNames.TASK, id, wireChanges)
+        store.writeLocalAndEnqueue(updated.asSyncRecord(), operation)
+        return updated
+    }
+
+    /** Got It Back (docs/REVIEW_SPEC.md §6): clears manual waiting and takes back shared tasks you assigned. */
+    suspend fun gotItBack(id: String): TaskRecord? {
+        val existing = store.record(RegistryEntityNames.TASK, id)?.asTaskRecord() ?: return null
+        if (existing.deletedAt != null) return null
+        var result: TaskRecord? = existing
+        val hasManualWait = !existing.fields[RegistryEntityFields.Task.WAITING_ON].stringValue().isNullOrBlank()
+        if (hasManualWait) {
+            result = setWaiting(id, null) ?: return null
+        }
+        val projectId = existing.fields[RegistryEntityFields.Task.PROJECT].stringValue()
+        val assignedTo = existing.fields[RegistryEntityFields.Task.ASSIGNED_TO].stringValue()
+        val assignedBy = existing.fields[RegistryEntityFields.Task.ASSIGNED_BY].stringValue()
+        val share = projectId?.let { ProjectShare.of(store.record(RegistryEntityNames.PROJECT, it)) }
+        if (share != null && !assignedTo.isNullOrBlank() && assignedTo != share.me && assignedBy == share.me) {
+            result = assign(id, share.me) ?: return null
+        }
+        return result
+    }
 
     /** A2 for a day (a day on or before today is A1), A5 for none. */
     suspend fun schedule(
@@ -200,6 +241,46 @@ class TaskMutator(
     /** A7 / A8: set or clear the deadline. */
     suspend fun setDeadline(id: String, day: String?): TaskRecord? = applyDateAction(id, DateAction.SetDeadline(day))
 
+    /** Saves one repeat-rule edit, including any compatible custom pattern and the paused state. */
+    suspend fun setRepeat(id: String, rule: RecurrenceRule?, paused: Boolean? = null): TaskRecord? {
+        val existing = store.record(RegistryEntityNames.TASK, id)?.asTaskRecord() ?: return null
+        if (existing.deletedAt != null) return null
+        val f = existing.fields
+        val unit = rule?.unit
+        val fixed = rule?.afterCompletion == false
+        val weekdays = rule?.weekdays?.takeIf { fixed && unit == RegistryEntityEnums.RecurrenceUnit.WEEK }
+        val useMonthRule = fixed && (unit == RegistryEntityEnums.RecurrenceUnit.MONTH || unit == RegistryEntityEnums.RecurrenceUnit.YEAR)
+        val ordinal = rule?.ordinalWeekday?.takeIf { useMonthRule }
+        val changes = linkedMapOf(
+            RegistryEntityFields.Task.RECURRENCE_UNIT to JsonValue.stringOrNull(unit),
+            RegistryEntityFields.Task.RECURRENCE_INTERVAL to JsonValue.integerOrNull(rule?.interval?.coerceIn(1, 99)?.toLong()),
+            RegistryEntityFields.Task.RECURRENCE_AFTER_COMPLETION to JsonValue.BooleanValue(rule?.afterCompletion == true),
+            RegistryEntityFields.Task.RECURRENCE_PAUSED to JsonValue.BooleanValue(
+                rule != null && (paused ?: f[RegistryEntityFields.Task.RECURRENCE_PAUSED].booleanValue() ?: false),
+            ),
+            RegistryEntityFields.Task.RECURRENCE_SERIES_ID to JsonValue.stringOrNull(
+                if (rule == null) null else f[RegistryEntityFields.Task.RECURRENCE_SERIES_ID].stringValue() ?: id,
+            ),
+            RegistryEntityFields.Task.RECURRENCE_ANCHOR_DATE to JsonValue.stringOrNull(
+                if (fixed) f[RegistryEntityFields.Task.RECURRENCE_ANCHOR_DATE].stringValue()
+                    ?: f[RegistryEntityFields.Task.SCHEDULED].stringValue() else null,
+            ),
+            RegistryEntityFields.Task.RECURRENCE_WEEKDAYS to (weekdays?.takeIf { it.isNotEmpty() }?.let { days ->
+                JsonValue.ArrayValue(days.sorted().map { JsonValue.IntegerValue(it.toLong()) })
+            } ?: JsonValue.Null),
+            RegistryEntityFields.Task.RECURRENCE_MONTH_DAY to JsonValue.integerOrNull(
+                rule?.monthDay?.takeIf { useMonthRule }?.toLong(),
+            ),
+            RegistryEntityFields.Task.RECURRENCE_ORDINAL_WEEKDAY to (ordinal?.let {
+                JsonValue.ObjectValue(mapOf(
+                    "ordinal" to JsonValue.IntegerValue(it.ordinal.toLong()),
+                    "weekday" to JsonValue.IntegerValue(it.weekday.toLong()),
+                ))
+            } ?: JsonValue.Null),
+        ).filter { (field, value) -> value != (f[field] ?: JsonValue.Null) }
+        return if (changes.isEmpty()) existing else updateFields(id, changes)
+    }
+
     /**
      * One date action of docs/TASK_DATES_SPEC.md §4 (D5, #292). The shared core
      * decides every date field (When, deadline, Today pin and its stamp, time
@@ -211,8 +292,9 @@ class TaskMutator(
         val existing = store.record(RegistryEntityNames.TASK, id)?.asTaskRecord() ?: return null
         if (existing.deletedAt != null) return null
         val now = clock.now()
+        val shares = ProjectShare.byProject(store)
         val patch = coreApplyDateAction(
-            existing.toCoreSnapshot(),
+            existing.toCoreSnapshot(shares),
             action,
             clock.today(now).toString(),
             WireTimestamp.format(now),
@@ -255,7 +337,7 @@ class TaskMutator(
      * moves the anchor slot (#573, mirroring Apple `TasksBackend.rebaseFixedSeries`).
      */
     private suspend fun rebaseFixedSeries(source: TaskRecord) {
-        val rule = parseRecurrenceRule(source.fields) ?: return
+        val rule = RecurrenceRules.fromFields(source.fields) ?: return
         if (rule.afterCompletion) return
         val newAnchor = source.fields[RegistryEntityFields.Task.RECURRENCE_ANCHOR_DATE].stringValue() ?: return
         val seriesId = source.fields[RegistryEntityFields.Task.RECURRENCE_SERIES_ID].stringValue() ?: source.id
@@ -304,24 +386,6 @@ class TaskMutator(
             }
             updateFields(sibling.id, siblingChanges)
         }
-    }
-
-    private fun parseRecurrenceRule(fields: Map<String, JsonValue>): RecurrenceRule? {
-        val unit = fields[RegistryEntityFields.Task.RECURRENCE_UNIT].stringValue() ?: return null
-        val ordinal = fields[RegistryEntityFields.Task.RECURRENCE_ORDINAL_WEEKDAY] as? JsonValue.ObjectValue
-        return RecurrenceRule(
-            unit = unit,
-            interval = fields[RegistryEntityFields.Task.RECURRENCE_INTERVAL].longValue()?.toInt() ?: 1,
-            afterCompletion = fields[RegistryEntityFields.Task.RECURRENCE_AFTER_COMPLETION].booleanValue() ?: true,
-            weekdays = (fields[RegistryEntityFields.Task.RECURRENCE_WEEKDAYS] as? JsonValue.ArrayValue)
-                ?.values?.mapNotNull { it.longValue()?.toInt() },
-            monthDay = fields[RegistryEntityFields.Task.RECURRENCE_MONTH_DAY].longValue()?.toInt(),
-            ordinalWeekday = ordinal?.let {
-                val o = it["ordinal"].longValue()?.toInt()
-                val w = it["weekday"].longValue()?.toInt()
-                if (o != null && w != null) OrdinalWeekday(o, w) else null
-            },
-        )
     }
 
     /**
@@ -474,22 +538,8 @@ class TaskMutator(
      */
     private suspend fun spawnNextOccurrence(source: TaskRecord) {
         val f = source.fields
-        val unit = f[RegistryEntityFields.Task.RECURRENCE_UNIT].stringValue() ?: return
         if (f[RegistryEntityFields.Task.RECURRENCE_PAUSED].booleanValue() == true) return
-        val ordinal = f[RegistryEntityFields.Task.RECURRENCE_ORDINAL_WEEKDAY] as? JsonValue.ObjectValue
-        val rule = RecurrenceRule(
-            unit = unit,
-            interval = f[RegistryEntityFields.Task.RECURRENCE_INTERVAL].longValue()?.toInt() ?: 1,
-            afterCompletion = f[RegistryEntityFields.Task.RECURRENCE_AFTER_COMPLETION].booleanValue() ?: true,
-            weekdays = (f[RegistryEntityFields.Task.RECURRENCE_WEEKDAYS] as? JsonValue.ArrayValue)
-                ?.values?.mapNotNull { it.longValue()?.toInt() },
-            monthDay = f[RegistryEntityFields.Task.RECURRENCE_MONTH_DAY].longValue()?.toInt(),
-            ordinalWeekday = ordinal?.let {
-                val o = it["ordinal"].longValue()?.toInt()
-                val w = it["weekday"].longValue()?.toInt()
-                if (o != null && w != null) OrdinalWeekday(o, w) else null
-            },
-        )
+        val rule = RecurrenceRules.fromFields(f) ?: return
         val now = clock.now()
         val today = clock.today(now).toString()
         val next = RecurrenceRules.nextScheduledDate(
@@ -645,10 +695,11 @@ class TaskMutator(
     suspend fun runFadePass(conversations: Map<String, TaskConversation>): Int {
         val now = clock.now()
         val today = clock.today(now).toString()
+        val shares = ProjectShare.byProject(store)
         var faded = 0
         for (record in store.records(RegistryEntityNames.TASK)) {
             if (record.deletedAt != null) continue
-            val task = runCatching { TaskSnapshot.from(record) }.getOrNull() ?: continue
+            val task = runCatching { TaskSnapshot.from(record, shares) }.getOrNull() ?: continue
             if (task.status != app.septena.core.generated.RegistryEntityEnums.TaskStatus.OPEN || task.fadedAt != null) continue
             // A waiting task never fades (docs/REVIEW_SPEC.md §6).
             if (task.isWaiting) continue
@@ -742,8 +793,10 @@ class TaskMutator(
 }
 
 /** The task as the shared core reads it, every date field included. */
-internal fun TaskRecord.toCoreSnapshot(): CoreTaskSnapshot {
-    val base = TaskSnapshot.from(asSyncRecord()).toCore()
+internal fun TaskRecord.toCoreSnapshot(
+    shares: Map<String, ProjectShare> = emptyMap(),
+): CoreTaskSnapshot {
+    val base = TaskSnapshot.from(asSyncRecord(), shares).toCore()
     val f = fields
     return base.copy(
         startTime = f[RegistryEntityFields.Task.START_TIME].stringValue(),

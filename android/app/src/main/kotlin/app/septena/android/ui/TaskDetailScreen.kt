@@ -74,6 +74,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.septena.android.AndroidAppGraph
 import app.septena.core.JsonValue
 import app.septena.core.NotesBase
+import app.septena.core.OrdinalWeekday
+import app.septena.core.RecurrenceRule
 import app.septena.core.RegistryCatalog
 import app.septena.core.StructureOrder
 import app.septena.core.SyncRecord
@@ -151,6 +153,8 @@ internal data class TaskDetailData(
     val attachmentCount: Int = 0,
     /** The task's conversation hands it to the user for review (`needs_verify`). */
     val needsReview: Boolean = false,
+    /** Shared project metadata for the task's project, if shared. */
+    val projectShare: app.septena.core.ProjectShare? = null,
 )
 
 internal data class RepeatUnitOption(val value: String, val title: String)
@@ -241,6 +245,7 @@ fun TaskDetailScreen(
     var showAddReferenceDialog by remember(taskId) { mutableStateOf(false) }
     var doTitleEditing by remember(taskId) { mutableStateOf(false) }
     var waitingSheetOpen by remember(taskId) { mutableStateOf(false) }
+    var assignDialogOpen by remember(taskId) { mutableStateOf(false) }
 
     LaunchedEffect(graph, taskId, dataVersion) {
         val loaded = withContext(Dispatchers.IO) { loadTaskDetail(graph, taskId) }
@@ -588,59 +593,18 @@ fun TaskDetailScreen(
         monthDay: Int? = recurrenceMonthDay,
         ordinalWeekday: Pair<Int, Int>? = recurrenceOrdinal,
     ) {
-        val existing = savedTask ?: return
-        val currentScheduled = existing.fields[RegistryEntityFields.Task.SCHEDULED].stringValue()
-        val changes = if (unit == null) {
-            linkedMapOf(
-                RegistryEntityFields.Task.RECURRENCE_UNIT to JsonValue.Null,
-                RegistryEntityFields.Task.RECURRENCE_INTERVAL to JsonValue.Null,
-                RegistryEntityFields.Task.RECURRENCE_AFTER_COMPLETION to JsonValue.BooleanValue(false),
-                RegistryEntityFields.Task.RECURRENCE_PAUSED to JsonValue.BooleanValue(false),
-                RegistryEntityFields.Task.RECURRENCE_SERIES_ID to JsonValue.Null,
-                RegistryEntityFields.Task.RECURRENCE_ANCHOR_DATE to JsonValue.Null,
-                RegistryEntityFields.Task.RECURRENCE_WEEKDAYS to JsonValue.Null,
-                RegistryEntityFields.Task.RECURRENCE_MONTH_DAY to JsonValue.Null,
-                RegistryEntityFields.Task.RECURRENCE_ORDINAL_WEEKDAY to JsonValue.Null,
-            )
-        } else {
-            val fixed = !afterCompletion
-            val usesWeekdays = fixed && unit == RegistryEntityEnums.RecurrenceUnit.WEEK
-            val usesMonthRules = fixed && (unit == RegistryEntityEnums.RecurrenceUnit.MONTH || unit == RegistryEntityEnums.RecurrenceUnit.YEAR)
-            linkedMapOf(
-                RegistryEntityFields.Task.RECURRENCE_UNIT to JsonValue.StringValue(unit),
-                RegistryEntityFields.Task.RECURRENCE_INTERVAL to JsonValue.IntegerValue(interval.coerceIn(1L, 99L)),
-                RegistryEntityFields.Task.RECURRENCE_AFTER_COMPLETION to JsonValue.BooleanValue(afterCompletion),
-                RegistryEntityFields.Task.RECURRENCE_PAUSED to JsonValue.BooleanValue(
-                    existing.fields[RegistryEntityFields.Task.RECURRENCE_PAUSED].booleanValue() ?: false,
-                ),
-                RegistryEntityFields.Task.RECURRENCE_SERIES_ID to JsonValue.StringValue(
-                    existing.fields[RegistryEntityFields.Task.RECURRENCE_SERIES_ID].stringValue() ?: taskId,
-                ),
-                RegistryEntityFields.Task.RECURRENCE_ANCHOR_DATE to JsonValue.stringOrNull(
-                    if (fixed) {
-                        existing.fields[RegistryEntityFields.Task.RECURRENCE_ANCHOR_DATE].stringValue()
-                            ?: currentScheduled
-                    } else {
-                        null
-                    },
-                ),
-                RegistryEntityFields.Task.RECURRENCE_WEEKDAYS to if (usesWeekdays && weekdays.isNotEmpty()) {
-                    JsonValue.ArrayValue(weekdays.sorted().map { JsonValue.IntegerValue(it.toLong()) })
-                } else JsonValue.Null,
-                RegistryEntityFields.Task.RECURRENCE_MONTH_DAY to if (usesMonthRules && monthDay != null) {
-                    JsonValue.IntegerValue(monthDay.toLong())
-                } else JsonValue.Null,
-                RegistryEntityFields.Task.RECURRENCE_ORDINAL_WEEKDAY to if (usesMonthRules && ordinalWeekday != null) {
-                    JsonValue.ObjectValue(
-                        mapOf(
-                            "ordinal" to JsonValue.IntegerValue(ordinalWeekday.first.toLong()),
-                            "weekday" to JsonValue.IntegerValue(ordinalWeekday.second.toLong()),
-                        ),
-                    )
-                } else JsonValue.Null,
+        if (savedTask == null) return
+        val rule = unit?.let {
+            RecurrenceRule(
+                unit = it,
+                interval = interval.coerceIn(1L, 99L).toInt(),
+                afterCompletion = afterCompletion,
+                weekdays = weekdays.toList(),
+                monthDay = monthDay,
+                ordinalWeekday = ordinalWeekday?.let { (ordinal, weekday) -> OrdinalWeekday(ordinal, weekday) },
             )
         }
-        write { check(graph.taskMutator.updateFields(taskId, changes) != null) }
+        write { check(graph.taskMutator.setRepeat(taskId, rule) != null) }
     }
 
     fun moveToArea(areaId: String?) {
@@ -737,6 +701,20 @@ fun TaskDetailScreen(
             onConfirm = { name, checkBack ->
                 waitingSheetOpen = false
                 write { check(graph.taskMutator.setWaiting(taskId, name, checkBack, changesWhen = true) != null) }
+            },
+        )
+    }
+
+    if (assignDialogOpen) {
+        AssignTaskDialog(
+            graph = graph,
+            taskId = taskId,
+            title = RegistryCatalog.submenuTitle("task.row", "assign", languageTag).orEmpty(),
+            languageTag = languageTag,
+            onDismiss = { assignDialogOpen = false },
+            onPick = { memberId ->
+                assignDialogOpen = false
+                write { check(graph.taskMutator.assign(taskId, memberId) != null) }
             },
         )
     }
@@ -917,10 +895,21 @@ fun TaskDetailScreen(
                                                 }
                                             }
 
-                                            // Waiting On… / Got It Back (docs/REVIEW_SPEC.md §6).
+                                            // Waiting On… / Got It Back (docs/REVIEW_SPEC.md §6) + shared Assign To.
                                             if (isTaskOpen && !isDoPage) {
-                                                val waitingOn = taskFields[RegistryEntityFields.Task.WAITING_ON]
+                                                val manualWaitingOn = taskFields[RegistryEntityFields.Task.WAITING_ON]
                                                     .stringValue()?.trim()?.takeIf(String::isNotEmpty)
+                                                val share = data?.projectShare
+                                                val assignedTo = taskFields[RegistryEntityFields.Task.ASSIGNED_TO].stringValue()
+                                                val assignedBy = taskFields[RegistryEntityFields.Task.ASSIGNED_BY].stringValue()
+                                                val assignedAt = taskFields[RegistryEntityFields.Task.ASSIGNED_AT].stringValue()
+                                                val sharedWaitingOn = if (share != null && !assignedTo.isNullOrBlank() && assignedTo != share.me && assignedBy == share.me) {
+                                                    share.member(assignedTo)?.name ?: assignedTo
+                                                } else null
+                                                val activeWaitingOn = manualWaitingOn ?: sharedWaitingOn
+                                                val activeWaitingSince = if (manualWaitingOn != null) {
+                                                    taskFields[RegistryEntityFields.Task.WAITING_SINCE].stringValue()
+                                                } else assignedAt
                                                 FlowRow(
                                                     verticalArrangement = Arrangement.Center,
                                                     modifier = Modifier.padding(
@@ -928,11 +917,11 @@ fun TaskDetailScreen(
                                                         top = 4.dp,
                                                     ),
                                                 ) {
-                                                    if (waitingOn != null) {
+                                                    if (activeWaitingOn != null) {
                                                         Text(
                                                             text = WaitingCopy.label(
-                                                                waitingOn,
-                                                                taskFields[RegistryEntityFields.Task.WAITING_SINCE].stringValue(),
+                                                                activeWaitingOn,
+                                                                activeWaitingSince,
                                                                 todayDate,
                                                                 languageTag,
                                                             ),
@@ -941,17 +930,19 @@ fun TaskDetailScreen(
                                                             modifier = Modifier.align(Alignment.CenterVertically),
                                                         )
                                                     }
-                                                    TextButton(onClick = { waitingSheetOpen = true }, enabled = canEdit) {
-                                                        Text(
-                                                            RegistryCatalog.actionTitle(
-                                                                RegistryActionIds.TASK_WAITING_ON,
-                                                                languageTag = languageTag,
-                                                            ).orEmpty(),
-                                                        )
+                                                    if (activeWaitingOn == null || manualWaitingOn != null) {
+                                                        TextButton(onClick = { waitingSheetOpen = true }, enabled = canEdit) {
+                                                            Text(
+                                                                RegistryCatalog.actionTitle(
+                                                                    RegistryActionIds.TASK_WAITING_ON,
+                                                                    languageTag = languageTag,
+                                                                ).orEmpty(),
+                                                            )
+                                                        }
                                                     }
-                                                    if (waitingOn != null) {
+                                                    if (activeWaitingOn != null) {
                                                         TextButton(
-                                                            onClick = { write { check(graph.taskMutator.setWaiting(taskId, null) != null) } },
+                                                            onClick = { write { check(graph.taskMutator.gotItBack(taskId) != null) } },
                                                             enabled = canEdit,
                                                         ) {
                                                             Text(
@@ -960,6 +951,18 @@ fun TaskDetailScreen(
                                                                     languageTag = languageTag,
                                                                 ).orEmpty(),
                                                             )
+                                                        }
+                                                    }
+                                                    if (share != null) {
+                                                        val assignLabel = when {
+                                                            assignedTo.isNullOrBlank() ->
+                                                                RegistryCatalog.submenuTitle("task.row", "assign", languageTag).orEmpty()
+                                                            assignedTo == share.me -> sharingCopy(SharingCopy.you, languageTag)
+                                                            else -> share.member(assignedTo)?.name
+                                                                ?: RegistryCatalog.submenuTitle("task.row", "assign", languageTag).orEmpty()
+                                                        }
+                                                        TextButton(onClick = { assignDialogOpen = true }, enabled = canEdit) {
+                                                            Text(assignLabel)
                                                         }
                                                     }
                                                 }
@@ -2242,6 +2245,8 @@ internal suspend fun loadTaskDetail(graph: AndroidAppGraph, taskId: String): Tas
     val conversation = graph.taskStore.record(RegistryEntityNames.CONVO, taskId)?.let { record ->
         TaskConversation.from(record, graph.taskStore.turns(taskId))
     }
+    val projectShare = task.fields[RegistryEntityFields.Task.PROJECT].stringValue()
+        ?.let { app.septena.core.ProjectShare.of(graph.taskStore.record(RegistryEntityNames.PROJECT, it)) }
     return TaskDetailData(
         task = task,
         areas = areas,
@@ -2250,6 +2255,7 @@ internal suspend fun loadTaskDetail(graph: AndroidAppGraph, taskId: String): Tas
         tags = tags,
         attachmentCount = attachmentCount,
         needsReview = conversation?.needsHumanReview == true,
+        projectShare = projectShare,
     )
 }
 

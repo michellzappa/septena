@@ -129,13 +129,15 @@ struct TaskWaitingStrip: View {
           refresh()
         }
         .buttonStyle(.bordered)
-        Button {
-          showingSheet = true
-        } label: {
-          Image(systemName: "pencil")
+        if TaskWaiting.isWaiting(task.waitingOn) {
+          Button {
+            showingSheet = true
+          } label: {
+            Image(systemName: "pencil")
+          }
+          .buttonStyle(.borderless)
+          .accessibilityLabel(RegistryActions.title(.taskWaitingOn))
         }
-        .buttonStyle(.borderless)
-        .accessibilityLabel(RegistryActions.title(.taskWaitingOn))
       } else if offersNewWait {
         Button {
           showingSheet = true
@@ -158,6 +160,66 @@ struct TaskWaitingStrip: View {
   }
 
   private func refresh() {
+    live = LocalCache.task(id: task.id, in: LocalStore.shared.container.mainContext)
+  }
+}
+
+/// Inline Assign To control on the task page for tasks in a shared project
+/// (`docs/PROJECT_SHARING_SPEC.md` §8). Hidden on private projects.
+struct TaskAssigneeStrip: View {
+  let task: SeptenaTask
+
+  @State private var live: SeptenaTask?
+
+  private var current: SeptenaTask { live?.id == task.id ? live ?? task : task }
+
+  var body: some View {
+    let task = current
+    if let share = task.projectShare {
+      let currentLabel: String = {
+        guard let assigned = task.assignedTo else { return SharedProjects.assignTitle }
+        if assigned == share.me { return RegistrySharing.you }
+        return share.name(of: assigned) ?? SharedProjects.assignTitle
+      }()
+      HStack(spacing: Theme.iconTextGap) {
+        Menu {
+          Button {
+            assign(nil)
+          } label: {
+            if task.assignedTo == nil {
+              Label(RegistrySharing.nobody, systemImage: "checkmark")
+            } else {
+              Text(RegistrySharing.nobody)
+            }
+          }
+          ForEach(share.members) { member in
+            let title = member.id == share.me ? "\(member.name) (\(RegistrySharing.you))" : member.name
+            Button {
+              assign(member.id)
+            } label: {
+              if task.assignedTo == member.id {
+                Label(title, systemImage: "checkmark")
+              } else {
+                Text(title)
+              }
+            }
+          }
+        } label: {
+          Label(currentLabel, systemImage: RegistryIcons.sfSymbol(for: "action.assign"))
+            .font(.septenaMeta)
+            .foregroundStyle(task.assignedTo == nil ? Theme.inkSecondary : Theme.inkPrimary)
+        }
+        .buttonStyle(.borderless)
+        Spacer(minLength: 0)
+      }
+    }
+  }
+
+  private func assign(_ memberID: String?) {
+    Haptics.commit()
+    TaskUndo.setAssignee(ids: [task.id], memberID: memberID,
+                         context: LocalStore.shared.container.mainContext,
+                         mutator: SeptenaServices.shared.taskMutator)
     live = LocalCache.task(id: task.id, in: LocalStore.shared.container.mainContext)
   }
 }
