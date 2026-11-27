@@ -164,6 +164,11 @@ function validateTokens(tokens) {
     }
   }
   assert(Array.isArray(tokens.textScale?.steps) && tokens.textScale.steps.length === 5, "tokens.json: textScale must have 5 steps");
+  const cm = tokens.motion?.completion;
+  assert(cm && typeof cm === "object", "tokens.json: missing motion.completion");
+  for (const k of ["settleDelayMs", "fadeOutMs", "checkPopMs", "pulseRingMs"]) {
+    assert(Number.isInteger(cm[k]) && cm[k] > 0, `tokens.json: motion.completion.${k} must be a positive integer`);
+  }
 }
 
 function validateCapabilities(caps) {
@@ -1181,6 +1186,12 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push(`    static let maxInset: Double = ${tokens.desktopColumn.maxInset}`);
   lines.push(`    static let verticalInset: Double = ${tokens.desktopColumn.verticalInset}`);
   lines.push(`    static let titleBarGap: Double = ${tokens.desktopColumn.titleBarGap}`);
+  lines.push("  }");
+  lines.push("  enum CompletionMotion {");
+  lines.push(`    static let settleDelayMs: Int = ${tokens.motion.completion.settleDelayMs}`);
+  lines.push(`    static let fadeOutMs: Int = ${tokens.motion.completion.fadeOutMs}`);
+  lines.push(`    static let checkPopMs: Int = ${tokens.motion.completion.checkPopMs}`);
+  lines.push(`    static let pulseRingMs: Int = ${tokens.motion.completion.pulseRingMs}`);
   lines.push("  }");
   lines.push(`  static let accentPalette: [String] = [${tokens.accentPalette.map(swiftStr).join(", ")}]`);
   lines.push("  static let fruitAccents: [RegistryFruitAccent] = [");
@@ -2530,7 +2541,7 @@ function generateTS({ entities, rules, icons, tokens, caps, settings, dests, act
   lines.push(`export const DESTINATIONS = ${JSON.stringify(dests.destinations)} as const;`);
   lines.push(`export const GENERIC_EMPTY_STATE = ${JSON.stringify(dests.genericEmptyState)} as const;`);
   lines.push(`export const ICONS = ${JSON.stringify(icons.icons)} as const;`);
-  lines.push(`export const DESIGN_TOKENS = ${JSON.stringify({ accentPolicy: tokens.accentPolicy, fruitAccents: tokens.fruitAccents ?? [], textures: tokens.textures ?? [], selection: tokens.selection, colors: tokens.colors, multicolorGlyphs: tokens.multicolorGlyphs?.glyphs ?? {}, accentPalette: tokens.accentPalette, radii: tokens.radii, spacing: tokens.spacing, desktopColumn: tokens.desktopColumn, textScale: tokens.textScale })} as const;`);
+  lines.push(`export const DESIGN_TOKENS = ${JSON.stringify({ accentPolicy: tokens.accentPolicy, fruitAccents: tokens.fruitAccents ?? [], textures: tokens.textures ?? [], selection: tokens.selection, colors: tokens.colors, multicolorGlyphs: tokens.multicolorGlyphs?.glyphs ?? {}, accentPalette: tokens.accentPalette, radii: tokens.radii, spacing: tokens.spacing, desktopColumn: tokens.desktopColumn, textScale: tokens.textScale, motion: tokens.motion })} as const;`);
   lines.push(`export const CAPABILITIES = ${JSON.stringify(caps.capabilities)} as const;`);
   lines.push(`export const ACTIONS_CATALOG = ${JSON.stringify({ actions: actions.actions, contextMenus: actions.contextMenus, menuBar: actions.menuBar, shortcutsSheet: actions.shortcutsSheet })} as const;`);
   lines.push(`export const SURFACES_CATALOG = ${JSON.stringify({ notices: surfaces.notices, prompts: surfaces.prompts, toasts: surfaces.toasts, taskAttributes: surfaces.taskAttributes, taskDateBoard: surfaces.taskDateBoard, taskPage: surfaces.taskPage, waiting: surfaces.waiting, sharing: surfaces.sharing, accountSwitch: surfaces.accountSwitch, deviceSignIn: surfaces.deviceSignIn, quickFind: surfaces.quickFind, checklistProjects: surfaces.checklistProjects, listSort: surfaces.listSort, support: surfaces.support })} as const;`);
@@ -2709,6 +2720,14 @@ function generateKotlinCore(bundle) {
     const literal = Number.isInteger(value) ? `${value}L` : `${value}`;
     lines.push(`    const val ${kotlinConstName(key)}: ${type} = ${literal}`);
   }
+  lines.push("}");
+  lines.push("");
+  lines.push("/** Standard task-completion settle and checkbox motion (`registry/tokens.json` `motion.completion`). */");
+  lines.push("object RegistryCompletionMotion {");
+  lines.push(`    const val SETTLE_DELAY_MS: Long = ${tokens.motion.completion.settleDelayMs}L`);
+  lines.push(`    const val FADE_OUT_MS: Int = ${tokens.motion.completion.fadeOutMs}`);
+  lines.push(`    const val CHECK_POP_MS: Int = ${tokens.motion.completion.checkPopMs}`);
+  lines.push(`    const val PULSE_RING_MS: Int = ${tokens.motion.completion.pulseRingMs}`);
   lines.push("}");
   lines.push("");
 

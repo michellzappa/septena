@@ -225,6 +225,8 @@ The two sanctioned exceptions are `LogCommit.swift` and `CommitMotion.swift`, wh
 
 **A task list moves as whole rows.** When a row leaves, arrives or folds, the title, the checkbox and the card surface of every other row move as one piece, on one curve:
 
+- **Standard completion settle (`tokens.json` `motion.completion`):** On Apple, Android, and Web, checking off a task plays a brief checkbox stamp pop (`checkPopMs`: 280 ms) plus outward pulse ring (`pulseRingMs`: 400 ms, skipped under Reduce Motion or when logging animations are off), immediately restyles the row as checked and struck through in place, holds the row for `settleDelayMs` (3000 ms — re-tapping unchecks and aborts the fade), and then fades the row out over `fadeOutMs` (350 ms) while sibling rows slide smoothly into place. Switching lists clears any active settle immediately.
+
 - SwiftUI: everything that can shift in a task list carries `.geometryGroup()` (`taskCardChrome`, `asListRow`, `plainListChrome` and the group headers have it). Without it every leaf animates its own position and the titles drift away from their rows. A row or header leaves with `TaskListRowExit`.
 - Checking a row never changes its layout: the trailing cluster stays until the row leaves (`TaskRow.isSettling`).
 - AppKit: one `beginUpdates`/`endUpdates` batch per reload, height changes included. A height noted after the batch starts a second animation.

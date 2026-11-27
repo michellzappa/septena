@@ -18,9 +18,28 @@ export const SSE_HEARTBEAT_MS = 25_000;
 export const SSE_RETRY_MS = 3_000;
 
 /// Webhook retries after a failed attempt (network error, timeout, 408, 425,
-/// 429 or 5xx). Three attempts in all. A delivery that still fails is left to
-/// the agent's `tasks_agent_events` poll, which carries every event.
+/// 429 or 5xx). Three attempts in all for the direct helper (`deliverWebhookWithRetry`).
 export const WEBHOOK_RETRY_DELAYS_MS: readonly number[] = [1_000, 5_000];
+
+/// Durable outbox retry schedule on the Durable Object alarm (#748):
+/// exponential backoff from 5 s up to 1 hour across 6 retries (7 attempts in all).
+export const WEBHOOK_OUTBOX_BACKOFF_MS: readonly number[] = [
+  5_000,
+  30_000,
+  2 * 60_000,
+  10 * 60_000,
+  30 * 60_000,
+  60 * 60_000,
+];
+
+/// Consecutive failed deliveries after which a webhook is auto-disabled (`enabled = 0`).
+export const WEBHOOK_DISABLE_AFTER_FAILURES = 10;
+
+/// Safety cap on queued outbox rows per webhook.
+export const WEBHOOK_OUTBOX_MAX_ROWS_PER_HOOK = 500;
+
+/// Max outbox rows attempted per drain pass.
+export const WEBHOOK_OUTBOX_BATCH = 50;
 
 /// The kinds that wake an agent. `unpaused` is one: a reply that arrived
 /// while agents were paused woke nobody (every claim was refused), so the end
