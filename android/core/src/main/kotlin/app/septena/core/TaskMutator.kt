@@ -7,6 +7,7 @@ import app.septena.core.generated.RegistryEntityNames
 import app.septena.sharedcore.DateAction
 import app.septena.sharedcore.RescheduleMode
 import java.time.Duration
+import java.time.Instant
 import app.septena.sharedcore.TaskSnapshot as CoreTaskSnapshot
 import app.septena.sharedcore.applyDateAction as coreApplyDateAction
 import app.septena.sharedcore.nextOccurrenceDates as coreNextOccurrenceDates
@@ -20,6 +21,27 @@ class TaskMutator(
     private val doSessions: DoSessionMutator? = null,
     private val sourceClient: String = "Septena Android",
 ) {
+    /**
+     * Inline-create drafts whose push waits for the first title (Apple's
+     * `deferPush`). Every write to one stays local until a write sets a
+     * non-blank title; that write releases the merged insert to the server.
+     */
+    private val deferredDrafts: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
+
+    /** When a write to [id] may be sent. A blank draft stays local. */
+    private fun pushTime(id: String, changes: Map<String, JsonValue>): Instant {
+        if (id !in deferredDrafts) return Instant.EPOCH
+        val title = changes[RegistryEntityFields.Task.TITLE]?.stringValue()
+        if (title != null && title.isNotBlank()) {
+            deferredDrafts.remove(id)
+            return Instant.EPOCH
+        }
+        return DEFERRED_PUSH
+    }
+
+    /** True while [id] is an inline draft that has never had a title. */
+    fun isUnsentDraft(id: String): Boolean = id in deferredDrafts
+
     suspend fun create(
         title: String,
         area: String? = null,
@@ -31,6 +53,11 @@ class TaskMutator(
         source: String = app.septena.core.generated.RegistryEntityEnums.TaskSource.APP,
         heading: String? = null,
         position: Double? = null,
+        /**
+         * An inline-create draft (empty title): the row stays on this device
+         * until its first title write, like Apple's `deferPush`.
+         */
+        deferPush: Boolean = false,
     ): TaskRecord = createTask(
         title = title,
         area = area,
@@ -43,6 +70,7 @@ class TaskMutator(
         kind = null,
         heading = heading,
         position = position,
+        deferPush = deferPush,
     )
 
     suspend fun createHeading(title: String, project: String, position: Double? = null): TaskRecord = createTask(
@@ -71,6 +99,7 @@ class TaskMutator(
         kind: String?,
         heading: String?,
         position: Double?,
+        deferPush: Boolean = false,
     ): TaskRecord {
         val id = ids.nextTaskId()
         val normalizedTitle = title.trim { it.isWhitespace() }
@@ -97,7 +126,12 @@ class TaskMutator(
         RegistryValidator.requireValidUpsert(RegistryEntityNames.TASK, id, fields, insert = true)
 
         val task = TaskRecord(id, fields)
-        store.writeLocalAndEnqueue(task.asSyncRecord(), task.toUpsert(ids.nextClientOpId()))
+        if (deferPush) deferredDrafts += id
+        store.writeLocalAndEnqueue(
+            task.asSyncRecord(),
+            task.toUpsert(ids.nextClientOpId()),
+            if (deferPush) DEFERRED_PUSH else Instant.EPOCH,
+        )
         return task
     }
 
@@ -110,7 +144,7 @@ class TaskMutator(
         RegistryValidator.requireValidUpsert(RegistryEntityNames.TASK, id, changes, insert = false)
         val updated = existing.changing(changes)
         val operation = SyncOperation.Upsert(ids.nextClientOpId(), RegistryEntityNames.TASK, id, changes)
-        store.writeLocalAndEnqueue(updated.asSyncRecord(), operation)
+        store.writeLocalAndEnqueue(updated.asSyncRecord(), operation, pushTime(id, changes))
         return updated
     }
 
@@ -130,6 +164,7 @@ class TaskMutator(
                 ids.nextClientOpId(), RegistryEntityNames.TASK, id, changes,
                 base = NotesBase.of(RegistryEntityNames.TASK, changes, existing.fields, notesBase),
             ),
+            pushTime(id, changes),
         )
         if (RegistryEntityFields.Task.STATUS in changes || RegistryEntityFields.Task.FADED_AT in changes) endDoIfClosed(updated)
         return updated
@@ -764,10 +799,16 @@ class TaskMutator(
     /** Permanently removes a soft-deleted task (Delete Permanently / Empty Trash, #460). */
     suspend fun purge(id: String): Boolean {
         store.record(RegistryEntityNames.TASK, id) ?: return false
+        deferredDrafts.remove(id)
         val operation = SyncOperation.Delete(ids.nextClientOpId(), RegistryEntityNames.TASK, id)
         doSessions?.purge(id)
         store.purgeLocalAndEnqueue(RegistryEntityNames.TASK, id, operation)
         return true
+    }
+
+    companion object {
+        /** The not-before time of a draft's queued insert: never, until a title write releases it. */
+        val DEFERRED_PUSH: Instant = Instant.ofEpochMilli(Long.MAX_VALUE)
     }
 
     private fun validateTitle(title: String) {

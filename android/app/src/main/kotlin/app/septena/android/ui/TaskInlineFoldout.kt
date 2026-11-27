@@ -51,6 +51,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -124,6 +126,16 @@ internal fun TaskInlineFoldout(
     onOpenFullPage: (String) -> Unit,
     onCollapse: () -> Unit,
     modifier: Modifier = Modifier,
+    /**
+     * An inline-create draft (InlineDraft.kt): the title field takes focus,
+     * Return with a blank title folds, and a fold with nothing typed purges it.
+     */
+    isDraft: Boolean = false,
+    /**
+     * True while the host still shows this row expanded. A lazy list disposes a
+     * row that scrolls off screen; that is not a fold, so a draft is kept.
+     */
+    isStillOpen: () -> Boolean = { false },
 ) {
     val languageTag = LocalConfiguration.current.locales[0].toLanguageTag()
     val labels = remember(languageTag) { TaskDetailLabels.fromRegistry(languageTag) }
@@ -191,6 +203,13 @@ internal fun TaskInlineFoldout(
         val title = rawTitle.trim()
         if (title.isEmpty()) return false
         val currentTitle = current.task.fields[RegistryEntityFields.Task.TITLE].stringValue().orEmpty()
+        if (isDraft && currentTitle.isBlank()) {
+            // The draft's first title: tokens, `# Heading`, and the deferred push (InlineDraft.kt).
+            val commit = withContext(Dispatchers.IO) { graph.commitInlineDraft(taskId, title, rawNotes) }
+            graph.sync.noteLocalChange()
+            graph.sync.requestSync()
+            return commit != InlineDraftCommit.NoChange
+        }
         val currentNotes = current.task.fields[RegistryEntityFields.Task.NOTES].stringValue().orEmpty()
         val notes = rawNotes.trim()
         val titleChanged = title != currentTitle && title != baseTitle.trim()
@@ -239,7 +258,14 @@ internal fun TaskInlineFoldout(
     // Folding by tapping another row or leaving the list autosaves pending text edits.
     DisposableEffect(taskId) {
         onDispose {
-            if (latestDirty) {
+            if (isDraft && latestTitle.isBlank() && !isStillOpen()) {
+                // Nothing typed: drop the draft. It never left this device.
+                graph.launch {
+                    if (runCatching { graph.discardInlineDraftIfEmpty(taskId) }.getOrDefault(false)) {
+                        graph.sync.noteLocalChange()
+                    }
+                }
+            } else if (latestDirty) {
                 val snap = latestData
                 val t = latestTitle
                 val n = latestNotes
@@ -251,7 +277,8 @@ internal fun TaskInlineFoldout(
     }
 
     fun saveThen(then: () -> Unit) {
-        if (!textIsDirty || data == null) {
+        // A blank draft folds at once; the fold drops it (Apple: blank Return only closes).
+        if (!textIsDirty || data == null || (isDraft && titleDraft.isBlank())) {
             then()
             return
         }
@@ -268,6 +295,8 @@ internal fun TaskInlineFoldout(
     fun handleOpenFullPage() = saveThen { onOpenFullPage(taskId) }
 
     BackHandler(enabled = openSheet == null, onBack = ::handleCollapse)
+
+    val titleFocus = remember(taskId) { FocusRequester() }
 
     val taskFields = data?.task?.fields.orEmpty()
     val deleted = data?.task?.deletedAt != null
@@ -353,6 +382,12 @@ internal fun TaskInlineFoldout(
 
     val savedTask = data?.task
     val canEdit = savedTask != null && !deleted && !saving
+    // A new draft opens with the keyboard on its title (Apple focuses deferred-create drafts only).
+    // Keyed on the load: the field takes focus once it can be edited.
+    val draftCanFocus = isDraft && savedTask != null && !deleted
+    LaunchedEffect(taskId, draftCanFocus) {
+        if (draftCanFocus) runCatching { titleFocus.requestFocus() }
+    }
     val completeAction = RegistryCatalog.actionTitle(RegistryActionIds.TASK_TOGGLE_COMPLETE, languageTag = languageTag).orEmpty()
     val openAction = RegistryCatalog.actionTitle(RegistryActionIds.TASK_OPEN, languageTag = languageTag).orEmpty()
     val collapseAction = RegistryCatalog.actionTitle(RegistryActionIds.DO_DONE, languageTag = languageTag).orEmpty()
@@ -678,6 +713,7 @@ internal fun TaskInlineFoldout(
                             keyboardActions = KeyboardActions(onDone = { handleCollapse() }),
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .focusRequester(titleFocus)
                                 .semantics { contentDescription = labels.field(RegistryTaskDetail.Fields.TITLE) },
                         )
                     }
