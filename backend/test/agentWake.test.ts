@@ -485,6 +485,8 @@ describe("outbound agent webhooks (/v1/agent/webhooks + signed dispatch)", () =>
 
     try {
       const { store, flushWaitUntil } = await createTestTaskStore();
+      // One attempt per event here: test/agentLoop.test.ts covers the retries.
+      (store as unknown as { webhookRetryDelaysMs: number[] }).webhookRetryDelaysMs = [];
       const secret = "whsec_verify_me_1234567890abcdef";
       const active = store.createAgentWebhook("https://hooks.example.com/wake", secret, true);
       assert.equal(active.ok, true);
@@ -587,6 +589,7 @@ describe("task-runner-wake.mjs SSE parser & backoff", () => {
     assert.equal(isWakeEvent("assigned"), true);
     assert.equal(isWakeEvent("user_turn"), true);
     assert.equal(isWakeEvent("resumed"), true);
+    assert.equal(isWakeEvent("unpaused"), true);
     assert.equal(isWakeEvent("paused"), false);
     assert.equal(isWakeEvent("stopped"), false);
     assert.ok(backoffDelayMs(0, 1000, 60_000, () => 0.5) === 1000);
