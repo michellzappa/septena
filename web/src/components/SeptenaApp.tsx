@@ -70,7 +70,7 @@ import {
   PLAN_UI,
 } from "@/lib/generated/registries";
 import { hexWithAlpha, type HeaderTextureStyle } from "@/lib/headerWash";
-import { groupTasksByList, moveIdToTarget, orderByPosition, positionAbove } from "@/lib/listOrder";
+import { groupTasksByList, moveIdToTarget, orderByPosition, positionAbove, positionBelow } from "@/lib/listOrder";
 import {
   LIST_SORT_OPTIONS,
   LIST_SORT_SURFACE,
@@ -121,7 +121,7 @@ import type {
 } from "@/lib/types";
 import { nextIsoDay } from "@/lib/upcomingGroups";
 import { AccountSwitchDialog, type AccountSwitchChoice } from "./AccountSwitchDialog";
-import { ContextMenu, type ContextMenuState } from "./ContextMenu";
+import { ContextMenu, type ContextMenuEntry, type ContextMenuState } from "./ContextMenu";
 import { DateBoardPopover, anchorOf, type DateBoardAnchor } from "./DateBoard";
 import { FadeSweepModal } from "./FadeSweepModal";
 import { FirstRunModal } from "./FirstRunModal";
@@ -266,6 +266,9 @@ export function SeptenaApp() {
   const [tagFilterId, setTagFilterId] = useState<string | null>(null);
   const [assigneeFilter, setAssigneeFilter] = useState<string | null>(null);
   const [composerTitle, setComposerTitle] = useState("");
+  // New Task in Section (registry section.newTask): an inline composer under one heading.
+  // A task is created only on submit with a title, so there is no empty draft row to purge.
+  const [sectionComposer, setSectionComposer] = useState<{ headingId: string; title: string } | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Modals & notices
@@ -2172,6 +2175,64 @@ export function SeptenaApp() {
       supportsInlineCreate: true,
     };
   }, [areaById, destination, lang, logbookTab, projectById]);
+
+  // Apple startCreateUnderHeading: the new task joins the section at the bottom of the project.
+  const submitSectionComposer = async (e: React.FormEvent, heading: TaskRow) => {
+    e.preventDefault();
+    const title = sectionComposer?.title.trim();
+    setSectionComposer(null);
+    if (!title || !heading.project) return;
+    const last = syncState.snapshot.tasks.reduce<number | null>((max, t) => {
+      if (t.deletedAt || t.project !== heading.project || t.kind === "heading") return max;
+      const p = t.position;
+      return typeof p === "number" && Number.isFinite(p) && (max === null || p > max) ? p : max;
+    }, null);
+    await engine.createTask({
+      title,
+      project: heading.project,
+      area: projectById.get(heading.project)?.area ?? null,
+      heading: heading.id,
+      position: positionBelow(last),
+    });
+  };
+
+  // The section header's context menu, rendered from registry/actions.json "project.heading".
+  const headingMenuItems = (h: TaskRow): ContextMenuEntry[] => {
+    const handlers: Record<string, { onSelect: () => void; destructive?: boolean }> = {
+      "section.rename": {
+        onSelect: () => {
+          const next = window.prompt(registryText(ACTIONS_CATALOG.actions["section.rename"].title, lang), h.title)?.trim();
+          if (next && next !== h.title) void engine.updateTaskFields(h, { title: next });
+        },
+      },
+      "section.newTask": { onSelect: () => setSectionComposer({ headingId: h.id, title: "" }) },
+      "section.delete": {
+        destructive: true,
+        onSelect: () => {
+          if (window.confirm("Delete this section? Its tasks stay in the project.")) {
+            void engine.deleteTask(h);
+          }
+        },
+      },
+    };
+    const actions = ACTIONS_CATALOG.actions as Record<string, { title: string }>;
+    const items: ContextMenuEntry[] = [];
+    for (const entry of ACTIONS_CATALOG.contextMenus["project.heading"]) {
+      if (entry.kind === "divider") {
+        if (items.length > 0 && items[items.length - 1].kind !== "divider") items.push({ kind: "divider" });
+        continue;
+      }
+      const handler = handlers[entry.id];
+      if (!handler) continue;
+      items.push({
+        kind: "item",
+        label: registryText(actions[entry.id]?.title ?? entry.id, lang),
+        destructive: handler.destructive,
+        onSelect: handler.onSelect,
+      });
+    }
+    return items;
+  };
 
   const handleQuickAddInline = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -4771,35 +4832,39 @@ export function SeptenaApp() {
                         },
                         onContextMenu: (e) => {
                           e.preventDefault();
-                          setContextMenu({
-                            x: e.clientX,
-                            y: e.clientY,
-                            items: [
-                              {
-                                kind: "item",
-                                label: "Rename Section",
-                                onSelect: () => {
-                                  const next = window.prompt("Rename Section", h.title)?.trim();
-                                  if (next && next !== h.title) void engine.updateTaskFields(h, { title: next });
-                                },
-                              },
-                              { kind: "divider" },
-                              {
-                                kind: "item",
-                                label: "Delete Section",
-                                destructive: true,
-                                onSelect: () => {
-                                  if (window.confirm("Delete this section? Its tasks stay in the project.")) {
-                                    void engine.deleteTask(h);
-                                  }
-                                },
-                              },
-                            ],
-                          });
+                          setContextMenu({ x: e.clientX, y: e.clientY, items: headingMenuItems(h) });
                         },
                       })}
                       {under.length > 0 && (
                         <div className={taskCardClass}>{under.map((i) => renderTaskRow(i))}</div>
+                      )}
+                      {sectionComposer?.headingId === h.id && (
+                        <form
+                          onSubmit={(e) => void submitSectionComposer(e, h)}
+                          className={`mt-2 flex items-center gap-2.5 rounded-[14px] border border-[var(--accent)] px-3 py-2.5 ${
+                            canvasTexture !== "none"
+                              ? "bg-[var(--bg-card-glass)] backdrop-blur-md"
+                              : "bg-[var(--bg-card)]"
+                          }`}
+                        >
+                          <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center text-[var(--text-muted)]">
+                            <Plus className="h-[17px] w-[17px]" />
+                          </span>
+                          <input
+                            type="text"
+                            autoFocus
+                            value={sectionComposer.title}
+                            onChange={(e) => setSectionComposer({ headingId: h.id, title: e.target.value })}
+                            onKeyDown={(e) => {
+                              if (e.key === "Escape") setSectionComposer(null);
+                            }}
+                            onBlur={() => {
+                              if (!sectionComposer.title.trim()) setSectionComposer(null);
+                            }}
+                            placeholder={`New task in ${h.title}…`}
+                            className="min-w-0 flex-1 bg-transparent text-[15px] text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)]"
+                          />
+                        </form>
                       )}
                     </section>
                   );

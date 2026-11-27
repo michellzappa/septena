@@ -166,3 +166,13 @@ export function positionAbove(below: number | null | undefined): number {
   const slot = below - TASK_ORDER_GAP;
   return slot === 0 ? slot - TASK_ORDER_GAP / 2 : slot;
 }
+
+/**
+ * Apple `TaskOrder.between(above:, below: nil)`: the position for one task placed after
+ * `above` (the last task of a list), or the first position of an empty list. Never 0.
+ */
+export function positionBelow(above: number | null | undefined): number {
+  if (typeof above !== "number" || !Number.isFinite(above)) return TASK_ORDER_GAP;
+  const slot = above + TASK_ORDER_GAP;
+  return slot === 0 ? slot + TASK_ORDER_GAP / 2 : slot;
+}

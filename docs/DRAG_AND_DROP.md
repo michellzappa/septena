@@ -68,6 +68,11 @@ On the web, a project heading drags onto another heading to take its slot
 same accent top border as a task-row drop, in a sorted or Manual project.
 It writes the headings' `position` through `engine.reorderTasks`, the task-row
 reorder path, which never writes 0.
+A task dropped on a section header files into that section
+(`handleTaskDropOnHeading`): at the top of its tasks in Manual
+(`positionAbove`, a port of `TaskOrder.between`), with no `position` in a
+sorted project. Row reorder, section reorder and filing each record one entry
+on the web `UndoStack` at the drop.
 
 ---
 
