@@ -3494,11 +3494,18 @@ export function SeptenaApp() {
   const hasAnyActiveTasks = syncState.snapshot.tasks.some((t) => !t.deletedAt && t.kind !== "heading");
   const todayIconColor = isColorfulAccent ? "var(--today-gold)" : "var(--accent)";
 
-  const renderSidebarButton = (dest: (typeof sidebarDestinations.top)[number]) => {
+  const renderSidebarButton = (
+    dest: (typeof sidebarDestinations.top)[number],
+    placement: "top" | "bottom",
+  ) => {
     const selected = destination.kind === "smart" && destination.id === dest.id;
     const count = smartCounts.counts[dest.id];
     const isDropOver = dropTargetSidebar === `smart:${dest.id}`;
     const destHref = destinationPath({ kind: "smart", id: dest.id });
+    const unselectedInk =
+      placement === "top"
+        ? "text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
+        : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]";
     return (
       <a
         key={dest.id}
@@ -3524,7 +3531,7 @@ export function SeptenaApp() {
             ? "ring-2 ring-[var(--accent)] bg-[var(--bg-selected)] text-[var(--text-primary)]"
             : selected
               ? "bg-[var(--bg-selected)] font-medium text-[var(--text-primary)]"
-              : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+              : unselectedInk
         }`}
       >
         <RegistryIcon
@@ -3617,7 +3624,7 @@ export function SeptenaApp() {
             }
           }}
         >
-          {sidebarDestinations.top.map(renderSidebarButton)}
+          {sidebarDestinations.top.map((d) => renderSidebarButton(d, "top"))}
         </div>
 
         <div className="mt-4 border-t border-[var(--border-subtle)] pt-3">
@@ -4132,7 +4139,7 @@ export function SeptenaApp() {
 
         {sidebarDestinations.bottom.length > 0 && (
           <div className="mt-4 space-y-0.5 border-t border-[var(--border-subtle)] pt-3">
-            {sidebarDestinations.bottom.map(renderSidebarButton)}
+            {sidebarDestinations.bottom.map((d) => renderSidebarButton(d, "bottom"))}
           </div>
         )}
       </nav>
