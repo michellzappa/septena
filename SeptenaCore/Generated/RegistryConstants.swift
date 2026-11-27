@@ -2479,7 +2479,7 @@ enum RegistryPlans {
   static let trialDays = 14
   static var trialTitle: String { RegistryL10n.t("Every new account starts with 14 days of Plus") }
   static var trialDetail: String { RegistryL10n.t("You do not need a card. After 14 days the account becomes a free account, and your tasks stay where they are.") }
-  static var priceFootnote: String { RegistryL10n.t("Prices include VAT where it applies. Outside the euro area, the App Store charges its matching local price.") }
+  static var priceFootnote: String { RegistryL10n.t("Prices include VAT where it applies. Outside the euro area, the App Store and Google Play charge their matching local price.") }
   static var prices: [RegistryPlanPrice] { [
     RegistryPlanPrice(id: "annual", productId: "com.septena.tasks.sync.annual", amountMinor: 6000, currency: "EUR", interval: "year", highlighted: true, label: RegistryL10n.t("€60 a year"), detail: RegistryL10n.t("€5 a month. You save €24 against paying monthly.")),
     RegistryPlanPrice(id: "monthly", productId: "com.septena.tasks.sync.monthly", amountMinor: 700, currency: "EUR", interval: "month", highlighted: false, label: RegistryL10n.t("€7 a month"), detail: RegistryL10n.t("Cancel at any time.")),

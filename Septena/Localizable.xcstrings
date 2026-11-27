@@ -29111,6 +29111,10 @@
       "comment" : "Generated from registry plans.currencies.0.footnote. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
+    "Prices include VAT where it applies. Outside the euro area, the App Store and Google Play charge their matching local price." : {
+      "comment" : "Generated from registry plans.priceFootnote. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Prices include VAT where it applies. Outside the euro area, the App Store charges its matching local price." : {
       "comment" : "Generated from registry plans.priceFootnote. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",

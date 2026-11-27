@@ -862,46 +862,6 @@ function validatePlans(plans, icons, caps, importSources) {
   for (const f of ["title", "detail", "label", "rateDetail", "action"]) assert(typeof pass[f] === "string" && pass[f].length > 0, `plans.json: pass.${f} missing`);
   assert(pass.label.includes(String(pass.amountMinor / 100)), `plans.json: pass.label must state ${pass.amountMinor / 100}`);
 
-  // ADR 0060: pinned currencies (EUR baseline + USD, GBP, BRL) for the pricing
-  // page and web checkout. EUR amounts must stay in lockstep with prices/proPrices.
-  assert(plans.defaultCurrency === "EUR", "plans.json: defaultCurrency must be EUR (ADR 0060)");
-  assert(Array.isArray(plans.currencies) && plans.currencies.length > 0, "plans.json: currencies missing (ADR 0060)");
-  const curCodes = new Set();
-  const curCountries = new Set();
-  for (const cur of plans.currencies) {
-    assert(/^[A-Z]{3}$/.test(cur.code) && !curCodes.has(cur.code), `plans.json: bad or duplicate currency "${cur.code}"`);
-    curCodes.add(cur.code);
-    assert(typeof cur.symbol === "string" && cur.symbol.length > 0, `plans.json: currency ${cur.code} needs symbol`);
-    assert(typeof cur.taxInclusive === "boolean", `plans.json: currency ${cur.code} needs taxInclusive boolean`);
-    assert(typeof cur.freeLabel === "string" && cur.freeLabel.includes("0"), `plans.json: currency ${cur.code} needs freeLabel`);
-    assert(typeof cur.footnote === "string" && cur.footnote.length > 0, `plans.json: currency ${cur.code} needs footnote`);
-    assert(Array.isArray(cur.countries), `plans.json: currency ${cur.code} countries must be an array`);
-    for (const cc of cur.countries) {
-      assert(/^[A-Z]{2}$/.test(cc) && !curCountries.has(cc), `plans.json: currency ${cur.code} bad or duplicate country "${cc}"`);
-      curCountries.add(cc);
-    }
-    for (const tier of ["plus", "pro"]) {
-      for (const iv of ["year", "month"]) {
-        const entry = cur[tier]?.[iv];
-        assert(entry && Number.isInteger(entry.amountMinor) && entry.amountMinor > 0, `plans.json: currency ${cur.code}.${tier}.${iv} needs positive integer amountMinor`);
-        const whole = String(entry.amountMinor / 100);
-        assert(typeof entry.label === "string" && entry.label.includes(whole), `plans.json: currency ${cur.code}.${tier}.${iv} label must state ${whole}`);
-        assert(typeof entry.detail === "string" && entry.detail.length > 0, `plans.json: currency ${cur.code}.${tier}.${iv} needs detail`);
-      }
-    }
-    const curPass = cur.plus?.pass;
-    assert(curPass && Number.isInteger(curPass.amountMinor) && curPass.amountMinor > 0, `plans.json: currency ${cur.code}.plus.pass needs positive integer amountMinor`);
-    const passWhole = String(curPass.amountMinor / 100);
-    assert(typeof curPass.label === "string" && curPass.label.includes(passWhole), `plans.json: currency ${cur.code}.plus.pass label must state ${passWhole}`);
-    assert(typeof curPass.detail === "string" && curPass.detail.length > 0, `plans.json: currency ${cur.code}.plus.pass needs detail`);
-    assert(cur.pro?.pass === undefined, `plans.json: currency ${cur.code}.pro must not have a pass (ADR 0061)`);
-  }
-  const eurCur = plans.currencies.find((c) => c.code === plans.defaultCurrency);
-  assert(eurCur, "plans.json: defaultCurrency must exist in currencies");
-  for (const pr of plans.prices) assert(eurCur.plus[pr.interval].amountMinor === pr.amountMinor, `plans.json: EUR plus.${pr.interval} must match prices.${pr.id}`);
-  for (const pr of plans.proPrices) assert(eurCur.pro[pr.interval].amountMinor === pr.amountMinor, `plans.json: EUR pro.${pr.interval} must match proPrices.${pr.id}`);
-  assert(eurCur.plus.pass.amountMinor === plans.pass.amountMinor, "plans.json: EUR plus.pass must match pass.amountMinor");
-
   assert(JSON.stringify(plans.levels.map((l) => l.id)) === JSON.stringify(PLAN_LEVELS), `plans.json: levels must be ${PLAN_LEVELS.join(", ")}`);
   assert(JSON.stringify(plans.cards.map((c) => c.id)) === JSON.stringify(PLAN_LEVELS), `plans.json: cards must be ${PLAN_LEVELS.join(", ")}`);
   // ADR 0059: Pro sells like Plus, so no card carries a status: every card is on sale.

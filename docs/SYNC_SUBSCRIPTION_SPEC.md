@@ -651,18 +651,19 @@ on every device.
   verifier (`backend/src/entitlement/appleJws.ts`) is superseded once
   RevenueCat integration ships. Task data and sync traffic never touch
   RevenueCat.
-- **Currencies (ADR 0060):** EUR is the baseline. Top markets are pinned to
-  clean `.00` prices on App Store Connect, Google Play and Web/Windows
-  checkout; all other store storefronts auto-equalize from the EUR base:
-  - **Plus:** `€7 / €60 / €210 (7 yrs)` (incl. VAT), `$7 / $60 / $210 (7 yrs)` (+ applicable tax), `£6 / £50 / £175 (7 yrs)` (incl. VAT), `R$ 29 / R$ 240 / R$ 840 (7 yrs)` (BRL PPP, incl. taxes) — 7-Year Pass decided in ADR 0061
-  - **Pro:** `€14 / €120` (incl. VAT), `$14 / $120` (+ applicable tax), `£12 / £100` (incl. VAT), `R$ 58 / R$ 480` (BRL PPP, incl. taxes) — subscription-only (ADR 0061)
-  - **Web & Windows:** Fixed EUR, USD, GBP and BRL prices matching the pinned
-    store numbers (no dynamic FX conversion on subscriptions). Stripe Tax
-    calculates VAT; Envisioning Technology files EU VAT through the One Stop
+- **Currencies (ADR 0060, amended 2026-11-27):** EUR is the single baseline
+  (`€7 / €60 / €210 (7 yrs)` Plus, `€14 / €120` Pro; 7-Year Pass decided in
+  ADR 0061). No manual currency pinning across stores: App Store Connect and
+  Google Play auto-equalize every storefront from the EUR base.
+  - **Web & Windows:** EUR baseline via RevenueCat / Stripe; Stripe Tax
+    calculates VAT and Envisioning Technology files EU VAT through the One Stop
     Shop.
-  - **Pricing page (`/pricing` and home plan cards):** Geo-defaults to EUR,
-    USD, GBP or BRL via `/api/geo` (`CF-IPCountry`) with a quiet inline
-    currency switcher above the plan cards and currency-aware tax footnotes.
+  - **Pricing page (`/pricing` and home plan cards):** Quiet inline currency
+    dropdown above the plan cards with the Big 3 (`EUR`, `USD`, `GBP`) on top
+    and the next 10 major currencies below. Visitors from any other country
+    automatically see their own local currency converted from EUR via `/api/geo`
+    (`CF-IPCountry` + daily edge-cached EUR FX rates), with an approximate-price
+    footnote.
   - **Annual price lock:** Locked in purchase currency within the same store;
     protects Septena's subscription price tier, excluding statutory tax changes.
 - **No double payment:** an account on Plus or Pro from any source sees no buy
