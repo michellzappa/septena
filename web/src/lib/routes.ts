@@ -50,7 +50,7 @@ const SMART_CANONICAL_PATH: Record<SmartDestination, string> = {
   upcoming: "/upcoming",
   repeating: "/repeating",
   anytime: "/anytime",
-  starred: "/favorites",
+  starred: "/starred",
   logbook: "/logbook",
 };
 
@@ -230,17 +230,11 @@ export function parseWebRoute(pathname: string, search = ""): ParsedWebRoute {
         destination: { kind: "smart", id: "anytime" },
         canonicalize: true,
       };
-    case "favorites":
-      return {
-        ...base,
-        destination: { kind: "smart", id: "starred" },
-        canonicalize: segments.length > 1 || segments[0] !== "favorites" || hasTrailingSlash,
-      };
     case "starred":
       return {
         ...base,
         destination: { kind: "smart", id: "starred" },
-        canonicalize: true,
+        canonicalize: segments.length > 1 || segments[0] !== "starred" || hasTrailingSlash,
       };
     case "logbook": {
       const sub = segments[1]?.toLowerCase();

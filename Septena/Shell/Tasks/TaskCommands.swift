@@ -26,7 +26,7 @@ struct TaskActions {
   var doTask: (() -> Void)?
   var duplicate: (() -> Void)?
   var copy: (() -> Void)?
-  /// Favorite / unfavorite the selected row(s) — ⌥⌘S.
+  /// Star / unstar the selected row(s) — ⌥⌘S.
   var toggleStar: (() -> Void)? = nil
   /// Open the tag picker for the selected row(s) — ⇧⌘T.
   var openTags: (() -> Void)? = nil

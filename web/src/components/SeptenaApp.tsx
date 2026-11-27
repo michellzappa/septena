@@ -1304,7 +1304,7 @@ export function SeptenaApp() {
     return result.groups.length > 0 ? result : null;
   }, [activeAreas, activeProjects, destination, prefs.todayGroupByList, todayCommittedTasks]);
 
-  // Anytime & Favorites also group by Area & Project in sidebar order (1:1 with iOS/Mac).
+  // Anytime & Starred also group by Area & Project in sidebar order (1:1 with iOS/Mac).
   const smartListGroups = useMemo(() => {
     if (
       !(
@@ -2781,7 +2781,7 @@ export function SeptenaApp() {
             },
             {
               kind: "item",
-              label: task.starred ? "Unfavorite" : "Favorite",
+              label: task.starred ? "Unstar" : "Star",
               shortcut: "⌘⌥S",
               onSelect: () => void engine.toggleTaskStar(task),
             },
@@ -3211,7 +3211,7 @@ export function SeptenaApp() {
             if (singleOnly) void engine.toggleTaskStar(single);
             else void engine.bulkUpdateTasks(activeSelectedTasks, { starred: !single.starred });
           },
-          { keywords: ["star", "favorite", "pin"], contextual: true },
+          { keywords: ["star", "pin"], contextual: true },
         ),
       );
 

@@ -1718,25 +1718,6 @@
       "surfaces.fadeSweep.title"
     ]
   },
-  "Favorite": {
-    "text": "Favorite",
-    "paths": [
-      "actions.actions.task.toggleStar.addTitle",
-      "surfaces.taskAttributes.star.label"
-    ]
-  },
-  "Favorite important tasks to keep them one tap away.": {
-    "text": "Favorite important tasks to keep them one tap away.",
-    "paths": [
-      "destinations.destinations.starred.emptyState.detail"
-    ]
-  },
-  "Favorites": {
-    "text": "Favorites",
-    "paths": [
-      "destinations.destinations.starred.title"
-    ]
-  },
   "Field Matrix": {
     "text": "Field Matrix",
     "paths": [
@@ -2676,12 +2657,6 @@
       "destinations.destinations.faded.emptyState.title"
     ]
   },
-  "No Favorites": {
-    "text": "No Favorites",
-    "paths": [
-      "destinations.destinations.starred.emptyState.title"
-    ]
-  },
   "No agent work": {
     "text": "No agent work",
     "paths": [
@@ -2770,6 +2745,12 @@
     "text": "No smart lists in this section",
     "paths": [
       "settings.copy.smart_lists_editor.empty.label"
+    ]
+  },
+  "No starred tasks": {
+    "text": "No starred tasks",
+    "paths": [
+      "destinations.destinations.starred.emptyState.title"
     ]
   },
   "No tasks, projects, or areas match your search.": {
@@ -4285,10 +4266,30 @@
       "settings.copy.import_export.exportCsvDetail.label"
     ]
   },
+  "Star": {
+    "text": "Star",
+    "paths": [
+      "actions.actions.task.toggleStar.addTitle",
+      "surfaces.taskAttributes.star.label"
+    ]
+  },
+  "Star tasks to keep them one tap away.": {
+    "text": "Star tasks to keep them one tap away.",
+    "paths": [
+      "destinations.destinations.starred.emptyState.detail"
+    ]
+  },
   "Starlings record": {
     "text": "Starlings record",
     "paths": [
       "surfaces.taskReferences.kinds.door.label"
+    ]
+  },
+  "Starred": {
+    "text": "Starred",
+    "paths": [
+      "destinations.destinations.starred.title",
+      "surfaces.taskDetail.controls.historyStarred"
     ]
   },
   "Starter prompt": {
@@ -4857,8 +4858,8 @@
       "actions.actions.task.toggleChecklistItem.title"
     ]
   },
-  "Toggle Favorite": {
-    "text": "Toggle Favorite",
+  "Toggle Star": {
+    "text": "Toggle Star",
     "paths": [
       "actions.actions.task.toggleStar.title"
     ]
@@ -4960,12 +4961,6 @@
       "actions.actions.app.undo.title"
     ]
   },
-  "Unfavorite": {
-    "text": "Unfavorite",
-    "paths": [
-      "actions.actions.task.toggleStar.removeTitle"
-    ]
-  },
   "Ungrouped": {
     "text": "Ungrouped",
     "paths": [
@@ -4976,6 +4971,18 @@
     "text": "Unknown device",
     "paths": [
       "settings.copy.access_devices.deviceUnknown.label"
+    ]
+  },
+  "Unstar": {
+    "text": "Unstar",
+    "paths": [
+      "actions.actions.task.toggleStar.removeTitle"
+    ]
+  },
+  "Unstarred": {
+    "text": "Unstarred",
+    "paths": [
+      "surfaces.taskDetail.controls.historyUnstarred"
     ]
   },
   "Unused invites": {

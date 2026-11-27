@@ -176,7 +176,7 @@ struct QuickFindView: View {
         (.taskTags, ["tag", "label"]),
         (.taskDeadline, ["due", "date"]),
         (.taskReminder, ["alarm", "notify", "alert"]),
-        (.taskToggleStar, ["star", "favorite", "pin"]),
+        (.taskToggleStar, ["star", "pin"]),
         (.taskWaitingOn, ["wait", "delegate", "follow up"]),
         (.taskGotItBack, ["waiting", "received", "unblock"]),
         (.taskEditDetails, ["rename", "edit", "title"]),

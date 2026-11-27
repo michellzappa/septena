@@ -561,7 +561,7 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
       (.taskDeadline, .deadline, ["due", "date"]),
       (.taskReminder, .reminder, ["alarm", "notify", "alert"]),
       (.taskRepeat, .repeatEditor, ["recur", "recurring", "schedule"]),
-      (.taskToggleStar, .toggleStar, ["star", "favorite", "pin"]),
+      (.taskToggleStar, .toggleStar, ["star", "pin"]),
       (.taskWaitingOn, .waitingOn, ["wait", "delegate", "follow up"]),
       (.taskGotItBack, .gotItBack, ["waiting", "received", "unblock"]),
       (.taskEditDetails, .rename, ["rename", "edit", "title"]),

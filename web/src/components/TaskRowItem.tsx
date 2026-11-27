@@ -445,7 +445,7 @@ export function TaskDetailEditor({
             <button
               type="button"
               onClick={props.onToggleStar}
-              title={task.starred ? "Unfavorite (⌘⌥S)" : "Favorite (⌘⌥S)"}
+              title={task.starred ? "Unstar (⌘⌥S)" : "Star (⌘⌥S)"}
               className="rounded-md p-1 text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"
             >
               <Star
@@ -1515,7 +1515,7 @@ export function TaskRowItem(props: TaskRowItemProps) {
           <Star
             className="h-[12px] w-[12px] shrink-0"
             style={{ color: "var(--today-gold)", fill: "var(--today-gold)" }}
-            aria-label="Favorite"
+            aria-label="Starred"
           />
         )}
 

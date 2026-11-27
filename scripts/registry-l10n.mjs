@@ -33,6 +33,7 @@ const FIELDS = {
     "emptyTitleFormat", "singularFormat", "body", "footnote", "returningTitle", "returningBody",
     "label", "countLabel", "workingLabel", "valueLabel", "instructions", "setup", "first", "placeholder", "commandPlaceholder", "untitledName", "selfLabel",
     "askKicker", "reviewKicker", "reviewFallback", "acceptedLabel", "menuTitle", "sortedBy",
+    "historyStarred", "historyUnstarred",
   ]),
   importSources: new Set(["detail"]),
   signIn: new Set([
