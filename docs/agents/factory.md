@@ -72,14 +72,14 @@ Set up 2026-11-19 so planned work keeps moving without mz.
 The septena target has two repos. The website is the second (mz,
 2026-11-26). Its issues are work for this run like the app's.
 
-- **Where it lives:** `SITE_DIR=~/Dev/_/septena-site`. A pending move puts
-  every Septena repo under one directory; when it lands, change this line
-  only. Never hard-code the path anywhere else in this playbook.
+- **Where it lives:** `SITE_DIR=~/Dev/septena/site`, next to the app in
+  `~/Dev/septena/septena`. Never hard-code the path anywhere else in this
+  playbook.
 - **Read its `AGENTS.md` first.** Its rules hold for site work: commit on
   `main`, continuous deployment, the copy rules, no email address.
 - **Never work in `SITE_DIR` itself.** mz keeps uncommitted files there. Use a
   detached worktree: `git -C "$SITE_DIR" fetch -q && git -C "$SITE_DIR"
-  worktree add --detach ../septena-site-factory-<N> origin/main`.
+  worktree add --detach ../worktrees/site-factory-<N> origin/main`.
 - **Dependencies without a download:** clone the checkout's packages with
   `cp -cR "$SITE_DIR/node_modules" <worktree>/` (APFS clone; a symlink
   breaks the Next build). Only when `package-lock.json` differs from the
