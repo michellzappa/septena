@@ -23,6 +23,7 @@ import app.septena.core.SyncedSettingsMutator
 import app.septena.core.SystemDayClock
 import app.septena.core.TaskConversation
 import app.septena.core.TaskMutator
+import app.septena.core.TaskUndoHistory
 import app.septena.core.TaskRefAddResult
 import app.septena.core.TaskRefLookup
 import app.septena.core.TaskRefMutator

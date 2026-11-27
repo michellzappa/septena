@@ -252,21 +252,25 @@ function checkShipsClaims(repo, allowed) {
   for (const m of swiftGen.matchAll(/^\s*case `?(\w+)`? = "([^"]+)"/gm)) (swiftCases[m[2]] ??= []).push(m[1]);
   for (const m of swiftGen.matchAll(/RegistryTaskPageBlock\(id: "([^"]+)", kind: \.(\w+)/g)) (swiftCases[m[1]] ??= []).push(m[2]);
   const ktApp = readAll(walk(path.join(repo, "android"), [".kt"]).filter((f) => !f.includes(`${path.sep}test${path.sep}`)));
+  const windowsApp = readAll(walk(path.join(repo, "windows/src/main"), [".kt"]));
   const ktGen = fs.readFileSync(path.join(repo, "android/core/src/main/kotlin/app/septena/core/generated/RegistryConstants.kt"), "utf8");
   const ktConstants = {};
   for (const m of ktGen.matchAll(/val (\w+)(?::[^=]+)? = "([^"]+)"/g)) (ktConstants[m[2]] ??= []).push(m[1]);
   const webApp = readAll(walk(path.join(repo, "web/src"), [".ts", ".tsx"]));
   const quoted = (src, id) => src.includes(`"${id}"`) || src.includes(`'${id}'`);
+  const kotlinReader = (source, id) => quoted(source, id)
+    || (ktConstants[id] ?? []).some((n) => new RegExp(`\\.${esc(n)}\\b`).test(source));
   const readers = {
     swift: (id) => quoted(swiftApp, id)
       || (/^\w+$/.test(id) && new RegExp(`(?:\\bcase |\\.)${id}\\b`).test(swiftApp))
       || (swiftCases[id] ?? []).some((n) => new RegExp(`\\.${esc(n)}\\b`).test(swiftApp)),
-    kotlin: (id) => quoted(ktApp, id) || (ktConstants[id] ?? []).some((n) => new RegExp(`\\.${esc(n)}\\b`).test(ktApp)),
+    android: (id) => kotlinReader(ktApp, id),
+    windows: (id) => kotlinReader(windowsApp, id),
     web: (id) => quoted(webApp, id) || (/^\w+$/.test(id) && new RegExp(`\\.${id}\\b`).test(webApp)),
   };
   const seen = new Set();
   for (const [featureId, claim] of Object.entries(capabilities)) {
-    for (const platform of [...SWIFT_PLATFORMS, "android", "web"]) {
+    for (const platform of [...SWIFT_PLATFORMS, "android", "web", "windows"]) {
       if (claim[platform] !== "ships" && claim[platform] !== "partial") continue;
       const ids = (entries[featureId] ?? [])
         .filter((e) => e.platforms.length === 0 || e.platforms.includes(platform))
@@ -274,7 +278,7 @@ function checkShipsClaims(repo, allowed) {
       if (ids.length === 0) continue;
       const key = `${platform}:${featureId}`;
       seen.add(key);
-      const reader = platform === "android" ? readers.kotlin : platform === "web" ? readers.web : readers.swift;
+      const reader = readers[platform] ?? readers.swift;
       const read = ids.some(reader);
       if (!read && !(key in allowed)) {
         problems.push(`ships: ${featureId} is "${claim[platform]}" on ${platform}, but no ${platform} source reads any of its registry entries (${ids.slice(0, 5).join(", ")}${ids.length > 5 ? ", …" : ""}). Read one, change the claim in registry/capabilities.json, or allowlist ${key} with a reason and issue`);
