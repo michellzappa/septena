@@ -54,6 +54,16 @@ tasks are not on screen (a sidebar row, a project card on an area page, the Move
 panel) wears the selection fill, because there is no place to mark. Android
 draws the same bar for both drags (`drawInsertionMark` in `MagicPlusDrag.kt`).
 
+**Android moves a heading the same way** (#779 parity). Long-press a project
+heading and slide it. The drag carries headings only
+(`TaskDragPayload.Headings` in `TaskReorderDrag.kt`), so only the slots above
+each heading and one slot after the last section answer it, with the same bar.
+The drop writes the headings' `position` with Apple's rule
+(`headingReorderPositions` = `handleHeadingDrop` → `applyManualOrder`:
+midpoints between neighbours, else renumber `base + gap * i`, never 0). The
+section's tasks keep their `heading`, so they move with it. It works under any
+Sort By, because headings keep their manual order.
+
 **A sorted list has no reorder** (Sort By, `docs/LIST_SORT_SPEC.md` §6, #779).
 When a list's sort is not Manual, the rows do not follow `position`, so a drop
 between rows has nothing to mean. Every shell turns it off: SwiftUI gives
