@@ -96,6 +96,7 @@ import app.septena.core.stringValue
 import app.septena.ui.CalendarAgendaRow
 import app.septena.core.RegistryActionContext
 import app.septena.core.RegistryActionResolver
+import app.septena.core.ListSortCopy
 import app.septena.core.RegistryCatalog
 import app.septena.core.QuickFindTarget
 import app.septena.core.formatUpcomingDayHeader
@@ -1181,7 +1182,12 @@ private fun TaskHomeScaffold(
         onToggle = homeViewModel::toggleSelection,
     )
     LaunchedEffect(state.selectedIds) { allOnToday = homeViewModel.allOnToday(state.selectedIds) }
+    val listSortCopy = remember(languageTag) { ListSortCopy.fromRegistry(languageTag) }
+    var sortMenuOpen by remember { mutableStateOf(false) }
+    // A row in its inline foldout keeps its place in a sorted list until it closes (LIST_SORT_SPEC §6).
+    LaunchedEffect(expandedTaskId) { homeViewModel.setPinnedTask(expandedTaskId) }
     LaunchedEffect(state.location) {
+        sortMenuOpen = false
         if (!magicPlusDrag.isDragging) magicPlusDrag.reset()
         if (!reorderDrag.isDragging) reorderDrag.reset()
     }
@@ -1368,6 +1374,21 @@ private fun TaskHomeScaffold(
             onOpenSettings = onOpenSettings,
             onShareProject = onShareProject,
         )
+        state.listSort?.let(listSortCopy::sortedBy)?.let { sortedBy ->
+            Text(
+                text = sortedBy,
+                fontSize = 13.sp,
+                lineHeight = 16.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(
+                    start = TaskCardMetrics.HeaderLeading,
+                    end = TaskCardMetrics.Margin,
+                    bottom = 10.dp,
+                ),
+            )
+        }
         val noticedDo = doing.current?.takeIf { doing.showsNotice }
         val needsYou = doing.endedSince?.let { since -> state.agentRequestTimes.count { !it.isBefore(since) } } ?: 0
         if (noticedDo != null) {
@@ -1580,6 +1601,15 @@ private fun TaskHomeScaffold(
                                     )
                                 }
                             }
+                            state.listSort?.let { currentSort ->
+                                ListSortMenuButton(
+                                    copy = listSortCopy,
+                                    current = currentSort,
+                                    expanded = sortMenuOpen,
+                                    onExpandedChange = { sortMenuOpen = it },
+                                    onPick = homeViewModel::setListSort,
+                                )
+                            }
                             IconButton(
                                 onClick = onQuickFind,
                                 modifier = Modifier.semantics { contentDescription = quickFindTitle },
@@ -1789,6 +1819,7 @@ private fun TaskHomeScaffold(
                                 }
                             } else null,
                             canReorder = canReorderList,
+                            reorderBetweenRows = !state.isSorted,
                             onReorderInboxHeader = if (isTodayList) {
                                 { ids ->
                                     val topPos = inboxPositions.firstOrNull() ?: 0.0
@@ -1907,6 +1938,83 @@ private fun defaultQuickAddDraft(location: TaskHomeLocation): QuickAddDraft = wh
         RegistryDestinationIds.TODAY -> QuickAddDraft(today = true)
         RegistryDestinationIds.STARRED -> QuickAddDraft(starred = true)
         else -> QuickAddDraft()
+    }
+}
+
+/**
+ * Sort By (docs/LIST_SORT_SPEC.md §6): the list's toolbar menu with the `listSort` choices
+ * and a check on the current one. Picking one is a view change, not an undoable edit.
+ */
+@Composable
+private fun ListSortMenuButton(
+    copy: ListSortCopy,
+    current: String,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    onPick: (String) -> Unit,
+) {
+    Box {
+        IconButton(
+            onClick = { onExpandedChange(true) },
+            modifier = Modifier.semantics { contentDescription = copy.menuTitle },
+        ) {
+            SortGlyph(tint = MaterialTheme.colorScheme.onSurface)
+        }
+        val isDark = LocalSeptenaDarkTheme.current
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { onExpandedChange(false) },
+            shape = RoundedCornerShape(14.dp),
+            containerColor = if (isDark) MaterialTheme.colorScheme.surfaceContainerHigh else Color(0xF7FFFFFF),
+            tonalElevation = 0.dp,
+            shadowElevation = 10.dp,
+            modifier = Modifier.width(210.dp),
+        ) {
+            Text(
+                text = copy.menuTitle,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+            )
+            copy.options.forEach { option ->
+                val isCurrent = option.value == current
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            text = option.title,
+                            fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Normal,
+                        )
+                    },
+                    trailingIcon = if (isCurrent) {
+                        { CheckmarkGlyph(tint = MaterialTheme.colorScheme.primary, size = 16.dp) }
+                    } else null,
+                    onClick = {
+                        onExpandedChange(false)
+                        if (!isCurrent) onPick(option.value)
+                    },
+                )
+            }
+        }
+    }
+}
+
+/** The `action.sort` glyph of registry/icons.json (Material `swap_vert`): an up and a down arrow. */
+@Composable
+private fun SortGlyph(tint: Color) {
+    Canvas(modifier = Modifier.size(21.dp)) {
+        val stroke = 1.9.dp.toPx()
+        val head = size.width * 0.16f
+        val upX = size.width * 0.34f
+        val downX = size.width * 0.66f
+        val top = size.height * 0.18f
+        val bottom = size.height * 0.82f
+        drawLine(tint, Offset(upX, top), Offset(upX, bottom), strokeWidth = stroke, cap = StrokeCap.Round)
+        drawLine(tint, Offset(upX, top), Offset(upX - head, top + head), strokeWidth = stroke, cap = StrokeCap.Round)
+        drawLine(tint, Offset(upX, top), Offset(upX + head, top + head), strokeWidth = stroke, cap = StrokeCap.Round)
+        drawLine(tint, Offset(downX, top), Offset(downX, bottom), strokeWidth = stroke, cap = StrokeCap.Round)
+        drawLine(tint, Offset(downX, bottom), Offset(downX - head, bottom - head), strokeWidth = stroke, cap = StrokeCap.Round)
+        drawLine(tint, Offset(downX, bottom), Offset(downX + head, bottom - head), strokeWidth = stroke, cap = StrokeCap.Round)
     }
 }
 

@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.septena.android.AndroidAppGraph
 import app.septena.core.JsonValue
+import app.septena.core.ListSortPreferences
+import app.septena.core.ListSortRules
 import app.septena.core.ProjectShare
 import app.septena.core.RegistryActionContext
 import app.septena.core.RegistryActionResolver
@@ -38,6 +40,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -98,8 +101,16 @@ data class TaskHomeUiState(
     val weeklySweepItems: List<FadeSweepItem> = emptyList(),
     /** True on sweep day (Sunday) when unswept faded tasks exist and banner wasn't dismissed. */
     val showWeeklySweepBanner: Boolean = false,
+    /**
+     * The Sort By choice of this list (a `listSort` value), or null when the list has a fixed
+     * order and takes no sort (docs/LIST_SORT_SPEC.md §1).
+     */
+    val listSort: String? = null,
     val errorMessage: String? = null,
 ) {
+    /** True when the list shows a sort other than Manual: drag between rows is off (spec §6). */
+    val isSorted: Boolean get() = listSort != null && listSort != RegistryEntityEnums.ListSort.MANUAL
+
     /** The rows the list draws, in order; a folded group draws none. */
     val visibleTasks: List<TaskListItem> by lazy(LazyThreadSafetyMode.PUBLICATION) {
         inboxTasks + tasks + if (fadedGroupExpanded) fadedTasks else emptyList()
@@ -142,6 +153,11 @@ private data class LoadedTaskHome(
     val fadedSweepItems: List<FadeSweepItem> = emptyList(),
     val weeklySweepItems: List<FadeSweepItem> = emptyList(),
     val showWeeklySweepBanner: Boolean = false,
+    /** The `listSort` key of this list, null when it takes no sort. */
+    val listSortKey: String? = null,
+    val listSort: String = RegistryEntityEnums.ListSort.MANUAL,
+    /** The listed tasks the core sorts, by id. */
+    val sortSnapshots: Map<String, TaskSnapshot> = emptyMap(),
 )
 
 /** Reads the store on IO and refreshes from the sync controller's data version flow. */
@@ -152,6 +168,10 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
     private val starredOnly = MutableStateFlow(false)
     private val selectedIds = MutableStateFlow<Set<String>>(emptySet())
     private val errorMessage = MutableStateFlow<String?>(null)
+    /** The row in inline edit: it keeps its place in a sorted list until the edit ends (spec §6). */
+    private val pinnedTaskId = MutableStateFlow<String?>(null)
+    /** The list key and row order the list showed last, for [pinnedTaskId]. */
+    @Volatile private var lastShownOrder: Pair<String?, List<String>> = null to emptyList()
     @Volatile private var filingSuggestionsByTask: Map<String, FilingSuggestion> = emptyMap()
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -169,8 +189,13 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         initialValue = loadInitial(),
     )
 
+    /** [loaded] with the list's Sort By applied off the main thread, inside each group. */
+    private val sortedLoaded = combine(loaded, pinnedTaskId) { home, pinned ->
+        applyListSort(home, pinned)
+    }.flowOn(Dispatchers.Default)
+
     val state: StateFlow<TaskHomeUiState> = combine(
-        loaded,
+        sortedLoaded,
         starredOnly,
         selectedIds,
         errorMessage,
@@ -201,6 +226,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             fadedSweepItems = home.fadedSweepItems,
             weeklySweepItems = home.weeklySweepItems,
             showWeeklySweepBanner = home.showWeeklySweepBanner,
+            listSort = home.listSort.takeIf { home.listSortKey != null },
             errorMessage = error,
         )
     }.stateIn(
@@ -231,6 +257,56 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
 
     fun toggleStarFilter() {
         starredOnly.value = !starredOnly.value
+    }
+
+    /** The row in inline edit, or null when no edit is open. */
+    fun setPinnedTask(id: String?) {
+        pinnedTaskId.value = id
+    }
+
+    /**
+     * Sort By on the current list (docs/LIST_SORT_SPEC.md §5): a synced view setting, never a
+     * position write, and not on the undo stack. Manual removes the list's key.
+     */
+    fun setListSort(sort: String) {
+        val key = loaded.value.listSortKey ?: return
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    suspend fun liveIds(entity: String): Set<String> =
+                        graph.taskStore.records(entity).filter { it.deletedAt == null }.mapTo(HashSet(), SyncRecord::id)
+                    val liveProjects = liveIds(EntityNames.PROJECT)
+                    val liveAreas = liveIds(EntityNames.AREA)
+                    val current = ListSortPreferences.fromSynced(graph.syncedSettings)
+                    val next = current.setting(key, sort, liveProjects, liveAreas)
+                    if (next != current) graph.syncedSettingsMutator.set(RegistrySettingKeys.LIST_SORT, next.toJson())
+                    next != current
+                }
+            }.onSuccess { changed ->
+                errorMessage.value = null
+                if (changed) noteLocalChangeAndSync()
+            }.onFailure { errorMessage.value = it.message }
+        }
+    }
+
+    private fun applyListSort(home: LoadedTaskHome, pinned: String?): LoadedTaskHome {
+        if (home.listSortKey == null || home.listSort == RegistryEntityEnums.ListSort.MANUAL) {
+            lastShownOrder = home.listSortKey to home.tasks.map(TaskListItem::id)
+            return home
+        }
+        val previous = lastShownOrder.takeIf { it.first == home.listSortKey }?.second.orEmpty()
+        val sorted = ListSortRules.sortInGroups(
+            items = home.tasks,
+            sort = home.listSort,
+            id = TaskListItem::id,
+            groupKey = { it.group?.key },
+            snapshot = { home.sortSnapshots[it.id] },
+            isFixed = TaskListItem::isCompleted,
+            pinnedId = pinned,
+            previousIds = previous,
+        )
+        lastShownOrder = home.listSortKey to sorted.map(TaskListItem::id)
+        return home.copy(tasks = sorted)
     }
 
     /** Long-press enters selection with the row; in selection a tap adds or removes a row. */
@@ -986,6 +1062,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         ).map { it.third }
 
         val agentsPaused = graph.syncedSettings.value(RegistrySettingKeys.AGENTS_PAUSED).booleanValue() ?: false
+        val listSorts = ListSortPreferences.fromSynced(graph.syncedSettings)
 
         val areaTitles = areaRecords.mapNotNull { item ->
             val area = item.location as? TaskHomeLocation.Area ?: return@mapNotNull null
@@ -1471,6 +1548,18 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         val fadedGroup = reviewGroups[ReviewGroupIds.FADED].takeIf { destinationId == RegistryDestinationIds.REVIEW }
         val (fadedTasks, listedTasks) = orderedTasks.partition { fadedGroup != null && it.group?.key == fadedGroup.key }
         filingSuggestionsByTask = nextSuggestions
+        val listSortKey = when (resolvedLocation) {
+            is TaskHomeLocation.SmartList -> ListSortPreferences.smartListKey(resolvedLocation.destinationId)
+            is TaskHomeLocation.Area -> ListSortPreferences.areaKey(resolvedLocation.id)
+            is TaskHomeLocation.Project -> ListSortPreferences.projectKey(resolvedLocation.id)
+        }
+        val listSort = listSorts.sortFor(listSortKey)
+        val sortSnapshots = if (listSortKey != null && listSort != RegistryEntityEnums.ListSort.MANUAL) {
+            val listedIds = listedTasks.mapTo(HashSet(listedTasks.size), TaskListItem::id)
+            allSnapshots.asSequence().map { it.second }.filter { it.id in listedIds }.associateBy(TaskSnapshot::id)
+        } else {
+            emptyMap()
+        }
         val lastSweepAt = graph.fadeSweepStore.lastSweepAt()
         val dismissedWeek = graph.fadeSweepStore.dismissedSweepWeek()
         val sortedFadedSweep = fadedSweepList.sortedWith(
@@ -1505,6 +1594,9 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             fadedSweepItems = sortedFadedSweep,
             weeklySweepItems = currentWeekSweep,
             showWeeklySweepBanner = showSweepBanner,
+            listSortKey = listSortKey,
+            listSort = listSort,
+            sortSnapshots = sortSnapshots,
         )
     }
 
