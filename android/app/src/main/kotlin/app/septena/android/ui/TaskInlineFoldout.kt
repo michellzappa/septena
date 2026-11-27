@@ -367,6 +367,43 @@ internal fun TaskInlineFoldout(
         ?: selectedProject?.parentAreaId
     val selectedArea = data?.areas?.firstOrNull { it.id == selectedAreaId }
     val listShortValue = selectedProject?.title ?: selectedArea?.title
+
+    // A draft's title tokens, offered while the draft has no stored title yet and only
+    // for fields still unset (Apple `detectedTokens` / `isUnset`). `# Name` in a project
+    // makes a heading instead, so it offers nothing.
+    val storedTitle = taskFields[RegistryEntityFields.Task.TITLE].stringValue().orEmpty()
+    val rawAreaId = taskFields[RegistryEntityFields.Task.AREA].stringValue()
+    val draftTokens = if (!isDraft || data == null || storedTitle.isNotBlank() ||
+        (selectedProjectId != null && InlineTitleTokens.headingTitle(titleDraft.trim()) != null)
+    ) {
+        emptyList()
+    } else {
+        InlineTitleTokens.detect(
+            raw = titleDraft,
+            projects = data?.projects.orEmpty().map { it.id to it.title },
+            areas = data?.areas.orEmpty().map { it.id to it.title },
+            today = todayDate,
+        ).filter { token ->
+            when (token.kind) {
+                InlineTitleTokens.Kind.Today, InlineTitleTokens.Kind.Date -> !isToday && scheduled == null
+                InlineTitleTokens.Kind.Project -> selectedProjectId == null
+                InlineTitleTokens.Kind.Area -> rawAreaId == null && selectedProjectId == null
+            }
+        }
+    }
+    val tomorrowLabel = RegistryCatalog.tomorrowLabel(languageTag)
+    val chipDayFormat = remember(languageTag) {
+        java.time.format.DateTimeFormatter.ofPattern("MMM d", java.util.Locale.forLanguageTag(languageTag))
+    }
+    fun tokenLabel(token: InlineTitleTokens.Detected): String = when (token.kind) {
+        InlineTitleTokens.Kind.Today -> todayLabel
+        InlineTitleTokens.Kind.Date -> when (token.day) {
+            todayDate -> todayLabel
+            todayDate.plusDays(1) -> tomorrowLabel
+            else -> token.day?.let(chipDayFormat::format).orEmpty()
+        }
+        InlineTitleTokens.Kind.Project, InlineTitleTokens.Kind.Area -> token.title.orEmpty()
+    }
     val selectedTagIds = (taskFields[RegistryEntityFields.Task.TAGS] as? JsonValue.ArrayValue)
         ?.values?.mapNotNull { it.stringValue() }.orEmpty()
     val selectedTagNames = data?.tags.orEmpty().filter { it.id in selectedTagIds }.map(TagLine::name)
@@ -427,6 +464,22 @@ internal fun TaskInlineFoldout(
     fun writeChecklist(block: suspend () -> Unit) = save {
         block()
         graph.touchTask(taskId)
+    }
+
+    /** Applies a chip's field to the draft and takes its words out of the title (Apple `applyToken`). */
+    fun applyDraftToken(token: InlineTitleTokens.Detected) {
+        save {
+            when (token.kind) {
+                InlineTitleTokens.Kind.Today -> check(graph.taskMutator.setToday(taskId, enabled = true) != null)
+                InlineTitleTokens.Kind.Date -> token.day?.let { check(graph.taskMutator.setWhen(taskId, it.toString()) != null) }
+                InlineTitleTokens.Kind.Project ->
+                    check(graph.taskMutator.moveToList(taskId, area = null, project = token.id) != null)
+                InlineTitleTokens.Kind.Area ->
+                    check(graph.taskMutator.moveToList(taskId, area = token.id, project = null) != null)
+            }
+        }
+        titleDraft = InlineTitleTokens.removing(token.phrase, titleDraft)
+        textIsDirty = true
     }
 
     fun toggleComplete() {
@@ -746,6 +799,40 @@ internal fun TaskInlineFoldout(
                     .padding(start = TaskCardMetrics.LeadingColumnWidth + TaskCardMetrics.IconTextGap),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                if (draftTokens.isNotEmpty()) {
+                    // Tap-to-apply chips for what the draft's title names (Apple `quickEntryChips`).
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        draftTokens.forEach { token ->
+                            InlineAttributePill(
+                                label = tokenLabel(token),
+                                isSet = false,
+                                isActive = false,
+                                isDark = isDark,
+                                enabled = canEdit,
+                                tint = accent,
+                                icon = { tint ->
+                                    when (token.kind) {
+                                        InlineTitleTokens.Kind.Today ->
+                                            SeptenaGlyph(kind = SeptenaIconKind.Today, tint = tint, size = 13.dp)
+                                        InlineTitleTokens.Kind.Date -> CalendarSmallGlyph(tint = tint, size = 13.dp)
+                                        InlineTitleTokens.Kind.Project ->
+                                            SeptenaGlyph(kind = SeptenaIconKind.Project, tint = tint, size = 13.dp)
+                                        InlineTitleTokens.Kind.Area ->
+                                            SeptenaGlyph(kind = SeptenaIconKind.Area, tint = tint, size = 13.dp)
+                                    }
+                                },
+                                onClick = { applyDraftToken(token) },
+                            )
+                        }
+                    }
+                }
+
                 if (TaskPageBlockKinds.NOTES in blockKinds) {
                     val notesLabel = labels.field(RegistryTaskDetail.Fields.NOTES)
                     Box(modifier = Modifier.fillMaxWidth()) {

@@ -103,6 +103,8 @@ fun AreasProjectsScreen(
     onTaskAction: (String, String) -> Unit = { _, _ -> },
     selection: TaskSelection = TaskSelection(),
     newSectionTrigger: Int = 0,
+    /** Magic Plus menu on an area page: New Project in Area opens the new-project prompt. */
+    newProjectTrigger: Int = 0,
     onLeftProject: () -> Unit = {},
     onMagicPlusDrop: ((QuickAddDraft) -> Unit)? = null,
     expandedTaskId: String? = null,
@@ -137,6 +139,11 @@ fun AreasProjectsScreen(
     LaunchedEffect(newSectionTrigger) {
         if (newSectionTrigger > 0 && destination is AreasProjectsDestination.Project) {
             dialog = PlacesDialog.CreateSection
+        }
+    }
+    LaunchedEffect(newProjectTrigger) {
+        if (newProjectTrigger > 0 && destination is AreasProjectsDestination.Area) {
+            dialog = PlacesDialog.CreateProject
         }
     }
 
@@ -542,7 +549,7 @@ fun AreasProjectsScreen(
                         itemsIndexed(visibleAreaTasks, key = { _, it -> "task:${it.id}" }) { index, task ->
                             val slicePosition = cardPosition(index, visibleAreaTasks.size)
                             if (expandedTaskId == task.id && expandedTaskContent != null) {
-                                expandedTaskContent(task.item, slicePosition, taskListMotion())
+                                expandedTaskContent(task.item, slicePosition, taskListMotion(dimsForInlineEdit = false))
                             } else {
                                 PlaceTaskItem(
                                     task = task,
@@ -643,7 +650,7 @@ fun AreasProjectsScreen(
                         itemsIndexed(visibleUnsectioned, key = { _, it -> "task:${it.id}" }) { index, task ->
                             val slicePosition = cardPosition(index, visibleUnsectioned.size)
                             if (expandedTaskId == task.id && expandedTaskContent != null) {
-                                expandedTaskContent(task.item, slicePosition, taskListMotion())
+                                expandedTaskContent(task.item, slicePosition, taskListMotion(dimsForInlineEdit = false))
                             } else {
                                 PlaceTaskItem(
                                     task = task,
@@ -960,7 +967,7 @@ private fun LazyListScope.placeSection(
         itemsIndexed(section.tasks, key = { _, it -> "task:${it.id}" }) { index, task ->
             val slicePosition = cardPosition(index, section.tasks.size)
             if (expandedTaskId == task.id && expandedTaskContent != null) {
-                expandedTaskContent(task.item, slicePosition, taskListMotion())
+                expandedTaskContent(task.item, slicePosition, taskListMotion(dimsForInlineEdit = false))
             } else {
                 PlaceTaskItem(
                     task = task,

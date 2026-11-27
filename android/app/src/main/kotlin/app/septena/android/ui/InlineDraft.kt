@@ -9,6 +9,9 @@ import app.septena.core.generated.RegistryEntityFields
 import app.septena.core.generated.RegistryEntityNames
 import app.septena.core.stringValue
 import app.septena.ui.TASK_ORDER_GAP
+import java.time.DayOfWeek
+import java.time.LocalDate
+import java.time.temporal.TemporalAdjusters
 import java.util.Locale
 
 /*
@@ -247,6 +250,137 @@ internal object InlineTitleTokens {
         return Result(title = cleaned, today = today, projectId = projectId, areaId = if (projectId != null) null else areaId)
     }
 
+    /** One tap-to-apply chip under a draft's title (Apple `DetectedToken`). */
+    data class Detected(
+        val kind: Kind,
+        /** The words that leave the title when the chip is applied. */
+        val phrase: String,
+        val day: LocalDate? = null,
+        val id: String? = null,
+        val title: String? = null,
+    )
+
+    enum class Kind { Today, Date, Project, Area }
+
+    /**
+     * Apple `TaskTitleParser.detect`: the explicit tokens, then one date phrase
+     * found in the title with the token words taken out (so `#friday-standup`
+     * is never the day Friday).
+     */
+    fun detect(
+        raw: String,
+        projects: List<Pair<String, String>>,
+        areas: List<Pair<String, String>>,
+        today: LocalDate,
+    ): List<Detected> {
+        val tokens = mutableListOf<Detected>()
+        for (word in raw.split(' ', '\n').filter(String::isNotEmpty)) {
+            val lower = word.lowercase(Locale.ROOT)
+            when {
+                lower == "!today" || lower == "!t" -> tokens += Detected(Kind.Today, word)
+                word.startsWith("#") && word.length > 1 ->
+                    projects.firstOrNull { titleMatches(it.second, lower.drop(1)) }?.let { (id, title) ->
+                        tokens += Detected(Kind.Project, word, id = id, title = title)
+                    }
+                word.startsWith("@") && word.length > 1 ->
+                    areas.firstOrNull { titleMatches(it.second, lower.drop(1)) }?.let { (id, title) ->
+                        tokens += Detected(Kind.Area, word, id = id, title = title)
+                    }
+            }
+        }
+        val withoutTokens = tokens.fold(raw) { text, token -> strip(token.phrase, text) }
+        detectDate(withoutTokens, today)?.let { (day, phrase) -> tokens += Detected(Kind.Date, phrase, day = day) }
+        return tokens
+    }
+
+    /** Takes [phrase] out of [text] (Apple `TaskTitleParser.strip`). */
+    fun removing(phrase: String, text: String): String = strip(phrase, text)
+
+    private val weekdays: Map<String, DayOfWeek> = buildMap {
+        DayOfWeek.values().forEach { day -> put(day.name.lowercase(Locale.ROOT), day) }
+        put("mon", DayOfWeek.MONDAY)
+        put("tue", DayOfWeek.TUESDAY)
+        put("tues", DayOfWeek.TUESDAY)
+        put("wed", DayOfWeek.WEDNESDAY)
+        put("thu", DayOfWeek.THURSDAY)
+        put("thur", DayOfWeek.THURSDAY)
+        put("thurs", DayOfWeek.THURSDAY)
+        put("fri", DayOfWeek.FRIDAY)
+    }
+
+    private val months: Map<String, Int> = buildMap {
+        listOf(
+            "january", "february", "march", "april", "may", "june",
+            "july", "august", "september", "october", "november", "december",
+        ).forEachIndexed { i, name ->
+            put(name, i + 1)
+            if (name.length > 3) put(name.take(3), i + 1)
+        }
+        put("sept", 9)
+    }
+
+    private val weekdayPattern = weekdays.keys.sortedByDescending(String::length).joinToString("|")
+    private val monthPattern = months.keys.sortedByDescending(String::length).joinToString("|")
+    private val urlPattern = Regex("""\S+://\S+""")
+    private fun rule(
+        regex: Regex,
+        resolve: (MatchResult, LocalDate) -> LocalDate?,
+    ): Pair<Regex, (MatchResult, LocalDate) -> LocalDate?> = regex to resolve
+
+    private val datePatterns: List<Pair<Regex, (MatchResult, LocalDate) -> LocalDate?>> = listOf(
+        rule(Regex("""\b(today|tonight)\b""", RegexOption.IGNORE_CASE)) { _, today -> today },
+        rule(Regex("""\btomorrow\b""", RegexOption.IGNORE_CASE)) { _, today -> today.plusDays(1) },
+        rule(Regex("""\bnext week\b""", RegexOption.IGNORE_CASE)) { _, today -> today.plusWeeks(1) },
+        rule(Regex("""\bin (\d{1,3}) (day|days|week|weeks)\b""", RegexOption.IGNORE_CASE)) { m, today ->
+            val n = m.groupValues[1].toLong()
+            if (m.groupValues[2].lowercase(Locale.ROOT).startsWith("week")) today.plusWeeks(n) else today.plusDays(n)
+        },
+        rule(Regex("""\b(?:(next|this|on) )?($weekdayPattern)\b""", RegexOption.IGNORE_CASE)) { m, today ->
+            val day = weekdays.getValue(m.groupValues[2].lowercase(Locale.ROOT))
+            if (m.groupValues[1].equals("next", ignoreCase = true)) {
+                today.with(TemporalAdjusters.next(day))
+            } else {
+                today.with(TemporalAdjusters.nextOrSame(day))
+            }
+        },
+        rule(Regex("""\b($monthPattern)\.? (\d{1,2})(?:st|nd|rd|th)?\b""", RegexOption.IGNORE_CASE)) { m, today ->
+            monthDay(months.getValue(m.groupValues[1].lowercase(Locale.ROOT)), m.groupValues[2].toInt(), today)
+        },
+        rule(Regex("""\b(\d{1,2})(?:st|nd|rd|th)? ($monthPattern)\b""", RegexOption.IGNORE_CASE)) { m, today ->
+            monthDay(months.getValue(m.groupValues[2].lowercase(Locale.ROOT)), m.groupValues[1].toInt(), today)
+        },
+    )
+
+    /** The next [month]/[day] on or after [today], or null for an impossible date. */
+    private fun monthDay(month: Int, day: Int, today: LocalDate): LocalDate? {
+        val thisYear = runCatching { LocalDate.of(today.year, month, day) }.getOrNull() ?: return null
+        return if (thisYear.isBefore(today)) runCatching { thisYear.plusYears(1) }.getOrNull() else thisYear
+    }
+
+    /**
+     * One date phrase in [text], the earliest match (Apple uses `NSDataDetector`
+     * and keeps a match only when it holds a letter; every phrase here does).
+     * Words inside a link never count.
+     */
+    fun detectDate(text: String, today: LocalDate): Pair<LocalDate, String>? {
+        val links = urlPattern.findAll(text).map { it.range }.toList()
+        var best: Pair<MatchResult, LocalDate>? = null
+        for ((pattern, resolve) in datePatterns) {
+            for (match in pattern.findAll(text)) {
+                if (links.any { match.range.first in it }) continue
+                val day = resolve(match, today) ?: continue
+                val current = best
+                if (current == null || match.range.first < current.first.range.first ||
+                    (match.range.first == current.first.range.first && match.value.length > current.first.value.length)
+                ) {
+                    best = match to day
+                }
+                break
+            }
+        }
+        return best?.let { (match, day) -> day to match.value }
+    }
+
     /** Apple `TaskTitleParser.strip`: the first case-insensitive match, then tidy spaces. */
     private fun strip(phrase: String, text: String): String {
         val index = text.indexOf(phrase, ignoreCase = true)
@@ -258,8 +392,10 @@ internal object InlineTitleTokens {
 
     /** Exact, prefix, or prefix with spaces removed, as Apple `titleMatches`. */
     private fun matchTitle(query: String, candidates: List<Pair<String, String>>): String? =
-        candidates.firstOrNull { (_, title) ->
-            val t = title.lowercase(Locale.ROOT)
-            t == query || t.startsWith(query) || t.replace(" ", "").startsWith(query)
-        }?.first
+        candidates.firstOrNull { (_, title) -> titleMatches(title, query) }?.first
+
+    private fun titleMatches(title: String, query: String): Boolean {
+        val t = title.lowercase(Locale.ROOT)
+        return t == query || t.startsWith(query) || t.replace(" ", "").startsWith(query)
+    }
 }

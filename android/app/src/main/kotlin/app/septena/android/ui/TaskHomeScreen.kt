@@ -130,6 +130,8 @@ import app.septena.ui.TaskHomeContent
 import app.septena.ui.TaskMenuActionIcon
 import app.septena.ui.TaskRowMenuAction
 import app.septena.ui.TaskSelection
+import app.septena.ui.InlineEditDim
+import app.septena.ui.LocalInlineEditDim
 import app.septena.ui.insertionPosition
 import app.septena.ui.positionAbove
 import app.septena.ui.positionsAbove
@@ -1186,7 +1188,9 @@ private fun TaskHomeScaffold(
     /** Magic Plus tap: the new task this list makes (`newTaskTarget`). */
     onNewTaskHere: () -> Unit = {},
 ) {
-    var newSectionTrigger by remember { mutableIntStateOf(0) }
+    // Keyed on the place, so a count from another page never opens a prompt here.
+    var newSectionTrigger by remember(state.location) { mutableIntStateOf(0) }
+    var newProjectTrigger by remember(state.location) { mutableIntStateOf(0) }
     var selectionPicker by remember { mutableStateOf<SelectionPicker?>(null) }
     var pendingFixedReschedule by remember { mutableStateOf<PendingFixedReschedule?>(null) }
     var allOnToday by remember { mutableStateOf(false) }
@@ -1541,6 +1545,8 @@ private fun TaskHomeScaffold(
     CompositionLocalProvider(
         LocalMagicPlusDrag provides magicPlusDrag,
         LocalTaskReorderDrag provides reorderDrag,
+        // An open inline editor dims the rest of the list; a tap there folds it (Apple inlineEditDimmed).
+        LocalInlineEditDim provides InlineEditDim(isActive = expandedTaskId != null, onDismiss = onCollapseExpandedTask),
     ) {
         Box(modifier = Modifier.fillMaxSize().background(canvasBackground)) {
             HeaderWashBackdrop()
@@ -1712,6 +1718,7 @@ private fun TaskHomeScaffold(
                             },
                             onOpenTask = onToggleExpandTask,
                             onMagicPlusDrop = onStartInlineDraft,
+                            newProjectTrigger = newProjectTrigger,
                             expandedTaskId = expandedTaskId,
                             expandedTaskContent = expandedTaskContent,
                         )
@@ -1964,6 +1971,8 @@ private fun TaskHomeScaffold(
                     languageTag = languageTag,
                     onNewTask = newTaskHere,
                     onNewSection = { newSectionTrigger += 1 },
+                    isViewingArea = state.location is TaskHomeLocation.Area,
+                    onNewProjectInArea = { newProjectTrigger += 1 },
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
                         .navigationBarsPadding()

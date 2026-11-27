@@ -61,8 +61,14 @@ rules). The row stays on the device until its first title write
 (`TaskMutator` `deferPush`). Return saves and folds. A fold with nothing typed
 purges the draft, and only when the field, the store and the unsent mark all
 agree. On save the explicit title tokens (`!today`, `#project`, `@area`) apply
-to unset fields, and `# Name` in a project makes a heading. Quick Add stays a
-sheet (widget, home-screen action, Do screen).
+to unset fields, and `# Name` in a project makes a heading. Before the first
+save, the title's tokens and one date phrase show as tap-to-apply chips, as
+iPhone's `quickEntryChips` do. While an inline editor is open, the rest of the
+list dims and a tap there folds the editor (`InlineEditDim.kt`). Where a tap
+creates is `newTaskTarget` in `registry/destinations.json`: here, here on
+tomorrow (Upcoming), or Today. On an area page the orb opens New Task / New
+Project in Area. Quick Add stays a sheet (widget, home-screen action, Do
+screen).
 
 **Android moves a heading the same way** (#779 parity). Long-press a project
 heading and slide it. The drag carries headings only

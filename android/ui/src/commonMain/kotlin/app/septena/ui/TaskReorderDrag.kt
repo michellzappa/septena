@@ -538,7 +538,8 @@ fun Modifier.headingReorderDragSource(
     enabled: Boolean = true,
 ): Modifier = composed {
     val drag = LocalTaskReorderDrag.current
-    if (drag == null || !enabled) return@composed this
+    // While an inline editor is open the header is dimmed and a tap only folds it.
+    if (drag == null || !enabled || LocalInlineEditDim.current.isActive) return@composed this
     val density = LocalDensity.current.density
     val haptics = LocalHapticFeedback.current
     var origin by remember(headingId) { mutableStateOf(Offset.Zero) }
