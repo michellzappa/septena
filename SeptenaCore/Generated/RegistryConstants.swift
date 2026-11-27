@@ -2383,6 +2383,21 @@ struct RegistryPlanPrice: Sendable, Hashable, Identifiable {
   let detail: String
 }
 
+/// One-time non-renewing pass for Plus (ADR 0061).
+struct RegistryPlanPass: Sendable, Hashable, Identifiable {
+  let id: String
+  let plan: String
+  let productId: String
+  let years: Int
+  let amountMinor: Int
+  let currency: String
+  let title: String
+  let detail: String
+  let label: String
+  let rateDetail: String
+  let action: String
+}
+
 struct RegistryPlanCard: Sendable, Hashable, Identifiable {
   let id: String
   let title: String
@@ -2449,6 +2464,8 @@ enum RegistryPlans {
     RegistryPlanPrice(id: "pro_annual", productId: "com.septena.tasks.sync.pro.annual", amountMinor: 12000, currency: "EUR", interval: "year", highlighted: true, label: RegistryL10n.t("€120 a year"), detail: RegistryL10n.t("€10 a month. You save €48 against paying monthly.")),
     RegistryPlanPrice(id: "pro_monthly", productId: "com.septena.tasks.sync.pro.monthly", amountMinor: 1400, currency: "EUR", interval: "month", highlighted: false, label: RegistryL10n.t("€14 a month"), detail: RegistryL10n.t("Cancel at any time.")),
   ] }
+  /// The 7-Year Plus Pass (ADR 0061): one-time Non-Renewing Subscription, Plus only.
+  static var pass: RegistryPlanPass { RegistryPlanPass(id: "plus_7year", plan: "plus", productId: "com.septena.tasks.sync.plus.7year", years: 7, amountMinor: 21000, currency: "EUR", title: RegistryL10n.t("Pay once for seven years of Plus"), detail: RegistryL10n.t("If you prefer not to keep a subscription, one payment covers seven years of Septena Plus across your devices. That works out to half the annual rate. When the seven years end, your tasks stay on your devices, and you can extend, move to a free account, or export everything. Support for running the open-source sync server on your own Cloudflare account is on the roadmap."), label: RegistryL10n.t("€210 once"), rateDetail: RegistryL10n.t("€30 a year for 7 years. Half the annual rate."), action: RegistryL10n.t("Get 7-Year Pass")) }
   static var plusBenefits: [RegistryPlanBenefit] { [
     RegistryPlanBenefit(id: "devices", icon: "plans.devices", title: RegistryL10n.t("Every device, always current"), detail: RegistryL10n.t("Your list on all your devices, updated as you type.")),
     RegistryPlanBenefit(id: "agents", icon: "plans.agents", title: RegistryL10n.t("Three agents at work"), detail: RegistryL10n.t("Connect Claude and two more. Each one asks before it acts.")),
@@ -2561,6 +2578,7 @@ enum RegistryPlans {
     static var choosePlan: String { RegistryL10n.t("Choose a plan") }
     static func youGet(plan: String) -> String { RegistryL10n.format("With %@", english: "With %@", args: [plan]) }
     static var upgradeNote: String { RegistryL10n.t("Pro starts right away. The App Store refunds the unused part of your Plus.") }
+    static var upgradeFromPassNote: String { RegistryL10n.t("Pro starts right away. Upgrading to Pro does not refund a 7-Year Pass. If you cancel Pro later, you return to the time remaining on your pass.") }
     static var upgradeElsewhere: String { RegistryL10n.t("To move to Pro, change your plan in the store where you bought Plus.") }
     static var yourPlanIncludes: String { RegistryL10n.t("Your plan includes") }
     static var compareAll: String { RegistryL10n.t("Compare every plan") }

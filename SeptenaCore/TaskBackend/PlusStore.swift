@@ -42,9 +42,9 @@ final class PlusStore {
 
   private init() {}
 
-  /// Every product the sheet sells, Plus and Pro, from `registry/plans.json`
-  /// (ADR 0059: one subscription group, Pro the higher level).
-  static var productIDs: [String] { PlanTier.allCases.flatMap(\.productIDs) }
+  /// Every product the sheet sells, Plus (subscriptions + 7-Year Pass, ADR 0061)
+  /// and Pro, from `registry/plans.json` (ADR 0059).
+  static var productIDs: [String] { PlanTier.allCases.flatMap(\.productIDs) + [RegistryPlans.pass.productId] }
 
   /// The sheet offers a purchase when checkout is open on a build the App
   /// Store sold, or in a run Xcode launched with the `Septask` scheme, where

@@ -85,6 +85,30 @@
         }
       }
     },
+    "$30 a year for 7 years. Half the annual rate." : {
+      "comment" : "Generated from registry plans.currencies.1.plus.pass.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "$210 once" : {
+      "comment" : "Generated from registry plans.currencies.1.plus.pass.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "£25 a year for 7 years. Half the annual rate." : {
+      "comment" : "Generated from registry plans.currencies.2.plus.pass.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "£175 once" : {
+      "comment" : "Generated from registry plans.currencies.2.plus.pass.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "€30 a year for 7 years. Half the annual rate." : {
+      "comment" : "Generated from registry plans.pass.rateDetail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "€210 once" : {
+      "comment" : "Generated from registry plans.pass.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "$5 a month. You save $24 against paying monthly." : {
       "comment" : "Generated from registry plans.currencies.1.plus.year.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
@@ -17293,6 +17317,10 @@
         }
       }
     },
+    "Get 7-Year Pass" : {
+      "comment" : "Generated from registry plans.pass.action. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Get a new code" : {
       "comment" : "Generated from registry surfaces.deviceSignIn.copy.retry.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -18948,6 +18976,10 @@
           }
         }
       }
+    },
+    "If you prefer not to keep a subscription, one payment covers seven years of Septena Plus across your devices. That works out to half the annual rate. When the seven years end, your tasks stay on your devices, and you can extend, move to a free account, or export everything. Support for running the open-source sync server on your own Cloudflare account is on the roadmap." : {
+      "comment" : "Generated from registry plans.pass.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "If you skip this, your tasks stay on this device until you sign in." : {
       "comment" : "Generated from registry surfaces.firstRun.steps.account.footnote. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -28087,6 +28119,10 @@
       "comment" : "Generated from registry settings.copy.access_agents.paused.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
+    "Pay once for seven years of Plus" : {
+      "comment" : "Generated from registry plans.pass.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Persimmon" : {
       "comment" : "Generated from registry tokens.fruitAccents.persimmon.name. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -29211,6 +29247,10 @@
       "comment" : "Generated from registry plans.paywall.upgradeNote. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
+    "Pro starts right away. Upgrading to Pro does not refund a 7-Year Pass. If you cancel Pro later, you return to the time remaining on your pass." : {
+      "comment" : "Generated from registry plans.paywall.upgradeFromPassNote. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Pro through %@" : {
       "comment" : "Generated from registry plans.status.proThrough. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -29910,12 +29950,20 @@
       "comment" : "Generated from registry plans.currencies.3.pro.month.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
+    "R$ 120 a year for 7 years. Half the annual rate." : {
+      "comment" : "Generated from registry plans.currencies.3.plus.pass.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "R$ 240 a year" : {
       "comment" : "Generated from registry plans.currencies.3.plus.year.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
     "R$ 480 a year" : {
       "comment" : "Generated from registry plans.currencies.3.pro.year.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "R$ 840 once" : {
+      "comment" : "Generated from registry plans.currencies.3.plus.pass.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
     "Read-only agenda in Today and Upcoming" : {

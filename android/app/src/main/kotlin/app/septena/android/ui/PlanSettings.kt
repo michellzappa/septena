@@ -231,7 +231,7 @@ internal fun PlusOffer(plans: PlanSettingsModel, languageTag: String, syncState:
         HorizontalDivider()
         PlanHead(tier, planCardField(tier.id, "detail", languageTag), languageTag, markSize = 44.dp)
         planBenefits(tier, languageTag).forEach { PlanBenefitRow(it) }
-        PlanPrices(document, if (tier == PlanTier.PRO) "proPrices" else "prices", languageTag, last = tier == above.last())
+        PlanPrices(document, if (tier == PlanTier.PRO) "proPrices" else "prices", languageTag, showPass = tier == PlanTier.PLUS, last = tier == above.last())
     }
 
     if (plans.plan == AccountPlan.Device) {
@@ -256,9 +256,9 @@ internal fun PlusOffer(plans: PlanSettingsModel, languageTag: String, syncState:
     }
 }
 
-/** What one plan costs (`prices` for Plus, `proPrices` for Pro): the highlighted price strong, the other after it. */
+/** What one plan costs (`prices` for Plus, `proPrices` for Pro): the highlighted price strong, the other after it, and the 7-Year Pass for Plus (ADR 0061). */
 @Composable
-private fun PlanPrices(document: JsonValue.ObjectValue, key: String, languageTag: String, last: Boolean) {
+private fun PlanPrices(document: JsonValue.ObjectValue, key: String, languageTag: String, showPass: Boolean = false, last: Boolean) {
     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
         document.objects(key).forEach { price ->
             val highlighted = price.fields["highlighted"].booleanValue() == true
@@ -272,6 +272,21 @@ private fun PlanPrices(document: JsonValue.ObjectValue, key: String, languageTag
                 Text(
                     registryText(price.fields["detail"].stringValue(), languageTag),
                     style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        if (showPass) {
+            (document.fields["pass"] as? JsonValue.ObjectValue)?.let { pass ->
+                Text(
+                    registryText(pass.fields["label"].stringValue(), languageTag),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+                Text(
+                    registryText(pass.fields["rateDetail"].stringValue(), languageTag),
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }

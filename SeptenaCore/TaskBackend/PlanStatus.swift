@@ -108,11 +108,14 @@ final class PlanStatus {
   /// This Apple ID holds a verified Plus entitlement whose `appAccountToken`
   /// belongs to another Septena account (spec §6.4 finding 7).
   private(set) var plusOwnedByAnotherAccount = false
-  /// The account holds an active App Store subscription. It can also hold a
-  /// grant (a Pro grant on top of a paid Plus, ADR 0045), and then `plan`
-  /// names the grant. The subscription still renews, so Manage Subscription
-  /// must stay reachable.
+  /// The account holds an active auto-renewing App Store subscription. It can
+  /// also hold a grant (a Pro grant on top of a paid Plus, ADR 0045), and then
+  /// `plan` names the grant. The subscription still renews, so Manage
+  /// Subscription must stay reachable. Non-renewing passes (ADR 0061) do not
+  /// appear in Apple's subscription management sheet.
   private(set) var hasAppleSubscription = false
+  /// The account holds an active 7-Year Plus Pass (ADR 0061).
+  private(set) var hasPlusPass = false
 
   private init() {}
 
@@ -137,9 +140,14 @@ final class PlanStatus {
     plan != nil && (!isGranted || hasAppleSubscription || !isPro)
   }
 
-  /// The account pays an App Store subscription that is active now.
+  /// The account pays an active auto-renewing App Store subscription.
   nonisolated static func hasAppleSubscription(_ answer: BackendEntitlement) -> Bool {
-    answer.entitlements.contains { $0.active && $0.source == "apple" }
+    answer.entitlements.contains { $0.active && $0.source == "apple" && $0.productId != RegistryPlans.pass.productId }
+  }
+
+  /// The account holds an active 7-Year Plus Pass (ADR 0061).
+  nonisolated static func hasPlusPass(_ answer: BackendEntitlement) -> Bool {
+    answer.entitlements.contains { $0.active && $0.productId == RegistryPlans.pass.productId }
   }
 
   /// The account has file sync in its plan: Plus, Pro, the trial, or a server
@@ -224,6 +232,7 @@ final class PlanStatus {
       trialEnded = false
       plusOwnedByAnotherAccount = false
       hasAppleSubscription = false
+      hasPlusPass = false
       return
     }
     do {
@@ -237,6 +246,7 @@ final class PlanStatus {
       serverBlockedDevice = false
       trialEnded = Self.trialEnded(answer)
       hasAppleSubscription = Self.hasAppleSubscription(answer)
+      hasPlusPass = Self.hasPlusPass(answer)
       lastError = nil
       TaskSyncEngine.shared.applyPlanStatus(
         deviceNotSyncing: deviceNotSyncing,

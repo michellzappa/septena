@@ -4,7 +4,23 @@
     "policies" : []
   },
   "identifier" : "SeptenaPlus",
-  "nonRenewingSubscriptions" : [],
+  "nonRenewingSubscriptions" : [
+    {
+      "displayPrice" : "210.00",
+      "familyShareable" : false,
+      "internalID" : "30006",
+      "localizations" : [
+        {
+          "description" : "Seven years of Septena Plus across your devices, paid once.",
+          "displayName" : "Septena Plus 7-Year Pass",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.septena.tasks.sync.plus.7year",
+      "referenceName" : "Septena Plus 7-Year Pass",
+      "type" : "NonRenewingSubscription"
+    }
+  ],
   "products" : [],
   "settings" : {
     "_failTransactionsEnabled" : false,

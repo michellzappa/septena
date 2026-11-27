@@ -117,10 +117,19 @@ struct SeptaskPlusSheet: View {
 
   /// StoreKit's subscription store for the picked plan, with the pitch on
   /// top. It is rebuilt when the plan changes, so it lists only that plan's
-  /// two prices.
+  /// two prices. For Plus (non-upgrade), the pitch also includes a compact
+  /// StoreKit ProductView for the non-renewing 7-Year Pass (ADR 0061).
   private func storeView(upgrade: Bool) -> some View {
     SubscriptionStoreView(productIDs: selection.wrappedValue.productIDs) {
-      PlanPitch(upsellID: upsellID, tiers: tiers, selection: selection, upgrade: upgrade && status.hasAppleSubscription, onSynced: close)
+      PlanPitch(
+        upsellID: upsellID,
+        tiers: tiers,
+        selection: selection,
+        upgrade: upgrade && status.hasAppleSubscription,
+        upgradeFromPass: upgrade && !status.hasAppleSubscription && status.hasPlusPass,
+        showPassStore: !upgrade && selection.wrappedValue == .plus,
+        onSynced: close
+      )
     }
     .id(selection.wrappedValue)
     .subscriptionStoreControlStyle(.picker)
@@ -152,6 +161,8 @@ private struct PlanPitch: View {
   var tiers: [PlanTier]
   @Binding var selection: PlanTier
   var upgrade = false
+  var upgradeFromPass = false
+  var showPassStore = false
   /// Runs after this device took the sync slot; the sheet then closes.
   var onSynced: () -> Void = {}
   private var status: PlanStatus { .shared }
@@ -177,8 +188,21 @@ private struct PlanPitch: View {
       VStack(alignment: .leading, spacing: 12) {
         ForEach(selection.benefits) { PlanBenefitRow(benefit: $0) }
       }
+      if showPassStore {
+        Divider()
+        VStack(alignment: .leading, spacing: 8) {
+          Text(RegistryPlans.pass.title).font(.subheadline.weight(.semibold))
+          Text(RegistryPlans.pass.rateDetail).font(.footnote).foregroundStyle(.secondary)
+          ProductView(id: RegistryPlans.pass.productId)
+            .productViewStyle(.compact)
+            .inAppPurchaseOptions { _ in await PlusStore.shared.purchaseOptions() }
+            .onInAppPurchaseCompletion { _, result in await PlusStore.shared.handle(result) }
+        }
+      }
       if upgrade {
         Text(RegistryPlans.Paywall.upgradeNote).font(.footnote).foregroundStyle(.secondary)
+      } else if upgradeFromPass {
+        Text(RegistryPlans.Paywall.upgradeFromPassNote).font(.footnote).foregroundStyle(.secondary)
       }
       if case .trial(let end) = status.plan {
         VStack(alignment: .leading, spacing: 4) {
@@ -260,6 +284,12 @@ private struct PlusInfoView: View {
                 Text(price.detail).font(.subheadline).foregroundStyle(.secondary)
               }
             }
+            if selection == .plus {
+              VStack(alignment: .leading, spacing: 2) {
+                Text(RegistryPlans.pass.label).font(.body)
+                Text(RegistryPlans.pass.rateDetail).font(.subheadline).foregroundStyle(.secondary)
+              }
+            }
           }
           .padding(.horizontal)
         }
@@ -302,8 +332,9 @@ private struct PlusOwnedView: View {
           .font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.center)
       }
       // A grant can sit on top of a paid App Store subscription (Pro on a
-      // paid Plus). The subscription still renews, so Manage stays here.
-      if source == "apple" || PlanStatus.shared.hasAppleSubscription {
+      // paid Plus). The subscription still renews, so Manage stays here. A
+      // non-renewing 7-Year Pass has no recurring subscription to manage.
+      if PlanStatus.shared.hasAppleSubscription {
         ManageSubscriptionButton().buttonStyle(.borderedProminent)
       }
       PlusRestoreButton().font(.footnote)

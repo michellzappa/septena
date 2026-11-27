@@ -30,6 +30,18 @@
       "plans.currencies.1.pro.month.label"
     ]
   },
+  "$210 once": {
+    "text": "$210 once",
+    "paths": [
+      "plans.currencies.1.plus.pass.label"
+    ]
+  },
+  "$30 a year for 7 years. Half the annual rate.": {
+    "text": "$30 a year for 7 years. Half the annual rate.",
+    "paths": [
+      "plans.currencies.1.plus.pass.detail"
+    ]
+  },
   "$5 a month. You save $24 against paying monthly.": {
     "text": "$5 a month. You save $24 against paying monthly.",
     "paths": [
@@ -1860,6 +1872,12 @@
       "actions.shortcutsSheet.general.title"
     ]
   },
+  "Get 7-Year Pass": {
+    "text": "Get 7-Year Pass",
+    "paths": [
+      "plans.pass.action"
+    ]
+  },
   "Get a new code": {
     "text": "Get a new code",
     "paths": [
@@ -2004,6 +2022,12 @@
     "text": "If this agent takes the place of one you connected before, pick it. That agent stops working.",
     "paths": [
       "surfaces.prompts.items.agentReplaces.message"
+    ]
+  },
+  "If you prefer not to keep a subscription, one payment covers seven years of Septena Plus across your devices. That works out to half the annual rate. When the seven years end, your tasks stay on your devices, and you can extend, move to a free account, or export everything. Support for running the open-source sync server on your own Cloudflare account is on the roadmap.": {
+    "text": "If you prefer not to keep a subscription, one payment covers seven years of Septena Plus across your devices. That works out to half the annual rate. When the seven years end, your tasks stay on your devices, and you can extend, move to a free account, or export everything. Support for running the open-source sync server on your own Cloudflare account is on the roadmap.",
+    "paths": [
+      "plans.pass.detail"
     ]
   },
   "If you skip this, your tasks stay on this device until you sign in.": {
@@ -3097,6 +3121,12 @@
       "settings.copy.access_agents.paused.label"
     ]
   },
+  "Pay once for seven years of Plus": {
+    "text": "Pay once for seven years of Plus",
+    "paths": [
+      "plans.pass.title"
+    ]
+  },
   "Persimmon": {
     "text": "Persimmon",
     "paths": [
@@ -3297,6 +3327,12 @@
       "plans.paywall.upgradeNote"
     ]
   },
+  "Pro starts right away. Upgrading to Pro does not refund a 7-Year Pass. If you cancel Pro later, you return to the time remaining on your pass.": {
+    "text": "Pro starts right away. Upgrading to Pro does not refund a 7-Year Pass. If you cancel Pro later, you return to the time remaining on your pass.",
+    "paths": [
+      "plans.paywall.upgradeFromPassNote"
+    ]
+  },
   "Pro through {date}": {
     "text": "Pro through {date}",
     "placeholders": [
@@ -3373,6 +3409,12 @@
       "actions.actions.app.quickFind.title"
     ]
   },
+  "R$ 120 a year for 7 years. Half the annual rate.": {
+    "text": "R$ 120 a year for 7 years. Half the annual rate.",
+    "paths": [
+      "plans.currencies.3.plus.pass.detail"
+    ]
+  },
   "R$ 20 a month. You save R$ 108 against paying monthly.": {
     "text": "R$ 20 a month. You save R$ 108 against paying monthly.",
     "paths": [
@@ -3407,6 +3449,12 @@
     "text": "R$ 58 a month",
     "paths": [
       "plans.currencies.3.pro.month.label"
+    ]
+  },
+  "R$ 840 once": {
+    "text": "R$ 840 once",
+    "paths": [
+      "plans.currencies.3.plus.pass.label"
     ]
   },
   "Read-only agenda in Today and Upcoming": {
@@ -5733,6 +5781,18 @@
       "plans.currencies.2.pro.month.label"
     ]
   },
+  "£175 once": {
+    "text": "£175 once",
+    "paths": [
+      "plans.currencies.2.plus.pass.label"
+    ]
+  },
+  "£25 a year for 7 years. Half the annual rate.": {
+    "text": "£25 a year for 7 years. Half the annual rate.",
+    "paths": [
+      "plans.currencies.2.plus.pass.detail"
+    ]
+  },
   "£4.17 a month. You save £22 against paying monthly.": {
     "text": "£4.17 a month. You save £22 against paying monthly.",
     "paths": [
@@ -5799,6 +5859,20 @@
     "paths": [
       "plans.proPrices.pro_monthly.label",
       "plans.currencies.0.pro.month.label"
+    ]
+  },
+  "€210 once": {
+    "text": "€210 once",
+    "paths": [
+      "plans.pass.label",
+      "plans.currencies.0.plus.pass.label"
+    ]
+  },
+  "€30 a year for 7 years. Half the annual rate.": {
+    "text": "€30 a year for 7 years. Half the annual rate.",
+    "paths": [
+      "plans.pass.rateDetail",
+      "plans.currencies.0.plus.pass.detail"
     ]
   },
   "€5 a month. You save €24 against paying monthly.": {
