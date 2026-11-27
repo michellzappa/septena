@@ -581,12 +581,17 @@ struct SidebarRootView: View {
   }
 
   @ViewBuilder
-  private func smartListRow(for spec: SmartListSpec) -> some View {
+  /// `inBottomSection`: rows below Areas & Projects draw their title in
+  /// secondary ink (docs/DesignSpec.md, "Sidebar ink"), the same rule as the AppKit sidebar.
+  private func smartListRow(for spec: SmartListSpec,
+                            inBottomSection: Bool = false) -> some View {
+    let titleInk: Color = inBottomSection ? Theme.inkSecondary : .primary
     #if os(macOS)
     navRow(spec.route) {
       SmartListRow(icon: spec.icon,
                    iconColor: spec.color,
                    title: spec.title,
+                   titleInk: titleInk,
                    count: spec.count)
     }
     .contextMenu { smartListContextMenu(for: spec) }
@@ -596,6 +601,7 @@ struct SidebarRootView: View {
       SmartListRow(icon: spec.icon,
                    iconColor: spec.color,
                    title: spec.title,
+                   titleInk: titleInk,
                    count: spec.count)
     } menu: {
       smartListContextMenu(for: spec)
@@ -1068,7 +1074,7 @@ struct SidebarRootView: View {
     if !bottomSpecs.isEmpty {
       Section {
         ForEach(bottomSpecs, id: \.route.id) { spec in
-          compactRow(route: spec.route) { smartListRow(for: spec) }
+          compactRow(route: spec.route) { smartListRow(for: spec, inBottomSection: true) }
         }
       }
     }
@@ -1678,6 +1684,10 @@ struct SmartListRow: View {
   /// Bare symbol tint — active accent on Today, quiet secondary on other special lists.
   var iconColor: Color = .secondary
   let title: String
+  /// Title ink. `.primary` (not a fixed Theme ink) so the native `.sidebar`
+  /// selection inverts the title to white over the focused accent. Bottom
+  /// smart lists pass `Theme.inkSecondary`, which adapts the same way.
+  var titleInk: Color = .primary
   /// Muted gray count — neutral signal for total rows on this list.
   var count: Int? = nil
 
@@ -1692,9 +1702,7 @@ struct SmartListRow: View {
         .frame(width: Theme.sidebarIconSize + 4, height: Theme.sidebarIconSize + 4)
       Text(title)
         .scaledFont(size: Theme.sidebarAreaTitleSize)
-        // `.primary` (not a fixed Theme ink) so the native `.sidebar`
-        // selection inverts the title to white over the focused accent.
-        .foregroundStyle(.primary)
+        .foregroundStyle(titleInk)
       Spacer()
       if let n = count { SidebarCount(count: n) }
     }
