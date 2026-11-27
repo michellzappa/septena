@@ -131,6 +131,8 @@ import app.septena.ui.TaskMenuActionIcon
 import app.septena.ui.TaskRowMenuAction
 import app.septena.ui.TaskSelection
 import app.septena.ui.insertionPosition
+import app.septena.ui.positionAbove
+import app.septena.ui.positionsAbove
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -242,6 +244,31 @@ fun TaskHomeScreen(
         homeViewModel.createInlineDraft(draft) { id ->
             inlineDraftIds = inlineDraftIds + id
             expandedTaskId = id
+        }
+    }
+    // Magic Plus tap / app.newTask from this list (`newTaskTarget` in destinations.json,
+    // Apple `triggerInlineNewTask`): a draft here, a draft here on tomorrow, or a jump
+    // to Today, where the draft opens once Today has loaded.
+    var pendingTodayNewTask by remember { mutableStateOf(false) }
+    val newTaskFromHere: () -> Unit = {
+        val destId = (state.location as? TaskHomeLocation.SmartList)?.destinationId
+        val target = destId?.let(RegistryCatalog::destinationNewTaskTarget) ?: RegistryCatalog.NEW_TASK_HERE
+        when {
+            target == RegistryCatalog.NEW_TASK_TOMORROW -> startInlineDraft(
+                QuickAddDraft(whenDay = graph.clock.today(graph.clock.now()).plusDays(1).toString()),
+            )
+            target == RegistryCatalog.NEW_TASK_TODAY && destId != RegistryDestinationIds.TODAY -> {
+                pendingTodayNewTask = true
+                selectHomeLocation(TaskHomeLocation.SmartList(RegistryDestinationIds.TODAY))
+            }
+            else -> startInlineDraft(inlineNewTaskDraft(state))
+        }
+    }
+    LaunchedEffect(pendingTodayNewTask, state.location, state.hasLoaded) {
+        val onToday = (state.location as? TaskHomeLocation.SmartList)?.destinationId == RegistryDestinationIds.TODAY
+        if (pendingTodayNewTask && onToday && state.hasLoaded) {
+            pendingTodayNewTask = false
+            startInlineDraft(inlineNewTaskDraft(state))
         }
     }
     val openTaskWithAttribute: (String, String?) -> Unit = { id, attribute ->
@@ -532,12 +559,8 @@ fun TaskHomeScreen(
                 quickFindOpen = false
                 openedTaskId = null
                 expandedTaskId = null
-                // app.newTask (⌘N) makes an inline draft where the list can hold one, else Quick Add to the Inbox.
-                if (state.location !is TaskHomeLocation.SmartList || state.canQuickAdd) {
-                    startInlineDraft(inlineNewTaskDraft(state))
-                } else {
-                    homeQuickAddDraft = QuickAddDraft()
-                }
+                // app.newTask (⌘N): the same new task as a Magic Plus tap.
+                newTaskFromHere()
                 true
             }
             primary && event.key == Key.K -> {
@@ -701,6 +724,7 @@ fun TaskHomeScreen(
                         onCollapseExpandedTask = { expandedTaskId = null },
                         inlineDraftIds = inlineDraftIds,
                         onStartInlineDraft = startInlineDraft,
+                        onNewTaskHere = newTaskFromHere,
                         onOpenFullPage = { openTaskWithAttribute(it, null) },
                         onSendBackReview = openTaskSendBack,
                         onTaskAction = onTaskAction,
@@ -805,6 +829,7 @@ fun TaskHomeScreen(
                     onCollapseExpandedTask = { expandedTaskId = null },
                     inlineDraftIds = inlineDraftIds,
                     onStartInlineDraft = startInlineDraft,
+                    onNewTaskHere = newTaskFromHere,
                     onOpenFullPage = { openTaskWithAttribute(it, null) },
                     onSendBackReview = openTaskSendBack,
                     onTaskAction = onTaskAction,
@@ -1158,6 +1183,8 @@ private fun TaskHomeScaffold(
     inlineDraftIds: Set<String> = emptySet(),
     /** Magic Plus: make a draft row in a place and open it inline. */
     onStartInlineDraft: (QuickAddDraft) -> Unit = {},
+    /** Magic Plus tap: the new task this list makes (`newTaskTarget`). */
+    onNewTaskHere: () -> Unit = {},
 ) {
     var newSectionTrigger by remember { mutableIntStateOf(0) }
     var selectionPicker by remember { mutableStateOf<SelectionPicker?>(null) }
@@ -1177,7 +1204,6 @@ private fun TaskHomeScaffold(
     val appearance = LocalAppearance.current
     val selecting = state.selectedIds.isNotEmpty()
     val destinationId = (state.location as? TaskHomeLocation.SmartList)?.destinationId
-    val canCreateHere = state.location !is TaskHomeLocation.SmartList || state.canQuickAdd
     val showStarFilterButton = destinationId != RegistryDestinationIds.STARRED &&
         destinationId != RegistryDestinationIds.RECENTLY_DELETED &&
         !(destinationId == RegistryDestinationIds.LOGBOOK && logbookShowingDeleted)
@@ -1271,10 +1297,9 @@ private fun TaskHomeScaffold(
     }
     BackHandler(enabled = selecting) { homeViewModel.clearSelection() }
 
-    // Magic Plus tap (Apple `startCreate`): a draft at the foot of this list. On Today with
-    // Inbox rows it lands at the foot of the Inbox band, as an Inbox task.
-    val newTaskHere: () -> Unit = { onStartInlineDraft(inlineNewTaskDraft(state)) }
-    magicPlusDrag.fallbackDrop = { if (canCreateHere) newTaskHere() }
+    // A Magic Plus drop on no target makes the same task as a tap (Apple `fallbackDrop`).
+    val newTaskHere: () -> Unit = onNewTaskHere
+    magicPlusDrag.fallbackDrop = { newTaskHere() }
 
     val openGroupTarget: (String) -> Unit = { targetKey ->
         when {
@@ -1783,7 +1808,7 @@ private fun TaskHomeScaffold(
                                     onStartInlineDraft(
                                         QuickAddDraft(
                                             today = false,
-                                            position = inboxPositions.firstOrNull()?.let { it - 1.0 },
+                                            position = positionAbove(inboxPositions.firstOrNull()),
                                         ),
                                     )
                                 }
@@ -1830,7 +1855,7 @@ private fun TaskHomeScaffold(
                                             defaultQuickAddDraft(location).copy(
                                                 areaId = areaId,
                                                 projectId = projectId,
-                                                position = firstInGroupPos?.let { it - 1.0 },
+                                                position = positionAbove(firstInGroupPos),
                                                 useTodayPosition = isTodayList,
                                             ),
                                         )
@@ -1842,7 +1867,7 @@ private fun TaskHomeScaffold(
                             onReorderInboxHeader = if (isTodayList) {
                                 { ids ->
                                     val topPos = inboxPositions.firstOrNull() ?: 0.0
-                                    val newPositions = List(ids.size) { i -> topPos - (ids.size - i).toDouble() }
+                                    val newPositions = positionsAbove(topPos, ids.size)
                                     homeViewModel.reorderTasks(
                                         ids = ids,
                                         positions = newPositions,
@@ -1893,7 +1918,7 @@ private fun TaskHomeScaffold(
                                         val firstInGroupPos = displayedTasks
                                             .firstOrNull { it.group?.targetLocationKey == targetLocationKey }
                                             ?.position ?: 0.0
-                                        val newPositions = List(ids.size) { i -> firstInGroupPos - (ids.size - i).toDouble() }
+                                        val newPositions = positionsAbove(firstInGroupPos, ids.size)
                                         homeViewModel.reorderTasks(
                                             ids = ids,
                                             positions = newPositions,
@@ -1926,7 +1951,8 @@ private fun TaskHomeScaffold(
             // Round Magic Plus orb (matches iPhone `MagicPlusOrb`): visible on
             // creatable smart lists, areas and projects; hides during multi-select,
             // while an inline foldout is open, while a snackbar is up, or when the software keyboard is showing.
-            if (canCreateHere && !selecting && expandedTaskId == null && !snackbarVisible && !imeVisible && !reorderDrag.isDragging) {
+            // Shown on every list, as on iPhone: a list that cannot hold a new task sends it to Today.
+            if (!selecting && expandedTaskId == null && !snackbarVisible && !imeVisible && !reorderDrag.isDragging) {
                 MagicPlusOrb(
                     drag = magicPlusDrag,
                     isViewingProject = state.location is TaskHomeLocation.Project,

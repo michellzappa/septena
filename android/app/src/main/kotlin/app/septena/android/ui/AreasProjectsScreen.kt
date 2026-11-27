@@ -74,6 +74,8 @@ import app.septena.ui.cardPosition
 import app.septena.ui.headingReorderDragSource
 import app.septena.ui.headingReorderDrop
 import app.septena.ui.insertionPosition
+import app.septena.ui.positionAbove
+import app.septena.ui.positionsAbove
 import app.septena.ui.magicPlusRowDrop
 import app.septena.ui.magicPlusSectionDrop
 import app.septena.ui.rememberTaskContainerDropTarget
@@ -504,7 +506,7 @@ fun AreasProjectsScreen(
                                         onMagicPlusDrop?.invoke(
                                             QuickAddDraft(
                                                 areaId = destination.id,
-                                                position = visibleAreaTasks.firstOrNull()?.position?.let { it - 1.0 },
+                                                position = visibleAreaTasks.firstOrNull()?.position.let(::positionAbove),
                                             ),
                                         )
                                     },
@@ -514,7 +516,7 @@ fun AreasProjectsScreen(
                                     enabled = true,
                                     onDrop = { ids ->
                                         val topPos = visibleAreaTasks.firstOrNull()?.position ?: 0.0
-                                        val newPositions = List(ids.size) { i -> topPos - (ids.size - i).toDouble() }
+                                        val newPositions = positionsAbove(topPos, ids.size)
                                         viewModel.reorderTasks(ids, newPositions)
                                     },
                                 )
@@ -604,7 +606,7 @@ fun AreasProjectsScreen(
                                         onMagicPlusDrop?.invoke(
                                             QuickAddDraft(
                                                 projectId = destination.id,
-                                                position = visibleUnsectioned.firstOrNull()?.position?.let { it - 1.0 },
+                                                position = visibleUnsectioned.firstOrNull()?.position.let(::positionAbove),
                                             ),
                                         )
                                     },
@@ -614,7 +616,7 @@ fun AreasProjectsScreen(
                                     enabled = true,
                                     onDrop = { ids ->
                                         val topPos = visibleUnsectioned.firstOrNull()?.position ?: 0.0
-                                        val positions = List(ids.size) { i -> topPos - (ids.size - i).toDouble() }
+                                        val positions = positionsAbove(topPos, ids.size)
                                         viewModel.reorderTasks(ids, positions, targetHeadingId = null, updateHeading = true)
                                     },
                                 )
@@ -1036,7 +1038,7 @@ private fun PlaceSectionHeader(
                         QuickAddDraft(
                             projectId = projectId,
                             headingId = section.id,
-                            position = section.tasks.firstOrNull()?.position?.let { it - 1.0 },
+                            position = section.tasks.firstOrNull()?.position.let(::positionAbove),
                         ),
                     )
                 },
@@ -1046,7 +1048,7 @@ private fun PlaceSectionHeader(
                 enabled = true,
                 onDrop = { ids ->
                     val topPos = section.tasks.firstOrNull()?.position ?: 0.0
-                    val positions = List(ids.size) { i -> topPos - (ids.size - i).toDouble() }
+                    val positions = positionsAbove(topPos, ids.size)
                     onReorderToSection(ids, positions)
                 },
             )

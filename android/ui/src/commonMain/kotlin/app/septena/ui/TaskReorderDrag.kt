@@ -302,7 +302,7 @@ fun reorderPositions(
     if (count == 1) return listOf(insertionPosition(positions, targetIndex, before))
     val target = positions.getOrNull(targetIndex)
     val neighbor = positions.getOrNull(if (before) targetIndex - 1 else targetIndex + 1)
-    return when {
+    val slots = when {
         target != null && neighbor != null -> {
             val low = minOf(target, neighbor)
             val high = maxOf(target, neighbor)
@@ -326,6 +326,26 @@ fun reorderPositions(
             List(count) { i -> base + i.toDouble() }
         }
     }
+    if (slots.none { it == 0.0 }) return slots
+    // `position == 0` means "never ordered" on Apple: nudge every slot half a step, away
+    // from the row it lands next to, as `TaskOrder.positions` does.
+    val nudge = when {
+        target != null && neighbor != null -> (slots[1] - slots[0]) / 2.0
+        target != null -> if (before) -0.5 else 0.5
+        neighbor != null -> if (before) 0.5 else -0.5
+        else -> 0.5
+    }
+    return slots.map { it + nudge }
+}
+
+/**
+ * [count] ascending positions just above [top] (the first row of a group), for
+ * rows dropped on its header. Never 0, which Apple reads as "never ordered".
+ */
+fun positionsAbove(top: Double?, count: Int): List<Double> {
+    val base = top ?: 0.0
+    val slots = List(count) { i -> base - (count - i).toDouble() }
+    return if (slots.any { it == 0.0 }) slots.map { it - 0.5 } else slots
 }
 
 /** Apple's `TaskOrder.gap`: the spacing between manual positions. */
