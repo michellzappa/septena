@@ -4,6 +4,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -20,6 +21,7 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -29,8 +31,13 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
@@ -49,6 +56,21 @@ sealed interface TaskReorderDropKind {
 
     /** Drop onto a container row such as an Area's Project card (wears selection fill). */
     data object ContainerRow : TaskReorderDropKind
+
+    /**
+     * A slot between two project headings, at the top edge of the zone. Only a
+     * heading drag sees it; the heading's section moves with it.
+     */
+    data object HeadingSlot : TaskReorderDropKind
+}
+
+/** What a drag carries. A zone only answers the payload it accepts. */
+enum class TaskDragPayload {
+    /** Task rows: reorder, file under a heading, re-home. */
+    Tasks,
+
+    /** Project headings: reorder among the project's headings (`docs/DRAG_AND_DROP.md`). */
+    Headings,
 }
 
 data class TaskReorderActiveTarget(
@@ -69,6 +91,7 @@ class TaskReorderDragState {
         val kind: TaskReorderDropKind,
         val rect: Rect,
         val ownerTaskId: String?,
+        val accepts: TaskDragPayload,
         val onDrop: (ids: List<String>, before: Boolean) -> Unit,
     )
 
@@ -89,6 +112,9 @@ class TaskReorderDragState {
     var draggedTitle by mutableStateOf("")
         private set
 
+    var draggedPayload by mutableStateOf(TaskDragPayload.Tasks)
+        private set
+
     var pointerRoot by mutableStateOf(Offset.Zero)
         private set
 
@@ -102,10 +128,11 @@ class TaskReorderDragState {
         kind: TaskReorderDropKind,
         rect: Rect,
         ownerTaskId: String? = null,
+        accepts: TaskDragPayload = TaskDragPayload.Tasks,
         onDrop: (ids: List<String>, before: Boolean) -> Unit,
     ) {
         if (rect.height <= 0f || rect.width <= 0f) return
-        zones[id] = Zone(id = id, kind = kind, rect = rect, ownerTaskId = ownerTaskId, onDrop = onDrop)
+        zones[id] = Zone(id = id, kind = kind, rect = rect, ownerTaskId = ownerTaskId, accepts = accepts, onDrop = onDrop)
     }
 
     fun unregister(id: String) {
@@ -119,10 +146,12 @@ class TaskReorderDragState {
         location: Offset,
         density: Float,
         onHapticTick: () -> Unit,
+        payload: TaskDragPayload = TaskDragPayload.Tasks,
     ) {
         if (ids.isEmpty()) return
         draggedIds = ids
         draggedTitle = primaryTitle
+        draggedPayload = payload
         pointerRoot = location
         isDragging = true
         activeTarget = null
@@ -162,6 +191,7 @@ class TaskReorderDragState {
         isDragging = false
         draggedIds = emptyList()
         draggedTitle = ""
+        draggedPayload = TaskDragPayload.Tasks
         activeTarget = null
     }
 
@@ -170,7 +200,8 @@ class TaskReorderDragState {
 
         // 1. Direct container hits (e.g., dropping tasks onto a Project row inside an Area) take priority.
         val containerHit = zones.values.firstOrNull { zone ->
-            zone.kind == TaskReorderDropKind.ContainerRow &&
+            zone.accepts == draggedPayload &&
+                zone.kind == TaskReorderDropKind.ContainerRow &&
                 location.x in zone.rect.left..zone.rect.right &&
                 location.y in zone.rect.top..zone.rect.bottom
         }
@@ -218,6 +249,7 @@ class TaskReorderDragState {
     private fun insertionPoints(density: Float, draggedSet: Set<String>): List<Gap> {
         val points = mutableListOf<Gap>()
         for (zone in zones.values) {
+            if (zone.accepts != draggedPayload) continue
             if (zone.ownerTaskId != null && zone.ownerTaskId in draggedSet) continue
             when (zone.kind) {
                 TaskReorderDropKind.TaskRow -> {
@@ -226,6 +258,9 @@ class TaskReorderDragState {
                 }
                 TaskReorderDropKind.SectionHeader -> {
                     points += Gap(zone.rect.bottom, zone.id, zone.kind, before = true, rank = 1)
+                }
+                TaskReorderDropKind.HeadingSlot -> {
+                    points += Gap(zone.rect.top, zone.id, zone.kind, before = true, rank = 1)
                 }
                 TaskReorderDropKind.ContainerRow -> Unit
             }
@@ -267,7 +302,7 @@ fun reorderPositions(
     if (count == 1) return listOf(insertionPosition(positions, targetIndex, before))
     val target = positions.getOrNull(targetIndex)
     val neighbor = positions.getOrNull(if (before) targetIndex - 1 else targetIndex + 1)
-    return when {
+    val slots = when {
         target != null && neighbor != null -> {
             val low = minOf(target, neighbor)
             val high = maxOf(target, neighbor)
@@ -291,6 +326,112 @@ fun reorderPositions(
             List(count) { i -> base + i.toDouble() }
         }
     }
+    if (slots.none { it == 0.0 }) return slots
+    // `position == 0` means "never ordered" on Apple: nudge every slot half a step, away
+    // from the row it lands next to, as `TaskOrder.positions` does.
+    val nudge = when {
+        target != null && neighbor != null -> (slots[1] - slots[0]) / 2.0
+        target != null -> if (before) -0.5 else 0.5
+        neighbor != null -> if (before) 0.5 else -0.5
+        else -> 0.5
+    }
+    return slots.map { it + nudge }
+}
+
+/**
+ * [count] ascending positions just above [top] (the first row of a group), for
+ * rows dropped on its header. Never 0, which Apple reads as "never ordered".
+ */
+fun positionsAbove(top: Double?, count: Int): List<Double> {
+    val base = top ?: 0.0
+    val slots = List(count) { i -> base - (count - i).toDouble() }
+    return if (slots.any { it == 0.0 }) slots.map { it - 0.5 } else slots
+}
+
+/** Apple's `TaskOrder.gap`: the spacing between manual positions. */
+const val TASK_ORDER_GAP: Double = 1024.0
+
+/**
+ * Apple's `TaskOrder.positions(count:above:below:)`: [count] ascending slots
+ * between two neighbor keys (either may be absent). A slot never lands on 0,
+ * because `position == 0` means "never ordered".
+ */
+fun taskOrderPositions(count: Int, above: Double?, below: Double?): List<Double> {
+    if (count <= 0) return emptyList()
+    val slots: List<Double>
+    val nudge: Double
+    when {
+        above != null && below != null -> {
+            val step = (below - above) / (count + 1).toDouble()
+            slots = List(count) { i -> above + step * (i + 1) }
+            nudge = step / 2
+        }
+        above != null -> {
+            slots = List(count) { i -> above + TASK_ORDER_GAP * (i + 1) }
+            nudge = TASK_ORDER_GAP / 2
+        }
+        below != null -> {
+            slots = List(count) { i -> below - TASK_ORDER_GAP * (count - i) }
+            nudge = -TASK_ORDER_GAP / 2
+        }
+        else -> {
+            slots = List(count) { i -> TASK_ORDER_GAP * (i + 1) }
+            nudge = 0.0
+        }
+    }
+    return if (slots.any { it == 0.0 }) slots.map { it + nudge } else slots
+}
+
+/**
+ * The position writes for a heading reorder, the same rule as Apple's
+ * `TaskListView.handleHeadingDrop` → `applyManualOrder`.
+ *
+ * [headings] is the project's headings in the order the page shows them, with
+ * their stored positions. [movedIds] land just above [beforeHeadingId], or at
+ * the end when it is null. The moved headings take midpoint slots between
+ * their new neighbors. When a neighbor has no usable key (null or the unset 0)
+ * or the slots do not fit strictly between them, every heading is renumbered
+ * `base + gap * i` in the new order, and a 0 becomes `gap / 2`. Only changed
+ * positions are returned. An empty result means nothing to write.
+ */
+fun headingReorderPositions(
+    headings: List<Pair<String, Double?>>,
+    movedIds: List<String>,
+    beforeHeadingId: String?,
+): List<Pair<String, Double>> {
+    val moved = movedIds.filter { id -> headings.any { it.first == id } }.distinct()
+    if (moved.isEmpty()) return emptyList()
+    if (beforeHeadingId != null && beforeHeadingId in moved) return emptyList()
+    val movedSet = moved.toSet()
+    val remaining = headings.filter { it.first !in movedSet }
+    val insertion = if (beforeHeadingId == null) {
+        remaining.size
+    } else {
+        remaining.indexOfFirst { it.first == beforeHeadingId }.takeIf { it >= 0 } ?: return emptyList()
+    }
+    val current = headings.toMap()
+    fun usable(p: Double?): Double? = p?.takeIf { it != 0.0 }
+
+    val aboveRow = remaining.getOrNull(insertion - 1)
+    val belowRow = remaining.getOrNull(insertion)
+    val above = usable(aboveRow?.second)
+    val below = usable(belowRow?.second)
+    val keysKnown = (aboveRow == null || above != null) && (belowRow == null || below != null)
+    if (keysKnown) {
+        val slots = taskOrderPositions(moved.size, above, below)
+        val strictlyPlaced = slots.zipWithNext().all { (a, b) -> a < b } &&
+            (above == null || slots.first() > above) &&
+            (below == null || slots.last() < below)
+        if (strictlyPlaced) {
+            return moved.zip(slots).filter { (id, pos) -> current[id] != pos }
+        }
+    }
+    val final = remaining.map { it.first }.toMutableList().apply { addAll(insertion, moved) }
+    val base = usable(remaining.firstOrNull()?.second) ?: TASK_ORDER_GAP
+    return final.mapIndexed { i, id ->
+        val pos = base + TASK_ORDER_GAP * i
+        id to (if (pos == 0.0) TASK_ORDER_GAP / 2 else pos)
+    }.filter { (id, pos) -> current[id] != pos }
 }
 
 val LocalTaskReorderDrag = compositionLocalOf<TaskReorderDragState?> { null }
@@ -347,6 +488,88 @@ fun Modifier.taskReorderSectionDrop(
             drag.register(id, TaskReorderDropKind.SectionHeader, coords.boundsInRoot()) { ids, _ -> onDrop(ids) }
         }
         .drawInsertionMark(tint, markAlpha, atTop = false, visible = isTargeted)
+}
+
+/**
+ * Registers a project heading's slot for a heading drag: the drop lands just
+ * above [headingId] (or at the end of the headings when it is null). Draws the
+ * same 6dp insertion mark, on the zone's top edge. [headingId] is also the
+ * zone's owner, so the dragged heading does not offer its own slot.
+ */
+fun Modifier.headingReorderDrop(
+    id: String,
+    headingId: String?,
+    enabled: Boolean = true,
+    onDrop: (ids: List<String>) -> Unit,
+): Modifier = composed {
+    val drag = LocalTaskReorderDrag.current
+    val tint = LocalMagicPlusColor.current
+    if (drag == null || !enabled) return@composed this
+
+    DisposableEffect(drag, id) {
+        onDispose { drag.unregister(id) }
+    }
+    val isTargeted = drag.isDragging && drag.activeTarget?.id == id
+    val markAlpha by animateFloatAsState(
+        targetValue = if (isTargeted) 1f else 0f,
+        animationSpec = tween(durationMillis = 120),
+        label = "headingReorderMark",
+    )
+    this
+        .onGloballyPositioned { coords ->
+            drag.register(
+                id,
+                TaskReorderDropKind.HeadingSlot,
+                coords.boundsInRoot(),
+                ownerTaskId = headingId,
+                accepts = TaskDragPayload.Headings,
+            ) { ids, _ -> onDrop(ids) }
+        }
+        .drawInsertionMark(tint, markAlpha, atTop = true, visible = isTargeted)
+}
+
+/**
+ * Makes a project heading draggable: long-press, then slide, as a task row.
+ * The drag carries [TaskDragPayload.Headings], so only heading slots answer it.
+ */
+fun Modifier.headingReorderDragSource(
+    headingId: String,
+    title: String,
+    enabled: Boolean = true,
+): Modifier = composed {
+    val drag = LocalTaskReorderDrag.current
+    // While an inline editor is open the header is dimmed and a tap only folds it.
+    if (drag == null || !enabled || LocalInlineEditDim.current.isActive) return@composed this
+    val density = LocalDensity.current.density
+    val haptics = LocalHapticFeedback.current
+    var origin by remember(headingId) { mutableStateOf(Offset.Zero) }
+    val hapticTick: () -> Unit = { haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove) }
+    this
+        .onGloballyPositioned { coords -> origin = coords.positionInRoot() }
+        .pointerInput(headingId, title, drag) {
+            var last = Offset.Zero
+            detectDragGesturesAfterLongPress(
+                onDragStart = { offset ->
+                    last = origin + offset
+                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    drag.beginDrag(
+                        ids = listOf(headingId),
+                        primaryTitle = title,
+                        location = last,
+                        density = density,
+                        onHapticTick = hapticTick,
+                        payload = TaskDragPayload.Headings,
+                    )
+                },
+                onDrag = { change, _ ->
+                    change.consume()
+                    last = origin + change.position
+                    drag.updateDrag(last, density, hapticTick)
+                },
+                onDragEnd = { drag.endDrag(last, density) },
+                onDragCancel = { drag.cancel() },
+            )
+        }
 }
 
 /**

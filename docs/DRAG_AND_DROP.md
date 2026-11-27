@@ -54,6 +54,32 @@ tasks are not on screen (a sidebar row, a project card on an area page, the Move
 panel) wears the selection fill, because there is no place to mark. Android
 draws the same bar for both drags (`drawInsertionMark` in `MagicPlusDrag.kt`).
 
+**Android creates in place, as iPhone does.** A Magic Plus tap or drop makes
+an empty draft row in that place and opens its inline foldout with the title
+focused (`InlineDraft.kt`, the Apple `startCreate` / `createInlineDraftAtDrop`
+rules). The row stays on the device until its first title write
+(`TaskMutator` `deferPush`). Return saves and folds. A fold with nothing typed
+purges the draft, and only when the field, the store and the unsent mark all
+agree. On save the explicit title tokens (`!today`, `#project`, `@area`) apply
+to unset fields, and `# Name` in a project makes a heading. Before the first
+save, the title's tokens and one date phrase show as tap-to-apply chips, as
+iPhone's `quickEntryChips` do. While an inline editor is open, the rest of the
+list dims and a tap there folds the editor (`InlineEditDim.kt`). Where a tap
+creates is `newTaskTarget` in `registry/destinations.json`: here, here on
+tomorrow (Upcoming), or Today. On an area page the orb opens New Task / New
+Project in Area. Quick Add stays a sheet (widget, home-screen action, Do
+screen).
+
+**Android moves a heading the same way** (#779 parity). Long-press a project
+heading and slide it. The drag carries headings only
+(`TaskDragPayload.Headings` in `TaskReorderDrag.kt`), so only the slots above
+each heading and one slot after the last section answer it, with the same bar.
+The drop writes the headings' `position` with Apple's rule
+(`headingReorderPositions` = `handleHeadingDrop` → `applyManualOrder`:
+midpoints between neighbours, else renumber `base + gap * i`, never 0). The
+section's tasks keep their `heading`, so they move with it. It works under any
+Sort By, because headings keep their manual order.
+
 **A sorted list has no reorder** (Sort By, `docs/LIST_SORT_SPEC.md` §6, #779).
 When a list's sort is not Manual, the rows do not follow `position`, so a drop
 between rows has nothing to mean. Every shell turns it off: SwiftUI gives

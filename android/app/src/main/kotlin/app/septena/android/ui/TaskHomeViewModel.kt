@@ -260,6 +260,14 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
     }
 
     /** The row in inline edit, or null when no edit is open. */
+    init {
+        // A crash can leave an empty draft row on this device; drop it once per launch.
+        viewModelScope.launch {
+            val swept = runCatching { withContext(Dispatchers.IO) { graph.sweepAbandonedInlineDrafts() } }.getOrDefault(0)
+            if (swept > 0) graph.sync.noteLocalChange()
+        }
+    }
+
     fun setPinnedTask(id: String?) {
         pinnedTaskId.value = id
     }
@@ -614,6 +622,22 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                 }
                 .onFailure { errorMessage.value = it.message }
             quickAddRunning = false
+        }
+    }
+
+    /**
+     * Magic Plus (tap or drop): an empty draft row in [draft]'s place, opened
+     * inline by the caller (InlineDraft.kt, Apple `createInlineDraftAtDrop`).
+     */
+    fun createInlineDraft(draft: QuickAddDraft, onCreated: (taskId: String) -> Unit) {
+        errorMessage.value = null
+        viewModelScope.launch {
+            runCatching { withContext(Dispatchers.IO) { graph.createInlineDraft(draft) } }
+                .onSuccess { taskId ->
+                    graph.sync.noteLocalChange()
+                    onCreated(taskId)
+                }
+                .onFailure { errorMessage.value = it.message }
         }
     }
 

@@ -14,9 +14,15 @@ private const val FADE_OUT_MILLIS = 140
  * Put it on EVERY item that can move. An item without it jumps while its neighbors slide.
  * A leaving row fades out before the row below reaches its title.
  * The system "Remove animations" setting turns it off.
+ *
+ * It also carries the inline-edit dim ([inlineEditDimmed]): pass
+ * `dimsForInlineEdit = false` only on the open editor itself.
  */
-fun LazyItemScope.taskListMotion(): Modifier = Modifier.animateItem(
-    fadeInSpec = tween(FADE_IN_MILLIS),
-    placementSpec = tween(SHIFT_MILLIS, easing = FastOutSlowInEasing),
-    fadeOutSpec = tween(FADE_OUT_MILLIS),
-)
+fun LazyItemScope.taskListMotion(dimsForInlineEdit: Boolean = true): Modifier {
+    val motion = Modifier.animateItem(
+        fadeInSpec = tween(FADE_IN_MILLIS),
+        placementSpec = tween(SHIFT_MILLIS, easing = FastOutSlowInEasing),
+        fadeOutSpec = tween(FADE_OUT_MILLIS),
+    )
+    return if (dimsForInlineEdit) motion.inlineEditDimmed() else motion
+}

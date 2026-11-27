@@ -467,7 +467,7 @@ fun TaskHomeContent(
                         val slicePositions = List(dayTasks.size) { i -> cardPosition(i, dayTasks.size) }
                         itemsIndexed(dayTasks, key = { _, (_, task) -> "task:${task.id}" }) { localIdx, (globalIdx, task) ->
                             if (expandedTaskId == task.id && expandedTaskContent != null) {
-                                expandedTaskContent(task, slicePositions[localIdx], taskListMotion())
+                                expandedTaskContent(task, slicePositions[localIdx], taskListMotion(dimsForInlineEdit = false))
                             } else {
                                 TaskCardRow(
                                     task = task,
@@ -693,7 +693,7 @@ private fun LazyListScope.taskCardRows(
                     modifier = taskListMotion(),
                 )
             } else if (expandedTaskId == task.id && expandedTaskContent != null) {
-                expandedTaskContent(task, positions[index], taskListMotion())
+                expandedTaskContent(task, positions[index], taskListMotion(dimsForInlineEdit = false))
             } else {
                 TaskCardRow(
                     task = task,

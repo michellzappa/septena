@@ -398,6 +398,9 @@ function validateDestinations(dests, icons, caps) {
     }
     assert(typeof d.canHide === "boolean", `destinations.json: ${d.id} missing boolean canHide`);
     assert(typeof d.canMoveSection === "boolean", `destinations.json: ${d.id} missing boolean canMoveSection`);
+    // Where Magic Plus / app.newTask makes a task from this list: an inline draft
+    // here, an inline draft here on tomorrow, or a jump to Today and a draft there.
+    assert(["here", "tomorrow", "today"].includes(d.newTaskTarget), `destinations.json: ${d.id} newTaskTarget must be here, tomorrow or today`);
     assert(typeof d.emptyState?.title === "string" && typeof d.emptyState?.detail === "string", `destinations.json: ${d.id} needs emptyState.title and .detail`);
     assert(d.icon in icons.icons, `destinations.json: ${d.id} unknown icon "${d.icon}"`);
     assert(d.featureId in caps.capabilities, `destinations.json: ${d.id} unknown featureId "${d.featureId}"`);
