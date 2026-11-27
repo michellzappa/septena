@@ -84,6 +84,7 @@ import {
   isAssignedToOther,
   isWaitingTask,
   projectShareOf,
+  shareMembersLabel,
   sharingCopy,
   waitingName,
 } from "@/lib/waiting";
@@ -2461,12 +2462,28 @@ export function SeptenaApp() {
       : "bg-[var(--bg-card)]"
   }`;
 
+  const renderSharedMark = (project: ProjectRow | null | undefined, sizeClass = "h-3 w-3") => {
+    const share = projectShareOf(project);
+    if (!share) return null;
+    const label = shareMembersLabel(share, lang);
+    return (
+      <span
+        title={label}
+        aria-label={label}
+        className="inline-flex shrink-0 items-center text-[var(--text-muted)]"
+      >
+        <RegistryIcon token="project.shared" className={sizeClass} />
+      </span>
+    );
+  };
+
   // Unified iOS group/section header: shares the exact horizontal inset (`px-3`)
   // and 22px leading icon slot (`w-[22px]` + `gap-2.5`) as every task row
   // checkbox below it. Sentence case, no bottom underline.
   const renderSectionHeader = ({
     leading,
     title,
+    badge,
     count,
     muted = false,
     collapse,
@@ -2474,6 +2491,7 @@ export function SeptenaApp() {
   }: {
     leading?: React.ReactNode;
     title: string;
+    badge?: React.ReactNode;
     count?: number;
     muted?: boolean;
     collapse?: { expanded: boolean; onToggle: () => void };
@@ -2494,6 +2512,7 @@ export function SeptenaApp() {
         >
           {title}
         </span>
+        {badge}
         {typeof count === "number" && (
           <span className="font-mono-tabular ml-auto text-[13px] font-normal text-[var(--text-muted)]">
             {count}
@@ -3093,7 +3112,10 @@ export function SeptenaApp() {
                     <span className="flex h-4 w-4 shrink-0 items-center justify-center">
                       <ProjectRing done={stats.done} total={stats.total} />
                     </span>
-                    <span className="flex-1 truncate text-left">{proj.title}</span>
+                    <span className="flex min-w-0 flex-1 items-center gap-1.5">
+                      <span className="truncate text-left">{proj.title}</span>
+                      {renderSharedMark(proj, "h-3 w-3")}
+                    </span>
                     {prefs.sidebarCounts && stats.total - stats.done > 0 && (
                       <span className="font-mono-tabular text-xs text-[var(--text-muted)]">
                         {stats.total - stats.done}
@@ -3361,7 +3383,10 @@ export function SeptenaApp() {
                             <span className="flex h-4 w-4 shrink-0 items-center justify-center">
                               <ProjectRing done={stats.done} total={stats.total} />
                             </span>
-                            <span className="flex-1 truncate text-left">{proj.title}</span>
+                            <span className="flex min-w-0 flex-1 items-center gap-1.5">
+                              <span className="truncate text-left">{proj.title}</span>
+                              {renderSharedMark(proj, "h-3 w-3")}
+                            </span>
                             {prefs.sidebarCounts && stats.total - stats.done > 0 && (
                               <span className="font-mono-tabular text-xs text-[var(--text-muted)]">
                                 {stats.total - stats.done}
@@ -3625,10 +3650,11 @@ export function SeptenaApp() {
             {pageMeta.subtitle && (
               <p className="text-xs font-medium text-[var(--text-muted)]">{pageMeta.subtitle}</p>
             )}
-            <div className="flex items-baseline gap-2.5">
+            <div className="flex items-center gap-2">
               <h1 className="truncate text-2xl font-semibold tracking-tight text-[var(--text-primary)]">
                 {pageMeta.title}
               </h1>
+              {destination.kind === "project" && renderSharedMark(projectById.get(destination.id), "h-4 w-4")}
             </div>
           </div>
 
@@ -4191,6 +4217,10 @@ export function SeptenaApp() {
                               {renderSectionHeader({
                                 leading,
                                 title: grp.title,
+                                badge:
+                                  grp.kind === "project"
+                                    ? renderSharedMark(projectById.get(grp.projectId), "h-3.5 w-3.5")
+                                    : undefined,
                               })}
                               <div className={taskCardClass}>
                                 {grp.items.map((i) => renderTaskRow(i, true))}
@@ -4360,6 +4390,10 @@ export function SeptenaApp() {
                       {renderSectionHeader({
                         leading,
                         title: grp.title,
+                        badge:
+                          grp.kind === "project"
+                            ? renderSharedMark(projectById.get(grp.projectId), "h-3.5 w-3.5")
+                            : undefined,
                       })}
                       <div className={taskCardClass}>
                         {grp.items.map((i) => renderTaskRow(i, true))}

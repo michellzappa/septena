@@ -8,7 +8,9 @@ import {
   compareWaiting,
   isAssignedToOther,
   isWaitingTask,
+  projectShareOf,
   setWaitingFields,
+  shareMembersLabel,
   sharedWaitingTarget,
   waitingDays,
   waitingLabel,
@@ -114,4 +116,14 @@ test("compareWaiting orders manual and shared waits together by start day", () =
     [manualNewer, sharedOlder].sort((a, b) => compareWaiting(a, b, share, share)).map((t) => t.id),
     ["s", "m"],
   );
+});
+
+test("projectShareOf accepts object or JSON string and formats members label", () => {
+  assert.deepEqual(projectShareOf({ id: "p1", title: "Trip", status: "open", share }), share);
+  assert.deepEqual(
+    projectShareOf({ id: "p1", title: "Trip", status: "open", share: JSON.stringify(share) as unknown as ProjectShareInfo }),
+    share,
+  );
+  assert.equal(projectShareOf({ id: "p1", title: "Private", status: "open", share: null }), null);
+  assert.equal(shareMembersLabel(share, "en"), "Members: Alice, Bob, Cara");
 });
