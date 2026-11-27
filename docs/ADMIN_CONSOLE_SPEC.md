@@ -25,30 +25,27 @@ millions of accounts. It never shows what a user wrote (ADR 0043).
 
 ## 3. Layout (UX)
 
-The page is read top to bottom, once a day, in about a minute. The order
-follows the questions in §1, and the most frequent question comes first.
+The console is six pages under one top bar: the Septena mark, the admin's
+email, Refresh counts, and a tab per page. The tab of the open page carries
+the brand accent (Persimmon, `registry/tokens.json`). Each page loads only the
+data it shows, so a page with the account table is the only one that reads
+every account row.
 
-1. **Growth (the morning read).** A row of headline cards. Each card has one
-   number, its change against 7 days before (green up, amber down, "no
-   history yet" when there is none), and a 30-day line. Hovering a point shows
-   the day and the value. Under the cards: one row of ratios (DAU/MAU,
-   activation %, trial to paid), then the two funnels next to each other.
-2. **Website.** Where the people in the funnel come from: traffic, CTA
-   conversion, sources, pages, drawn from the Stats API. Without a key the
-   section embeds a shared Plausible dashboard instead.
-3. **Retention by week.** One row per start week. A healthy product shows the
-   "active this week" column holding up in older rows.
-4. **Clients and agents.** What people run Septena on and which versions are
-   still out. Read it after a release.
-5. **Plans and usage, Plan links, Accounts, Signups.** The work area: give a
-   plan, find an account, export signups. It sits below the reading area
-   because it is used less often.
+| Page | Path | Shows |
+|---|---|---|
+| Overview | `/admin` | The morning read: growth cards (number, change against 7 days before, 30-day line), the ratio row, the website and product funnels. |
+| Website | `/admin/website` | Traffic cards, visitors and signups per day, calls to action with conversion, where visitors come from. |
+| Product | `/admin/product` | Retention by start week, devices and versions, agents, sign-in methods, Mac downloads, usage counts. |
+| Plans | `/admin/plans` | Plan counts, then plan links: make, close, take back. |
+| Accounts | `/admin/accounts` | Search and the account table: give or take back a plan. |
+| Signups | `/admin/signups` | Signup counts by list, screen, task app, week and page; the latest 50; CSV. |
 
-Rules for the layout: a jump bar at the top links every section. A number
-has its label and its window ("7 days", "30 days", "every account"). An empty
-state says what is missing and the one step that fixes it. Colour carries
-direction only (up, down, warning), never identity. The page works at phone
-width.
+Rules for the layout: every block is a titled card with one line that says
+what it counts. A number has its label and its window ("7 days", "30 days",
+"every account"). The accent marks the open tab, the primary button of a
+form, links, chart marks and the funnel meters. Green and red mean only up
+and down. An empty state says what is missing and the one step that fixes
+it. The pages work at phone width.
 
 ## 4. Definitions
 

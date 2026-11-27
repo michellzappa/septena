@@ -257,7 +257,9 @@ describe("admin page", () => {
     assert.ok(html.includes("&lt;b&gt;Anna") && !html.includes("<b>Anna"));
     const id = h.accounts.listPlusLinks().links[0].id;
     assert.equal((await post(`/admin/links/${id}/revoke`, {})).status, 404, "a revoke must say who");
-    assert.equal((await post(`/admin/links/${id}/close`, {})).status, 303);
+    const closed = await post(`/admin/links/${id}/close`, {});
+    assert.equal(closed.status, 303);
+    assert.equal(closed.headers.get("Location"), "/admin/plans");
     assert.ok(h.accounts.listPlusLinks().links[0].closedAt);
   });
 
