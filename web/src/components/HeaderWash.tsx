@@ -17,6 +17,7 @@ interface HeaderWashProps {
   dayISO: string;
   projectId?: string | null;
   fadeHeight?: number;
+  fullBleed?: boolean;
 }
 
 export function HeaderWash({
@@ -28,6 +29,7 @@ export function HeaderWash({
   dayISO,
   projectId,
   fadeHeight = 260,
+  fullBleed = false,
 }: HeaderWashProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const phaseRef = useRef(0);
@@ -67,7 +69,7 @@ export function HeaderWash({
         intensity,
         seed,
         phase,
-        fadeHeight,
+        fadeHeight: fullBleed ? rect.height : fadeHeight,
         mini: false,
         increaseContrast,
       });
@@ -104,7 +106,7 @@ export function HeaderWash({
       ro.disconnect();
       if (rafId) cancelAnimationFrame(rafId);
     };
-  }, [accentHex, dayISO, fadeHeight, intensity, isDark, motion, projectId, style]);
+  }, [accentHex, dayISO, fadeHeight, fullBleed, intensity, isDark, motion, projectId, style]);
 
   if (style === "none") return null;
 
@@ -112,8 +114,12 @@ export function HeaderWash({
     <canvas
       ref={canvasRef}
       aria-hidden="true"
-      className="pointer-events-none absolute inset-x-0 top-0 z-0 w-full select-none"
-      style={{ height: `${fadeHeight}px` }}
+      className={
+        fullBleed
+          ? "pointer-events-none absolute inset-0 z-0 h-full w-full select-none"
+          : "pointer-events-none absolute inset-x-0 top-0 z-0 w-full select-none"
+      }
+      style={fullBleed ? undefined : { height: `${fadeHeight}px` }}
     />
   );
 }
