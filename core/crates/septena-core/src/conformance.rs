@@ -23,6 +23,7 @@ pub const CONFORMANCE_FIXTURES: &[&str] = &[
     "convo-derived",
     "do-session",
     "list-sort",
+    "project-checklist",
     "recurrence",
     "refs",
     "reminders",
@@ -59,6 +60,13 @@ pub fn run_conformance(fixture: String, json: String) -> Result<ConformanceRepor
             for case in cases(&doc, "cases") {
                 let input = json!({ "tasks": case["tasks"], "sort": case["sort"] });
                 run.check("cases", case, "sortTasks", input, false);
+            }
+        }
+        "project-checklist" => {
+            for (section, function) in [("layout", "projectChecklist"), ("check", "checklistCheckPatch")] {
+                for case in cases(&doc, section) {
+                    run.check(section, case, function, case["input"].clone(), false);
+                }
             }
         }
         "task-views" => {
