@@ -71,6 +71,7 @@ enum RegistryEntityEnums {
   static let taskSource: [String] = ["app", "mcp"]
   static let projectStatus: [String] = ["active", "done", "cancelled"]
   static let taskKind: [String] = ["heading"]
+  static let listSort: [String] = ["manual", "when", "deadline", "title", "created"]
   static let recurrenceUnit: [String] = ["day", "week", "month", "year"]
   static let reminderMode: [String] = ["floating", "fixed"]
   static let convoAssignee: [String] = ["me", "local", "claude"]

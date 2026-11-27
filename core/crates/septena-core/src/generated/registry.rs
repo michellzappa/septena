@@ -76,6 +76,14 @@ pub mod enums {
         pub const HEADING: &str = "heading";
         pub const ALL: &[&str] = &["heading"];
     }
+    pub mod list_sort {
+        pub const MANUAL: &str = "manual";
+        pub const WHEN: &str = "when";
+        pub const DEADLINE: &str = "deadline";
+        pub const TITLE: &str = "title";
+        pub const CREATED: &str = "created";
+        pub const ALL: &[&str] = &["manual", "when", "deadline", "title", "created"];
+    }
     pub mod recurrence_unit {
         pub const DAY: &str = "day";
         pub const WEEK: &str = "week";

@@ -49,6 +49,7 @@ where a date-only value needs one.
 |---|---|---|
 | `fade` | `row_opacity`, `should_fade`, `fade_fill` | `task-fade.json` |
 | `views` | `task_view_membership` (lists, due state, Upcoming day, arrived on its own) | `task-views.json` |
+| `sort` | `sort_tasks` (Sort By on a list, `LIST_SORT_SPEC.md`) | `list-sort.json` |
 | `task_dates` | `apply_date_action`, `normalize_task_dates`, `next_occurrence_dates` (ADR 0027) | `task-dates.json` |
 | `recurrence` | `next_scheduled_date`, `occurrence_id` | `recurrence.json` |
 | `reminders` | `shift_reminder_for_recurrence`, `shift_reminder_on_reschedule`, `should_arm_reminder` | `reminders.json` |

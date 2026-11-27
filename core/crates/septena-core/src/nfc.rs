@@ -50,6 +50,20 @@ pub(crate) fn nfc(text: &str) -> String {
     out.into_iter().filter_map(char::from_u32).collect()
 }
 
+/// `text` with every combining mark removed after canonical decomposition:
+/// "École" becomes "Ecole". The list sort compares titles with it.
+pub(crate) fn strip_marks(text: &str) -> String {
+    let mut chars: Vec<(u32, u8)> = Vec::new();
+    for c in text.chars() {
+        decompose(u32::from(c), &mut chars);
+    }
+    chars
+        .into_iter()
+        .filter(|(_, class)| *class == 0)
+        .filter_map(|(c, _)| char::from_u32(c))
+        .collect()
+}
+
 fn decompose(c: u32, out: &mut Vec<(u32, u8)>) {
     if (S_BASE..S_BASE + S_COUNT).contains(&c) {
         let s = c - S_BASE;

@@ -15,7 +15,7 @@ use crate::{
     email_ref_keys, fade_fill, find_issue_refs, next_occurrence_dates, next_scheduled_date, normalize_ref_key,
     normalize_task_dates, occurrence_id, parse_ref, plan_pull_row, plan_push_response, row_opacity,
     server_rejection_reason, shift_reminder_for_recurrence, shift_reminder_on_reschedule, should_arm_reminder,
-    should_fade, task_ref_id, task_view_membership,
+    should_fade, sort_tasks, task_ref_id, task_view_membership,
 };
 
 /// The functions `invoke_json` accepts.
@@ -24,6 +24,7 @@ pub const JSON_FUNCTIONS: &[&str] = &[
     "shouldFade",
     "fadeFill",
     "taskViewMembership",
+    "sortTasks",
     "applyDateAction",
     "normalizeTaskDates",
     "nextOccurrenceDates",
@@ -78,6 +79,10 @@ pub(crate) fn invoke_value(function: &str, input: Value) -> Result<Value, CoreEr
         }
         "shouldFade" => Ok(json!(should_fade(decode::<FadeInput>(input).map_err(|e| parse(&e))?)?)),
         "fadeFill" => Ok(json!(fade_fill(decode::<FadeInput>(input).map_err(|e| parse(&e))?)?)),
+        "sortTasks" => {
+            let args: SortArgs = decode(input).map_err(|e| parse(&e))?;
+            Ok(json!(sort_tasks(args.tasks, args.sort)?))
+        }
         "taskViewMembership" => {
             let args: ViewArgs = decode(input).map_err(|e| parse(&e))?;
             Ok(membership_json(&task_view_membership(args.task, args.today, args.now)?))
@@ -249,6 +254,12 @@ pub(crate) struct ViewArgs {
     pub task: TaskSnapshot,
     pub today: String,
     pub now: String,
+}
+
+#[derive(Deserialize)]
+pub(crate) struct SortArgs {
+    pub tasks: Vec<TaskSnapshot>,
+    pub sort: String,
 }
 
 #[derive(Deserialize)]

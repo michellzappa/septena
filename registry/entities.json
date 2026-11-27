@@ -52,6 +52,7 @@
     "taskSource": ["app", "mcp"],
     "projectStatus": ["active", "done", "cancelled"],
     "taskKind": ["heading"],
+    "listSort": ["manual", "when", "deadline", "title", "created"],
     "recurrenceUnit": ["day", "week", "month", "year"],
     "reminderMode": ["floating", "fixed"],
     "convoAssignee": ["me", "local", "claude"],
