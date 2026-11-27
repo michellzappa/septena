@@ -82,7 +82,7 @@ class SecretVaultContractTest {
             action()
             fail("Expected session validation failure")
         } catch (error: IllegalStateException) {
-            val messages = generateSequence<Throwable>(error) { it.cause }.mapNotNull(Throwable::getMessage).joinToString(" ")
+            val messages = generateSequence<Throwable>(error) { it.cause }.mapNotNull { it.message }.joinToString(" ")
             check(messages.contains(message))
         }
     }
