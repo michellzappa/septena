@@ -43,6 +43,7 @@ export const ENTITY_ENUMS = {
   taskSource: ["app","mcp"] as const,
   projectStatus: ["active","done","cancelled"] as const,
   taskKind: ["heading"] as const,
+  listSort: ["manual","when","deadline","title","created"] as const,
   recurrenceUnit: ["day","week","month","year"] as const,
   reminderMode: ["floating","fixed"] as const,
   convoAssignee: ["me","local","claude"] as const,

@@ -22,6 +22,7 @@ pub struct ConformanceReport {
 pub const CONFORMANCE_FIXTURES: &[&str] = &[
     "convo-derived",
     "do-session",
+    "list-sort",
     "recurrence",
     "refs",
     "reminders",
@@ -52,6 +53,12 @@ pub fn run_conformance(fixture: String, json: String) -> Result<ConformanceRepor
             }
             for case in cases(&doc, "shouldFade") {
                 run.check("shouldFade", case, "shouldFade", case["input"].clone(), false);
+            }
+        }
+        "list-sort" => {
+            for case in cases(&doc, "cases") {
+                let input = json!({ "tasks": case["tasks"], "sort": case["sort"] });
+                run.check("cases", case, "sortTasks", input, false);
             }
         }
         "task-views" => {

@@ -65,6 +65,7 @@ See [ADR 0007](adr/0007-septena-is-the-task-app.md).
 | [SYNC_SUBSCRIPTION_SPEC.md](SYNC_SUBSCRIPTION_SPEC.md) | proposed (launch track) |
 | [SIGN_IN_SURFACES_SPEC.md](SIGN_IN_SURFACES_SPEC.md) | accepted (ADR 0047; #137, SI0 to SI6) |
 | [SUPPORT_SPEC.md](SUPPORT_SPEC.md) | accepted (ADR 0054; SUP1 to SUP5) |
+| [LIST_SORT_SPEC.md](LIST_SORT_SPEC.md) | building (#779) |
 | [ADMIN_CONSOLE_SPEC.md](ADMIN_CONSOLE_SPEC.md) | building (ADR 0043, 0058; phase 1 shipped) |
 | [IDENTIFIERS.md](IDENTIFIERS.md) | current |
 | [CloudKitSchema.md](CloudKitSchema.md) | current until the iCloud exit, then historical |

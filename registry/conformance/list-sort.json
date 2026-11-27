@@ -1,0 +1,401 @@
+{
+  "version": 1,
+  "description": "Golden conformance vectors for sortTasks (docs/LIST_SORT_SPEC.md). Input tasks arrive in manual order; the sort is stable, so manual order breaks every tie. A task without the sorted field sinks to the bottom. when and deadline: earliest day first. title: A to Z, ignoring case and accents, then accented after plain. created: newest first (createdAt, else the created day). An invalid day reads as no date.",
+  "cases": [
+    {
+      "name": "manual keeps the input order",
+      "sort": "manual",
+      "tasks": [
+        {
+          "id": "c",
+          "title": "Cherry",
+          "status": "open",
+          "today": false,
+          "scheduled": "2026-11-30"
+        },
+        {
+          "id": "a",
+          "title": "Apple",
+          "status": "open",
+          "today": false,
+          "scheduled": "2026-11-20"
+        },
+        {
+          "id": "b",
+          "title": "Banana",
+          "status": "open",
+          "today": false
+        }
+      ],
+      "expected": [
+        "c",
+        "a",
+        "b"
+      ]
+    },
+    {
+      "name": "when: earliest When date first, undated last in manual order",
+      "sort": "when",
+      "tasks": [
+        {
+          "id": "u1",
+          "title": "Undated one",
+          "status": "open",
+          "today": false
+        },
+        {
+          "id": "late",
+          "title": "Late",
+          "status": "open",
+          "today": false,
+          "scheduled": "2026-12-05"
+        },
+        {
+          "id": "u2",
+          "title": "Undated two",
+          "status": "open",
+          "today": false
+        },
+        {
+          "id": "early",
+          "title": "Early",
+          "status": "open",
+          "today": false,
+          "scheduled": "2026-11-21"
+        }
+      ],
+      "expected": [
+        "early",
+        "late",
+        "u1",
+        "u2"
+      ]
+    },
+    {
+      "name": "when: same day keeps manual order",
+      "sort": "when",
+      "tasks": [
+        {
+          "id": "second",
+          "title": "Second",
+          "status": "open",
+          "today": false,
+          "scheduled": "2026-11-25"
+        },
+        {
+          "id": "first",
+          "title": "First",
+          "status": "open",
+          "today": false,
+          "scheduled": "2026-11-25"
+        }
+      ],
+      "expected": [
+        "second",
+        "first"
+      ]
+    },
+    {
+      "name": "when: an invalid day reads as no date",
+      "sort": "when",
+      "tasks": [
+        {
+          "id": "bad",
+          "title": "Bad",
+          "status": "open",
+          "today": false,
+          "scheduled": "2026-13-40"
+        },
+        {
+          "id": "good",
+          "title": "Good",
+          "status": "open",
+          "today": false,
+          "scheduled": "2026-11-28"
+        }
+      ],
+      "expected": [
+        "good",
+        "bad"
+      ]
+    },
+    {
+      "name": "when: a deadline does not count as a When date",
+      "sort": "when",
+      "tasks": [
+        {
+          "id": "deadline",
+          "title": "Deadline only",
+          "status": "open",
+          "today": false,
+          "deadline": "2026-11-22"
+        },
+        {
+          "id": "when",
+          "title": "When only",
+          "status": "open",
+          "today": false,
+          "scheduled": "2026-12-01"
+        }
+      ],
+      "expected": [
+        "when",
+        "deadline"
+      ]
+    },
+    {
+      "name": "deadline: earliest deadline first, no deadline last",
+      "sort": "deadline",
+      "tasks": [
+        {
+          "id": "none",
+          "title": "No deadline",
+          "status": "open",
+          "today": false,
+          "scheduled": "2026-11-21"
+        },
+        {
+          "id": "dec",
+          "title": "December",
+          "status": "open",
+          "today": false,
+          "deadline": "2026-12-10"
+        },
+        {
+          "id": "nov",
+          "title": "November",
+          "status": "open",
+          "today": false,
+          "deadline": "2026-11-24"
+        }
+      ],
+      "expected": [
+        "nov",
+        "dec",
+        "none"
+      ]
+    },
+    {
+      "name": "title: case-insensitive A to Z",
+      "sort": "title",
+      "tasks": [
+        {
+          "id": "z",
+          "title": "zebra",
+          "status": "open",
+          "today": false
+        },
+        {
+          "id": "a",
+          "title": "Apple",
+          "status": "open",
+          "today": false
+        },
+        {
+          "id": "m",
+          "title": "mango",
+          "status": "open",
+          "today": false
+        },
+        {
+          "id": "b",
+          "title": "banana",
+          "status": "open",
+          "today": false
+        }
+      ],
+      "expected": [
+        "a",
+        "b",
+        "m",
+        "z"
+      ]
+    },
+    {
+      "name": "title: same title ignoring case keeps manual order",
+      "sort": "title",
+      "tasks": [
+        {
+          "id": "upper",
+          "title": "Call Ana",
+          "status": "open",
+          "today": false
+        },
+        {
+          "id": "lower",
+          "title": "call ana",
+          "status": "open",
+          "today": false
+        }
+      ],
+      "expected": [
+        "upper",
+        "lower"
+      ]
+    },
+    {
+      "name": "title: an empty title sinks to the bottom",
+      "sort": "title",
+      "tasks": [
+        {
+          "id": "empty",
+          "title": "  ",
+          "status": "open",
+          "today": false
+        },
+        {
+          "id": "b",
+          "title": "Book flights",
+          "status": "open",
+          "today": false
+        }
+      ],
+      "expected": [
+        "b",
+        "empty"
+      ]
+    },
+    {
+      "name": "title: composed and decomposed accents compare equal",
+      "sort": "title",
+      "tasks": [
+        {
+          "id": "decomposed",
+          "title": "école",
+          "status": "open",
+          "today": false
+        },
+        {
+          "id": "composed",
+          "title": "école",
+          "status": "open",
+          "today": false
+        }
+      ],
+      "expected": [
+        "decomposed",
+        "composed"
+      ]
+    },
+    {
+      "name": "title: an accented letter sorts with its plain letter",
+      "sort": "title",
+      "tasks": [
+        {
+          "id": "zebra",
+          "title": "Zebra",
+          "status": "open",
+          "today": false
+        },
+        {
+          "id": "ecole",
+          "title": "École",
+          "status": "open",
+          "today": false
+        },
+        {
+          "id": "dentist",
+          "title": "Dentist",
+          "status": "open",
+          "today": false
+        },
+        {
+          "id": "email",
+          "title": "email",
+          "status": "open",
+          "today": false
+        }
+      ],
+      "expected": [
+        "dentist",
+        "ecole",
+        "email",
+        "zebra"
+      ]
+    },
+    {
+      "name": "title: plain before accented when only the accent differs",
+      "sort": "title",
+      "tasks": [
+        {
+          "id": "accented",
+          "title": "Pêra",
+          "status": "open",
+          "today": false
+        },
+        {
+          "id": "plain",
+          "title": "Pera",
+          "status": "open",
+          "today": false
+        }
+      ],
+      "expected": [
+        "plain",
+        "accented"
+      ]
+    },
+    {
+      "name": "created: newest first, createdAt before the created day",
+      "sort": "created",
+      "tasks": [
+        {
+          "id": "old",
+          "title": "Old",
+          "status": "open",
+          "today": false,
+          "created": "2026-11-01",
+          "createdAt": "2026-11-01T09:00:00Z"
+        },
+        {
+          "id": "dayOnly",
+          "title": "Day only",
+          "status": "open",
+          "today": false,
+          "created": "2026-11-15"
+        },
+        {
+          "id": "new",
+          "title": "New",
+          "status": "open",
+          "today": false,
+          "created": "2026-11-20",
+          "createdAt": "2026-11-20T18:30:00Z"
+        },
+        {
+          "id": "none",
+          "title": "No creation date",
+          "status": "open",
+          "today": false
+        }
+      ],
+      "expected": [
+        "new",
+        "dayOnly",
+        "old",
+        "none"
+      ]
+    },
+    {
+      "name": "an empty list sorts to an empty list",
+      "sort": "deadline",
+      "tasks": [],
+      "expected": []
+    },
+    {
+      "name": "an unknown sort is refused",
+      "sort": "priority",
+      "tasks": [
+        {
+          "id": "a",
+          "title": "A",
+          "status": "open",
+          "today": false
+        }
+      ],
+      "expected": {
+        "error": "`sort` is not a list sort: priority"
+      }
+    }
+  ]
+}

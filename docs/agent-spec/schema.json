@@ -54,6 +54,16 @@
         "heading"
       ]
     },
+    "listSort": {
+      "type": "string",
+      "enum": [
+        "manual",
+        "when",
+        "deadline",
+        "title",
+        "created"
+      ]
+    },
     "recurrenceUnit": {
       "type": "string",
       "enum": [
