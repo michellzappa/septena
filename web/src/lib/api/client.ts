@@ -497,6 +497,7 @@ export class SeptenaApiClient {
       checklists: "1",
       tags: "1",
       refs: "1",
+      repeatWindows: "1",
     });
     const res = await this.authedFetch(`/v1/sync/pull?${qs.toString()}`, { method: "GET" });
     if (!res.ok) {

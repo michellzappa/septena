@@ -2421,7 +2421,7 @@ export class TaskStore extends DurableObject<Env> {
   /// The other flags do the same for entities that came later.
   pull(
     since: number, limit: number, includeSettings = false, includeChecklists = false, includeTags = false,
-    includeRefs = false, includeDoSessions = false,
+    includeRefs = false, includeDoSessions = false, supportsRepeatWindows = true,
   ): PullResult {
     this.reconcileRepeats();
     const n = Math.min(Math.max(limit, 1), MAX_PULL);
@@ -2450,7 +2450,13 @@ export class TaskStore extends DurableObject<Env> {
     const head = this.meta("rev");
     const nextSince = page.length ? page[page.length - 1].rev : Math.max(since, head);
     return {
-      changes: page.map(({ entity, row }) => ({ entity, row })),
+      changes: page.map(({ entity, row }) => ({
+        entity,
+        // Older builds fall back to open for unknown status values.
+        row: !supportsRepeatWindows && entity === "task" && row.status === "repeatExpired"
+          ? { ...row, status: "cancelled" }
+          : row,
+      })),
       nextSince,
       hasMore: merged.length > n,
     };

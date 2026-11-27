@@ -39,6 +39,9 @@ describe("Missed recurrence windows", () => {
     assert.equal(open.filter((row) => row.recurrenceSeriesID === "timesheet").length, 4);
     assert.equal(open.filter((row) => row.recurrenceSeriesID === "stretch").length, 1);
     assert.equal(store.readTasks("done", 100).total, 0);
+    const legacyPull = store.pull(0, 100, false, false, false, false, false, false);
+    const expiredLegacy = legacyPull.changes.find((change) => change.entity === "task" && change.row.id === currentHabit);
+    assert.equal(expiredLegacy?.row.status, "cancelled");
 
     store.push([{
       clientOpId: "late_manual_completion", op: "upsert", entity: "task", id: currentHabit,

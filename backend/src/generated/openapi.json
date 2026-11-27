@@ -6533,6 +6533,19 @@
             }
           },
           {
+            "name": "repeatWindows",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "0",
+                "1"
+              ],
+              "default": "0"
+            }
+          },
+          {
             "$ref": "#/components/parameters/ErrorFormat"
           }
         ],
