@@ -1754,6 +1754,7 @@ final class TaskSyncEngine {
     // smart-list mirrors so the previous account cannot leak into the next one.
     SeptaskSyncedSettings.clearLocal()
     SmartListPreferences.shared.clearLocalForAccountSwitch()
+    ListSortPreferences.shared.clearLocalForAccountSwitch()
     // Account switch / delete: the launch snapshot holds the old rows (#82).
     TodaySnapshotStore.invalidate()
     TasksWidgetSnapshotStore.invalidate()

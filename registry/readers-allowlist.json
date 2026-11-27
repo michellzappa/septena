@@ -60,10 +60,6 @@
     "RegistryRules.doLapseHours": {
       "reason": "The shared core applies it (resolve_do_sessions).",
       "issue": "#517"
-    },
-    "RegistryEntityEnums.listSort": {
-      "reason": "Read by the Sort By menu, which lands with the core pin in the shell PR.",
-      "issue": "#779"
     }
   },
   "ts": {

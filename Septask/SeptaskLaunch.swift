@@ -59,6 +59,7 @@ enum SeptaskLaunch {
       settings.reloadFromMirror(context: context)
       AppearancePreferences.shared.adoptSynced(SeptaskSyncedSettings.current())
       SmartListPreferences.shared.adoptSynced(SeptaskSyncedSettings.current())
+      ListSortPreferences.shared.adoptSynced(SeptaskSyncedSettings.current())
       settings.reconcileWelcomeName(context: context, engine: services.ckEngine)
       settings.reconcileHiddenCalendars(context: context, engine: services.ckEngine)
       // No `reconcileSupporter`: the supporter flag came from Septena through

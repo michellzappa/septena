@@ -45,6 +45,9 @@ No schema change, no migration, cross-device sync already works.
   order (project/area detail lists, heading groups). In tier/date-sorted
   surfaces (Today buckets, Upcoming) rows are not reorder targets — dropping
   there keeps today's filing semantics.
+- A list with a Sort By other than Manual (`docs/LIST_SORT_SPEC.md`, #779)
+  is not a reorder target either: its render order is the sort, not
+  `position`. The sort never writes `position`, so Manual restores the order.
 - Things-style *independent* Today ordering is explicitly deferred; if ever
   wanted it's one additive field (`todayPosition`) later, not a redesign now.
 
