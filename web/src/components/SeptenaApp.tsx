@@ -70,6 +70,17 @@ import {
 } from "@/lib/generated/registries";
 import { hexWithAlpha, type HeaderTextureStyle } from "@/lib/headerWash";
 import { groupTasksByList, orderByPosition } from "@/lib/listOrder";
+import {
+  LIST_SORT_OPTIONS,
+  LIST_SORT_SURFACE,
+  listSortFor,
+  listSortKey,
+  nextListSortMap,
+  readListSortMap,
+  sortListItems,
+  sortedByLine,
+  type ListSort,
+} from "@/lib/listSort";
 import { loadWebPrefs, saveWebPref, type WebDisplayPrefs } from "@/lib/prefs";
 import { AccountSwitchRequiredError, type AccountSwitchSummary } from "@/lib/sync/accountSwitch";
 import {
@@ -950,6 +961,44 @@ export function SeptenaApp() {
     return activeTags.filter((t) => usedIds.has(t.id));
   }, [activeTags, destinationTasks]);
 
+  // Sort By (docs/LIST_SORT_SPEC.md): one synced record, keyed by list. Manual is the absence of a key.
+  const listSortMap = useMemo(
+    () => readListSortMap(syncState.snapshot.settings.listSort),
+    [syncState.snapshot.settings.listSort],
+  );
+  const currentListSortKey = listSortKey(destination);
+  const currentListSort: ListSort = listSortFor(listSortMap, currentListSortKey);
+  // Lists that keep a manual order: the registry's supportsManualOrder smart lists, projects and areas.
+  const canManualOrder = currentListSortKey !== null;
+  // A sorted list shows the sort, so drag-to-reorder between rows is off. Drags to other targets stay.
+  const canReorderRows = canManualOrder && currentListSort === "manual";
+
+  const setListSort = useCallback(
+    (sort: ListSort) => {
+      if (!currentListSortKey) return;
+      // A view change: not on the undo stack.
+      void engine.setSetting(
+        "listSort",
+        nextListSortMap(listSortMap, currentListSortKey, sort, {
+          projectIds: new Set(activeProjects.map((p) => p.id)),
+          areaIds: new Set(activeAreas.map((a) => a.id)),
+        }),
+      );
+    },
+    [activeAreas, activeProjects, currentListSortKey, engine, listSortMap],
+  );
+
+  // A row in inline edit keeps its place until the edit ends: it sorts by the task as it was
+  // when the edit began, so a rename or a new date never moves it under the cursor.
+  const snapshotTasksRef = useRef(syncState.snapshot.tasks);
+  snapshotTasksRef.current = syncState.snapshot.tasks;
+  const [editFrozenTask, setEditFrozenTask] = useState<TaskRow | null>(null);
+  useEffect(() => {
+    setEditFrozenTask(
+      expandedTaskId ? (snapshotTasksRef.current.find((t) => t.id === expandedTaskId) ?? null) : null,
+    );
+  }, [expandedTaskId]);
+
   const listedTasks = useMemo(() => {
     const tagFiltered = tagFilterId
       ? destinationTasks.filter(({ task }) => {
@@ -964,7 +1013,7 @@ export function SeptenaApp() {
           )
         : tagFiltered;
 
-    return [...filtered].sort((a, b) => {
+    const manual = [...filtered].sort((a, b) => {
       if (destination.kind === "smart" && destination.id === "logbook") {
         const ka = logbookTab === "deleted" ? String(a.task.deletedAt ?? "") : String(a.task.completedAt ?? "");
         const kb = logbookTab === "deleted" ? String(b.task.deletedAt ?? "") : String(b.task.completedAt ?? "");
@@ -983,7 +1032,38 @@ export function SeptenaApp() {
       if (pa !== pb) return pa - pb;
       return String(b.task.createdAt ?? "").localeCompare(String(a.task.createdAt ?? ""));
     });
-  }, [assigneeFilter, destination, destinationTasks, logbookTab, tagFilterId]);
+    if (currentListSort === "manual") return manual;
+
+    // Sort inside each group the list shows; groups, headings and the Inbox band keep their order.
+    const isToday = destination.kind === "smart" && destination.id === "today";
+    const byList = (destination.kind === "smart" && destination.id === "anytime") || (isToday && prefs.todayGroupByList);
+    const groupOf = (i: EvaluatedTask): string =>
+      destination.kind === "project"
+        ? (i.task.heading ?? "")
+        : byList
+          ? i.task.project
+            ? `p:${i.task.project}`
+            : i.task.area
+              ? `a:${i.task.area}`
+              : ""
+          : "";
+    return sortListItems(
+      manual,
+      currentListSort,
+      (i) => (editFrozenTask && editFrozenTask.id === i.task.id ? editFrozenTask : i.task),
+      groupOf,
+      (i) => isToday && i.membership.inInbox,
+    );
+  }, [
+    assigneeFilter,
+    currentListSort,
+    destination,
+    destinationTasks,
+    editFrozenTask,
+    logbookTab,
+    prefs.todayGroupByList,
+    tagFilterId,
+  ]);
 
   // Review grouped by what waits on the user, then agent work in progress (docs/REVIEW_SPEC.md §1), in registry order.
   const reviewGroups = useMemo(() => {
@@ -1516,17 +1596,12 @@ export function SeptenaApp() {
     [showToast],
   );
 
-  const canManualOrder =
-    destination.kind === "area" ||
-    destination.kind === "project" ||
-    (destination.kind === "smart" && (destination.id === "today" || destination.id === "anytime"));
-
   const handleDropOnTask = useCallback(
     async (targetId: string) => {
       const sourceId = draggedTaskId;
       setDraggedTaskId(null);
       setDropTargetTaskId(null);
-      if (!sourceId || sourceId === targetId || !canManualOrder) return;
+      if (!sourceId || sourceId === targetId || !canReorderRows) return;
       const ids = visibleTasks.map((v) => v.task.id);
       const fromIdx = ids.indexOf(sourceId);
       const toIdx = ids.indexOf(targetId);
@@ -1538,7 +1613,7 @@ export function SeptenaApp() {
         destination.kind === "smart" && destination.id === "today" ? "todayPosition" : "position";
       await engine.reorderTasks(reordered, field);
     },
-    [canManualOrder, destination, draggedTaskId, engine, visibleTasks],
+    [canReorderRows, destination, draggedTaskId, engine, visibleTasks],
   );
 
   const handleDropOnSidebarSmart = useCallback(
@@ -2360,7 +2435,7 @@ export function SeptenaApp() {
         e.dataTransfer.setData("text/plain", task.id);
       },
       onDragOver: (e) => {
-        if (!draggedTaskId || !canManualOrder) return;
+        if (!draggedTaskId || !canReorderRows) return;
         e.preventDefault();
         setDropTargetTaskId(task.id);
       },
@@ -3630,6 +3705,9 @@ export function SeptenaApp() {
                 {pageMeta.title}
               </h1>
             </div>
+            {currentListSort !== "manual" && (
+              <p className="mt-0.5 text-xs text-[var(--text-muted)]">{sortedByLine(currentListSort, lang)}</p>
+            )}
           </div>
 
           <div className="flex items-center gap-2 text-xs">
@@ -3704,6 +3782,35 @@ export function SeptenaApp() {
                   Empty Trash
                 </button>
               )}
+
+            {currentListSortKey !== null && (
+              <button
+                type="button"
+                aria-haspopup="menu"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  setContextMenu({
+                    x: rect.left,
+                    y: rect.bottom + 4,
+                    items: LIST_SORT_OPTIONS.map((option) => ({
+                      kind: "item" as const,
+                      label: registryText(option.title, lang),
+                      checked: option.value === currentListSort,
+                      onSelect: () => setListSort(option.value),
+                    })),
+                  });
+                }}
+                className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 font-medium ${
+                  currentListSort !== "manual"
+                    ? "bg-[var(--bg-selected)] text-[var(--text-primary)]"
+                    : "bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                }`}
+              >
+                <RegistryIcon token={LIST_SORT_SURFACE.icon} className="h-3 w-3" />
+                {registryText(LIST_SORT_SURFACE.menuTitle, lang)}
+              </button>
+            )}
 
             {(destination.kind === "area" || destination.kind === "project") && (
               <button

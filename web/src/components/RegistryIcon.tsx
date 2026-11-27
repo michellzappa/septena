@@ -1,5 +1,6 @@
 import {
   AlignLeft,
+  ArrowUpDown,
   Bell,
   Bot,
   Calendar,
@@ -40,6 +41,7 @@ import { ICONS } from "@/lib/generated/registries";
 // sign-in methods, and task row chrome. Named imports keep the rest of lucide out of the bundle.
 const LUCIDE: Record<string, LucideIcon> = {
   "align-left": AlignLeft,
+  "arrow-up-down": ArrowUpDown,
   bell: Bell,
   bot: Bot,
   calendar: Calendar,

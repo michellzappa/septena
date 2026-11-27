@@ -22,6 +22,8 @@ export interface DestinationInfo {
   /** False: the list stays in its registry section; a stored placement is ignored. */
   canMoveSection?: boolean;
   supportsInlineCreate: boolean;
+  /** True: the list keeps a manual order, so it takes a Sort By (docs/LIST_SORT_SPEC.md §1). */
+  supportsManualOrder?: boolean;
   dropBehavior: string;
   groups?: readonly DestinationGroup[];
   emptyState?: { title: string; detail: string };

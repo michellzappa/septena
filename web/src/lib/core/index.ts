@@ -111,6 +111,18 @@ export interface CoreMembership {
   arrivedOnOwn: boolean;
 }
 
+/**
+ * The ids of `tasks` (one group, in manual order) in the order of `sort` (docs/LIST_SORT_SPEC.md §3).
+ * JSON entry point only. Throws when the core does not know the rule: call it through `lib/listSort`.
+ */
+export function sortTasks(tasks: readonly TaskRow[], sort: string): string[] {
+  const out = callCore<unknown>("sortTasks", { tasks: tasks.map(toCoreTask), sort });
+  if (!Array.isArray(out) || !out.every((id) => typeof id === "string")) {
+    throw new CoreError("sortTasks", "expected an array of task ids");
+  }
+  return out as string[];
+}
+
 export function taskViewMembership(task: TaskRow, today: string, now: string): CoreMembership {
   return callCore<CoreMembership>("taskViewMembership", {
     task: toCoreTask(task),

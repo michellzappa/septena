@@ -1,5 +1,6 @@
 "use client";
 
+import { Check } from "lucide-react";
 import { useEffect } from "react";
 
 export type ContextMenuEntry =
@@ -8,6 +9,8 @@ export type ContextMenuEntry =
       kind: "item";
       label: string;
       shortcut?: string;
+      /** Shows a check: the current choice of a menu of choices. */
+      checked?: boolean;
       destructive?: boolean;
       onSelect: () => void;
     };
@@ -62,6 +65,8 @@ export function ContextMenu({
           <button
             key={`${entry.label}-${idx}`}
             type="button"
+            role={entry.checked !== undefined ? "menuitemradio" : undefined}
+            aria-checked={entry.checked}
             onClick={() => {
               onClose();
               entry.onSelect();
@@ -72,7 +77,12 @@ export function ContextMenu({
                 : "text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
             }`}
           >
-            <span>{entry.label}</span>
+            <span className="flex items-center gap-2">
+              {entry.checked !== undefined && (
+                <Check className={`h-3.5 w-3.5 ${entry.checked ? "" : "invisible"}`} aria-hidden="true" />
+              )}
+              {entry.label}
+            </span>
             {entry.shortcut && (
               <span className="font-mono-tabular text-[10px] text-[var(--text-muted)]">
                 {entry.shortcut}
