@@ -4,18 +4,24 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -28,7 +34,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -51,6 +61,8 @@ fun AreasProjectsScreen(
     modifier: Modifier = Modifier,
     onOpenProject: (String) -> Unit = {},
     onOpenTask: (String) -> Unit = {},
+    completeTitle: String = "",
+    onCompleteTask: (String) -> Unit = {},
     rowMenuGroups: List<List<TaskRowMenuAction>> = emptyList(),
     rowMenuAccessibilityLabel: String = "",
     onTaskAction: (String, String) -> Unit = { _, _ -> },
@@ -62,12 +74,15 @@ fun AreasProjectsScreen(
     var dialog by remember { mutableStateOf<PlacesDialog?>(null) }
     var emojiPickerOpen by rememberSaveable(destination.key) { mutableStateOf(false) }
     var notesDraft by rememberSaveable(destination.key) { mutableStateOf("") }
+    var notesHadFocus by remember(destination.key) { mutableStateOf(false) }
     var areaTaskDraft by rememberSaveable(destination.key) { mutableStateOf("") }
     var projectTaskDraft by rememberSaveable(destination.key) { mutableStateOf("") }
     var sectionTaskDrafts by remember(destination.key) { mutableStateOf(emptyMap<String, String>()) }
 
     LaunchedEffect(destination) { viewModel.select(destination) }
-    LaunchedEffect(state.destination, state.notes) { notesDraft = state.notes }
+    LaunchedEffect(state.destination, state.notes) {
+        if (!notesHadFocus) notesDraft = state.notes
+    }
 
     Column(modifier = modifier.fillMaxSize()) {
         if (state.isLoading) {
@@ -80,7 +95,7 @@ fun AreasProjectsScreen(
             ) {
                 item(key = "place-title") {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
@@ -90,8 +105,14 @@ fun AreasProjectsScreen(
                                 accessibilityLabel = actionTitle(RegistryActionIds.AREA_CHANGE_EMOJI, languageTag),
                                 onClick = { emojiPickerOpen = true },
                             )
+                        } else {
+                            ProjectProgressRing(state.progress)
                         }
-                        Text(state.title, modifier = Modifier.weight(1f))
+                        Text(
+                            state.title,
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.headlineSmall,
+                        )
                         TextButton(onClick = { dialog = PlacesDialog.RenamePlace(state.title) }) {
                             Text(actionTitle(destination.renameAction(), languageTag))
                         }
@@ -101,101 +122,169 @@ fun AreasProjectsScreen(
                     OutlinedTextField(
                         value = notesDraft,
                         onValueChange = { notesDraft = it },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().padding(start = 16.dp).onFocusChanged { focus ->
+                            if (notesHadFocus && !focus.isFocused && notesDraft != state.notes) {
+                                viewModel.saveNotes(notesDraft)
+                            }
+                            notesHadFocus = focus.isFocused
+                        },
                         label = { Text(surfaceText(RegistryTaskAttributeIds.NOTES, "label", languageTag)) },
                         minLines = 2,
                     )
                 }
-                item(key = "save-notes") {
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                        TextButton(onClick = { viewModel.saveNotes(notesDraft) }) {
-                            Text(actionTitle(RegistryActionIds.PLACE_SAVE_NOTES, languageTag))
-                        }
-                    }
-                }
 
                 if (destination is AreasProjectsDestination.Area) {
                     item(key = "projects-heading") {
-                        Text(surfaceText(RegistryPlacesScreenIds.AREA_PROJECTS_HEADING, "label", languageTag))
-                    }
-                    item(key = "new-project") {
-                        Button(onClick = { dialog = PlacesDialog.CreateProject }) {
-                            Text(actionTitle(RegistryActionIds.AREA_NEW_PROJECT, languageTag))
-                        }
+                        SectionHeading(
+                            title = surfaceText(RegistryPlacesScreenIds.AREA_PROJECTS_HEADING, "label", languageTag),
+                            actionTitle = actionTitle(RegistryActionIds.AREA_NEW_PROJECT, languageTag),
+                            onAction = { dialog = PlacesDialog.CreateProject },
+                        )
                     }
                     if (state.projects.isEmpty()) {
                         item(key = "projects-empty") {
-                            Text(surfaceText(RegistryPlacesScreenIds.EMPTY_AREA_PROJECTS, "title", languageTag))
+                            Text(
+                                surfaceText(RegistryPlacesScreenIds.EMPTY_AREA_PROJECTS, "title", languageTag),
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
                     } else {
-                        items(state.projects, key = { "project:${it.id}" }) { project ->
-                            ListItem(
-                                headlineContent = { Text(project.title) },
-                                modifier = Modifier.fillMaxWidth().clickable { onOpenProject(project.id) },
-                            )
+                        item(key = "projects-card") {
+                            Card(modifier = Modifier.fillMaxWidth()) {
+                                Column {
+                                    state.projects.forEachIndexed { index, project ->
+                                        ProjectPlaceItem(project, onOpenProject)
+                                        if (index < state.projects.lastIndex) {
+                                            HorizontalDivider(modifier = Modifier.padding(start = 68.dp, end = 16.dp))
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                     item(key = "area-tasks-heading") {
-                        Text(surfaceText(RegistryPlacesScreenIds.TASKS_HEADING, "label", languageTag))
-                    }
-                    item(key = "area-quick-add") {
-                        QuickAddRow(
-                            draft = areaTaskDraft,
-                            onDraftChange = { areaTaskDraft = it },
-                            title = actionTitle(RegistryActionIds.APP_QUICK_ADD, languageTag),
-                            onAdd = {
-                                viewModel.createTask(areaTaskDraft)
-                                areaTaskDraft = ""
-                            },
-                        )
+                        SectionHeading(surfaceText(RegistryPlacesScreenIds.TASKS_HEADING, "label", languageTag))
                     }
                     if (state.areaTasks.isEmpty()) {
                         item(key = "area-tasks-empty") {
-                            Text(surfaceText(RegistryPlacesScreenIds.EMPTY_AREA_TASKS, "title", languageTag))
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(
+                                    surfaceText(RegistryPlacesScreenIds.EMPTY_AREA_TASKS, "title", languageTag),
+                                    modifier = Modifier.padding(horizontal = 12.dp),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                QuickAddRow(
+                                    draft = areaTaskDraft,
+                                    onDraftChange = { areaTaskDraft = it },
+                                    title = actionTitle(RegistryActionIds.APP_QUICK_ADD, languageTag),
+                                    onAdd = { viewModel.createTask(areaTaskDraft); areaTaskDraft = "" },
+                                )
+                            }
                         }
                     } else {
-                        items(state.areaTasks, key = { "task:${it.id}" }) { task ->
-                            PlaceTaskItem(task, rowMenuGroups, rowMenuAccessibilityLabel, onOpenTask, onTaskAction)
+                        item(key = "area-tasks-card") {
+                            Card(modifier = Modifier.fillMaxWidth()) {
+                                Column {
+                                    state.areaTasks.forEachIndexed { index, task ->
+                                        PlaceTaskItem(
+                                            task = task,
+                                            completeTitle = completeTitle,
+                                            rowMenuGroups = rowMenuGroups,
+                                            rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
+                                            onOpenTask = onOpenTask,
+                                            onCompleteTask = onCompleteTask,
+                                            onTaskAction = onTaskAction,
+                                        )
+                                        if (index < state.areaTasks.lastIndex) {
+                                            HorizontalDivider(modifier = Modifier.padding(start = 68.dp, end = 16.dp))
+                                        }
+                                    }
+                                    QuickAddRow(
+                                        draft = areaTaskDraft,
+                                        onDraftChange = { areaTaskDraft = it },
+                                        title = actionTitle(RegistryActionIds.APP_QUICK_ADD, languageTag),
+                                        onAdd = { viewModel.createTask(areaTaskDraft); areaTaskDraft = "" },
+                                    )
+                                }
+                            }
                         }
                     }
                 }
 
                 if (destination is AreasProjectsDestination.Project) {
                     item(key = "sections-heading") {
-                        Text(surfaceText(RegistryPlacesScreenIds.SECTIONS_HEADING, "label", languageTag))
-                    }
-                    item(key = "new-section") {
-                        Button(onClick = { dialog = PlacesDialog.CreateSection }) {
-                            Text(actionTitle(RegistryActionIds.SECTION_NEW, languageTag))
-                        }
+                        SectionHeading(
+                            title = surfaceText(RegistryPlacesScreenIds.SECTIONS_HEADING, "label", languageTag),
+                            actionTitle = actionTitle(RegistryActionIds.SECTION_NEW, languageTag),
+                            onAction = { dialog = PlacesDialog.CreateSection },
+                        )
                     }
                     item(key = "project-tasks-heading") {
-                        Text(surfaceText(RegistryPlacesScreenIds.TASKS_HEADING, "label", languageTag))
-                    }
-                    item(key = "project-quick-add") {
-                        QuickAddRow(
-                            draft = projectTaskDraft,
-                            onDraftChange = { projectTaskDraft = it },
-                            title = actionTitle(RegistryActionIds.APP_QUICK_ADD, languageTag),
-                            onAdd = {
-                                viewModel.createTask(projectTaskDraft)
-                                projectTaskDraft = ""
-                            },
-                        )
+                        SectionHeading(surfaceText(RegistryPlacesScreenIds.TASKS_HEADING, "label", languageTag))
                     }
                     if (state.unsectionedTasks.isEmpty() && state.sections.isEmpty()) {
                         item(key = "project-tasks-empty") {
-                            Text(surfaceText(RegistryPlacesScreenIds.EMPTY_PROJECT_TASKS, "title", languageTag))
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(
+                                    surfaceText(RegistryPlacesScreenIds.EMPTY_PROJECT_TASKS, "title", languageTag),
+                                    modifier = Modifier.padding(horizontal = 12.dp),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                QuickAddRow(
+                                    draft = projectTaskDraft,
+                                    onDraftChange = { projectTaskDraft = it },
+                                    title = actionTitle(RegistryActionIds.APP_QUICK_ADD, languageTag),
+                                    onAdd = { viewModel.createTask(projectTaskDraft); projectTaskDraft = "" },
+                                )
+                            }
                         }
-                    }
-                    if (state.unsectionedTasks.isNotEmpty()) {
-                        items(state.unsectionedTasks, key = { "task:${it.id}" }) { task ->
-                            PlaceTaskItem(task, rowMenuGroups, rowMenuAccessibilityLabel, onOpenTask, onTaskAction)
+                    } else if (state.unsectionedTasks.isNotEmpty()) {
+                        item(key = "project-unsectioned-card") {
+                            Card(modifier = Modifier.fillMaxWidth()) {
+                                Column {
+                                    state.unsectionedTasks.forEachIndexed { index, task ->
+                                        PlaceTaskItem(
+                                            task = task,
+                                            completeTitle = completeTitle,
+                                            rowMenuGroups = rowMenuGroups,
+                                            rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
+                                            onOpenTask = onOpenTask,
+                                            onCompleteTask = onCompleteTask,
+                                            onTaskAction = onTaskAction,
+                                        )
+                                        if (index < state.unsectionedTasks.lastIndex) {
+                                            HorizontalDivider(modifier = Modifier.padding(start = 68.dp, end = 16.dp))
+                                        }
+                                    }
+                                    QuickAddRow(
+                                        draft = projectTaskDraft,
+                                        onDraftChange = { projectTaskDraft = it },
+                                        title = actionTitle(RegistryActionIds.APP_QUICK_ADD, languageTag),
+                                        onAdd = { viewModel.createTask(projectTaskDraft); projectTaskDraft = "" },
+                                    )
+                                }
+                            }
+                        }
+                    } else {
+                        item(key = "project-quick-add") {
+                            Card(modifier = Modifier.fillMaxWidth()) {
+                                QuickAddRow(
+                                    draft = projectTaskDraft,
+                                    onDraftChange = { projectTaskDraft = it },
+                                    title = actionTitle(RegistryActionIds.APP_QUICK_ADD, languageTag),
+                                    onAdd = { viewModel.createTask(projectTaskDraft); projectTaskDraft = "" },
+                                )
+                            }
                         }
                     }
                     if (state.sections.isEmpty()) {
                         item(key = "project-sections-empty") {
-                            Text(surfaceText(RegistryPlacesScreenIds.EMPTY_PROJECT_SECTIONS, "title", languageTag))
+                            Text(
+                                surfaceText(RegistryPlacesScreenIds.EMPTY_PROJECT_SECTIONS, "title", languageTag),
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
                     } else {
                         items(state.sections, key = { "section:${it.id}" }) { section ->
@@ -203,12 +292,14 @@ fun AreasProjectsScreen(
                                 section = section,
                                 languageTag = languageTag,
                                 taskDraft = sectionTaskDrafts[section.id].orEmpty(),
+                                completeTitle = completeTitle,
                                 onTaskDraftChange = { value -> sectionTaskDrafts = sectionTaskDrafts + (section.id to value) },
                                 onAddTask = {
                                     viewModel.createTask(sectionTaskDrafts[section.id].orEmpty(), section.id)
                                     sectionTaskDrafts = sectionTaskDrafts + (section.id to "")
                                 },
                                 onOpenTask = onOpenTask,
+                                onCompleteTask = onCompleteTask,
                                 rowMenuGroups = rowMenuGroups,
                                 rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
                                 onTaskAction = onTaskAction,
@@ -298,17 +389,75 @@ private fun QuickAddRow(
 }
 
 @Composable
+private fun SectionHeading(
+    title: String,
+    actionTitle: String? = null,
+    onAction: (() -> Unit)? = null,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = title,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (actionTitle != null && onAction != null) {
+            TextButton(onClick = onAction) { Text(actionTitle) }
+        }
+    }
+}
+
+@Composable
+private fun ProjectProgressRing(progress: Float) {
+    Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+        CircularProgressIndicator(
+            progress = { progress.coerceIn(0f, 1f) },
+            modifier = Modifier.size(18.dp),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            trackColor = MaterialTheme.colorScheme.outlineVariant,
+            strokeWidth = 2.dp,
+        )
+    }
+}
+
+@Composable
+private fun ProjectPlaceItem(project: PlaceProjectRow, onOpenProject: (String) -> Unit) {
+    ListItem(
+        leadingContent = { ProjectProgressRing(project.progress) },
+        headlineContent = {
+            Text(project.title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+        },
+        trailingContent = {
+            Text("›", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        },
+        modifier = Modifier.fillMaxWidth().clickable { onOpenProject(project.id) },
+    )
+}
+
+@Composable
 @OptIn(ExperimentalFoundationApi::class)
 private fun PlaceTaskItem(
     task: PlaceTaskRow,
+    completeTitle: String,
     rowMenuGroups: List<List<TaskRowMenuAction>>,
     rowMenuAccessibilityLabel: String,
     onOpenTask: (String) -> Unit,
+    onCompleteTask: (String) -> Unit,
     onTaskAction: (String, String) -> Unit,
 ) {
     var menuExpanded by remember(task.id) { mutableStateOf(false) }
     ListItem(
-        headlineContent = { Text(task.title) },
+        leadingContent = {
+            Checkbox(
+                checked = false,
+                onCheckedChange = { checked -> if (checked) onCompleteTask(task.id) },
+                modifier = Modifier.semantics { contentDescription = completeTitle },
+            )
+        },
+        headlineContent = { Text(task.title, style = MaterialTheme.typography.bodyLarge) },
         modifier = Modifier.fillMaxWidth().combinedClickable(
             onClick = { onOpenTask(task.id) },
             onLongClick = { menuExpanded = true },
@@ -339,38 +488,64 @@ private fun PlaceSectionBlock(
     section: PlaceSectionRow,
     languageTag: String,
     taskDraft: String,
+    completeTitle: String,
     onTaskDraftChange: (String) -> Unit,
     onAddTask: () -> Unit,
     onOpenTask: (String) -> Unit,
+    onCompleteTask: (String) -> Unit,
     rowMenuGroups: List<List<TaskRowMenuAction>>,
     rowMenuAccessibilityLabel: String,
     onTaskAction: (String, String) -> Unit,
     onRename: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(section.title, modifier = Modifier.weight(1f))
-            TextButton(onClick = onRename) {
-                Text(actionTitle(RegistryActionIds.SECTION_RENAME, languageTag))
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    section.title,
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                TextButton(onClick = onRename) {
+                    Text(actionTitle(RegistryActionIds.SECTION_RENAME, languageTag))
+                }
+                TextButton(onClick = onDelete) {
+                    Text(actionTitle(RegistryActionIds.SECTION_DELETE, languageTag))
+                }
             }
-            TextButton(onClick = onDelete) {
-                Text(actionTitle(RegistryActionIds.SECTION_DELETE, languageTag))
+            if (section.tasks.isEmpty()) {
+                Text(
+                    surfaceText(RegistryPlacesScreenIds.EMPTY_SECTION_TASKS, "title", languageTag),
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                section.tasks.forEachIndexed { index, task ->
+                    PlaceTaskItem(
+                        task = task,
+                        completeTitle = completeTitle,
+                        rowMenuGroups = rowMenuGroups,
+                        rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
+                        onOpenTask = onOpenTask,
+                        onCompleteTask = onCompleteTask,
+                        onTaskAction = onTaskAction,
+                    )
+                    if (index < section.tasks.lastIndex) {
+                        HorizontalDivider(modifier = Modifier.padding(start = 68.dp, end = 16.dp))
+                    }
+                }
             }
+            QuickAddRow(
+                draft = taskDraft,
+                onDraftChange = onTaskDraftChange,
+                title = actionTitle(RegistryActionIds.SECTION_NEW_TASK, languageTag),
+                onAdd = onAddTask,
+            )
         }
-        if (section.tasks.isEmpty()) {
-            Text(surfaceText(RegistryPlacesScreenIds.EMPTY_SECTION_TASKS, "title", languageTag), modifier = Modifier.padding(start = 12.dp))
-        } else {
-            section.tasks.forEach { task ->
-                PlaceTaskItem(task, rowMenuGroups, rowMenuAccessibilityLabel, onOpenTask, onTaskAction)
-            }
-        }
-        QuickAddRow(
-            draft = taskDraft,
-            onDraftChange = onTaskDraftChange,
-            title = actionTitle(RegistryActionIds.SECTION_NEW_TASK, languageTag),
-            onAdd = onAddTask,
-        )
     }
 }
 

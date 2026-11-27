@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import app.septena.android.AndroidAppGraph
 import app.septena.core.JsonValue
 import app.septena.core.RegistryCatalog
+import app.septena.core.SyncRecord
 import app.septena.core.TaskSnapshot
 import app.septena.core.generated.RegistryEntityEnums
 import app.septena.core.generated.RegistryEntityFields
@@ -36,7 +37,7 @@ sealed interface AreasProjectsDestination {
         }
 }
 
-data class PlaceProjectRow(val id: String, val title: String)
+data class PlaceProjectRow(val id: String, val title: String, val progress: Float = 0f)
 data class PlaceTaskRow(val id: String, val title: String, val isStarred: Boolean = false)
 data class PlaceSectionRow(val id: String, val title: String, val tasks: List<PlaceTaskRow>)
 
@@ -46,6 +47,7 @@ data class AreasProjectsUiState(
     val title: String = "",
     val emoji: String? = null,
     val notes: String = "",
+    val progress: Float = 0f,
     val projects: List<PlaceProjectRow> = emptyList(),
     val areaTasks: List<PlaceTaskRow> = emptyList(),
     val unsectionedTasks: List<PlaceTaskRow> = emptyList(),
@@ -111,6 +113,7 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
 
     fun saveNotes(notes: String) {
         val selected = destination.value ?: return
+        if (notes == loaded.value.notes) return
         mutate {
             val field = when (selected) {
                 is AreasProjectsDestination.Area -> RegistryEntityFields.Area.CONTEXT
@@ -257,6 +260,16 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         }
     }
 
+    private fun projectProgress(tasks: List<Pair<SyncRecord, TaskSnapshot>>, projectId: String): Float {
+        val relevant = tasks.filter { (_, task) ->
+            task.project == projectId && !task.isHeading &&
+                task.status in setOf(RegistryEntityEnums.TaskStatus.OPEN, RegistryEntityEnums.TaskStatus.DONE)
+        }
+        if (relevant.isEmpty()) return 0f
+        return relevant.count { (_, task) -> task.status == RegistryEntityEnums.TaskStatus.DONE }.toFloat() /
+            relevant.size
+    }
+
     private fun placeError(id: String): String =
         RegistryCatalog.surface(id)?.fields?.get("message").stringValue()
             ?: error("Missing registry error copy for '$id'")
@@ -292,14 +305,14 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         }
         val title = container.fields[titleField].stringValue().orEmpty()
         val notes = container.fields[notesField].stringValue().orEmpty()
-        val taskRows = graph.taskStore.records(RegistryEntityNames.TASK)
+        val allTasks = graph.taskStore.records(RegistryEntityNames.TASK)
             .asSequence()
             .filter { it.deletedAt == null }
             .mapNotNull { record ->
                 runCatching { record to TaskSnapshot.from(record) }.getOrNull()
             }
-            .filter { (_, task) -> task.status == RegistryEntityEnums.TaskStatus.OPEN }
             .toList()
+        val taskRows = allTasks.filter { (_, task) -> task.status == RegistryEntityEnums.TaskStatus.OPEN }
 
         return when (selected) {
             is AreasProjectsDestination.Area -> {
@@ -310,7 +323,11 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                     .filter { it.fields[RegistryEntityFields.Project.AREA].stringValue() == selected.id }
                     .mapNotNull { record ->
                         record.fields[RegistryEntityFields.Project.TITLE].stringValue()?.let { name ->
-                            record to PlaceProjectRow(record.id, name)
+                            record to PlaceProjectRow(
+                                id = record.id,
+                                title = name,
+                                progress = projectProgress(allTasks, record.id),
+                            )
                         }
                     }
                     .sortedWith(compareBy({ it.first.fields[RegistryEntityFields.Project.POSITION].numberValue() ?: Double.MAX_VALUE }, { it.second.title.lowercase() }))
@@ -365,6 +382,7 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                     destination = selected,
                     isLoading = false,
                     title = title,
+                    progress = projectProgress(allTasks, selected.id),
                     notes = notes,
                     unsectionedTasks = unsectioned,
                     sections = sections,
