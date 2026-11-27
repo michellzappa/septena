@@ -452,10 +452,6 @@
     "RegistryActionIds.APP_CONTACT_SUPPORT": {
       "reason": "Android has no Help menu; Contact Support opens from Settings (ADR 0054)",
       "issue": "#676"
-    },
-    "RegistryEntityEnums.ListSort.MANUAL": {
-      "reason": "Read by the Sort By menu, which lands with the core pin in the shell PR.",
-      "issue": "#779"
     }
   },
   "ships": {
