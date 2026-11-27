@@ -1,5 +1,7 @@
 import {
   zAccessSummary,
+  zEntitlement,
+  type Entitlement,
   zAuthMethodsResponse,
   zCreatedAgentKey,
   zEmailStartResponse,
@@ -546,6 +548,17 @@ export class SeptenaApiClient {
       throw new ApiError(res.status, err.error ?? "access_failed", err.message, raw);
     }
     return zAccessSummary.parse(await res.json());
+  }
+
+  /** The account's plan (GET /v1/entitlement). */
+  async getEntitlement(): Promise<Entitlement> {
+    const res = await this.authedFetch("/v1/entitlement", { method: "GET" });
+    if (!res.ok) {
+      const raw = await res.text().catch(() => "");
+      const err = parseErr(raw);
+      throw new ApiError(res.status, err.error ?? "entitlement_failed", err.message, raw);
+    }
+    return zEntitlement.parse(await res.json());
   }
 
   async revokeDevice(sid: string): Promise<void> {

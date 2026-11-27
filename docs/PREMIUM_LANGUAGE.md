@@ -18,7 +18,10 @@ others.
 | **Benefit row** | A 30 pt Settings-style tile in the benefit's own color with a white glyph, a semibold title, one line of detail. Text wraps; it never truncates. | `PlanBenefitRow`, `BenefitTile` | `PlanBenefitRow` | `plans.json` `benefits` |
 
 Code: `Septena/Shell/UI/PlanLanguage.swift`,
-`android/app/src/main/kotlin/app/septena/android/ui/PlanLanguage.kt`.
+`android/app/src/main/kotlin/app/septena/android/ui/PlanLanguage.kt`,
+`web/src/components/PlanLanguage.tsx` (with `web/src/lib/plans.ts`; colors as
+CSS variables `--brand`, `--plan-*`). The web reads the words from the
+generated `PLAN_UI`.
 
 ## Color
 

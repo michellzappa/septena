@@ -66,6 +66,7 @@ import {
   GENERIC_EMPTY_STATE,
   SURFACES_CATALOG,
   registryText,
+  PLAN_UI,
 } from "@/lib/generated/registries";
 import { hexWithAlpha, type HeaderTextureStyle } from "@/lib/headerWash";
 import { groupTasksByList, orderByPosition } from "@/lib/listOrder";
@@ -101,6 +102,8 @@ import { QuickAddModal, type QuickAddInitial } from "./QuickAddModal";
 import { QuickFindModal, type CommandBarItem } from "./QuickFindModal";
 import { RegistryIcon } from "./RegistryIcon";
 import { SettingsModal, type SettingsTab } from "./SettingsModal";
+import { PlanMark, PlanSheet } from "./PlanLanguage";
+import { planColors, upsellMoment } from "@/lib/plans";
 import { SignInScreen } from "./SignInScreen";
 import { TaskPageDrawer } from "./TaskPageDrawer";
 import { WaitingOnDialog } from "./WaitingOnDialog";
@@ -239,6 +242,8 @@ export function SeptenaApp() {
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [quickAddInitial, setQuickAddInitial] = useState<QuickAddInitial | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // The plan sheet opened from a server limit (HTTP 402 `upsell`), by moment id.
+  const [upsellSheet, setUpsellSheet] = useState<string | null>(null);
   const [settingsInitialTab, setSettingsInitialTab] = useState<SettingsTab | undefined>(undefined);
   /** A new session for another account, waiting for the user's answer (#575). Null: no question. */
   const [accountSwitch, setAccountSwitch] = useState<
@@ -490,10 +495,14 @@ export function SeptenaApp() {
     document.documentElement.style.setProperty("--accent", accentHex);
     document.documentElement.style.setProperty("--accent-check", accentCheckHex);
     document.documentElement.style.setProperty("--bg-selected", hexWithAlpha(accentHex, selAlpha));
+    // The premium language's brand and benefit colors (docs/PREMIUM_LANGUAGE.md).
+    for (const [name, value] of Object.entries(planColors(activeFruit, isDark))) {
+      document.documentElement.style.setProperty(name, value);
+    }
 
     const scaleObj = DESIGN_TOKENS.textScale.steps.find((s) => s.step === prefs.textSizeStep);
     document.documentElement.style.fontSize = `${Math.round((scaleObj?.factor ?? 1) * 16)}px`;
-  }, [accentCheckHex, accentHex, isDark, prefs.appearanceMode, prefs.textSizeStep]);
+  }, [accentCheckHex, accentHex, activeFruit, isDark, prefs.appearanceMode, prefs.textSizeStep]);
 
   const handleSignedIn = useCallback(
     async (session: SessionResponse) => {
@@ -2735,6 +2744,14 @@ export function SeptenaApp() {
   ]);
 
   const settingsModal = (
+    <>
+    <PlanSheet
+      open={upsellSheet !== null}
+      onClose={() => setUpsellSheet(null)}
+      plan={null}
+      upsellId={upsellSheet}
+      lang={prefs.language}
+    />
     <SettingsModal
       open={settingsOpen}
       initialTab={settingsInitialTab}
@@ -2760,6 +2777,7 @@ export function SeptenaApp() {
       onOpenSupport={() => setSupportOpen(true)}
       supportUnread={supportUnread}
     />
+    </>
   );
 
   if (accountSwitch) {
@@ -3811,6 +3829,27 @@ export function SeptenaApp() {
             {syncState.lastError && (
               <div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3.5 py-2 text-xs text-amber-700 dark:text-amber-300">
                 {syncState.lastError}
+              </div>
+            )}
+
+            {/* A plan limit the server named (HTTP 402): its registry line and the
+                plan sheet one click away. A quiet line, never a modal (spec §3.2). */}
+            {syncState.upsell && upsellMoment(syncState.upsell) && (
+              <div className="mb-4 flex items-start gap-3 rounded-lg border border-[var(--border-subtle)] px-3.5 py-2.5">
+                <PlanMark tier={upsellMoment(syncState.upsell)?.plan === "pro" ? "pro" : "plus"} size={28} />
+                <div className="min-w-0 flex-1 text-xs">
+                  <p className="font-semibold text-[var(--text-primary)]">
+                    {registryText(upsellMoment(syncState.upsell)?.title ?? "", lang)}
+                  </p>
+                  <p className="text-[var(--text-secondary)]">{registryText(upsellMoment(syncState.upsell)?.detail ?? "", lang)}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setUpsellSheet(syncState.upsell)}
+                  className="shrink-0 text-xs font-semibold text-[var(--accent)] hover:underline"
+                >
+                  {registryText(upsellMoment(syncState.upsell)?.plan === "pro" ? PLAN_UI.paywall.seePro : PLAN_UI.paywall.seePlus, lang)}
+                </button>
               </div>
             )}
 
