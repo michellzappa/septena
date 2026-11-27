@@ -1,31 +1,50 @@
 # Septena
 
-Septena is a private, local-first task app for you and your agents, on iPhone, iPad, Mac, Apple Watch and Android. Tasks live in a local store and sync through Septena's own backend. Agents reach the same tasks over MCP.
+Tasks that think with you. Your agents do the work. You decide when it's done.
+
+Septena is a task app for you and your agents. You capture tasks, your agents add theirs, and everything lands in one list in your own account. An agent can pick up a task you assign it, ask its questions inside that task, and hand the result back for you to check. Only you mark it done.
+
+[septena.app](https://septena.app) · [Download](https://septena.app/download) · [Connect an agent](https://septena.app/agents) · [Roadmap](https://septena.app/roadmap) · [Changelog](https://septena.app/changelog) · [Support](https://septena.app/support)
 
 ## Connect an agent
 
-In Claude Code, install the Septena plugin. It adds the tasks connector and the agent loop skill:
+In Claude Code, add this repository as a plugin marketplace and install the Septena plugin:
 
 ```
 /plugin marketplace add septena/septena
 /plugin install septena@septena
 ```
 
-Then type `/mcp`, pick septena and sign in. Other agents: [septena.app/agents](https://septena.app/agents).
+Then type `/mcp`, pick septena and sign in. The plugin adds the tasks connector and a skill that teaches Claude how to work a task. For other agents, see [septena.app/agents](https://septena.app/agents).
 
-The app was once a life operating system. That product moved to its own repository on 2026-11-21 ([ADR 0017](docs/adr/0017-move-septena-life-out-of-repo.md)); its history is under the tag `septena-life-archive`.
+## How agents work with your tasks
 
-## Stack
+An agent connects over MCP at `api.septena.app/mcp`. It reads the tasks, areas and projects you can see in the app, and it changes them the way you would.
 
-- **SwiftUI** on iOS, iPadOS and watchOS, **AppKit** on macOS, **Kotlin / Compose** on Android
-- **SwiftData** local store on Apple platforms, first write for every change
-- **Cloudflare Worker** task backend and MCP server (`backend/`)
-- **Rust** core for shared task rules (`core/`, [ADR 0025](docs/adr/0025-shared-rust-core.md))
-- **Registry** files for shared copy, actions and settings (`registry/`)
-- **XcodeGen**: `project.yml` is the source of truth for the Xcode project
-- Swift 5.10, deployment target 26.0
+When you assign a task to an agent, the agent claims it, writes each step into the task's conversation, and asks you when it needs a decision. When it finishes, it sends the task to Review with a note on what to check. You accept the work or send it back.
 
-## Quick start
+Stop ends one agent's work on a task. Pause stops every agent at once. The sync server enforces both, so an agent cannot carry on past them. The rules are in [ADR 0008](docs/adr/0008-agent-loop-rules-live-in-the-store.md).
+
+The same tasks are also available over a REST API. The contract is generated from the server code: [`api.septena.app/openapi.json`](https://api.septena.app/openapi.json) and [`docs/agent-spec/spec.md`](docs/agent-spec/spec.md). The procedures an agent follows are in [`skills/`](skills/).
+
+## How it works
+
+Each app keeps your tasks in a local store and writes every change there first, so the app works offline. A sync engine sends the changes to Septena's own server at `api.septena.app`, which runs on Cloudflare Workers ([ADR 0002](docs/adr/0002-own-backend-replaces-icloud.md)).
+
+Rules that must behave the same in every app, such as repeating tasks and list order, live once in a shared Rust core ([ADR 0025](docs/adr/0025-shared-rust-core.md)). The apps call it instead of re-implementing it. Copy, menu actions, shortcuts and settings live in JSON files under [`registry/`](registry/), and a generator turns them into constants for each app.
+
+## Build it
+
+| Part | Folder | Toolchain |
+| --- | --- | --- |
+| Apple apps | `Septena/`, `SeptenaCore/`, `Septask*/` | Xcode, [XcodeGen](https://github.com/yonaskolb/XcodeGen) |
+| Android app | `android/` | Gradle, JDK 17 |
+| Web app | `web/` | Node, pnpm |
+| Windows app | `windows/` | Gradle |
+| Sync server and MCP | `backend/` | Node, pnpm, Wrangler |
+| Shared core | `core/` | Rust (CI builds it) |
+
+For the Apple apps, `project.yml` is the source of truth. Generate the Xcode project, then open it:
 
 ```bash
 git clone https://github.com/septena/septena.git
@@ -35,37 +54,33 @@ xcodegen generate
 open Septena.xcodeproj
 ```
 
-| Scheme | Target |
-| --- | --- |
-| `Septask` | iOS and iPadOS app, embeds the watch app, widgets and share extension |
-| `SeptaskMac` | macOS app |
-| `SeptaskWatch` | watchOS app |
-| `SeptenaCoreTests` | unit tests for pure task logic |
+The code targets keep the working name Septask. `Septask` builds the phone and tablet app with its watch app, widgets and share extension. `SeptaskMac` builds the desktop app. `SeptenaCoreTests` runs the unit tests for the task logic.
 
-The code targets keep the working name Septask; the product is Septena. To build a signed copy on your own account, copy `Config/Secrets.example.xcconfig` to `Config/Secrets.xcconfig` (gitignored) and set `SEPTENA_DEVELOPMENT_TEAM`. See [`docs/BUILDING_YOUR_OWN.md`](docs/BUILDING_YOUR_OWN.md). Android builds in CI (`.github/workflows/android.yml`).
+To sign a build with your own developer account, copy `Config/Secrets.example.xcconfig` to `Config/Secrets.xcconfig` and set `SEPTENA_DEVELOPMENT_TEAM`. [`docs/BUILDING_YOUR_OWN.md`](docs/BUILDING_YOUR_OWN.md) has the details. The other parts build in CI; the workflows are in [`.github/workflows/`](.github/workflows/).
 
-## Layout
+## Repository map
 
 | Folder | What it holds |
 | --- | --- |
-| `SeptenaCore/` | models, SwiftData, task sync, import, mutators |
-| `Septena/Shell/` | shared task UI, sidebar, settings, on-device AI |
-| `Septask/` | app entry, launch, settings shell, AppKit shell |
-| `SeptaskWatch/`, `SeptaskWatchComplication/`, `SeptaskWidgets/`, `ShareExtension/` | watch app and extensions |
-| `android/` | Android app |
-| `core/` | shared Rust core |
-| `backend/` | task backend and MCP server (`api.septena.app`) |
-| `registry/` | shared copy, actions, settings and tokens |
-| `docs/` | specs, plans and ADRs; start at [`docs/README.md`](docs/README.md) |
+| `SeptenaCore/` | models, local store, sync, import, the mutators that every write goes through |
+| `Septena/Shell/` | the shared task screens, sidebar and settings |
+| `Septask/` | app entry, launch and the desktop window shell |
+| `SeptaskWatch/`, `SeptaskWidgets/`, `ShareExtension/` | watch app, widgets and share extension |
+| `android/`, `web/`, `windows/` | the other apps |
+| `backend/` | the sync server, REST API and MCP server |
+| `core/` | the shared Rust core |
+| `registry/` | copy, actions, settings and design tokens shared by every app |
+| `skills/` | agent procedures, also served at `septena.app/skills` |
+| `docs/` | specs, plans and decision records; start at [`docs/README.md`](docs/README.md) |
 
-Rules for contributors and coding agents are in [`AGENTS.md`](AGENTS.md). Code wins over any doc.
+## Contributing
+
+Bug reports, ideas and focused pull requests are welcome. Open an [issue](https://github.com/septena/septena/issues) first for anything large. People and coding agents follow the same rules, and they are in [`AGENTS.md`](AGENTS.md). [`CONTRIBUTING.md`](CONTRIBUTING.md) covers the checks a pull request must pass. To report a vulnerability, follow [`SECURITY.md`](SECURITY.md).
+
+Michell Zappa makes Septena on his own, with AI as his pair programmer, mostly Claude.
 
 ## License
 
-MIT - see [`LICENSE`](LICENSE). Copyright (c) 2026 Michell Zappa.
+The code is MIT licensed. See [`LICENSE`](LICENSE). Copyright (c) 2026 Michell Zappa.
 
-The MIT grant covers the **code**, not the **brand** — see [`NOTICE`](NOTICE).
-"Septena," the wordmark, and the app icon are reserved trademarks: fork and
-build all you like, but ship derivatives under your own name and icon. One
-bundled asset is also excluded — the Claude name/logo (an Anthropic trademark,
-bundled only to identify the Claude integration).
+The license covers the code, not the brand. The name "Septena", the wordmark and the app icon are reserved trademarks, as [`NOTICE`](NOTICE) explains. Fork and build all you like, but ship your version under your own name and icon. The bundled Claude name and logo belong to Anthropic and are there only to identify the Claude integration.
