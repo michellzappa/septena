@@ -399,13 +399,6 @@ struct AreaDetailView: View {
       } label: {
         Label(RegistryActions.title(.areaNewProject), systemImage: "plus")
       }
-      if TaskHistory.isAvailable {
-        Button {
-          showingNotesHistory = true
-        } label: {
-          Label(ContainerNotesCopy.historyMenuTitle, systemImage: "clock.arrow.circlepath")
-        }
-      }
     }
   }
 
@@ -887,13 +880,6 @@ struct ProjectDetailView: View {
 
   private var projectOverflowMenu: some View {
     OverflowMenu {
-      if TaskHistory.isAvailable {
-        Button {
-          showingNotesHistory = true
-        } label: {
-          Label(ContainerNotesCopy.historyMenuTitle, systemImage: "clock.arrow.circlepath")
-        }
-      }
       Button {
         nav.shouldCreateHeading = true
       } label: {

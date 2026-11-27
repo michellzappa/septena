@@ -362,6 +362,10 @@ struct TaskListView: View {
   /// Keeps the empty-list top quick-add anchored while its draft is open (the
   /// list stops being "empty" the moment the draft exists).
   @State private var quickAddDraftAtTop = false
+  /// A Today capture opened while the Inbox was empty: an empty Inbox draws
+  /// no band (#708), so the draft sits at the foot of Today's own list until
+  /// it closes, even when an item arrives meanwhile.
+  @State private var quickAddDraftAtTodayFoot = false
   /// Which Today group owns an in-flight capture draft — Inbox foot line vs a
   /// specific area / project section opened from its header "+".
   private enum QuickAddGroupTarget: Equatable {
@@ -1094,6 +1098,7 @@ struct TaskListView: View {
       draftEditIds = []
       quickAddDraftId = nil
       quickAddDraftAtTop = false
+      quickAddDraftAtTodayFoot = false
       quickAddGroupTarget = nil
       pendingReloadWhileEditing = false
       // Re-fetch the woven calendar agenda SYNCHRONOUSLY, in the same
@@ -1296,6 +1301,8 @@ struct TaskListView: View {
       quickAddDraftAtTop = usesMagicPlusInsteadOfInboxTrigger
         ? filter != .today && filter != .triage && showsEmptyTaskList
         : showsQuickAddAtTop
+      quickAddDraftAtTodayFoot = usesMagicPlusInsteadOfInboxTrigger
+        && groupTarget == .inbox && renderedTodayInboxRows.isEmpty
       quickAddDraftId = task.id
       items.append(task)
       beginEdit(task)
@@ -1617,6 +1624,7 @@ struct TaskListView: View {
     guard quickAddDraftId == id else { return }
     quickAddDraftId = nil
     quickAddDraftAtTop = false
+    quickAddDraftAtTodayFoot = false
     quickAddGroupTarget = nil
   }
 
@@ -1640,6 +1648,17 @@ struct TaskListView: View {
       return quickAddInInboxShowsEditor
     }
     return true
+  }
+
+  /// The Inbox capture slot sits in the band, not at Today's foot.
+  private var showsQuickAddInInboxBand: Bool {
+    showsQuickAddInInbox && !quickAddDraftAtTodayFoot
+  }
+
+  /// The Inbox capture slot sits at the foot of Today's own list: the draft
+  /// opened while the Inbox was empty (#708).
+  private var showsQuickAddAtTodayFoot: Bool {
+    showsQuickAddInInbox && quickAddDraftAtTodayFoot
   }
 
   private var quickAddInInboxShowsEditor: Bool {
@@ -1692,6 +1711,9 @@ struct TaskListView: View {
       // inside the open-task card via `cardedRows(appendQuickAdd:)`. Grouped
       // lists (Anytime) get a foot solo card here instead.
       if showsQuickAddAtFoot && !attachesQuickAddToVisibleCard { quickAddFootCard }
+      // Today with an empty Inbox: the capture opens at the foot of the day's
+      // own list, because an empty Inbox draws no band (#708).
+      if showsQuickAddAtTodayFoot { quickAddFootCard }
       scopeFadedSection()
       scopeLoggedSection()
       taskListFooter
@@ -2091,18 +2113,21 @@ struct TaskListView: View {
   private var triageSection: some View {
     // "Inbox" on Today = agent proposals (triageItems, today==false) + loose
     // manually-added tasks (today==true, no project/area). Both are unclassified
-    // work — the Inbox header should appear for either source. The quick-add line
-    // always lives at the foot of this card (capture drops into the band).
+    // work — the Inbox header should appear for either source. An empty Inbox
+    // draws no band (#708): the header goes with the last item, after the
+    // inbox-zero checkmark has played. The quick-add line lives at the foot
+    // of this card while the band shows; a capture opened into an empty Inbox
+    // sits at the foot of Today instead (`showsQuickAddAtTodayFoot`).
     if filter == .today {
       let allInbox = renderedTodayInboxRows
-      if showsQuickAddInInbox || !allInbox.isEmpty || inboxZeroPhase == .checkmark || inboxZeroAnimating {
+      if showsQuickAddInInboxBand || !allInbox.isEmpty || inboxZeroPhase == .checkmark || inboxZeroAnimating {
         // Type-erased: a deep header type overflowed the launch stack
         // (see cardedRows).
         AnyView(inboxHeader(count: allInbox.count))
         if !inboxCollapsed {
           cardedRows(allInbox,
                      quickMenu: { model.filingSuggestions[$0.id] != nil },
-                     appendQuickAdd: showsQuickAddInInbox,
+                     appendQuickAdd: showsQuickAddInInboxBand,
                      quickAddShowsEditor: quickAddInInboxShowsEditor,
                      moveDropTarget: .inbox,
                      magicContext: "Inbox")
@@ -3522,7 +3547,10 @@ struct TaskListView: View {
   private var todayInboxKeyboardIDs: [String] {
     guard !inboxCollapsed else { return [] }
     var ids = renderedTodayInboxRows.map(\.id)
-    if let draft = quickAddCaptureTask,
+    if quickAddDraftAtTodayFoot {
+      // The capture sits at Today's foot (#708); `keyboardOrderedTaskIds`
+      // puts it last.
+    } else if let draft = quickAddCaptureTask,
        quickAddGroupTarget == nil || quickAddGroupTarget == .inbox {
       ids.append(draft.id)
     } else {
@@ -3551,7 +3579,8 @@ struct TaskListView: View {
         classifiedIds = orderedFromGroupedOpen(pool: classified)
       }
       // The Get started steps sit above everything, under their notice.
-      return todayNoticeSteps.map(\.selectionID) + todayInboxKeyboardIDs + classifiedIds
+      let footDraft = quickAddDraftAtTodayFoot ? quickAddCaptureTask.map { [$0.id] } ?? [] : []
+      return todayNoticeSteps.map(\.selectionID) + todayInboxKeyboardIDs + classifiedIds + footDraft
     case .unscheduled, .starred:
       return orderedFromGroupedOpen(pool: items) + quickAddOrderedIds
     case .review:

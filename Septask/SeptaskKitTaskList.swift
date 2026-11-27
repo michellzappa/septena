@@ -233,6 +233,10 @@ final class SeptaskKitTaskListController: NSViewController {
   /// A ⌘N row whose first title is still being typed — abandoned (empty on
   /// commit) it's purged, so escaping a fresh row leaves nothing behind.
   private var pendingNewTaskId: String?
+  /// The new-task draft drawn at the foot of Today because the Inbox was
+  /// empty when it opened (#708). It stays at the foot until it closes, so an
+  /// item that arrives mid-capture never moves the live editor.
+  private var todayFootDraftId: String?
   /// True while the rolled-back-save sheet is on screen, so a run of failures
   /// raises one report instead of one sheet per failed write.
   private var storeHealthSheetUp = false
@@ -1356,7 +1360,11 @@ final class SeptaskKitTaskListController: NSViewController {
     let priorRows = rows
     let live = liveEditorIDs
     var nextRows = pinned(newRows, liveEditors: live)
-    let currentInboxIDs = visibleInboxIDs(in: nextRows)
+    // An empty Inbox draws no band (#708). A draft opened into an empty Inbox
+    // sits at the foot of Today's own list instead.
+    let footDraftId = filter == .today ? moveDraftToTodayFoot(&nextRows) : nil
+    var currentInboxIDs = visibleInboxIDs(in: nextRows)
+    if let footDraftId { currentInboxIDs.remove(footDraftId) }
     if filter == .today,
        let headerIndex = nextRows.firstIndex(where: {
          if case .header(let id, _, _, _) = $0 { return id == "inbox" }
@@ -1383,6 +1391,14 @@ final class SeptaskKitTaskListController: NSViewController {
     )
     let preserveInboxHeader = inboxZeroOutcome.playVisualMotion
       || inboxZeroTracker.phase == .checkmark
+    // The Inbox header goes with its last item. The inbox-zero checkmark keeps
+    // it on screen until the motion ends; the hold's end reloads to drop it.
+    if filter == .today, currentInboxIDs.isEmpty, !preserveInboxHeader {
+      nextRows.removeAll {
+        if case .header(let id, _, _, _) = $0 { return id == "inbox" }
+        return false
+      }
+    }
     apply(nextRows, animated: animated, preserving: live, preserveInboxHeader: preserveInboxHeader)
     applyInboxZeroOutcome(inboxZeroOutcome, inboxCount: currentInboxIDs.count)
     let hasContent = rows.contains { row in
@@ -1983,10 +1999,9 @@ final class SeptaskKitTaskListController: NSViewController {
   /// The Inbox — every unratified row, whatever its source: pending Apple
   /// Reminders first, then agent proposals and loose captures.
   ///
-  /// Rendered even when empty: the Inbox header carries the `+`, so it is the
-  /// capture slot whether or not anything sits in it. Matches
-  /// `TaskListView.triageSection`, which shows the section whenever
-  /// `allowsInlineCreate` regardless of row count.
+  /// Built with its header even when empty; `reload` drops the header when no
+  /// Inbox row is visible and no inbox-zero checkmark is playing, so an empty
+  /// Inbox draws no band (#708). Matches `TaskListView.triageSection`.
   private func triageBand(_ rawBand: [SeptenaTask]) -> [Row] {
     let band = activeTagFilterIDs.isEmpty
       ? rawBand
@@ -2002,6 +2017,33 @@ final class SeptaskKitTaskListController: NSViewController {
                     count: count)]
       + reminders
       + band.map(chipped)
+  }
+
+  /// Moves the open new-task draft from the Inbox run to the foot of Today's
+  /// own list (above the logged block) when no other Inbox row is visible, or
+  /// when the draft already sits there. Returns the draft's id when it moved.
+  /// Same placement as `TaskListView`'s Today foot quick-add (#708).
+  private func moveDraftToTodayFoot(_ candidateRows: inout [Row]) -> String? {
+    guard let draftId = pendingNewTaskId else {
+      todayFootDraftId = nil
+      return nil
+    }
+    let inboxIDs = visibleInboxIDs(in: candidateRows)
+    guard inboxIDs.contains(draftId),
+          todayFootDraftId == draftId || inboxIDs == [draftId],
+          let from = candidateRows.firstIndex(where: { $0.task?.id == draftId })
+    else {
+      todayFootDraftId = nil
+      return nil
+    }
+    let draft = candidateRows.remove(at: from)
+    let foot = candidateRows.firstIndex(where: {
+      if case .loggedFooter = $0 { return true }
+      return false
+    }) ?? candidateRows.endIndex
+    candidateRows.insert(draft, at: foot)
+    todayFootDraftId = draftId
+    return draftId
   }
 
   // MARK: - Inbox zero motion (docs/INBOX_ZERO_MOTION_SPEC.md, #298)
@@ -2072,6 +2114,9 @@ final class SeptaskKitTaskListController: NSViewController {
         guard self.inboxZeroTracker.phase == .checkmark else { return }
         self.inboxZeroTracker.finishMotion()
         self.inboxHeaderCell()?.finishInboxZeroToEmptyTray()
+        // The empty Inbox draws no band (#708): drop the header once the
+        // checkmark has played.
+        self.reload(animated: true)
       }
       inboxZeroHoldWorkItem = work
       DispatchQueue.main.asyncAfter(deadline: .now() + InboxZeroMotion.holdDuration, execute: work)
@@ -2355,10 +2400,7 @@ final class SeptaskKitTaskListController: NSViewController {
     KitContainerNotesPopover.present(
       isArea: isArea,
       notes: text,
-      relativeTo: anchor,
-      onHistory: { [weak self] in
-        self?.showContainerNotesHistory(isArea: isArea, id: id)
-      }
+      relativeTo: anchor
     ) { [weak self] newText in
       let value: String? = newText.isEmpty ? nil : newText
       Task { @MainActor in

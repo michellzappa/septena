@@ -207,6 +207,7 @@ Shape and motion tokens live alongside the type and color tokens — like color,
   - `Theme.tileGap` (12pt) — between tiles in any surface-level grid (Week tiles, Coach bands, Tasks smart lists).
 - **Corner radius** — `Theme.cornerRadius` (22pt, the iOS-26 "soft tile") and `Theme.cornerRadiusSmall` (6pt, chips and pills).
 - **Row rhythm** — `Theme.rowVPadding`, `iconTextGap`, `checkboxTap`, and the per-platform row/sidebar heights keep the icon column and text baseline aligned across every row type.
+- **Sidebar ink** — smart lists in the bottom section of the sidebar (below Areas & Projects: Logbook, and any list the person moves down) draw their title in secondary ink on every platform, in light and dark. Top smart lists, areas and projects keep primary ink. Only the title changes: the icon tint and the muted count stay as they are, and a selected row keeps the §4.5 treatment. SwiftUI: `Theme.inkSecondary`; AppKit: `SeptaskKitTheme.inkSecondary`; Android: `colorScheme.onSurfaceVariant`; web: `--text-secondary`.
 
 **Motion is gated for accessibility, centrally.** Use the helpers in [Accessibility.swift](../Septena/Shell/UI/Accessibility.swift) — never raw `withAnimation` or a raw `.animation(_:value:)`, both of which honor nothing:
 
