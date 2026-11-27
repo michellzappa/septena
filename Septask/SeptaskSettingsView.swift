@@ -194,7 +194,7 @@ struct SeptaskSettingsView: View {
   }
   #endif
 
-  // MARK: - macOS 6-Tab Sidebar (from RegistrySettings.desktopTabs)
+  // MARK: - macOS 7-Tab Sidebar (from RegistrySettings.desktopTabs)
 
   #if os(macOS)
   @ViewBuilder
