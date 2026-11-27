@@ -147,11 +147,18 @@ To chase later, the user changes When, as for any task.
 
 ### Shared projects
 
+`ProjectStore` stamps `assignedBy` (the acting member id) and `assignedAt`
+(`YYYY-MM-DD`, the day of the assignment) whenever `assignedTo` changes to a
+member, and clears both when `assignedTo` is cleared (server-owned). Clients
+set them optimistically in local storage until the echo lands.
+
 A shared task waits on a member only when **this user** assigned it to that
-member: the client shows the member's name, and `waitingSince` is the day of
-the assignment. A task someone else assigned, or one assigned to the user,
-does not wait. When the member completes it, it closes for everyone, with no
-Accept step.
+member (`assignedBy == share.me && assignedTo != nil && assignedTo != share.me`):
+the client shows the member's name, and `assignedAt` is the start day (sorted
+alongside `waitingSince`). A task someone else assigned, or one assigned to the
+user, does not wait. Tapping **Got It Back** on a shared waiting task takes
+ownership back (`assignedTo = share.me`). When the member completes it, it
+closes for everyone, with no Accept step.
 
 ### Wire
 
