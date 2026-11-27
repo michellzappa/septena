@@ -2499,6 +2499,8 @@ function generateTS({ entities, rules, icons, tokens, caps, settings, dests, act
   lines.push(`export const PLAN_PRODUCTS = ${JSON.stringify(plans.prices.map((p) => p.productId))} as const;`);
   lines.push("/** The plan each store product gives (ADR 0059). A product not listed gives nothing. */");
   lines.push(`export const PLAN_PRODUCT_PLANS = ${JSON.stringify(Object.fromEntries([...plans.prices.map((p) => [p.productId, "plus"]), ...plans.proPrices.map((p) => [p.productId, "pro"])]))} as const;`);
+  lines.push("/** The plan page and the plan sheet's words, prices and benefits (registry/plans.json, docs/PREMIUM_LANGUAGE.md). English; localize with registryText(). */");
+  lines.push(`export const PLAN_UI = ${JSON.stringify({ name: plans.name, shortName: plans.shortName, proName: plans.proName, headline: plans.headline, subhead: plans.subhead, checkout: plans.checkout, trial: { title: plans.trial.title, detail: plans.trial.detail }, priceFootnote: plans.priceFootnote, prices: plans.prices, proPrices: plans.proPrices, cards: plans.cards, benefits: { plus: plans.benefits.plus, pro: plans.benefits.pro }, upsells: plans.upsells, promises: plans.promises, paywall: plans.paywall, status: plans.status, compareURL: plans.compareURL })} as const;`);
   lines.push("/** Upsell copy by moment id (registry/plans.json `upsells`). Server refusals quote it, so the words match the app. */");
   lines.push(`export const PLAN_UPSELLS = ${JSON.stringify(Object.fromEntries(plans.upsells.map((u) => [u.id, { title: u.title, detail: u.detail }])))} as const;`);
   lines.push("/** Sign-in methods, order per platform and screen copy (registry/sign-in.json, ADR 0047). Copy is English; localize with registryText(). GET /v1/auth/methods says which methods are on. */");

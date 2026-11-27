@@ -67,6 +67,12 @@ export interface SyncState {
   liveConnected: boolean;
   lastError: string | null;
   notSynced: NotSyncedItem[];
+  /**
+   * The upsell moment the server named when it refused this device (HTTP 402,
+   * `upsell` in the body, e.g. `second_device`), or null. The app shows its
+   * registry line and opens the plan sheet from it (#681).
+   */
+  upsell: string | null;
 }
 
 /** What a completion replaced, so its undo restores exactly that. */
@@ -150,6 +156,7 @@ export class WebSyncEngine {
       liveConnected: false,
       lastError: null,
       notSynced: [],
+      upsell: null,
     };
   }
 
@@ -247,6 +254,7 @@ export class WebSyncEngine {
       liveConnected: false,
       lastError: null,
       notSynced: [],
+      upsell: null,
     });
   }
 
@@ -263,6 +271,7 @@ export class WebSyncEngine {
       liveConnected: false,
       lastError: null,
       notSynced: [],
+      upsell: null,
     });
   }
 
@@ -1716,10 +1725,22 @@ export class WebSyncEngine {
       try {
         await this.drainOutbox();
         await this.pullAllPages();
+        if (this.state.upsell) this.emit({ upsell: null });
         await this.runFadePassIfDue();
         this.broadcastChange();
       } catch (err) {
-        if (err instanceof ApiError && err.status === 401) {
+        if (err instanceof ApiError && err.status === 402) {
+          // A plan limit, not a failure: the device keeps its tasks and the
+          // app explains the limit with the plan sheet (spec §6.3).
+          let upsell: string | null = null;
+          try {
+            const body = JSON.parse(err.rawBody) as { upsell?: unknown };
+            if (typeof body.upsell === "string") upsell = body.upsell;
+          } catch {
+            // No body: fall back to the device moment, the one sync answers with.
+          }
+          this.emit({ lastError: null, upsell: upsell ?? "second_device" });
+        } else if (err instanceof ApiError && err.status === 401) {
           this.emit({ lastError: "Session expired — please sign in again." });
         } else if (err instanceof TypeError || (typeof navigator !== "undefined" && !navigator.onLine)) {
           this.emit({ online: false, lastError: null });
