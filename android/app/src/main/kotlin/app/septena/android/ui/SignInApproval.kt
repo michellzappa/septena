@@ -53,13 +53,13 @@ import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
 import kotlinx.coroutines.launch
 
 /**
- * Surface `sign_in_approval` (Settings ▸ Account, signed in only): a row that opens
- * [ApproveSignInDialog]. Same as Apple `SeptaskSignInApprovalSection`.
+ * Surface `sign_in_approval` (Settings ▸ Account ▸ Devices, signed in only): a row that opens
+ * [ApproveSignInDialog]. Same as Apple `SeptaskSignInApprovalSection`. Sign-in methods are
+ * their own surface on the Account page (`sign_in_methods`).
  */
 @Composable
 internal fun SignInApprovalSection(graph: AndroidAppGraph, signedIn: Boolean, languageTag: String) {
     if (!signedIn) return
-    SignInMethodsSettingsSection(graph = graph, signedIn = signedIn, languageTag = languageTag)
     var open by remember { mutableStateOf(false) }
     ListItem(
         headlineContent = { Text(approvalCopy("title", languageTag), color = MaterialTheme.colorScheme.primary) },
@@ -72,7 +72,7 @@ internal fun SignInApprovalSection(graph: AndroidAppGraph, signedIn: Boolean, la
 }
 
 /**
- * Surface `claude_connector` (Settings ▸ Connect Claude): the setup and first prompts,
+ * Surface `claude_connector` (Settings ▸ Agents): the setup and first prompts,
  * the connector URL, and the code field for the browser's code. Same as Apple
  * `SeptaskClaudePairingSections`; the agent tools row is the page's next section.
  */
@@ -148,7 +148,7 @@ private fun CopyRow(
 }
 
 /**
- * The code field for a sign-in code on Settings ▸ Connect Claude. Continue opens
+ * The code field for a sign-in code on Settings ▸ Agents. Continue opens
  * [ApproveSignInDialog], which looks the code up and shows who asks before the user
  * approves; a device code typed here reads "Sign in on <device>?", never "Connect Claude".
  */

@@ -37,7 +37,7 @@ import kotlinx.coroutines.launch
 
 /**
  * The account's devices and agents, as the server reports them (`GET /v1/access`).
- * Settings ▸ Account ▸ Devices reads `devices`; Settings ▸ AI & Agents ▸ Agents reads
+ * Settings ▸ Account ▸ Devices reads `devices`; Settings ▸ Agents reads
  * `connections` and `agents.count`. Same model as iOS `AgentRoster` and
  * `SeptaskDevicesAccessPane`.
  */
@@ -104,7 +104,7 @@ internal class AccessSettingsModel(
         }
     }
 
-    /** The AI & Agents row status (`statusKey: agentsStatus`): "3 agents", or null until loaded. */
+    /** The Agents row status (`statusKey: agentsStatus`): "3 agents", or null until loaded. */
     fun agentsStatus(languageTag: String): String? =
         access?.let { countPhrase(app.septena.core.generated.RegistryCountPhraseIds.AGENTS, it.agentCount, languageTag) }
 

@@ -25,7 +25,7 @@ In both paths:
   the standard one-time 14-day Plus trial per email address.
 - The agent never receives an `sa1`/`sr2` app session. It cannot mint keys,
   manage devices, delete the account, or bypass Stop/Pause.
-- The agent appears in Settings ▸ AI & Agents under its name and can be
+- The agent appears in Settings ▸ Agents under its name and can be
   paused, renamed, or disconnected as soon as the user opens an app.
 - Both paths require `EMAIL_SIGNIN = "true"` and the `EMAIL` send binding.
 

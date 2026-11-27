@@ -6,6 +6,18 @@
 **Scope:** **Septena (the task app)** across iOS, iPadOS, macOS, Web (`#21`), Android (`#20`), and Windows (`#136`). (Septena Life moved out of this repo in ADR 0017.)
 **Owner of decisions:** mz. Defaults chosen by the author are marked *(default)*.
 
+**The top level (2026-11-27, mz: "top level needs to feel ordered and predictable"). This block wins over everything below it.**
+- The top level holds **only navigation rows**, one per place, never a toggle or an inline setting. Every setting lives on a page. `gen-registries.mjs` fails when a `rootGroups` item is not a `pageLink`.
+- Seven places, in this order on every platform: **Account, General, Appearance, Agents, Connections, Privacy & Data, About**. Mobile (iOS, iPadOS, Android) shows the account card, then six rows. Desktop (macOS, Web, Windows) shows seven sidebar tabs.
+- Each desktop tab is the depth-1 page with the same id (`account`, `general`, `appearance`, `agents`, `connections`, `privacy`, `about`). `rootGroups[].desktopTab` is removed. The validator checks that the root rows link the tab pages in tab order, and that every depth-1 page is a tab.
+- **Account:** Septena Plus, Devices (Add a device, Apple Watch), sign-in methods (`sign_in_methods`), Sync, Delete account.
+- **General:** Lists (`smart_lists`, renamed from Smart Lists, detail "Choose which lists you see and their order."), the list rows that were on the root, Notifications (timed reminders), Language, and **AI on this device** (`ai_preferences`, renamed from On-Device AI, now depth 2).
+- **Agents:** one page with no subpages: Pause all agents, the connected agents, then the "Connect an agent" section (connector URL, Claude prompts, the code field, MCP Skills). The `claude_pairing` page merged into `agents`.
+- **Connections:** Calendar, Reminders, and **Siri & Shortcuts** (`shortcuts`, Apple platforms, `platformsReason: "system Shortcuts API"`). Agents are not a connection (ADR 0038).
+- **Privacy & Data:** your data, Import & Export. **About:** version, Help, Contact Support, Show Welcome Again, Advanced.
+- Calendar, Reminders, Lists and AI on this device are depth 2 now. A row that shows on some platforms only carries `platforms` and a `platformsReason`.
+- Menu paths in copy and docs: "Settings ▸ Agents", "Settings ▸ General ▸ AI on this device", "Settings ▸ General ▸ Lists".
+
 **Changes after this spec (2026-11-27, mz):**
 - `desktopInline` is removed: every surface (iOS, macOS, Web, Android) shares the exact same pushed subpage tree from `registry/settings.json`.
 - **Appearance** is always its own destination: a pushed subpage on mobile, and its own sidebar tab on desktop (7 desktop tabs: Account, General, Appearance, AI & Agents, Connections, Privacy & Data, About).
@@ -245,8 +257,8 @@ Allowed values for `visibility`: `"always"` *(default)*, `"signedIn"`, `"signedO
 
 | Surface | Layout Container | How it reads `registry/settings.json` |
 |---|---|---|
-| **iOS / iPadOS (compact sheet)** | `NavigationStack` + grouped `Form` | Renders `rootGroups` in order (`card` / `inline`); `pageLink` rows push `pages[id]` with live status subtitle; `about` pushes `advanced` (`depth: 2`) |
-| **macOS (Settings window, ⌘,)** | `NavigationSplitView` (sidebar + `NavigationStack` detail) | Sidebar renders `desktopTabs` (6 items); detail renders groups/pages mapped to that `desktopTab` (expanding `desktopInline: true` pages directly into the detail `Form` so Connect Claude is immediately visible in `AI & Agents`) |
+| **iOS / iPadOS (compact sheet)** | `NavigationStack` + grouped `Form` | Renders `rootGroups` in order: the account card, then one page-link row per place, with a live status subtitle; a depth-1 page pushes its depth-2 pages |
+| **macOS (Settings window, ⌘,)** | `NavigationSplitView` (sidebar + `NavigationStack` detail) | Sidebar renders `desktopTabs` (7 items); the detail shows the depth-1 page with the tab's id, the same page iOS pushes |
 | **Web (`#21`) / Windows (`#136`) / iPad wide** | Split sidebar + detail panel | Same `desktopTabs` projection as macOS; automatically omits Apple-only items via `platforms` |
 | **Android mobile (`#20`)** | Compose `LazyColumn` + navigation stack | Same `rootGroups` projection as iOS; automatically includes `tasksTitleLines` (`platforms` includes `"android"`) and omits EventKit/Apple Intelligence/Things SQLite. Each `customSurface` has a Compose renderer in `android/app/.../ui/` (`SettingsSurfaces.kt`, `PlanSettings.kt`, `SmartListsSettings.kt`, `CalendarFeedSettings.kt`, `AccessSettings.kt`). Android differences: Smart Lists reorder with arrow buttons (no drag), Calendar shows only the private iCal feed (`calendar.events` is planned on Android), Septena Plus shows the plan but sells nothing (Play billing is #176), and Import & Export is not built yet |
 

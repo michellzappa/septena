@@ -3,7 +3,7 @@ import SwiftUI
 /// The account's agents, as the server reports them (`GET /v1/access`,
 /// `connections` + `agents`). One agent is one MCP connection: Claude, or
 /// Claude Code on one machine. Devices (app installs) are a separate list in
-/// Settings ▸ Account ▸ Devices. Settings reads the count for the AI & Agents
+/// Settings ▸ Account ▸ Devices. Settings reads the count for the Agents
 /// row; the Agents page reads the list.
 @MainActor
 @Observable
@@ -73,12 +73,14 @@ final class AgentRoster {
   }
 }
 
-/// Settings ▸ AI & Agents ▸ Agents (`registry/settings.json` page `agents`,
-/// surface `access_agents`): a page on iPhone and iPad.
+/// Settings ▸ Agents (`registry/settings.json` page `agents`): one page with
+/// Pause all agents, the connected agents, and "Connect an agent". It is the
+/// Agents tab on the Mac and a pushed page on iPhone and iPad.
 struct SeptaskAgentsPane: View {
   var body: some View {
     Form {
       SeptaskAgentsSections()
+      SeptaskClaudePairingSections()
     }
     .formStyle(.grouped)
     .navigationTitle(RegistrySettings.pageById[RegistrySettings.PageID.agents]?.title ?? "")

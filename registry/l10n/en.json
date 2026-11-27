@@ -167,13 +167,6 @@
       "settings.copy.claude_connector.codePlaceholder.label"
     ]
   },
-  "AI & Agents": {
-    "text": "AI & Agents",
-    "paths": [
-      "settings.desktopTabs.ai_agents.title",
-      "settings.rootGroups.ai_agents_root.header"
-    ]
-  },
   "AI Mode": {
     "text": "AI Mode",
     "paths": [
@@ -189,7 +182,8 @@
   "AI on this device": {
     "text": "AI on this device",
     "paths": [
-      "settings.pages.ai_preferences.sections.on_device.header"
+      "settings.pages.general.sections.ai.items.0.label",
+      "settings.pages.ai_preferences.title"
     ]
   },
   "AI’s turn: it’s working": {
@@ -202,7 +196,7 @@
     "text": "About",
     "paths": [
       "settings.desktopTabs.about.title",
-      "settings.rootGroups.meta_root.items.1.label",
+      "settings.rootGroups.about_root.items.0.label",
       "settings.pages.about.title"
     ]
   },
@@ -412,15 +406,12 @@
       "surfaces.prompts.text.newAgentKey.placeholder"
     ]
   },
-  "Agent tools": {
-    "text": "Agent tools",
-    "paths": [
-      "settings.pages.claude_pairing.sections.agent_tools.header"
-    ]
-  },
   "Agents": {
     "text": "Agents",
     "paths": [
+      "settings.desktopTabs.agents.title",
+      "settings.rootGroups.places_root.items.2.label",
+      "settings.pages.agents.title",
       "plans.outcomes.agents.rows.connected.label"
     ]
   },
@@ -516,7 +507,7 @@
     "text": "Appearance",
     "paths": [
       "settings.desktopTabs.appearance.title",
-      "settings.rootGroups.appearance_root.items.0.label",
+      "settings.rootGroups.places_root.items.1.label",
       "settings.pages.appearance.title",
       "settings.pages.appearance.sections.appearance.items.0.parts.mode.label"
     ]
@@ -682,7 +673,7 @@
   "Calendar": {
     "text": "Calendar",
     "paths": [
-      "settings.rootGroups.connections_data_root.items.0.label",
+      "settings.pages.connections.sections.connections.items.0.label",
       "settings.pages.calendar.title"
     ]
   },
@@ -790,7 +781,7 @@
   "Check for Updates…": {
     "text": "Check for Updates…",
     "paths": [
-      "settings.pages.about.sections.actions.items.2.label"
+      "settings.pages.about.sections.actions.items.3.label"
     ]
   },
   "Checking the code…": {
@@ -809,6 +800,12 @@
     "text": "Choose a plan",
     "paths": [
       "plans.paywall.choosePlan"
+    ]
+  },
+  "Choose which lists you see and their order.": {
+    "text": "Choose which lists you see and their order.",
+    "paths": [
+      "settings.pages.general.sections.lists.items.0.detail"
     ]
   },
   "Classic Window": {
@@ -962,11 +959,10 @@
       "plans.outcomes.agents.detail"
     ]
   },
-  "Connect an Agent": {
-    "text": "Connect an Agent",
+  "Connect an agent": {
+    "text": "Connect an agent",
     "paths": [
-      "settings.rootGroups.ai_agents_root.items.1.label",
-      "settings.pages.claude_pairing.title"
+      "settings.pages.agents.sections.connect.header"
     ]
   },
   "Connect your agent": {
@@ -984,13 +980,6 @@
       "settings.copy.sign_in_approval.confirmConnector.label"
     ]
   },
-  "Connected Agents": {
-    "text": "Connected Agents",
-    "paths": [
-      "settings.rootGroups.ai_agents_root.items.0.label",
-      "settings.pages.agents.title"
-    ]
-  },
   "Connected agents": {
     "text": "Connected agents",
     "paths": [
@@ -1000,8 +989,9 @@
   "Connections": {
     "text": "Connections",
     "paths": [
-      "settings.desktopTabs.connections_data.title",
-      "settings.rootGroups.connections_data_root.header"
+      "settings.desktopTabs.connections.title",
+      "settings.rootGroups.places_root.items.3.label",
+      "settings.pages.connections.title"
     ]
   },
   "Connector URL": {
@@ -1013,7 +1003,7 @@
   "Contact Support": {
     "text": "Contact Support",
     "paths": [
-      "settings.pages.about.sections.actions.items.5.label",
+      "settings.pages.about.sections.actions.items.1.label",
       "surfaces.support.title"
     ]
   },
@@ -1409,9 +1399,9 @@
   "Devices": {
     "text": "Devices",
     "paths": [
+      "settings.pages.account.sections.devices_access.items.0.label",
       "settings.pages.devices_access.title",
       "settings.pages.devices_access.sections.devices.header",
-      "settings.pages.account.sections.devices_access.items.0.label",
       "plans.outcomes.everywhere.rows.devices.label"
     ]
   },
@@ -1745,7 +1735,7 @@
   "Fade inactive tasks": {
     "text": "Fade inactive tasks",
     "paths": [
-      "settings.rootGroups.lists_root.items.3.label"
+      "settings.pages.general.sections.lists.items.3.label"
     ]
   },
   "Faded": {
@@ -1876,6 +1866,8 @@
     "text": "General",
     "paths": [
       "settings.desktopTabs.general.title",
+      "settings.rootGroups.places_root.items.0.label",
+      "settings.pages.general.title",
       "actions.shortcutsSheet.general.title"
     ]
   },
@@ -1931,7 +1923,7 @@
   "Group Today by list": {
     "text": "Group Today by list",
     "paths": [
-      "settings.rootGroups.lists_root.items.1.label"
+      "settings.pages.general.sections.lists.items.1.label"
     ]
   },
   "Hand off": {
@@ -2058,8 +2050,8 @@
   "Import & Export": {
     "text": "Import & Export",
     "paths": [
-      "settings.pages.import_export.title",
-      "settings.pages.privacy.sections.transfer.items.0.label"
+      "settings.pages.privacy.sections.transfer.items.0.label",
+      "settings.pages.import_export.title"
     ]
   },
   "Import JSON backup…": {
@@ -2231,15 +2223,15 @@
   "Keyboard Shortcuts": {
     "text": "Keyboard Shortcuts",
     "paths": [
-      "settings.pages.about.sections.actions.items.1.label",
+      "settings.pages.about.sections.actions.items.2.label",
       "actions.actions.app.keyboardShortcuts.title"
     ]
   },
   "Language": {
     "text": "Language",
     "paths": [
-      "settings.rootGroups.language_root.header",
-      "settings.rootGroups.language_root.items.0.label"
+      "settings.pages.general.sections.language.header",
+      "settings.pages.general.sections.language.items.0.label"
     ]
   },
   "Large": {
@@ -2284,7 +2276,7 @@
   "Learn where you usually file similar tasks.": {
     "text": "Learn where you usually file similar tasks.",
     "paths": [
-      "settings.rootGroups.lists_root.items.5.detail"
+      "settings.pages.general.sections.lists.items.5.detail"
     ]
   },
   "Leave Project": {
@@ -2339,7 +2331,8 @@
   "Lists": {
     "text": "Lists",
     "paths": [
-      "settings.rootGroups.lists_root.header"
+      "settings.pages.general.sections.lists.items.0.label",
+      "settings.pages.smart_lists.title"
     ]
   },
   "Logbook": {
@@ -2363,13 +2356,7 @@
   "MCP Skills": {
     "text": "MCP Skills",
     "paths": [
-      "settings.pages.claude_pairing.sections.agent_tools.items.0.label"
-    ]
-  },
-  "MCP connector": {
-    "text": "MCP connector",
-    "paths": [
-      "settings.pages.claude_pairing.sections.connector.header"
+      "settings.pages.agents.sections.connect.items.1.label"
     ]
   },
   "MIT License": {
@@ -2883,7 +2870,7 @@
   "Notifications": {
     "text": "Notifications",
     "paths": [
-      "settings.rootGroups.notifications_root.header"
+      "settings.pages.general.sections.notifications.header"
     ]
   },
   "OK": {
@@ -2952,13 +2939,6 @@
       "plans.outcomes.nothing_lost.rows.files.cells.free"
     ]
   },
-  "On-Device AI": {
-    "text": "On-Device AI",
-    "paths": [
-      "settings.rootGroups.ai_agents_root.items.2.label",
-      "settings.pages.ai_preferences.title"
-    ]
-  },
   "On-device": {
     "text": "On-device",
     "paths": [
@@ -3007,6 +2987,12 @@
     "text": "Open Help",
     "paths": [
       "surfaces.support.copy.helpLink.label"
+    ]
+  },
+  "Open Shortcuts": {
+    "text": "Open Shortcuts",
+    "paths": [
+      "settings.pages.shortcuts.sections.actions.items.0.label"
     ]
   },
   "Open Today": {
@@ -3076,7 +3062,7 @@
   "Overdue app icon badge": {
     "text": "Overdue app icon badge",
     "paths": [
-      "settings.rootGroups.lists_root.items.6.label"
+      "settings.pages.general.sections.lists.items.6.label"
     ]
   },
   "Owner": {
@@ -3305,7 +3291,7 @@
     "text": "Privacy & Data",
     "paths": [
       "settings.desktopTabs.privacy.title",
-      "settings.rootGroups.meta_root.items.0.label",
+      "settings.rootGroups.places_root.items.4.label",
       "settings.pages.privacy.title"
     ]
   },
@@ -3533,7 +3519,7 @@
   "Reminders": {
     "text": "Reminders",
     "paths": [
-      "settings.rootGroups.connections_data_root.items.1.label",
+      "settings.pages.connections.sections.connections.items.1.label",
       "settings.pages.reminders.title"
     ]
   },
@@ -4013,6 +3999,12 @@
       "surfaces.prompts.items.agentKeyCreated.message"
     ]
   },
+  "Septena works with Siri and the Shortcuts app. Ask Siri to add a task, or build a shortcut that adds, completes or shows your tasks.": {
+    "text": "Septena works with Siri and the Shortcuts app. Ask Siri to add a task, or build a shortcut that adds, completes or shows your tasks.",
+    "paths": [
+      "settings.pages.shortcuts.sections.actions.items.0.detail"
+    ]
+  },
   "Set up Septena for me using https://septena.app/agents.md": {
     "text": "Set up Septena for me using https://septena.app/agents.md",
     "paths": [
@@ -4089,7 +4081,7 @@
   "Show Get Started Again": {
     "text": "Show Get Started Again",
     "paths": [
-      "settings.pages.about.sections.actions.items.3.label"
+      "settings.pages.about.sections.actions.items.4.label"
     ]
   },
   "Show Info": {
@@ -4119,7 +4111,7 @@
   "Show Welcome Again": {
     "text": "Show Welcome Again",
     "paths": [
-      "settings.pages.about.sections.actions.items.4.label"
+      "settings.pages.about.sections.actions.items.5.label"
     ]
   },
   "Show calendar events": {
@@ -4131,19 +4123,19 @@
   "Show completed tasks": {
     "text": "Show completed tasks",
     "paths": [
-      "settings.rootGroups.lists_root.items.2.label"
+      "settings.pages.general.sections.lists.items.2.label"
     ]
   },
   "Show faded tasks": {
     "text": "Show faded tasks",
     "paths": [
-      "settings.rootGroups.lists_root.items.4.label"
+      "settings.pages.general.sections.lists.items.4.label"
     ]
   },
   "Show faded tasks in projects and areas.": {
     "text": "Show faded tasks in projects and areas.",
     "paths": [
-      "settings.rootGroups.lists_root.items.4.detail"
+      "settings.pages.general.sections.lists.items.4.detail"
     ]
   },
   "Show less": {
@@ -4161,7 +4153,7 @@
   "Show sidebar counts": {
     "text": "Show sidebar counts",
     "paths": [
-      "settings.rootGroups.lists_root.items.7.label"
+      "settings.pages.general.sections.lists.items.7.label"
     ]
   },
   "Shown when non-empty": {
@@ -4285,6 +4277,13 @@
       "signIn.manage.heading"
     ]
   },
+  "Siri & Shortcuts": {
+    "text": "Siri & Shortcuts",
+    "paths": [
+      "settings.pages.connections.sections.connections.items.2.label",
+      "settings.pages.shortcuts.title"
+    ]
+  },
   "Skip": {
     "text": "Skip",
     "paths": [
@@ -4307,13 +4306,6 @@
     "text": "Smallest",
     "paths": [
       "tokens.textScale.steps.xSmall.label"
-    ]
-  },
-  "Smart Lists": {
-    "text": "Smart Lists",
-    "paths": [
-      "settings.rootGroups.lists_root.items.0.label",
-      "settings.pages.smart_lists.title"
     ]
   },
   "Some help is always on your device": {
@@ -4428,7 +4420,7 @@
   "Suggest where to file": {
     "text": "Suggest where to file",
     "paths": [
-      "settings.rootGroups.lists_root.items.5.label"
+      "settings.pages.general.sections.lists.items.5.label"
     ]
   },
   "Sunday": {
@@ -4598,7 +4590,7 @@
   "Tasks without activity for 14 days fade out and move to Review. This applies on all your devices.": {
     "text": "Tasks without activity for 14 days fade out and move to Review. This applies on all your devices.",
     "paths": [
-      "settings.rootGroups.lists_root.items.3.detail"
+      "settings.pages.general.sections.lists.items.3.detail"
     ]
   },
   "Tasks you assign to Claude show up in Review, grouped by where the work stands.": {
@@ -4668,6 +4660,12 @@
       "signIn.manage.alreadyLinked"
     ]
   },
+  "The Shortcuts app lists every Septena action. Add them to your own shortcuts.": {
+    "text": "The Shortcuts app lists every Septena action. Add them to your own shortcuts.",
+    "paths": [
+      "settings.pages.shortcuts.sections.actions.footer"
+    ]
+  },
   "The brief did not load. Check your connection and open this page again.": {
     "text": "The brief did not load. Check your connection and open this page again.",
     "paths": [
@@ -4677,7 +4675,7 @@
   "The brief that teaches a model how to use your tasks through the connection (tools, conventions, and examples).": {
     "text": "The brief that teaches a model how to use your tasks through the connection (tools, conventions, and examples).",
     "paths": [
-      "settings.pages.claude_pairing.sections.agent_tools.footer"
+      "settings.pages.agents.sections.connect.items.1.detail"
     ]
   },
   "The code expired.": {
@@ -4857,7 +4855,7 @@
   "Timed reminders": {
     "text": "Timed reminders",
     "paths": [
-      "settings.rootGroups.notifications_root.items.0.label"
+      "settings.pages.general.sections.notifications.items.0.label"
     ]
   },
   "Timed tasks only": {
@@ -5212,7 +5210,7 @@
   "When off, tasks appear in one list with their project or area underneath.": {
     "text": "When off, tasks appear in one list with their project or area underneath.",
     "paths": [
-      "settings.rootGroups.lists_root.items.1.detail"
+      "settings.pages.general.sections.lists.items.1.detail"
     ]
   },
   "When…": {
@@ -5530,8 +5528,8 @@
       "settings.copy.delete_account.tasks.label"
     ]
   },
-  "Your tasks, areas, projects, and conversations stay on this device until you sign in. When signed in, they sync through Septena’s private server at api.septena.app, encrypted at rest (not end-to-end, so connected agents can read them when you choose). AI on your device stays on your device. Connect an agent under AI & Agents.": {
-    "text": "Your tasks, areas, projects, and conversations stay on this device until you sign in. When signed in, they sync through Septena’s private server at api.septena.app, encrypted at rest (not end-to-end, so connected agents can read them when you choose). AI on your device stays on your device. Connect an agent under AI & Agents.",
+  "Your tasks, areas, projects, and conversations stay on this device until you sign in. When signed in, they sync through Septena’s private server at api.septena.app, encrypted at rest (not end-to-end, so connected agents can read them when you choose). AI on your device stays on your device. Connect an agent under Agents.": {
+    "text": "Your tasks, areas, projects, and conversations stay on this device until you sign in. When signed in, they sync through Septena’s private server at api.septena.app, encrypted at rest (not end-to-end, so connected agents can read them when you choose). AI on your device stays on your device. Connect an agent under Agents.",
     "paths": [
       "settings.pages.privacy.sections.data_locality.items.0.detail"
     ]
@@ -5575,8 +5573,8 @@
       "settings.copy.ai_explainer.privateBody.label"
     ]
   },
-  "{client} can read and change your tasks. You can pause it in AI & Agents.": {
-    "text": "{client} can read and change your tasks. You can pause it in AI & Agents.",
+  "{client} can read and change your tasks. You can pause it in Agents.": {
+    "text": "{client} can read and change your tasks. You can pause it in Agents.",
     "placeholders": [
       "client"
     ],

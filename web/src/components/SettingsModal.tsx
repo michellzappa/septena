@@ -143,20 +143,10 @@ interface RegistryPage {
   sections: readonly RegistrySection[];
 }
 
-interface RegistryRootGroup {
-  id: string;
-  header?: string;
-  mobilePresentation: string;
-  desktopTab: string | null;
-  items: readonly RegistryItem[];
-}
-
 const DESKTOP_TABS = SETTINGS_REGISTRY.desktopTabs;
-const ROOT_GROUPS = SETTINGS_REGISTRY.rootGroups as readonly RegistryRootGroup[];
 const PAGES = SETTINGS_REGISTRY.pages as readonly RegistryPage[];
 const PAGE_BY_ID = new Map<string, RegistryPage>(PAGES.map((p) => [p.id, p]));
 const TAB_BY_ID = new Map<string, (typeof DESKTOP_TABS)[number]>(DESKTOP_TABS.map((t) => [t.id, t]));
-const TAB_DIRECT_PAGES = new Set<string>(["account", "appearance", "privacy", "about"]);
 
 const NEW_KEY_PROMPT = SURFACES_CATALOG.prompts.text.find((p) => p.id === "newAgentKey");
 const KEY_CREATED_PROMPT = SURFACES_CATALOG.prompts.items.find((p) => p.id === "agentKeyCreated");
@@ -397,10 +387,10 @@ export function SettingsModal({
   useEffect(() => {
     if (!open) return;
     void loadEntitlement();
-    if (tab === "account" || tab === "ai_agents" || activePageId === "devices_access" || activePageId === "agents") {
+    if (tab === "account" || tab === "agents" || activePageId === "devices_access" || activePageId === "agents") {
       void loadAccess();
     }
-    if (tab === "connections_data" || activePageId === "calendar") {
+    if (tab === "connections" || activePageId === "calendar") {
       void loadIcal();
     }
   }, [activePageId, loadAccess, loadEntitlement, loadIcal, open, tab]);
@@ -633,8 +623,6 @@ export function SettingsModal({
         if (agentsPaused) return count ? `${count} · ${paused}` : paused;
         return count;
       }
-      case "claudeStatus":
-        return access && access.connections.length > 0 ? registryText("Connected", lang) : registryText("Set up", lang);
       case "aiMode": {
         const opts = SETTINGS_REGISTRY.keys.aiMode.options;
         const match = opts.find((o) => o.value === prefs.aiMode);
@@ -1637,6 +1625,9 @@ export function SettingsModal({
           </div>
         );
 
+      case "sign_in_methods":
+        return <SignInMethodsSection api={api} language={lang} />;
+
       case "mcp_skills":
         return (
           <div className="space-y-2 py-2 text-xs">
@@ -2121,7 +2112,12 @@ export function SettingsModal({
           className="flex w-full items-center gap-2.5 py-2.5 text-left text-xs text-[var(--text-primary)] hover:opacity-80"
         >
           <Icon className="h-4 w-4 shrink-0 text-[var(--accent)]" />
-          <span className="min-w-0 flex-1 truncate font-medium">{label}</span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate font-medium">{label}</span>
+            {item.detail && (
+              <span className="block text-[11px] text-[var(--text-muted)]">{registryText(item.detail, lang)}</span>
+            )}
+          </span>
           {badge && <span className="shrink-0 text-[11px] text-[var(--text-muted)]">{badge}</span>}
           <ChevronRight className="h-3.5 w-3.5 shrink-0 text-[var(--text-muted)]" />
         </button>
@@ -2142,9 +2138,12 @@ export function SettingsModal({
           .map((sec) => {
             const visibleItems = sec.items.filter(isItemVisible);
             if (visibleItems.length === 0) return null;
+            // Sign-in methods draws its own card (SignInMethodsSection).
+            if (visibleItems.length === 1 && visibleItems[0].surface === "sign_in_methods") {
+              return <div key={sec.id}>{renderSurface(visibleItems[0])}</div>;
+            }
             return (
-              <div key={sec.id} className="space-y-5">
-                <section>
+              <section key={sec.id}>
                   {sec.header && (
                     <h3 className="mb-1.5 text-[11px] font-semibold tracking-wide text-[var(--text-muted)] uppercase">
                       {registryText(sec.header, lang)}
@@ -2158,44 +2157,9 @@ export function SettingsModal({
                   {sec.footer && (
                     <p className="mt-1.5 text-[11px] text-[var(--text-muted)]">{registryText(sec.footer, lang)}</p>
                   )}
-                </section>
-                {pageId === "account" && sec.id === "sync" && signedIn && (
-                  <SignInMethodsSection api={api} language={lang} />
-                )}
-              </div>
+              </section>
             );
           })}
-      </div>
-    );
-  };
-
-  const renderTabContent = (tabId: SettingsTab) => {
-    if (TAB_DIRECT_PAGES.has(tabId)) {
-      return renderPageContent(tabId);
-    }
-    const tabTitle = TAB_BY_ID.get(tabId)?.title;
-    const groups = ROOT_GROUPS.filter((g) => g.desktopTab === tabId);
-    return (
-      <div className="space-y-5">
-        {groups.map((grp) => {
-          const visibleItems = grp.items.filter(isItemVisible);
-          if (visibleItems.length === 0) return null;
-          const showHeader = grp.header && grp.header !== tabTitle;
-          return (
-            <section key={grp.id}>
-              {showHeader && (
-                <h3 className="mb-1.5 text-[11px] font-semibold tracking-wide text-[var(--text-muted)] uppercase">
-                  {registryText(grp.header!, lang)}
-                </h3>
-              )}
-              <div className="divide-y divide-[var(--border-subtle)] rounded-xl border border-[var(--border-subtle)] px-3.5">
-                {visibleItems.map((item, idx) => (
-                  <div key={item.key ?? item.page ?? item.surface ?? idx}>{renderItem(item)}</div>
-                ))}
-              </div>
-            </section>
-          );
-        })}
       </div>
     );
   };
@@ -2359,7 +2323,8 @@ export function SettingsModal({
           </div>
 
           <div className="flex-1 overflow-y-auto p-5 text-sm">
-            {activePageId ? renderPageContent(activePageId) : renderTabContent(tab)}
+            {/* Each desktop tab is the depth-1 page with its id (registry/settings.json). */}
+            {renderPageContent(activePageId ?? tab)}
           </div>
         </div>
       </div>

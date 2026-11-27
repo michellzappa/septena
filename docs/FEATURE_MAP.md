@@ -8,10 +8,10 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 
 | Status | iPhone | iPad | Mac | Web | Android | Windows | linux | Watch |
 |---|---|---|---|---|---|---|---|---|
-| ships | 61 | 62 | 62 | 54 | 58 | 0 | 0 | 1 |
+| ships | 62 | 63 | 63 | 54 | 58 | 0 | 0 | 1 |
 | partial | 1 | 1 | 1 | 1 | 2 | 0 | 0 | 3 |
 | planned | 2 | 2 | 2 | 6 | 3 | 64 | 64 | 2 |
-| - | 4 | 3 | 3 | 7 | 5 | 4 | 4 | 62 |
+| - | 4 | 3 | 3 | 8 | 6 | 5 | 5 | 63 |
 
 **Agent** lists the MCP tools at `api.septena.app/mcp` that reach the feature; **none** means an agent cannot reach it.
 
@@ -76,6 +76,7 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 | `task.times` | Start time and duration on a task | ships | ships | ships | ships | ships | planned | planned | - | `tasks_create`, `tasks_update` |
 | `calendar.feed` | Private read-only calendar feed (.ics) | ships | ships | ships | ships | ships | planned | planned | - | none |
 | `widgets.tasks` | Today and Upcoming widgets | ships | ships | ships | - | ships | planned | planned | - | none |
+| `system.shortcuts` | Siri and Shortcuts actions | ships | ships | ships | - | - | - | - | - | none |
 | `watch.app` | Apple Watch app | - | - | - | - | - | - | - | ships | none |
 | `data.import-export` | Export as JSON, Markdown or CSV; import JSON with a preview | ships | ships | ships | ships | ships | planned | planned | - | none |
 | `agents.list` | Connected agents: list, name, disconnect | ships | ships | ships | ships | ships | planned | planned | - | none |
