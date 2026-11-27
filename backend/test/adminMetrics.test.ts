@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { createTestAccountStore, installWorkerTestHooks } from "./taskStoreHarness.ts";
+import { createTestAccountStore, createTestTaskStore, ensureSession, installWorkerTestHooks } from "./taskStoreHarness.ts";
 
 installWorkerTestHooks();
 
@@ -9,6 +9,9 @@ installWorkerTestHooks();
 const { change, cumulative, lastDays, perDay, snapshotSeries, weeklyCohorts, windowChange } = await import("../src/admin/metrics.ts");
 const { ADMIN_PAGES, renderAdmin } = await import("../src/admin/page.ts");
 const { embedUrl } = await import("../src/admin/plausible.ts");
+const { clientMix, releaseAdoption } = await import("../src/admin/metrics.ts");
+const { deviceLabel } = await import("../src/admin/accounts.ts");
+const { clientVersion } = await import("../src/api/routes.ts");
 
 const DAY = 86_400_000;
 const NOW = Date.UTC(2026, 10, 26, 12);
@@ -103,5 +106,40 @@ describe("admin growth", () => {
     assert.equal(embedUrl("http://plausible.io/share/x"), null);
     assert.equal(embedUrl("https://plausible.io/septena.app"), null);
     assert.equal(embedUrl(undefined), null);
+  });
+
+  it("reads the version header, and the version older Android and web builds put in the client name", () => {
+    assert.equal(clientVersion("0.9.0 (2935)", "septask-mac"), "0.9.0 (2935)");
+    assert.equal(clientVersion(undefined, "android 0.9.0"), "0.9.0");
+    assert.equal(clientVersion(undefined, "web 0.2.0"), "0.2.0");
+    assert.equal(clientVersion(undefined, "septask-mac"), null);
+    assert.equal(clientVersion("x".repeat(80), "septask-mac"), null, "a value the client-name rule refuses is dropped");
+    assert.equal(deviceLabel({ client: "septask-mac", version: null }), "Mac, older build");
+    assert.equal(deviceLabel({ client: "android 0.9.0", version: null }), "Android 0.9.0");
+    assert.equal(deviceLabel({ client: "septena-android", version: "0.9.1 (40)" }), "Android 0.9.1 (40)");
+  });
+
+  it("groups versions by marketing version and counts releases per device", () => {
+    const dev = (client: string, version: string | null) => ({ client, version, firstSeen: NOW - DAY, lastSeen: NOW });
+    const rows = [
+      row(1, NOW, summary({ devices: [dev("septask-mac", "0.9.0 (2844)"), dev("septask-mac", "0.9.0 (2935)"), dev("septask-mac", null)],
+        versions: [{ client: "septask-mac", version: "0.9.0 (2844)", firstSeen: NOW - 5 * DAY, lastSeen: NOW }, { client: "septask-mac", version: "0.9.0 (2935)", firstSeen: NOW - DAY, lastSeen: NOW }] })),
+      row(2, NOW, summary({ devices: [dev("android 0.9.0", null)], versions: [{ client: "septena-android", version: "0.9.1 (40)", firstSeen: NOW, lastSeen: NOW }] })),
+    ] as never;
+    const mix = clientMix(rows, NOW);
+    assert.deepEqual(mix.platforms.map((t) => [t.name, t.n]), [["Mac", 3], ["Android", 1]]);
+    assert.deepEqual(mix.versions.map((t) => [t.name, t.n]), [["Mac 0.9.0", 2], ["Android 0.9.0", 1], ["Mac, older build", 1]]);
+    assert.equal(mix.builds.length, 3);
+    assert.deepEqual(releaseAdoption(rows).map((r) => [r.name, r.devices]), [["Android 0.9.1", 1], ["Mac 0.9.0", 2]]);
+  });
+
+  it("keeps every version a device ran", async () => {
+    const { store } = await createTestTaskStore();
+    ensureSession(store, "sid-1");
+    store.deviceAccess("sid-1", "septask-mac", null, NOW - DAY, "0.9.0 (1)");
+    store.deviceAccess("sid-1", "septask-mac", null, NOW, "0.9.0 (2)");
+    store.deviceAccess("sid-1", "septask-mac", null, NOW, null);
+    const versions = store.accountSummary(NOW)!.versions!.map((v) => v.version);
+    assert.deepEqual(versions, ["0.9.0 (1)", "0.9.0 (2)"]);
   });
 });

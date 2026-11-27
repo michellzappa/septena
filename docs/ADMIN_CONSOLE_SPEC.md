@@ -55,6 +55,14 @@ it. The pages work at phone width.
 - **Activated**: completed at least one task (`closedTasks >= 1`).
 - **Paying**: an active App Store, Stripe or Play purchase in Production.
 - **Week**: Monday 00:00 UTC.
+- **Version**: what a device sends in `X-Septena-Version`, `<marketing> (<build>)`,
+  read from the build on every client (#764). The client name in
+  `X-Septena-Client` is fixed per platform (`septask-ios`, `septask-mac`,
+  `septask-watch`, `septena-android`, `septena-web`); older Android and web
+  builds put the version in the name, and the server still reads that. A
+  device with no version runs a build from before the header ("older
+  build"). The server keeps every version a device ran for 90 days
+  (`device_versions`), which gives release adoption.
 - **Change**: today's value against the snapshot 7 days before; for daily
   counts, the last 7 days against the 7 before.
 

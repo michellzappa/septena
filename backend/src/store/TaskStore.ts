@@ -81,6 +81,9 @@ export interface AccountSummary {
   files: number;
   fileBytes: number;
   devices: { client: string | null; version: string | null; firstSeen: number; lastSeen: number }[];
+  /// Each version a device ran in the last 90 days, one row per device and
+  /// version (`device_versions`). Optional: summaries from before it lack it.
+  versions?: { client: string | null; version: string; firstSeen: number; lastSeen: number }[];
   agents: { client: string; since: number; lastUsed: number }[];
   agentChangesWeek: number;
   webhooks: number;
@@ -660,6 +663,11 @@ export class TaskStore extends DurableObject<Env> {
       CREATE TABLE IF NOT EXISTS devices (
         sid TEXT PRIMARY KEY, client TEXT, firstSeen INTEGER NOT NULL,
         lastSeen INTEGER NOT NULL, slotAt INTEGER
+      );
+      CREATE TABLE IF NOT EXISTS device_versions (
+        sid TEXT NOT NULL, client TEXT, version TEXT NOT NULL,
+        firstSeen INTEGER NOT NULL, lastSeen INTEGER NOT NULL,
+        PRIMARY KEY (sid, version)
       );
       CREATE TABLE IF NOT EXISTS usage (
         key TEXT PRIMARY KEY, count INTEGER NOT NULL, updatedAt INTEGER NOT NULL
@@ -3059,6 +3067,13 @@ export class TaskStore extends DurableObject<Env> {
       "INSERT INTO devices (sid, client, firstSeen, lastSeen, version) VALUES (?, ?, ?, ?, ?) ON CONFLICT(sid) DO UPDATE SET lastSeen = excluded.lastSeen, client = COALESCE(excluded.client, devices.client), version = COALESCE(excluded.version, devices.version)",
       sid, client, now, now, version,
     );
+    // Every version a device ran, for release adoption on the admin page.
+    if (version !== null) {
+      this.sql.exec(
+        "INSERT INTO device_versions (sid, client, version, firstSeen, lastSeen) VALUES (?, ?, ?, ?, ?) ON CONFLICT(sid, version) DO UPDATE SET lastSeen = excluded.lastSeen, client = COALESCE(excluded.client, device_versions.client)",
+        sid, client, version, now, now,
+      );
+    }
   }
 
   /// Strictly increasing, so two calls in the same millisecond still order.
@@ -3196,6 +3211,9 @@ export class TaskStore extends DurableObject<Env> {
       files: count("SELECT COUNT(*) AS n FROM attachments WHERE deletedAt IS NULL AND uploadedAt IS NOT NULL"),
       fileBytes: this.attachmentBytes(),
       devices,
+      versions: this.sql.exec<{ client: string | null; version: string; firstSeen: number; lastSeen: number }>(
+        "SELECT client, version, firstSeen, lastSeen FROM device_versions WHERE lastSeen > ? ORDER BY firstSeen", now - 90 * DAY_MS,
+      ).toArray().map((r) => ({ ...r })),
       agents,
       agentChangesWeek: count("SELECT COUNT(*) AS n FROM changes WHERE actor LIKE 'mcp:%' AND at > ?", new Date(now - 7 * DAY_MS).toISOString()),
       webhooks: count("SELECT COUNT(*) AS n FROM agent_webhooks WHERE enabled = 1"),
@@ -3730,6 +3748,7 @@ export class TaskStore extends DurableObject<Env> {
       this.sql.exec("DELETE FROM changes WHERE at < ?", new Date(now - CHANGE_LOG_TTL_MS).toISOString());
       this.sessions.purge(now);
       this.sql.exec("DELETE FROM devices WHERE sid NOT IN (SELECT sid FROM sessions WHERE sid IS NOT NULL)");
+      this.sql.exec("DELETE FROM device_versions WHERE lastSeen < ?", now - 90 * DAY_MS);
       // A key never expires: its row stays until the user revokes it.
       this.sql.exec("DELETE FROM connections WHERE lastUsed < ? AND clientId != ?", now - CONNECTION_TTL_MS, AGENT_KEY_CLIENT);
       // Day and month counters: two months covers the current month.

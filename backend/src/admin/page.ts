@@ -4,7 +4,7 @@ import type { PlusLink, PlusLinkUse } from "../store/plusLinks.js";
 import { deviceLabel, lastSeen, overview, planView } from "./accounts.js";
 import type { SignupRow, SignupView } from "./signups.js";
 import {
-  SERIES_DAYS, agentMix, change, clientMix, cumulative, lastDays, perDay, providerMix, snapshotSeries, weeklyCohorts, windowChange,
+  SERIES_DAYS, agentMix, change, clientMix, releaseAdoption, cumulative, lastDays, perDay, providerMix, snapshotSeries, weeklyCohorts, windowChange,
   type MetricDay, type Tally,
 } from "./metrics.js";
 import type { Row as TrafficRow, TrafficResult } from "./plausible.js";
@@ -358,8 +358,12 @@ function clientsSection(v: AdminView): string {
   const mix = clientMix(v.accounts, v.now);
   const mac = v.releases === null ? `<div class="blist"><h3>Mac downloads</h3><p class="warn">GitHub does not answer.</p></div>`
     : tallyList("Mac downloads by release", v.releases.map((r) => ({ name: r.tag, n: r.installs })));
-  return `<div class="cols">${tallyList("Devices, 30 days", mix.platforms)}${tallyList("Versions, 30 days", mix.versions)}${tallyList("Agents, accounts using each", agentMix(v.accounts))}${tallyList("Sign-in, accounts", providerMix(v.accounts))}${mac}</div>
-  <p class="dim">Store installs and revenue come with RevenueCat (#644, #645).</p>`;
+  const releases = releaseAdoption(v.accounts).slice(0, 12).map((r) =>
+    `<tr><td>${esc(r.name)}</td><td class="n">${fmt(r.devices)}</td><td>${esc(day(r.firstSeen))}</td><td class="dim">${esc(when(r.lastSeen, v.now))}</td></tr>`);
+  return `<div class="cols">${tallyList("Devices, 30 days", mix.platforms)}${tallyList("Versions, 30 days", mix.versions)}${tallyList("Builds, 30 days", mix.builds)}${tallyList("Agents, accounts using each", agentMix(v.accounts))}${tallyList("Sign-in, accounts", providerMix(v.accounts))}${mac}</div>
+  <h3>Releases, last 90 days</h3>
+  ${table(["Release", "Devices that ran it", "First seen", "Last seen"], releases, "No versions reported yet.")}
+  <p class="dim">A device with no version runs a build from before the version header. Store installs and revenue come with RevenueCat (#644, #645).</p>`;
 }
 
 /// A titled card: the unit every page is built from.

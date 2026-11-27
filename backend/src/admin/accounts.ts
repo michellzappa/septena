@@ -152,10 +152,29 @@ export function lastSeen(summary: AccountSummary | null): number | null {
   return times.length ? Math.max(...times) : null;
 }
 
-/// "septask-ios" with its version header; Android puts the version in the name.
+/// The platform behind an `X-Septena-Client` name, in words. Android and web
+/// once put their version in the name (`android 0.9.0`), so those match by prefix.
+export function platformName(client: string | null): string {
+  const c = client ?? "";
+  if (c === "septask-ios") return "iPhone or iPad";
+  if (c === "septask-mac") return "Mac";
+  if (c === "septask-watch") return "Watch";
+  if (/android/i.test(c)) return "Android";
+  if (/web/i.test(c)) return "Web";
+  return c || "unknown";
+}
+
+/// The version a device runs: `X-Septena-Version`, else the version an older
+/// Android or web build put in its client name. Null: a build from before
+/// either.
+export function deviceVersion(d: { client: string | null; version: string | null }): string | null {
+  return d.version ?? /^(?:android|web) (\S.*)$/.exec(d.client ?? "")?.[1] ?? null;
+}
+
+/// "0.9.0" from "0.9.0 (2935)".
+export const marketingVersion = (v: string) => v.replace(/\s*\(.*\)$/, "");
+
 export function deviceLabel(d: { client: string | null; version: string | null }): string {
-  const client = d.client ?? "unknown";
-  const name = client === "septask-ios" ? "iPhone or iPad" : client === "septask-mac" ? "Mac" : client === "septask-watch" ? "Watch"
-    : client.replace(/^android\b/, "Android");
-  return d.version ? `${name} ${d.version}` : name;
+  const v = deviceVersion(d);
+  return v ? `${platformName(d.client)} ${v}` : `${platformName(d.client)}, older build`;
 }

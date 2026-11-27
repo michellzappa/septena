@@ -69,9 +69,11 @@ class SeptenaAndroidApp : Application() {
 
 class AndroidAppGraph(application: Application) {
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    /** `X-Septena-Version`: "<marketing> (<build>)", the same form as iOS and Mac. */
     private val clientVersion: String = runCatching {
-        application.packageManager.getPackageInfo(application.packageName, 0).versionName
-    }.getOrNull() ?: "0.0.0"
+        val info = application.packageManager.getPackageInfo(application.packageName, 0)
+        "${info.versionName ?: "0.0.0"} (${info.longVersionCode})"
+    }.getOrNull() ?: "0.0.0 (0)"
 
     private val driver = AndroidSqliteDriver(
         schema = SeptenaDatabase.Schema,
