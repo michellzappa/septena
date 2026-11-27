@@ -76,6 +76,7 @@ jobs:
     name: Deploy the Worker
     needs: check
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment: cloudflare-deploy
     runs-on: ubuntu-latest
     timeout-minutes: 15
     concurrency:
