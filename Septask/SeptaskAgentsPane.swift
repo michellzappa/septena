@@ -88,11 +88,16 @@ struct SeptaskAgentsPane: View {
   }
 }
 
-/// The agent list, with rename and disconnect, and New Agent Key for an
-/// agent that cannot sign in (#86). The Mac AI & Agents tab shows
-/// it inline; `SeptaskAgentsPane` wraps it as a page.
+/// The agent list, pause toggle, rename and disconnect, and New Agent Key for
+/// an agent that cannot sign in (#86). Shared identically on macOS and iOS.
 struct SeptaskAgentsSections: View {
+  @Environment(\.modelContext) private var modelContext
+  @Environment(CKEngine.self) private var ckEngine
+  @Environment(SettingsStore.self) private var store
+
   private var roster: AgentRoster { .shared }
+  private static let pauseSection = RegistrySettings.section("pause", page: RegistrySettings.PageID.agents)
+  private static let pauseItem = RegistrySettings.itemByKey["agentsPaused"]
   private static let section = RegistrySettings.section("agents", page: RegistrySettings.PageID.agents)
   private static let renamePrompt = RegistryPrompts.text[.renameAgent]
   private static let newKeyPrompt = RegistryPrompts.text[.newAgentKey]
@@ -111,6 +116,26 @@ struct SeptaskAgentsSections: View {
   @State private var plansMoment: String?
 
   var body: some View {
+    if TaskSyncEngine.shared.signedIn {
+      Section {
+        Toggle(isOn: Binding(
+          get: { store.agentsPaused },
+          set: { store.setAgentsPaused($0, context: modelContext, engine: ckEngine) }
+        )) {
+          VStack(alignment: .leading, spacing: 1) {
+            Text(Self.pauseItem?.label ?? RegistrySettings.label(key: "agentsPaused"))
+            if let detail = Self.pauseItem?.detail, !detail.isEmpty {
+              Text(detail)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+          }
+        }
+      } footer: {
+        if let footer = Self.pauseSection?.footer { Text(footer) }
+      }
+    }
+
     Section {
       summaryRow
         .sheet(isPresented: $showingPlans) { SeptaskPlusSheet(upsellID: plansMoment) }
@@ -122,6 +147,8 @@ struct SeptaskAgentsSections: View {
       if let error = roster.lastError {
         Text(error).font(.caption).foregroundStyle(.red)
       }
+    } header: {
+      if let header = Self.section?.header { Text(header) }
     } footer: {
       if let footer = Self.section?.footer { Text(footer) }
     }

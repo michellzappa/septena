@@ -62,12 +62,6 @@
       "issue": "#260"
     },
     {
-      "file": "Septask/SeptaskClaudePairingPane.swift",
-      "literal": "Connect Claude",
-      "reason": "Settings chrome or status word that is not a registry item yet (P2d hand-over).",
-      "issue": "#260"
-    },
-    {
       "file": "Septask/SeptaskDataTransfer.swift",
       "literal": "Attachments",
       "reason": "Settings chrome or status word that is not a registry item yet (P2d hand-over).",

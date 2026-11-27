@@ -6,6 +6,15 @@
 **Scope:** **Septena (the task app)** across iOS, iPadOS, macOS, Web (`#21`), Android (`#20`), and Windows (`#136`). (Septena Life moved out of this repo in ADR 0017.)
 **Owner of decisions:** mz. Defaults chosen by the author are marked *(default)*.
 
+**Changes after this spec (2026-11-27, mz):**
+- `desktopInline` is removed: every surface (iOS, macOS, Web, Android) shares the exact same pushed subpage tree from `registry/settings.json`.
+- **Appearance** is always its own destination: a pushed subpage on mobile, and its own sidebar tab on desktop (7 desktop tabs: Account, General, Appearance, AI & Agents, Connections, Privacy & Data, About).
+- **Profile card** drops `· Live` / `· Synced` when healthy (shows Name + Plan badge only; sync text surfaces only when Offline or Not syncing).
+- **Devices & AI/Agents IA untangled:**
+  - `Account ▸ Devices` holds signed-in devices, `Add a device` (`sign_in_approval`), and Apple Watch (iOS).
+  - `AI & Agents` has 3 subpages on every platform: **Connected Agents** (includes `Pause all agents` + connected agents list + New Agent Key), **Connect an Agent** (MCP connector URL, Claude prompts, inline approval code, and MCP Skills), and **On-Device AI** (Apple Intelligence, Where AI runs, How AI helps).
+- **Web** (`web/src/components/SettingsModal.tsx`) renders directly from `SETTINGS_REGISTRY` with a real subpage stack, `Septena Plus` page, Web-gated `Notifications` and `Language` sections in `General`, `Import & Export` subpage under `Privacy & Data`, and diagnostics under `About ▸ Advanced`.
+
 **Changes after this spec (2026-11-22, mz):** `registry/settings.json` wins where the tables below disagree.
 - Appearance is its own page (`appearance`); on desktop it stays inline in General.
 - Import & Export is a depth-2 page under **Privacy & Data**. The tab and group formerly "Connections & Data" are **Connections**.

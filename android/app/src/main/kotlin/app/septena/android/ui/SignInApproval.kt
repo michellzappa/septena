@@ -93,14 +93,27 @@ internal fun ClaudeConnectorSection(graph: AndroidAppGraph, signedIn: Boolean, l
         ?.fields?.get("prompts") as? JsonValue.ObjectValue
     val setupPrompt = registryText(prompts?.fields?.get("setup").stringValue(), languageTag)
     val firstPrompt = registryText(prompts?.fields?.get("first").stringValue(), languageTag)
-    CopyRow(connectorCopy("setupPrompt", languageTag), copied == "setupPrompt", languageTag) { copy("setupPrompt", setupPrompt) }
-    CopyRow(connectorCopy("firstPrompt", languageTag), copied == "firstPrompt", languageTag) { copy("firstPrompt", firstPrompt) }
     CopyRow(
         connectorCopy("connectorUrl", languageTag),
         copied == "connectorUrl",
         languageTag,
         supporting = CONNECTOR_URL,
+        monospacedSupporting = true,
     ) { copy("connectorUrl", CONNECTOR_URL) }
+    CopyRow(
+        connectorCopy("setupPrompt", languageTag),
+        copied == "setupPrompt",
+        languageTag,
+        supporting = connectorCopy("setupPromptDetail", languageTag),
+    ) { copy("setupPrompt", setupPrompt) }
+    CopyRow(
+        connectorCopy("firstPrompt", languageTag),
+        copied == "firstPrompt",
+        languageTag,
+        supporting = connectorCopy("firstPromptDetail", languageTag),
+    ) { copy("firstPrompt", firstPrompt) }
+    SectionFooter(connectorCopy("connectorUrlDetail", languageTag))
+    SectionHeader(connectorCopy("approveHeader", languageTag))
     PairingCodeField(graph, signedIn, languageTag)
     SectionFooter(connectorCopy("footer", languageTag))
 }
@@ -111,11 +124,20 @@ private fun CopyRow(
     copied: Boolean,
     languageTag: String,
     supporting: String? = null,
+    monospacedSupporting: Boolean = false,
     onCopy: () -> Unit,
 ) {
     ListItem(
         headlineContent = { Text(title) },
-        supportingContent = supporting?.let { { Text(it, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall) } },
+        supportingContent = supporting?.let {
+            {
+                Text(
+                    it,
+                    fontFamily = if (monospacedSupporting) FontFamily.Monospace else null,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+        },
         trailingContent = {
             TextButton(onClick = onCopy) {
                 Text(connectorCopy(if (copied) "copied" else "copy", languageTag))

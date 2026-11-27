@@ -273,7 +273,7 @@ import Testing
   @Test func generatedRegistriesCoverCoreContracts() {
     #expect(RegistrySettings.syncedKeys.contains("welcomeName"))
     #expect(RegistrySettings.syncedKeys.contains("agentsPaused"))
-    #expect(RegistrySettings.desktopTabs.count == 6)
+    #expect(RegistrySettings.desktopTabs.count == 7)
     #expect(RegistrySettings.pageById[RegistrySettings.PageID.claudePairing]?.depth == 1)
     #expect(RegistrySettings.pageById[RegistrySettings.PageID.advanced]?.depth == 2)
     #expect(RegistryDestinations.viewAliases["someday"] == "anytime")

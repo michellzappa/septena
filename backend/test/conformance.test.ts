@@ -263,7 +263,7 @@ describe("Registry cross-cutting contracts (R1–R4)", () => {
     assert.ok(SYNCED_SETTING_KEYS.includes("welcomeName"));
     assert.ok(SYNCED_SETTING_KEYS.includes("agentsPaused"));
     assert.equal(SETTINGS_REGISTRY.version, 2);
-    assert.equal(SETTINGS_REGISTRY.desktopTabs.length, 6);
+    assert.equal(SETTINGS_REGISTRY.desktopTabs.length, 7);
     assert.ok(SETTINGS_REGISTRY.pages.some((p: { id: string; depth: number }) => p.id === "advanced" && p.depth === 2));
     assert.ok(DESTINATIONS.length >= 8);
     assert.ok(Object.keys(ICONS).length >= 40);
