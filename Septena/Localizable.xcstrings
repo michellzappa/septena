@@ -85,6 +85,26 @@
         }
       }
     },
+    "€30 a year for 7 years. Pay for 3 years, get 7." : {
+      "comment" : "Generated from registry plans.pass.rateDetail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "€70 a year" : {
+      "comment" : "Generated from registry plans.prices.annual.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "€70 a year or €7 a month" : {
+      "comment" : "Generated from registry plans.levels.plus.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "€140 a year" : {
+      "comment" : "Generated from registry plans.proPrices.pro_annual.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "€140 a year or €14 a month" : {
+      "comment" : "Generated from registry plans.levels.pro.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "%@ can read and change your tasks. You can pause it in Agents." : {
       "comment" : "Generated from registry settings.copy.sign_in_approval.detailConnector.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -19333,6 +19353,10 @@
         }
       }
     },
+    "If you prefer not to keep a subscription, one payment covers seven years of Septena Plus across your devices, for the price of three annual years. When the seven years end, your tasks stay on your devices, and you can extend, move to a free account, or export everything. Support for running the open-source sync server on your own Cloudflare account is on the roadmap." : {
+      "comment" : "Generated from registry plans.pass.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "If you prefer not to keep a subscription, one payment covers seven years of Septena Plus across your devices. That works out to half the annual rate. When the seven years end, your tasks stay on your devices, and you can extend, move to a free account, or export everything. Support for running the open-source sync server on your own Cloudflare account is on the roadmap." : {
       "comment" : "Generated from registry plans.pass.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
@@ -29507,6 +29531,10 @@
     },
     "Prices include UK VAT. Outside EUR, USD, GBP and BRL, the App Store and Google Play charge their matching local price." : {
       "comment" : "Generated from registry plans.currencies.2.footnote. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Prices include VAT where it applies. In the US, prices are the same numbers in USD plus applicable local sales tax. Elsewhere, the App Store and Google Play charge their matching local price." : {
+      "comment" : "Generated from registry plans.priceFootnote. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
     "Prices include VAT where it applies. Outside EUR, USD, GBP and BRL, the App Store and Google Play charge their matching local price." : {
@@ -41630,6 +41658,14 @@
           }
         }
       }
+    },
+    "Two months free. You save €14 against paying monthly." : {
+      "comment" : "Generated from registry plans.prices.annual.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Two months free. You save €28 against paying monthly." : {
+      "comment" : "Generated from registry plans.proPrices.pro_annual.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Type %@ · %@" : {
       "localizations" : {

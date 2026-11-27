@@ -65,7 +65,7 @@ adds the server; Plus adds more than one. The earlier rule "the server is paid" 
 replaced. The public rule: **free on one device, Plus on all of them.** The
 paid plan is named **Septena Plus** on every surface.
 
-| Free, no account | Free account | Septena Plus (€7 / €60) |
+| Free, no account | Free account | Septena Plus (€7 / €70 / €210 7-yr) |
 |---|---|---|
 | Every task feature: lists, projects, areas, Today, Next, recurrence, fade, the composer, quick entry, widgets | Everything in the left column | Everything in the left column |
 | Watch app paired to the phone (syncs through the phone) | Server sync for 1 device (backup; moving to a new device is free, the old one stops syncing) | Server sync on all devices, including the watch through the server |
@@ -651,19 +651,21 @@ on every device.
   verifier (`backend/src/entitlement/appleJws.ts`) is superseded once
   RevenueCat integration ships. Task data and sync traffic never touch
   RevenueCat.
-- **Currencies (ADR 0060, amended 2026-11-27):** EUR is the single baseline
-  (`€7 / €60 / €210 (7 yrs)` Plus, `€14 / €120` Pro; 7-Year Pass decided in
-  ADR 0061). No manual currency pinning across stores: App Store Connect and
-  Google Play auto-equalize every storefront from the EUR base.
-  - **Web & Windows:** EUR baseline via RevenueCat / Stripe; Stripe Tax
+- **Currencies (ADR 0060, amended 2026-11-27):** EUR is the canonical baseline
+  and **USD uses exact 1:1 numeric parity** (`€7 / €70 / €210 (7 yrs)` and
+  `$7 / $70 / $210 (7 yrs)` Plus; `€14 / €140` and `$14 / $140` Pro; 7-Year Pass
+  decided in ADR 0061). EU prices include VAT while US prices exclude local
+  sales tax; App Store Connect and Google Play auto-equalize every other
+  storefront from the EUR base.
+  - **Web & Windows:** EUR and 1:1 USD via RevenueCat / Stripe; Stripe Tax
     calculates VAT and Envisioning Technology files EU VAT through the One Stop
     Shop.
-  - **Pricing page (`/pricing` and home plan cards):** Quiet inline currency
-    dropdown above the plan cards with the Big 3 (`EUR`, `USD`, `GBP`) on top
-    and the next 10 major currencies below. Visitors from any other country
-    automatically see their own local currency converted from EUR via `/api/geo`
-    (`CF-IPCountry` + daily edge-cached EUR FX rates), with an approximate-price
-    footnote.
+  - **Pricing page (`/pricing` and home plan cards):** Minimal inline currency
+    dropdown above the plan cards showing only `EUR`, `USD`, plus the visitor's
+    own local currency auto-detected via `/api/geo` (`CF-IPCountry` + daily
+    edge-cached EUR FX rates) whenever outside EUR/USD. `EUR` displays
+    VAT-inclusive numbers, `USD` displays exact 1:1 pre-tax numbers, and other
+    local currencies show an approximate live-FX conversion from EUR.
   - **Annual price lock:** Locked in purchase currency within the same store;
     protects Septena's subscription price tier, excluding statutory tax changes.
 - **No double payment:** an account on Plus or Pro from any source sees no buy
@@ -711,14 +713,14 @@ before any public release that uses the backend.
 
 | Question | Default |
 |---|---|
-| Monthly and annual price | Decided 2026-11-19: €5 / €40. Raised 2026-11-22 to €7 / €60. Pro added 2026-11-26 at €14 / €120 (ADR 0059). Currencies pinned 2026-11-26: EUR €7/€60, USD $7/$60, GBP £6/£50 (Pro 2×), rest auto-equalized from EUR (ADR 0060) |
-| Web payment provider & subscription backend | Decided 2026-11-22: Stripe, not a merchant of record (ADR 0026). Amended 2026-11-26: standardize on RevenueCat across Apple, Google Play and Web/Stripe, with fixed EUR/USD/GBP on web (ADR 0060) |
+| Monthly and annual price | Decided 2026-11-19: €5 / €40. Raised 2026-11-22 to €7 / €60. Pro added 2026-11-26 (ADR 0059). Updated 2026-11-27 to thematic multiples of 7 with 1:1 EUR=USD parity: Plus €7/€70 ($7/$70), Pro €14/€140 ($14/$140), rest auto-equalized from EUR (ADR 0060) |
+| Web payment provider & subscription backend | Decided 2026-11-22: Stripe, not a merchant of record (ADR 0026). Amended 2026-11-26/27: standardize on RevenueCat across Apple, Google Play and Web/Stripe, EUR baseline + 1:1 USD parity (ADR 0060) |
 | Subscribing during the trial | Default 2026-11-22: billing starts on the day of purchase; the sheet says so (§7.1) |
 | Terms of Use | Default: Apple's standard EULA, linked from the paywall and the App Store listing |
 | Trial length | Decided 2026-11-19: 14 days |
 | Does the watch need the subscription? | No, it syncs through the paired phone |
 | Is the hosted Claude connector paid? | Yes, it runs on our server |
-| Lifetime / one-time product | No lifetime product. 7-Year Plus Pass at €210 / $210 / £175 / R$ 840 (50% off annual × 7, Plus only; Apple Non-Renewing Subscription, Play/Stripe one-time), paired with free Cloudflare self-hosting (ADR 0011, ADR 0061, decided 2026-11-27) |
+| Lifetime / one-time product | No lifetime product. 7-Year Plus Pass at €210 / $210 (3× annual — pay for 3 years, get 7; Plus only; Apple Non-Renewing Subscription, Play/Stripe one-time), paired with free Cloudflare self-hosting (ADR 0011, ADR 0061, decided 2026-11-27) |
 | Family Sharing | Off at launch |
 | How long the server keeps a lapsed user's data | Tasks: always (it is a free account). Attachment bytes and old history: 12 months, with a warning mail first (§6.4) |
 | Tip jar in the task app | Removed |
