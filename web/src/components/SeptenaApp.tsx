@@ -1742,18 +1742,47 @@ export function SeptenaApp() {
 
   // A manual reorder by drag, on the shared undo stack (recorded here, at the gesture, never in
   // the engine: a sync apply must not land on the stack). Undo puts back each value as it was.
+  // A manual reorder by drag, on the shared undo stack (recorded here, at the gesture, never in
+  // the engine: a sync apply must not land on the stack). Undo puts back each value as it was.
+  // `refile` is a section change that rides in the same entry (a drop into another section).
   const reorderWithUndo = useCallback(
-    async (reordered: string[], field: "position" | "todayPosition", movedId: string) => {
+    async (
+      reordered: string[] | null,
+      field: "position" | "todayPosition",
+      movedId: string,
+      refile?: { task: TaskRow; heading: string | null },
+    ) => {
       const byId = new Map(syncState.snapshot.tasks.map((t) => [t.id, t]));
-      const before = reordered.map((id) => ({ id, value: byId.get(id)?.[field] ?? null }));
-      await engine.reorderTasks(reordered, field);
+      const before = (reordered ?? []).map((id) => ({ id, value: byId.get(id)?.[field] ?? null }));
+      const prevHeading = refile ? (refile.task.heading ?? null) : null;
+      const apply = async () => {
+        if (refile) await engine.updateTaskFields(refile.task, { heading: refile.heading });
+        if (reordered) await engine.reorderTasks(reordered, field);
+      };
+      await apply();
       undoStack.record({
         label: `Moved “${byId.get(movedId)?.title ?? ""}”`,
-        undo: () => engine.restoreTaskOrder(before, field),
-        redo: () => engine.reorderTasks(reordered, field),
+        undo: async () => {
+          if (reordered) await engine.restoreTaskOrder(before, field);
+          if (refile) await engine.updateTaskFields(refile.task, { heading: prevHeading });
+        },
+        redo: apply,
       });
     },
     [engine, syncState.snapshot.tasks, undoStack],
+  );
+
+  // A task row can take a drop when the list reorders, or, on a project page, when the drop
+  // moves the task into another section (that files it even in a sorted project, as the Mac list
+  // files a drop into another group: docs/DRAG_AND_DROP.md section 1).
+  const canDropOnTaskRow = useCallback(
+    (target: TaskRow) => {
+      if (canReorderRows) return true;
+      if (destination.kind !== "project" || !draggedTaskId) return false;
+      const source = syncState.snapshot.tasks.find((t) => t.id === draggedTaskId);
+      return Boolean(source) && (source?.heading ?? null) !== (target.heading ?? null);
+    },
+    [canReorderRows, destination, draggedTaskId, syncState.snapshot.tasks],
   );
 
   const handleDropOnTask = useCallback(
@@ -1761,18 +1790,32 @@ export function SeptenaApp() {
       const sourceId = draggedTaskId;
       setDraggedTaskId(null);
       setDropTargetTaskId(null);
-      if (!sourceId || !canReorderRows) return;
+      if (!sourceId || sourceId === targetId) return;
+      const source = syncState.snapshot.tasks.find((t) => t.id === sourceId);
+      const target = syncState.snapshot.tasks.find((t) => t.id === targetId);
+      if (!source || !target) return;
+      // Apple handleGroupedTaskDrop: the dragged task joins the target's section (or the
+      // un-headed block) and takes the target's slot there.
+      const targetHeading = target.heading ?? null;
+      const refile =
+        destination.kind === "project" && (source.heading ?? null) !== targetHeading
+          ? { task: source, heading: targetHeading }
+          : undefined;
+      const field =
+        destination.kind === "smart" && destination.id === "today" ? "todayPosition" : "position";
+      if (!canReorderRows) {
+        if (refile) await reorderWithUndo(null, field, sourceId, refile);
+        return;
+      }
       const reordered = moveIdToTarget(
         visibleTasks.map((v) => v.task.id),
         sourceId,
         targetId,
       );
       if (!reordered) return;
-      const field =
-        destination.kind === "smart" && destination.id === "today" ? "todayPosition" : "position";
-      await reorderWithUndo(reordered, field, sourceId);
+      await reorderWithUndo(reordered, field, sourceId, refile);
     },
-    [canReorderRows, destination, draggedTaskId, reorderWithUndo, visibleTasks],
+    [canReorderRows, destination, draggedTaskId, reorderWithUndo, syncState.snapshot.tasks, visibleTasks],
   );
 
   // A project heading dropped on another heading: reorder the project's headings. Its tasks
@@ -2742,7 +2785,7 @@ export function SeptenaApp() {
         e.dataTransfer.setData("text/plain", task.id);
       },
       onDragOver: (e) => {
-        if (!draggedTaskId || !canReorderRows) return;
+        if (!draggedTaskId || !canDropOnTaskRow(task)) return;
         e.preventDefault();
         setDropTargetTaskId(task.id);
       },
