@@ -789,6 +789,24 @@ function validatePlans(plans, icons, caps, importSources) {
     assert(pr.label.includes(whole), `plans.json: price ${pr.id} label must state ${whole}`);
   }
   assert(plans.prices.filter((x) => x.highlighted).length === 1, "plans.json: exactly one price must be highlighted");
+  // Benefits (docs/PREMIUM_LANGUAGE.md): each states its plan's value, so the
+  // words cannot drift from the server's plan table.
+  const WORDS = { 1: "one", 2: "two", 3: "three", 365: "year" };
+  for (const tier of ["plus", "pro"]) {
+    const list = plans.benefits?.[tier];
+    assert(Array.isArray(list) && list.length > 0, `plans.json: benefits.${tier} missing`);
+    for (const b of list) {
+      assert(b.id && b.icon && b.title && b.detail, `plans.json: benefits.${tier}.${b.id} needs id, icon, title, detail`);
+      assert(b.icon in icons.icons, `plans.json: benefits.${tier}.${b.id} unknown icon "${b.icon}"`);
+      if (!b.limit) continue;
+      assert(b.limit in plans.limits[tier], `plans.json: benefits.${tier}.${b.id} unknown limit "${b.limit}"`);
+      const v = plans.limits[tier][b.limit];
+      const t = b.title.toLowerCase();
+      if (v === null) assert(/no limit|every|all/.test(t), `plans.json: benefits.${tier}.${b.id} must say there is no limit`);
+      else assert(t.includes(String(v)) || (WORDS[v] && t.includes(WORDS[v])), `plans.json: benefits.${tier}.${b.id} must state ${v}`);
+    }
+  }
+  assert(/^https:\/\//.test(plans.compareURL ?? ""), "plans.json: compareURL must be an https URL");
   // An upsell moment names the plan that answers it, so the paywall opens on that plan.
   for (const u of plans.upsells) assert(["plus", "pro"].includes(u.plan), `plans.json: upsell ${u.id} needs plan "plus" or "pro"`);
   // ADR 0059: Pro sells like Plus, in the same subscription group. Its prices
@@ -2212,6 +2230,15 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  let rows: [RegistryPlanRow]");
   lines.push("}");
   lines.push("");
+  lines.push("/// One benefit of a paid plan (`benefits` in plans.json, docs/PREMIUM_LANGUAGE.md).");
+  lines.push("struct RegistryPlanBenefit: Sendable, Hashable, Identifiable {");
+  lines.push("  let id: String");
+  lines.push("  /// Registry icon id (icons.json); its tile color is `AppearancePreferences.glyphSwiftUIColor`.");
+  lines.push("  let icon: String");
+  lines.push("  let title: String");
+  lines.push("  let detail: String");
+  lines.push("}");
+  lines.push("");
   lines.push("struct RegistryPlanNote: Sendable, Hashable, Identifiable {");
   lines.push("  let id: String");
   lines.push("  let title: String");
@@ -2236,6 +2263,13 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  static var proPrices: [RegistryPlanPrice] { [");
   for (const pr of P.proPrices) lines.push(`    RegistryPlanPrice(id: ${swiftStr(pr.id)}, productId: ${swiftStr(pr.productId)}, amountMinor: ${pr.amountMinor}, currency: ${swiftStr(pr.currency)}, interval: ${swiftStr(pr.interval)}, highlighted: ${pr.highlighted}, label: ${L(pr.label, pr, "label")}, detail: ${L(pr.detail, pr, "detail")}),`);
   lines.push("  ] }");
+  for (const tier of ["plus", "pro"]) {
+    lines.push(`  static var ${tier}Benefits: [RegistryPlanBenefit] { [`);
+    for (const b of P.benefits[tier]) lines.push(`    RegistryPlanBenefit(id: ${swiftStr(b.id)}, icon: ${swiftStr(b.icon)}, title: ${L(b.title, b, "title")}, detail: ${L(b.detail, b, "detail")}),`);
+    lines.push("  ] }");
+  }
+  lines.push("  /// The full comparison of every plan, on the website.");
+  lines.push(`  static let compareURL = URL(string: ${swiftStr(P.compareURL)})!`);
   lines.push("  /// The rows every plan card lists (`cardRows`), in order.");
   lines.push(`  static let cardRowIDs: [String] = [${P.cardRows.map(swiftStr).join(", ")}]`);
   lines.push("  static var cards: [RegistryPlanCard] { [");

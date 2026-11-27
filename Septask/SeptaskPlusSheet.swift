@@ -11,8 +11,8 @@
 //   sees why the sheet is there before any price;
 // - it opens on the plan that answers that moment (`upsells[].plan`), and an
 //   account on Plus opens on Pro, the plan above it;
-// - the plan's card rows (devices, agents, files, history) show what changes
-//   against the plan the account has now, and the changed values stand out;
+// - the picked plan shows its mark, wordmark and benefits in the premium
+//   language (docs/PREMIUM_LANGUAGE.md), one benefit per line;
 // - the price comes last, from StoreKit, with cancel-anytime and the
 //   no-hostage promise under it.
 //
@@ -30,6 +30,9 @@ struct SeptaskPlusSheet: View {
   /// Closes the sheet where SwiftUI's `dismiss` does not reach: the AppKit
   /// shell presents it from an `NSHostingController`.
   var onClose: (() -> Void)? = nil
+  /// The plan to open on, when the caller already knows it (a plan card's
+  /// button). Else the moment's plan (`PlanTier.recommended`).
+  var initialTier: PlanTier? = nil
 
   @Environment(\.dismiss) private var dismiss
   /// The plan the reader picked; nil until they pick one.
@@ -52,7 +55,7 @@ struct SeptaskPlusSheet: View {
   /// plan state is read here, on the main actor, not inside the binding.
   private var selection: Binding<PlanTier> {
     let allowed = tiers
-    let chosen = picked ?? PlanTier.recommended(upsellID: upsellID, status: status)
+    let chosen = picked ?? initialTier ?? PlanTier.recommended(upsellID: upsellID, status: status)
     let tier = allowed.contains(chosen) ? chosen : allowed[0]
     return Binding(get: { tier }, set: { picked = $0 })
   }
@@ -168,7 +171,12 @@ private struct PlanPitch: View {
         .pickerStyle(.segmented)
         .labelsHidden()
       }
-      PlanChanges(tier: selection)
+      // The picked plan: its mark and wordmark, then what it gives, one
+      // benefit per line (docs/PREMIUM_LANGUAGE.md).
+      PlanHead(tier: selection, line: selection.card?.detail, markSize: 44)
+      VStack(alignment: .leading, spacing: 12) {
+        ForEach(selection.benefits) { PlanBenefitRow(benefit: $0) }
+      }
       if upgrade {
         Text(RegistryPlans.Paywall.upgradeNote).font(.footnote).foregroundStyle(.secondary)
       }
@@ -205,70 +213,6 @@ private struct PlanPitch: View {
   private var title: String {
     if case .free(lapsed: true) = status.plan { return RegistryPlans.Paywall.welcomeBack }
     return RegistryPlans.name
-  }
-}
-
-/// What the picked plan changes: its card line, then the card rows with the
-/// plan's value. A value that differs from the account's plan today stands
-/// out; one that stays the same is quiet.
-private struct PlanChanges: View {
-  let tier: PlanTier
-  private var status: PlanStatus { .shared }
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: 10) {
-      if let card = tier.card {
-        Label {
-          VStack(alignment: .leading, spacing: 2) {
-            Text(RegistryPlans.Paywall.youGet(plan: tier.title)).font(.headline)
-            Text(card.detail).font(.subheadline).foregroundStyle(.secondary)
-          }
-        } icon: {
-          Image(systemName: RegistryIcons.sfSymbols[card.icon] ?? "circle").foregroundStyle(.tint)
-        }
-      }
-      Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 8) {
-        ForEach(PlanTier.cardRows) { row in
-          let value = tier.cell(row)
-          let changes = value != current(row)
-          GridRow(alignment: .firstTextBaseline) {
-            Text(row.label).foregroundStyle(.secondary)
-            PlanValue(cell: value, emphasized: changes)
-              .gridColumnAlignment(.trailing)
-          }
-        }
-      }
-      .font(.subheadline)
-    }
-  }
-
-  /// The account's value today. The trial ends in a free account, so a trial
-  /// compares with Free.
-  private func current(_ row: RegistryPlanRow) -> RegistryPlanCell {
-    if case .plus = status.plan { return status.isPro ? row.pro : row.plus }
-    return row.free
-  }
-}
-
-/// One plan value: a check, a dash, or text; bold in the accent when it is
-/// what the plan adds.
-private struct PlanValue: View {
-  let cell: RegistryPlanCell
-  let emphasized: Bool
-
-  var body: some View {
-    switch cell {
-    case .included:
-      Image(systemName: "checkmark").foregroundStyle(emphasized ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
-        .accessibilityLabel(Text(RegistryPlans.Copy.included))
-    case .notIncluded:
-      Image(systemName: "minus").foregroundStyle(.tertiary)
-        .accessibilityLabel(Text(RegistryPlans.Copy.notIncluded))
-    case .text(let text):
-      Text(text)
-        .fontWeight(emphasized ? .semibold : .regular)
-        .foregroundStyle(emphasized ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
-    }
   }
 }
 
@@ -345,13 +289,11 @@ private struct PlusInfoView: View {
 /// second purchase (ADR 0026).
 private struct PlusOwnedView: View {
   let source: String
-  @State private var managing = false
 
   var body: some View {
     VStack(spacing: 16) {
-      Image(systemName: RegistryIcons.sfSymbols[PlanStatus.shared.isPro ? RegistryPlans.proCard.icon : "settings.plus"] ?? "plus.circle.fill")
-        .font(.largeTitle)
-        .foregroundStyle(.tint)
+      PlanMark(tier: PlanStatus.shared.isPro ? .pro : .plus, size: 64)
+      PlanWordmark(tier: PlanStatus.shared.isPro ? .pro : .plus)
       Text(line).multilineTextAlignment(.center)
       // Plus bought on Google Play or the web moves to Pro where it was
       // bought (ADR 0026: no second purchase for the same account).
@@ -362,25 +304,13 @@ private struct PlusOwnedView: View {
       // A grant can sit on top of a paid App Store subscription (Pro on a
       // paid Plus). The subscription still renews, so Manage stays here.
       if source == "apple" || PlanStatus.shared.hasAppleSubscription {
-        #if os(iOS)
-        Button(RegistryPlans.Action.manage) { managing = true }
-          .buttonStyle(.borderedProminent)
-          .manageSubscriptionsSheet(isPresented: $managing)
-        #else
-        // macOS has no manage sheet; the App Store app owns subscriptions.
-        Link(RegistryPlans.Action.manage, destination: Self.macSubscriptionsURL)
-          .buttonStyle(.borderedProminent)
-        #endif
+        ManageSubscriptionButton().buttonStyle(.borderedProminent)
       }
       PlusRestoreButton().font(.footnote)
     }
     .padding()
     .frame(maxWidth: .infinity, maxHeight: .infinity)
   }
-
-  #if os(macOS)
-  private static let macSubscriptionsURL = URL(string: "macappstores://apps.apple.com/account/subscriptions")!
-  #endif
 
   private var line: String {
     switch source {
@@ -389,6 +319,21 @@ private struct PlusOwnedView: View {
     case "google": return RegistryPlans.Paywall.ownedGoogle
     default: return PlanStatus.shared.isPro ? RegistryPlans.Paywall.ownedGrantPro : RegistryPlans.Paywall.ownedGrant
     }
+  }
+}
+
+/// Manage Subscription for an App Store subscription: the system sheet on
+/// iOS, the App Store's subscriptions page on macOS (it has no sheet).
+struct ManageSubscriptionButton: View {
+  @State private var managing = false
+
+  var body: some View {
+    #if os(iOS)
+    Button(RegistryPlans.Action.manage) { managing = true }
+      .manageSubscriptionsSheet(isPresented: $managing)
+    #else
+    Link(RegistryPlans.Action.manage, destination: URL(string: "macappstores://apps.apple.com/account/subscriptions")!)
+    #endif
   }
 }
 

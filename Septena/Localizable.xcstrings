@@ -3759,6 +3759,10 @@
         }
       }
     },
+    "10 GB of synced files" : {
+      "comment" : "Generated from registry plans.benefits.plus.files.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "10 GB synced" : {
       "comment" : "Generated from registry plans.outcomes.nothing_lost.rows.files.cells.plus. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -3885,6 +3889,10 @@
           }
         }
       }
+    },
+    "50 GB of synced files" : {
+      "comment" : "Generated from registry plans.benefits.pro.files.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "50 GB synced" : {
       "comment" : "Generated from registry plans.outcomes.nothing_lost.rows.files.cells.pro. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -4079,6 +4087,10 @@
           }
         }
       }
+    },
+    "A year of history" : {
+      "comment" : "Generated from registry plans.benefits.plus.history.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "ABCD-EFGH" : {
       "comment" : "Generated from registry settings.copy.sign_in_approval.codePlaceholder.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -7470,6 +7482,10 @@
         }
       }
     },
+    "Attach a file once and it opens on every device." : {
+      "comment" : "Generated from registry plans.benefits.plus.files.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Attachments" : {
       "comment" : "Generated from registry surfaces.taskAttributes.attachments.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -10114,6 +10130,10 @@
         }
       }
     },
+    "Compare every plan" : {
+      "comment" : "Generated from registry plans.paywall.compareAll. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Complete" : {
       "comment" : "SeptaskKit localization pass 2026-08-09",
       "localizations" : {
@@ -10405,6 +10425,10 @@
           }
         }
       }
+    },
+    "Connect Claude and two more. Each one asks before it acts." : {
+      "comment" : "Generated from registry plans.benefits.plus.agents.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Connect Claude or another agent to your list. It asks before it acts, and you can stop it at any time." : {
       "comment" : "Generated from registry plans.outcomes.agents.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -15087,6 +15111,14 @@
         }
       }
     },
+    "Every device, a year of history and shared projects." : {
+      "comment" : "Generated from registry plans.benefits.pro.everything.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Every device, always current" : {
+      "comment" : "Generated from registry plans.benefits.plus.devices.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Every list, from Today to the Logbook" : {
       "comment" : "Generated from registry plans.fullApp.points.lists.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -15296,6 +15328,10 @@
           }
         }
       }
+    },
+    "Everything in Plus" : {
+      "comment" : "Generated from registry plans.benefits.pro.everything.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Everything in Plus is included." : {
       "comment" : "Generated from registry plans.cards.pro.footnote. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -24552,6 +24588,10 @@
         }
       }
     },
+    "No limit on agents" : {
+      "comment" : "Generated from registry plans.benefits.pro.agents.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "No list" : {
       "comment" : "SeptaskKit localization pass 2026-08-09",
       "localizations" : {
@@ -31875,6 +31915,10 @@
         }
       }
     },
+    "Room for scans, screenshots and long documents." : {
+      "comment" : "Generated from registry plans.benefits.pro.files.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Rotate Calendar Feed Link?" : {
       "comment" : "Generated from registry settings.copy.calendar_detail.rotateTitle.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -32034,6 +32078,10 @@
           }
         }
       }
+    },
+    "Run as many agents on your list as your work needs." : {
+      "comment" : "Generated from registry plans.benefits.pro.agents.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Sad" : {
       "localizations" : {
@@ -32696,6 +32744,10 @@
           }
         }
       }
+    },
+    "See who changed what, and bring back what you deleted." : {
+      "comment" : "Generated from registry plans.benefits.plus.history.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Select" : {
       "comment" : "Generated from registry actions.actions.task.select.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -39603,6 +39655,10 @@
         }
       }
     },
+    "Three agents at work" : {
+      "comment" : "Generated from registry plans.benefits.plus.agents.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Thursday" : {
       "comment" : "Generated from registry surfaces.taskDetail.weekdays.3.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -44078,6 +44134,10 @@
         }
       }
     },
+    "Your list on all your devices, updated as you type." : {
+      "comment" : "Generated from registry plans.benefits.plus.devices.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Your list on every device, updated live." : {
       "comment" : "Generated from registry plans.cards.plus.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -44245,6 +44305,10 @@
           }
         }
       }
+    },
+    "Your plan includes" : {
+      "comment" : "Generated from registry plans.paywall.yourPlanIncludes. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Your Profile" : {
       "comment" : "Generated from registry settings.copy.account_profile_card.yourProfile.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",

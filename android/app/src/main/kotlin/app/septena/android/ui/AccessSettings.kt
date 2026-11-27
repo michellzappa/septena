@@ -201,6 +201,7 @@ internal fun AccessAgentsList(model: AccessSettingsModel, signedIn: Boolean, lan
     if (access != null && limit != null && access.agentCount >= limit && plans?.isPro != true) {
         planUpsell(if (plans?.isPlus == true) "agents_full_plus" else "agents_full", languageTag)?.let { (title, detail) ->
             ListItem(
+                leadingContent = { PlanMark(if (plans?.isPlus == true) PlanTier.PRO else PlanTier.PLUS, 30.dp) },
                 headlineContent = { Text(title) },
                 supportingContent = { Text(detail) },
             )

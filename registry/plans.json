@@ -136,6 +136,21 @@
   ],
   "ladderHeadline": "One device free. All devices on Plus. All your agents on Pro.",
   "cardRows": ["devices", "connected", "files", "history"],
+  "compareURL": "https://septena.app/pricing",
+  "benefits": {
+    "description": "What each paid plan gives, one line per benefit, for the plan page, the plan sheet and onboarding (docs/PREMIUM_LANGUAGE.md). A benefit with a limit must state that plan's value. Pro lists only what it adds, then Everything in Plus.",
+    "plus": [
+      { "id": "devices", "icon": "plans.devices", "limit": "devices", "title": "Every device, always current", "detail": "Your list on all your devices, updated as you type." },
+      { "id": "agents", "icon": "plans.agents", "limit": "connectedAgents", "title": "Three agents at work", "detail": "Connect Claude and two more. Each one asks before it acts." },
+      { "id": "files", "icon": "plans.files", "limit": "attachmentsGB", "title": "10 GB of synced files", "detail": "Attach a file once and it opens on every device." },
+      { "id": "history", "icon": "plans.history", "limit": "changeLogDays", "title": "A year of history", "detail": "See who changed what, and bring back what you deleted." }
+    ],
+    "pro": [
+      { "id": "agents", "icon": "plans.agents", "limit": "connectedAgents", "title": "No limit on agents", "detail": "Run as many agents on your list as your work needs." },
+      { "id": "files", "icon": "plans.files", "limit": "attachmentsGB", "title": "50 GB of synced files", "detail": "Room for scans, screenshots and long documents." },
+      { "id": "everything", "icon": "plans.plus", "title": "Everything in Plus", "detail": "Every device, a year of history and shared projects." }
+    ]
+  },
   "accountNote": "Backup, history and your agent need a free account. The app does not.",
   "agentNote": "An agent is an AI you connect to your list, such as Claude.",
   "fullApp": {
@@ -304,6 +319,8 @@
     "youGet": "With {plan}",
     "upgradeNote": "Pro starts right away. The App Store refunds the unused part of your Plus.",
     "upgradeElsewhere": "To move to Pro, change your plan in the store where you bought Plus.",
+    "yourPlanIncludes": "Your plan includes",
+    "compareAll": "Compare every plan",
     "buyElsewhere": "This copy of Septena does not sell plans. Buy Plus or Pro in the App Store version on any device. It turns on here when you sign in to the same account."
   },
   "status": {
