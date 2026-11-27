@@ -135,3 +135,44 @@ export function groupTasksByList<
 
   return { ungrouped, groups };
 }
+
+/**
+ * Manual reorder by drag: move `sourceId` to the slot `targetId` holds and return the new
+ * order, or null when the drop means nothing (same row, or either id missing). Task rows and
+ * project headings share it; the caller writes the order with `engine.reorderTasks`, which
+ * gives every id a position of (index + 1) * 1000, so no write is ever 0 (the unset value).
+ */
+export function moveIdToTarget(ids: readonly string[], sourceId: string, targetId: string): string[] | null {
+  if (sourceId === targetId) return null;
+  const fromIdx = ids.indexOf(sourceId);
+  const toIdx = ids.indexOf(targetId);
+  if (fromIdx < 0 || toIdx < 0) return null;
+  const next = [...ids];
+  const [moved] = next.splice(fromIdx, 1);
+  next.splice(toIdx, 0, moved);
+  return next;
+}
+
+/** Apple `TaskOrder.gap`: the step between manual positions at a list edge. */
+export const TASK_ORDER_GAP = 1024;
+
+/**
+ * Apple `TaskOrder.between(above: nil, below:)`: the position for one task placed above
+ * `below` (the first task of a group), or at the start of an empty group. Never 0, the
+ * "never dragged" value: a result of 0 moves half a step, which stays above `below`.
+ */
+export function positionAbove(below: number | null | undefined): number {
+  if (typeof below !== "number" || !Number.isFinite(below)) return TASK_ORDER_GAP;
+  const slot = below - TASK_ORDER_GAP;
+  return slot === 0 ? slot - TASK_ORDER_GAP / 2 : slot;
+}
+
+/**
+ * Apple `TaskOrder.between(above:, below: nil)`: the position for one task placed after
+ * `above` (the last task of a list), or the first position of an empty list. Never 0.
+ */
+export function positionBelow(above: number | null | undefined): number {
+  if (typeof above !== "number" || !Number.isFinite(above)) return TASK_ORDER_GAP;
+  const slot = above + TASK_ORDER_GAP;
+  return slot === 0 ? slot + TASK_ORDER_GAP / 2 : slot;
+}
