@@ -1,6 +1,5 @@
 import SwiftUI
 import SwiftData
-import AppIntents
 
 /// Opens Settings on a canonical registry page ID (`RegistrySettings.PageID.*`),
 /// from outside Settings (e.g. the Get Started checklist). The caller sets
@@ -1034,8 +1033,7 @@ private struct SeptaskSmartListsPane: View {
 // MARK: - Siri & Shortcuts (Depth 2, Connections ▸ Siri & Shortcuts)
 
 /// Explains that Septena's App Intents (`SeptaskAppShortcuts`) work in Siri
-/// and the Shortcuts app, and opens Shortcuts with the system
-/// `ShortcutsLink`. Apple platforms only: the row and page carry
+/// and the Shortcuts app, and opens the Shortcuts app. Apple platforms only: the row and page carry
 /// `platforms` with the reason "system Shortcuts API" in the registry.
 private struct SeptaskShortcutsPane: View {
   private static let page = RegistrySettings.pageById[RegistrySettings.PageID.shortcuts]
@@ -1048,9 +1046,10 @@ private struct SeptaskShortcutsPane: View {
         if let detail = Self.item?.detail {
           Text(detail)
         }
-        ShortcutsLink()
-          .frame(maxWidth: .infinity, alignment: .center)
-          .listRowBackground(Color.clear)
+        // `ShortcutsLink` is iOS only; the URL opens Shortcuts on iOS and Mac alike.
+        Link(destination: URL(string: "shortcuts://")!) {
+          Label(Self.item?.label ?? "", systemImage: Self.item?.sfSymbol ?? "square.2.layers.3d")
+        }
       } footer: {
         if let footer = Self.section?.footer { Text(footer) }
       }

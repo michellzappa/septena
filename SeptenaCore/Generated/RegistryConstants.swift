@@ -685,7 +685,7 @@ enum RegistrySettings {
     ]),
     RegistrySettingsPage(id: "shortcuts", title: RegistryL10n.t("Siri & Shortcuts"), iconId: "settings.siri_shortcuts", sfSymbol: "square.2.layers.3d", depth: 2, platforms: ["ios", "ipados", "macos"], featureId: "system.shortcuts", sections: [
       RegistrySettingsSection(id: "actions", header: nil, footer: RegistryL10n.t("The Shortcuts app lists every Septena action. Add them to your own shortcuts."), platforms: nil, items: [
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "siri_shortcuts", label: nil, detail: RegistryL10n.t("Septena works with Siri and the Shortcuts app. Ask Siri to add a task, or build a shortcut that adds, completes or shows your tasks."), iconId: "settings.siri_shortcuts", sfSymbol: "square.2.layers.3d", statusKey: nil, visibility: "always", platforms: ["ios", "ipados", "macos"], featureId: "system.shortcuts"),
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "siri_shortcuts", label: RegistryL10n.t("Open Shortcuts"), detail: RegistryL10n.t("Septena works with Siri and the Shortcuts app. Ask Siri to add a task, or build a shortcut that adds, completes or shows your tasks."), iconId: "settings.siri_shortcuts", sfSymbol: "square.2.layers.3d", statusKey: nil, visibility: "always", platforms: ["ios", "ipados", "macos"], featureId: "system.shortcuts"),
       ]),
     ]),
     RegistrySettingsPage(id: "privacy", title: RegistryL10n.t("Privacy & Data"), iconId: "settings.privacy", sfSymbol: "hand.raised", depth: 1, platforms: nil, featureId: "settings.display", sections: [

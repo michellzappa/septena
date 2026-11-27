@@ -2989,6 +2989,12 @@
       "surfaces.support.copy.helpLink.label"
     ]
   },
+  "Open Shortcuts": {
+    "text": "Open Shortcuts",
+    "paths": [
+      "settings.pages.shortcuts.sections.actions.items.0.label"
+    ]
+  },
   "Open Today": {
     "text": "Open Today",
     "paths": [
