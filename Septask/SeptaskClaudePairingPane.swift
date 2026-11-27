@@ -5,9 +5,10 @@ import AppKit
 import UIKit
 #endif
 
-/// Connect an Agent sections, driven by `registry/settings.json`
-/// (`claude_pairing`, docs/SETTINGS_UX_SPEC.md). Rendered as a pushed subpage
-/// on every platform (iOS, macOS, Web, Android).
+/// The "Connect an agent" section of Settings ▸ Agents, driven by
+/// `registry/settings.json` (page `agents`, section `connect`,
+/// docs/SETTINGS_UX_SPEC.md). It sits below the connected agents on the same
+/// page, on every platform.
 struct SeptaskClaudePairingSections: View {
   private enum CopiedTarget: Equatable { case url, setupPrompt, starterPrompt }
 
@@ -17,8 +18,7 @@ struct SeptaskClaudePairingSections: View {
   // One copy of each prompt, shared with the first run (`registry/surfaces.json`).
   private static let setupPrompt = RegistryFirstRun.setupPrompt
   private static let starterPrompt = RegistryFirstRun.firstPrompt
-  private static let connectorSection = RegistrySettings.section("connector", page: RegistrySettings.PageID.claudePairing)
-  private static let agentTools = RegistrySettings.section("agent_tools", page: RegistrySettings.PageID.claudePairing)
+  private static let connectSection = RegistrySettings.section("connect", page: RegistrySettings.PageID.agents)
   private static let skills = RegistrySettings.itemBySurface["mcp_skills"]
 
   var body: some View {
@@ -56,7 +56,7 @@ struct SeptaskClaudePairingSections: View {
         value: Self.starterPrompt
       )
     } header: {
-      if let header = Self.connectorSection?.header { Text(header) }
+      if let header = Self.connectSection?.header { Text(header) }
     } footer: {
       Text(RegistrySettings.copy("claude_connector", "connectorUrlDetail"))
     }
@@ -69,17 +69,15 @@ struct SeptaskClaudePairingSections: View {
       Text(RegistrySettings.copy("claude_connector", "footer"))
     }
 
-    // Agent tools (moved from About ▸ Advanced, 2026-11-22).
+    // MCP Skills: the last row of the connect section.
     Section {
       NavigationLink {
         TasksSkillPane()
       } label: {
         Label(Self.skills?.label ?? "", systemImage: Self.skills?.sfSymbol ?? "book.closed")
       }
-    } header: {
-      Text(Self.agentTools?.header ?? "")
     } footer: {
-      if let footer = Self.agentTools?.footer { Text(footer) }
+      if let footer = Self.skills?.detail { Text(footer) }
     }
   }
 
@@ -124,7 +122,7 @@ enum SeptaskClipboard {
   }
 }
 
-/// The code field for a connection code, on Settings ▸ Connect an Agent and in
+/// The code field for a connection code, on Settings ▸ Agents and in
 /// the first run. Continue opens `SeptaskApproveSignInFlow`, which looks the
 /// code up and shows who asks before the user approves. `onApproved` runs after
 /// an approval of either kind.
@@ -173,18 +171,5 @@ struct SeptaskPairingCodeField: View {
   private func review() {
     guard sync.signedIn, let code = SeptaskApproveSignInFlow.normalized(pairCode) else { return }
     reviewing = ReviewedCode(code: code)
-  }
-}
-
-struct SeptaskClaudePairingPane: View {
-  var body: some View {
-    Form {
-      SeptaskClaudePairingSections()
-    }
-    .formStyle(.grouped)
-    .navigationTitle(RegistrySettings.pageById[RegistrySettings.PageID.claudePairing]?.title ?? "")
-    #if os(iOS)
-    .navigationBarTitleDisplayMode(.inline)
-    #endif
   }
 }

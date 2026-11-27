@@ -157,12 +157,12 @@ Septena uses standard **OAuth 2.1 + PKCE (`S256`) + Dynamic Client Registration*
 2. **Metadata**: The client fetches `/.well-known/oauth-protected-resource` and `/.well-known/oauth-authorization-server`, learning `/oauth/register`, `/oauth/authorize`, `/oauth/token`, and `/oauth/revoke`.
 3. **Registration**: The client registers via `POST /oauth/register` with its redirect URI (validated against the pinned client allowlist: `claude.ai`, `claude.com`, `chatgpt.com`, or loopback).
 4. **Authorization & Pairing Screen**: The client opens `GET /oauth/authorize` with `response_type=code`, `client_id`, `redirect_uri`, `state`, and `code_challenge` (`S256`). Septena renders an HTML page showing a QR code and an 8-character pairing code (for example `ABCD-EFGH`, valid for 10 minutes, max 5 failed guesses per window) and sets an `HttpOnly; Secure; SameSite=Lax` cookie (`septena_pair`). The page refreshes to `GET /oauth/pair/continue` every 3 seconds.
-5. **In-App Approval**: The user opens Septena on a signed-in iPhone, iPad, or Mac (`Settings ▸ AI & Agents` / `Connect Claude`), scans the QR code or types the 8-character code. The app calls `POST /v1/pair/inspect` so the user sees the requesting client name before confirming, then `POST /v1/pair/approve` with the app's bearer session token.
+5. **In-App Approval**: The user opens Septena on a signed-in iPhone, iPad, or Mac (`Settings ▸ Agents`, section "Connect an agent"), scans the QR code or types the 8-character code. The app calls `POST /v1/pair/inspect` so the user sees the requesting client name before confirming, then `POST /v1/pair/approve` with the app's bearer session token.
    - *Security note*: Scanning the QR code with a phone's system camera lands on `GET /pair/:code`, which approves nothing and instructs the user to scan only inside Septena. Users should only enter a pairing code from a browser window they opened themselves.
 6. **Redirect & Token Exchange**: On the next poll of `/oauth/pair/continue`, Septena issues a single-use authorization code (5-minute TTL) and redirects (`302`) to `redirect_uri` with `code`, `state`, and `iss=https://api.septena.app`. The client exchanges the code and PKCE `code_verifier` at `POST /oauth/token` for:
    - `access_token`: prefix `sm2.`, 1-hour lifetime, scope `tasks:read tasks:write`.
    - `refresh_token`: prefix `smr2.`, 30-day sliding lifetime, rotated on every refresh (reusing a spent refresh token revokes the entire token family).
-7. **Revocation**: Clients can revoke via `POST /oauth/revoke`, or the user can disconnect the agent at any time in Septena `Settings ▸ AI & Agents`, which deletes the token family immediately.
+7. **Revocation**: Clients can revoke via `POST /oauth/revoke`, or the user can disconnect the agent at any time in Septena `Settings ▸ Agents`, which deletes the token family immediately.
 
 ---
 

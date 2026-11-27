@@ -288,7 +288,7 @@ private struct RequestSummary: View {
     case .device:
       return String(localized: "\(request.client) gets full access to your Septena account, including tasks, lists, conversations and settings. It stays signed in until you sign it out.")
     case .connector:
-      return String(localized: "\(request.client) can read and change your tasks. You can pause it in AI & Agents.")
+      return String(localized: "\(request.client) can read and change your tasks. You can pause it in Agents.")
     }
   }
 }

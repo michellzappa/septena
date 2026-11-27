@@ -85,6 +85,48 @@
         }
       }
     },
+    "%@ can read and change your tasks. You can pause it in Agents." : {
+      "comment" : "Generated from registry settings.copy.sign_in_approval.detailConnector.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ kann deine Aufgaben lesen und ändern. Du kannst es unter Agenten pausieren."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ puede leer y modificar tus tareas. Puedes pausarlo en Agentes."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ peut lire et modifier vos tâches. Vous pouvez le mettre en pause dans Agents."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ può leggere e modificare le tue attività. Puoi metterlo in pausa in Agenti."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ kan je taken lezen en wijzigen. Je kunt de verbinding pauzeren bij Agents."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ pode ler e alterar suas tarefas. Você pode pausá-lo em Agentes."
+          }
+        }
+      }
+    },
     "$30 a year for 7 years. Half the annual rate." : {
       "comment" : "Generated from registry plans.currencies.1.plus.pass.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"

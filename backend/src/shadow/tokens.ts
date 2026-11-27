@@ -238,7 +238,7 @@ async function verifyLegacyAccess(env: Env, raw: string): Promise<McpGrant | nul
   return { userId: a.userId, clientId: a.clientId, scope: a.scope, timeZone: a.timeZone, familyId: a.familyId };
 }
 
-/// Lists the family in Settings > AI & Agents > Agents. The index never
+/// Lists the family in Settings > Agents. The index never
 /// blocks a token: a failure here only logs.
 async function noteConnection(env: Env, grant: McpGrant, familyId: string): Promise<void> {
   try {

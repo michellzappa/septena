@@ -2989,12 +2989,6 @@
       "surfaces.support.copy.helpLink.label"
     ]
   },
-  "Open Shortcuts": {
-    "text": "Open Shortcuts",
-    "paths": [
-      "settings.pages.shortcuts.sections.actions.items.0.label"
-    ]
-  },
   "Open Today": {
     "text": "Open Today",
     "paths": [
@@ -5573,8 +5567,8 @@
       "settings.copy.ai_explainer.privateBody.label"
     ]
   },
-  "{client} can read and change your tasks. You can pause it in AI & Agents.": {
-    "text": "{client} can read and change your tasks. You can pause it in AI & Agents.",
+  "{client} can read and change your tasks. You can pause it in Agents.": {
+    "text": "{client} can read and change your tasks. You can pause it in Agents.",
     "placeholders": [
       "client"
     ],

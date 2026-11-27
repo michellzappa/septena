@@ -423,7 +423,6 @@
   "Only approve a code you started yourself. Septena never asks for a code by email, text or phone call.": "Approva solo i codici che hai richiesto tu. Septena non ti chiederà mai un codice via email, SMS o telefono.",
   "Open": "Apri",
   "Open Help": "Apri la Guida",
-  "Open Shortcuts": "Apri Comandi Rapidi",
   "Open Today": "Apri Oggi",
   "Open a task or choose Keep to bring it back, or review the list and let the rest go.": "Apri un’attività o scegli Mantieni per recuperarla; altrimenti rivedi l’elenco e scarta le altre.",
   "Open in Calendar": "Apri in Calendario",
@@ -778,7 +777,7 @@
   "Yuzu": "Yuzu",
   "iPhone or iPad": "iPhone o iPad",
   "{app}’s servers never run AI on your tasks. AI runs on your device, or in your own Claude when you connect it. Turn AI off and the app works the same, without conversations.": "I server di {app} non eseguono mai l’IA sulle tue attività. L’IA viene eseguita sul tuo dispositivo o nel tuo Claude quando lo connetti. Disattiva l’IA e l’app continuerà a funzionare allo stesso modo, senza conversazioni.",
-  "{client} can read and change your tasks. You can pause it in AI & Agents.": "{client} può leggere e modificare le tue attività. Puoi metterlo in pausa in IA e agenti.",
+  "{client} can read and change your tasks. You can pause it in Agents.": "{client} può leggere e modificare le tue attività. Puoi metterlo in pausa in Agenti.",
   "{client} gets full access to your Septena account, including tasks, lists, conversations and settings. It stays signed in until you sign it out.": "{client} ottiene pieno accesso al tuo account Septena, incluse attività, elenchi, conversazioni e impostazioni. L’accesso resta attivo finché non lo disconnetti.",
   "{client} is signed in.": "Accesso effettuato per {client}.",
   "{count} agents": {

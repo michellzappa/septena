@@ -499,7 +499,7 @@
       { "id": "confirmDevice", "label": "Sign in on {client}?" },
       { "id": "confirmConnector", "label": "Connect {client} to your tasks?" },
       { "id": "detailDevice", "label": "{client} gets full access to your Septena account, including tasks, lists, conversations and settings. It stays signed in until you sign it out." },
-      { "id": "detailConnector", "label": "{client} can read and change your tasks. You can pause it in AI & Agents." },
+      { "id": "detailConnector", "label": "{client} can read and change your tasks. You can pause it in Agents." },
       { "id": "doneDevice", "label": "{client} is signed in." },
       { "id": "doneConnector", "label": "Agent connected. Go back to your browser to finish." }
     ],
@@ -1237,7 +1237,6 @@
             {
               "kind": "customSurface",
               "surface": "siri_shortcuts",
-              "label": "Open Shortcuts",
               "detail": "Septena works with Siri and the Shortcuts app. Ask Siri to add a task, or build a shortcut that adds, completes or shows your tasks.",
               "icon": "settings.siri_shortcuts",
               "platforms": ["ios", "ipados", "macos"],

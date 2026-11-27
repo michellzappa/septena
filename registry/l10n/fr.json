@@ -423,7 +423,6 @@
   "Only approve a code you started yourself. Septena never asks for a code by email, text or phone call.": "N’approuvez que les codes dont vous avez vous-même demandé la création. Septena ne demande jamais de code par e-mail, SMS ou téléphone.",
   "Open": "Ouvrir",
   "Open Help": "Ouvrir l'aide",
-  "Open Shortcuts": "Ouvrir Raccourcis",
   "Open Today": "Ouvrir Aujourd’hui",
   "Open a task or choose Keep to bring it back, or review the list and let the rest go.": "Ouvrez une tâche ou choisissez Conserver pour la réactiver, ou examinez la liste et abandonnez les autres.",
   "Open in Calendar": "Ouvrir dans Calendrier",
@@ -778,7 +777,7 @@
   "Yuzu": "Yuzu",
   "iPhone or iPad": "iPhone ou iPad",
   "{app}’s servers never run AI on your tasks. AI runs on your device, or in your own Claude when you connect it. Turn AI off and the app works the same, without conversations.": "Les serveurs de {app} n’exécutent jamais d’IA sur vos tâches. L’IA s’exécute sur votre appareil ou dans votre propre Claude si vous le connectez. Désactivez l’IA et l’application fonctionnera de la même façon, sans conversations.",
-  "{client} can read and change your tasks. You can pause it in AI & Agents.": "{client} peut lire et modifier vos tâches. Vous pouvez le mettre en pause dans IA et agents.",
+  "{client} can read and change your tasks. You can pause it in Agents.": "{client} peut lire et modifier vos tâches. Vous pouvez le mettre en pause dans Agents.",
   "{client} gets full access to your Septena account, including tasks, lists, conversations and settings. It stays signed in until you sign it out.": "{client} obtient un accès complet à votre compte Septena, notamment à vos tâches, listes, conversations et réglages. Sa session reste ouverte jusqu’à ce que vous la fermiez.",
   "{client} is signed in.": "{client} est connecté.",
   "{count} agents": {

@@ -277,7 +277,7 @@ queue for team work)*. Then all of mz's agent questions are in one app.
 - **Onboarding vs. Settings (decided 2026-11-21):** first-run onboarding
   (`#103`) stays focused on connecting an interactive agent. "Always-on /
   Background agent" (webhooks, cloud routines, local runner setup) lives in
-  **Settings ▸ AI & Agents** later, never blocking initial setup.
+  **Settings ▸ Agents** later, never blocking initial setup.
 - **Batching:** the runner groups several questions on one task into one card
   when they do not depend on each other. At most one open card per task.
 - **Quiet hours:** notifications respect Focus. No custom quiet-hours logic.
@@ -340,5 +340,5 @@ links (issue, PR, commit).
 | Where `factory-day` asks for personal projects | Decided (default, 2026-11-21): Septask. Starlings stays for team work. |
 | Agent merges on `ship` | Decided (default, 2026-11-21): Yes, per your global merge rule. |
 | F1 runner scope & wake transport | Decided (2026-11-21): Multi-user transport on `api.septena.app` (signed outbound webhook URL + SSE/WebSocket stream for NAT'd Macs); `mz-mini` is the first runner. |
-| Background runner in onboarding | Decided (2026-11-21): Keep onboarding (`#103`) interactive-only; put "Always-on / Background agent" in Settings ▸ AI & Agents later. |
+| Background runner in onboarding | Decided (2026-11-21): Keep onboarding (`#103`) interactive-only; put "Always-on / Background agent" in Settings ▸ Agents later. |
 | F1 split | Decided (2026-11-21): Split into F1a (wake transport + runner, `#5`) and F1b (APNs push + notification actions, gated on mz's APNs `.p8` key). |
