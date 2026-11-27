@@ -175,12 +175,16 @@ struct SeptaskRootView: View {
   ///   opens Today (Inbox) and opens the inline composer there.
   private func triggerInlineNewTask() {
     Haptics.press()
+    // Where the draft lands is the list's `newTaskTarget`
+    // (registry/destinations.json): `here` and `tomorrow` create on this
+    // list, `today` opens Today first. Project and area pages create here.
     let canCreateInPlace: Bool = {
       guard let last = nav.path.last else { return false }
       switch last {
-      case .project, .area, .filter(.unscheduled), .filter(.triage),
-           .filter(.today), .filter(.upcoming):
+      case .project, .area:
         return true
+      case .filter(let filter):
+        return (filter.registryDestination?.newTaskTarget ?? "today") != "today"
       default:
         return false
       }
