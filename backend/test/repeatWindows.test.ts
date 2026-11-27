@@ -49,5 +49,19 @@ describe("Missed recurrence windows", () => {
       fields: { status: "repeatExpired" },
     }], "app:test");
     assert.equal(store.readTask(currentHabit)?.task.status, "done");
+
+    store.push([{
+      clientOpId: "late_device_creation", op: "upsert", entity: "task", id: currentHabit,
+      fields: {
+        title: "stretch", status: "open", createdAt: "2026-11-20T08:00:00Z",
+        recurrenceMissed: "startFresh", recurrenceSeriesID: "stretch", recurrenceAnchorDate: "2026-11-20",
+      },
+    }], "app:test");
+    assert.equal(store.readTask(currentHabit)?.task.status, "done");
+    store.push([{
+      clientOpId: "explicit_reopen", op: "upsert", entity: "task", id: currentHabit,
+      fields: { status: "open" },
+    }], "app:test");
+    assert.equal(store.readTask(currentHabit)?.task.status, "open");
   });
 });

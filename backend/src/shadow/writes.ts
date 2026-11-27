@@ -540,6 +540,7 @@ function planDateEdits(
   const changed: Record<string, unknown> = {};
   for (const action of actions) {
     const patch = applyDateAction(coreRow(row), action, today, now);
+    if (patch.timeZone === null && advancesBySchedule(row)) delete patch.timeZone;
     Object.assign(row, patch);
     Object.assign(changed, patch);
   }

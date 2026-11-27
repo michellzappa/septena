@@ -773,6 +773,15 @@ export class WebSyncEngine {
     return projectShareOf(project);
   }
 
+  private taskDatePatch(task: TaskRow, action: Parameters<typeof applyDateAction>[1], today: string, now: string) {
+    const patch = applyDateAction(this.taskForCore(task), action, today, now);
+    if (patch.timeZone === null && !task.recurrenceAfterCompletion &&
+        (task.recurrenceMissed === "startFresh" || task.recurrenceMissed === "keepEach")) {
+      delete patch.timeZone;
+    }
+    return patch;
+  }
+
   private taskForCore(task: TaskRow): TaskRow {
     const share = this.shareForTask(task);
     return { ...task, assignedToOther: isAssignedToOther(task, share) };
@@ -821,7 +830,7 @@ export class WebSyncEngine {
     await ensureCoreReady();
     const now = new Date().toISOString();
     const todayYMD = localTodayYMD();
-    const datePatch = applyDateAction(this.taskForCore(task), { type: "toggleToday", mode }, todayYMD, now);
+    const datePatch = this.taskDatePatch(task, { type: "toggleToday", mode }, todayYMD, now);
     if (Object.keys(datePatch).length === 0) return;
     await this.patchTask(task, {
       ...datePatch,
@@ -853,8 +862,8 @@ export class WebSyncEngine {
     const now = new Date().toISOString();
     const todayYMD = localTodayYMD();
     const datePatch = day
-      ? applyDateAction(this.taskForCore(task), { type: "scheduleFor", day, mode }, todayYMD, now)
-      : applyDateAction(this.taskForCore(task), { type: "clearWhenDate" }, todayYMD, now);
+      ? this.taskDatePatch(task, { type: "scheduleFor", day, mode }, todayYMD, now)
+      : this.taskDatePatch(task, { type: "clearWhenDate" }, todayYMD, now);
     if (Object.keys(datePatch).length === 0) return;
 
     const shiftedReminder = shiftReminderOnReschedule({
@@ -917,7 +926,7 @@ export class WebSyncEngine {
     await ensureCoreReady();
     const now = new Date().toISOString();
     const todayYMD = localTodayYMD();
-    const datePatch = applyDateAction(this.taskForCore(task), { type: "setDeadline", day }, todayYMD, now);
+    const datePatch = this.taskDatePatch(task, { type: "setDeadline", day }, todayYMD, now);
     if (Object.keys(datePatch).length === 0) return;
     await this.patchTask(task, {
       ...datePatch,
@@ -930,7 +939,7 @@ export class WebSyncEngine {
   async clearTaskWhen(task: TaskRow): Promise<void> {
     await ensureCoreReady();
     const now = new Date().toISOString();
-    const datePatch = applyDateAction(this.taskForCore(task), { type: "clearWhen" }, localTodayYMD(), now);
+    const datePatch = this.taskDatePatch(task, { type: "clearWhen" }, localTodayYMD(), now);
     if (Object.keys(datePatch).length === 0) return;
     await this.patchTask(task, {
       ...datePatch,
@@ -948,8 +957,8 @@ export class WebSyncEngine {
     const now = new Date().toISOString();
     const todayYMD = localTodayYMD();
     const timeZone = startTime ? Intl.DateTimeFormat().resolvedOptions().timeZone : null;
-    const datePatch = applyDateAction(
-      this.taskForCore(task),
+    const datePatch = this.taskDatePatch(
+      task,
       { type: "setTimeSlot", startTime, durationMinutes, timeZone },
       todayYMD,
       now,
@@ -1044,7 +1053,7 @@ export class WebSyncEngine {
     const todayYMD = localTodayYMD();
     const filePatch =
       target.area || target.project
-        ? applyDateAction(this.taskForCore(task), { type: "fileFromTriage" }, todayYMD, now)
+        ? this.taskDatePatch(task, { type: "fileFromTriage" }, todayYMD, now)
         : {};
     await this.patchTask(task, {
       ...filePatch,
@@ -1478,8 +1487,8 @@ export class WebSyncEngine {
     const ops: OutboxOp[] = [];
     const toRebase: Array<{ task: TaskRow; newAnchor: string }> = [];
     tasks.forEach((task, idx) => {
-      const datePatch = applyDateAction(
-        this.taskForCore(task),
+      const datePatch = this.taskDatePatch(
+        task,
         putOnToday ? { type: "putOnToday", mode } : { type: "removeFromToday" },
         todayYMD,
         now,

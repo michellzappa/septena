@@ -1469,17 +1469,19 @@ final class CloudKitTasksBackend {
 
   /// Set or clear the optional wall-clock time slot (`startTime` `HH:MM`,
   /// `durationMinutes` `5..1440`, optional `timeZone`). Clearing `startTime`
-  /// also clears `durationMinutes` and `timeZone`.
+  /// clears `durationMinutes`. Calendar-driven repeats keep their time zone.
   func setTimeSlot(id: String, startTime: String?, durationMinutes: Int?, timeZone: String? = nil) {
     guard let entity = fetch(id: id) else { return }
+    let repeatZone = entity.recurrence?.missed?.advancesOnSchedule == true
+      ? entity.timeZone ?? TimeZone.current.identifier : nil
     if let start = startTime, !start.isEmpty {
       entity.startTime = start
       entity.durationMinutes = durationMinutes.map { min(1440, max(5, $0)) }
-      entity.timeZone = timeZone
+      entity.timeZone = timeZone ?? repeatZone
     } else {
       entity.startTime = nil
       entity.durationMinutes = nil
-      entity.timeZone = nil
+      entity.timeZone = repeatZone
     }
     entity.pendingSync = true
     commitAndPush(entity, op: startTime == nil ? "setTimeSlot(nil)" : "setTimeSlot")
@@ -1545,8 +1547,10 @@ final class CloudKitTasksBackend {
     // alone, so setting a rule on a series whose only rows are finished — a
     // task edited from the Logbook, or the occurrence you just ticked — wrote
     // nothing at all and reported success.
-    let targets = seriesTargets(entity: entity, members: members)
     let previousRule = entity.recurrence
+    let calendarSeries = recurrence.missed?.advancesOnSchedule == true ||
+      members.contains { $0.recurrence?.missed?.advancesOnSchedule == true }
+    let targets = seriesTargets(entity: entity, members: members, includeHistory: calendarSeries)
     let currentSlot = entity.recurrenceAnchorDate ?? entity.scheduled
     let starts: String? = if recurrence.missed == previousRule?.missed {
       entity.recurrenceMissedFrom
@@ -1580,7 +1584,8 @@ final class CloudKitTasksBackend {
     guard let entity = fetch(id: id), entity.recurrence != nil else { return }
     let seriesID = entity.recurrenceSeriesID ?? entity.id
     let members = seriesMembers(seriesID: seriesID)
-    let targets = seriesTargets(entity: entity, members: members)
+    let calendarSeries = members.contains { $0.recurrence?.missed?.advancesOnSchedule == true }
+    let targets = seriesTargets(entity: entity, members: members, includeHistory: calendarSeries)
     for member in targets {
       member.recurrencePaused = paused
       member.pendingSync = true
@@ -1588,12 +1593,13 @@ final class CloudKitTasksBackend {
     }
   }
 
-  /// The rows a series-wide rule edit writes to: every OPEN copy, plus the
-  /// row the caller actually named — which may itself be finished. Editing a
-  /// rule is a statement about the series, so it must never silently write to
-  /// nothing.
-  private func seriesTargets(entity: TaskEntity, members: [TaskEntity]) -> [TaskEntity] {
-    var targets = members.filter { $0.status == .open && $0.id != entity.id }
+  /// A calendar-driven series can advance from a finished or expired copy.
+  /// Keep those copies in step with the open rows when changing its policy.
+  private func seriesTargets(entity: TaskEntity, members: [TaskEntity],
+                             includeHistory: Bool) -> [TaskEntity] {
+    var targets = members.filter {
+      $0.id != entity.id && $0.deletedAt == nil && (includeHistory || $0.status == .open)
+    }
     targets.insert(entity, at: 0)
     return targets
   }

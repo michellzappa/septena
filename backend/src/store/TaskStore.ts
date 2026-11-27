@@ -941,10 +941,21 @@ export class TaskStore extends DurableObject<Env> {
 
     const spec: EntitySpec = ENTITIES[op.entity];
     const row = this.sql.exec(`SELECT * FROM ${spec.table} WHERE id = ?`, op.id).toArray()[0];
-    // A stale offline expiry cannot overwrite a completion or a newer policy.
-    if (op.op === "upsert" && op.entity === "task" && op.fields.status === "repeatExpired" &&
-        (row?.status !== "open" || row.recurrenceMissed !== "startFresh" || row.recurrencePaused === 1)) {
-      return { clientOpId: op.clientOpId, status: "noop" };
+    if (op.op === "upsert" && op.entity === "task") {
+      const fields = op.fields;
+      // A stale offline expiry cannot overwrite a completion or a newer policy.
+      const staleExpiry = fields.status === "repeatExpired" &&
+        (row?.status !== "open" || row.recurrenceMissed !== "startFresh" || row.recurrencePaused === 1);
+      // A different device may have created and closed this slot while the
+      // writer was offline. An explicit reopen patches status without createdAt.
+      const staleCreation = row && row.status !== "open" && fields.status === "open" &&
+        typeof fields.createdAt === "string" && advancesBySchedule(fields) &&
+        typeof fields.recurrenceSeriesID === "string" && typeof fields.recurrenceAnchorDate === "string" &&
+        op.id === occurrenceId(fields.recurrenceSeriesID, fields.recurrenceAnchorDate);
+      if (staleExpiry || staleCreation) {
+        if (row) this.sql.exec("UPDATE tasks SET rev = ? WHERE id = ?", this.nextRev(), op.id);
+        return { clientOpId: op.clientOpId, status: "noop" };
+      }
     }
 
     const sharing = this.shares.any();
@@ -2344,6 +2355,7 @@ export class TaskStore extends DurableObject<Env> {
       LEFT JOIN projects p ON p.id = t.project
       WHERE t.deletedAt IS NULL AND t.recurrenceMissed IS NOT NULL
         AND t.recurrenceUnit IS NOT NULL AND p.checklistMode IS NULL
+        AND COALESCE(t.kind, '') != 'heading'
         AND COALESCE(t.recurrenceAnchorDate, t.scheduled) IS NOT NULL
       ORDER BY COALESCE(t.recurrenceAnchorDate, t.scheduled) DESC, t.id DESC`).toArray()
       .map((row) => decodeRow(ENTITIES.task, row) as Row);

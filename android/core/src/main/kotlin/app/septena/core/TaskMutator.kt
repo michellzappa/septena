@@ -370,6 +370,8 @@ class TaskMutator(
         val f = patch.fields
         val changes = linkedMapOf<String, JsonValue>()
         for (name in patch.changed) {
+            if (name == RegistryEntityFields.Task.TIME_ZONE && f.timeZone == null &&
+                RecurrenceRules.followsCalendar(RecurrenceRules.fromFields(existing.fields)?.missed)) continue
             changes[name] = when (name) {
                 RegistryEntityFields.Task.SCHEDULED -> JsonValue.stringOrNull(f.scheduled)
                 RegistryEntityFields.Task.DEADLINE -> JsonValue.stringOrNull(f.deadline)
@@ -387,6 +389,7 @@ class TaskMutator(
                 else -> error("The core changed an unknown date field: $name")
             }
         }
+        if (changes.isEmpty()) return existing
         val updated = updateFields(id, changes) ?: return null
         val updatesSeries = when (action) {
             is DateAction.ScheduleFor -> action.mode == RescheduleMode.UPDATE_RULE
