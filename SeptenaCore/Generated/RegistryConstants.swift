@@ -1351,7 +1351,7 @@ enum RegistryActions {
     .appClassicWindow: "macwindow",
   ]
 
-  /// Other titles of an action: `desktopTitle`, `activeTitle` (state on), `pluralTitle`, `addTitle`, `removeTitle`, `shortTitle` (swipe buttons).
+  /// Other titles of an action: `desktopTitle`, `activeTitle` (state on), `pluralTitle`, `addTitle`, `removeTitle`, `shortTitle` (compact buttons).
   static let alternateTitles: [RegistryActionID: [String: String]] = [
     .taskEditDetails: ["desktopTitle": RegistryL10n.t("Rename")],
     .taskToggleInfo: ["activeTitle": RegistryL10n.t("Hide Info")],
@@ -1427,7 +1427,7 @@ enum RegistryActions {
     opensAttribute.first(where: { $0.value == attributeId })?.key
   }
 
-  /// Actions whose `role` is `destructive` (red in menus and swipes).
+  /// Actions whose `role` is `destructive` (red in menus).
   static let destructive: Set<RegistryActionID> = [
     .taskReferenceRemove,
     .taskDeleteChecklistItem,

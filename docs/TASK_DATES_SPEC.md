@@ -84,8 +84,8 @@ agent cue (`acknowledge`).
 |---|---|---|---|---|---|---|---|
 | A1 | **Put on Today** | When ▸ Today, Move to Today, Toggle Today (on), drop on Today, quick tray, MCP `tasks_move_to_today`, REST `today`, watch `today` | nil (after the recurrence slot is recorded) | unchanged | set (I2) | unchanged | shifts to T if it was on the old When day |
 | A2 | **Schedule for a day D** (D > T) | When ▸ date / Tomorrow / This Weekend, drop on Upcoming, defer, MCP `tasks_defer` / `tasks_update scheduled`, REST `tomorrow` / `defer` | D (fixed repeat: mode from the prompt) | unchanged **(Q1)**; an arrived one is recorded in `deferredDeadline` **(Q8)** | removed | unchanged | shifts with When (`shiftReminderOnReschedule`) |
-| A3 | **Remove from Today** | Toggle Today (off), swipe, context menu, REST `untoday`, watch `untoday`, MCP `tasks_update today:false` | nil if arrived | nil if arrived **(Q2)**, unless the task is planned past it (I8) | removed | removed if no day remains (I6) | unchanged |
-| A4 | **Toggle Today** | ⌘T, row pill, swipe | A3 if the task is on Today (§5 R2), else A1. Reads `isOnToday`, never the raw pin. | | | | |
+| A3 | **Remove from Today** | Toggle Today (off), context menu, REST `untoday`, watch `untoday`, MCP `tasks_update today:false` | nil if arrived | nil if arrived **(Q2)**, unless the task is planned past it (I8) | removed | removed if no day remains (I6) | unchanged |
+| A4 | **Toggle Today** | ⌘T, row pill | A3 if the task is on Today (§5 R2), else A1. Reads `isOnToday`, never the raw pin. | | | | |
 | A5 | **Clear the When date** | When ▸ Clear (Anytime), composer clear, MCP `tasks_update scheduled:null` | nil | unchanged | removed | removed (I6) | unchanged |
 | A6 | **Clear When** (`task.clearSchedule`) | context menu ▸ Schedule ▸ Clear When, ⌘⇧., drop on Anytime **(Q6)** | nil | nil | removed | removed **(Q5)** | unchanged |
 | A7 | **Set deadline D** | Deadline picker, MCP `deadline`, import | unchanged | D | see rule below | unchanged | unchanged |

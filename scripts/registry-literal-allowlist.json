@@ -226,7 +226,7 @@
     {
       "file": "Septena/Shell/Tasks/TaskListView.swift",
       "literal": "Inbox",
-      "reason": "iOS bulk toolbar or swipe title with no registry action title yet.",
+      "reason": "iOS bulk toolbar title with no registry action title yet.",
       "issue": "#260"
     },
     {

@@ -29,7 +29,7 @@ Add one column to `entities.task.columns` in `registry/entities.json` and run `n
 - **Task row:** Zero indicator when `starred == false`. When `starred == true`, show a subtle star glyph (`star.fill`, warm accent/gold tint) tucked beside trailing meta (or leading title edge — keep compact so Today's gold badge and Star never clash; *(default: trailing meta beside deadline/repeat)*).
 - **Controls:**
   - Mac: `⇧⌘S` or `⌘*` (verify no shortcut collision with existing `SeptaskNavigationCommands` — *(default: `⌥⌘S` or `⌃S`; verify in ST1 against `TaskRowShortcuts`*), composer pill, inspector toggle, context menu (`Star` / `Remove Star`), multi-select bulk star.
-  - iOS / iPadOS: context menu, edit sheet toggle, optional swipe action slot (`#132`).
+  - iOS / iPadOS: context menu, inline composer / task page toggle.
 - **Filtering & Smart View:**
   - Inside any list with ≥ 1 starred task, show a single `★` pill in the visual filter bar (`#96`) to filter to starred tasks in one tap.
   - Sidebar smart list **Starred** (open starred tasks, grouped by area/project) shows only when open starred count > 0 *(default, progressive disclosure — same pattern as Recently Deleted)*.
