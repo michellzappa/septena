@@ -71,6 +71,9 @@ enum SeptaskSyncedSettings {
     case "rolledInDismissedOn": return .from(s.rolledInDismissedOn)
     case "homeTimezone": return .from(s.time?.homeTimezone)
     case "agentsPaused": return s.agentsPaused.map { .bool($0) } ?? .null
+    case "agentCommentNotifications": return .from(s.agentCommentNotifications)
+    case "agentCommentNotificationsByAgent":
+      return s.agentCommentNotificationsByAgent.map { .object($0.mapValues { .string($0) }) } ?? .null
     case "tasksShowAging": return s.tasksShowAging.map { .bool($0) } ?? .null
     case "fadeSweptAt": return s.fadeSweptAt.map { .string(stampFormatter.string(from: $0)) } ?? .null
     case "fadeSweepDismissedOn": return .from(s.fadeSweepDismissedOn)
@@ -137,6 +140,21 @@ enum SeptaskSyncedSettings {
       switch v {
       case .null: s.agentsPaused = nil
       case .bool(let b): s.agentsPaused = b
+      default: return false
+      }
+    case "agentCommentNotifications":
+      guard let x = string() else { return false }
+      s.agentCommentNotifications = x
+    case "agentCommentNotificationsByAgent":
+      switch v {
+      case .null: s.agentCommentNotificationsByAgent = nil
+      case .object(let dict):
+        var out: [String: String] = [:]
+        for (k, val) in dict {
+          guard let str = val.stringValue else { return false }
+          out[k] = str
+        }
+        s.agentCommentNotificationsByAgent = out
       default: return false
       }
     case "tasksShowAging":

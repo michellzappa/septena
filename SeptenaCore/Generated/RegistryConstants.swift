@@ -447,7 +447,7 @@ struct RegistrySettingsPage: Sendable, Hashable, Identifiable {
 enum RegistrySettings {
   /// The help center. Help rows and menu items open it or a page below it.
   static let helpURL = URL(string: "https://septena.app/help")!
-  static let syncedKeys: [String] = ["welcomeName", "telemetryLevel", "calendarHiddenTitles", "rolledInDismissedOn", "homeTimezone", "agentsPaused", "getStartedDismissed", "getStartedSteps", "upsellsSeen", "onboardedAt", "accentColor", "canvasTexture", "textureIntensity", "textureMotion", "smartListOrder", "smartListHidden", "smartListPlacement", "listSort", "tasksShowAging", "fadeSweptAt", "fadeSweepDismissedOn"]
+  static let syncedKeys: [String] = ["welcomeName", "telemetryLevel", "calendarHiddenTitles", "rolledInDismissedOn", "homeTimezone", "agentsPaused", "agentCommentNotifications", "agentCommentNotificationsByAgent", "getStartedDismissed", "getStartedSteps", "upsellsSeen", "onboardedAt", "accentColor", "canvasTexture", "textureIntensity", "textureMotion", "smartListOrder", "smartListHidden", "smartListPlacement", "listSort", "tasksShowAging", "fadeSweptAt", "fadeSweepDismissedOn"]
 
   enum StorageKey {
     static let welcomeName = "septena.homepage.welcomeName"
@@ -487,6 +487,7 @@ enum RegistrySettings {
     static let welcomeName: String = ""
     static let telemetryLevel: String = "balanced"
     static let agentsPaused: Bool = false
+    static let agentCommentNotifications: String = "needs_input"
     static let getStartedDismissed: Bool = false
     static let accentColor: String = "colorful"
     static let canvasTexture: String = "none"
@@ -544,6 +545,7 @@ enum RegistrySettings {
   }
 
   static let optionsByKey: [String: [RegistrySettingsOption]] = [
+    "agentCommentNotifications": [RegistrySettingsOption(value: "every_comment", title: RegistryL10n.t("Every comment")), RegistrySettingsOption(value: "needs_input", title: RegistryL10n.t("Needs my answer or approval")), RegistrySettingsOption(value: "daily_digest", title: RegistryL10n.t("Daily digest")), RegistrySettingsOption(value: "off", title: RegistryL10n.t("No notifications"))],
     "listSort": [RegistrySettingsOption(value: "manual", title: RegistryL10n.t("Manual")), RegistrySettingsOption(value: "when", title: RegistryL10n.t("When")), RegistrySettingsOption(value: "deadline", title: RegistryL10n.t("Deadline")), RegistrySettingsOption(value: "title", title: RegistryL10n.t("Title")), RegistrySettingsOption(value: "created", title: RegistryL10n.t("Created"))],
     "appearanceMode": [RegistrySettingsOption(value: "system", title: RegistryL10n.t("System")), RegistrySettingsOption(value: "light", title: RegistryL10n.t("Light")), RegistrySettingsOption(value: "dark", title: RegistryL10n.t("Dark"))],
     "tasksTitleLines": [RegistrySettingsOption(value: "1", title: RegistryL10n.t("One")), RegistrySettingsOption(value: "2", title: RegistryL10n.t("Two")), RegistrySettingsOption(value: "3", title: RegistryL10n.t("Three"))],
@@ -664,6 +666,9 @@ enum RegistrySettings {
       RegistrySettingsSection(id: "pause", header: nil, footer: RegistryL10n.t("While paused, no agent can pick up or work on a task. Stop one task from its conversation instead. Agents never close assigned tasks on their own; finished work lands in Review for you to accept or send back."), platforms: nil, items: [
         RegistrySettingsItem(kind: "setting", key: "agentsPaused", page: nil, surface: nil, label: RegistryL10n.t("Pause all agents"), detail: RegistryL10n.t("While paused, no agent can start or work on a task."), iconId: nil, sfSymbol: nil, statusKey: nil, visibility: "signedIn", platforms: nil, featureId: "agents.stop-pause"),
       ]),
+      RegistrySettingsSection(id: "notifications", header: RegistryL10n.t("Notifications"), footer: RegistryL10n.t("Choose when agent comments notify you. You can override this for any connected agent below."), platforms: nil, items: [
+        RegistrySettingsItem(kind: "setting", key: "agentCommentNotifications", page: nil, surface: nil, label: RegistryL10n.t("Agent comments"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, visibility: "signedIn", platforms: nil, featureId: "agents.connector"),
+      ]),
       RegistrySettingsSection(id: "agents", header: RegistryL10n.t("Connected agents"), footer: RegistryL10n.t("Each agent you connected to your tasks, with the name you gave it. An agent counts while it was used in the last 30 days. Your phones, tablets and computers are under Account, Devices."), platforms: nil, items: [
         RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "access_agents", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, visibility: "always", platforms: nil, featureId: "agents.connector"),
       ]),
@@ -782,6 +787,8 @@ enum RegistrySettings {
     "access_devices.deviceBrowser": RegistryL10n.t("Browser"),
     "access_devices.deviceUnknown": RegistryL10n.t("Unknown device"),
     "access_agents.paused": RegistryL10n.t("Paused"),
+    "access_agents.notificationsLabel": RegistryL10n.t("Notifications"),
+    "access_agents.notificationsDefault": RegistryL10n.t("Use default"),
     "ai_explainer.title": RegistryL10n.t("How AI helps"),
     "ai_explainer.intro": RegistryL10n.t("Some tasks need thinking before you can act. Tap Discuss and talk them through, right on the task."),
     "ai_explainer.flowHeader": RegistryL10n.t("How a task conversation moves"),

@@ -57,6 +57,31 @@
       "platforms": ["ios", "ipados", "macos", "web", "android", "windows", "linux"],
       "featureId": "agents.stop-pause"
     },
+    "agentCommentNotifications": {
+      "scope": "synced",
+      "type": "enum",
+      "values": ["every_comment", "needs_input", "daily_digest", "off"],
+      "default": "needs_input",
+      "options": [
+        { "value": "every_comment", "title": "Every comment" },
+        { "value": "needs_input", "title": "Needs my answer or approval" },
+        { "value": "daily_digest", "title": "Daily digest" },
+        { "value": "off", "title": "No notifications" }
+      ],
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows", "linux"],
+      "featureId": "agents.connector"
+    },
+    "agentCommentNotificationsByAgent": {
+      "scope": "synced",
+      "type": "record",
+      "maxEntries": 64,
+      "keyMaxLength": 120,
+      "values": ["every_comment", "needs_input", "daily_digest", "off"],
+      "default": {},
+      "ui": false,
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows", "linux"],
+      "featureId": "agents.connector"
+    },
     "getStartedDismissed": {
       "scope": "synced",
       "type": "bool",
@@ -444,7 +469,9 @@
     ],
     "access_agents": [
       { "id": "lastUsed", "label": "Last used {time}" },
-      { "id": "paused", "label": "Paused" }
+      { "id": "paused", "label": "Paused" },
+      { "id": "notificationsLabel", "label": "Notifications" },
+      { "id": "notificationsDefault", "label": "Use default" }
     ],
     "ai_explainer": [
       { "id": "title", "label": "How AI helps" },
@@ -1101,6 +1128,19 @@
               "key": "agentsPaused",
               "label": "Pause all agents",
               "detail": "While paused, no agent can start or work on a task.",
+              "visibility": "signedIn"
+            }
+          ]
+        },
+        {
+          "id": "notifications",
+          "header": "Notifications",
+          "footer": "Choose when agent comments notify you. You can override this for any connected agent below.",
+          "items": [
+            {
+              "kind": "setting",
+              "key": "agentCommentNotifications",
+              "label": "Agent comments",
               "visibility": "signedIn"
             }
           ]
