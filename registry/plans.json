@@ -169,7 +169,6 @@
       "id": "pro",
       "title": "Septena Pro",
       "icon": "plans.pro",
-      "status": "given",
       "priceLabel": "€120 a year",
       "priceDetail": "Or €14 a month.",
       "detail": "For people who run many agents on one list.",
@@ -254,12 +253,14 @@
     { "id": "own_ai", "title": "You pay your AI provider, not us", "detail": "Septena runs the sync server and the connector. When you connect Claude or another agent, its bill stays with that provider." }
   ],
   "upsells": [
-    { "id": "second_device", "title": "This device is not syncing", "detail": "A free account syncs one device. Plus syncs all of them. You can also move your free account to this device." },
-    { "id": "history_edge", "title": "Older changes are hidden", "detail": "A free account shows 30 days of history. Plus shows a full year." },
-    { "id": "file_elsewhere", "title": "This file is on another device", "detail": "Plus syncs files and images to all your devices." },
-    { "id": "connector_cap", "title": "Daily change limit reached", "detail": "Agents on this account made 500 changes today. They can make changes again tomorrow." },
-    { "id": "share_create", "title": "Sharing a project needs Plus", "detail": "Anyone can join a shared project for free. Plus lets you create one and invite people." },
-    { "id": "trial_end", "title": "Your 14 days of Plus have ended", "detail": "Your account is now a free account. One device keeps syncing. Your tasks on every device stay where they are." }
+    { "id": "second_device", "plan": "plus", "title": "This device is not syncing", "detail": "A free account syncs one device. Plus syncs all of them. You can also move your free account to this device." },
+    { "id": "history_edge", "plan": "plus", "title": "Older changes are hidden", "detail": "A free account shows 30 days of history. Plus shows a full year." },
+    { "id": "file_elsewhere", "plan": "plus", "title": "This file is on another device", "detail": "Plus syncs files and images to all your devices." },
+    { "id": "connector_cap", "plan": "plus", "title": "Daily change limit reached", "detail": "Agents on this account made 500 changes today. They can make changes again tomorrow." },
+    { "id": "share_create", "plan": "plus", "title": "Sharing a project needs Plus", "detail": "Anyone can join a shared project for free. Plus lets you create one and invite people." },
+    { "id": "trial_end", "plan": "plus", "title": "Your 14 days of Plus have ended", "detail": "Your account is now a free account. One device keeps syncing. Your tasks on every device stay where they are." },
+    { "id": "agents_full", "plan": "plus", "title": "Your agent slot is in use", "detail": "A free account connects one agent. Plus connects three. Pro has no limit." },
+    { "id": "agents_full_plus", "plan": "pro", "title": "All three agent slots are in use", "detail": "Plus connects three agents. Pro connects as many as you run, and holds 50 GB of files." }
   ],
   "actions": {
     "subscribe": "Subscribe",
@@ -297,7 +298,13 @@
     "ownedGrantPro": "Pro is on for this account.",
     "ownedOtherAccount": "This Apple ID's Plus belongs to another Septena account. Sign in to that account to use it.",
     "syncThisDeviceFailed": "Septena could not reach the server. Try again in a moment.",
-    "done": "Done"
+    "done": "Done",
+    "seePro": "See Pro",
+    "choosePlan": "Choose a plan",
+    "youGet": "With {plan}",
+    "upgradeNote": "Pro starts right away. The App Store refunds the unused part of your Plus.",
+    "upgradeElsewhere": "To move to Pro, change your plan in the store where you bought Plus.",
+    "buyElsewhere": "This copy of Septena does not sell plans. Buy Plus or Pro in the App Store version on any device. It turns on here when you sign in to the same account."
   },
   "status": {
     "device": "On this device",

@@ -287,7 +287,7 @@ impl Ctx<'_> {
         if when_arrived {
             self.f.scheduled = None;
         }
-        if deadline_arrived && (when_arrived || facts.holding_deadline.is_some()) {
+        if !self.task.assigned_to_other && deadline_arrived && (when_arrived || facts.holding_deadline.is_some()) {
             self.f.deadline = None;
         }
         if self.f.scheduled.is_none() && !self.f.today {

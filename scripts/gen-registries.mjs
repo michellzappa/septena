@@ -789,6 +789,8 @@ function validatePlans(plans, icons, caps, importSources) {
     assert(pr.label.includes(whole), `plans.json: price ${pr.id} label must state ${whole}`);
   }
   assert(plans.prices.filter((x) => x.highlighted).length === 1, "plans.json: exactly one price must be highlighted");
+  // An upsell moment names the plan that answers it, so the paywall opens on that plan.
+  for (const u of plans.upsells) assert(["plus", "pro"].includes(u.plan), `plans.json: upsell ${u.id} needs plan "plus" or "pro"`);
   // ADR 0059: Pro sells like Plus, in the same subscription group. Its prices
   // must state the Pro level's amounts, and its products sit under .sync.pro.
   const proLevel = plans.levels.find((l) => l.id === "pro");
@@ -840,9 +842,8 @@ function validatePlans(plans, icons, caps, importSources) {
 
   assert(JSON.stringify(plans.levels.map((l) => l.id)) === JSON.stringify(PLAN_LEVELS), `plans.json: levels must be ${PLAN_LEVELS.join(", ")}`);
   assert(JSON.stringify(plans.cards.map((c) => c.id)) === JSON.stringify(PLAN_LEVELS), `plans.json: cards must be ${PLAN_LEVELS.join(", ")}`);
-  // ADR 0052, ADR 0059: Pro is a real plan. `given` keeps it out of the in-app
-  // purchase list until the app paywalls offer the Pro products.
-  assert(plans.cards.find((c) => c.id === "pro").status === "given", "plans.json: the pro card must be given until the app paywalls sell Pro (ADR 0059)");
+  // ADR 0059: Pro sells like Plus, so no card carries a status: every card is on sale.
+  assert(plans.cards.every((c) => c.status === undefined), "plans.json: plan cards carry no status (ADR 0059: every plan is on sale)");
   assert(plans.cards.filter((c) => c.highlighted).length === 1, "plans.json: exactly one card must be highlighted");
   for (const k of ["seePlus", "startTrial", "trialStarted", "trialBilling", "success", "pending", "serverRetry", "failed", "ownedApple", "ownedWeb", "ownedGoogle", "ownedGrant", "ownedGrantPro", "ownedOtherAccount", "done"]) {
     assert(typeof plans.paywall?.[k] === "string" && plans.paywall[k].length > 0, `plans.json: paywall.${k} missing`);
@@ -2215,6 +2216,8 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  let id: String");
   lines.push("  let title: String");
   lines.push("  let detail: String");
+  lines.push("  /// For an upsell moment: the plan that answers it (`plus` or `pro`). The paywall opens on it.");
+  lines.push("  var plan: String? = nil");
   lines.push("}");
   lines.push("");
   lines.push("/// Plans and pricing (`registry/plans.json`). The site's /pricing page reads the same file.");
@@ -2229,6 +2232,12 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  static var prices: [RegistryPlanPrice] { [");
   for (const pr of P.prices) lines.push(`    RegistryPlanPrice(id: ${swiftStr(pr.id)}, productId: ${swiftStr(pr.productId)}, amountMinor: ${pr.amountMinor}, currency: ${swiftStr(pr.currency)}, interval: ${swiftStr(pr.interval)}, highlighted: ${pr.highlighted}, label: ${L(pr.label, pr, "label")}, detail: ${L(pr.detail, pr, "detail")}),`);
   lines.push("  ] }");
+  lines.push("  /// What Pro costs (ADR 0059): the higher level of the same subscription group.");
+  lines.push("  static var proPrices: [RegistryPlanPrice] { [");
+  for (const pr of P.proPrices) lines.push(`    RegistryPlanPrice(id: ${swiftStr(pr.id)}, productId: ${swiftStr(pr.productId)}, amountMinor: ${pr.amountMinor}, currency: ${swiftStr(pr.currency)}, interval: ${swiftStr(pr.interval)}, highlighted: ${pr.highlighted}, label: ${L(pr.label, pr, "label")}, detail: ${L(pr.detail, pr, "detail")}),`);
+  lines.push("  ] }");
+  lines.push("  /// The rows every plan card lists (`cardRows`), in order.");
+  lines.push(`  static let cardRowIDs: [String] = [${P.cardRows.map(swiftStr).join(", ")}]`);
   lines.push("  static var cards: [RegistryPlanCard] { [");
   const cardSwift = (c) => `RegistryPlanCard(id: ${swiftStr(c.id)}, title: ${L(c.title, c, "title")}, icon: ${swiftStr(c.icon)}, detail: ${L(c.detail, c, "detail")}, footnote: ${LOpt(c.footnote, c, "footnote")}, highlighted: ${c.highlighted === true})`;
   for (const c of P.cards.filter((c) => c.status === undefined)) lines.push(`    ${cardSwift(c)},`);
@@ -2243,7 +2252,7 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  ] }");
   for (const list of ["promises", "upsells"]) {
     lines.push(`  static var ${list}: [RegistryPlanNote] { [`);
-    for (const n of P[list]) lines.push(`    RegistryPlanNote(id: ${swiftStr(n.id)}, title: ${L(n.title, n, "title")}, detail: ${L(n.detail, n, "detail")}),`);
+    for (const n of P[list]) lines.push(`    RegistryPlanNote(id: ${swiftStr(n.id)}, title: ${L(n.title, n, "title")}, detail: ${L(n.detail, n, "detail")}${n.plan ? `, plan: ${swiftStr(n.plan)}` : ""}),`);
     lines.push("  ] }");
   }
   lines.push("  static func card(_ id: String) -> RegistryPlanCard? { cards.first { $0.id == id } }");
