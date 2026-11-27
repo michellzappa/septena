@@ -129,7 +129,7 @@ struct SeptaskFirstRunView: View {
         Button {
           a11yAnimate(.easeInOut(duration: 0.2)) { currentID = history.removeLast() }
         } label: {
-          Label("Back", systemImage: "chevron.left")
+          Label(RegistryFirstRun.backTitle, systemImage: "chevron.left")
         }
         .buttonStyle(.borderless)
       }

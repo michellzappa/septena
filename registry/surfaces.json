@@ -560,6 +560,10 @@
       {
         "id": "close",
         "label": "Close"
+      },
+      {
+        "id": "back",
+        "label": "Back"
       }
     ],
     "prompts": {

@@ -2185,6 +2185,8 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push(`  /// The synced setting that records a finished first run, so a second device skips it.`);
   lines.push(`  static let completionSetting: String = ${swiftStr(fr.completionSetting)}`);
   lines.push(`  static let connectorUrl: String = ${swiftStr(fr.connectorUrl)}`);
+  const frBack = fr.chrome.find((c) => c.id === "back");
+  lines.push(`  static let backTitle: String = ${L(frBack.label, frBack, "label")}`);
   lines.push(`  static let setupPrompt: String = ${L(fr.prompts.setup, fr.prompts, "setup")}`);
   lines.push(`  static let firstPrompt: String = ${L(fr.prompts.first, fr.prompts, "first")}`);
   lines.push("  static let steps: [RegistryFirstRunStep] = [");

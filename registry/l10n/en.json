@@ -561,6 +561,12 @@
       "tokens.fruitAccents.acai.name"
     ]
   },
+  "Back": {
+    "text": "Back",
+    "paths": [
+      "surfaces.firstRun.chrome.back.label"
+    ]
+  },
   "Backup on our server": {
     "text": "Backup on our server",
     "paths": [

@@ -13,7 +13,7 @@ import {
   StickyNote,
   X,
 } from "lucide-react";
-import { FIRST_RUN, SETTINGS_REGISTRY, SURFACES_CATALOG, registryText } from "@/lib/generated/registries";
+import { FIRST_RUN, SETTINGS_REGISTRY, registryText } from "@/lib/generated/registries";
 import type { SeptenaApiClient } from "@/lib/api/client";
 
 interface FirstRunModalProps {
@@ -105,7 +105,10 @@ export function FirstRunModal({
     FIRST_RUN.chrome.find((c) => c.id === "close")?.label ?? "Close",
     language,
   );
-  const backLabel = registryText(SURFACES_CATALOG.taskDetail.controls.back, language);
+  const backLabel = registryText(
+    FIRST_RUN.chrome.find((c) => c.id === "back")?.label ?? "Back",
+    language,
+  );
   const copiedLabel = settingsCopy("claude_connector", "copied", language);
   const copyLabel = settingsCopy("claude_connector", "copy", language);
 

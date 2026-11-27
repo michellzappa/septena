@@ -2384,6 +2384,7 @@ enum RegistryFirstRun {
   /// The synced setting that records a finished first run, so a second device skips it.
   static let completionSetting: String = "onboardedAt"
   static let connectorUrl: String = "https://api.septena.app/mcp"
+  static let backTitle: String = RegistryL10n.t("Back")
   static let setupPrompt: String = RegistryL10n.t("Set up Septena for me using https://septena.app/agents.md")
   static let firstPrompt: String = RegistryL10n.t("Set up my Septena areas, projects, and tasks by following https://api.septena.app/onboard.md")
   static let steps: [RegistryFirstRunStep] = [

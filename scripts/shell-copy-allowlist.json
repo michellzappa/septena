@@ -583,11 +583,6 @@
       "reasonId": "predates-rule"
     },
     {
-      "file": "Septask/SeptaskFirstRun.swift",
-      "literal": "Back",
-      "reasonId": "predates-rule"
-    },
-    {
       "file": "Septask/SeptaskNavigationCommands.swift",
       "literal": "Check for Updates…",
       "reasonId": "predates-rule"
