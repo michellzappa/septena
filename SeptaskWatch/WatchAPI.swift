@@ -30,6 +30,14 @@ actor WatchAPI {
 
   static let baseURL = URL(string: "https://api.septena.app")!
   static let clientName = "septask-watch"
+  /// Sent as `X-Septena-Version`, the same "<marketing> (<build>)" form as
+  /// `TaskBackendClient.clientVersion` on iPhone and Mac.
+  static let clientVersion: String = {
+    let info = Bundle.main.infoDictionary
+    let version = info?["CFBundleShortVersionString"] as? String ?? "0"
+    let build = info?["CFBundleVersion"] as? String ?? "0"
+    return "\(version) (\(build))"
+  }()
 
   private let session: URLSession
   private var accessToken: String?
@@ -221,6 +229,7 @@ actor WatchAPI {
     var request = URLRequest(url: url)
     request.httpMethod = method
     request.setValue(Self.clientName, forHTTPHeaderField: "X-Septena-Client")
+    request.setValue(Self.clientVersion, forHTTPHeaderField: "X-Septena-Version")
     request.setValue(TimeZone.current.identifier, forHTTPHeaderField: "X-Septena-TimeZone")
     request.setValue("application/json", forHTTPHeaderField: "Accept")
     if let auth { request.setValue("Bearer \(auth)", forHTTPHeaderField: "Authorization") }

@@ -141,9 +141,14 @@ export const zRefreshBody = z.object({ refreshToken: z.string().min(20).max(400)
 const zClientName = z.string().regex(/^[\w .()-]{1,40}$/);
 
 /// The app version behind a call, for the device list on the admin page.
-function clientVersion(c: Ctx): string | null {
-  const sent = zClientName.safeParse(c.req.header("X-Septena-Version"));
-  return sent.success ? sent.data : null;
+/// Every client sends `X-Septena-Version: <marketing> (<build>)`. Builds from
+/// before that header put the version in the client name (`android 0.9.0`,
+/// `web 0.2.0`); those still count.
+export function clientVersion(versionHeader: string | undefined, clientHeader: string | undefined): string | null {
+  const sent = zClientName.safeParse(versionHeader);
+  if (sent.success) return sent.data;
+  const legacy = /^(?:android|web) (\d[\w.()-]*(?: \(\d+\))?)$/.exec(clientHeader ?? "");
+  return legacy ? legacy[1] : null;
 }
 
 async function parse<T extends z.ZodTypeAny>(c: Ctx, schema: T): Promise<z.infer<T> | Response> {
@@ -508,7 +513,7 @@ async function requireSyncDevice(c: Ctx, next: Next) {
   // A token from before session ids names no device; it refreshes within
   // the hour and carries one from then on.
   if (plan && sid) {
-    const { syncing } = await storeFor(c.env, c.get("userId")).deviceAccess(sid, c.get("client"), plan.limits.devices, Date.now(), clientVersion(c));
+    const { syncing } = await storeFor(c.env, c.get("userId")).deviceAccess(sid, c.get("client"), plan.limits.devices, Date.now(), clientVersion(c.req.header("X-Septena-Version"), c.req.header("X-Septena-Client")));
     const breach: LimitBreach | null = syncing ? null : { limit: "devices", upsell: "second_device" };
     if (decide(c.env, c.get("userId"), "sync_device", plan, breach) === "block") return limitRefusal(c, "device_not_syncing", breach!);
   }
