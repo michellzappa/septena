@@ -638,8 +638,9 @@ export function SettingsModal({
   };
 
   // Profile card alert: only show sync state if this device is not syncing.
+  const currentDevice = access?.devices.find((d) => d.current);
   const profileSyncAlert =
-    signedIn && entitlement?.device && entitlement.device.syncing === false
+    signedIn && currentDevice && currentDevice.syncing === false
       ? registryText(PLAN_UI.status.device, lang)
       : null;
 
