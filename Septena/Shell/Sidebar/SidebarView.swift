@@ -1364,6 +1364,10 @@ struct SidebarRootView: View {
           return .init(perform: idx == siblings.count - 1 ? nil : {
             reorderProject(siblings[idx + 1].id, before: project.id, parent: project.area)
           })
+        case .projectUseAsChecklist:
+          return project.checklistMode == nil ? .init {
+            Task { try await projectsMutator.useAsChecklist(id: project.id) }
+          } : nil
         case .projectMarkDone: return .init { setProjectStatus(project, to: .done) }
         case .projectCancel: return .init { setProjectStatus(project, to: .cancelled) }
         case .projectShare: return .init { SeptaskSharing.present(projectID: project.id) }

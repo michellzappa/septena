@@ -1414,7 +1414,7 @@ export function SeptenaApp() {
         wasDone ? `Reopened “${task.title}”` : isChecklist ? `Checked “${task.title}”` : `Completed “${task.title}”`,
         receipt,
         () => engine.toggleTaskDone(task),
-        !wasDone && !isChecklist,
+        isChecklist || !wasDone,
       );
     },
     [destination, engine, projectById, recordCompletion, reviewGroupForSettle, settle],
@@ -2550,66 +2550,50 @@ export function SeptenaApp() {
         },
       })),
     ];
-    setContextMenu({
-      x: e.clientX,
-      y: e.clientY,
-      items: [
-        {
+    const finishProject = (status: "done" | "cancelled") => {
+      void engine.updateProject(proj, { status, completedAt: new Date().toISOString() });
+      if (destination.kind === "project" && destination.id === proj.id) {
+        setDestination({ kind: "smart", id: "today" });
+      }
+    };
+    const handlers: Partial<Record<keyof typeof ACTIONS_CATALOG.actions, () => void>> = {
+      "project.rename": () => {
+        const next = window.prompt("Rename Project", proj.title)?.trim();
+        if (next && next !== proj.title) void engine.updateProject(proj, { title: next });
+      },
+      "project.useAsChecklist": proj.checklistMode ? undefined
+        : () => void engine.updateProject(proj, { checklistMode: "plain" }),
+      "project.markDone": () => finishProject("done"),
+      "project.cancel": () => finishProject("cancelled"),
+      "project.delete": () => {
+        if (window.confirm(`Delete “${proj.title}”?`)) {
+          void engine.deleteProject(proj);
+          if (destination.kind === "project" && destination.id === proj.id) {
+            setDestination({ kind: "smart", id: "today" });
+          }
+        }
+      },
+    };
+    const items: ContextMenuEntry[] = [];
+    for (const entry of ACTIONS_CATALOG.contextMenus["sidebar.project"]) {
+      if (entry.kind === "divider") {
+        if (items.length && items.at(-1)?.kind !== "divider") items.push({ kind: "divider" });
+      } else if (entry.kind === "submenu" && entry.id === "moveToArea") {
+        items.push({ kind: "submenu", label: registryText(entry.title, lang), items: moveAreaItems });
+      } else if (entry.kind === "action") {
+        const onSelect = handlers[entry.id];
+        if (!onSelect) continue;
+        const action = ACTIONS_CATALOG.actions[entry.id];
+        items.push({
           kind: "item",
-          label: "Rename",
-          onSelect: () => {
-            const next = window.prompt("Rename Project", proj.title)?.trim();
-            if (next && next !== proj.title) void engine.updateProject(proj, { title: next });
-          },
-        },
-        { kind: "divider" },
-        ...moveAreaItems,
-        { kind: "divider" },
-        ...(!proj.checklistMode ? [
-          { kind: "item" as const, label: "Use as Checklist", onSelect: () => void engine.updateProject(proj, { checklistMode: "plain" }) },
-        ] : []),
-        {
-          kind: "item",
-          label: "Mark Done",
-          onSelect: () => {
-            void engine.updateProject(proj, {
-              status: "done",
-              completedAt: new Date().toISOString(),
-            });
-            if (destination.kind === "project" && destination.id === proj.id) {
-              setDestination({ kind: "smart", id: "today" });
-            }
-          },
-        },
-        {
-          kind: "item",
-          label: "Cancel Project",
-          onSelect: () => {
-            void engine.updateProject(proj, {
-              status: "cancelled",
-              completedAt: new Date().toISOString(),
-            });
-            if (destination.kind === "project" && destination.id === proj.id) {
-              setDestination({ kind: "smart", id: "today" });
-            }
-          },
-        },
-        { kind: "divider" },
-        {
-          kind: "item",
-          label: "Delete Project",
-          destructive: true,
-          onSelect: () => {
-            if (window.confirm(`Delete “${proj.title}”?`)) {
-              void engine.deleteProject(proj);
-              if (destination.kind === "project" && destination.id === proj.id) {
-                setDestination({ kind: "smart", id: "today" });
-              }
-            }
-          },
-        },
-      ],
-    });
+          label: registryText(action.title, lang),
+          destructive: action.role === "destructive",
+          onSelect,
+        });
+      }
+    }
+    if (items.at(-1)?.kind === "divider") items.pop();
+    setContextMenu({ x: e.clientX, y: e.clientY, items });
   };
 
   const buildTaskRowProps = (item: EvaluatedTask, hideContainerLabel = false): TaskRowItemProps => {
@@ -5211,7 +5195,7 @@ export function SeptenaApp() {
                   className="inline-flex items-center gap-1 rounded-md bg-[var(--bg-selected)] px-2 py-1 font-medium text-[var(--text-primary)]"
                 >
                   <Undo2 className="h-3 w-3" />
-                  Undo
+                  {registryText(ACTIONS_CATALOG.actions["app.undo"].title, lang)}
                 </button>
               )}
               <button
