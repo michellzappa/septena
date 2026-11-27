@@ -3,8 +3,10 @@
 //! Weekdays use the Apple convention: 1 = Sunday … 7 = Saturday.
 
 use serde::Deserialize;
+use serde_json::{Value, json};
 
 use crate::date::{Day, YearMonth};
+use crate::error::CoreError;
 use crate::registry::enums::recurrence_unit;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
@@ -128,6 +130,67 @@ pub fn next_scheduled_date(
         }
     }
     Some(next.to_string())
+}
+
+/// Reconcile a fixed series from its latest materialized slot. The host
+/// supplies local day/time in the series' zone and processes the plan
+/// atomically. Only slots from the current policy may be expired.
+pub(crate) fn recurrence_window(input: &Value) -> Result<Value, CoreError> {
+    let today = input["today"].as_str().and_then(Day::parse);
+    let anchor = input["lastSlot"].as_str().and_then(Day::parse);
+    let Some((mut through, anchor)) = today.zip(anchor) else {
+        return Err(CoreError::invalid("recurrenceWindow requires a local day and last slot"));
+    };
+    if let Some(start) = input["startTime"].as_str() {
+        let now = input["localTime"]
+            .as_str()
+            .ok_or_else(|| CoreError::invalid("recurrenceWindow requires local time for a timed slot"))?;
+        if now < start {
+            through = through.plus_days(-1);
+        }
+    }
+    let mode = input["mode"].as_str().unwrap_or("keepOneOpen");
+    let fresh = mode == "startFresh";
+    let each = mode == "keepEach";
+    if !(fresh || each || mode == "keepOneOpen") {
+        return Err(CoreError::invalid("Unknown missed recurrence behavior"));
+    }
+    let rule: RecurrenceRule = serde_json::from_value(input["rule"].clone())
+        .map_err(|_| CoreError::invalid("recurrenceWindow requires a recurrence rule"))?;
+    let mut dates = Vec::new();
+    let mut last = anchor;
+    let mut more = false;
+    if !rule.after_completion && (fresh || each) && anchor <= through {
+        for _ in 0..10_000 {
+            let slot = last.to_string();
+            let next = next_scheduled_date(slot.clone(), Some(slot), None, rule.clone()).and_then(|next| Day::parse(&next));
+            let Some(next) = next.filter(|next| *next <= through) else { break };
+            if each && dates.len() == 256 {
+                more = true;
+                break;
+            }
+            last = next;
+            if each {
+                dates.push(next);
+            }
+        }
+        if fresh && last > anchor {
+            dates.push(last);
+        }
+    }
+    let series = input["seriesId"]
+        .as_str()
+        .filter(|id| !id.is_empty())
+        .ok_or_else(|| CoreError::invalid("recurrenceWindow requires a series id"))?;
+    let create: Vec<_> = dates
+        .into_iter()
+        .map(|date| {
+            let scheduled = date.to_string();
+            json!({ "id": occurrence_id(series.into(), scheduled.clone()), "scheduled": scheduled })
+        })
+        .collect();
+    let expiry = (fresh && !rule.after_completion && anchor <= through).then(|| last.to_string());
+    Ok(json!({ "create": create, "expireBefore": expiry, "hasMore": more }))
 }
 
 /// The stable record id of one occurrence: FNV-1a 64 over `"<id>|<date>"`.

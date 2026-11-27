@@ -92,6 +92,9 @@ pub fn run_conformance(fixture: String, json: String) -> Result<ConformanceRepor
             }
         }
         "recurrence" => {
+            for case in cases(&doc, "missedWindows") {
+                run.check("missedWindows", case, "recurrenceWindow", case["input"].clone(), false);
+            }
             for case in cases(&doc, "nextScheduledDate") {
                 run.check(
                     "nextScheduledDate",
