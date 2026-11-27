@@ -49,7 +49,7 @@ internal class DpapiSecretVault : SecretVault {
         val file = fileFor(accountId)
         if (!Files.exists(file)) return null
         val encrypted = Files.readAllBytes(file)
-        return dpapi { input, output -> Crypt32.INSTANCE.CryptUnprotectData(input, null, null, null, null, CRYPTPROTECT_UI_FORBIDDEN, output) }
+        return dpapi(encrypted) { input, output -> Crypt32.INSTANCE.CryptUnprotectData(input, null, null, null, null, CRYPTPROTECT_UI_FORBIDDEN, output) }
     }
 
     override fun write(accountId: String, payload: ByteArray) {
