@@ -17,10 +17,19 @@ export const WEBHOOK_TIMEOUT_MS = 8_000;
 export const SSE_HEARTBEAT_MS = 25_000;
 export const SSE_RETRY_MS = 3_000;
 
+/// Webhook retries after a failed attempt (network error, timeout, 408, 425,
+/// 429 or 5xx). Three attempts in all. A delivery that still fails is left to
+/// the agent's `tasks_agent_events` poll, which carries every event.
+export const WEBHOOK_RETRY_DELAYS_MS: readonly number[] = [1_000, 5_000];
+
+/// The kinds that wake an agent. `unpaused` is one: a reply that arrived
+/// while agents were paused woke nobody (every claim was refused), so the end
+/// of the pause must.
 export const WAKE_EVENT_KINDS: ReadonlySet<AgentEvent["kind"]> = new Set([
   "assigned",
   "user_turn",
   "resumed",
+  "unpaused",
 ]);
 
 export function isWakeEventKind(kind: AgentEvent["kind"]): boolean {
@@ -302,6 +311,14 @@ export interface WebhookDeliveryResult {
   status: number;
   deliveryId: string;
   deliveredAt: string;
+  /// The URL failed validation: no request was sent, and a retry cannot help.
+  blocked?: boolean;
+}
+
+/// A failure that a later attempt can fix. Other 4xx answers say the
+/// receiver refuses this request, so the same request is not sent again.
+export function isRetryableWebhookStatus(status: number): boolean {
+  return status === 0 || status === 408 || status === 425 || status === 429 || status >= 500;
 }
 
 export async function deliverWebhookEvent(
@@ -317,7 +334,7 @@ export async function deliverWebhookEvent(
   const valid = validateWebhookUrl(target.url);
   if (!valid.ok) {
     logEvent("agent_webhook_blocked", { webhookId: target.id, reason: valid.reason });
-    return { ok: false, status: 0, deliveryId, deliveredAt };
+    return { ok: false, status: 0, deliveryId, deliveredAt, blocked: true };
   }
 
   const timestampMs = String(Date.now());
@@ -371,5 +388,27 @@ export async function deliverWebhookEvent(
     return { ok: false, status: 0, deliveryId, deliveredAt };
   } finally {
     clearTimeout(timer);
+  }
+}
+
+/// Delivers one event, and sends it again after each delay in `delaysMs`
+/// while the failure is retryable. Each attempt is signed anew with a fresh
+/// timestamp and gets a new `X-Septena-Delivery` id. A receiver dedupes on
+/// `rev`, which every attempt carries.
+export async function deliverWebhookWithRetry(
+  target: AgentWebhookTarget,
+  event: AgentEvent,
+  delaysMs: readonly number[] = WEBHOOK_RETRY_DELAYS_MS,
+  fetchImpl: typeof fetch = fetch,
+  sleep: (ms: number) => Promise<void> = (ms) => new Promise((r) => setTimeout(r, ms)),
+): Promise<WebhookDeliveryResult & { attempts: number }> {
+  let attempts = 0;
+  for (;;) {
+    const res = await deliverWebhookEvent(target, event, fetchImpl);
+    attempts++;
+    if (res.ok || res.blocked || !isRetryableWebhookStatus(res.status) || attempts > delaysMs.length) {
+      return { ...res, attempts };
+    }
+    await sleep(delaysMs[attempts - 1]);
   }
 }

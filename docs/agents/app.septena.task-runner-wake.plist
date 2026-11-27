@@ -3,7 +3,7 @@
 <!--
   LaunchAgent template: persistent SSE wake listener on mz-mini.
   Opens GET https://api.septena.app/v1/agent/events/stream and triggers
-  scripts/task-runner.sh immediately on assigned / user_turn / resumed events.
+  scripts/task-runner.sh immediately on assigned / user_turn / resumed / unpaused events.
   See docs/TASK_FACTORY_SPEC.md §4.2 for installation instructions.
   Replace REPLACE_WITH_USER with the local macOS username before loading.
 -->

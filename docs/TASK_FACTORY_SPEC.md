@@ -119,7 +119,7 @@ handles `research`-shaped work only.
 Two LaunchAgent templates live under `docs/agents/`:
 
 - `docs/agents/app.septena.task-runner.plist` — scheduled 15-minute pass (`scripts/task-runner.sh --max 2`).
-- `docs/agents/app.septena.task-runner-wake.plist` — persistent SSE wake listener (`scripts/task-runner-wake.mjs`) subscribed to `GET https://api.septena.app/v1/agent/events/stream`, triggering `scripts/task-runner.sh --max 2` immediately on `assigned`, `user_turn`, and `resumed` events.
+- `docs/agents/app.septena.task-runner-wake.plist` — persistent SSE wake listener (`scripts/task-runner-wake.mjs`) subscribed to `GET https://api.septena.app/v1/agent/events/stream`, triggering `scripts/task-runner.sh --max 2` immediately on `assigned`, `user_turn`, `resumed` and `unpaused` events.
 
 `scripts/task-runner.sh` guards against overlap with an atomic `mkdir` lock (`/tmp/septena-task-runner.lock.d`, with stale-lock recovery), runs `--max 2` as two bounded parallel worker slots (`<agent>:w1` / `<agent>:w2`) with per-slot log isolation, and rotates logs in `~/Library/Logs/septena-runner/` (keeping the newest 100 by default).
 
@@ -141,7 +141,7 @@ Two LaunchAgent templates live under `docs/agents/`:
      launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/$f"
    done
    ```
-4. **Outbound webhooks (optional, for cloud routines / OpenClaw / n8n):** register an `https://` URL via `POST /v1/agent/webhooks` (`{ "url": "https://...", "secret": "..." }`, authenticated with a user bearer token). Every wake event (`assigned`, `user_turn`, `resumed`) sends a pointer-only JSON POST signed with `X-Septena-Signature: sha256=<hex>` over `${X-Septena-Timestamp}.${rawBody}` using HMAC-SHA256.
+4. **Outbound webhooks (optional, for cloud routines / OpenClaw / n8n):** register an `https://` URL via `POST /v1/agent/webhooks` (`{ "url": "https://...", "secret": "..." }`, authenticated with a user bearer token). Every wake event (`assigned`, `user_turn`, `resumed`, `unpaused`) sends a pointer-only JSON POST signed with `X-Septena-Signature: sha256=<hex>` over `${X-Septena-Timestamp}.${rawBody}` using HMAC-SHA256. A failed POST (network error, timeout, 408, 425, 429, 5xx) is sent again after 1 s and 5 s; each webhook's `failureCount` counts deliveries that gave up. Audit of the whole loop: `docs/AGENT_LOOP_AUDIT.md`.
 
 ## 5. Claims
 
@@ -266,7 +266,7 @@ queue for team work)*. Then all of mz's agent questions are in one app.
 - **Wake (multi-user transport, decided 2026-11-21):** the wake plumbing on
   `api.septena.app` is built multi-user from day one, with `mz-mini` as the
   first runner and Settings UI added later. Two transports share the same
-  `tasks_agent_events` event stream (`assigned`, `user_turn`, `resumed`):
+  `tasks_agent_events` event stream (`assigned`, `user_turn`, `resumed`, `unpaused`):
   1. **Outbound webhook URL** attached to an agent key or pairing (HMAC-signed
      POST with event payload) — works for cloud routines, OpenClaw, n8n, and
      tunneled hosts.

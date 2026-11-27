@@ -33,7 +33,8 @@ import {
 import {
   MAX_AGENT_WEBHOOKS,
   SSE_HEARTBEAT_MS,
-  deliverWebhookEvent,
+  deliverWebhookWithRetry,
+  WEBHOOK_RETRY_DELAYS_MS,
   formatSseEvent,
   formatSseKeepalive,
   formatSseReady,
@@ -2145,11 +2146,16 @@ export class TaskStore extends DurableObject<Env> {
     const n = Math.min(Math.max(limit, 1), 500);
     const events: AgentEvent[] = [];
     let cursor = since;
+    // The scan reached the end of the log. Only then may the cursor jump to
+    // the head: a scan cut short by the page cap must resume where it
+    // stopped, or the next call skips every row it did not read.
+    let reachedEnd = false;
     // Scan in pages so a long run of agent-only writes cannot starve the feed.
     for (let page = 0; page < 10 && events.length < n; page++) {
       const rows = this.sql.exec<{ rev: number; entity: string; id: string; op: string; diff: string | null; actor: string; at: string }>(
         "SELECT rev, entity, id, op, diff, actor, at FROM changes WHERE rev > ? ORDER BY rev LIMIT 500", cursor,
       ).toArray();
+      if (rows.length < 500) reachedEnd = true;
       if (!rows.length) break;
       for (const r of rows) {
         cursor = r.rev;
@@ -2172,7 +2178,8 @@ export class TaskStore extends DurableObject<Env> {
         if (events.length >= n) break;
       }
     }
-    return { events, nextSince: events.length >= n ? cursor : Math.max(cursor, this.meta("rev")) };
+    const full = events.length >= n;
+    return { events, nextSince: full || !reachedEnd ? cursor : Math.max(cursor, this.meta("rev")) };
   }
 
   // ---- pull ----
@@ -3489,7 +3496,7 @@ export class TaskStore extends DurableObject<Env> {
       }
     }
 
-    // 3. Outbound signed webhooks for wake-worthy events (assigned, user_turn, resumed)
+    // 3. Outbound signed webhooks for wake-worthy events (WAKE_EVENT_KINDS)
     const wakeEvents = events.filter((ev) => isWakeEventKind(ev.kind));
     if (wakeEvents.length === 0) return;
     const targets: AgentWebhookTarget[] = this.sql.exec<{ id: string; url: string; secret: string }>(
@@ -3505,11 +3512,14 @@ export class TaskStore extends DurableObject<Env> {
     }
   }
 
+  /// The waits between webhook attempts. Tests set it to zeros.
+  private webhookRetryDelaysMs: readonly number[] = WEBHOOK_RETRY_DELAYS_MS;
+
   private async deliverAgentWebhooks(targets: AgentWebhookTarget[], events: AgentEvent[]): Promise<void> {
     await Promise.allSettled(
       targets.flatMap((target) =>
         events.map(async (ev) => {
-          const res = await deliverWebhookEvent(target, ev);
+          const res = await deliverWebhookWithRetry(target, ev, this.webhookRetryDelaysMs);
           try {
             this.recordAgentWebhookDelivery(target.id, res.status, res.ok, res.deliveredAt);
           } catch {
