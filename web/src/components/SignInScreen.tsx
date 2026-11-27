@@ -325,26 +325,22 @@ export function SignInScreen({ api, language, isDark, dayISO, onSignedIn }: Sign
           </>
         )}
 
-        {/* A visitor with no Septena app has nothing to approve this browser
-            from: point them at the apps. Same tab, like every site link. */}
-        <p className="mt-5 text-center text-sm text-[var(--text-secondary)]">
-          New to Septena?{" "}
-          <a
-            href="https://septena.app/download"
-            className="font-medium text-[var(--accent)] underline-offset-4 hover:underline"
-          >
-            Get the app
-          </a>
-        </p>
+        {/* Only show when the server falls back to device-only approval, where a
+            new visitor has no existing app to approve this browser from. */}
+        {methods !== null && !hasPrimary && (
+          <p className="mt-5 text-center text-sm text-[var(--text-secondary)]">
+            New to Septena?{" "}
+            <a
+              href="https://septena.app/download"
+              className="font-medium text-[var(--accent)] underline-offset-4 hover:underline"
+            >
+              Get the app
+            </a>
+          </p>
+        )}
 
-        <p className="mt-4 text-center text-xs leading-relaxed text-[var(--text-muted)]">
+        <p className="mt-5 text-center text-xs leading-relaxed text-[var(--text-muted)]">
           {withLinks(registryText(SIGN_IN.copy.terms, language), links)}
-        </p>
-
-        <p className="mt-6 border-t border-[var(--border-subtle)] pt-4 text-xs leading-relaxed text-[var(--text-muted)]">
-          Task data syncs directly between this browser and{" "}
-          <span className="font-mono-tabular">api.septena.app</span>, stored locally in
-          IndexedDB so new tasks queue offline and push on reconnect.
         </p>
       </div>
     </main>
