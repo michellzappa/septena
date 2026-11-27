@@ -1967,8 +1967,8 @@
       "surfaces.prompts.items.agentReplaces.message"
     ]
   },
-  "If you prefer not to keep a subscription, one payment covers seven years of Septena Plus across your devices. That works out to half the annual rate. When the seven years end, your tasks stay on your devices, and you can extend, move to a free account, or export everything. Support for running the open-source sync server on your own Cloudflare account is on the roadmap.": {
-    "text": "If you prefer not to keep a subscription, one payment covers seven years of Septena Plus across your devices. That works out to half the annual rate. When the seven years end, your tasks stay on your devices, and you can extend, move to a free account, or export everything. Support for running the open-source sync server on your own Cloudflare account is on the roadmap.",
+  "If you prefer not to keep a subscription, one payment covers seven years of Septena Plus across your devices, for the price of three annual years. When the seven years end, your tasks stay on your devices, and you can extend, move to a free account, or export everything. Support for running the open-source sync server on your own Cloudflare account is on the roadmap.": {
+    "text": "If you prefer not to keep a subscription, one payment covers seven years of Septena Plus across your devices, for the price of three annual years. When the seven years end, your tasks stay on your devices, and you can extend, move to a free account, or export everything. Support for running the open-source sync server on your own Cloudflare account is on the roadmap.",
     "paths": [
       "plans.pass.detail"
     ]
@@ -3215,8 +3215,8 @@
       "settings.copy.import_export.importJsonDetail.label"
     ]
   },
-  "Prices include VAT where it applies. Outside the euro area, the App Store and Google Play charge their matching local price.": {
-    "text": "Prices include VAT where it applies. Outside the euro area, the App Store and Google Play charge their matching local price.",
+  "Prices include VAT where it applies. In the US, prices are the same numbers in USD plus applicable local sales tax. Elsewhere, the App Store and Google Play charge their matching local price.": {
+    "text": "Prices include VAT where it applies. In the US, prices are the same numbers in USD plus applicable local sales tax. Elsewhere, the App Store and Google Play charge their matching local price.",
     "paths": [
       "plans.priceFootnote"
     ]
@@ -4882,6 +4882,18 @@
       "settings.keys.tasksTitleLines.options.1.title"
     ]
   },
+  "Two months free. You save €14 against paying monthly.": {
+    "text": "Two months free. You save €14 against paying monthly.",
+    "paths": [
+      "plans.prices.annual.detail"
+    ]
+  },
+  "Two months free. You save €28 against paying monthly.": {
+    "text": "Two months free. You save €28 against paying monthly.",
+    "paths": [
+      "plans.proPrices.pro_annual.detail"
+    ]
+  },
   "Type above to add your first task.": {
     "text": "Type above to add your first task.",
     "paths": [
@@ -5709,29 +5721,23 @@
       "plans.cards.free.priceLabel"
     ]
   },
-  "€10 a month. You save €48 against paying monthly.": {
-    "text": "€10 a month. You save €48 against paying monthly.",
+  "€14 a month": {
+    "text": "€14 a month",
     "paths": [
-      "plans.proPrices.pro_annual.detail"
+      "plans.proPrices.pro_monthly.label"
     ]
   },
-  "€120 a year": {
-    "text": "€120 a year",
+  "€140 a year": {
+    "text": "€140 a year",
     "paths": [
       "plans.proPrices.pro_annual.label",
       "plans.cards.pro.priceLabel"
     ]
   },
-  "€120 a year or €14 a month": {
-    "text": "€120 a year or €14 a month",
+  "€140 a year or €14 a month": {
+    "text": "€140 a year or €14 a month",
     "paths": [
       "plans.levels.pro.detail"
-    ]
-  },
-  "€14 a month": {
-    "text": "€14 a month",
-    "paths": [
-      "plans.proPrices.pro_monthly.label"
     ]
   },
   "€210 once": {
@@ -5740,34 +5746,28 @@
       "plans.pass.label"
     ]
   },
-  "€30 a year for 7 years. Half the annual rate.": {
-    "text": "€30 a year for 7 years. Half the annual rate.",
+  "€30 a year for 7 years. Pay for 3 years, get 7.": {
+    "text": "€30 a year for 7 years. Pay for 3 years, get 7.",
     "paths": [
       "plans.pass.rateDetail"
-    ]
-  },
-  "€5 a month. You save €24 against paying monthly.": {
-    "text": "€5 a month. You save €24 against paying monthly.",
-    "paths": [
-      "plans.prices.annual.detail"
-    ]
-  },
-  "€60 a year": {
-    "text": "€60 a year",
-    "paths": [
-      "plans.prices.annual.label"
-    ]
-  },
-  "€60 a year or €7 a month": {
-    "text": "€60 a year or €7 a month",
-    "paths": [
-      "plans.levels.plus.detail"
     ]
   },
   "€7 a month": {
     "text": "€7 a month",
     "paths": [
       "plans.prices.monthly.label"
+    ]
+  },
+  "€70 a year": {
+    "text": "€70 a year",
+    "paths": [
+      "plans.prices.annual.label"
+    ]
+  },
+  "€70 a year or €7 a month": {
+    "text": "€70 a year or €7 a month",
+    "paths": [
+      "plans.levels.plus.detail"
     ]
   }
 }
