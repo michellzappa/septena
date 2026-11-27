@@ -135,3 +135,20 @@ export function groupTasksByList<
 
   return { ungrouped, groups };
 }
+
+/**
+ * Manual reorder by drag: move `sourceId` to the slot `targetId` holds and return the new
+ * order, or null when the drop means nothing (same row, or either id missing). Task rows and
+ * project headings share it; the caller writes the order with `engine.reorderTasks`, which
+ * gives every id a position of (index + 1) * 1000, so no write is ever 0 (the unset value).
+ */
+export function moveIdToTarget(ids: readonly string[], sourceId: string, targetId: string): string[] | null {
+  if (sourceId === targetId) return null;
+  const fromIdx = ids.indexOf(sourceId);
+  const toIdx = ids.indexOf(targetId);
+  if (fromIdx < 0 || toIdx < 0) return null;
+  const next = [...ids];
+  const [moved] = next.splice(fromIdx, 1);
+  next.splice(toIdx, 0, moved);
+  return next;
+}

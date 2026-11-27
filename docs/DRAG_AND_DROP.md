@@ -63,6 +63,11 @@ that files still lands: onto a Today or Anytime group header, into another
 group of the Mac list, onto a project heading, or onto the sidebar. The row
 then takes its sorted place, and no `position` is written. Headings still
 reorder in a sorted project. Manual shows the stored order again, untouched.
+On the web, a project heading drags onto another heading to take its slot
+(`handleDropOnHeading` in `web/src/components/SeptenaApp.tsx`), with the
+same accent top border as a task-row drop, in a sorted or Manual project.
+It writes the headings' `position` through `engine.reorderTasks`, the task-row
+reorder path, which never writes 0.
 
 ---
 

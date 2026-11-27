@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { groupTasksByList, nextStructurePosition, orderByPosition } from "../src/lib/listOrder.ts";
+import { groupTasksByList, moveIdToTarget, nextStructurePosition, orderByPosition } from "../src/lib/listOrder.ts";
 import type { AreaRow, ProjectRow } from "../src/lib/types.ts";
 
 test("orderByPosition puts positioned items ascending and sinks position 0/unset to bottom", () => {
@@ -54,4 +54,16 @@ test("nextStructurePosition uses 0 for unpositioned/mixed groups and max + 1 for
   assert.equal(nextStructurePosition([{ position: 0 }, { position: null }]), 0);
   assert.equal(nextStructurePosition([{ position: 1 }, { position: 0 }]), 0);
   assert.equal(nextStructurePosition([{ position: 1 }, { position: 3 }, { position: 2 }]), 4);
+});
+
+test("moveIdToTarget moves a row into the target's slot in both directions", () => {
+  const ids = ["h1", "h2", "h3", "h4"];
+  assert.deepEqual(moveIdToTarget(ids, "h1", "h3"), ["h2", "h3", "h1", "h4"]);
+  assert.deepEqual(moveIdToTarget(ids, "h4", "h2"), ["h1", "h4", "h2", "h3"]);
+});
+
+test("moveIdToTarget refuses a drop on itself or on an id outside the list", () => {
+  assert.equal(moveIdToTarget(["a", "b"], "a", "a"), null);
+  assert.equal(moveIdToTarget(["a", "b"], "x", "b"), null);
+  assert.equal(moveIdToTarget(["a", "b"], "a", "x"), null);
 });

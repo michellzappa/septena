@@ -70,7 +70,7 @@ import {
   PLAN_UI,
 } from "@/lib/generated/registries";
 import { hexWithAlpha, type HeaderTextureStyle } from "@/lib/headerWash";
-import { groupTasksByList, orderByPosition } from "@/lib/listOrder";
+import { groupTasksByList, moveIdToTarget, orderByPosition } from "@/lib/listOrder";
 import {
   LIST_SORT_OPTIONS,
   LIST_SORT_SURFACE,
@@ -339,6 +339,10 @@ export function SeptenaApp() {
     | null
   >(null);
   const [dropTargetTaskId, setDropTargetTaskId] = useState<string | null>(null);
+  // A project heading in drag. Kept apart from draggedTaskId so a heading never lands on a
+  // task row or on the sidebar: it only reorders among the project's headings.
+  const [draggedHeadingId, setDraggedHeadingId] = useState<string | null>(null);
+  const [dropTargetHeadingId, setDropTargetHeadingId] = useState<string | null>(null);
   const [dropTargetSidebar, setDropTargetSidebar] = useState<string | null>(null);
 
   // Reminders
@@ -1738,19 +1742,38 @@ export function SeptenaApp() {
       const sourceId = draggedTaskId;
       setDraggedTaskId(null);
       setDropTargetTaskId(null);
-      if (!sourceId || sourceId === targetId || !canReorderRows) return;
-      const ids = visibleTasks.map((v) => v.task.id);
-      const fromIdx = ids.indexOf(sourceId);
-      const toIdx = ids.indexOf(targetId);
-      if (fromIdx < 0 || toIdx < 0) return;
-      const reordered = [...ids];
-      const [moved] = reordered.splice(fromIdx, 1);
-      reordered.splice(toIdx, 0, moved);
+      if (!sourceId || !canReorderRows) return;
+      const reordered = moveIdToTarget(
+        visibleTasks.map((v) => v.task.id),
+        sourceId,
+        targetId,
+      );
+      if (!reordered) return;
       const field =
         destination.kind === "smart" && destination.id === "today" ? "todayPosition" : "position";
       await engine.reorderTasks(reordered, field);
     },
     [canReorderRows, destination, draggedTaskId, engine, visibleTasks],
+  );
+
+  // A project heading dropped on another heading: reorder the project's headings. Its tasks
+  // follow, because they point at the heading. Headings keep their manual order in a sorted
+  // project too (docs/LIST_SORT_SPEC.md §6), so this does not check canReorderRows.
+  const handleDropOnHeading = useCallback(
+    async (targetId: string) => {
+      const sourceId = draggedHeadingId;
+      setDraggedHeadingId(null);
+      setDropTargetHeadingId(null);
+      if (!sourceId) return;
+      const reordered = moveIdToTarget(
+        projectHeadings.map((h) => h.id),
+        sourceId,
+        targetId,
+      );
+      if (!reordered) return;
+      await engine.reorderTasks(reordered, "position");
+    },
+    [draggedHeadingId, engine, projectHeadings],
   );
 
   const handleDropOnSidebarSmart = useCallback(
@@ -2739,6 +2762,7 @@ export function SeptenaApp() {
     muted = false,
     collapse,
     onContextMenu,
+    drag,
   }: {
     leading?: React.ReactNode;
     title: string;
@@ -2747,6 +2771,15 @@ export function SeptenaApp() {
     muted?: boolean;
     collapse?: { expanded: boolean; onToggle: () => void };
     onContextMenu?: (e: React.MouseEvent) => void;
+    /** A header the user reorders by drag (a project heading). Same drop mark as a task row. */
+    drag?: {
+      isDropTarget: boolean;
+      onDragStart: (e: React.DragEvent) => void;
+      onDragEnd: () => void;
+      onDragOver: (e: React.DragEvent) => void;
+      onDragLeave: () => void;
+      onDrop: (e: React.DragEvent) => void;
+    };
   }) => {
     const Chevron = collapse?.expanded ? ChevronDown : ChevronRight;
     const inner = (
@@ -2788,6 +2821,22 @@ export function SeptenaApp() {
         >
           {inner}
         </button>
+      );
+    }
+    if (drag) {
+      return (
+        <div
+          draggable
+          onDragStart={drag.onDragStart}
+          onDragEnd={drag.onDragEnd}
+          onDragOver={drag.onDragOver}
+          onDragLeave={drag.onDragLeave}
+          onDrop={drag.onDrop}
+          onContextMenu={onContextMenu}
+          className={`${className} cursor-grab ${drag.isDropTarget ? "border-t-2 border-[var(--accent)]" : ""}`}
+        >
+          {inner}
+        </div>
       );
     }
     return (
@@ -4649,6 +4698,30 @@ export function SeptenaApp() {
                     <section key={h.id}>
                       {renderSectionHeader({
                         title: h.title,
+                        drag: {
+                          isDropTarget: dropTargetHeadingId === h.id && draggedHeadingId !== h.id,
+                          onDragStart: (e) => {
+                            setDraggedHeadingId(h.id);
+                            e.dataTransfer.effectAllowed = "move";
+                            e.dataTransfer.setData("text/plain", h.id);
+                          },
+                          onDragEnd: () => {
+                            setDraggedHeadingId(null);
+                            setDropTargetHeadingId(null);
+                          },
+                          onDragOver: (e) => {
+                            if (!draggedHeadingId) return;
+                            e.preventDefault();
+                            setDropTargetHeadingId(h.id);
+                          },
+                          onDragLeave: () => {
+                            setDropTargetHeadingId((prev) => (prev === h.id ? null : prev));
+                          },
+                          onDrop: (e) => {
+                            e.preventDefault();
+                            void handleDropOnHeading(h.id);
+                          },
+                        },
                         onContextMenu: (e) => {
                           e.preventDefault();
                           setContextMenu({
