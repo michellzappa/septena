@@ -1,32 +1,69 @@
-// The Plus sheet: the one place in the app that sells Septena Plus
-// (docs/SYNC_SUBSCRIPTION_SPEC.md §7.1, ADR 0026).
+// The plan sheet: the one place in the app that sells Septena Plus and Pro
+// (docs/SYNC_SUBSCRIPTION_SPEC.md §7.1, ADR 0026, ADR 0059).
 //
 // It opens only from a tap: "See Plus" on an upsell moment (§3.2), on the
-// trial-end notice, or on Settings ▸ Septena Plus. Never on launch, never
-// on a timer. Every word comes from `registry/plans.json` (`RegistryPlans`).
+// trial-end notice, on a full agent list, or on Settings ▸ Septena Plus.
+// Never on launch, never on a timer. Every word comes from
+// `registry/plans.json` (`RegistryPlans`).
+//
+// The sheet sells in context:
+// - the moment that opened it comes first, title and detail, so the reader
+//   sees why the sheet is there before any price;
+// - it opens on the plan that answers that moment (`upsells[].plan`), and an
+//   account on Plus opens on Pro, the plan above it;
+// - the plan's card rows (devices, agents, files, history) show what changes
+//   against the plan the account has now, and the changed values stand out;
+// - the price comes last, from StoreKit, with cancel-anytime and the
+//   no-hostage promise under it.
 //
 // The purchase UI is StoreKit's own `SubscriptionStoreView`: it draws the
 // products, the localized prices and periods and the purchase button. The
-// sheet adds the header, the plan states, and hands every result to
+// sheet adds the pitch and the plan states, and hands every result to
 // `PlusStore`, which posts it to the server before anything turns on.
 
 import StoreKit
 import SwiftUI
 
 struct SeptaskPlusSheet: View {
-  /// The upsell moment that opened the sheet (`RegistryPlans.upsell(_:)`),
-  /// shown as the first line so the user sees why it opened.
+  /// The upsell moment that opened the sheet (`RegistryPlans.upsell(_:)`).
   var upsellID: String?
   /// Closes the sheet where SwiftUI's `dismiss` does not reach: the AppKit
   /// shell presents it from an `NSHostingController`.
   var onClose: (() -> Void)? = nil
 
   @Environment(\.dismiss) private var dismiss
+  /// The plan the reader picked; nil until they pick one.
+  @State private var picked: PlanTier?
   private var status: PlanStatus { .shared }
   private var store: PlusStore { .shared }
 
   private func close() {
     if let onClose { onClose() } else { dismiss() }
+  }
+
+  /// The plans this account can buy: both, or only Pro for an account on
+  /// Plus (an upgrade in the same subscription group).
+  private var tiers: [PlanTier] {
+    if case .plus = status.plan { return [.pro] }
+    return PlanTier.allCases
+  }
+
+  /// The picked plan, else the recommended one, limited to `tiers`. The
+  /// plan state is read here, on the main actor, not inside the binding.
+  private var selection: Binding<PlanTier> {
+    let allowed = tiers
+    let chosen = picked ?? PlanTier.recommended(upsellID: upsellID, status: status)
+    let tier = allowed.contains(chosen) ? chosen : allowed[0]
+    return Binding(get: { tier }, set: { picked = $0 })
+  }
+
+  /// An account on Plus through the App Store or a grant can move to Pro
+  /// here. Plus bought on Google Play or the web changes plan there, so the
+  /// account never pays twice (ADR 0026).
+  private var canUpgrade: Bool {
+    guard case .plus(_, let source) = status.plan, !status.isPro else { return false }
+    guard source == "apple" || source == "grant" else { return false }
+    return PlusStore.checkoutAvailable && status.appAccountToken != nil && !status.plusOwnedByAnotherAccount
   }
 
   var body: some View {
@@ -43,7 +80,7 @@ struct SeptaskPlusSheet: View {
         }
     }
     #if os(macOS)
-    .frame(minWidth: 420, minHeight: 560)
+    .frame(minWidth: 440, minHeight: 600)
     #endif
     // Again after a sign-in from inside the sheet: the server starts the
     // trial on the first sign-in, and the sheet then shows the store.
@@ -58,26 +95,31 @@ struct SeptaskPlusSheet: View {
     } else {
       switch status.plan {
       case .plus(_, let source):
-        PlusOwnedView(source: source)
-      case .free, .trial:
-        if status.plusOwnedByAnotherAccount {
-          PlusInfoView(upsellID: upsellID, onSynced: close)
-        } else if PlusStore.checkoutAvailable, status.canPurchase {
-          storeView
+        if canUpgrade {
+          storeView(upgrade: true)
         } else {
-          PlusInfoView(upsellID: upsellID, onSynced: close)
+          PlusOwnedView(source: source)
+        }
+      case .free, .trial:
+        if !status.plusOwnedByAnotherAccount, PlusStore.checkoutAvailable, status.canPurchase {
+          storeView(upgrade: false)
+        } else {
+          PlusInfoView(upsellID: upsellID, tiers: tiers, selection: selection, onSynced: close)
         }
       case .device, nil:
-        PlusInfoView(upsellID: upsellID, onSynced: close)
+        PlusInfoView(upsellID: upsellID, tiers: tiers, selection: selection, onSynced: close)
       }
     }
   }
 
-  /// StoreKit's subscription store, with the registry header on top.
-  private var storeView: some View {
-    SubscriptionStoreView(productIDs: PlusStore.productIDs) {
-      PlusSheetHeader(upsellID: upsellID, onSynced: close)
+  /// StoreKit's subscription store for the picked plan, with the pitch on
+  /// top. It is rebuilt when the plan changes, so it lists only that plan's
+  /// two prices.
+  private func storeView(upgrade: Bool) -> some View {
+    SubscriptionStoreView(productIDs: selection.wrappedValue.productIDs) {
+      PlanPitch(upsellID: upsellID, tiers: tiers, selection: selection, upgrade: upgrade && status.hasAppleSubscription, onSynced: close)
     }
+    .id(selection.wrappedValue)
     .subscriptionStoreControlStyle(.picker)
     .subscriptionStoreButtonLabel(.action)
     // Restore goes through PlusStore, which posts every transaction to the
@@ -90,7 +132,7 @@ struct SeptaskPlusSheet: View {
     .onInAppPurchaseCompletion { _, result in await PlusStore.shared.handle(result) }
     .safeAreaInset(edge: .bottom) {
       VStack(spacing: 6) {
-        Text(RegistryPlans.Paywall.cancelNote)
+        PlanTrustLine()
         PlusRestoreButton()
       }
       .font(.footnote)
@@ -100,32 +142,35 @@ struct SeptaskPlusSheet: View {
   }
 }
 
-/// The top of the sheet: why it opened, the name, the headline and the three
-/// outcomes.
-private struct PlusSheetHeader: View {
+/// The top of the sheet, in the order a reader decides: why the sheet
+/// opened, which plan, what that plan changes for this account.
+private struct PlanPitch: View {
   var upsellID: String?
+  var tiers: [PlanTier]
+  @Binding var selection: PlanTier
+  var upgrade = false
   /// Runs after this device took the sync slot; the sheet then closes.
   var onSynced: () -> Void = {}
   private var status: PlanStatus { .shared }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 14) {
-      if let id = upsellID, let moment = RegistryPlans.upsell(id) {
-        Text(moment.title).font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
-      }
+    VStack(alignment: .leading, spacing: 16) {
+      reason
       // The second-device moment also offers the free way out: move the
       // free account's one sync slot to this device (spec §3.2, §6.3).
       if upsellID == "second_device", status.deviceNotSyncing {
         SyncThisDeviceButton(onSynced: onSynced)
       }
-      VStack(alignment: .leading, spacing: 4) {
-        Text(title).font(.title2.weight(.bold))
-        Text(RegistryPlans.headline).font(.title3)
-      }
-      VStack(alignment: .leading, spacing: 10) {
-        ForEach(RegistryPlans.outcomes) { outcome in
-          Label(outcome.title, systemImage: RegistryIcons.sfSymbols[outcome.icon] ?? "circle")
+      if tiers.count > 1 {
+        Picker(RegistryPlans.Paywall.choosePlan, selection: $selection) {
+          ForEach(tiers) { tier in Text(tier.title).tag(tier) }
         }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+      }
+      PlanChanges(tier: selection)
+      if upgrade {
+        Text(RegistryPlans.Paywall.upgradeNote).font(.footnote).foregroundStyle(.secondary)
       }
       if case .trial(let end) = status.plan {
         VStack(alignment: .leading, spacing: 4) {
@@ -141,27 +186,131 @@ private struct PlusSheetHeader: View {
     .padding()
   }
 
+  /// Why the sheet is open: the moment, else the plan ladder's headline.
+  @ViewBuilder
+  private var reason: some View {
+    if let id = upsellID, let moment = RegistryPlans.upsell(id) {
+      VStack(alignment: .leading, spacing: 4) {
+        Text(moment.title).font(.title3.weight(.semibold))
+        Text(moment.detail).foregroundStyle(.secondary)
+      }
+    } else {
+      VStack(alignment: .leading, spacing: 4) {
+        Text(title).font(.title2.weight(.bold))
+        Text(RegistryPlans.headline).font(.title3).foregroundStyle(.secondary)
+      }
+    }
+  }
+
   private var title: String {
     if case .free(lapsed: true) = status.plan { return RegistryPlans.Paywall.welcomeBack }
     return RegistryPlans.name
   }
 }
 
+/// What the picked plan changes: its card line, then the card rows with the
+/// plan's value. A value that differs from the account's plan today stands
+/// out; one that stays the same is quiet.
+private struct PlanChanges: View {
+  let tier: PlanTier
+  private var status: PlanStatus { .shared }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 10) {
+      if let card = tier.card {
+        Label {
+          VStack(alignment: .leading, spacing: 2) {
+            Text(RegistryPlans.Paywall.youGet(plan: tier.title)).font(.headline)
+            Text(card.detail).font(.subheadline).foregroundStyle(.secondary)
+          }
+        } icon: {
+          Image(systemName: RegistryIcons.sfSymbols[card.icon] ?? "circle").foregroundStyle(.tint)
+        }
+      }
+      Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 8) {
+        ForEach(PlanTier.cardRows) { row in
+          let value = tier.cell(row)
+          let changes = value != current(row)
+          GridRow(alignment: .firstTextBaseline) {
+            Text(row.label).foregroundStyle(.secondary)
+            PlanValue(cell: value, emphasized: changes)
+              .gridColumnAlignment(.trailing)
+          }
+        }
+      }
+      .font(.subheadline)
+    }
+  }
+
+  /// The account's value today. The trial ends in a free account, so a trial
+  /// compares with Free.
+  private func current(_ row: RegistryPlanRow) -> RegistryPlanCell {
+    if case .plus = status.plan { return status.isPro ? row.pro : row.plus }
+    return row.free
+  }
+}
+
+/// One plan value: a check, a dash, or text; bold in the accent when it is
+/// what the plan adds.
+private struct PlanValue: View {
+  let cell: RegistryPlanCell
+  let emphasized: Bool
+
+  var body: some View {
+    switch cell {
+    case .included:
+      Image(systemName: "checkmark").foregroundStyle(emphasized ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
+        .accessibilityLabel(Text(RegistryPlans.Copy.included))
+    case .notIncluded:
+      Image(systemName: "minus").foregroundStyle(.tertiary)
+        .accessibilityLabel(Text(RegistryPlans.Copy.notIncluded))
+    case .text(let text):
+      Text(text)
+        .fontWeight(emphasized ? .semibold : .regular)
+        .foregroundStyle(emphasized ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
+    }
+  }
+}
+
+/// The reassurance under the price: cancel at any time, and nothing is held
+/// back when a plan ends (`promises`).
+private struct PlanTrustLine: View {
+  var body: some View {
+    VStack(spacing: 2) {
+      Text(RegistryPlans.Paywall.cancelNote)
+      if let promise = RegistryPlans.promises.first(where: { $0.id == "no_hostage" }) {
+        Text(promise.title)
+      }
+    }
+    .multilineTextAlignment(.center)
+  }
+}
+
 /// The sheet when it cannot sell here: signed out (the trial is the offer),
 /// this Apple ID's Plus belongs to another Septena account (spec §6.4
-/// finding 7), or before checkout opens.
+/// finding 7), the Mac download build (#683), or before checkout opens.
+/// It still shows the same pitch and the picked plan's prices.
 private struct PlusInfoView: View {
   var upsellID: String?
+  var tiers: [PlanTier]
+  @Binding var selection: PlanTier
   var onSynced: () -> Void = {}
   private var status: PlanStatus { .shared }
+
+  init(upsellID: String?, tiers: [PlanTier], selection: Binding<PlanTier>, onSynced: @escaping () -> Void = {}) {
+    self.upsellID = upsellID
+    self.tiers = tiers
+    self._selection = selection
+    self.onSynced = onSynced
+  }
 
   var body: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 20) {
-        PlusSheetHeader(upsellID: upsellID, onSynced: onSynced)
+        PlanPitch(upsellID: upsellID, tiers: tiers, selection: $selection, onSynced: onSynced)
         if !status.plusOwnedByAnotherAccount {
           VStack(alignment: .leading, spacing: 8) {
-            ForEach(RegistryPlans.prices) { price in
+            ForEach(selection.prices) { price in
               VStack(alignment: .leading, spacing: 2) {
                 Text(price.label).font(.body.weight(price.highlighted ? .semibold : .regular))
                 Text(price.detail).font(.subheadline).foregroundStyle(.secondary)
@@ -177,9 +326,13 @@ private struct PlusInfoView: View {
             Text(RegistryPlans.Paywall.startTrial).font(.headline)
             Text(RegistryPlans.trialDetail).font(.subheadline).foregroundStyle(.secondary)
             SeptaskSignInButton()
+          } else if RegistryPlans.checkoutOpen, PlusStore.isDirectDownload {
+            Text(RegistryPlans.Paywall.buyElsewhere).font(.subheadline).foregroundStyle(.secondary)
           } else {
             Text(RegistryPlans.checkoutNotice).font(.subheadline).foregroundStyle(.secondary)
           }
+          PlanTrustLine().font(.footnote).foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity)
         }
         .padding(.horizontal)
       }
@@ -200,6 +353,12 @@ private struct PlusOwnedView: View {
         .font(.largeTitle)
         .foregroundStyle(.tint)
       Text(line).multilineTextAlignment(.center)
+      // Plus bought on Google Play or the web moves to Pro where it was
+      // bought (ADR 0026: no second purchase for the same account).
+      if !PlanStatus.shared.isPro, source == "google" || source == "stripe" {
+        Text(RegistryPlans.Paywall.upgradeElsewhere)
+          .font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.center)
+      }
       // A grant can sit on top of a paid App Store subscription (Pro on a
       // paid Plus). The subscription still renews, so Manage stays here.
       if source == "apple" || PlanStatus.shared.hasAppleSubscription {

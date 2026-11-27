@@ -168,7 +168,7 @@ internal fun AccessDevicesList(model: AccessSettingsModel, signedIn: Boolean, la
  * disconnect, then New Agent Key for an agent that cannot sign in (#86).
  */
 @Composable
-internal fun AccessAgentsList(model: AccessSettingsModel, signedIn: Boolean, languageTag: String) {
+internal fun AccessAgentsList(model: AccessSettingsModel, signedIn: Boolean, languageTag: String, plans: PlanSettingsModel? = null) {
     if (!signedIn) return
     var renaming by remember { mutableStateOf<AgentConnection?>(null) }
     var draftName by remember { mutableStateOf("") }
@@ -195,6 +195,17 @@ internal fun AccessAgentsList(model: AccessSettingsModel, signedIn: Boolean, lan
         },
         modifier = Modifier.fillMaxWidth(),
     )
+    // Every agent slot of the plan is in use (iOS `SeptaskAgentsSections.agentsFullRow`):
+    // what the next plan connects. Free names Plus; Plus and the trial name Pro.
+    val limit = access?.agentLimit
+    if (access != null && limit != null && access.agentCount >= limit && plans?.isPro != true) {
+        planUpsell(if (plans?.isPlus == true) "agents_full_plus" else "agents_full", languageTag)?.let { (title, detail) ->
+            ListItem(
+                headlineContent = { Text(title) },
+                supportingContent = { Text(detail) },
+            )
+        }
+    }
     access?.connections.orEmpty().forEach { agent ->
         ListItem(
             headlineContent = { Text(agent.name) },

@@ -1,71 +1,115 @@
 {
-  "appPolicies": {
-    "eula": "",
-    "policies": []
+  "appPolicies" : {
+    "eula" : "",
+    "policies" : []
   },
-  "identifier": "SeptenaPlus",
-  "nonRenewingSubscriptions": [],
-  "products": [],
-  "settings": {
-    "_failTransactionsEnabled": false,
-    "_storeKitErrors": [],
-    "_storefront": "NLD"
+  "identifier" : "SeptenaPlus",
+  "nonRenewingSubscriptions" : [],
+  "products" : [],
+  "settings" : {
+    "_failTransactionsEnabled" : false,
+    "_storeKitErrors" : [],
+    "_storefront" : "NLD"
   },
-  "subscriptionGroups": [
+  "subscriptionGroups" : [
     {
-      "id": "30001",
-      "localizations": [],
-      "name": "Septena Plus",
-      "subscriptions": [
+      "id" : "30001",
+      "localizations" : [],
+      "name" : "Septena",
+      "subscriptions" : [
         {
-          "adHocOffers": [],
-          "codeOffers": [],
-          "displayPrice": "60.00",
-          "familyShareable": false,
-          "groupNumber": 1,
-          "internalID": "30002",
-          "introductoryOffer": null,
-          "localizations": [
+          "adHocOffers" : [],
+          "codeOffers" : [],
+          "displayPrice" : "120.00",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "30004",
+          "introductoryOffer" : null,
+          "localizations" : [
             {
-              "description": "Sync on all your devices, a year of history and synced files. Billed every year.",
-              "displayName": "Septena Plus Yearly",
-              "locale": "en_US"
+              "description" : "Plus with no agent limit and 50 GB of files. Billed every year.",
+              "displayName" : "Septena Pro Yearly",
+              "locale" : "en_US"
             }
           ],
-          "productID": "com.septena.tasks.sync.annual",
-          "recurringSubscriptionPeriod": "P1Y",
-          "referenceName": "Septena Plus Yearly",
-          "subscriptionGroupID": "30001",
-          "type": "RecurringSubscription",
-          "winbackOffers": []
+          "productID" : "com.septena.tasks.sync.pro.annual",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "Septena Pro Yearly",
+          "subscriptionGroupID" : "30001",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : []
         },
         {
-          "adHocOffers": [],
-          "codeOffers": [],
-          "displayPrice": "7.00",
-          "familyShareable": false,
-          "groupNumber": 1,
-          "internalID": "30003",
-          "introductoryOffer": null,
-          "localizations": [
+          "adHocOffers" : [],
+          "codeOffers" : [],
+          "displayPrice" : "14.00",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "30005",
+          "introductoryOffer" : null,
+          "localizations" : [
             {
-              "description": "Sync on all your devices, a year of history and synced files. Billed every month.",
-              "displayName": "Septena Plus Monthly",
-              "locale": "en_US"
+              "description" : "Plus with no agent limit and 50 GB of files. Billed every month.",
+              "displayName" : "Septena Pro Monthly",
+              "locale" : "en_US"
             }
           ],
-          "productID": "com.septena.tasks.sync.monthly",
-          "recurringSubscriptionPeriod": "P1M",
-          "referenceName": "Septena Plus Monthly",
-          "subscriptionGroupID": "30001",
-          "type": "RecurringSubscription",
-          "winbackOffers": []
+          "productID" : "com.septena.tasks.sync.pro.monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Septena Pro Monthly",
+          "subscriptionGroupID" : "30001",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : []
+        },
+        {
+          "adHocOffers" : [],
+          "codeOffers" : [],
+          "displayPrice" : "60.00",
+          "familyShareable" : false,
+          "groupNumber" : 2,
+          "internalID" : "30002",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Sync on all your devices, a year of history and synced files. Billed every year.",
+              "displayName" : "Septena Plus Yearly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.septena.tasks.sync.annual",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "Septena Plus Yearly",
+          "subscriptionGroupID" : "30001",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : []
+        },
+        {
+          "adHocOffers" : [],
+          "codeOffers" : [],
+          "displayPrice" : "7.00",
+          "familyShareable" : false,
+          "groupNumber" : 2,
+          "internalID" : "30003",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Sync on all your devices, a year of history and synced files. Billed every month.",
+              "displayName" : "Septena Plus Monthly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.septena.tasks.sync.monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Septena Plus Monthly",
+          "subscriptionGroupID" : "30001",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : []
         }
       ]
     }
   ],
-  "version": {
-    "major": 4,
-    "minor": 0
+  "version" : {
+    "major" : 4,
+    "minor" : 0
   }
 }

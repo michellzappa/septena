@@ -3944,6 +3944,10 @@
         }
       }
     },
+    "A free account connects one agent. Plus connects three. Pro has no limit." : {
+      "comment" : "Generated from registry plans.upsells.agents_full.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "A free account shows 30 days of history. Plus shows a full year." : {
       "comment" : "Generated from registry plans.upsells.history_edge.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -6124,6 +6128,10 @@
           }
         }
       }
+    },
+    "All three agent slots are in use" : {
+      "comment" : "Generated from registry plans.upsells.agents_full_plus.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "All your devices" : {
       "comment" : "Generated from registry plans.outcomes.everywhere.rows.devices.cells.plus. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -9077,6 +9085,10 @@
           }
         }
       }
+    },
+    "Choose a plan" : {
+      "comment" : "Generated from registry plans.paywall.choosePlan. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Chore" : {
       "extractionState" : "manual",
@@ -22988,6 +23000,10 @@
         }
       }
     },
+    "Move to Pro" : {
+      "comment" : "Generated from registry plans.paywall.upgradeToPro. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Move to Section" : {
       "comment" : "Generated from registry actions.contextMenus.task.row.moveToSection.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -28205,6 +28221,10 @@
         }
       }
     },
+    "Plus connects three agents. Pro connects as many as you run, and holds 50 GB of files." : {
+      "comment" : "Generated from registry plans.upsells.agents_full_plus.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Plus is on for this account." : {
       "comment" : "Generated from registry plans.paywall.ownedGrant. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -28972,6 +28992,10 @@
           }
         }
       }
+    },
+    "Pro starts right away. The App Store refunds the unused part of your Plus." : {
+      "comment" : "Generated from registry plans.paywall.upgradeNote. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Pro through %@" : {
       "comment" : "Generated from registry plans.status.proThrough. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -32496,6 +32520,10 @@
           }
         }
       }
+    },
+    "See Pro" : {
+      "comment" : "Generated from registry plans.paywall.seePro. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "See what Plus adds" : {
       "comment" : "Generated from registry plans.actions.learnMore. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -39098,6 +39126,10 @@
       "comment" : "Generated from registry signIn.errors.codeExpired. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
+    "This copy of Septena does not sell plans. Buy Plus or Pro in the App Store version on any device. It turns on here when you sign in to the same account." : {
+      "comment" : "Generated from registry plans.paywall.buyElsewhere. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "This deletes the following from the Septena server:" : {
       "comment" : "Generated from registry settings.copy.delete_account.intro.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -39650,6 +39682,10 @@
           }
         }
       }
+    },
+    "To move to Pro, change your plan in the store where you bought Plus." : {
+      "comment" : "Generated from registry plans.paywall.upgradeElsewhere. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "To sign in on a new phone, tablet or computer, tap Get a sign-in code on it. Then scan or enter that code here." : {
       "comment" : "Generated from registry settings.copy.sign_in_approval.footer.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -42445,6 +42481,10 @@
         }
       }
     },
+    "With %@" : {
+      "comment" : "Generated from registry plans.paywall.youGet. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Work" : {
       "comment" : "Generated from registry settings.copy.ai_explainer.workTitle.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -43479,6 +43519,10 @@
           }
         }
       }
+    },
+    "Your agent slot is in use" : {
+      "comment" : "Generated from registry plans.upsells.agents_full.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Your agent's questions, finished work and tasks in progress show up here, and so do tasks you are waiting on. Faded tasks do too." : {
       "comment" : "Generated from registry destinations.destinations.review.emptyState.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",

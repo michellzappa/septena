@@ -105,19 +105,50 @@ struct SeptaskAgentsSections: View {
   @State private var keyName = ""
   /// The new key, shown once.
   @State private var createdKey: String?
+  /// The plan sheet, opened from the full-list line, with the moment it
+  /// opened for.
+  @State private var showingPlans = false
+  @State private var plansMoment: String?
 
   var body: some View {
     Section {
       summaryRow
+        .sheet(isPresented: $showingPlans) { SeptaskPlusSheet(upsellID: plansMoment) }
       ForEach(roster.agents) { agent in
         agentRow(agent)
       }
+      agentsFullRow
       newKeyRow
       if let error = roster.lastError {
         Text(error).font(.caption).foregroundStyle(.red)
       }
     } footer: {
       if let footer = Self.section?.footer { Text(footer) }
+    }
+  }
+
+  /// Every agent slot of the plan is in use: one line that says so and
+  /// what the next plan connects, with the plan sheet one tap away. Free
+  /// opens on Plus, Plus and the trial on Pro (`upsells[].plan`). The server
+  /// only logs past the limit today (#445); the line is the honest state.
+  private var agentsFullMoment: RegistryPlanNote? {
+    guard let access = roster.access, let limit = access.agents?.limit,
+          access.agentCount >= limit, !PlanStatus.shared.isPro else { return nil }
+    return RegistryPlans.upsell(PlanStatus.shared.isPlus ? "agents_full_plus" : "agents_full")
+  }
+
+  @ViewBuilder
+  private var agentsFullRow: some View {
+    if let moment = agentsFullMoment {
+      VStack(alignment: .leading, spacing: 6) {
+        Text(moment.title).font(.body.weight(.medium))
+        Text(moment.detail).font(.subheadline).foregroundStyle(.secondary)
+        Button(moment.plan == "pro" ? RegistryPlans.Paywall.seePro : RegistryPlans.Paywall.seePlus) {
+          plansMoment = moment.id
+          showingPlans = true
+        }
+      }
+      .padding(.vertical, 2)
     }
   }
 

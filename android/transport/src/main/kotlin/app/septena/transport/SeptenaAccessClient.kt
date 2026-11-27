@@ -33,6 +33,8 @@ data class AccountAccess(
     val connections: List<AgentConnection>,
     /** `agents.count`; an old server leaves it out, so it falls back to the number of connections. */
     val agentCount: Int,
+    /** `agents.limit`: the plan's agent slots, null for no limit (Pro) or an old server. */
+    val agentLimit: Int? = null,
 )
 
 /** One row of `GET /v1/entitlement` `entitlements` (ADR 0026). */
@@ -181,6 +183,7 @@ class SeptenaAccessClient(
             devices = devices,
             connections = connections,
             agentCount = agents?.fields?.get("count").longValue()?.toInt() ?: connections.size,
+            agentLimit = agents?.fields?.get("limit").longValue()?.toInt(),
         )
     }
 

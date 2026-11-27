@@ -406,7 +406,7 @@ private fun SettingsRegistryRow(
                     }
                 }
                 "access_devices" -> AccessDevicesList(accessModel, signedIn, languageTag)
-                "access_agents" -> AccessAgentsList(accessModel, signedIn, languageTag)
+                "access_agents" -> AccessAgentsList(accessModel, signedIn, languageTag, surfaceEnv.plans)
                 APPEARANCE_PICKER_SURFACE -> AppearancePicker(languageTag)
                 "account_profile_editor" -> {
                     val key = item.ownsKeys.firstOrNull() ?: return

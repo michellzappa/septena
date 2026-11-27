@@ -76,6 +76,12 @@
       "plans.outcomes.nothing_lost.rows.files.cells.pro"
     ]
   },
+  "A free account connects one agent. Plus connects three. Pro has no limit.": {
+    "text": "A free account connects one agent. Plus connects three. Pro has no limit.",
+    "paths": [
+      "plans.upsells.agents_full.detail"
+    ]
+  },
   "A free account shows 30 days of history. Plus shows a full year.": {
     "text": "A free account shows 30 days of history. Plus shows a full year.",
     "paths": [
@@ -346,6 +352,12 @@
     "text": "All dated tasks",
     "paths": [
       "settings.copy.calendar_detail.scopeAll.label"
+    ]
+  },
+  "All three agent slots are in use": {
+    "text": "All three agent slots are in use",
+    "paths": [
+      "plans.upsells.agents_full_plus.title"
     ]
   },
   "All your devices": {
@@ -688,6 +700,12 @@
     "text": "Checklist",
     "paths": [
       "surfaces.taskAttributes.checklist.label"
+    ]
+  },
+  "Choose a plan": {
+    "text": "Choose a plan",
+    "paths": [
+      "plans.paywall.choosePlan"
     ]
   },
   "Classic Window": {
@@ -2967,6 +2985,12 @@
       "plans.status.plus"
     ]
   },
+  "Plus connects three agents. Pro connects as many as you run, and holds 50 GB of files.": {
+    "text": "Plus connects three agents. Pro connects as many as you run, and holds 50 GB of files.",
+    "paths": [
+      "plans.upsells.agents_full_plus.detail"
+    ]
+  },
   "Plus is on for this account.": {
     "text": "Plus is on for this account.",
     "paths": [
@@ -3082,6 +3106,12 @@
     "text": "Pro is on for this account.",
     "paths": [
       "plans.paywall.ownedGrantPro"
+    ]
+  },
+  "Pro starts right away. The App Store refunds the unused part of your Plus.": {
+    "text": "Pro starts right away. The App Store refunds the unused part of your Plus.",
+    "paths": [
+      "plans.paywall.upgradeNote"
     ]
   },
   "Pro through {date}": {
@@ -3514,6 +3544,12 @@
       "surfaces.notices.items.trialEnd.primaryTitle",
       "surfaces.notices.items.secondDevice.primaryTitle",
       "plans.paywall.seePlus"
+    ]
+  },
+  "See Pro": {
+    "text": "See Pro",
+    "paths": [
+      "plans.paywall.seePro"
     ]
   },
   "See what Plus adds": {
@@ -4422,6 +4458,12 @@
       "signIn.errors.codeExpired"
     ]
   },
+  "This copy of Septena does not sell plans. Buy Plus or Pro in the App Store version on any device. It turns on here when you sign in to the same account.": {
+    "text": "This copy of Septena does not sell plans. Buy Plus or Pro in the App Store version on any device. It turns on here when you sign in to the same account.",
+    "paths": [
+      "plans.paywall.buyElsewhere"
+    ]
+  },
   "This deletes the following from the Septena server:": {
     "text": "This deletes the following from the Septena server:",
     "paths": [
@@ -4502,6 +4544,12 @@
     "text": "Title lines",
     "paths": [
       "settings.pages.appearance.sections.appearance.items.2.label"
+    ]
+  },
+  "To move to Pro, change your plan in the store where you bought Plus.": {
+    "text": "To move to Pro, change your plan in the store where you bought Plus.",
+    "paths": [
+      "plans.paywall.upgradeElsewhere"
     ]
   },
   "To sign in on a new phone, tablet or computer, tap Get a sign-in code on it. Then scan or enter that code here.": {
@@ -4869,6 +4917,15 @@
       "settings.copy.ai_explainer.turnHeader.label"
     ]
   },
+  "With {plan}": {
+    "text": "With {plan}",
+    "placeholders": [
+      "plan"
+    ],
+    "paths": [
+      "plans.paywall.youGet"
+    ]
+  },
   "Work": {
     "text": "Work",
     "paths": [
@@ -5010,6 +5067,12 @@
     "text": "Your agent key",
     "paths": [
       "surfaces.prompts.items.agentKeyCreated.title"
+    ]
+  },
+  "Your agent slot is in use": {
+    "text": "Your agent slot is in use",
+    "paths": [
+      "plans.upsells.agents_full.title"
     ]
   },
   "Your agent's questions, finished work and tasks in progress show up here, and so do tasks you are waiting on. Faded tasks do too.": {
