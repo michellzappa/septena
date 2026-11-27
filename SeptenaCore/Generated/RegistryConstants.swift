@@ -242,6 +242,10 @@ enum RegistryIcons {
     "plans.free": "iphone",
     "plans.pro": "infinity",
     "plans.history": "clock.arrow.circlepath",
+    "plans.plus": "plus",
+    "plans.devices": "laptopcomputer.and.iphone",
+    "plans.agents": "bubble.left.and.text.bubble.right.fill",
+    "plans.files": "paperclip",
     "notice.sign_in": "person.crop.circle.badge.exclamationmark",
     "notice.rolled_in": "arrow.down.circle",
     "notice.get_started": "sparkles",
@@ -338,7 +342,7 @@ enum RegistryTokens {
   ]
   /// Icon id → hex for icons that keep their semantic color under the
   /// multicolor fruit (`multicolorGlyphs`); other fruits tint them with the accent.
-  static let multicolorGlyphHex: [String: String] = ["list.today": "#F5C721"]
+  static let multicolorGlyphHex: [String: String] = ["list.today": "#F5C721", "plans.devices": "#007AFF", "plans.agents": "#E05212", "plans.files": "#30B0C7", "plans.history": "#5856D6"]
   static let textures: [RegistryTextureOption] = [
     RegistryTextureOption(id: "none", name: RegistryL10n.t("Pure Canvas"), tag: RegistryL10n.t("Baseline")),
     RegistryTextureOption(id: "topography", name: RegistryL10n.t("Topography"), tag: RegistryL10n.t("Height Map")),
@@ -2387,10 +2391,21 @@ struct RegistryPlanOutcome: Sendable, Hashable, Identifiable {
   let rows: [RegistryPlanRow]
 }
 
+/// One benefit of a paid plan (`benefits` in plans.json, docs/PREMIUM_LANGUAGE.md).
+struct RegistryPlanBenefit: Sendable, Hashable, Identifiable {
+  let id: String
+  /// Registry icon id (icons.json); its tile color is `AppearancePreferences.glyphSwiftUIColor`.
+  let icon: String
+  let title: String
+  let detail: String
+}
+
 struct RegistryPlanNote: Sendable, Hashable, Identifiable {
   let id: String
   let title: String
   let detail: String
+  /// For an upsell moment: the plan that answers it (`plus` or `pro`). The paywall opens on it.
+  var plan: String? = nil
 }
 
 /// Plans and pricing (`registry/plans.json`). The site's /pricing page reads the same file.
@@ -2410,9 +2425,30 @@ enum RegistryPlans {
     RegistryPlanPrice(id: "annual", productId: "com.septena.tasks.sync.annual", amountMinor: 6000, currency: "EUR", interval: "year", highlighted: true, label: RegistryL10n.t("€60 a year"), detail: RegistryL10n.t("€5 a month. You save €24 against paying monthly.")),
     RegistryPlanPrice(id: "monthly", productId: "com.septena.tasks.sync.monthly", amountMinor: 700, currency: "EUR", interval: "month", highlighted: false, label: RegistryL10n.t("€7 a month"), detail: RegistryL10n.t("Cancel at any time.")),
   ] }
+  /// What Pro costs (ADR 0059): the higher level of the same subscription group.
+  static var proPrices: [RegistryPlanPrice] { [
+    RegistryPlanPrice(id: "pro_annual", productId: "com.septena.tasks.sync.pro.annual", amountMinor: 12000, currency: "EUR", interval: "year", highlighted: true, label: RegistryL10n.t("€120 a year"), detail: RegistryL10n.t("€10 a month. You save €48 against paying monthly.")),
+    RegistryPlanPrice(id: "pro_monthly", productId: "com.septena.tasks.sync.pro.monthly", amountMinor: 1400, currency: "EUR", interval: "month", highlighted: false, label: RegistryL10n.t("€14 a month"), detail: RegistryL10n.t("Cancel at any time.")),
+  ] }
+  static var plusBenefits: [RegistryPlanBenefit] { [
+    RegistryPlanBenefit(id: "devices", icon: "plans.devices", title: RegistryL10n.t("Every device, always current"), detail: RegistryL10n.t("Your list on all your devices, updated as you type.")),
+    RegistryPlanBenefit(id: "agents", icon: "plans.agents", title: RegistryL10n.t("Three agents at work"), detail: RegistryL10n.t("Connect Claude and two more. Each one asks before it acts.")),
+    RegistryPlanBenefit(id: "files", icon: "plans.files", title: RegistryL10n.t("10 GB of synced files"), detail: RegistryL10n.t("Attach a file once and it opens on every device.")),
+    RegistryPlanBenefit(id: "history", icon: "plans.history", title: RegistryL10n.t("A year of history"), detail: RegistryL10n.t("See who changed what, and bring back what you deleted.")),
+  ] }
+  static var proBenefits: [RegistryPlanBenefit] { [
+    RegistryPlanBenefit(id: "agents", icon: "plans.agents", title: RegistryL10n.t("No limit on agents"), detail: RegistryL10n.t("Run as many agents on your list as your work needs.")),
+    RegistryPlanBenefit(id: "files", icon: "plans.files", title: RegistryL10n.t("50 GB of synced files"), detail: RegistryL10n.t("Room for scans, screenshots and long documents.")),
+    RegistryPlanBenefit(id: "everything", icon: "plans.plus", title: RegistryL10n.t("Everything in Plus"), detail: RegistryL10n.t("Every device, a year of history and shared projects.")),
+  ] }
+  /// The full comparison of every plan, on the website.
+  static let compareURL = URL(string: "https://septena.app/pricing")!
+  /// The rows every plan card lists (`cardRows`), in order.
+  static let cardRowIDs: [String] = ["devices", "connected", "files", "history"]
   static var cards: [RegistryPlanCard] { [
     RegistryPlanCard(id: "free", title: RegistryL10n.t("Free"), icon: "plans.free", detail: RegistryL10n.t("The full task app on one device. You do not need an account."), footnote: nil, highlighted: false),
     RegistryPlanCard(id: "plus", title: RegistryL10n.t("Septena Plus"), icon: "settings.plus", detail: RegistryL10n.t("Your list on every device, updated live."), footnote: RegistryL10n.t("Everything in Free is included."), highlighted: true),
+    RegistryPlanCard(id: "pro", title: RegistryL10n.t("Septena Pro"), icon: "plans.pro", detail: RegistryL10n.t("For people who run many agents on one list."), footnote: RegistryL10n.t("Everything in Plus is included."), highlighted: false),
   ] }
   /// The Pro card, for an account that has Pro. The paywalls offer it in #719 (ADR 0059).
   static var proCard: RegistryPlanCard { RegistryPlanCard(id: "pro", title: RegistryL10n.t("Septena Pro"), icon: "plans.pro", detail: RegistryL10n.t("For people who run many agents on one list."), footnote: RegistryL10n.t("Everything in Plus is included."), highlighted: false) }
@@ -2441,12 +2477,14 @@ enum RegistryPlans {
     RegistryPlanNote(id: "own_ai", title: RegistryL10n.t("You pay your AI provider, not us"), detail: RegistryL10n.t("Septena runs the sync server and the connector. When you connect Claude or another agent, its bill stays with that provider.")),
   ] }
   static var upsells: [RegistryPlanNote] { [
-    RegistryPlanNote(id: "second_device", title: RegistryL10n.t("This device is not syncing"), detail: RegistryL10n.t("A free account syncs one device. Plus syncs all of them. You can also move your free account to this device.")),
-    RegistryPlanNote(id: "history_edge", title: RegistryL10n.t("Older changes are hidden"), detail: RegistryL10n.t("A free account shows 30 days of history. Plus shows a full year.")),
-    RegistryPlanNote(id: "file_elsewhere", title: RegistryL10n.t("This file is on another device"), detail: RegistryL10n.t("Plus syncs files and images to all your devices.")),
-    RegistryPlanNote(id: "connector_cap", title: RegistryL10n.t("Daily change limit reached"), detail: RegistryL10n.t("Agents on this account made 500 changes today. They can make changes again tomorrow.")),
-    RegistryPlanNote(id: "share_create", title: RegistryL10n.t("Sharing a project needs Plus"), detail: RegistryL10n.t("Anyone can join a shared project for free. Plus lets you create one and invite people.")),
-    RegistryPlanNote(id: "trial_end", title: RegistryL10n.t("Your 14 days of Plus have ended"), detail: RegistryL10n.t("Your account is now a free account. One device keeps syncing. Your tasks on every device stay where they are.")),
+    RegistryPlanNote(id: "second_device", title: RegistryL10n.t("This device is not syncing"), detail: RegistryL10n.t("A free account syncs one device. Plus syncs all of them. You can also move your free account to this device."), plan: "plus"),
+    RegistryPlanNote(id: "history_edge", title: RegistryL10n.t("Older changes are hidden"), detail: RegistryL10n.t("A free account shows 30 days of history. Plus shows a full year."), plan: "plus"),
+    RegistryPlanNote(id: "file_elsewhere", title: RegistryL10n.t("This file is on another device"), detail: RegistryL10n.t("Plus syncs files and images to all your devices."), plan: "plus"),
+    RegistryPlanNote(id: "connector_cap", title: RegistryL10n.t("Daily change limit reached"), detail: RegistryL10n.t("Agents on this account made 500 changes today. They can make changes again tomorrow."), plan: "plus"),
+    RegistryPlanNote(id: "share_create", title: RegistryL10n.t("Sharing a project needs Plus"), detail: RegistryL10n.t("Anyone can join a shared project for free. Plus lets you create one and invite people."), plan: "plus"),
+    RegistryPlanNote(id: "trial_end", title: RegistryL10n.t("Your 14 days of Plus have ended"), detail: RegistryL10n.t("Your account is now a free account. One device keeps syncing. Your tasks on every device stay where they are."), plan: "plus"),
+    RegistryPlanNote(id: "agents_full", title: RegistryL10n.t("Your agent slot is in use"), detail: RegistryL10n.t("A free account connects one agent. Plus connects three. Pro has no limit."), plan: "plus"),
+    RegistryPlanNote(id: "agents_full_plus", title: RegistryL10n.t("All three agent slots are in use"), detail: RegistryL10n.t("Plus connects three agents. Pro connects as many as you run, and holds 50 GB of files."), plan: "pro"),
   ] }
   static func card(_ id: String) -> RegistryPlanCard? { cards.first { $0.id == id } }
   static func upsell(_ id: String) -> RegistryPlanNote? { upsells.first { $0.id == id } }
@@ -2500,6 +2538,14 @@ enum RegistryPlans {
     static var ownedOtherAccount: String { RegistryL10n.t("This Apple ID's Plus belongs to another Septena account. Sign in to that account to use it.") }
     static var syncThisDeviceFailed: String { RegistryL10n.t("Septena could not reach the server. Try again in a moment.") }
     static var done: String { RegistryL10n.t("Done") }
+    static var seePro: String { RegistryL10n.t("See Pro") }
+    static var choosePlan: String { RegistryL10n.t("Choose a plan") }
+    static func youGet(plan: String) -> String { RegistryL10n.format("With %@", english: "With %@", args: [plan]) }
+    static var upgradeNote: String { RegistryL10n.t("Pro starts right away. The App Store refunds the unused part of your Plus.") }
+    static var upgradeElsewhere: String { RegistryL10n.t("To move to Pro, change your plan in the store where you bought Plus.") }
+    static var yourPlanIncludes: String { RegistryL10n.t("Your plan includes") }
+    static var compareAll: String { RegistryL10n.t("Compare every plan") }
+    static var buyElsewhere: String { RegistryL10n.t("This copy of Septena does not sell plans. Buy Plus or Pro in the App Store version on any device. It turns on here when you sign in to the same account.") }
   }
 }
 

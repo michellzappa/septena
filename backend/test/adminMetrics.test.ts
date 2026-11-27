@@ -1,14 +1,17 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { createTestAccountStore, installWorkerTestHooks } from "./taskStoreHarness.ts";
+import { createTestAccountStore, createTestTaskStore, ensureSession, installWorkerTestHooks } from "./taskStoreHarness.ts";
 
 installWorkerTestHooks();
 
 // Growth on the admin page (ADR 0059).
 
 const { change, cumulative, lastDays, perDay, snapshotSeries, weeklyCohorts, windowChange } = await import("../src/admin/metrics.ts");
-const { renderAdmin } = await import("../src/admin/page.ts");
+const { ADMIN_PAGES, renderAdmin } = await import("../src/admin/page.ts");
 const { embedUrl } = await import("../src/admin/plausible.ts");
+const { clientMix, releaseAdoption } = await import("../src/admin/metrics.ts");
+const { deviceLabel } = await import("../src/admin/accounts.ts");
+const { clientVersion } = await import("../src/api/routes.ts");
 
 const DAY = 86_400_000;
 const NOW = Date.UTC(2026, 10, 26, 12);
@@ -67,19 +70,34 @@ describe("admin growth", () => {
       admin: "mz@example.com", accounts: [row(1, NOW, summary({ closedTasks: 1 }))] as never, links: [], uses: [], signups: null, query: "",
       emailSignups: [], emailUserId: null, history: [], releases: [], now: NOW,
     };
-    const off = renderAdmin({ ...base, traffic: { state: "off" } });
+    const off = renderAdmin("website", { ...base, traffic: { state: "off" } });
     assert.match(off, /Plausible is not connected/);
-    assert.match(off, /id="growth"/);
+    assert.match(off, /<a href="\/admin\/website" aria-current="page">Website<\/a>/);
     const view = {
       site: "septena.app", days: [{ day: "2026-11-26", visitors: 5, pageviews: 9 }],
       totals: { visitors: 5, visits: 6, pageviews: 9, bounceRate: 40, visitDuration: 75 },
       sources: [{ name: "<script>", visitors: 3, n: 3, rate: null }], pages: [], countries: [],
       goals: [{ name: "Signup", visitors: 1, n: 1, rate: 20 }], missingGoals: ["Download click"], downloads: [], ctaPlacements: [], fetchedAt: NOW,
     };
-    const on = renderAdmin({ ...base, traffic: { state: "ok", view } });
+    const on = renderAdmin("website", { ...base, traffic: { state: "ok", view } });
     assert.ok(on.includes("&lt;script&gt;") && !on.includes("<script>"));
     assert.match(on, /20\.00%/);
     assert.match(on, /No events in 30 days: Download click/);
+  });
+
+  it("renders every page with its own tab marked and the brand accent", () => {
+    const base = {
+      admin: "mz@example.com", accounts: [row(1, NOW, summary({ closedTasks: 1 }))] as never, links: [], uses: [], signups: null, query: "",
+      emailSignups: [], emailUserId: null, history: [], releases: [], now: NOW, traffic: { state: "off" as const },
+    };
+    for (const p of ADMIN_PAGES) {
+      const html = renderAdmin(p.id, base);
+      assert.equal((html.match(/aria-current="page"/g) ?? []).length, 1, p.id);
+      assert.ok(html.includes(`href="/admin${p.path}" aria-current="page"`), p.id);
+      assert.match(html, /--accent: #E05212/i, p.id);
+    }
+    assert.match(renderAdmin("accounts", base), /1 of 1/);
+    assert.doesNotMatch(renderAdmin("overview", base), /<table><thead><tr><th>Account<\/th>/, "the account table is its own page");
   });
 
   it("embeds only a plausible.io share link", () => {
@@ -88,5 +106,40 @@ describe("admin growth", () => {
     assert.equal(embedUrl("http://plausible.io/share/x"), null);
     assert.equal(embedUrl("https://plausible.io/septena.app"), null);
     assert.equal(embedUrl(undefined), null);
+  });
+
+  it("reads the version header, and the version older Android and web builds put in the client name", () => {
+    assert.equal(clientVersion("0.9.0 (2935)", "septask-mac"), "0.9.0 (2935)");
+    assert.equal(clientVersion(undefined, "android 0.9.0"), "0.9.0");
+    assert.equal(clientVersion(undefined, "web 0.2.0"), "0.2.0");
+    assert.equal(clientVersion(undefined, "septask-mac"), null);
+    assert.equal(clientVersion("x".repeat(80), "septask-mac"), null, "a value the client-name rule refuses is dropped");
+    assert.equal(deviceLabel({ client: "septask-mac", version: null }), "Mac, older build");
+    assert.equal(deviceLabel({ client: "android 0.9.0", version: null }), "Android 0.9.0");
+    assert.equal(deviceLabel({ client: "septena-android", version: "0.9.1 (40)" }), "Android 0.9.1 (40)");
+  });
+
+  it("groups versions by marketing version and counts releases per device", () => {
+    const dev = (client: string, version: string | null) => ({ client, version, firstSeen: NOW - DAY, lastSeen: NOW });
+    const rows = [
+      row(1, NOW, summary({ devices: [dev("septask-mac", "0.9.0 (2844)"), dev("septask-mac", "0.9.0 (2935)"), dev("septask-mac", null)],
+        versions: [{ client: "septask-mac", version: "0.9.0 (2844)", firstSeen: NOW - 5 * DAY, lastSeen: NOW }, { client: "septask-mac", version: "0.9.0 (2935)", firstSeen: NOW - DAY, lastSeen: NOW }] })),
+      row(2, NOW, summary({ devices: [dev("android 0.9.0", null)], versions: [{ client: "septena-android", version: "0.9.1 (40)", firstSeen: NOW, lastSeen: NOW }] })),
+    ] as never;
+    const mix = clientMix(rows, NOW);
+    assert.deepEqual(mix.platforms.map((t) => [t.name, t.n]), [["Mac", 3], ["Android", 1]]);
+    assert.deepEqual(mix.versions.map((t) => [t.name, t.n]), [["Mac 0.9.0", 2], ["Android 0.9.0", 1], ["Mac, older build", 1]]);
+    assert.equal(mix.builds.length, 3);
+    assert.deepEqual(releaseAdoption(rows).map((r) => [r.name, r.devices]), [["Android 0.9.1", 1], ["Mac 0.9.0", 2]]);
+  });
+
+  it("keeps every version a device ran", async () => {
+    const { store } = await createTestTaskStore();
+    ensureSession(store, "sid-1");
+    store.deviceAccess("sid-1", "septask-mac", null, NOW - DAY, "0.9.0 (1)");
+    store.deviceAccess("sid-1", "septask-mac", null, NOW, "0.9.0 (2)");
+    store.deviceAccess("sid-1", "septask-mac", null, NOW, null);
+    const versions = store.accountSummary(NOW)!.versions!.map((v) => v.version);
+    assert.deepEqual(versions, ["0.9.0 (1)", "0.9.0 (2)"]);
   });
 });

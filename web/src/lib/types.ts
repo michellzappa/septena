@@ -121,8 +121,27 @@ export const zAccessSummary = z.object({
       active: z.boolean().optional(),
     }),
   ),
+  // The agent count and the plan's agent slots (null = no limit).
+  agents: z.object({ count: z.number(), limit: z.number().nullable().optional() }).optional(),
 });
 export type AccessSummary = z.infer<typeof zAccessSummary>;
+
+// GET /v1/entitlement: the account's plan as the server enforces it
+// (docs/SYNC_SUBSCRIPTION_SPEC.md §6). The app reads it; it never decides.
+export const zEntitlement = z.object({
+  active: z.boolean(),
+  plan: z.enum(["free", "plus", "pro"]).nullable().optional(),
+  trialEndsAt: z.number().nullable().optional(),
+  entitlements: z.array(
+    z.object({
+      source: z.string(),
+      plan: z.string().nullable().optional(),
+      expiresAt: z.number().nullable().optional(),
+      active: z.boolean().optional(),
+    }),
+  ),
+});
+export type Entitlement = z.infer<typeof zEntitlement>;
 
 // POST /v1/access/keys (#86): the key appears in this reply only.
 export const zCreatedAgentKey = z.object({

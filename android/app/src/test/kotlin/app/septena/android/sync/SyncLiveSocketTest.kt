@@ -50,7 +50,7 @@ class SyncLiveSocketTest {
                     val (requestLine, headers) = readHttpRequest(input)
                     assertTrue(requestLine.startsWith("GET /v1/sync/ws HTTP/1.1"))
                     sawAuthHeader.set(headers["authorization"] == "Bearer tok-1")
-                    sawClientHeader.set(headers["x-septena-client"] == "android 0.9.0")
+                    sawClientHeader.set(headers["x-septena-client"] == "septena-android" && headers["x-septena-version"] == "0.9.0")
                     val secKey = headers["sec-websocket-key"]!!
                     writeUpgrade101(output, secKey)
 

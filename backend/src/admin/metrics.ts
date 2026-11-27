@@ -1,7 +1,7 @@
 import type { Env } from "../env.js";
 import { logEvent } from "../util.js";
 import { accountStoreFor, type AccountIndexRow } from "../store/AccountStore.js";
-import { deviceLabel, isActivated, lastSeen, overview, planView } from "./accounts.js";
+import { deviceVersion, isActivated, lastSeen, marketingVersion, overview, planView, platformName } from "./accounts.js";
 import { signupTotals } from "./signups.js";
 
 // Growth for the admin page (ADR 0059). Two kinds of history:
@@ -116,13 +116,39 @@ const tally = (names: string[]): Tally[] => {
   return [...m.entries()].map(([name, n]) => ({ name, n })).sort((a, b) => b.n - a.n || a.name.localeCompare(b.name));
 };
 
-/// Devices seen in the last 30 days: by platform, and by platform and version.
+/// Devices seen in the last 30 days: by platform, and by platform and
+/// version (marketing version; the builds are counted inside it).
 export function clientMix(rows: AccountIndexRow[], now = Date.now()) {
   const devices = rows.flatMap((r) => r.summary?.devices ?? []).filter((d) => now - d.lastSeen < 30 * DAY_MS);
-  return {
-    platforms: tally(devices.map((d) => deviceLabel({ client: d.client, version: null }))),
-    versions: tally(devices.map((d) => deviceLabel(d))).slice(0, 12),
+  const release = (d: { client: string | null; version: string | null }) => {
+    const v = deviceVersion(d);
+    return v ? `${platformName(d.client)} ${marketingVersion(v)}` : `${platformName(d.client)}, older build`;
   };
+  return {
+    platforms: tally(devices.map((d) => platformName(d.client))),
+    versions: tally(devices.map(release)).slice(0, 12),
+    builds: tally(devices.flatMap((d) => {
+      const v = deviceVersion(d);
+      return v ? [`${platformName(d.client)} ${v}`] : [];
+    })),
+  };
+}
+
+export interface Release { name: string; devices: number; firstSeen: number; lastSeen: number }
+
+/// Each platform and version that a device ran in the last 90 days: how many
+/// devices ran it and when the first one did. Newest release first.
+export function releaseAdoption(rows: AccountIndexRow[]): Release[] {
+  const m = new Map<string, Release>();
+  for (const v of rows.flatMap((r) => r.summary?.versions ?? [])) {
+    const name = `${platformName(v.client)} ${marketingVersion(v.version)}`;
+    const r = m.get(name) ?? { name, devices: 0, firstSeen: v.firstSeen, lastSeen: v.lastSeen };
+    r.devices += 1;
+    r.firstSeen = Math.min(r.firstSeen, v.firstSeen);
+    r.lastSeen = Math.max(r.lastSeen, v.lastSeen);
+    m.set(name, r);
+  }
+  return [...m.values()].sort((a, b) => b.firstSeen - a.firstSeen);
 }
 
 /// Accounts per agent client (an account counts once per client).

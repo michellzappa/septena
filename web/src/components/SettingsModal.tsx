@@ -58,6 +58,10 @@ import { fadeSettings } from "@/lib/fade";
 import type { HeaderTextureStyle } from "@/lib/headerWash";
 import type { WebDisplayPrefs } from "@/lib/prefs";
 import type { SeptenaApiClient } from "@/lib/api/client";
+import type { Entitlement } from "@/lib/types";
+import { PLAN_UI } from "@/lib/generated/registries";
+import { accountPlan, currentTier, statusLine, tierCard, tiersAbove, type PlanTier } from "@/lib/plans";
+import { PlanBenefitRow, PlanHead, PlanMark, PlanPriceLine, PlanSheet } from "./PlanLanguage";
 import type { WebSyncEngine } from "@/lib/sync/engine";
 import type {
   AccessSummary,
@@ -192,6 +196,9 @@ export function SettingsModal({
   const [tab, setTab] = useState<SettingsTab>("general");
   const [access, setAccess] = useState<AccessSummary | null>(null);
   const [accessError, setAccessError] = useState<string | null>(null);
+  // The account's plan (GET /v1/entitlement) and the plan sheet, when open.
+  const [entitlement, setEntitlement] = useState<Entitlement | null>(null);
+  const [planSheet, setPlanSheet] = useState<{ upsellId: string | null; tier: PlanTier | null } | null>(null);
   const [pairCode, setPairCode] = useState("");
   const [pairPreview, setPairPreview] = useState<{ kind: "connector" | "device"; client: string } | null>(null);
   const [pairStatus, setPairStatus] = useState<string | null>(null);
@@ -265,6 +272,20 @@ export function SettingsModal({
     }
   }, [api]);
 
+  const loadEntitlement = useCallback(async () => {
+    if (!snapshot.userId) return;
+    try {
+      setEntitlement(await api.getEntitlement());
+    } catch {
+      // A failed read keeps the last known plan (Apple `PlanStatus.refresh`).
+    }
+  }, [api, snapshot.userId]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (tab === "account" || tab === "ai_agents") void loadEntitlement();
+  }, [loadEntitlement, open, tab]);
+
   useEffect(() => {
     if (!open) return;
     if (tab === "account" || tab === "ai_agents") void loadAccess();
@@ -274,6 +295,16 @@ export function SettingsModal({
   if (!open) return null;
 
   const lang = prefs.language;
+  const plan = accountPlan(entitlement, Boolean(snapshot.userId));
+  const planCurrent = currentTier(plan);
+  const planAbove = tiersAbove(plan);
+  const planStatus = statusLine(plan);
+  // Every agent slot of the plan is in use: the line that says what the next plan connects.
+  const agentLimit = access?.agents?.limit ?? null;
+  const agentsFull =
+    access && agentLimit != null && (access.agents?.count ?? access.connections.length) >= agentLimit && planCurrent !== "pro"
+      ? PLAN_UI.upsells.find((u) => u.id === (planCurrent === "plus" ? "agents_full_plus" : "agents_full")) ?? null
+      : null;
   const currentAccent =
     typeof snapshot.settings.accentColor === "string" ? snapshot.settings.accentColor : "colorful";
   const currentTexture = (
@@ -546,6 +577,70 @@ export function SettingsModal({
             {/* ACCOUNT TAB */}
             {tab === "account" && (
               <>
+                {/* Septena Plus: the account's plan and each plan above it, in the
+                    premium language (docs/PREMIUM_LANGUAGE.md). No comparison grid:
+                    the full table is on the website. */}
+                <section className="space-y-4 rounded-xl border border-[var(--border-subtle)] p-4">
+                  {planCurrent ? (
+                    <PlanHead
+                      tier={planCurrent}
+                      lang={lang}
+                      line={
+                        planStatus
+                          ? registryText(planStatus.text, lang, planStatus.vars ?? {})
+                          : registryText(tierCard(planCurrent)?.detail ?? "", lang)
+                      }
+                    />
+                  ) : (
+                    <div>
+                      <p className="text-base font-bold text-[var(--text-primary)]">{registryText(PLAN_UI.headline, lang)}</p>
+                      <p className="mt-1 text-[13px] text-[var(--text-secondary)]">{registryText(PLAN_UI.subhead, lang)}</p>
+                      {planStatus ? (
+                        <p className="mt-2 text-xs text-[var(--text-muted)]">{registryText(planStatus.text, lang, planStatus.vars ?? {})}</p>
+                      ) : null}
+                    </div>
+                  )}
+                  {planCurrent ? (
+                    <div className="space-y-3">
+                      <p className="text-xs font-semibold tracking-wide text-[var(--text-muted)] uppercase">
+                        {registryText(PLAN_UI.paywall.yourPlanIncludes, lang)}
+                      </p>
+                      {(planCurrent === "pro" ? PLAN_UI.benefits.pro : PLAN_UI.benefits.plus).map((b) => (
+                        <PlanBenefitRow key={b.id} benefit={b} lang={lang} />
+                      ))}
+                    </div>
+                  ) : null}
+                  {planAbove.map((t) => (
+                    <div key={t} className="space-y-3 border-t border-[var(--border-subtle)] pt-4">
+                      <PlanHead tier={t} lang={lang} markSize={40} line={registryText(tierCard(t)?.detail ?? "", lang)} />
+                      {(t === "pro" ? PLAN_UI.benefits.pro : PLAN_UI.benefits.plus).map((b) => (
+                        <PlanBenefitRow key={b.id} benefit={b} lang={lang} />
+                      ))}
+                      <PlanPriceLine tier={t} lang={lang} />
+                      <button
+                        type="button"
+                        onClick={() => setPlanSheet({ upsellId: null, tier: t })}
+                        className="rounded-lg px-3 py-1.5 text-sm font-semibold"
+                        style={{ background: "var(--brand)", color: "var(--brand-ink)" }}
+                      >
+                        {registryText(t === "pro" ? PLAN_UI.paywall.seePro : PLAN_UI.paywall.seePlus, lang)}
+                      </button>
+                    </div>
+                  ))}
+                  {planAbove.length > 0 ? (
+                    <p className="text-[11px] text-[var(--text-muted)]">
+                      {registryText(PLAN_UI.checkout.open ? PLAN_UI.priceFootnote : PLAN_UI.checkout.notice, lang)}
+                    </p>
+                  ) : null}
+                  <a
+                    href={PLAN_UI.compareURL}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-block text-xs text-[var(--accent)] hover:underline"
+                  >
+                    {registryText(PLAN_UI.paywall.compareAll, lang)}
+                  </a>
+                </section>
                 <section className="rounded-xl border border-[var(--border-subtle)] p-4">
                   <label className="block text-xs font-medium text-[var(--text-primary)]">
                     Your name
@@ -1210,6 +1305,23 @@ export function SettingsModal({
                   </p>
                 </section>
 
+                {agentsFull ? (
+                  <section className="flex items-start gap-3 rounded-xl border border-[var(--border-subtle)] p-3.5">
+                    <PlanMark tier={agentsFull.plan === "pro" ? "pro" : "plus"} size={30} />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-[var(--text-primary)]">{registryText(agentsFull.title, lang)}</p>
+                      <p className="text-[13px] text-[var(--text-secondary)]">{registryText(agentsFull.detail, lang)}</p>
+                      <button
+                        type="button"
+                        onClick={() => setPlanSheet({ upsellId: agentsFull.id, tier: null })}
+                        className="mt-2 text-sm font-semibold text-[var(--accent)] hover:underline"
+                      >
+                        {registryText(agentsFull.plan === "pro" ? PLAN_UI.paywall.seePro : PLAN_UI.paywall.seePlus, lang)}
+                      </button>
+                    </div>
+                  </section>
+                ) : null}
+
                 <section>
                   <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold tracking-wide text-[var(--text-muted)] uppercase">
                     <Users className="h-3.5 w-3.5" />
@@ -1822,6 +1934,14 @@ export function SettingsModal({
           </div>
         </div>
       </div>
+      <PlanSheet
+        open={planSheet !== null}
+        onClose={() => setPlanSheet(null)}
+        plan={plan}
+        upsellId={planSheet?.upsellId ?? null}
+        initialTier={planSheet?.tier ?? null}
+        lang={lang}
+      />
     </div>
   );
 }

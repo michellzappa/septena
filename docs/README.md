@@ -86,6 +86,7 @@ See [ADR 0007](adr/0007-septena-is-the-task-app.md).
 | [PROJECT_SHARING_SPEC.md](PROJECT_SHARING_SPEC.md) | MVP built |
 | [PUBLIC_LINKS_SPEC.md](PUBLIC_LINKS_SPEC.md) | proposal (#22, phase S4 of project sharing) |
 | [TASK_FACTORY_SPEC.md](TASK_FACTORY_SPEC.md) | accepted |
+| [AGENT_LOOP_AUDIT.md](AGENT_LOOP_AUDIT.md) | current (#619): every hop of the agent comment loop, its test and its status |
 | [DO_SPEC.md](DO_SPEC.md) | building (ADR 0041): Do one task, full on one device, a notice on the others, the orb takes over |
 | [REVIEW_SPEC.md](REVIEW_SPEC.md) | accepted (ADR 0044, 0046; store rules built) |
 | [DAILY_REVIEW_SPEC.md](DAILY_REVIEW_SPEC.md) | proposal (#618): a short end-of-day review in Review |
@@ -157,6 +158,7 @@ See [ADR 0007](adr/0007-septena-is-the-task-app.md).
 | Doc | Status |
 |---|---|
 | [DesignSpec.md](DesignSpec.md) | canonical |
+| [PREMIUM_LANGUAGE.md](PREMIUM_LANGUAGE.md) | canonical: plan mark, wordmark, benefit rows for every paid surface |
 | [FEATURE_MAP.md](FEATURE_MAP.md) | generated: feature status per platform |
 | [PAGE_CHROME_SPEC.md](PAGE_CHROME_SPEC.md), [GLASS_DOTS_SPEC.md](GLASS_DOTS_SPEC.md) | mixed: see each status line |
 | [SETTINGS_UX_SPEC.md](SETTINGS_UX_SPEC.md) | proposal (task app Settings IA + `registry/settings.json` v2, S0–S3) |

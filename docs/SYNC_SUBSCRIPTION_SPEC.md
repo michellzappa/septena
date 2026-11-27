@@ -516,67 +516,81 @@ grants for testers; a week of `entitlement_would_block` logs; then
 
 ### 7.1 The paywall
 
-One sheet, **the Plus sheet**, is the only place that sells Plus in the
-app. It opens only from a tap, never on launch and never on a timer.
+One sheet, **the plan sheet** (`SeptaskPlusSheet`), is the only place that
+sells Plus and Pro in the app (ADR 0059). It opens only from a tap, never on
+launch and never on a timer.
 
 **Where it opens from:**
 
-- "See Plus" on an upsell moment (§3.2). The sheet then shows that moment's
-  title as its first line, so the user sees why it opened.
-- "See Plus" on Settings ▸ Septena Plus (`SeptaskPlusPane`). An account on
-  a bought plan sees "Manage Subscription" there instead. An account with a
-  grant and an active App Store subscription (Pro on top of a paid Plus)
-  keeps "Manage Subscription", because the subscription still renews.
+- "See Plus" or "See Pro" on an upsell moment (§3.2), including the full
+  agent list in Settings ▸ AI & Agents ▸ Agents (`agents_full`,
+  `agents_full_plus`).
+- Settings ▸ Septena Plus (`SeptaskPlusPane`): "See Plus" before a plan,
+  "See Pro" on Plus, "Manage Subscription" on Pro or a store subscription
+  with nothing above it.
 - "See Plus" on the trial-end notice.
 
 **Each upsell moment shows once per account.** The "shown" mark syncs with
 the account's other settings, so a second device does not repeat it. After
 that the moment stays as a quiet line where the limit is (the device row,
-the history edge, the file row), never as a new prompt.
+the history edge, the file row, the agent list), never as a new prompt.
 
-**What it looks like** (iPhone; iPad and Mac show the same sheet at form
-size):
+**How it sells (in the order a reader decides):**
+
+1. **Why it opened.** The moment's title and detail come first. With no
+   moment, the plan name and the ladder headline.
+2. **Which plan.** A Plus / Pro picker. The sheet opens on the plan that
+   answers the moment (`upsells[].plan` in `plans.json`). An account on
+   Plus sees only Pro, as an upgrade.
+3. **What changes.** The plan's card line, then its card rows (devices,
+   agents, files, history). A value that differs from the account's plan
+   today is bold in the accent; one that stays the same is quiet. A trial
+   compares with Free, because the trial ends in a free account.
+4. **The price.** StoreKit lists the picked plan's two products, annual
+   first. Under it: cancel at any time, the no-hostage promise, Restore,
+   Terms, Privacy.
 
 ```text
 ┌───────────────────────────────────────┐
-│                                   ✕   │
-│  This device is not syncing           │  ← the moment's title, if any
+│ Not Now                Septena Plus   │
 │                                       │
-│  Septena Plus                         │
-│  Free on one device.                  │
-│  Plus on all of them.                 │
+│  All three agent slots are in use     │  ← the moment: title
+│  Plus connects three agents. Pro …    │    and detail
 │                                       │
-│  ◉  Your list everywhere             │  ← the three outcomes from
-│  ◉  Nothing lost                     │     plans.json, icon + title
-│  ◉  Help that keeps working          │
+│  [   Plus   |▐  Pro  ▌]               │  ← opens on the moment's plan
+│                                       │
+│  ◉ With Pro                           │
+│    For people who run many agents …   │
+│  Devices        All your devices      │  ← quiet: same as today
+│  Agents                 No limit      │  ← bold accent: what changes
+│  Files              50 GB synced      │
+│  History                365 days      │
 │                                       │
 │  ┌─────────────────────────────────┐  │
-│  │ ● €60 a year    €5 a month      │  │  ← highlighted price first
-│  │   You save €24                  │  │
-│  ├─────────────────────────────────┤  │
-│  │ ○ €7 a month                    │  │
+│  │ ● €120 a year                   │  │  ← StoreKit, the picked plan
+│  │ ○ €14 a month                   │  │
 │  └─────────────────────────────────┘  │
-│  [          Subscribe            ]    │
-│                                       │
-│  Cancel any time in Settings.         │
+│  [            Subscribe            ]  │
+│  Cancel at any time in Settings.      │
+│  We never hold your data back         │
 │  Restore Purchases · Terms · Privacy  │
 └───────────────────────────────────────┘
 ```
 
 **How it is built (standard StoreKit, no custom store UI):**
 
-- `SubscriptionStoreView(groupID:)` with a marketing header view. StoreKit
-  draws the products, the localized prices and periods, the purchase
-  button, Restore Purchases, and the Terms and Privacy links that App
-  Review requires.
-- `.subscriptionStoreControlStyle(.picker)`, annual first and selected.
-- Every purchase carries `appAccountToken` (§5). The header text, the
-  outcomes and every label come from `registry/plans.json` (a new
-  `paywall` block), so the site, iOS, Mac and Android say the same words.
-  Copy goes through the humanizer skill.
-- The Mac sells through the Mac App Store (ADR 0026), with the same
-  sheet in the settings window. Manage Subscription opens the App Store's
-  subscriptions page.
+- `SubscriptionStoreView(productIDs:)` for the picked plan, with the pitch
+  as its marketing header, rebuilt when the plan changes. Plus and Pro are
+  two levels of one subscription group (Pro level 1, Plus level 2), so the
+  App Store handles upgrade, downgrade and proration.
+- `.subscriptionStoreControlStyle(.picker)`. Every purchase carries
+  `appAccountToken` (§5). Every word comes from `registry/plans.json`
+  (`paywall`, `upsells`, `cards`, `cardRows`), so the site and every app
+  say the same words. Copy goes through the humanizer skill.
+- The Mac App Store build sells with the same sheet. The Mac download build
+  (Developer ID, Sparkle) has no App Store receipt: it never shows the
+  store, it says to buy in the App Store version and that the plan turns
+  on at sign-in (`PlusStore.isDirectDownload`, #683).
 - The sheet reads `PlanStatus` and the entitlement source. It never decides
   the plan itself.
 
@@ -584,12 +598,13 @@ size):
 
 | State | Main action | Notes |
 |---|---|---|
-| No account | "Try Plus free for 14 days" (Sign in with Apple) | No prices to buy yet. Signing in starts the reverse trial, and the sheet shows "Plus is on until {date}". The prices show below as information. |
-| Trial | Subscribe | The first line reads "Plus trial until {date}". A purchase now starts billing today; the sheet says so above the button. |
+| No account | "Try Plus free for 14 days" (Sign in) | The pitch and the picked plan's prices show as information. Signing in starts the reverse trial. |
+| Trial | Subscribe | "Plus is on until {date}"; a purchase now starts billing today, and the sheet says so. |
 | Free account | Subscribe | The standard sheet. |
 | Lapsed (was Plus) | Subscribe | The title reads "Welcome back". |
-| Plus through Apple | Manage Subscription (`.manageSubscriptionsSheet`) | No prices. |
-| Plus through another source | None | One line: "Plus through the web. Manage it at septena.app." or "...through Google Play". No Apple button (ADR 0026). |
+| Plus through Apple or a grant | Subscribe to Pro | Only Pro. Through Apple, one line says Pro starts at once and the App Store refunds the unused Plus. |
+| Plus through Google Play or the web | None | The owned line, and "change your plan in the store where you bought Plus" (ADR 0026: never two purchases). |
+| Pro | Manage Subscription | No prices. |
 
 **After the purchase:**
 
@@ -637,13 +652,15 @@ on every device.
 - **Currencies (ADR 0060):** EUR is the baseline. Top markets are pinned to
   clean `.00` prices on App Store Connect, Google Play and Web/Windows
   checkout; all other store storefronts auto-equalize from the EUR base:
-  - **Plus:** `€7 / €60` (incl. VAT), `$7 / $60` (+ applicable tax), `£6 / £50` (incl. VAT)
-  - **Pro:** `€14 / €120` (incl. VAT), `$14 / $120` (+ applicable tax), `£12 / £100` (incl. VAT)
-  - **Web & Windows:** Fixed EUR, USD and GBP prices matching the pinned store
-    numbers (no dynamic FX conversion on subscriptions). Stripe Tax calculates
-    VAT; Envisioning Technology files EU VAT through the One Stop Shop.
-  - **Pricing page (`/pricing`):** Geo-defaults to EUR, USD or GBP with a small
-    currency switcher and currency-aware tax footnotes.
+  - **Plus:** `€7 / €60` (incl. VAT), `$7 / $60` (+ applicable tax), `£6 / £50` (incl. VAT), `R$ 29 / R$ 240` (BRL PPP, incl. taxes)
+  - **Pro:** `€14 / €120` (incl. VAT), `$14 / $120` (+ applicable tax), `£12 / £100` (incl. VAT), `R$ 58 / R$ 480` (BRL PPP, incl. taxes)
+  - **Web & Windows:** Fixed EUR, USD, GBP and BRL prices matching the pinned
+    store numbers (no dynamic FX conversion on subscriptions). Stripe Tax
+    calculates VAT; Envisioning Technology files EU VAT through the One Stop
+    Shop.
+  - **Pricing page (`/pricing` and home plan cards):** Geo-defaults to EUR,
+    USD, GBP or BRL via `/api/geo` (`CF-IPCountry`) with a quiet inline
+    currency switcher above the plan cards and currency-aware tax footnotes.
   - **Annual price lock:** Locked in purchase currency within the same store;
     protects Septena's subscription price tier, excluding statutory tax changes.
 - **No double payment:** an account on Plus or Pro from any source sees no buy

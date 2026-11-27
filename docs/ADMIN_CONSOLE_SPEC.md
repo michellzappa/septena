@@ -25,30 +25,28 @@ millions of accounts. It never shows what a user wrote (ADR 0043).
 
 ## 3. Layout (UX)
 
-The page is read top to bottom, once a day, in about a minute. The order
-follows the questions in §1, and the most frequent question comes first.
+The console is six pages under one top bar: the Septena icon, the admin's
+email, Refresh counts, and a tab per page. The icon is the app icon, loaded from septena.app/icon.svg. The tab of the open page carries
+the brand accent (Persimmon, `registry/tokens.json`). Each page loads only the
+data it shows, so a page with the account table is the only one that reads
+every account row.
 
-1. **Growth (the morning read).** A row of headline cards. Each card has one
-   number, its change against 7 days before (green up, amber down, "no
-   history yet" when there is none), and a 30-day line. Hovering a point shows
-   the day and the value. Under the cards: one row of ratios (DAU/MAU,
-   activation %, trial to paid), then the two funnels next to each other.
-2. **Website.** Where the people in the funnel come from: traffic, CTA
-   conversion, sources, pages, drawn from the Stats API. Without a key the
-   section embeds a shared Plausible dashboard instead.
-3. **Retention by week.** One row per start week. A healthy product shows the
-   "active this week" column holding up in older rows.
-4. **Clients and agents.** What people run Septena on and which versions are
-   still out. Read it after a release.
-5. **Plans and usage, Plan links, Accounts, Signups.** The work area: give a
-   plan, find an account, export signups. It sits below the reading area
-   because it is used less often.
+| Page | Path | Shows |
+|---|---|---|
+| Overview | `/admin` | The morning read: growth cards (number, change against 7 days before, 30-day line), the ratio row, the website and product funnels. |
+| Website | `/admin/website` | Traffic cards, visitors and signups per day, calls to action with conversion, where visitors come from. |
+| Product | `/admin/product` | Retention by start week, devices and versions, agents, sign-in methods, Mac downloads, usage counts. |
+| Plans | `/admin/plans` | Plan counts, then plan links: make, close, take back. |
+| Accounts | `/admin/accounts` | Search and the account table: give or take back a plan. |
+| Signups | `/admin/signups` | Signup counts by list, screen, task app, week and page; the latest 50; CSV. |
 
-Rules for the layout: a jump bar at the top links every section. A number
-has its label and its window ("7 days", "30 days", "every account"). An empty
-state says what is missing and the one step that fixes it. Colour carries
-direction only (up, down, warning), never identity. The page works at phone
-width.
+Rules for the layout: every block is a titled card with one line that says
+what it counts. A number has its label and its window ("7 days", "30 days",
+"every account"). The accent marks the open tab, the primary button of a
+form, links, chart marks and a rise (▲). A drop (▼) is
+gray. Red is only for a fault: a lapsed plan, a failing webhook, a source
+that does not answer. An empty state says what is missing and the one step that fixes
+it. The pages work at phone width.
 
 ## 4. Definitions
 
@@ -57,6 +55,14 @@ width.
 - **Activated**: completed at least one task (`closedTasks >= 1`).
 - **Paying**: an active App Store, Stripe or Play purchase in Production.
 - **Week**: Monday 00:00 UTC.
+- **Version**: what a device sends in `X-Septena-Version`, `<marketing> (<build>)`,
+  read from the build on every client (#764). The client name in
+  `X-Septena-Client` is fixed per platform (`septask-ios`, `septask-mac`,
+  `septask-watch`, `septena-android`, `septena-web`); older Android and web
+  builds put the version in the name, and the server still reads that. A
+  device with no version runs a build from before the header ("older
+  build"). The server keeps every version a device ran for 90 days
+  (`device_versions`), which gives release adoption.
 - **Change**: today's value against the snapshot 7 days before; for daily
   counts, the last 7 days against the 7 before.
 

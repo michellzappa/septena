@@ -169,7 +169,8 @@ class SyncLiveSocket(
                 append("Sec-WebSocket-Key: ").append(secKey).append("\r\n")
                 append("Sec-WebSocket-Version: 13\r\n")
                 append("Authorization: Bearer ").append(token).append("\r\n")
-                append("X-Septena-Client: android ").append(clientVersion).append("\r\n")
+                append("X-Septena-Client: ").append(JsonHttp.CLIENT_NAME).append("\r\n")
+                append("X-Septena-Version: ").append(clientVersion).append("\r\n")
                 append("\r\n")
             }
             output.write(request.toByteArray(StandardCharsets.US_ASCII))

@@ -165,6 +165,10 @@ Two channels tell the user something. Never a modal for an explanation.
 - **A lost write is neither** (`StoreHealthNotice`): it is an alert, because it is not confirmable or undoable.
 - Copy for notices and toasts goes through the humanizer pass like all human-facing copy.
 
+## 6.5.1 Plans and paid surfaces
+
+Every surface that names Plus or Pro uses the premium language: the plan mark, the wordmark, the plan head and the benefit row, in the brand color. No comparison grid in the app. See [PREMIUM_LANGUAGE.md](PREMIUM_LANGUAGE.md).
+
 ## 6.6 Words
 
 The unit of work is a **task**, on every platform and surface: UI copy,

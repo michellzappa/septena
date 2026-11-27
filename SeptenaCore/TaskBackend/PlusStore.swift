@@ -42,16 +42,34 @@ final class PlusStore {
 
   private init() {}
 
-  /// The products the sheet sells, from `registry/plans.json`.
-  static var productIDs: [String] { RegistryPlans.prices.map(\.productId) }
+  /// Every product the sheet sells, Plus and Pro, from `registry/plans.json`
+  /// (ADR 0059: one subscription group, Pro the higher level).
+  static var productIDs: [String] { PlanTier.allCases.flatMap(\.productIDs) }
 
-  /// The Plus sheet offers a purchase when checkout is open, or in a run
-  /// Xcode launched with the `Septask` scheme, where
+  /// The sheet offers a purchase when checkout is open on a build the App
+  /// Store sold, or in a run Xcode launched with the `Septask` scheme, where
   /// `Config/Septena.storekit` stands in for App Store Connect (the scheme
-  /// sets `SEPTENA_STOREKIT_TEST`). The Mac sells through the Mac App
-  /// Store like the iPhone (ADR 0026).
+  /// sets `SEPTENA_STOREKIT_TEST`). The Mac sells through the Mac App Store
+  /// like the iPhone (ADR 0026).
   static var checkoutAvailable: Bool {
-    RegistryPlans.checkoutOpen || ProcessInfo.processInfo.environment["SEPTENA_STOREKIT_TEST"] == "1"
+    if ProcessInfo.processInfo.environment["SEPTENA_STOREKIT_TEST"] == "1" { return true }
+    return RegistryPlans.checkoutOpen && !isDirectDownload
+  }
+
+  /// The Mac download from GitHub (Developer ID, Sparkle updates): it has
+  /// no App Store receipt, so StoreKit cannot complete a purchase there
+  /// (#683). It signs in to the same account and gets the account's plan,
+  /// wherever the plan was bought; the sheet points to the App Store
+  /// version instead of selling. The Mac App Store build drops Sparkle and
+  /// its feed key (#266).
+  static var isDirectDownload: Bool {
+    #if os(macOS)
+    guard Bundle.main.object(forInfoDictionaryKey: "SUFeedURL") != nil else { return false }
+    guard let receipt = Bundle.main.appStoreReceiptURL else { return true }
+    return !FileManager.default.fileExists(atPath: receipt.path)
+    #else
+    return false
+    #endif
   }
 
   /// Starts the transaction listener once per process. Call at launch.
@@ -141,5 +159,64 @@ final class PlusStore {
     } catch {
       return .retryLater
     }
+  }
+}
+
+/// The two paid plans the sheet sells (ADR 0059). Plus is every device;
+/// Pro is every agent. Words, prices and rows come from `registry/plans.json`.
+enum PlanTier: String, CaseIterable, Identifiable, Sendable {
+  case plus, pro
+
+  var id: String { rawValue }
+
+  /// The short name on the plan picker ("Plus", "Pro").
+  var title: String {
+    switch self {
+    case .plus: return RegistryPlans.shortName
+    case .pro: return RegistryPlans.proName
+    }
+  }
+
+  var card: RegistryPlanCard? {
+    switch self {
+    case .plus: return RegistryPlans.card("plus")
+    case .pro: return RegistryPlans.proCard
+    }
+  }
+
+  var prices: [RegistryPlanPrice] {
+    switch self {
+    case .plus: return RegistryPlans.prices
+    case .pro: return RegistryPlans.proPrices
+    }
+  }
+
+  var productIDs: [String] { prices.map(\.productId) }
+
+  /// This plan's value in a comparison row.
+  func cell(_ row: RegistryPlanRow) -> RegistryPlanCell {
+    switch self {
+    case .plus: return row.plus
+    case .pro: return row.pro
+    }
+  }
+
+  /// The rows every plan card lists (`cardRows`): the lines that set the
+  /// plans apart.
+  static var cardRows: [RegistryPlanRow] {
+    let all = RegistryPlans.outcomes.flatMap(\.rows)
+    return RegistryPlans.cardRowIDs.compactMap { id in all.first { $0.id == id } }
+  }
+
+  /// The plan the sheet opens on. A Plus account looks at Pro, the plan
+  /// above it. Otherwise the moment that opened the sheet names the plan
+  /// that answers it (`upsells[].plan`); with no moment, Plus.
+  @MainActor
+  static func recommended(upsellID: String?, status: PlanStatus) -> PlanTier {
+    if case .plus = status.plan, !status.isPro { return .pro }
+    if let id = upsellID, let plan = RegistryPlans.upsell(id)?.plan, let tier = PlanTier(rawValue: plan) {
+      return tier
+    }
+    return .plus
   }
 }

@@ -4,21 +4,37 @@ import type { PlusLink, PlusLinkUse } from "../store/plusLinks.js";
 import { deviceLabel, lastSeen, overview, planView } from "./accounts.js";
 import type { SignupRow, SignupView } from "./signups.js";
 import {
-  SERIES_DAYS, agentMix, change, clientMix, cumulative, lastDays, perDay, providerMix, snapshotSeries, weeklyCohorts, windowChange,
+  SERIES_DAYS, agentMix, change, clientMix, releaseAdoption, cumulative, lastDays, perDay, providerMix, snapshotSeries, weeklyCohorts, windowChange,
   type MetricDay, type Tally,
 } from "./metrics.js";
 import type { Row as TrafficRow, TrafficResult } from "./plausible.js";
 import type { MacRelease } from "./releases.js";
+import { DESIGN_TOKENS } from "../generated/registries.js";
 
-// The admin page as one HTML document: no script, no external file. Every
-// value goes through `esc`.
+// The admin pages (docs/ADMIN_CONSOLE_SPEC.md §3). Each page is one HTML
+// document: no script, no external file. Every value goes through `esc`.
+// The pages share one shell: the top bar with the tabs, then cards.
+
+/// The admin pages, in tab order. The path is relative to /admin.
+export const ADMIN_PAGES = [
+  { id: "overview", path: "", title: "Overview" },
+  { id: "website", path: "/website", title: "Website" },
+  { id: "product", path: "/product", title: "Product" },
+  { id: "plans", path: "/plans", title: "Plans" },
+  { id: "accounts", path: "/accounts", title: "Accounts" },
+  { id: "signups", path: "/signups", title: "Signups" },
+] as const;
+export type AdminPage = (typeof ADMIN_PAGES)[number]["id"];
+
+/// The brand accent, Persimmon, from registry/tokens.json.
+const BRAND = DESIGN_TOKENS.fruitAccents.find((a) => a.id === "persimmon") ?? { light: "#E05212", dark: "#FF7738" };
 
 export const PAGE_HEADERS = {
   "Content-Type": "text/html; charset=utf-8",
   "Cache-Control": "no-store",
   "Referrer-Policy": "same-origin",
   "X-Robots-Tag": "noindex, nofollow",
-  "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; frame-src https://plausible.io; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
+  "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; img-src https://septena.app; frame-src https://plausible.io; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
 };
 
 export interface AdminView {
@@ -40,37 +56,66 @@ export interface AdminView {
 }
 
 const CSS = `
-  :root { color-scheme: light dark; --bg: #fafafa; --card: #fff; --line: #e5e5e5; --text: #1a1a1a; --dim: #6b6b6b; --ok: #1d7a3d; --warn: #a15c00; }
-  @media (prefers-color-scheme: dark) { :root { --bg: #0a0a0a; --card: #161616; --line: #2a2a2a; --text: #f5f5f5; --dim: #999; --ok: #57c77d; --warn: #e0a04a; } }
+  :root { color-scheme: light dark;
+    --bg: #faf9f7; --card: #fff; --line: #e8e5e0; --text: #26231f; --dim: #74706a; --bad: #c0392b;
+    --accent: ${BRAND.light}; --accent-soft: color-mix(in oklab, var(--accent) 12%, transparent); }
+  @media (prefers-color-scheme: dark) { :root {
+    --bg: #1b1a18; --card: #24221f; --line: #34312d; --text: #f4f2ee; --dim: #a29d96; --bad: #ff6b5e;
+    --accent: ${BRAND.dark}; } }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 -apple-system, BlinkMacSystemFont, system-ui, sans-serif; }
-  main { max-width: 1180px; margin: 0 auto; padding: 24px 16px 64px; }
-  h1 { font-size: 20px; margin: 0; } h2 { font-size: 16px; margin: 32px 0 10px; }
-  header, .bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
-  .dim { color: var(--dim); } .ok { color: var(--ok); } .warn { color: var(--warn); }
-  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; margin-top: 16px; }
-  .tile, .box { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+  a { color: var(--accent); text-decoration: none; } a:hover { text-decoration: underline; }
+  .top { position: sticky; top: 0; z-index: 2; background: var(--bg); border-bottom: 1px solid var(--line); }
+  .top .in { max-width: 1180px; margin: 0 auto; padding: 12px 16px 0; }
+  .brand { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
+  .brand h1 { font-size: 17px; margin: 0; display: flex; gap: 8px; align-items: center; }
+  .mark { width: 22px; height: 22px; display: block; }
+  .who { display: flex; gap: 10px; align-items: center; }
+  .tabs { display: flex; gap: 4px; overflow-x: auto; margin-top: 8px; }
+  .tabs a { color: var(--dim); padding: 8px 10px; border-bottom: 2px solid transparent; white-space: nowrap; font-weight: 500; }
+  .tabs a:hover { color: var(--text); text-decoration: none; }
+  .tabs a[aria-current=page] { color: var(--text); border-bottom-color: var(--accent); }
+  main { max-width: 1180px; margin: 0 auto; padding: 8px 16px 64px; }
+  h2 { font-size: 15px; margin: 0; } h3 { font-size: 14px; margin: 18px 0 8px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-top: 16px; }
+  .card > header { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }
+  .card > header p { margin: 0; }
+  .bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
+  .dim { color: var(--dim); } .ok { color: var(--accent); font-weight: 600; } .warn { color: var(--bad); }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+  .tile { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
   .tile b { display: block; font-size: 20px; font-variant-numeric: tabular-nums; }
-  .scroll { overflow-x: auto; background: var(--card); border: 1px solid var(--line); border-radius: 10px; }
+  .scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
   table { border-collapse: collapse; width: 100%; } th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
-  tr:last-child td { border-bottom: 0; } th { font-weight: 600; color: var(--dim); white-space: nowrap; }
+  tr:last-child td { border-bottom: 0; } th { font-weight: 600; color: var(--dim); white-space: nowrap; font-size: 12px; }
+  tbody tr:hover { background: var(--accent-soft); }
   td.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
   code { font: 12px ui-monospace, Menlo, monospace; overflow-wrap: anywhere; }
   form { display: inline-flex; flex-wrap: wrap; gap: 8px; align-items: end; margin: 0; }
   label { display: grid; gap: 3px; font-size: 12px; color: var(--dim); }
-  input, select, button { font: inherit; padding: 6px 9px; border: 1px solid var(--line); border-radius: 7px; background: var(--card); color: var(--text); }
-  button { cursor: pointer; } summary { cursor: pointer; }
-  .box { margin: 12px 0; } .cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
-  nav { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 10px; font-size: 13px; } a { color: inherit; }
-  .kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; margin-top: 16px; }
-  .kpi { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: grid; gap: 2px; }
-  .kpi b { font-size: 24px; font-variant-numeric: tabular-nums; } .kpi svg { width: 100%; height: 30px; color: var(--dim); }
-  .delta { font-size: 12px; font-variant-numeric: tabular-nums; } .up { color: var(--ok); } .down { color: var(--warn); }
-  .funnel td.bar { width: 45%; } .meter { height: 8px; border-radius: 4px; background: var(--dim); opacity: .55; min-width: 2px; }
-  .chart { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
-  .chart svg { width: 100%; height: 90px; color: var(--dim); display: block; }
+  input, select, button { font: inherit; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--text); }
+  input:focus, select:focus, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  button { cursor: pointer; } button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  summary { cursor: pointer; }
+  .note { border-left: 3px solid var(--accent); background: var(--accent-soft); padding: 10px 12px; border-radius: 8px; margin-top: 16px; }
+  .note.warn { border-left-color: var(--bad); background: color-mix(in oklab, var(--bad) 10%, transparent); color: var(--text); }
+  .cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+  .cols > div > b { display: block; margin-bottom: 4px; }
+  .blist h3 { margin: 0 0 6px; } .blist ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
+  .blist li { position: relative; display: flex; justify-content: space-between; gap: 10px; padding: 5px 8px; border-radius: 6px; overflow: hidden; }
+  .bfill { position: absolute; inset: 0 auto 0 0; background: color-mix(in oklab, var(--accent) 18%, transparent); border-radius: 6px; }
+  .bname, .bn { position: relative; } .bname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bn { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px; }
+  .kpi { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: grid; gap: 2px; }
+  .kpi b { font-size: 26px; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+  .kpi svg { width: 100%; height: 30px; color: var(--accent); }
+  .delta { font-size: 12px; font-variant-numeric: tabular-nums; } .up { color: var(--accent); } .down { color: var(--dim); }
+  .chart { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+  .chart svg { width: 100%; height: 90px; color: var(--accent); display: block; margin-top: 6px; }
   .chart rect:hover { opacity: .7; }
-  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
 `;
 
 const when = (ms: number | null, now: number): string => {
@@ -112,7 +157,7 @@ function accountRow(r: AccountIndexRow, now: number): string {
   const devices = (s?.devices ?? []).map((d) => `<div>${esc(deviceLabel(d))} <span class="dim">${esc(when(d.lastSeen, now))}</span></div>`).join("");
   const agents = (s?.agents ?? []).map((a) => `<div>${esc(a.client)} <span class="dim">${esc(when(a.lastUsed, now))}</span></div>`).join("");
   const hooks = s && s.webhooks > 0 ? `<div class="${s.failingWebhooks ? "warn" : "dim"}">${s.webhooks} webhooks, ${s.failingWebhooks} failing</div>` : "";
-  const give = `<details><summary class="dim">Give a plan</summary><form method="post" action="/admin/accounts/${esc(r.userId)}/plan">${planSelect("pro")}${lasts("forever")}<button>Give</button></form>${
+  const give = `<details><summary class="dim">Give a plan</summary><form method="post" action="/admin/accounts/${esc(r.userId)}/plan">${planSelect("pro")}${lasts("forever")}<button class="primary">Give</button></form>${
     plan.adminGrant ? ` <form method="post" action="/admin/accounts/${esc(r.userId)}/plan/end"><button>Take back</button></form>` : ""}</details>`;
   const planText = `${plan.plan ? `${PLAN[plan.plan]}, ` : ""}${plan.word}${plan.period ? `, ${plan.period}` : ""}`;
   const until = plan.word === "paid" || plan.word === "granted" || plan.word === "trial" ? `<div class="dim">${plan.until === null ? "no end" : `until ${day(plan.until)}`}</div>` : "";
@@ -140,8 +185,7 @@ function linkRow(l: PlusLink, uses: PlusLinkUse[]): string {
     <td><span class="${state === "open" ? "ok" : "dim"}">${state}</span></td><td>${day(l.createdAt)}</td><td>${people}</td><td>${close}${revoke}</td></tr>`;
 }
 
-const counts = (title: string, rows: { name: string; n: number }[]) =>
-  `<div><b>${esc(title)}</b>${rows.map((r) => `<div>${esc(String(r.name))} <span class="dim">${r.n}</span></div>`).join("") || '<div class="dim">none</div>'}</div>`;
+const counts = (title: string, rows: { name: string; n: number }[]) => tallyList(title, rows);
 
 const signupTable = (rows: SignupRow[]) => table(["Email", "List", "Screens", "Task apps", "AI", "Page", "Date"], rows.map((r) =>
   `<tr>${[r.email, r.list, r.platforms, r.tools, r.agents, r.source, r.created_at.slice(0, 10)].map((x) => `<td>${esc(x.replace(/[[\]"]/g, ""))}</td>`).join("")}</tr>`), "No signups.");
@@ -179,8 +223,9 @@ function bars(values: number[], days: string[], unit: string): string {
 
 const deltaText = (abs: number | null, rel: number | null, label: string) => {
   if (abs === null) return `<span class="delta dim">no history yet</span>`;
+  // Direction is the arrow; the accent marks growth, a drop stays quiet.
   const cls = abs > 0 ? "up" : abs < 0 ? "down" : "dim";
-  return `<span class="delta ${cls}">${abs > 0 ? "+" : ""}${fmt(abs)}${rel === null ? "" : ` (${rel > 0 ? "+" : ""}${pct(rel)})`} ${esc(label)}</span>`;
+  return `<span class="delta ${cls}">${abs > 0 ? "▲ +" : abs < 0 ? "▼ " : ""}${fmt(abs)}${rel === null ? "" : ` (${rel > 0 ? "+" : ""}${pct(rel)})`} ${esc(label)}</span>`;
 };
 
 /// A headline number with its change against 7 days before and a 30-day line.
@@ -189,31 +234,35 @@ function kpi(label: string, value: number | string, series: (number | null)[], d
   return `<div class="kpi"><span class="dim">${esc(label)}</span><b>${esc(typeof value === "number" ? fmt(value) : value)}</b>${deltaText(c.abs, c.rel, c.label)}${sparkline(series, days)}</div>`;
 }
 
-function funnel(title: string, steps: { name: string; n: number; note?: string }[]): string {
-  const top = Math.max(1, steps[0]?.n ?? 0);
-  const rows = steps.map((s, i) => {
-    const prev = i === 0 ? null : steps[i - 1].n;
-    return `<tr><td>${esc(s.name)}${s.note ? `<div class="dim">${esc(s.note)}</div>` : ""}</td><td class="n">${fmt(s.n)}</td>
-      <td class="n dim">${prev === null ? "" : pct(ratio(s.n, prev))}</td>
-      <td class="bar"><div class="meter" style="width:${Math.min(100, (s.n / top) * 100).toFixed(1)}%"></div></td></tr>`;
-  });
-  return `<div><b>${esc(title)}</b>${table(["Step", "Count", "Of step before", ""], rows, "No data.").replace('class="scroll"', 'class="scroll funnel"')}</div>`;
+/// A funnel as a plain table: one line per step, no notes, no bars.
+function funnel(title: string, steps: { name: string; n: number }[]): string {
+  const first = steps[0]?.n ?? 0;
+  const rows = steps.map((s, i) => `<tr><td>${esc(s.name)}</td><td class="n">${fmt(s.n)}</td>
+      <td class="n">${i === 0 ? "" : pct(ratio(s.n, steps[i - 1].n))}</td><td class="n dim">${i === 0 ? "" : pct(ratio(s.n, first))}</td></tr>`);
+  return `<div><h3 style="margin-top:0">${esc(title)}</h3>${table(["Step", "Count", "Of step before", "Of first step"], rows, "No data.")}</div>`;
 }
 
-const tallyList = (title: string, rows: (Tally | TrafficRow)[], unit = "") =>
-  `<div><b>${esc(title)}</b>${rows.slice(0, 12).map((r) => `<div>${esc(String(r.name))} <span class="dim">${fmt("visitors" in r ? r.visitors : r.n)}${unit}</span></div>`).join("") || '<div class="dim">none</div>'}</div>`;
+/// A ranked list: one line per row, a bar behind it in the accent, the count
+/// and its share on the right. Plausible draws its breakdowns the same way.
+const tallyList = (title: string, rows: (Tally | TrafficRow)[], unit = "") => {
+  const top = rows.slice(0, 10).map((r) => ({ name: String(r.name), n: "visitors" in r ? r.visitors : r.n }));
+  const max = Math.max(1, ...top.map((r) => r.n));
+  const sum = rows.reduce((t, r) => t + ("visitors" in r ? r.visitors : r.n), 0);
+  const items = top.map((r) => `<li><span class="bfill" style="width:${((r.n / max) * 100).toFixed(1)}%"></span><span class="bname">${esc(r.name)}</span><span class="bn">${fmt(r.n)}${esc(unit)}<span class="dim"> ${pct(ratio(r.n, sum))}</span></span></li>`).join("");
+  return `<div class="blist"><h3>${esc(title)}</h3>${items ? `<ol>${items}</ol>` : '<p class="dim">None yet.</p>'}</div>`;
+}
 
 const duration = (s: number) => (s >= 60 ? `${Math.floor(s / 60)}m ${Math.round(s % 60)}s` : `${Math.round(s)}s`);
 
 function websiteSection(t: TrafficResult, signupsByDay: Map<string, number>): string {
   if (t.state === "off") {
-    return `<p class="warn">Plausible is not connected. On the Growth plan: make a shared link (Site settings ▸ Visibility ▸ Shared links) and store it with <code>wrangler secret put PLAUSIBLE_SHARED_LINK</code>. On Business: a Stats API key in <code>PLAUSIBLE_API_KEY</code> gives the full block.</p>`;
+    return `<p class="note">Plausible is not connected. On the Growth plan: make a shared link (Site settings ▸ Visibility ▸ Shared links) and store it with <code>wrangler secret put PLAUSIBLE_SHARED_LINK</code>. On Business: a Stats API key in <code>PLAUSIBLE_API_KEY</code> gives the full block.</p>`;
   }
   if (t.state === "embed") {
     return `<iframe src="${esc(t.url)}" title="Plausible dashboard" loading="lazy" referrerpolicy="no-referrer" style="width:100%;height:1700px;border:1px solid var(--line);border-radius:10px"></iframe>
   <p class="dim">The Plausible dashboard, embedded from a shared link. Funnels, goal conversion in the growth tiles and the website funnel need a Stats API key (Business plan).</p>`;
   }
-  if (t.state === "error") return `<p class="warn">Plausible does not answer (${esc(t.reason)}). The rest of the page is current.</p>`;
+  if (t.state === "error") return `<p class="note warn">Plausible does not answer (${esc(t.reason)}). The rest of the page is current.</p>`;
   const v = t.view;
   const days = v.days.map((d) => d.day);
   const visitors = v.days.map((d) => d.visitors);
@@ -235,8 +284,8 @@ function websiteSection(t: TrafficResult, signupsByDay: Map<string, number>): st
   <h3>Calls to action, 30 days</h3>
   ${table(["Goal", "Visitors", "Events", "Conversion"], goalRows, "No goals counted.")}
   ${v.missingGoals.length ? `<p class="dim">No events in 30 days: ${esc(v.missingGoals.join(", "))}. Plausible leaves a goal out when it has no events, so a goal that stays here may also be missing in Plausible ▸ Goals.</p>` : ""}
-  <div class="box cols">${tallyList("Sources", v.sources)}${tallyList("Pages", v.pages)}${tallyList("Countries", v.countries)}${tallyList("Download clicks by platform", v.downloads)}${tallyList("List-keeper CTA by placement", v.ctaPlacements)}</div>
-  <p class="dim">From Plausible, ${esc(v.site)}, ${esc(when(v.fetchedAt, Date.now()))}; cached for 10 minutes. <a href="https://plausible.io/${esc(v.site)}">Open Plausible</a></p>`;
+  <div class="grid2" style="margin-top:18px">${tallyList("Sources", v.sources)}${tallyList("Pages", v.pages)}</div><div class="cols" style="margin-top:18px">${tallyList("Countries", v.countries)}${tallyList("Download clicks by platform", v.downloads)}${tallyList("List-keeper CTA by placement", v.ctaPlacements)}</div>
+  <p class="dim" style="margin-bottom:0">From Plausible, ${esc(v.site)}, ${esc(when(v.fetchedAt, Date.now()))}; cached for 10 minutes. <a href="https://plausible.io/${esc(v.site)}">Open Plausible</a></p>`;
 }
 
 function growthSection(v: AdminView): string {
@@ -257,7 +306,6 @@ function growthSection(v: AdminView): string {
   let left = total - signupDays.reduce((a, b) => a + b, 0);
   const signupTotal = signupDays.map((n) => (left += n));
   const signupWin = windowChange(signups14(byDay, v.now));
-  const traffic = v.traffic.state === "ok" ? v.traffic.view : null;
   const stick = ratio(o.activeToday, o.activeThisMonth);
   return `<div class="kpis">
     ${kpi("Accounts", o.accounts, totalAccounts, days)}
@@ -269,21 +317,26 @@ function growthSection(v: AdminView): string {
     ${kpi("Website signups", total, signupTotal, days)}
     ${kpi("Signups, 7 days", signupWin.now, signupDays, days, { abs: signupWin.now - signupWin.before, rel: signupWin.pct, label: "vs the 7 days before" })}
   </div>
-  <div class="tiles">
+  <div class="tiles" style="margin-top:8px">
     ${tile(o.activeToday, "active today (DAU)")}${tile(pct(stick), "DAU / MAU")}${tile(pct(ratio(o.activated, o.accounts)), "activated")}
     ${tile(pct(ratio(o.activeThisMonth, o.accounts)), "of accounts active in 30 days")}${tile(pct(ratio(o.trialsConverted, o.trialsStarted)), "trial to paid")}
     ${tile(o.withAgent, "with an agent")}${tile(o.agentChangesWeek, "agent changes, 7 days")}${tile(o.twoDevices, "with 2+ devices")}
   </div>
-  <p class="dim">Accounts and signups reach back to the first day. Active, activated and paying are kept once a day since ${esc(v.history[0]?.day ?? "today")}, so their change shows after a week. Activated: completed at least one task.</p>
-  <div class="grid2" style="margin-top:12px">
+  <p class="dim">Accounts and signups reach back to the first day. Active, activated and paying are kept once a day since ${esc(v.history[0]?.day ?? "today")}, so their change shows after a week. Activated: completed at least one task.</p>`;
+}
+
+function funnelsSection(v: AdminView): string {
+  const o = overview(v.accounts, v.now);
+  const traffic = v.traffic.state === "ok" ? v.traffic.view : null;
+  return `<div class="grid2">
     ${funnel("Website, last 30 days", traffic ? [
       { name: "Visitors", n: traffic.totals.visitors },
-      { name: "Left an email", n: traffic.goals.find((g) => g.name === "Signup")?.visitors ?? 0, note: "Plausible goal Signup" },
+      { name: "Left an email", n: traffic.goals.find((g) => g.name === "Signup")?.visitors ?? 0 },
       { name: "Clicked a download", n: traffic.goals.find((g) => g.name === "Download click")?.visitors ?? 0 },
-    ] : [{ name: "Visitors", n: 0, note: "needs a Plausible Stats API key" }])}
+    ] : [{ name: "Visitors (Plausible not connected)", n: 0 }])}
     ${funnel("Product, every account", [
       { name: "Accounts", n: o.accounts },
-      { name: "Activated", n: o.activated, note: "completed a task" },
+      { name: "Activated (completed a task)", n: o.activated },
       { name: "Two or more devices", n: o.twoDevices },
       { name: "Connected an agent", n: o.withAgent },
       { name: "Started a trial", n: o.trialsStarted },
@@ -298,72 +351,98 @@ function retentionSection(v: AdminView): string {
   const rows = weeklyCohorts(v.accounts, 8, v.now).map((c) => `<tr><td>${esc(c.week)}</td><td class="n">${c.size}</td>
     <td class="n">${pct(ratio(c.activated, c.size))}</td><td class="n">${pct(ratio(c.activeWeek, c.size))}</td>
     <td class="n">${pct(ratio(c.twoDevices, c.size))}</td><td class="n">${pct(ratio(c.plan, c.size))}</td></tr>`);
-  return `${table(["Week started", "Accounts", "Activated", "Active this week", "2+ devices", "Paying"], rows, "No accounts yet.")}
-  <p class="dim">Each row is the accounts that started that week (Monday, UTC), as they are now.</p>`;
+  return table(["Week started", "Accounts", "Activated", "Active this week", "2+ devices", "Paying"], rows, "No accounts yet.");
 }
 
 function clientsSection(v: AdminView): string {
   const mix = clientMix(v.accounts, v.now);
-  const mac = v.releases === null ? `<div><b>Mac downloads</b><div class="warn">GitHub does not answer</div></div>`
-    : `<div><b>Mac downloads</b>${v.releases.map((r) => `<div>${esc(r.tag)} <span class="dim">${fmt(r.installs)} downloads, ${fmt(r.appcast)} update checks</span></div>`).join("") || '<div class="dim">no releases</div>'}
-      <div class="dim">${fmt(v.releases.reduce((n, r) => n + r.installs, 0))} in all</div></div>`;
-  return `<div class="box cols">${tallyList("Devices, 30 days", mix.platforms)}${tallyList("Versions, 30 days", mix.versions)}${tallyList("Agents", agentMix(v.accounts), " accounts")}${tallyList("Sign-in", providerMix(v.accounts), " accounts")}${mac}</div>
-  <p class="dim">App Store and Google Play installs, revenue and renewals are not here yet (docs/ADMIN_CONSOLE_SPEC.md).</p>`;
+  const mac = v.releases === null ? `<div class="blist"><h3>Mac downloads</h3><p class="warn">GitHub does not answer.</p></div>`
+    : tallyList("Mac downloads by release", v.releases.map((r) => ({ name: r.tag, n: r.installs })));
+  const releases = releaseAdoption(v.accounts).slice(0, 12).map((r) =>
+    `<tr><td>${esc(r.name)}</td><td class="n">${fmt(r.devices)}</td><td>${esc(day(r.firstSeen))}</td><td class="dim">${esc(when(r.lastSeen, v.now))}</td></tr>`);
+  return `<div class="cols">${tallyList("Devices, 30 days", mix.platforms)}${tallyList("Versions, 30 days", mix.versions)}${tallyList("Builds, 30 days", mix.builds)}${tallyList("Agents, accounts using each", agentMix(v.accounts))}${tallyList("Sign-in, accounts", providerMix(v.accounts))}${mac}</div>
+  <h3>Releases, last 90 days</h3>
+  ${table(["Release", "Devices that ran it", "First seen", "Last seen"], releases, "No versions reported yet.")}
+  <p class="dim">A device with no version runs a build from before the version header. Store installs and revenue come with RevenueCat (#644, #645).</p>`;
 }
 
-export function renderAdmin(v: AdminView): string {
-  const o = overview(v.accounts, v.now);
-  const shown = v.accounts.filter((r) => matches(r, v));
+/// A titled card: the unit every page is built from.
+const card = (title: string, body: string, note = "", id = "") =>
+  `<section class="card"${id ? ` id="${esc(id)}"` : ""}><header><h2>${esc(title)}</h2>${note ? `<p class="dim">${note}</p>` : ""}</header>${body}</section>`;
+
+function shell(page: AdminPage, v: AdminView, body: string): string {
+  const title = ADMIN_PAGES.find((p) => p.id === page)!.title;
+  const tabs = ADMIN_PAGES.map((p) => `<a href="/admin${p.path}"${p.id === page ? ' aria-current="page"' : ""}>${esc(p.title)}</a>`).join("");
   return `<!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Septena admin</title><style>${CSS}</style></head>
-<body><main>
-<header><h1>Septena admin</h1><span class="dim">${esc(v.admin)}</span>
-  <form method="post" action="/admin/refresh"><button>Refresh counts</button></form></header>
-<nav><a href="#growth">Growth</a><a href="#website">Website</a><a href="#retention">Retention</a><a href="#clients">Clients</a><a href="#plans">Plans</a><a href="#links">Plan links</a><a href="#accounts">Accounts</a><a href="#signups">Signups</a></nav>
-${v.error ? `<div class="box warn">${esc(v.error)}</div>` : ""}
-${v.newUrl ? `<div class="box"><b>New plan link</b><p><code>${esc(v.newUrl)}</code></p><span class="dim">Copy it now. Only a hash is stored, so this page cannot show it again.</span></div>` : ""}
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>${esc(title)} · Septena admin</title><style>${CSS}</style></head>
+<body>
+<div class="top"><div class="in">
+  <div class="brand"><h1><img class="mark" src="https://septena.app/icon.svg" alt="" width="22" height="22">Septena admin</h1>
+    <div class="who"><span class="dim">${esc(v.admin)}</span>
+    <form method="post" action="/admin/refresh"><input type="hidden" name="back" value="${esc(page)}"><button>Refresh counts</button></form></div></div>
+  <nav class="tabs" aria-label="Admin pages">${tabs}</nav>
+</div></div>
+<main>
+${v.error ? `<div class="note warn">${esc(v.error)}</div>` : ""}
+${body}
+</main></body></html>`;
+}
 
-<h2 id="growth">Growth</h2>
-${growthSection(v)}
+function overviewPage(v: AdminView): string {
+  return card("Growth", growthSection(v), "Each card: the number now, its change against 7 days before, and the last 30 days.")
+    + card("Funnels", funnelsSection(v));
+}
 
-<h2 id="website">Website</h2>
-${websiteSection(v.traffic, new Map((v.signups?.byDay ?? []).map((d) => [d.name, d.n])))}
+function websitePage(v: AdminView): string {
+  return card("Website", websiteSection(v.traffic, new Map((v.signups?.byDay ?? []).map((d) => [d.name, d.n]))), "septena.app, last 30 days, from Plausible.");
+}
 
-<h2 id="retention">Retention by week</h2>
-${retentionSection(v)}
+function productPage(v: AdminView): string {
+  const o = overview(v.accounts, v.now);
+  return card("Retention by week", retentionSection(v), "The accounts that started each week (Monday, UTC), as they are now.")
+    + card("Clients and agents", clientsSection(v), "Devices and versions seen in the last 30 days.")
+    + card("Usage", `<div class="tiles">${tile(o.openTasks, "open tasks")}${tile(o.closedTasks, "closed tasks")}${tile(o.files, `files (${size(o.fileBytes)})`)}${tile(o.agentChangesWeek, "agent changes, 7 days")}</div>`, "Counts only, every account.");
+}
 
-<h2 id="clients">Clients and agents</h2>
-${clientsSection(v)}
-
-<h2 id="plans">Plans and usage</h2>
-<div class="tiles">
+function plansPage(v: AdminView): string {
+  const o = overview(v.accounts, v.now);
+  const made = v.newUrl ? `<div class="note"><b>New plan link</b><p><code>${esc(v.newUrl)}</code></p><span class="dim">Copy it now. Only a hash is stored, so this page cannot show it again.</span></div>` : "";
+  return made + card("Plans", `<div class="tiles">
   ${tile(o.paid, `paid (${o.paidYear} year, ${o.paidMonth} month)`)}${tile(o.granted, `granted (${o.pro} Pro)`)}${tile(o.onTrial, "on trial")}${tile(o.trialsConverted, `bought, of ${o.trialsStarted} trials`)}${tile(o.lapsed, "lapsed")}
-  ${tile(o.openTasks, "open tasks")}${tile(o.closedTasks, "closed tasks")}${tile(o.files, `files (${size(o.fileBytes)})`)}
-</div>
-<p class="dim">Counts refresh hourly, each account at most a day old. Revenue and renewals are in App Store Connect.</p>
-
-<h2 id="links">Plan links</h2>
-<form method="post" action="/admin/links">
+</div>`, "Counts refresh hourly, each account at most a day old. Revenue and renewals are in App Store Connect.")
+    + card("Plan links", `<form method="post" action="/admin/links">
   <label>Label<input name="label" maxlength="60" required placeholder="Anna, press"></label>
   <label>Plan${planSelect("plus")}</label>
   <label>Lasts${lasts("12")}</label>
   <label>People<input name="maxUses" type="number" min="1" max="500" value="1" required></label>
-  <button>Make a link</button>
+  <button class="primary">Make a link</button>
 </form>
-<p class="dim">Close stops new people and keeps the plan for those who have it. Take back ends it.</p>
-${table(["Label", "Plan", "Lasts", "Used", "State", "Made", "Accounts", ""], v.links.map((l) => linkRow(l, v.uses)), "No links yet.")}
+<div style="margin-top:14px">${table(["Label", "Plan", "Lasts", "Used", "State", "Made", "Accounts", ""], v.links.map((l) => linkRow(l, v.uses)), "No links yet.")}</div>`,
+    "Close stops new people and keeps the plan for those who have it. Take back ends it.");
+}
 
-<h2 id="accounts">Accounts</h2>
-<form method="post" action="/admin/search"><label>Account id, link label, plan, sign-in or email<input name="q" value="${esc(v.query)}" maxlength="200"></label><button>Search</button></form>
-${v.query ? ` <a href="/admin">Show all</a>` : ""}
-<p class="dim">${shown.length} of ${v.accounts.length}. An account has no email unless its owner signed in with one.</p>
-${table(["Account", "Sign-in", "Plan", "Since", "Last seen", "Tasks", "Files", "Devices", "Agents", "Counted"], shown.map((r) => accountRow(r, v.now)), v.query ? "No account matches." : "No accounts counted yet. Press Refresh counts.")}
-${v.query.includes("@") ? `<h2>Signups with this email</h2>${signupTable(v.emailSignups)}` : ""}
+function accountsPage(v: AdminView): string {
+  const shown = v.accounts.filter((r) => matches(r, v));
+  const search = `<div class="bar"><form method="post" action="/admin/search"><label>Account id, link label, plan, sign-in or email<input name="q" value="${esc(v.query)}" maxlength="200"></label><button class="primary">Search</button>${v.query ? ` <a href="/admin/accounts">Show all</a>` : ""}</form>
+  <span class="dim">${shown.length} of ${v.accounts.length}</span></div>`;
+  return card("Accounts", `${search}<div style="margin-top:14px">${table(["Account", "Sign-in", "Plan", "Since", "Last seen", "Tasks", "Files", "Devices", "Agents", "Counted"], shown.map((r) => accountRow(r, v.now)), v.query ? "No account matches." : "No accounts counted yet. Press Refresh counts.")}</div>`,
+    "An account has no email unless its owner signed in with one.")
+    + (v.query.includes("@") ? card("Signups with this email", signupTable(v.emailSignups)) : "");
+}
 
-<h2 id="signups">Website signups</h2>
-${v.signups ? `<div class="box cols">${counts("List", v.signups.byList)}${counts("Screens", v.signups.byPlatform)}${counts("Task apps", v.signups.byTool)}${counts("Week of", v.signups.byWeek)}${counts("Page", v.signups.bySource)}</div>
-<p class="dim">${v.signups.total} signups from ${v.signups.people} people.</p>
-<p><a href="/admin/signups.csv">Download all as CSV</a></p>${signupTable(v.signups.latest)}` : `<p class="warn">The signup database does not answer.</p>`}
-</main></body></html>`;
+function signupsPage(v: AdminView): string {
+  if (!v.signups) return card("Website signups", `<p class="warn">The signup database does not answer.</p>`);
+  const sg = v.signups;
+  return card("Website signups", `<div class="cols">${counts("List", sg.byList)}${counts("Screens", sg.byPlatform)}${counts("Task apps", sg.byTool)}${counts("Week of", sg.byWeek)}${counts("Page", sg.bySource)}</div>`,
+    `${sg.total} signups from ${sg.people} people. <a href="/admin/signups.csv">Download all as CSV</a>`)
+    + card("Latest 50", signupTable(sg.latest));
+}
+
+const PAGES: Record<AdminPage, (v: AdminView) => string> = {
+  overview: overviewPage, website: websitePage, product: productPage, plans: plansPage, accounts: accountsPage, signups: signupsPage,
+};
+
+export function renderAdmin(page: AdminPage, v: AdminView): string {
+  return shell(page, v, PAGES[page](v));
 }

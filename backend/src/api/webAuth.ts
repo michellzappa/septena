@@ -12,7 +12,7 @@ const WS_TICKET_KV_TTL_S = 60;
 const WS_TICKET_PREFIX = "wst_";
 
 const ALLOW_METHODS = "GET, POST, PUT, PATCH, DELETE, OPTIONS";
-const ALLOW_HEADERS = "Authorization, Content-Type, X-Septena-Client";
+const ALLOW_HEADERS = "Authorization, Content-Type, X-Septena-Client, X-Septena-Version";
 const EXPOSE_HEADERS = "ETag";
 
 export function allowedWebOrigins(env: Env): string[] {
