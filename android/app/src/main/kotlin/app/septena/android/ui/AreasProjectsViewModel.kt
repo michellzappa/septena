@@ -182,7 +182,7 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                 .filter { it.deletedAt == null && it.fields[RegistryEntityFields.Project.AREA].stringValue() == selected.id }
             val nextPosition = (projects.mapNotNull { it.fields[RegistryEntityFields.Project.POSITION].numberValue() }
                 .maxOrNull() ?: -1.0) + 1.0
-            graph.registryEntityMutator.create(
+            val created = graph.registryEntityMutator.create(
                 RegistryEntityNames.PROJECT,
                 linkedMapOf(
                     RegistryEntityFields.Project.TITLE to JsonValue.StringValue(trimmed),
@@ -192,6 +192,8 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                     RegistryEntityFields.Project.POSITION to JsonValue.IntegerValue(nextPosition.toLong()),
                 ),
             )
+            // Recorded at the gesture, after the create lands: Undo removes the project.
+            graph.taskUndoHistory.recordCreatedEntity(created)
             true
         }
     }

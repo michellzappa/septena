@@ -298,24 +298,38 @@ struct AreaDetailView: View {
         // (rings for projects, checkboxes for loose tasks) under a quiet
         // "Projects" header — so the area reads as one continuous list rather
         // than a differently-indented block floating above the tasks.
-        if !projectsInArea.isEmpty {
-          projectsSectionHeader
-          let areaProjects = projectsInArea
-          ForEach(Array(areaProjects.enumerated()), id: \.element.id) { idx, project in
-            // The card wears the selection fill from touch-down, like a
-            // sidebar row (`NavigationPressStyle`, SelectionLanguage.swift).
-            NavigationPressReader { pressed in
-              Button { openProject(project) } label: {
-                projectRow(project)
-              }
-              .buttonStyle(NavigationPressStyle(hoverCornerRadius: Theme.cornerRadiusSmall))
-              .modifier(TaskMoveDrop(perform: { ids in
-                handleProjectDrop(ids: ids, project: project)
-              }))
-              .taskCardChrome(TaskCardPosition(index: idx, count: areaProjects.count),
-                              isSelected: pressed)
+        // The block shows also when the area has no projects yet, so the
+        // "New Project" row at its foot is always there (#706). The row is
+        // the last slot of the same card.
+        projectsSectionHeader
+        let areaProjects = projectsInArea
+        let cardCount = areaProjects.count + 1
+        ForEach(Array(areaProjects.enumerated()), id: \.element.id) { idx, project in
+          // The card wears the selection fill from touch-down, like a
+          // sidebar row (`NavigationPressStyle`, SelectionLanguage.swift).
+          NavigationPressReader { pressed in
+            Button { openProject(project) } label: {
+              projectRow(project)
             }
+            .buttonStyle(NavigationPressStyle(hoverCornerRadius: Theme.cornerRadiusSmall))
+            .modifier(TaskMoveDrop(perform: { ids in
+              handleProjectDrop(ids: ids, project: project)
+            }))
+            .taskCardChrome(TaskCardPosition(index: idx, count: cardCount),
+                            isSelected: pressed)
           }
+        }
+        NavigationPressReader { pressed in
+          Button {
+            notesFocused = false
+            Haptics.press()
+            showingNewProject = true
+          } label: {
+            newProjectRow
+          }
+          .buttonStyle(NavigationPressStyle(hoverCornerRadius: Theme.cornerRadiusSmall))
+          .taskCardChrome(TaskCardPosition(index: areaProjects.count, count: cardCount),
+                          isSelected: pressed)
         }
       }
     }
@@ -401,7 +415,9 @@ struct AreaDetailView: View {
     Haptics.commit()
     Task {
       do {
-        _ = try await projectsMutator.create(title: trimmed, area: areaId)
+        let project = try await projectsMutator.create(title: trimmed, area: areaId)
+        // Recorded at the gesture, after the create lands: undo removes it.
+        TaskUndo.recordProjectCreate(project, projects: projectsMutator)
         await load()
       } catch {
         errorMessage = error.localizedDescription
@@ -469,6 +485,30 @@ struct AreaDetailView: View {
       .padding(.trailing, TaskCardMetrics.margin)
       .padding(.top, 4)
       .padding(.bottom, 8)
+  }
+
+  /// Foot of the project card: the "New Project" add line (#706). Same
+  /// language as the quick-add line (`QuickAddTriggerRow`): a quiet glyph in
+  /// the checkbox column and the title in secondary ink.
+  private var newProjectRow: some View {
+    HStack(alignment: .center, spacing: Theme.iconTextGap) {
+      Image(systemName: "plus")
+        .scaledFont(size: 13, weight: .medium)
+        .foregroundStyle(Theme.inkSecondary)
+        .frame(width: Theme.checkboxTap, alignment: .center)
+        .offset(x: -Theme.checkboxLeadingNudge)
+      Text(RegistryActions.title(.areaNewProject))
+        .font(.septenaTaskTitle)
+        .foregroundStyle(Theme.inkSecondary)
+      Spacer()
+    }
+    .padding(.horizontal, TaskCardMetrics.contentInset)
+    .padding(.vertical, Theme.rowVPaddingTight)
+    .frame(minHeight: Theme.rowHeight)
+    .contentShape(Rectangle())
+    .accessibilityElement(children: .combine)
+    .accessibilityLabel(RegistryActions.title(.areaNewProject))
+    .accessibilityAddTraits(.isButton)
   }
 
   @ViewBuilder

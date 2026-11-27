@@ -1529,6 +1529,18 @@ fun ChevronRightGlyph(tint: Color, size: Dp = 14.dp, modifier: Modifier = Modifi
     }
 }
 
+/** Plain `+` for add rows (the area page's New Project line), matching iOS SF Symbol `plus`. */
+@Composable
+fun PlusGlyph(tint: Color, size: Dp = 14.dp, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier.size(size)) {
+        val w = this.size.width
+        val h = this.size.height
+        val stroke = (w * 0.12f).coerceAtLeast(1.4.dp.toPx())
+        drawLine(tint, Offset(w * 0.18f, h * 0.5f), Offset(w * 0.82f, h * 0.5f), strokeWidth = stroke, cap = StrokeCap.Round)
+        drawLine(tint, Offset(w * 0.5f, h * 0.18f), Offset(w * 0.5f, h * 0.82f), strokeWidth = stroke, cap = StrokeCap.Round)
+    }
+}
+
 @Composable
 fun ChevronLeftGlyph(tint: Color, size: Dp = 22.dp, modifier: Modifier = Modifier) {
     Canvas(modifier = modifier.size(size)) {
