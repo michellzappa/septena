@@ -151,6 +151,32 @@ export const zCreatedAgentKey = z.object({
   scope: z.string(),
 });
 
+// GET /v1/entitlement: the account's current plan (ADR 0010, ADR 0023, ADR 0045).
+export const zAccountEntitlement = z.object({
+  active: z.boolean(),
+  plan: z.string().nullable().optional(),
+  entitlements: z.array(
+    z.object({
+      source: z.string(),
+      productId: z.string().nullable().optional(),
+      expiresAt: z.number().nullable().optional(),
+      status: z.string(),
+      active: z.boolean(),
+      plan: z.string().nullable().optional(),
+    }),
+  ),
+  trialEndsAt: z.number().nullable().optional(),
+  device: z
+    .object({
+      syncing: z.boolean(),
+      syncingDevices: z.number(),
+      knownDevices: z.number(),
+    })
+    .nullable()
+    .optional(),
+});
+export type AccountEntitlement = z.infer<typeof zAccountEntitlement>;
+
 export const zChangeEntry = z.object({
   rev: z.number(),
   entity: z.string(),

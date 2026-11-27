@@ -21,13 +21,13 @@ enum SeptaskSettingsLink {
 /// Structure, grouping, ordering, defaults, icons, and platform gates come
 /// from `registry/settings.json` (`RegistrySettings` in
 /// `SeptenaCore/Generated/RegistryConstants.swift`):
-///   • iOS: flat, scannable grouped root `Form` — everyday Lists & Appearance
-///     controls sit inline on screen 1; multi-step flows are 1 tap deep with
+///   • iOS: flat, scannable grouped root `Form` — everyday Lists controls sit
+///     inline on screen 1; Appearance and multi-step flows are 1 tap deep with
 ///     live status badges; dev/diagnostic tools sit 2 taps deep under
 ///     About ▸ Advanced.
-///   • macOS: 6-tab `NavigationSplitView` generated from
-///     `RegistrySettings.desktopTabs`, expanding `desktopInline: true` pages
-///     (Connect Claude + AI Preferences) directly into the AI & Agents tab.
+///   • macOS: 7-tab `NavigationSplitView` generated from
+///     `RegistrySettings.desktopTabs`, sharing the exact same pushed subpages
+///     as mobile (no `desktopInline` divergence).
 struct SeptaskSettingsView: View {
   @Environment(\.dismiss) private var dismiss
   @Environment(\.modelContext) private var modelContext
@@ -90,7 +90,7 @@ struct SeptaskSettingsView: View {
           .navigationDestination(for: String.self) { page($0) }
       }
     }
-    .frame(width: 820, height: 600)
+    .frame(minWidth: 720, idealWidth: 820, minHeight: 480, idealHeight: 600)
     .onChange(of: selectedTab) { _, _ in
       // Switching sidebar tabs resets any pushed subpage cleanly.
       path.removeAll()
@@ -98,7 +98,10 @@ struct SeptaskSettingsView: View {
     .onExitCommand { dismiss() }
     .onAppear(perform: consumeLink)
     .onReceive(NotificationCenter.default.publisher(for: SeptaskSettingsLink.didRequest)) { _ in consumeLink() }
-    .task(id: TaskSyncEngine.shared.signedIn) { await PlanStatus.shared.refresh() }
+    .task(id: TaskSyncEngine.shared.signedIn) {
+      await PlanStatus.shared.refresh()
+      await AgentRoster.shared.refresh()
+    }
     #else
     NavigationStack(path: $path) {
       Form {
@@ -143,10 +146,7 @@ struct SeptaskSettingsView: View {
     #if os(macOS)
     let targetTab = owningDesktopTab(for: pageID)
     selectedTab = targetTab
-    // Pages marked `desktopInline: true` (or top-level tab pages) render
-    // directly inside the selected tab without pushing onto the detail stack.
-    let isTabRoot = (pageID == targetTab) || isDesktopInline(pageID: pageID)
-    if isTabRoot {
+    if pageID == targetTab {
       path = []
     } else {
       // Defer push one turn so `.onChange(of: selectedTab)` doesn't clear it.
@@ -180,7 +180,7 @@ struct SeptaskSettingsView: View {
         } else {
           Section {
             ForEach(visibleItems) { item in
-              registryItemRow(item, expandDesktopInline: false)
+              registryItemRow(item)
             }
           } header: {
             if let header = group.header {
@@ -247,79 +247,36 @@ struct SeptaskSettingsView: View {
     switch tabID {
     case RegistrySettings.TabID.account:
       SeptaskAccountPane()
+    case RegistrySettings.TabID.appearance:
+      Form {
+        registryPageSections(RegistrySettings.PageID.appearance)
+      }
+      .formStyle(.grouped)
+      .navigationTitle(RegistrySettings.pageById[RegistrySettings.PageID.appearance]?.title ?? "")
     case RegistrySettings.TabID.privacy:
       SeptaskPrivacyPane()
     case RegistrySettings.TabID.about:
       SeptaskAboutPane()
-    case RegistrySettings.TabID.aiAgents:
-      Form {
-        let groups = RegistrySettings.rootGroups.filter { $0.desktopTab == tabID }
-        ForEach(groups) { group in
-          let visibleItems = group.items.filter(isItemVisible)
-          ForEach(visibleItems) { item in
-            if item.kind == "pageLink", item.desktopInline, let target = item.page {
-              inlineDesktopPageSections(target)
-            } else {
-              Section {
-                registryItemRow(item, expandDesktopInline: true)
-              } header: {
-                if item.key == "agentsPaused" {
-                  Text(RegistrySettings.pageById[RegistrySettings.PageID.agents]?.title ?? "")
-                }
-              } footer: {
-                if item.key == "agentsPaused" {
-                  Text("While paused, no agent can pick up or work on a task. Stop one task from its conversation instead. Agents never close assigned tasks on their own — finished work lands in Review for you to accept or send back.")
-                }
-              }
-            }
-          }
-        }
-      }
-      .formStyle(.grouped)
-      .navigationTitle(RegistrySettings.tabById[tabID]?.title ?? tabID)
     default:
       Form {
         let groups = RegistrySettings.rootGroups.filter { $0.desktopTab == tabID }
         ForEach(groups) { group in
           let visibleItems = group.items.filter(isItemVisible)
-          let inlinePages = visibleItems.filter { $0.kind == "pageLink" && $0.desktopInline }
-          let rows = visibleItems.filter { !($0.kind == "pageLink" && $0.desktopInline) }
-          if !rows.isEmpty {
+          if !visibleItems.isEmpty {
             Section {
-              ForEach(rows) { item in
-                registryItemRow(item, expandDesktopInline: true)
+              ForEach(visibleItems) { item in
+                registryItemRow(item)
               }
             } header: {
-              if let header = group.header {
+              if let header = group.header, header != RegistrySettings.tabById[tabID]?.title {
                 Text(header)
               }
-            }
-          }
-          // A desktop-inline page link (Appearance) expands its page's
-          // sections into the tab instead of pushing a page.
-          ForEach(inlinePages) { item in
-            if let target = item.page {
-              inlineDesktopPageSections(target)
             }
           }
         }
       }
       .formStyle(.grouped)
       .navigationTitle(RegistrySettings.tabById[tabID]?.title ?? "Settings")
-    }
-  }
-
-  @ViewBuilder
-  private func inlineDesktopPageSections(_ pageID: String) -> some View {
-    switch pageID {
-    case RegistrySettings.PageID.claudePairing:
-      SeptaskClaudePairingSections()
-    case RegistrySettings.PageID.aiPreferences:
-      SeptaskAIPreferencesSections()
-    case RegistrySettings.PageID.agents:
-      SeptaskAgentsSections()
-    default:
-      registryPageSections(pageID, titleAsHeader: true)
     }
   }
 
@@ -333,12 +290,6 @@ struct SeptaskSettingsView: View {
       }
     }
     return RegistrySettings.TabID.general
-  }
-
-  private func isDesktopInline(pageID: String) -> Bool {
-    RegistrySettings.rootGroups.contains { group in
-      group.items.contains { $0.kind == "pageLink" && $0.page == pageID && $0.desktopInline }
-    }
   }
   #endif
 
@@ -358,12 +309,14 @@ struct SeptaskSettingsView: View {
         HStack(spacing: 6) {
           if TaskSyncEngine.shared.signedIn {
             if PlanStatus.shared.isPlus { SeptenaPlusBadge(isPro: PlanStatus.shared.isPro) } else { FreeAccountBadge() }
-            Text("·")
-              .font(.caption)
-              .foregroundStyle(.tertiary)
-            Text(liveSyncSummary)
-              .font(.caption)
-              .foregroundStyle(.secondary)
+            if let alert = profileSyncAlert {
+              Text("·")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+              Text(alert)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
           } else {
             Text(RegistrySettings.copy("account_profile_card", "signInToSync"))
               .font(.caption)
@@ -399,7 +352,7 @@ struct SeptaskSettingsView: View {
   }
 
   @ViewBuilder
-  private func registryItemRow(_ item: RegistrySettingsItem, expandDesktopInline: Bool) -> some View {
+  private func registryItemRow(_ item: RegistrySettingsItem) -> some View {
     switch item.kind {
     case "pageLink":
       if let pageID = item.page {
@@ -570,6 +523,19 @@ struct SeptaskSettingsView: View {
 
   // MARK: - Live Status Badges (for Depth-0 Push Rows)
 
+  /// Only surfaces sync status on the profile card when something needs
+  /// attention (Offline or Not syncing). Healthy Live/Synced stays quiet.
+  private var profileSyncAlert: String? {
+    let sync = TaskSyncEngine.shared
+    if sync.deviceNotSyncing || PlanStatus.shared.deviceNotSyncing {
+      return RegistryPlans.Status.device
+    }
+    if sync.isSyncing || sync.wsConnected || (sync.liveSyncBlocked && sync.lastError == nil) {
+      return nil
+    }
+    return RegistrySettings.copy("syncStatus", "offline")
+  }
+
   private var liveSyncSummary: String {
     let sync = TaskSyncEngine.shared
     if sync.deviceNotSyncing || PlanStatus.shared.deviceNotSyncing {
@@ -596,6 +562,10 @@ struct SeptaskSettingsView: View {
       let paired = SeptaskSyncedSettings.current().getStartedSteps?.contains(TaskNoticeStep.ID.connectAI.rawValue) == true
       return paired ? "Connected" : "Set up"
     case "agentsStatus":
+      let paused = RegistrySettings.copy("access_agents", "paused")
+      if store.agentsPaused {
+        return AgentRoster.shared.statusLine.map { "\($0) · \(paused)" } ?? paused
+      }
       return AgentRoster.shared.statusLine
     case "aiMode":
       return (AIMode(rawValue: aiModeRaw) ?? .auto).title
@@ -616,19 +586,18 @@ struct SeptaskSettingsView: View {
 
   /// Renders a page's sections straight from `RegistrySettings.pages`, for
   /// pages whose rows are all plain settings and inline surfaces (Appearance).
-  /// On a desktop tab the page title stands in for a missing section header.
   @ViewBuilder
-  private func registryPageSections(_ pageID: String, titleAsHeader: Bool) -> some View {
+  private func registryPageSections(_ pageID: String) -> some View {
     if let page = RegistrySettings.pageById[pageID] {
       ForEach(page.sections.filter { $0.applies(to: currentPlatform) }) { section in
         let visibleItems = section.items.filter(isItemVisible)
         if !visibleItems.isEmpty {
           Section {
             ForEach(visibleItems) { item in
-              registryItemRow(item, expandDesktopInline: titleAsHeader)
+              registryItemRow(item)
             }
           } header: {
-            if let header = section.header ?? (titleAsHeader ? page.title : nil) {
+            if let header = section.header {
               Text(header)
             }
           } footer: {
@@ -684,7 +653,7 @@ struct SeptaskSettingsView: View {
       SeptaskAgentsPane()
     case RegistrySettings.PageID.appearance:
       Form {
-        registryPageSections(pageID, titleAsHeader: false)
+        registryPageSections(pageID)
       }
       .formStyle(.grouped)
       .navigationTitle(RegistrySettings.pageById[pageID]?.title ?? "")
@@ -761,7 +730,6 @@ private struct SeptaskAccountPane: View {
 
       SeptaskSyncAccountSection()
       SeptaskSignInMethodsSection()
-      SeptaskSignInApprovalSection()
       SeptaskDeleteAccountSection()
     }
     .formStyle(.grouped)

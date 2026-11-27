@@ -239,6 +239,9 @@ enum RegistryIcons {
     "settings.open_source": "chevron.left.forwardslash.chevron.right",
     "settings.paste": "doc.on.clipboard",
     "settings.plus": "plus.circle.fill",
+    "settings.notifications": "bell",
+    "settings.language": "globe",
+    "settings.shortcuts": "keyboard",
     "plans.free": "iphone",
     "plans.pro": "infinity",
     "plans.history": "clock.arrow.circlepath",
@@ -391,7 +394,6 @@ struct RegistrySettingsItem: Sendable, Hashable, Identifiable {
   let iconId: String?
   let sfSymbol: String?
   let statusKey: String?
-  let desktopInline: Bool
   let visibility: String
   let platforms: [String]?
   let featureId: String?
@@ -506,6 +508,7 @@ enum RegistrySettings {
   enum TabID {
     static let account = "account"
     static let general = "general"
+    static let appearance = "appearance"
     static let aiAgents = "ai_agents"
     static let connectionsData = "connections_data"
     static let privacy = "privacy"
@@ -539,6 +542,7 @@ enum RegistrySettings {
   static let desktopTabs: [RegistrySettingsTab] = [
     RegistrySettingsTab(id: "account", title: RegistryL10n.t("Account"), iconId: "settings.account", sfSymbol: "person.crop.circle", group: "identity", paletteSlot: nil, featureId: "sync.backend"),
     RegistrySettingsTab(id: "general", title: RegistryL10n.t("General"), iconId: "settings.general", sfSymbol: "slider.horizontal.3", group: "main", paletteSlot: 0, featureId: "lists.today"),
+    RegistrySettingsTab(id: "appearance", title: RegistryL10n.t("Appearance"), iconId: "settings.appearance", sfSymbol: "paintpalette", group: "main", paletteSlot: 2, featureId: "settings.display"),
     RegistrySettingsTab(id: "ai_agents", title: RegistryL10n.t("AI & Agents"), iconId: "settings.ai_agents", sfSymbol: "cpu", group: "main", paletteSlot: 4, featureId: "ai.reach-dial"),
     RegistrySettingsTab(id: "connections_data", title: RegistryL10n.t("Connections"), iconId: "settings.connections", sfSymbol: "link", group: "main", paletteSlot: 5, featureId: "sync.backend"),
     RegistrySettingsTab(id: "privacy", title: RegistryL10n.t("Privacy & Data"), iconId: "settings.privacy", sfSymbol: "hand.raised", group: "main", paletteSlot: 6, featureId: "settings.display"),
@@ -547,155 +551,165 @@ enum RegistrySettings {
 
   static let rootGroups: [RegistrySettingsGroup] = [
     RegistrySettingsGroup(id: "account_root", header: nil, mobilePresentation: "card", desktopTab: "account", items: [
-      RegistrySettingsItem(kind: "pageLink", key: nil, page: "account", surface: "account_profile_card", label: RegistryL10n.t("Account"), detail: nil, iconId: "settings.account", sfSymbol: "person.crop.circle", statusKey: "syncStatus", desktopInline: false, visibility: "always", platforms: nil, featureId: "sync.backend"),
+      RegistrySettingsItem(kind: "pageLink", key: nil, page: "account", surface: "account_profile_card", label: RegistryL10n.t("Account"), detail: nil, iconId: "settings.account", sfSymbol: "person.crop.circle", statusKey: "syncStatus", visibility: "always", platforms: nil, featureId: "sync.backend"),
     ]),
     RegistrySettingsGroup(id: "ai_agents_root", header: RegistryL10n.t("AI & Agents"), mobilePresentation: "inline", desktopTab: "ai_agents", items: [
-      RegistrySettingsItem(kind: "pageLink", key: nil, page: "claude_pairing", surface: nil, label: RegistryL10n.t("Connect Claude"), detail: nil, iconId: "settings.claude", sfSymbol: "bubble.left.and.text.bubble.right", statusKey: "claudeStatus", desktopInline: true, visibility: "always", platforms: nil, featureId: "agents.connector"),
-      RegistrySettingsItem(kind: "pageLink", key: nil, page: "agents", surface: nil, label: RegistryL10n.t("Agents"), detail: nil, iconId: "settings.agents", sfSymbol: "person.2", statusKey: "agentsStatus", desktopInline: true, visibility: "signedIn", platforms: nil, featureId: "agents.connector"),
-      RegistrySettingsItem(kind: "setting", key: "agentsPaused", page: nil, surface: nil, label: RegistryL10n.t("Pause all agents"), detail: RegistryL10n.t("While paused, no agent can start or work on a task."), iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "signedIn", platforms: nil, featureId: "agents.stop-pause"),
-      RegistrySettingsItem(kind: "pageLink", key: nil, page: "ai_preferences", surface: nil, label: RegistryL10n.t("AI Preferences"), detail: nil, iconId: "settings.ai_agents", sfSymbol: "cpu", statusKey: "aiMode", desktopInline: true, visibility: "always", platforms: nil, featureId: "ai.reach-dial"),
+      RegistrySettingsItem(kind: "pageLink", key: nil, page: "agents", surface: nil, label: RegistryL10n.t("Connected Agents"), detail: nil, iconId: "settings.agents", sfSymbol: "person.2", statusKey: "agentsStatus", visibility: "signedIn", platforms: nil, featureId: "agents.connector"),
+      RegistrySettingsItem(kind: "pageLink", key: nil, page: "claude_pairing", surface: nil, label: RegistryL10n.t("Connect an Agent"), detail: nil, iconId: "settings.claude", sfSymbol: "bubble.left.and.text.bubble.right", statusKey: "claudeStatus", visibility: "always", platforms: nil, featureId: "agents.connector"),
+      RegistrySettingsItem(kind: "pageLink", key: nil, page: "ai_preferences", surface: nil, label: RegistryL10n.t("On-Device AI"), detail: nil, iconId: "settings.ai_agents", sfSymbol: "cpu", statusKey: "aiMode", visibility: "always", platforms: nil, featureId: "ai.reach-dial"),
     ]),
     RegistrySettingsGroup(id: "connections_data_root", header: RegistryL10n.t("Connections"), mobilePresentation: "inline", desktopTab: "connections_data", items: [
-      RegistrySettingsItem(kind: "pageLink", key: nil, page: "calendar", surface: nil, label: RegistryL10n.t("Calendar"), detail: nil, iconId: "settings.calendar", sfSymbol: "calendar", statusKey: "calendarStatus", desktopInline: false, visibility: "always", platforms: nil, featureId: "calendar.events"),
-      RegistrySettingsItem(kind: "pageLink", key: nil, page: "reminders", surface: nil, label: RegistryL10n.t("Reminders"), detail: nil, iconId: "settings.reminders", sfSymbol: "checklist", statusKey: "remindersStatus", desktopInline: false, visibility: "always", platforms: ["ios", "ipados", "macos"], featureId: "import.reminders"),
+      RegistrySettingsItem(kind: "pageLink", key: nil, page: "calendar", surface: nil, label: RegistryL10n.t("Calendar"), detail: nil, iconId: "settings.calendar", sfSymbol: "calendar", statusKey: "calendarStatus", visibility: "always", platforms: nil, featureId: "calendar.events"),
+      RegistrySettingsItem(kind: "pageLink", key: nil, page: "reminders", surface: nil, label: RegistryL10n.t("Reminders"), detail: nil, iconId: "settings.reminders", sfSymbol: "checklist", statusKey: "remindersStatus", visibility: "always", platforms: ["ios", "ipados", "macos"], featureId: "import.reminders"),
     ]),
     RegistrySettingsGroup(id: "lists_root", header: RegistryL10n.t("Lists"), mobilePresentation: "inline", desktopTab: "general", items: [
-      RegistrySettingsItem(kind: "pageLink", key: nil, page: "smart_lists", surface: nil, label: RegistryL10n.t("Smart Lists"), detail: nil, iconId: "list.today", sfSymbol: "sun.max.fill", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "settings.display"),
-      RegistrySettingsItem(kind: "setting", key: "todayGroupByList", page: nil, surface: nil, label: RegistryL10n.t("Group Today by list"), detail: RegistryL10n.t("When off, tasks appear in one list with their project or area underneath."), iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "lists.today"),
-      RegistrySettingsItem(kind: "setting", key: "todayShowCompleted", page: nil, surface: nil, label: RegistryL10n.t("Show completed tasks"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "lists.today"),
-      RegistrySettingsItem(kind: "setting", key: "tasksShowAging", page: nil, surface: nil, label: RegistryL10n.t("Fade inactive tasks"), detail: RegistryL10n.t("Tasks without activity for 14 days fade out and move to Review. This applies on all your devices."), iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "task.aging"),
-      RegistrySettingsItem(kind: "setting", key: "tasksShowFaded", page: nil, surface: nil, label: RegistryL10n.t("Show faded tasks"), detail: RegistryL10n.t("Show faded tasks in projects and areas."), iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "task.aging"),
-      RegistrySettingsItem(kind: "setting", key: "tasksFilingSuggestions", page: nil, surface: nil, label: RegistryL10n.t("Suggest where to file"), detail: RegistryL10n.t("Learn where you usually file similar tasks."), iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "edit.filing-suggestion"),
-      RegistrySettingsItem(kind: "setting", key: "badgeShowOverdue", page: nil, surface: nil, label: RegistryL10n.t("Overdue app icon badge"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: ["macos"], featureId: "settings.display"),
+      RegistrySettingsItem(kind: "pageLink", key: nil, page: "smart_lists", surface: nil, label: RegistryL10n.t("Smart Lists"), detail: nil, iconId: "list.today", sfSymbol: "sun.max.fill", statusKey: nil, visibility: "always", platforms: nil, featureId: "settings.display"),
+      RegistrySettingsItem(kind: "setting", key: "todayGroupByList", page: nil, surface: nil, label: RegistryL10n.t("Group Today by list"), detail: RegistryL10n.t("When off, tasks appear in one list with their project or area underneath."), iconId: nil, sfSymbol: nil, statusKey: nil, visibility: "always", platforms: nil, featureId: "lists.today"),
+      RegistrySettingsItem(kind: "setting", key: "todayShowCompleted", page: nil, surface: nil, label: RegistryL10n.t("Show completed tasks"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, visibility: "always", platforms: nil, featureId: "lists.today"),
+      RegistrySettingsItem(kind: "setting", key: "tasksShowAging", page: nil, surface: nil, label: RegistryL10n.t("Fade inactive tasks"), detail: RegistryL10n.t("Tasks without activity for 14 days fade out and move to Review. This applies on all your devices."), iconId: nil, sfSymbol: nil, statusKey: nil, visibility: "always", platforms: nil, featureId: "task.aging"),
+      RegistrySettingsItem(kind: "setting", key: "tasksShowFaded", page: nil, surface: nil, label: RegistryL10n.t("Show faded tasks"), detail: RegistryL10n.t("Show faded tasks in projects and areas."), iconId: nil, sfSymbol: nil, statusKey: nil, visibility: "always", platforms: nil, featureId: "task.aging"),
+      RegistrySettingsItem(kind: "setting", key: "tasksFilingSuggestions", page: nil, surface: nil, label: RegistryL10n.t("Suggest where to file"), detail: RegistryL10n.t("Learn where you usually file similar tasks."), iconId: nil, sfSymbol: nil, statusKey: nil, visibility: "always", platforms: nil, featureId: "edit.filing-suggestion"),
+      RegistrySettingsItem(kind: "setting", key: "badgeShowOverdue", page: nil, surface: nil, label: RegistryL10n.t("Overdue app icon badge"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, visibility: "always", platforms: ["macos"], featureId: "settings.display"),
+      RegistrySettingsItem(kind: "setting", key: "sidebarCounts", page: nil, surface: nil, label: RegistryL10n.t("Show sidebar counts"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, visibility: "always", platforms: ["web"], featureId: "settings.display"),
     ]),
-    RegistrySettingsGroup(id: "appearance_root", header: nil, mobilePresentation: "inline", desktopTab: "general", items: [
-      RegistrySettingsItem(kind: "pageLink", key: nil, page: "appearance", surface: nil, label: RegistryL10n.t("Appearance"), detail: nil, iconId: "settings.appearance", sfSymbol: "paintpalette", statusKey: nil, desktopInline: true, visibility: "always", platforms: nil, featureId: "settings.display"),
+    RegistrySettingsGroup(id: "notifications_root", header: RegistryL10n.t("Notifications"), mobilePresentation: "inline", desktopTab: "general", items: [
+      RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "browser_notifications", label: RegistryL10n.t("Timed reminders"), detail: nil, iconId: "settings.notifications", sfSymbol: "bell", statusKey: nil, visibility: "always", platforms: ["web"], featureId: "task.alerts"),
+    ]),
+    RegistrySettingsGroup(id: "language_root", header: RegistryL10n.t("Language"), mobilePresentation: "inline", desktopTab: "general", items: [
+      RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "web_language", label: RegistryL10n.t("Language"), detail: nil, iconId: "settings.language", sfSymbol: "globe", statusKey: nil, visibility: "always", platforms: ["web"], featureId: "settings.display"),
+    ]),
+    RegistrySettingsGroup(id: "appearance_root", header: nil, mobilePresentation: "inline", desktopTab: "appearance", items: [
+      RegistrySettingsItem(kind: "pageLink", key: nil, page: "appearance", surface: nil, label: RegistryL10n.t("Appearance"), detail: nil, iconId: "settings.appearance", sfSymbol: "paintpalette", statusKey: nil, visibility: "always", platforms: nil, featureId: "settings.display"),
     ]),
     RegistrySettingsGroup(id: "meta_root", header: nil, mobilePresentation: "inline", desktopTab: nil, items: [
-      RegistrySettingsItem(kind: "pageLink", key: nil, page: "privacy", surface: nil, label: RegistryL10n.t("Privacy & Data"), detail: nil, iconId: "settings.privacy", sfSymbol: "hand.raised", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "settings.display"),
-      RegistrySettingsItem(kind: "pageLink", key: nil, page: "about", surface: nil, label: RegistryL10n.t("About"), detail: nil, iconId: "settings.about", sfSymbol: "info.circle", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "settings.display"),
+      RegistrySettingsItem(kind: "pageLink", key: nil, page: "privacy", surface: nil, label: RegistryL10n.t("Privacy & Data"), detail: nil, iconId: "settings.privacy", sfSymbol: "hand.raised", statusKey: nil, visibility: "always", platforms: nil, featureId: "settings.display"),
+      RegistrySettingsItem(kind: "pageLink", key: nil, page: "about", surface: nil, label: RegistryL10n.t("About"), detail: nil, iconId: "settings.about", sfSymbol: "info.circle", statusKey: nil, visibility: "always", platforms: nil, featureId: "settings.display"),
     ]),
   ]
 
   static let pages: [RegistrySettingsPage] = [
     RegistrySettingsPage(id: "devices_access", title: RegistryL10n.t("Devices"), iconId: "settings.devices", sfSymbol: "laptopcomputer.and.iphone", depth: 2, platforms: nil, featureId: "sync.backend", sections: [
       RegistrySettingsSection(id: "devices", header: RegistryL10n.t("Devices"), footer: RegistryL10n.t("Each app you signed in to. A device you sign out stops syncing within the hour."), platforms: nil, items: [
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "access_devices", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "sync.backend"),
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "access_devices", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, visibility: "always", platforms: nil, featureId: "sync.backend"),
+      ]),
+      RegistrySettingsSection(id: "sign_in_approval", header: RegistryL10n.t("Add a device"), footer: nil, platforms: nil, items: [
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "sign_in_approval", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, visibility: "signedIn", platforms: nil, featureId: "sync.backend"),
       ]),
       RegistrySettingsSection(id: "watch", header: nil, footer: nil, platforms: ["ios"], items: [
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "apple_watch", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: ["ios"], featureId: "sync.backend"),
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "apple_watch", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, visibility: "always", platforms: ["ios"], featureId: "sync.backend"),
       ]),
     ]),
     RegistrySettingsPage(id: "appearance", title: RegistryL10n.t("Appearance"), iconId: "settings.appearance", sfSymbol: "paintpalette", depth: 1, platforms: nil, featureId: "settings.display", sections: [
       RegistrySettingsSection(id: "appearance", header: nil, footer: nil, platforms: nil, items: [
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "accent_color", label: RegistryL10n.t("Accent"), detail: nil, iconId: "settings.appearance", sfSymbol: "paintpalette", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "appearance.accents"),
-        RegistrySettingsItem(kind: "setting", key: "textSizeStep", page: nil, surface: nil, label: RegistryL10n.t("Text Size"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "appearance.text-size"),
-        RegistrySettingsItem(kind: "setting", key: "tasksTitleLines", page: nil, surface: nil, label: RegistryL10n.t("Title lines"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: ["ios", "ipados", "android"], featureId: "settings.display"),
-        RegistrySettingsItem(kind: "setting", key: "loggingAnimationsEnabled", page: nil, surface: nil, label: RegistryL10n.t("Completion animations"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "settings.display"),
-        RegistrySettingsItem(kind: "setting", key: "inboxZeroMotionEnabled", page: nil, surface: nil, label: RegistryL10n.t("Inbox zero animation"), detail: RegistryL10n.t("Play a short animation when you empty the Inbox."), iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: ["ios", "ipados", "macos"], featureId: "settings.display"),
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "accent_color", label: RegistryL10n.t("Accent"), detail: nil, iconId: "settings.appearance", sfSymbol: "paintpalette", statusKey: nil, visibility: "always", platforms: nil, featureId: "appearance.accents"),
+        RegistrySettingsItem(kind: "setting", key: "textSizeStep", page: nil, surface: nil, label: RegistryL10n.t("Text Size"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, visibility: "always", platforms: nil, featureId: "appearance.text-size"),
+        RegistrySettingsItem(kind: "setting", key: "tasksTitleLines", page: nil, surface: nil, label: RegistryL10n.t("Title lines"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, visibility: "always", platforms: ["ios", "ipados", "android"], featureId: "settings.display"),
+        RegistrySettingsItem(kind: "setting", key: "loggingAnimationsEnabled", page: nil, surface: nil, label: RegistryL10n.t("Completion animations"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, visibility: "always", platforms: nil, featureId: "settings.display"),
+        RegistrySettingsItem(kind: "setting", key: "inboxZeroMotionEnabled", page: nil, surface: nil, label: RegistryL10n.t("Inbox zero animation"), detail: RegistryL10n.t("Play a short animation when you empty the Inbox."), iconId: nil, sfSymbol: nil, statusKey: nil, visibility: "always", platforms: ["ios", "ipados", "macos"], featureId: "settings.display"),
       ]),
     ]),
     RegistrySettingsPage(id: "account", title: RegistryL10n.t("Account"), iconId: "settings.account", sfSymbol: "person.crop.circle", depth: 1, platforms: nil, featureId: "sync.backend", sections: [
       RegistrySettingsSection(id: "profile", header: nil, footer: RegistryL10n.t("Your name stays on this device, and syncs when you sign in."), platforms: nil, items: [
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "account_profile_editor", label: RegistryL10n.t("Your name"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "sync.backend"),
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "account_profile_editor", label: RegistryL10n.t("Your name"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, visibility: "always", platforms: nil, featureId: "sync.backend"),
       ]),
       RegistrySettingsSection(id: "plan", header: nil, footer: nil, platforms: nil, items: [
-        RegistrySettingsItem(kind: "pageLink", key: nil, page: "plus", surface: nil, label: RegistryL10n.t("Septena Plus"), detail: nil, iconId: "settings.plus", sfSymbol: "plus.circle.fill", statusKey: "planStatus", desktopInline: false, visibility: "always", platforms: nil, featureId: "sync.backend"),
+        RegistrySettingsItem(kind: "pageLink", key: nil, page: "plus", surface: nil, label: RegistryL10n.t("Septena Plus"), detail: nil, iconId: "settings.plus", sfSymbol: "plus.circle.fill", statusKey: "planStatus", visibility: "always", platforms: nil, featureId: "sync.backend"),
       ]),
       RegistrySettingsSection(id: "devices_access", header: nil, footer: nil, platforms: nil, items: [
-        RegistrySettingsItem(kind: "pageLink", key: nil, page: "devices_access", surface: nil, label: RegistryL10n.t("Devices"), detail: nil, iconId: "settings.devices", sfSymbol: "laptopcomputer.and.iphone", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "sync.backend"),
+        RegistrySettingsItem(kind: "pageLink", key: nil, page: "devices_access", surface: nil, label: RegistryL10n.t("Devices"), detail: nil, iconId: "settings.devices", sfSymbol: "laptopcomputer.and.iphone", statusKey: nil, visibility: "always", platforms: nil, featureId: "sync.backend"),
       ]),
       RegistrySettingsSection(id: "sync", header: RegistryL10n.t("Sync"), footer: nil, platforms: nil, items: [
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "sync_account_status", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "sync.backend"),
-      ]),
-      RegistrySettingsSection(id: "sign_in_approval", header: nil, footer: nil, platforms: nil, items: [
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "sign_in_approval", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "signedIn", platforms: nil, featureId: "sync.backend"),
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "sync_account_status", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, visibility: "always", platforms: nil, featureId: "sync.backend"),
       ]),
       RegistrySettingsSection(id: "delete_account", header: nil, footer: nil, platforms: nil, items: [
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "delete_account", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "signedIn", platforms: nil, featureId: "account.delete"),
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "delete_account", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, visibility: "signedIn", platforms: nil, featureId: "account.delete"),
       ]),
     ]),
     RegistrySettingsPage(id: "plus", title: RegistryL10n.t("Septena Plus"), iconId: "settings.plus", sfSymbol: "plus.circle.fill", depth: 2, platforms: nil, featureId: "sync.backend", sections: [
       RegistrySettingsSection(id: "offer", header: nil, footer: nil, platforms: nil, items: [
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "plus_offer", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "sync.backend"),
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "plus_offer", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, visibility: "always", platforms: nil, featureId: "sync.backend"),
       ]),
     ]),
-    RegistrySettingsPage(id: "agents", title: RegistryL10n.t("Agents"), iconId: "settings.agents", sfSymbol: "person.2", depth: 1, platforms: nil, featureId: "agents.connector", sections: [
+    RegistrySettingsPage(id: "agents", title: RegistryL10n.t("Connected Agents"), iconId: "settings.agents", sfSymbol: "person.2", depth: 1, platforms: nil, featureId: "agents.connector", sections: [
+      RegistrySettingsSection(id: "pause", header: nil, footer: RegistryL10n.t("While paused, no agent can pick up or work on a task. Stop one task from its conversation instead. Agents never close assigned tasks on their own; finished work lands in Review for you to accept or send back."), platforms: nil, items: [
+        RegistrySettingsItem(kind: "setting", key: "agentsPaused", page: nil, surface: nil, label: RegistryL10n.t("Pause all agents"), detail: RegistryL10n.t("While paused, no agent can start or work on a task."), iconId: nil, sfSymbol: nil, statusKey: nil, visibility: "signedIn", platforms: nil, featureId: "agents.stop-pause"),
+      ]),
       RegistrySettingsSection(id: "agents", header: RegistryL10n.t("Connected agents"), footer: RegistryL10n.t("Each agent you connected to your tasks, with the name you gave it. An agent counts while it was used in the last 30 days. Your phones, tablets and computers are under Account, Devices."), platforms: nil, items: [
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "access_agents", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "agents.connector"),
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "access_agents", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, visibility: "always", platforms: nil, featureId: "agents.connector"),
       ]),
     ]),
-    RegistrySettingsPage(id: "claude_pairing", title: RegistryL10n.t("Connect Claude"), iconId: "settings.claude", sfSymbol: "bubble.left.and.text.bubble.right", depth: 1, platforms: nil, featureId: "agents.connector", sections: [
-      RegistrySettingsSection(id: "connector", header: RegistryL10n.t("Connect Claude"), footer: nil, platforms: nil, items: [
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "claude_connector", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "agents.connector"),
+    RegistrySettingsPage(id: "claude_pairing", title: RegistryL10n.t("Connect an Agent"), iconId: "settings.claude", sfSymbol: "bubble.left.and.text.bubble.right", depth: 1, platforms: nil, featureId: "agents.connector", sections: [
+      RegistrySettingsSection(id: "connector", header: RegistryL10n.t("MCP connector"), footer: nil, platforms: nil, items: [
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "claude_connector", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, visibility: "always", platforms: nil, featureId: "agents.connector"),
       ]),
       RegistrySettingsSection(id: "agent_tools", header: RegistryL10n.t("Agent tools"), footer: RegistryL10n.t("The brief that teaches a model how to use your tasks through the connection (tools, conventions, and examples)."), platforms: nil, items: [
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "mcp_skills", label: RegistryL10n.t("MCP Skills"), detail: nil, iconId: "settings.skills", sfSymbol: "book.closed", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "agents.connector"),
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "mcp_skills", label: RegistryL10n.t("MCP Skills"), detail: nil, iconId: "settings.skills", sfSymbol: "book.closed", statusKey: nil, visibility: "always", platforms: nil, featureId: "agents.connector"),
       ]),
     ]),
-    RegistrySettingsPage(id: "ai_preferences", title: RegistryL10n.t("AI Preferences"), iconId: "settings.ai_agents", sfSymbol: "cpu", depth: 1, platforms: nil, featureId: "ai.reach-dial", sections: [
+    RegistrySettingsPage(id: "ai_preferences", title: RegistryL10n.t("On-Device AI"), iconId: "settings.ai_agents", sfSymbol: "cpu", depth: 1, platforms: nil, featureId: "ai.reach-dial", sections: [
       RegistrySettingsSection(id: "on_device", header: RegistryL10n.t("AI on this device"), footer: nil, platforms: ["ios", "ipados", "macos"], items: [
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "apple_intelligence_status", label: RegistryL10n.t("Apple Intelligence"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: ["ios", "ipados", "macos"], featureId: "ai.reach-dial"),
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "apple_intelligence_status", label: RegistryL10n.t("Apple Intelligence"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, visibility: "always", platforms: ["ios", "ipados", "macos"], featureId: "ai.reach-dial"),
       ]),
       RegistrySettingsSection(id: "reach", header: RegistryL10n.t("Where AI runs"), footer: RegistryL10n.t("Septena never runs AI on your data and never reads it. The intelligence is your own (Apple on-device, Private Cloud Compute, or your Claude). This only sets where requests may run."), platforms: nil, items: [
-        RegistrySettingsItem(kind: "setting", key: "aiMode", page: nil, surface: nil, label: RegistryL10n.t("AI Mode"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "ai.reach-dial"),
+        RegistrySettingsItem(kind: "setting", key: "aiMode", page: nil, surface: nil, label: RegistryL10n.t("AI Mode"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, visibility: "always", platforms: nil, featureId: "ai.reach-dial"),
       ]),
       RegistrySettingsSection(id: "explainer", header: nil, footer: nil, platforms: nil, items: [
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "ai_explainer", label: RegistryL10n.t("How AI helps with your tasks"), detail: nil, iconId: "settings.about", sfSymbol: "info.circle", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "ai.reach-dial"),
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "ai_explainer", label: RegistryL10n.t("How AI helps with your tasks"), detail: nil, iconId: "settings.about", sfSymbol: "info.circle", statusKey: nil, visibility: "always", platforms: nil, featureId: "ai.reach-dial"),
       ]),
     ]),
     RegistrySettingsPage(id: "calendar", title: RegistryL10n.t("Calendar"), iconId: "settings.calendar", sfSymbol: "calendar", depth: 1, platforms: nil, featureId: "calendar.events", sections: [
       RegistrySettingsSection(id: "calendars", header: nil, footer: nil, platforms: nil, items: [
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "calendar_detail", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "calendar.events"),
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "calendar_detail", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, visibility: "always", platforms: nil, featureId: "calendar.events"),
       ]),
     ]),
     RegistrySettingsPage(id: "reminders", title: RegistryL10n.t("Reminders"), iconId: "settings.reminders", sfSymbol: "checklist", depth: 1, platforms: ["ios", "ipados", "macos"], featureId: "import.reminders", sections: [
       RegistrySettingsSection(id: "reminders", header: nil, footer: nil, platforms: nil, items: [
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "reminders_inbox", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: ["ios", "ipados", "macos"], featureId: "import.reminders"),
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "reminders_inbox", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, visibility: "always", platforms: ["ios", "ipados", "macos"], featureId: "import.reminders"),
       ]),
     ]),
     RegistrySettingsPage(id: "import_export", title: RegistryL10n.t("Import & Export"), iconId: "settings.data", sfSymbol: "square.and.arrow.up", depth: 2, platforms: nil, featureId: "sync.backend", sections: [
       RegistrySettingsSection(id: "move_in", header: RegistryL10n.t("Move from another app"), footer: RegistryL10n.t("You can undo an import."), platforms: ["ios", "ipados", "macos"], items: [
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "import_sources", label: RegistryL10n.t("Move from another app"), detail: nil, iconId: "settings.import", sfSymbol: "square.and.arrow.down", statusKey: nil, desktopInline: false, visibility: "always", platforms: ["ios", "ipados", "macos"], featureId: "import.things"),
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "import_sources", label: RegistryL10n.t("Move from another app"), detail: nil, iconId: "settings.import", sfSymbol: "square.and.arrow.down", statusKey: nil, visibility: "always", platforms: ["ios", "ipados", "macos"], featureId: "import.things"),
       ]),
       RegistrySettingsSection(id: "transfer", header: nil, footer: nil, platforms: nil, items: [
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "import_export", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "sync.backend"),
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "import_export", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, visibility: "always", platforms: nil, featureId: "sync.backend"),
       ]),
     ]),
     RegistrySettingsPage(id: "privacy", title: RegistryL10n.t("Privacy & Data"), iconId: "settings.privacy", sfSymbol: "hand.raised", depth: 1, platforms: nil, featureId: "settings.display", sections: [
       RegistrySettingsSection(id: "data_locality", header: RegistryL10n.t("Your data"), footer: nil, platforms: nil, items: [
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "privacy_explainer", label: nil, detail: RegistryL10n.t("Your tasks, areas, projects, and conversations stay on this device until you sign in. When signed in, they sync through Septena’s private server at api.septena.app, encrypted at rest (not end-to-end, so connected agents can read them when you choose). AI on your device stays on your device. Connect Claude under AI & Agents."), iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "settings.display"),
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "privacy_explainer", label: nil, detail: RegistryL10n.t("Your tasks, areas, projects, and conversations stay on this device until you sign in. When signed in, they sync through Septena’s private server at api.septena.app, encrypted at rest (not end-to-end, so connected agents can read them when you choose). AI on your device stays on your device. Connect an agent under AI & Agents."), iconId: nil, sfSymbol: nil, statusKey: nil, visibility: "always", platforms: nil, featureId: "settings.display"),
       ]),
       RegistrySettingsSection(id: "transfer", header: nil, footer: nil, platforms: nil, items: [
-        RegistrySettingsItem(kind: "pageLink", key: nil, page: "import_export", surface: nil, label: RegistryL10n.t("Import & Export"), detail: nil, iconId: "settings.data", sfSymbol: "square.and.arrow.up", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "sync.backend"),
+        RegistrySettingsItem(kind: "pageLink", key: nil, page: "import_export", surface: nil, label: RegistryL10n.t("Import & Export"), detail: nil, iconId: "settings.data", sfSymbol: "square.and.arrow.up", statusKey: nil, visibility: "always", platforms: nil, featureId: "sync.backend"),
       ]),
     ]),
     RegistrySettingsPage(id: "about", title: RegistryL10n.t("About"), iconId: "settings.about", sfSymbol: "info.circle", depth: 1, platforms: nil, featureId: "settings.display", sections: [
       RegistrySettingsSection(id: "version", header: nil, footer: nil, platforms: nil, items: [
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "about_header", label: RegistryL10n.t("Tasks that think with you"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "settings.display"),
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "about_header", label: RegistryL10n.t("Tasks that think with you"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, visibility: "always", platforms: nil, featureId: "settings.display"),
       ]),
       RegistrySettingsSection(id: "open_source", header: nil, footer: nil, platforms: nil, items: [
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "open_source", label: RegistryL10n.t("Open source"), detail: RegistryL10n.t("MIT License"), iconId: "settings.open_source", sfSymbol: "chevron.left.forwardslash.chevron.right", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "settings.display"),
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "open_source", label: RegistryL10n.t("Open source"), detail: RegistryL10n.t("MIT License"), iconId: "settings.open_source", sfSymbol: "chevron.left.forwardslash.chevron.right", statusKey: nil, visibility: "always", platforms: nil, featureId: "settings.display"),
       ]),
       RegistrySettingsSection(id: "actions", header: nil, footer: nil, platforms: nil, items: [
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "open_help", label: RegistryL10n.t("Help"), detail: nil, iconId: "settings.help", sfSymbol: "questionmark.circle", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "settings.display"),
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "check_updates", label: RegistryL10n.t("Check for Updates…"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: ["macos", "windows"], featureId: "mac.updates"),
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "reset_get_started", label: RegistryL10n.t("Show Get Started Again"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "settings.display"),
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "reset_first_run", label: RegistryL10n.t("Show Welcome Again"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "onboarding.first-run"),
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "contact_support", label: RegistryL10n.t("Contact Support"), detail: nil, iconId: "settings.feedback", sfSymbol: "paperplane", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "support.contact"),
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "open_help", label: RegistryL10n.t("Help"), detail: nil, iconId: "settings.help", sfSymbol: "questionmark.circle", statusKey: nil, visibility: "always", platforms: nil, featureId: "settings.display"),
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "keyboard_shortcuts", label: RegistryL10n.t("Keyboard Shortcuts"), detail: nil, iconId: "settings.shortcuts", sfSymbol: "keyboard", statusKey: nil, visibility: "always", platforms: ["web"], featureId: "mac.keyboard"),
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "check_updates", label: RegistryL10n.t("Check for Updates…"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, visibility: "always", platforms: ["macos", "windows"], featureId: "mac.updates"),
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "reset_get_started", label: RegistryL10n.t("Show Get Started Again"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, visibility: "always", platforms: nil, featureId: "settings.display"),
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "reset_first_run", label: RegistryL10n.t("Show Welcome Again"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, visibility: "always", platforms: nil, featureId: "onboarding.first-run"),
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "contact_support", label: RegistryL10n.t("Contact Support"), detail: nil, iconId: "settings.feedback", sfSymbol: "paperplane", statusKey: nil, visibility: "always", platforms: nil, featureId: "support.contact"),
       ]),
       RegistrySettingsSection(id: "advanced_link", header: nil, footer: nil, platforms: nil, items: [
-        RegistrySettingsItem(kind: "pageLink", key: nil, page: "advanced", surface: nil, label: RegistryL10n.t("Advanced"), detail: nil, iconId: "settings.advanced", sfSymbol: "wrench.and.screwdriver", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "settings.display"),
+        RegistrySettingsItem(kind: "pageLink", key: nil, page: "advanced", surface: nil, label: RegistryL10n.t("Advanced"), detail: nil, iconId: "settings.advanced", sfSymbol: "wrench.and.screwdriver", statusKey: nil, visibility: "always", platforms: nil, featureId: "settings.display"),
       ]),
     ]),
     RegistrySettingsPage(id: "advanced", title: RegistryL10n.t("Advanced"), iconId: "settings.advanced", sfSymbol: "wrench.and.screwdriver", depth: 2, platforms: nil, featureId: "settings.display", sections: [
       RegistrySettingsSection(id: "diagnostics", header: RegistryL10n.t("Diagnostics"), footer: nil, platforms: nil, items: [
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "sync_diagnostics", label: RegistryL10n.t("Sync & storage diagnostics"), detail: RegistryL10n.t("Changes the server refused appear here, newest first. The server kept its own version of each."), iconId: "settings.diagnostics", sfSymbol: "stethoscope", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "sync.backend"),
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "sync_diagnostics", label: RegistryL10n.t("Sync & storage diagnostics"), detail: RegistryL10n.t("Changes the server refused appear here, newest first. The server kept its own version of each."), iconId: "settings.diagnostics", sfSymbol: "stethoscope", statusKey: nil, visibility: "always", platforms: nil, featureId: "sync.backend"),
       ]),
     ]),
     RegistrySettingsPage(id: "smart_lists", title: RegistryL10n.t("Smart Lists"), iconId: "list.today", sfSymbol: "sun.max.fill", depth: 1, platforms: nil, featureId: "settings.display", sections: [
       RegistrySettingsSection(id: "smart_lists", header: nil, footer: nil, platforms: nil, items: [
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "smart_lists_editor", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil, featureId: "settings.display"),
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "smart_lists_editor", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, visibility: "always", platforms: nil, featureId: "settings.display"),
       ]),
     ]),
   ]
@@ -745,6 +759,7 @@ enum RegistrySettings {
     "access_devices.deviceAndroid": RegistryL10n.t("Android"),
     "access_devices.deviceBrowser": RegistryL10n.t("Browser"),
     "access_devices.deviceUnknown": RegistryL10n.t("Unknown device"),
+    "access_agents.paused": RegistryL10n.t("Paused"),
     "ai_explainer.title": RegistryL10n.t("How AI helps"),
     "ai_explainer.intro": RegistryL10n.t("Some tasks need thinking before you can act. Tap Discuss and talk them through, right on the task."),
     "ai_explainer.flowHeader": RegistryL10n.t("How a task conversation moves"),
@@ -773,10 +788,10 @@ enum RegistrySettings {
     "mcp_skills.copySkill": RegistryL10n.t("Copy Skill"),
     "mcp_skills.copyFooter": RegistryL10n.t("Paste into a model's context to teach it the task tools without connecting MCP."),
     "mcp_skills.loadFailed": RegistryL10n.t("The brief did not load. Check your connection and open this page again."),
-    "sign_in_approval.title": RegistryL10n.t("Approve a sign-in"),
+    "sign_in_approval.title": RegistryL10n.t("Approve a device sign-in"),
     "sign_in_approval.footer": RegistryL10n.t("To sign in on a new phone, tablet or computer, tap Get a sign-in code on it. Then scan or enter that code here."),
     "sign_in_approval.codePlaceholder": RegistryL10n.t("ABCD-EFGH"),
-    "sign_in_approval.enterFooter": RegistryL10n.t("Enter the code from the other device. If you're connecting Claude, the code is in your browser."),
+    "sign_in_approval.enterFooter": RegistryL10n.t("Enter the 8-character code shown on the new device."),
     "sign_in_approval.continue": RegistryL10n.t("Continue"),
     "sign_in_approval.checking": RegistryL10n.t("Checking the code…"),
     "sign_in_approval.safetyFooter": RegistryL10n.t("Only approve a code you started yourself. Septena never asks for a code by email, text or phone call."),
@@ -788,16 +803,20 @@ enum RegistrySettings {
     "sign_in_approval.invalidCode": RegistryL10n.t("That code is wrong or has expired."),
     "sign_in_approval.codeUsed": RegistryL10n.t("That code was already used."),
     "sign_in_approval.tooManyAttempts": RegistryL10n.t("Too many wrong codes. Try again in 10 minutes."),
-    "sign_in_approval.doneConnector": RegistryL10n.t("Claude is connected. Go back to your browser to finish."),
-    "claude_connector.signInHeader": RegistryL10n.t("Sign in to connect Claude"),
-    "claude_connector.signInBody": RegistryL10n.t("Sign in so Claude can connect to your tasks through your private Septena account."),
-    "claude_connector.setupPrompt": RegistryL10n.t("Setup prompt"),
-    "claude_connector.firstPrompt": RegistryL10n.t("First prompt"),
+    "sign_in_approval.doneConnector": RegistryL10n.t("Agent connected. Go back to your browser to finish."),
+    "claude_connector.signInHeader": RegistryL10n.t("Sign in to connect an agent"),
+    "claude_connector.signInBody": RegistryL10n.t("Sign in so Claude or another MCP agent can connect to your tasks through your private Septena account."),
+    "claude_connector.setupPrompt": RegistryL10n.t("Claude setup prompt"),
+    "claude_connector.setupPromptDetail": RegistryL10n.t("Paste into Claude to start connecting"),
+    "claude_connector.firstPrompt": RegistryL10n.t("Claude starter prompt"),
+    "claude_connector.firstPromptDetail": RegistryL10n.t("Set up your areas, projects, and tasks"),
     "claude_connector.connectorUrl": RegistryL10n.t("Connector URL"),
+    "claude_connector.connectorUrlDetail": RegistryL10n.t("Add as a custom MCP connector in Claude or any MCP client"),
+    "claude_connector.approveHeader": RegistryL10n.t("Approve connection code"),
     "claude_connector.copy": RegistryL10n.t("Copy"),
     "claude_connector.copied": RegistryL10n.t("Copied"),
-    "claude_connector.codePlaceholder": RegistryL10n.t("Code from the browser page"),
-    "claude_connector.footer": RegistryL10n.t("Paste the setup prompt into Claude, or add the connector URL to Claude as a custom connector. When your browser shows a code, enter it here. Once connected, paste the first prompt to set up your areas, projects and tasks. Only enter a code from a browser window you opened yourself."),
+    "claude_connector.codePlaceholder": RegistryL10n.t("ABCD-EFGH"),
+    "claude_connector.footer": RegistryL10n.t("Add the connector URL to Claude or any MCP client, or paste the setup prompt into Claude. When your browser shows an 8-character code, enter it above. Only enter a code from a browser window you opened yourself."),
     "aiMode.onDeviceOnlyNoModel": RegistryL10n.t("Discuss never leaves this device. Septena has no on-device model here, so Discuss is off."),
     "aiMode.autoNoModel": RegistryL10n.t("Septena has no on-device model here, so Discuss hands the task to your own Claude. Recommended."),
     "smart_lists_editor.topHeader": RegistryL10n.t("Above Areas & Projects"),

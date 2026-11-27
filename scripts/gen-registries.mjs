@@ -295,6 +295,7 @@ function validateSettings(settings, entities, icons, caps) {
     if (item.visibility !== undefined) {
       assert(validVisibilities.has(item.visibility), `settings.json: ${ctx} invalid visibility "${item.visibility}"`);
     }
+    assert(item.desktopInline === undefined, `settings.json: ${ctx} desktopInline is removed; every surface shares the same subpages`);
     if (item.kind === "setting") {
       assert(item.key in settings.keys, `settings.json: ${ctx} references unknown setting "${item.key}"`);
       assert(settings.keys[item.key].ui !== false, `settings.json: ${ctx} references internal ui:false setting "${item.key}"`);
@@ -1224,7 +1225,7 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   const emitItem = (item, onPage) => {
     const iconId = item.icon ?? null;
     const sf = iconId ? icons.icons[iconId].sfSymbol : null;
-    return `RegistrySettingsItem(kind: ${swiftStr(item.kind)}, key: ${optStr(item.key)}, page: ${optStr(item.page)}, surface: ${optStr(item.surface)}, label: ${itemText(item, "label")}, detail: ${itemText(item, "detail")}, iconId: ${optStr(iconId)}, sfSymbol: ${optStr(sf)}, statusKey: ${optStr(item.statusKey)}, desktopInline: ${Boolean(item.desktopInline)}, visibility: ${swiftStr(item.visibility ?? "always")}, platforms: ${optArr(item.platforms)}, featureId: ${optStr(itemFeature(item, onPage))})`;
+    return `RegistrySettingsItem(kind: ${swiftStr(item.kind)}, key: ${optStr(item.key)}, page: ${optStr(item.page)}, surface: ${optStr(item.surface)}, label: ${itemText(item, "label")}, detail: ${itemText(item, "detail")}, iconId: ${optStr(iconId)}, sfSymbol: ${optStr(sf)}, statusKey: ${optStr(item.statusKey)}, visibility: ${swiftStr(item.visibility ?? "always")}, platforms: ${optArr(item.platforms)}, featureId: ${optStr(itemFeature(item, onPage))})`;
   };
 
   lines.push("/// Desktop Settings sidebar tab descriptor (`registry/settings.json`).");
@@ -1258,7 +1259,6 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  let iconId: String?");
   lines.push("  let sfSymbol: String?");
   lines.push("  let statusKey: String?");
-  lines.push("  let desktopInline: Bool");
   lines.push("  let visibility: String");
   lines.push("  let platforms: [String]?");
   lines.push("  let featureId: String?");
