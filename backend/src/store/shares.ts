@@ -31,7 +31,7 @@ export const SHARED_FIELDS: Record<SharedEntity, readonly string[]> = {
     "recurrenceSeriesID", "recurrenceAnchorDate", "recurrenceWeekdays", "recurrenceMonthDay",
     "recurrenceOrdinalWeekday", "createdAt", "dropReason", "assignedTo", "assignedBy", "assignedAt",
   ],
-  project: ["title", "status", "created", "completedAt", "notes"],
+  project: ["title", "status", "created", "completedAt", "notes", "checklistMode"],
   checklistItem: ["taskId", "title", "checked", "checkedAt", "position", "createdAt"],
 };
 

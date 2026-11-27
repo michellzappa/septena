@@ -429,12 +429,46 @@ final class CloudKitTasksBackend {
     commitAndPush(entity, op: "unacknowledge")
   }
 
+  func isProjectChecklistItem(_ entity: TaskEntity) -> Bool {
+    guard let project = entity.project, !entity.isHeading, entity.deletedAt == nil else { return false }
+    let descriptor = FetchDescriptor<ProjectEntity>(predicate: #Predicate { $0.id == project })
+    return (try? context.fetch(descriptor).first?.checklistModeRaw) != nil
+  }
+
+  func toggleProjectChecklist(id: String) -> (before: [String: BackendJSON], after: [String: BackendJSON])? {
+    guard let entity = fetch(id: id), isProjectChecklistItem(entity),
+          entity.status == .open || entity.status == .checklistChecked,
+          let patch = ProjectChecklist.patch(checked: entity.status == .open),
+          case .success(let row) = TaskBackendMapping.task(entity) else { return nil }
+    let before = row.fields.filter { patch.keys.contains($0.key) }
+    guard writeChecklistFields(entity, patch: patch) else { return nil }
+    return (before, patch)
+  }
+
+  func restoreChecklistFields(id: String, from expected: [String: BackendJSON], to fields: [String: BackendJSON]) {
+    guard let entity = fetch(id: id), isProjectChecklistItem(entity),
+          case .success(let row) = TaskBackendMapping.task(entity),
+          expected.allSatisfy({ row.fields[$0.key] == $0.value }) else { return }
+    writeChecklistFields(entity, patch: fields)
+  }
+
+  @discardableResult
+  private func writeChecklistFields(_ entity: TaskEntity, patch: [String: BackendJSON]) -> Bool {
+    TaskSyncEngine.shared.applyTaskFields(entity, patch, skip: [])
+    entity.pendingSync = true
+    return commitAndPush(entity, op: "projectChecklist")
+  }
+
   func complete(id: String) {
     guard let entity = fetch(id: id) else { return }
     // Completion can arrive twice (e.g. an optimistic phone tap followed by a
     // watch write). Never spawn a second occurrence from an already-terminal
     // source row.
     guard entity.status == .open else { return }
+    if isProjectChecklistItem(entity) {
+      _ = toggleProjectChecklist(id: id)
+      return
+    }
     let recurrence = entity.recurrence
     // `appToday`, not `SeptenaDate.today`: the next occurrence must be computed
     // against the day the user is actually looking at, so time travel can
@@ -479,6 +513,10 @@ final class CloudKitTasksBackend {
 
   func uncomplete(id: String) {
     guard let entity = fetch(id: id) else { return }
+    if entity.status == .checklistChecked {
+      _ = toggleProjectChecklist(id: id)
+      return
+    }
     // Completing a recurring task spawns the next occurrence, so undoing the
     // completion has to take that occurrence back — otherwise one mis-tap
     // (or the undo button right beside it) permanently leaves TWO open rows:
@@ -1771,8 +1809,12 @@ final class CloudKitTasksBackend {
   /// "New heading" adds a fresh section at the bottom; pass `atTop` to prepend.
   @discardableResult
   func createHeading(title: String, project: String, atTop: Bool = false,
-                     afterHeadingID: String? = nil) -> SeptenaTask {
-    let id = uniqueTaskID()
+                     afterHeadingID: String? = nil, id explicitID: String? = nil) -> SeptenaTask? {
+    if let explicitID, let existing = fetch(id: explicitID) {
+      guard existing.deletedAt == nil, existing.isHeading, existing.project == project else { return nil }
+      return SeptenaTask(existing)
+    }
+    let id = explicitID ?? uniqueTaskID()
     let position: Double
     if let afterHeadingID, let afterPos = headingPosition(after: afterHeadingID, inProject: project) {
       position = afterPos

@@ -434,6 +434,7 @@ final class TaskEntity {
 
 @Model
 final class ProjectEntity {
+  var checklistModeRaw: String?
   // Mirrors `TaskEntity` — the sidebar filters on both columns.
   #Index<ProjectEntity>([\.deletedAt], [\.area])
 
@@ -468,6 +469,7 @@ final class ProjectEntity {
   init(id: String,
        title: String,
        statusRaw: String = ProjectStatus.active.rawValue,
+       checklistModeRaw: String? = nil,
        area: String? = nil,
        created: String? = nil,
        completedAt: String? = nil,
@@ -484,6 +486,7 @@ final class ProjectEntity {
     self.id = id
     self.title = title
     self.statusRaw = statusRaw
+    self.checklistModeRaw = checklistModeRaw
     self.area = area
     self.created = created
     self.completedAt = completedAt
@@ -846,6 +849,7 @@ extension Project {
     self.init(id: e.id,
               title: e.title,
               status: e.status,
+              checklistMode: e.checklistModeRaw.flatMap(ProjectChecklistMode.init(rawValue:)),
               area: e.area,
               created: e.created,
               completedAt: e.completedAt,
@@ -1305,7 +1309,7 @@ enum LocalCache {
         guard row.fadedAt == nil else { continue }
         total[project, default: 0] += 1
         open[project, default: 0] += 1
-      case .cancelled:
+      case .cancelled, .checklistChecked:
         break
       }
     }
@@ -1661,6 +1665,7 @@ enum LocalCache {
       case .open: open += 1
       case .done: done += 1
       case .cancelled: cancelled += 1
+      case .checklistChecked: break
       }
       if e.today { todayFlag += 1 }
       if let s = e.scheduled, s <= today { scheduledLE += 1 }

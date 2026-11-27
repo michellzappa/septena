@@ -1678,6 +1678,22 @@
       "back": "Back"
     }
   },
+  "checklistProjects": {
+    "id": "checklistProjects",
+    "useAsChecklist": "Use as Checklist",
+    "useForGroceries": "Use for Groceries",
+    "addItem": "Add item",
+    "addItemToGroup": "Add item to {group}",
+    "onList": "On list",
+    "checked": "Checked",
+    "chooseGroup": "Choose group",
+    "moveToGroup": "Move to group",
+    "ungrouped": "Ungrouped",
+    "projectType": "Project type",
+    "project": "Project",
+    "checklist": "Checklist",
+    "groceries": "Groceries"
+  },
   "listSort": {
     "id": "listSort",
     "featureId": "lists.sort",

@@ -8,7 +8,10 @@ import app.septena.core.JsonValue
 import app.septena.core.ListSortPreferences
 import app.septena.core.ListSortRules
 import app.septena.core.NotesBase
+import app.septena.core.ProjectChecklistRules
 import app.septena.core.ProjectShare
+import app.septena.core.RecurrenceRules
+import app.septena.core.SyncRecord
 import app.septena.core.RegistryCatalog
 import app.septena.core.StructureOrder
 import app.septena.core.TaskFadeRules
@@ -81,6 +84,8 @@ data class AreasProjectsUiState(
     val areaTasks: List<PlaceTaskRow> = emptyList(),
     val unsectionedTasks: List<PlaceTaskRow> = emptyList(),
     val sections: List<PlaceSectionRow> = emptyList(),
+    val checklistMode: String? = null,
+    val checklistRows: List<SyncRecord> = emptyList(),
     /** The Sort By choice of this page (docs/LIST_SORT_SPEC.md); Manual is the stored order. */
     val listSort: String = RegistryEntityEnums.ListSort.MANUAL,
     /** The rows the core sorts, by id. Empty under Manual. */
@@ -260,6 +265,77 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             )
             // Recorded at the gesture, after the create lands: Undo removes the project.
             graph.taskUndoHistory.recordCreatedEntity(created)
+            true
+        }
+    }
+
+    fun useAsChecklist(mode: String) {
+        val project = destination.value as? AreasProjectsDestination.Project ?: return
+        mutate {
+            graph.registryEntityMutator.update(
+                RegistryEntityNames.PROJECT,
+                project.id,
+                mapOf(RegistryEntityFields.Project.CHECKLIST_MODE to JsonValue.StringValue(mode)),
+            ) != null
+        }
+    }
+
+    fun addChecklistItem(title: String, heading: String?) {
+        val project = destination.value as? AreasProjectsDestination.Project ?: return
+        val name = title.trim()
+        if (name.isEmpty()) return
+        mutate {
+            val projectRow = graph.taskStore.record(RegistryEntityNames.PROJECT, project.id) ?: return@mutate false
+            val mode = projectRow.fields[RegistryEntityFields.Project.CHECKLIST_MODE].stringValue() ?: return@mutate false
+            val suggested = ProjectChecklistRules.layout(emptyList(), name, mode == RegistryEntityEnums.ChecklistMode.GROCERIES).suggestedGroup
+            val groupName = when (suggested) {
+                "produce" -> "Produce"
+                "dairy" -> "Dairy"
+                "bakery" -> "Bakery"
+                "meatSeafood" -> "Meat & Seafood"
+                "pantry" -> "Pantry"
+                "frozen" -> "Frozen"
+                else -> null
+            }
+            val assignment = heading ?: groupName?.let { group ->
+                val id = RecurrenceRules.occurrenceId("checklist:${project.id}", requireNotNull(suggested))
+                graph.taskStore.records(RegistryEntityNames.TASK).firstOrNull { row ->
+                    row.deletedAt == null &&
+                        row.fields[RegistryEntityFields.Task.PROJECT].stringValue() == project.id &&
+                        row.fields[RegistryEntityFields.Task.KIND].stringValue() == RegistryEntityEnums.TaskKind.HEADING &&
+                        (row.id == id || row.fields[RegistryEntityFields.Task.TITLE].stringValue() == group)
+                }?.id ?: graph.taskMutator.createHeading(group, project.id, id = id)
+                    .takeIf { it.deletedAt == null }?.id
+            }
+            val item = graph.taskMutator.create(name, project = project.id, heading = assignment)
+            graph.taskUndoHistory.recordCreatedEntity(
+                SyncRecord(RegistryEntityNames.TASK, item.id, item.fields, item.revision, item.updatedAt, item.deletedAt),
+            )
+            true
+        }
+    }
+
+    fun toggleChecklistItem(id: String) {
+        mutate {
+            graph.captureTaskEdit(id, touches = false) { graph.taskMutator.toggleProjectChecklist(id) }
+            true
+        }
+    }
+
+    fun moveChecklistItem(id: String, heading: String?) {
+        mutate {
+            graph.captureTaskEdit(id) {
+                graph.taskMutator.updateFields(
+                    id, mapOf(RegistryEntityFields.Task.HEADING to JsonValue.stringOrNull(heading)),
+                )
+            }
+            true
+        }
+    }
+
+    fun deleteChecklistItem(id: String) {
+        mutate {
+            graph.captureTaskEdit(id, touches = false) { graph.taskMutator.delete(id) }
             true
         }
     }
@@ -568,6 +644,16 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                     availableAreas = availableAreas,
                     unsectionedTasks = unsectioned,
                     sections = sections,
+                    checklistMode = container.fields[RegistryEntityFields.Project.CHECKLIST_MODE].stringValue(),
+                    checklistRows = if (container.fields[RegistryEntityFields.Project.CHECKLIST_MODE].stringValue() != null) {
+                        allTaskRecords.filter { (_, task) -> task.project == selected.id }
+                            .map { it.first }
+                            .sortedWith(compareBy<SyncRecord>(
+                                { it.fields[RegistryEntityFields.Task.POSITION].numberValue() ?: Double.MAX_VALUE },
+                                { it.fields[RegistryEntityFields.Task.TITLE].stringValue()?.lowercase().orEmpty() },
+                                { it.id },
+                            ))
+                    } else emptyList(),
                     listSort = listSort,
                     sortSnapshots = sortSnapshots(
                         (unsectioned + sections.flatMap(PlaceSectionRow::tasks)).mapTo(HashSet(), PlaceTaskRow::id),

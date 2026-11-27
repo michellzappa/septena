@@ -160,7 +160,7 @@ enum TaskJSONTransfer {
     compact([
       "id": e.id, "title": e.title, "status": e.statusRaw, "area": e.area,
       "created": e.created, "completedAt": e.completedAt,
-      "notes": e.notes, "githubRepo": e.githubRepo,
+      "notes": e.notes, "githubRepo": e.githubRepo, "checklistMode": e.checklistModeRaw,
       "position": e.position, "updatedAt": e.updatedAt, "deletedAt": e.deletedAt,
     ])
   }
@@ -432,6 +432,7 @@ enum TaskJSONTransfer {
     if existing == nil { context.insert(entity) }
     entity.title = title
     entity.statusRaw = statusRaw
+    entity.checklistModeRaw = (r["checklistMode"] as? String).flatMap(ProjectChecklistMode.init(rawValue:))?.rawValue
     entity.area = nonEmptyString(r["area"])
     entity.created = r["created"] as? String
     entity.completedAt = r["completedAt"] as? String
@@ -727,6 +728,7 @@ enum TaskJSONTransfer {
     switch raw {
     case TaskStatus.done.rawValue: return TaskStatus.done.rawValue
     case TaskStatus.cancelled.rawValue: return TaskStatus.cancelled.rawValue
+    case TaskStatus.checklistChecked.rawValue: return TaskStatus.checklistChecked.rawValue
     default: return TaskStatus.open.rawValue
     }
   }
@@ -807,7 +809,7 @@ enum TaskJSONTransfer {
     let openTasks = allTasks.filter { !$0.isHeading && $0.status == .open }
     let headingsByProject = Dictionary(grouping: allTasks.filter(\.isHeading)) { $0.project ?? "" }
     let completedTasks = allTasks
-      .filter { !$0.isHeading && $0.status != .open }
+      .filter { !$0.isHeading && ($0.status == .done || $0.status == .cancelled) }
       .sorted { ($0.completedAt ?? "") > ($1.completedAt ?? "") }
 
     var lines: [String] = [
@@ -821,7 +823,7 @@ enum TaskJSONTransfer {
       let box: String
       switch t.status {
       case .open: box = "[ ]"
-      case .done: box = "[x]"
+      case .done, .checklistChecked: box = "[x]"
       case .cancelled: box = "[-]"
       }
       var meta: [String] = []
@@ -866,6 +868,7 @@ enum TaskJSONTransfer {
 
     func appendProject(_ p: ProjectEntity, headingLevel: String) {
       let projectTasks = openTasks.filter { $0.project == p.id }
+      let checked = allTasks.filter { $0.project == p.id && $0.status == .checklistChecked }
       let sections = (headingsByProject[p.id] ?? []).sorted { $0.position < $1.position }
       lines.append("\(headingLevel) \(p.title)")
       if let notes = p.notes?.trimmingCharacters(in: .whitespacesAndNewlines), !notes.isEmpty {
@@ -882,6 +885,12 @@ enum TaskJSONTransfer {
         lines.append("\(headingLevel)# \(s.title)")
         lines.append("")
         for t in inSection { appendTask(t) }
+        lines.append("")
+      }
+      if !checked.isEmpty {
+        lines.append("\(headingLevel)# Checked")
+        lines.append("")
+        for t in checked { appendTask(t) }
         lines.append("")
       }
     }

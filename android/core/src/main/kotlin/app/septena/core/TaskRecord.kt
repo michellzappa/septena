@@ -65,6 +65,7 @@ enum class TaskStatus(val wireValue: String) {
     OPEN(RegistryEntityEnums.TaskStatus.OPEN),
     DONE(RegistryEntityEnums.TaskStatus.DONE),
     CANCELLED(RegistryEntityEnums.TaskStatus.CANCELLED),
+    CHECKLIST_CHECKED(RegistryEntityEnums.TaskStatus.CHECKLIST_CHECKED),
     UNKNOWN("unknown");
 
     companion object {

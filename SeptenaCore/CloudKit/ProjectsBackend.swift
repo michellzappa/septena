@@ -7,7 +7,8 @@ import SwiftData
 
 @MainActor
 protocol ProjectsBackend: AnyObject {
-  func create(title: String, area: String?) async throws -> Project
+  func create(title: String, area: String?, checklistMode: ProjectChecklistMode?) async throws -> Project
+  func useAsChecklist(id: String, mode: ProjectChecklistMode) async throws
   func rename(id: String, to title: String) async throws
   /// `from`: the notes the editor opened with (`TaskMutator.update`).
   func setNotes(id: String, notes: String?, from: String?) async throws
@@ -53,8 +54,11 @@ final class ProjectsMutator: ProjectsBackend {
     return ck
   }
 
-  func create(title: String, area: String? = nil) async throws -> Project {
-    try await requireBackend().create(title: title, area: area)
+  func create(title: String, area: String? = nil, checklistMode: ProjectChecklistMode? = nil) async throws -> Project {
+    try await requireBackend().create(title: title, area: area, checklistMode: checklistMode)
+  }
+  func useAsChecklist(id: String, mode: ProjectChecklistMode = .plain) async throws {
+    try await requireBackend().useAsChecklist(id: id, mode: mode)
   }
   func rename(id: String, to title: String) async throws {
     try await requireBackend().rename(id: id, to: title)
@@ -129,6 +133,7 @@ final class ProjectsMutator: ProjectsBackend {
     let id: String
     let title: String
     let statusRaw: String
+    let checklistModeRaw: String?
     /// `var` so an area-delete undo can re-file the project under a revived
     /// area's new id (`TaskUndo.recordAreaDelete`).
     var area: String?
@@ -144,7 +149,8 @@ final class ProjectsMutator: ProjectsBackend {
   func snapshotForDelete(id: String) -> DeletedProject? {
     let descriptor = FetchDescriptor<ProjectEntity>(predicate: #Predicate { $0.id == id })
     guard let e = try? context.fetch(descriptor).first else { return nil }
-    return DeletedProject(id: e.id, title: e.title, statusRaw: e.statusRaw, area: e.area,
+    return DeletedProject(id: e.id, title: e.title, statusRaw: e.statusRaw,
+                          checklistModeRaw: e.checklistModeRaw, area: e.area,
                           created: e.created, completedAt: e.completedAt, notes: e.notes,
                           context: e.context, githubRepo: e.githubRepo,
                           position: e.position,
@@ -216,12 +222,18 @@ final class CloudKitProjectsBackend: ProjectsBackend {
     NotificationCenter.default.post(name: .septenaStructureChanged, object: nil)
   }
 
-  func create(title: String, area: String?) async throws -> Project {
+  func create(title: String, area: String?, checklistMode: ProjectChecklistMode? = nil) async throws -> Project {
     let newId = uniqueShortcode()
-    let entity = ProjectEntity(id: newId, title: title, area: area)
+    let entity = ProjectEntity(id: newId, title: title, checklistModeRaw: checklistMode?.rawValue, area: area)
     context.insert(entity)
     commitAndPush(entity, op: "create")
     return Project(entity)
+  }
+
+  func useAsChecklist(id: String, mode: ProjectChecklistMode) async throws {
+    guard let entity = fetch(id: id), entity.status == .active else { return }
+    entity.checklistModeRaw = mode.rawValue
+    commitAndPush(entity, op: "useAsChecklist")
   }
 
   /// Forensic create: caller supplies the entity id. Used to rebuild a
@@ -246,7 +258,8 @@ final class CloudKitProjectsBackend: ProjectsBackend {
     // the save is an update and needs the old change tag. Otherwise the row
     // is new to CloudKit and must carry no system fields.
     let keepSystemFields = sameID && engine.cancelPendingContainerDeletion(.project, id: s.id)
-    let entity = ProjectEntity(id: id, title: s.title, statusRaw: s.statusRaw, area: s.area,
+    let entity = ProjectEntity(id: id, title: s.title, statusRaw: s.statusRaw,
+                               checklistModeRaw: s.checklistModeRaw, area: s.area,
                                created: s.created, completedAt: s.completedAt, notes: s.notes,
                                context: s.context, githubRepo: s.githubRepo,
                                position: s.position,

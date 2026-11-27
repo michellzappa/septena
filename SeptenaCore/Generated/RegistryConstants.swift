@@ -67,7 +67,8 @@ enum RegistryEntityPatterns {
 
 /// Canonical enum wire strings shared with the backend (`registry/entities.json`).
 enum RegistryEntityEnums {
-  static let taskStatus: [String] = ["open", "done", "cancelled"]
+  static let taskStatus: [String] = ["open", "done", "cancelled", "checklistChecked"]
+  static let checklistMode: [String] = ["plain", "groceries"]
   static let taskSource: [String] = ["app", "mcp"]
   static let projectStatus: [String] = ["active", "done", "cancelled"]
   static let taskKind: [String] = ["heading"]
@@ -2051,6 +2052,18 @@ enum RegistrySurfaces {
   static let quickFindEmptyTitle: String = RegistryL10n.t("Search Tasks")
   static let quickFindEmptyDetail: String = RegistryL10n.t("Find any task, project, or area.")
   static let quickFindCompletedLabel: String = RegistryL10n.t("Completed")
+  static let checklistUseAsChecklist: String = RegistryL10n.t("Use as Checklist")
+  static let checklistUseForGroceries: String = RegistryL10n.t("Use for Groceries")
+  static let checklistAddItem: String = RegistryL10n.t("Add item")
+  static let checklistOnList: String = RegistryL10n.t("On list")
+  static let checklistChecked: String = RegistryL10n.t("Checked")
+  static let checklistProjectType: String = RegistryL10n.t("Project type")
+  static let checklistMoveToGroup: String = RegistryL10n.t("Move to group")
+  static let checklistUngrouped: String = RegistryL10n.t("Ungrouped")
+  static func checklistAddItemToGroup(group: String) -> String { RegistryL10n.format("Add item to %@", english: "Add item to %@", args: [group]) }
+  static let standardProjectTitle: String = RegistryL10n.t("Project")
+  static let checklistProjectTitle: String = RegistryL10n.t("Checklist")
+  static let groceriesProjectTitle: String = RegistryL10n.t("Groceries")
   /// Sort By copy (`surfaces.json` `listSort`, docs/LIST_SORT_SPEC.md).
   static let listSortMenuTitle: String = RegistryL10n.t("Sort By")
   static let listSortSymbol: String = "arrow.up.arrow.down"

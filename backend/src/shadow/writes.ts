@@ -3,7 +3,7 @@ import type { Env } from "../env.js";
 import { randomId } from "../util.js";
 import { localServerTimestamp, todayYMD } from "../tz.js";
 import { checklistOccurrenceID, nextScheduledDate, occurrenceID } from "../recurrence.js";
-import { applyDateAction, nextOccurrenceDates, normalizeTaskDates, taskRefId, taskViewMembership, type CoreDateAction, type CoreTask } from "../core/index.js";
+import { applyDateAction, callCore, nextOccurrenceDates, normalizeTaskDates, taskRefId, taskViewMembership, type CoreDateAction, type CoreTask } from "../core/index.js";
 import { storeFor } from "../api/session.js";
 import { MAX_REFS_PER_TASK, MAX_TAGS_PER_TASK, TAG_NAME_MAX, zId } from "../store/columns.js";
 import { zPushBody, type Op, type OpResult } from "../store/ops.js";
@@ -889,6 +889,20 @@ async function completeTask(ctx: WriteContext, id: string) {
   // second occurrence from a row that already advanced its series.
   if (src.status === "done") {
     return { id, status: "done", completedAt: str(src.completedAt) ?? null, alreadyComplete: true };
+  }
+  const project = typeof src.project === "string" && src.kind !== "heading"
+    ? await store.readContainer("project", src.project)
+    : null;
+  if (project?.checklistMode && (src.status === "open" || src.status === "checklistChecked")) {
+    const status = "checklistChecked";
+    if (src.status === status) return { id, status, alreadyComplete: true };
+    const fields = callCore<Record<string, unknown>>("checklistCheckPatch", { checked: true });
+    const [result] = await pushAs(store, ctx.actor, [{ op: "upsert", entity: "task", id, fields }]);
+    if (result?.status === "rejected" && result.reason === "human_accepts") {
+      return { id, completed: false, reason: "human_accepts", rule: result.rule ?? AGENT_WRITE_RULES.human_accepts };
+    }
+    requireApplied(result, id);
+    return { id, status };
   }
   const completedAt = localServerTimestamp(ctx.timeZone);
   const ops: NewOp[] = [

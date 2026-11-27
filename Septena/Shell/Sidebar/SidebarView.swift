@@ -760,7 +760,7 @@ struct SidebarRootView: View {
         nav.path = [.filter(.today)]
         nav.requestNewTask()
       },
-      onCreateProject: { title, areaId in createProject(title: title, areaId: areaId) },
+      onCreateProject: { title, areaId, mode in createProject(title: title, areaId: areaId, mode: mode) },
       onCreateArea: { createArea() },
       reload: { Task { await load() } }
     )
@@ -768,12 +768,12 @@ struct SidebarRootView: View {
 
   // MARK: - Create handlers
 
-  private func createProject(title: String, areaId: String?) {
+  private func createProject(title: String, areaId: String?, mode: ProjectChecklistMode?) {
     let t = title.trimmingCharacters(in: .whitespaces)
     guard !t.isEmpty else { return }
     Task {
       do {
-        _ = try await projectsMutator.create(title: t, area: areaId)
+        _ = try await projectsMutator.create(title: t, area: areaId, checklistMode: mode)
         await load()
       } catch {
         errorMessage = error.localizedDescription
@@ -1170,6 +1170,7 @@ struct SidebarRootView: View {
     #if os(iOS)
     cardRow(.project(id: project.id)) {
       SidebarProjectRow(name: project.title,
+                        isChecklist: project.checklistMode != nil,
                         progress: projectProgress[project.id] ?? 0,
                         count: projectOpenCount[project.id] ?? 0,
                         share: project.share)
@@ -1179,6 +1180,7 @@ struct SidebarRootView: View {
     #else
     navRow(.project(id: project.id)) {
       SidebarProjectRow(name: project.title,
+                        isChecklist: project.checklistMode != nil,
                         progress: projectProgress[project.id] ?? 0,
                         count: projectOpenCount[project.id] ?? 0,
                         share: project.share)
@@ -1600,7 +1602,7 @@ struct SidebarRootView: View {
         switch t.status {
         case .done:                 done[pid, default: 0] += 1; total[pid, default: 0] += 1
         case .open:                 total[pid, default: 0] += 1; projOpen[pid, default: 0] += 1
-        case .cancelled:            break
+        case .cancelled, .checklistChecked: break
         }
       } else if let aid = t.area, t.status == .open {
         areaDirectOpen[aid, default: 0] += 1
@@ -1762,7 +1764,7 @@ private struct SidebarBehaviorModifier: ViewModifier {
   let areas: [Area]
   let activeAreaId: String?
   let onNewTodo: () -> Void
-  let onCreateProject: (String, String?) -> Void
+  let onCreateProject: (String, String?, ProjectChecklistMode?) -> Void
   let onCreateArea: () -> Void
   let reload: () -> Void
 
@@ -1961,6 +1963,7 @@ struct AreaIcon: View {
 
 struct SidebarProjectRow: View {
   let name: String
+  var isChecklist: Bool = false
   /// Fraction of tasks done (0...1). 0 → empty ring, 1 → filled disc.
   var progress: Double = 0
   // Keep the project completion glyph consistent with the rest of the
@@ -1972,10 +1975,14 @@ struct SidebarProjectRow: View {
 
   var body: some View {
     HStack(spacing: Theme.sidebarRowSpacing) {
-      ProjectProgressIcon(progress: progress,
-                          tint: tint,
-                          diameter: nil)
-        .frame(width: Theme.sidebarIconSize + 4, alignment: .center)
+      Group {
+        if isChecklist {
+          Image(systemName: "checklist").foregroundStyle(tint)
+        } else {
+          ProjectProgressIcon(progress: progress, tint: tint, diameter: nil)
+        }
+      }
+      .frame(width: Theme.sidebarIconSize + 4, alignment: .center)
       Text(name)
         .scaledFont(size: Theme.sidebarTitleSize, weight: Theme.sidebarTitleWeight)
         .foregroundStyle(SidebarRowTitleStyle.color)
@@ -2064,14 +2071,15 @@ struct NewProjectSheet: View {
   /// Pre-selected area when invoked from an area's context menu, an open Area
   /// page, or a Project inside an Area.
   var initialAreaId: String? = nil
-  let onCreate: (String, String?) -> Void
+  let onCreate: (String, String?, ProjectChecklistMode?) -> Void
 
   @Environment(\.dismiss) private var dismiss
   @State private var title = ""
+  @State private var mode: ProjectChecklistMode?
   @State private var selectedAreaId: String?
   @FocusState private var titleFocused: Bool
 
-  init(areas: [Area], initialAreaId: String? = nil, onCreate: @escaping (String, String?) -> Void) {
+  init(areas: [Area], initialAreaId: String? = nil, onCreate: @escaping (String, String?, ProjectChecklistMode?) -> Void) {
     self.areas = areas
     self.initialAreaId = initialAreaId
     self.onCreate = onCreate
@@ -2084,7 +2092,7 @@ struct NewProjectSheet: View {
 
   private func submit() {
     guard canCreate else { return }
-    onCreate(title, selectedAreaId)
+    onCreate(title, selectedAreaId, mode)
     dismiss()
   }
 
@@ -2096,6 +2104,11 @@ struct NewProjectSheet: View {
             .focused($titleFocused)
             .submitLabel(.done)
             .onSubmit { submit() }
+        }
+        Picker(RegistrySurfaces.checklistProjectType, selection: $mode) {
+          Text(RegistrySurfaces.standardProjectTitle).tag(nil as ProjectChecklistMode?)
+          Text(RegistrySurfaces.checklistProjectTitle).tag(ProjectChecklistMode?.some(.plain))
+          Text(RegistrySurfaces.groceriesProjectTitle).tag(ProjectChecklistMode?.some(.groceries))
         }
         Section("Area") {
           Button { selectedAreaId = nil } label: {
@@ -2252,7 +2265,7 @@ private struct SidebarSheets: ViewModifier {
   let areas: [Area]
   let activeAreaId: String?
   let onNewTodo: () -> Void
-  let onCreateProject: (String, String?) -> Void
+  let onCreateProject: (String, String?, ProjectChecklistMode?) -> Void
   let onCreateArea: () -> Void
 
   func body(content: Content) -> some View {

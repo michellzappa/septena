@@ -1,6 +1,7 @@
 import { ApiError, SeptenaApiClient } from "../api/client";
 import {
   applyDateAction,
+  callCore,
   checkPullPage,
   checklistOccurrenceId,
   ensureCoreReady,
@@ -42,6 +43,7 @@ import type {
   NotSyncedItem,
   OrdinalWeekday,
   OutboxOp,
+  ProjectChecklistMode,
   ProjectRow,
   StoreSnapshot,
   SyncedEntity,
@@ -77,7 +79,7 @@ export interface SyncState {
 
 /** What a completion replaced, so its undo restores exactly that. */
 export interface CompletionReceipt {
-  before: Array<{ task: TaskRow; convo: ConvoRow | null }>;
+  before: Array<{ task: TaskRow; convo: ConvoRow | null; checklistPatch?: Record<string, unknown> }>;
   spawnedTaskIds: string[];
 }
 
@@ -506,10 +508,16 @@ export class WebSyncEngine {
     task: TaskRow,
     now: string,
     queuedAt: number,
-  ): { mutations: LocalMutation[]; ops: OutboxOp[]; spawnedTaskId: string | null; reviewed: ConvoRow | null } {
+  ): { mutations: LocalMutation[]; ops: OutboxOp[]; spawnedTaskId: string | null; reviewed: ConvoRow | null; checklistPatch?: Record<string, unknown> } {
     const mutations: LocalMutation[] = [];
     const ops: OutboxOp[] = [];
 
+    if (task.status === "open" && this.isChecklistItem(task)) {
+      const fields = callCore<Record<string, unknown>>("checklistCheckPatch", { checked: true });
+      mutations.push({ entity: "task", action: "put", id: task.id, row: { ...task, ...fields } });
+      ops.push({ clientOpId: newClientOpId(), op: "upsert", entity: "task", id: task.id, fields, queuedAt });
+      return { mutations, ops, spawnedTaskId: null, reviewed: null, checklistPatch: fields };
+    }
     const convo = this.existingConvo(task.id);
     const reviewed = convo.endState === "needs_verify" ? convo : null;
     if (reviewed) {
@@ -550,7 +558,7 @@ export class WebSyncEngine {
       const writes = this.completionWrites(task, now, queuedAt + idx * 10);
       mutations.push(...writes.mutations);
       ops.push(...writes.ops);
-      receipt.before.push({ task, convo: writes.reviewed });
+      receipt.before.push({ task, convo: writes.reviewed, checklistPatch: writes.checklistPatch });
       if (writes.spawnedTaskId) receipt.spawnedTaskIds.push(writes.spawnedTaskId);
     });
     await this.commit(mutations, ops);
@@ -559,7 +567,15 @@ export class WebSyncEngine {
 
   /** Undo of a completion: the task, its place in Review with the note, and the next occurrence. */
   async undoCompletion(receipt: CompletionReceipt): Promise<void> {
-    for (const { task, convo } of receipt.before) {
+    for (const { task, convo, checklistPatch } of receipt.before) {
+      if (checklistPatch) {
+        const current = this.liveTask(task.id);
+        if (current && this.isChecklistItem(current) &&
+            Object.entries(checklistPatch).every(([key, value]) => (current[key] ?? null) === value)) {
+          await this.patchTask(current, Object.fromEntries(Object.keys(checklistPatch).map((key) => [key, task[key] ?? null])));
+        }
+        continue;
+      }
       await this.patchTask(this.liveTask(task.id) ?? task, {
         status: task.status,
         completedAt: task.completedAt ?? null,
@@ -574,7 +590,20 @@ export class WebSyncEngine {
     }
   }
 
+  private isChecklistItem(task: TaskRow): boolean {
+    return Boolean(task.project && task.kind !== "heading" && this.state.snapshot.projects.some(
+      (project) => project.id === task.project && !project.deletedAt && project.checklistMode,
+    ));
+  }
+
   async toggleTaskDone(task: TaskRow): Promise<CompletionReceipt> {
+    const current = this.liveTask(task.id) ?? task;
+    if (current.status === "checklistChecked" && this.isChecklistItem(current)) {
+      await ensureCoreReady();
+      const checklistPatch = callCore<Record<string, unknown>>("checklistCheckPatch", { checked: false });
+      await this.patchTask(current, checklistPatch);
+      return { before: [{ task: current, convo: null, checklistPatch }], spawnedTaskIds: [] };
+    }
     if (task.status !== "done") return this.completeTasks([task]);
     const now = new Date().toISOString();
     await this.patchTask(this.liveTask(task.id) ?? task, {
@@ -1424,6 +1453,7 @@ export class WebSyncEngine {
       const fields: Record<string, unknown> = {
         title: p.title,
         status: p.status,
+        checklistMode: p.checklistMode ?? null,
         area: p.area ?? null,
         notes: p.notes ?? null,
         created: p.created ?? todayYMD,
@@ -1563,7 +1593,7 @@ export class WebSyncEngine {
     );
   }
 
-  async createProject(title: string, areaId: string | null = null): Promise<ProjectRow> {
+  async createProject(title: string, areaId: string | null = null, checklistMode: ProjectChecklistMode | null = null): Promise<ProjectRow> {
     const trimmed = title.trim();
     if (!trimmed) throw new Error("Project title is required");
     const id = newId("proj");
@@ -1575,10 +1605,11 @@ export class WebSyncEngine {
       title: trimmed,
       status: "active",
       area: areaId,
+      ...(checklistMode ? { checklistMode } : {}),
       created: localTodayYMD(),
       position,
     };
-    const row: ProjectRow = { id, title: trimmed, status: "active", area: areaId, position };
+    const row: ProjectRow = { id, title: trimmed, status: "active", area: areaId, position, checklistMode };
     await this.commit(
       [{ entity: "project", action: "put", id, row }],
       [{ clientOpId: newClientOpId(), op: "upsert", entity: "project", id, fields, queuedAt: Date.now() }],

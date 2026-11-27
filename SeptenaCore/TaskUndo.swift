@@ -269,6 +269,15 @@ enum TaskUndo {
   // point is that four shells can't each invent their own inverse for the same
   // gesture and then disagree about what ⌘Z means.
 
+  @discardableResult
+  static func toggleProjectChecklist(id: String, mutator: TaskMutator) -> Bool {
+    guard let change = mutator.toggleProjectChecklist(id: id) else { return false }
+    record(name: String(localized: "Check Checklist Item", comment: "Undo action name"),
+           undo: { mutator.restoreChecklistFields(id: id, from: change.after, to: change.before) },
+           redo: { mutator.restoreChecklistFields(id: id, from: change.before, to: change.after) })
+    return true
+  }
+
   /// Complete / uncomplete. The inverse of completing is uncompleting, which
   /// restores the row to its list; the inverse of uncompleting is completing.
   static func recordCompletion(ids: [String],
@@ -701,6 +710,9 @@ enum TaskUndo {
              Task { @MainActor in
                _ = try? await projects.createWithExplicitID(id: project.id, title: project.title,
                                                             area: project.area)
+               if let mode = project.checklistMode {
+                 try? await projects.useAsChecklist(id: project.id, mode: mode)
+               }
              }
            })
   }

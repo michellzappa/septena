@@ -4984,6 +4984,14 @@
       "comment" : "Generated from registry signIn.manage.addEmail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
+    "Add item" : {
+      "comment" : "Generated from registry surfaces.checklistProjects.addItem. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Add item to %@" : {
+      "comment" : "Generated from registry surfaces.checklistProjects.addItemToGroup. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Add Reference" : {
       "comment" : "Generated from registry actions.actions.task.addReference.shortTitle. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -9114,6 +9122,10 @@
         }
       }
     },
+    "Checked" : {
+      "comment" : "Generated from registry surfaces.checklistProjects.checked. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Checking the code…" : {
       "comment" : "Generated from registry settings.copy.sign_in_approval.checking.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -9200,6 +9212,10 @@
     },
     "Choose a plan" : {
       "comment" : "Generated from registry plans.paywall.choosePlan. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Choose group" : {
+      "comment" : "Generated from registry surfaces.checklistProjects.chooseGroup. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
     "Chore" : {
@@ -17843,22 +17859,16 @@
     },
     "Groceries" : {
       "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Compras"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Boodschappen"
-          }
-        },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Einkäufe"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compra"
           }
         },
         "fr" : {
@@ -17867,10 +17877,16 @@
             "value" : "Courses"
           }
         },
-        "es" : {
+        "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Compra"
+            "value" : "Boodschappen"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compras"
           }
         }
       }
@@ -23218,6 +23234,10 @@
         }
       }
     },
+    "Move to group" : {
+      "comment" : "Generated from registry surfaces.checklistProjects.moveToGroup. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Move to Pro" : {
       "comment" : "Generated from registry plans.paywall.upgradeToPro. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
@@ -26607,6 +26627,10 @@
         }
       }
     },
+    "On list" : {
+      "comment" : "Generated from registry surfaces.checklistProjects.onList. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "On Mac: quit Things, copy Things Database.thingsdatabase from ~/Library/Group Containers/JLMPQHK86H.com.culturedcode.ThingsMac/, then choose it here." : {
       "localizations" : {
         "pt-BR" : {
@@ -29381,6 +29405,10 @@
           }
         }
       }
+    },
+    "Project type" : {
+      "comment" : "Generated from registry surfaces.checklistProjects.projectType. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Projects" : {
       "localizations" : {
@@ -41007,6 +41035,10 @@
         }
       }
     },
+    "Ungrouped" : {
+      "comment" : "Generated from registry surfaces.checklistProjects.ungrouped. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Unknown device" : {
       "comment" : "Generated from registry settings.copy.access_devices.deviceUnknown.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -41338,6 +41370,14 @@
     },
     "Use a different email" : {
       "comment" : "Generated from registry signIn.email.differentEmail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Use as Checklist" : {
+      "comment" : "Generated from registry surfaces.checklistProjects.useAsChecklist. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Use for Groceries" : {
+      "comment" : "Generated from registry surfaces.checklistProjects.useForGroceries. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
     "Use my Claude" : {

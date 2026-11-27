@@ -753,6 +753,7 @@ extension TaskSyncEngine {
     }
     take("title") { p.title = $0.stringValue ?? p.title }
     take("status") { p.statusRaw = $0.stringValue ?? p.statusRaw }
+    take("checklistMode") { p.checklistModeRaw = $0.stringValue }
     take("area") { p.area = $0.stringValue }
     take("created") { p.created = $0.stringValue }
     take("completedAt") { p.completedAt = $0.stringValue }

@@ -110,6 +110,7 @@ Required on create: `title`, `status`. Can be deleted.
 | `id` | id | Set at create, never changes. |
 | `title` | text, ≤ 2000 | may be null |
 | `status` | text, ≤ 32 | may be null |
+| `checklistMode` | one of `checklistMode` | may be null |
 | `area` | id | may be null |
 | `created` | day | may be null |
 | `completedAt` | stamp | may be null |
@@ -248,7 +249,8 @@ One step of a task's conversation, in its `thread`. Turns are appended, never ch
 
 | Name | Values |
 |---|---|
-| `taskStatus` | `open`, `done`, `cancelled` |
+| `taskStatus` | `open`, `done`, `cancelled`, `checklistChecked` |
+| `checklistMode` | `plain`, `groceries` |
 | `taskSource` | `app`, `mcp` |
 | `projectStatus` | `active`, `done`, `cancelled` |
 | `taskKind` | `heading` |
@@ -392,6 +394,7 @@ The conformance vectors are the cases every Septena implementation passes: the a
 | [`convo-derived.json`](https://septena.app/spec/conformance/convo-derived.json) | `cases` (10), `conversationState` (11) |
 | [`do-session.json`](https://septena.app/spec/conformance/do-session.json) | `resolve` (16), `endWins` (4) |
 | [`list-sort.json`](https://septena.app/spec/conformance/list-sort.json) | `cases` (15) |
+| [`project-checklist.json`](https://septena.app/spec/conformance/project-checklist.json) | `layout` (3), `check` (2) |
 | [`recurrence.json`](https://septena.app/spec/conformance/recurrence.json) | `nextScheduledDate` (36), `occurrenceID` (3), `checklistOccurrenceID` (3) |
 | [`refs.json`](https://septena.app/spec/conformance/refs.json) | `parseRef` (110), `normalizeRefKey` (63), `findIssueRefs` (10), `emailRefKeys` (12), `taskRefId` (3) |
 | [`reminders.json`](https://septena.app/spec/conformance/reminders.json) | `shiftReminderForRecurrence` (6), `shiftReminderOnReschedule` (5), `shouldArmReminder` (8) |

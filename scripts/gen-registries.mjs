@@ -1950,6 +1950,15 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push(`  static let quickFindEmptyTitle: String = ${L(qf.emptyState.title, qf.emptyState, "title")}`);
   lines.push(`  static let quickFindEmptyDetail: String = ${L(qf.emptyState.detail, qf.emptyState, "detail")}`);
   lines.push(`  static let quickFindCompletedLabel: String = ${L(qf.completed.label, qf.completed, "label")}`);
+  const checklist = surfaces.checklistProjects;
+  for (const field of ["useAsChecklist", "useForGroceries", "addItem", "onList", "checked", "projectType", "moveToGroup", "ungrouped"]) {
+    const swiftName = "checklist" + field[0].toUpperCase() + field.slice(1);
+    lines.push(`  static let ${swiftName}: String = ${L(checklist[field], checklist, field)}`);
+  }
+  lines.push(tmplFn("checklistAddItemToGroup", tmplKey(checklist.addItemToGroup, checklist, "addItemToGroup")));
+  lines.push(`  static let standardProjectTitle: String = ${L(checklist.project, checklist, "project")}`);
+  lines.push(`  static let checklistProjectTitle: String = ${L(checklist.checklist, checklist, "checklist")}`);
+  lines.push(`  static let groceriesProjectTitle: String = ${L(checklist.groceries, checklist, "groceries")}`);
   const ls = surfaces.listSort;
   lines.push("  /// Sort By copy (`surfaces.json` `listSort`, docs/LIST_SORT_SPEC.md).");
   lines.push(`  static let listSortMenuTitle: String = ${L(ls.menuTitle, ls, "menuTitle")}`);
@@ -2541,7 +2550,7 @@ function generateTS({ entities, rules, icons, tokens, caps, settings, dests, act
   lines.push(`export const DESIGN_TOKENS = ${JSON.stringify({ accentPolicy: tokens.accentPolicy, fruitAccents: tokens.fruitAccents ?? [], textures: tokens.textures ?? [], selection: tokens.selection, colors: tokens.colors, multicolorGlyphs: tokens.multicolorGlyphs?.glyphs ?? {}, accentPalette: tokens.accentPalette, radii: tokens.radii, spacing: tokens.spacing, desktopColumn: tokens.desktopColumn, textScale: tokens.textScale })} as const;`);
   lines.push(`export const CAPABILITIES = ${JSON.stringify(caps.capabilities)} as const;`);
   lines.push(`export const ACTIONS_CATALOG = ${JSON.stringify({ actions: actions.actions, contextMenus: actions.contextMenus, menuBar: actions.menuBar, shortcutsSheet: actions.shortcutsSheet })} as const;`);
-  lines.push(`export const SURFACES_CATALOG = ${JSON.stringify({ notices: surfaces.notices, prompts: surfaces.prompts, toasts: surfaces.toasts, taskAttributes: surfaces.taskAttributes, taskDateBoard: surfaces.taskDateBoard, taskPage: surfaces.taskPage, waiting: surfaces.waiting, sharing: surfaces.sharing, accountSwitch: surfaces.accountSwitch, deviceSignIn: surfaces.deviceSignIn, quickFind: surfaces.quickFind, listSort: surfaces.listSort, support: surfaces.support })} as const;`);
+  lines.push(`export const SURFACES_CATALOG = ${JSON.stringify({ notices: surfaces.notices, prompts: surfaces.prompts, toasts: surfaces.toasts, taskAttributes: surfaces.taskAttributes, taskDateBoard: surfaces.taskDateBoard, taskPage: surfaces.taskPage, waiting: surfaces.waiting, sharing: surfaces.sharing, accountSwitch: surfaces.accountSwitch, deviceSignIn: surfaces.deviceSignIn, quickFind: surfaces.quickFind, checklistProjects: surfaces.checklistProjects, listSort: surfaces.listSort, support: surfaces.support })} as const;`);
   lines.push(`export const FIRST_RUN = ${JSON.stringify(surfaces.firstRun)} as const;`);
   lines.push("/** Plan limits (registry/plans.json). The server's plan table: every gate reads these, never a plan name. */");
   lines.push(`export const PLAN_LIMITS = ${JSON.stringify(plans.limits)} as const;`);

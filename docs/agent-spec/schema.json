@@ -30,7 +30,15 @@
       "enum": [
         "open",
         "done",
-        "cancelled"
+        "cancelled",
+        "checklistChecked"
+      ]
+    },
+    "checklistMode": {
+      "type": "string",
+      "enum": [
+        "plain",
+        "groceries"
       ]
     },
     "taskSource": {
@@ -836,6 +844,16 @@
             {
               "type": "string",
               "maxLength": 32
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "checklistMode": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/checklistMode"
             },
             {
               "type": "null"
