@@ -2301,6 +2301,46 @@ export function SeptenaApp() {
               label: registryText(ACTIONS_CATALOG.actions["task.waitingOn"].title, lang),
               onSelect: () => setWaitingTaskId(task.id),
             },
+            ...(taskShare && taskShare.members.length > 0
+              ? (() => {
+                  const assignMenu = ACTIONS_CATALOG.contextMenus["task.row"].find(
+                    (i) => "id" in i && i.id === "assign",
+                  );
+                  const assignLabel =
+                    assignMenu && "title" in assignMenu
+                      ? registryText(assignMenu.title, lang)
+                      : "Assign To";
+                  const orderedMembers = [
+                    ...taskShare.members.filter((m) => m.id === taskShare.me),
+                    ...taskShare.members.filter((m) => m.id !== taskShare.me),
+                  ];
+                  return [
+                    {
+                      kind: "submenu" as const,
+                      label: assignLabel,
+                      items: [
+                        ...orderedMembers.map((member) => ({
+                          kind: "item" as const,
+                          label: member.id === taskShare.me ? sharingCopy("you", lang) : member.name,
+                          checked: task.assignedTo === member.id,
+                          onSelect: () => {
+                            for (const t of findTasks(menuTaskIds)) void assignMember(t, member.id);
+                          },
+                        })),
+                        { kind: "divider" as const },
+                        {
+                          kind: "item" as const,
+                          label: sharingCopy("nobody", lang),
+                          checked: !task.assignedTo,
+                          onSelect: () => {
+                            for (const t of findTasks(menuTaskIds)) void assignMember(t, null);
+                          },
+                        },
+                      ],
+                    },
+                  ];
+                })()
+              : []),
             { kind: "divider" },
             {
               kind: "item",
