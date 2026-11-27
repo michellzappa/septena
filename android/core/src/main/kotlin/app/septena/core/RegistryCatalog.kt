@@ -205,6 +205,18 @@ object RegistryCatalog {
     fun destinationSupportsInlineCreate(id: String): Boolean =
         (destination(id)?.fields?.get(DESTINATION_INLINE_CREATE_FIELD) as? JsonValue.BooleanValue)?.value == true
 
+    /**
+     * Where Magic Plus / app.newTask makes a task from smart list [id]
+     * (`newTaskTarget` in destinations.json): [NEW_TASK_HERE], [NEW_TASK_TOMORROW]
+     * or [NEW_TASK_TODAY]. An unknown list reads as Today.
+     */
+    fun destinationNewTaskTarget(id: String): String =
+        destination(id)?.stringAt(DESTINATION_NEW_TASK_TARGET_FIELD) ?: NEW_TASK_TODAY
+
+    const val NEW_TASK_HERE = "here"
+    const val NEW_TASK_TOMORROW = "tomorrow"
+    const val NEW_TASK_TODAY = "today"
+
     fun destinationEmptyTitle(id: String, languageTag: String = "en"): String? =
         destination(id)?.objectAt("emptyState")?.stringAt("title")?.let { localizedString(it, languageTag) ?: it }
 
@@ -375,5 +387,6 @@ object RegistryCatalog {
     private const val TASK_DATE_BOARD_KEY = "taskDateBoard"
     private const val CAPABILITY_NOT_APPLICABLE = "not_applicable"
     private const val DESTINATION_INLINE_CREATE_FIELD = "supportsInlineCreate"
+    private const val DESTINATION_NEW_TASK_TARGET_FIELD = "newTaskTarget"
     private const val ACTION_ADD_TITLE_FIELD = "addTitle"
 }

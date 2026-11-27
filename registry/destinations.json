@@ -19,6 +19,7 @@
       "showsCalendarAgenda": false,
       "showsInboxBand": false,
       "supportsInlineCreate": true,
+      "newTaskTarget": "here",
       "dropBehavior": "clearPlace",
       "featureId": "lists.inbox",
       "emptyState": { "title": "Inbox is empty", "detail": "New tasks wait at the top of Today until you schedule or file them." }
@@ -40,6 +41,7 @@
       "showsCalendarAgenda": true,
       "showsInboxBand": true,
       "supportsInlineCreate": true,
+      "newTaskTarget": "here",
       "dropBehavior": "setToday",
       "featureId": "lists.today",
       "emptyState": { "title": "Nothing on Today", "detail": "Add a task or move one here when you want to work on it today." }
@@ -61,6 +63,7 @@
       "showsCalendarAgenda": false,
       "showsInboxBand": false,
       "supportsInlineCreate": false,
+      "newTaskTarget": "today",
       "dropBehavior": "none",
       "featureId": "lists.review",
       "groups": [
@@ -89,6 +92,7 @@
       "showsCalendarAgenda": false,
       "showsInboxBand": false,
       "supportsInlineCreate": false,
+      "newTaskTarget": "today",
       "dropBehavior": "none",
       "featureId": "lists.agent",
       "emptyState": { "title": "No agent work", "detail": "Tasks you assign to Claude show up in Review, grouped by where the work stands." }
@@ -110,6 +114,7 @@
       "showsCalendarAgenda": true,
       "showsInboxBand": false,
       "supportsInlineCreate": false,
+      "newTaskTarget": "tomorrow",
       "dropBehavior": "scheduleTomorrow",
       "featureId": "lists.upcoming",
       "emptyState": { "title": "Nothing upcoming", "detail": "Tasks with a future When or Deadline date appear here." }
@@ -131,6 +136,7 @@
       "showsCalendarAgenda": false,
       "showsInboxBand": false,
       "supportsInlineCreate": false,
+      "newTaskTarget": "today",
       "dropBehavior": "none",
       "featureId": "lists.repeating",
       "emptyState": { "title": "No repeating tasks", "detail": "Give any task a Repeat rule and it will show up here." }
@@ -152,6 +158,7 @@
       "showsCalendarAgenda": false,
       "showsInboxBand": false,
       "supportsInlineCreate": true,
+      "newTaskTarget": "here",
       "dropBehavior": "clearDates",
       "featureId": "lists.anytime",
       "emptyState": { "title": "Nothing in Anytime", "detail": "Open tasks without a date live here." }
@@ -173,6 +180,7 @@
       "showsCalendarAgenda": false,
       "showsInboxBand": false,
       "supportsInlineCreate": false,
+      "newTaskTarget": "today",
       "dropBehavior": "complete",
       "featureId": "lists.logbook",
       "emptyState": { "title": "Logbook is empty", "detail": "Tasks you complete or let go end up here." }
@@ -194,6 +202,7 @@
       "showsCalendarAgenda": false,
       "showsInboxBand": false,
       "supportsInlineCreate": true,
+      "newTaskTarget": "today",
       "dropBehavior": "none",
       "featureId": "lists.starred",
       "emptyState": { "title": "No Favorites", "detail": "Favorite important tasks to keep them one tap away." }
@@ -213,6 +222,7 @@
       "showsCalendarAgenda": false,
       "showsInboxBand": false,
       "supportsInlineCreate": false,
+      "newTaskTarget": "today",
       "dropBehavior": "none",
       "featureId": "lists.faded",
       "emptyState": { "title": "No Faded Tasks", "detail": "Tasks without activity for 14 days appear here until you keep them or let them go." }
@@ -232,6 +242,7 @@
       "showsCalendarAgenda": false,
       "showsInboxBand": false,
       "supportsInlineCreate": false,
+      "newTaskTarget": "today",
       "dropBehavior": "delete",
       "featureId": "lists.recently-deleted",
       "emptyState": { "title": "No Deleted Tasks", "detail": "Septena keeps deleted tasks here for 30 days, then deletes them for good." }

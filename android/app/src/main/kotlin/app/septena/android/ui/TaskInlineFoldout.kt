@@ -51,6 +51,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -124,6 +126,16 @@ internal fun TaskInlineFoldout(
     onOpenFullPage: (String) -> Unit,
     onCollapse: () -> Unit,
     modifier: Modifier = Modifier,
+    /**
+     * An inline-create draft (InlineDraft.kt): the title field takes focus,
+     * Return with a blank title folds, and a fold with nothing typed purges it.
+     */
+    isDraft: Boolean = false,
+    /**
+     * True while the host still shows this row expanded. A lazy list disposes a
+     * row that scrolls off screen; that is not a fold, so a draft is kept.
+     */
+    isStillOpen: () -> Boolean = { false },
 ) {
     val languageTag = LocalConfiguration.current.locales[0].toLanguageTag()
     val labels = remember(languageTag) { TaskDetailLabels.fromRegistry(languageTag) }
@@ -191,6 +203,13 @@ internal fun TaskInlineFoldout(
         val title = rawTitle.trim()
         if (title.isEmpty()) return false
         val currentTitle = current.task.fields[RegistryEntityFields.Task.TITLE].stringValue().orEmpty()
+        if (isDraft && currentTitle.isBlank()) {
+            // The draft's first title: tokens, `# Heading`, and the deferred push (InlineDraft.kt).
+            val commit = withContext(Dispatchers.IO) { graph.commitInlineDraft(taskId, title, rawNotes) }
+            graph.sync.noteLocalChange()
+            graph.sync.requestSync()
+            return commit != InlineDraftCommit.NoChange
+        }
         val currentNotes = current.task.fields[RegistryEntityFields.Task.NOTES].stringValue().orEmpty()
         val notes = rawNotes.trim()
         val titleChanged = title != currentTitle && title != baseTitle.trim()
@@ -239,7 +258,14 @@ internal fun TaskInlineFoldout(
     // Folding by tapping another row or leaving the list autosaves pending text edits.
     DisposableEffect(taskId) {
         onDispose {
-            if (latestDirty) {
+            if (isDraft && latestTitle.isBlank() && !isStillOpen()) {
+                // Nothing typed: drop the draft. It never left this device.
+                graph.launch {
+                    if (runCatching { graph.discardInlineDraftIfEmpty(taskId) }.getOrDefault(false)) {
+                        graph.sync.noteLocalChange()
+                    }
+                }
+            } else if (latestDirty) {
                 val snap = latestData
                 val t = latestTitle
                 val n = latestNotes
@@ -251,7 +277,8 @@ internal fun TaskInlineFoldout(
     }
 
     fun saveThen(then: () -> Unit) {
-        if (!textIsDirty || data == null) {
+        // A blank draft folds at once; the fold drops it (Apple: blank Return only closes).
+        if (!textIsDirty || data == null || (isDraft && titleDraft.isBlank())) {
             then()
             return
         }
@@ -268,6 +295,8 @@ internal fun TaskInlineFoldout(
     fun handleOpenFullPage() = saveThen { onOpenFullPage(taskId) }
 
     BackHandler(enabled = openSheet == null, onBack = ::handleCollapse)
+
+    val titleFocus = remember(taskId) { FocusRequester() }
 
     val taskFields = data?.task?.fields.orEmpty()
     val deleted = data?.task?.deletedAt != null
@@ -338,6 +367,42 @@ internal fun TaskInlineFoldout(
         ?: selectedProject?.parentAreaId
     val selectedArea = data?.areas?.firstOrNull { it.id == selectedAreaId }
     val listShortValue = selectedProject?.title ?: selectedArea?.title
+
+    // A draft's title tokens, offered while the draft has no stored title yet and only
+    // for fields still unset (Apple `detectedTokens` / `isUnset`). `# Name` in a project
+    // makes a heading instead, so it offers nothing.
+    val storedTitle = taskFields[RegistryEntityFields.Task.TITLE].stringValue().orEmpty()
+    val rawAreaId = taskFields[RegistryEntityFields.Task.AREA].stringValue()
+    val draftTokens = if (!isDraft || data == null || storedTitle.isNotBlank() ||
+        (selectedProjectId != null && InlineTitleTokens.headingTitle(titleDraft.trim()) != null)
+    ) {
+        emptyList()
+    } else {
+        InlineTitleTokens.detect(
+            raw = titleDraft,
+            projects = data?.projects.orEmpty().map { it.id to it.title },
+            areas = data?.areas.orEmpty().map { it.id to it.title },
+            today = todayDate,
+        ).filter { token ->
+            when (token.kind) {
+                InlineTitleTokens.Kind.Today, InlineTitleTokens.Kind.Date -> !isToday && scheduled == null
+                InlineTitleTokens.Kind.Project -> selectedProjectId == null
+                InlineTitleTokens.Kind.Area -> rawAreaId == null && selectedProjectId == null
+            }
+        }
+    }
+    val chipDayFormat = remember(languageTag) {
+        java.time.format.DateTimeFormatter.ofPattern("MMM d", java.util.Locale.forLanguageTag(languageTag))
+    }
+    fun tokenLabel(token: InlineTitleTokens.Detected): String = when (token.kind) {
+        InlineTitleTokens.Kind.Today -> todayLabel
+        InlineTitleTokens.Kind.Date -> when (token.day) {
+            todayDate -> todayLabel
+            todayDate.plusDays(1) -> tomorrowLabel
+            else -> token.day?.let(chipDayFormat::format).orEmpty()
+        }
+        InlineTitleTokens.Kind.Project, InlineTitleTokens.Kind.Area -> token.title.orEmpty()
+    }
     val selectedTagIds = (taskFields[RegistryEntityFields.Task.TAGS] as? JsonValue.ArrayValue)
         ?.values?.mapNotNull { it.stringValue() }.orEmpty()
     val selectedTagNames = data?.tags.orEmpty().filter { it.id in selectedTagIds }.map(TagLine::name)
@@ -353,6 +418,12 @@ internal fun TaskInlineFoldout(
 
     val savedTask = data?.task
     val canEdit = savedTask != null && !deleted && !saving
+    // A new draft opens with the keyboard on its title (Apple focuses deferred-create drafts only).
+    // Keyed on the load: the field takes focus once it can be edited.
+    val draftCanFocus = isDraft && savedTask != null && !deleted
+    LaunchedEffect(taskId, draftCanFocus) {
+        if (draftCanFocus) runCatching { titleFocus.requestFocus() }
+    }
     val completeAction = RegistryCatalog.actionTitle(RegistryActionIds.TASK_TOGGLE_COMPLETE, languageTag = languageTag).orEmpty()
     val openAction = RegistryCatalog.actionTitle(RegistryActionIds.TASK_OPEN, languageTag = languageTag).orEmpty()
     val collapseAction = RegistryCatalog.actionTitle(RegistryActionIds.DO_DONE, languageTag = languageTag).orEmpty()
@@ -392,6 +463,22 @@ internal fun TaskInlineFoldout(
     fun writeChecklist(block: suspend () -> Unit) = save {
         block()
         graph.touchTask(taskId)
+    }
+
+    /** Applies a chip's field to the draft and takes its words out of the title (Apple `applyToken`). */
+    fun applyDraftToken(token: InlineTitleTokens.Detected) {
+        save {
+            when (token.kind) {
+                InlineTitleTokens.Kind.Today -> check(graph.taskMutator.setToday(taskId, enabled = true) != null)
+                InlineTitleTokens.Kind.Date -> token.day?.let { check(graph.taskMutator.setWhen(taskId, it.toString()) != null) }
+                InlineTitleTokens.Kind.Project ->
+                    check(graph.taskMutator.moveToList(taskId, area = null, project = token.id) != null)
+                InlineTitleTokens.Kind.Area ->
+                    check(graph.taskMutator.moveToList(taskId, area = token.id, project = null) != null)
+            }
+        }
+        titleDraft = InlineTitleTokens.removing(token.phrase, titleDraft)
+        textIsDirty = true
     }
 
     fun toggleComplete() {
@@ -678,6 +765,7 @@ internal fun TaskInlineFoldout(
                             keyboardActions = KeyboardActions(onDone = { handleCollapse() }),
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .focusRequester(titleFocus)
                                 .semantics { contentDescription = labels.field(RegistryTaskDetail.Fields.TITLE) },
                         )
                     }
@@ -710,6 +798,40 @@ internal fun TaskInlineFoldout(
                     .padding(start = TaskCardMetrics.LeadingColumnWidth + TaskCardMetrics.IconTextGap),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                if (draftTokens.isNotEmpty()) {
+                    // Tap-to-apply chips for what the draft's title names (Apple `quickEntryChips`).
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        draftTokens.forEach { token ->
+                            InlineAttributePill(
+                                label = tokenLabel(token),
+                                isSet = false,
+                                isActive = false,
+                                isDark = isDark,
+                                enabled = canEdit,
+                                tint = accent,
+                                icon = { tint ->
+                                    when (token.kind) {
+                                        InlineTitleTokens.Kind.Today ->
+                                            SeptenaGlyph(kind = SeptenaIconKind.Today, tint = tint, size = 13.dp)
+                                        InlineTitleTokens.Kind.Date -> CalendarSmallGlyph(tint = tint, size = 13.dp)
+                                        InlineTitleTokens.Kind.Project ->
+                                            SeptenaGlyph(kind = SeptenaIconKind.Project, tint = tint, size = 13.dp)
+                                        InlineTitleTokens.Kind.Area ->
+                                            SeptenaGlyph(kind = SeptenaIconKind.Area, tint = tint, size = 13.dp)
+                                    }
+                                },
+                                onClick = { applyDraftToken(token) },
+                            )
+                        }
+                    }
+                }
+
                 if (TaskPageBlockKinds.NOTES in blockKinds) {
                     val notesLabel = labels.field(RegistryTaskDetail.Fields.NOTES)
                     Box(modifier = Modifier.fillMaxWidth()) {

@@ -416,6 +416,9 @@ function validateDestinations(dests, icons, caps) {
     }
     assert(typeof d.canHide === "boolean", `destinations.json: ${d.id} missing boolean canHide`);
     assert(typeof d.canMoveSection === "boolean", `destinations.json: ${d.id} missing boolean canMoveSection`);
+    // Where Magic Plus / app.newTask makes a task from this list: an inline draft
+    // here, an inline draft here on tomorrow, or a jump to Today and a draft there.
+    assert(["here", "tomorrow", "today"].includes(d.newTaskTarget), `destinations.json: ${d.id} newTaskTarget must be here, tomorrow or today`);
     assert(typeof d.emptyState?.title === "string" && typeof d.emptyState?.detail === "string", `destinations.json: ${d.id} needs emptyState.title and .detail`);
     assert(d.icon in icons.icons, `destinations.json: ${d.id} unknown icon "${d.icon}"`);
     assert(d.featureId in caps.capabilities, `destinations.json: ${d.id} unknown featureId "${d.featureId}"`);
@@ -1434,6 +1437,9 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  let canMoveSection: Bool");
   lines.push("  /// The list keeps a manual order and takes a Sort By (docs/LIST_SORT_SPEC.md).");
   lines.push("  let supportsManualOrder: Bool");
+  lines.push("  /// Where a Magic Plus tap creates the draft on this list: `here`, `tomorrow`");
+  lines.push("  /// (here, on tomorrow) or `today` (opens Today first).");
+  lines.push("  let newTaskTarget: String");
   lines.push("  let emptyTitle: String");
   lines.push("  let emptyDetail: String");
   lines.push("  let featureId: String");
@@ -1459,7 +1465,7 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  static let all: [RegistryDestination] = [");
   for (const d of dests.destinations) {
     lines.push(
-      `    RegistryDestination(id: ${swiftCaseRef(d.id)}, navigationKey: ${swiftStr(d.navigationKey)}, serverView: ${swiftStr(d.serverView)}, title: ${L(d.title, d, "title")}, iconId: ${swiftStr(d.icon)}, sfSymbol: ${swiftStr(icons.icons[d.icon].sfSymbol)}, sidebarSection: ${swiftStr(d.sidebarSection ?? "top")}, visibility: ${swiftStr(d.visibility)}, canHide: ${d.canHide ? "true" : "false"}, canMoveSection: ${d.canMoveSection ? "true" : "false"}, supportsManualOrder: ${d.supportsManualOrder ? "true" : "false"}, emptyTitle: ${L(d.emptyState.title, d.emptyState, "title")}, emptyDetail: ${L(d.emptyState.detail, d.emptyState, "detail")}, featureId: ${swiftStr(d.featureId)}),`
+      `    RegistryDestination(id: ${swiftCaseRef(d.id)}, navigationKey: ${swiftStr(d.navigationKey)}, serverView: ${swiftStr(d.serverView)}, title: ${L(d.title, d, "title")}, iconId: ${swiftStr(d.icon)}, sfSymbol: ${swiftStr(icons.icons[d.icon].sfSymbol)}, sidebarSection: ${swiftStr(d.sidebarSection ?? "top")}, visibility: ${swiftStr(d.visibility)}, canHide: ${d.canHide ? "true" : "false"}, canMoveSection: ${d.canMoveSection ? "true" : "false"}, supportsManualOrder: ${d.supportsManualOrder ? "true" : "false"}, newTaskTarget: ${swiftStr(d.newTaskTarget)}, emptyTitle: ${L(d.emptyState.title, d.emptyState, "title")}, emptyDetail: ${L(d.emptyState.detail, d.emptyState, "detail")}, featureId: ${swiftStr(d.featureId)}),`
     );
   }
   lines.push("  ]");

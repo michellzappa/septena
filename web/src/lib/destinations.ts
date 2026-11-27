@@ -3,7 +3,7 @@
 
 import { DESTINATIONS } from "./generated/registries.ts";
 import type { CoreConversationState } from "./core/index.ts";
-import type { ProjectShareInfo, SmartDestination, TaskRow } from "./types";
+import type { ActiveDestination, ProjectShareInfo, SmartDestination, TaskRow } from "./types";
 import { isWaitingTask } from "./waiting.ts";
 
 export interface DestinationGroup {
@@ -21,13 +21,21 @@ export interface DestinationInfo {
   sidebarSection?: "top" | "bottom";
   /** False: the list stays in its registry section; a stored placement is ignored. */
   canMoveSection?: boolean;
+  /** Magic Plus drops create a task in this list (Apple allowsInlineCreate). Not the add field. */
   supportsInlineCreate: boolean;
+  /**
+   * Where a new task from this list goes (iOS triggerInlineNewTask): "here" makes it in this
+   * list, "tomorrow" makes it here scheduled tomorrow, "today" opens Today and makes it there.
+   */
+  newTaskTarget: NewTaskTarget;
   /** True: the list keeps a manual order, so it takes a Sort By (docs/LIST_SORT_SPEC.md §1). */
   supportsManualOrder?: boolean;
   dropBehavior: string;
   groups?: readonly DestinationGroup[];
   emptyState?: { title: string; detail: string };
 }
+
+export type NewTaskTarget = "here" | "tomorrow" | "today";
 
 export type SidebarDestination = DestinationInfo & { id: SmartDestination };
 
@@ -43,6 +51,15 @@ export const SIDEBAR_DESTINATIONS: readonly SidebarDestination[] = ALL.filter(
 
 export function destinationInfo(id: string): DestinationInfo | undefined {
   return ALL.find((d) => d.id === id);
+}
+
+/**
+ * The registry newTaskTarget of the open list. An area or project page makes the task in place;
+ * a smart list reads destinations.json. An unknown list falls back to "here".
+ */
+export function newTaskTargetOf(destination: ActiveDestination): NewTaskTarget {
+  if (destination.kind !== "smart") return "here";
+  return destinationInfo(destination.id)?.newTaskTarget ?? "here";
 }
 
 export function destinationGroups(id: "review"): readonly DestinationGroup[] {

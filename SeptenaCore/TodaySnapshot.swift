@@ -17,7 +17,11 @@ import SwiftData
 //   task list frame is drawn (`LaunchPhase`). After that it returns nil.
 // - Invalidation: sign-out, account switch and account delete remove the file
 //   (`TaskSyncEngine`). A snapshot from another day is never used: the reader
-//   compares its day with `DayClock.today`.
+//   compares its day with `DayClock.today`. A snapshot in another Sort By
+//   than Today's current one is never used either.
+// - Sort By: the writer stores Today in its displayed order (`ListSort`), so
+//   the first frame already shows the sort and nothing moves at the first
+//   `load()`. The sort runs on the writer's debounce, off the launch path.
 //
 // Not shared with the widget snapshot (`TasksWidgetWire`): that is a reduced
 // shape for a widget. The first frame needs full row DTOs, so `TaskRow` draws
@@ -31,13 +35,18 @@ struct TodaySnapshot: Codable {
   var version: Int = currentVersion
   /// `SeptenaDate` day the rows were read on (YYYY-MM-DD).
   var day: String
-  /// `LocalCache.tasks(filter: .today)`, in that order.
+  /// `LocalCache.tasks(filter: .today)` in the order Today shows them: the
+  /// list's Sort By (`sort`) applied, so the first frame needs no re-sort.
   var today: [Row]
   /// `LocalCache.tasks(filter: .triage)`, in that order.
   var inbox: [Row]
   /// `StructureCache` order (sidebar order).
   var areas: [AreaRow]
   var projects: [ProjectRow]
+  /// The Today sort `today` is in (docs/LIST_SORT_SPEC.md). nil = Manual,
+  /// also for a file written before the field existed. A file in another
+  /// sort than the current one is not used: the live read sorts.
+  var sort: String?
 
   /// Size guard, not a layout cut: real Today lists stay well under it, so
   /// the first two screens always match the live list.
@@ -138,7 +147,8 @@ enum TodaySnapshotStore {
     guard let url = fileURL,
           let data = try? Data(contentsOf: url),
           let snap = try? JSONDecoder.taskConvo.decode(TodaySnapshot.self, from: data),
-          snap.version == TodaySnapshot.currentVersion
+          snap.version == TodaySnapshot.currentVersion,
+          (snap.sort ?? ListSort.manual) == ListSortPreferences.shared.sort(for: .today)
     else { return nil }
     launchDay = snap.day
     return Rows(today: snap.today.map(\.materialized),
@@ -183,6 +193,7 @@ final class TodaySnapshotWriter {
     started = true
     let names: [Notification.Name] = [
       .septenaTasksChanged, .septenaStructureChanged, .NSCalendarDayChanged,
+      .septenaListSortChanged,
     ]
     for name in names {
       observers.append(NotificationCenter.default.addObserver(
@@ -211,7 +222,11 @@ final class TodaySnapshotWriter {
   private func writeNow() {
     guard let url = TodaySnapshotStore.fileURL else { return }
     let context = LocalStore.shared.container.mainContext
-    let today = LocalCache.tasks(in: context, filter: .today)
+    // Today in its displayed order: the same rule the live list applies
+    // (`ListSort`), sorted before the cap so the kept rows are the top ones.
+    let sort = ListSortPreferences.shared.sort(for: .today)
+    let today = ListSort.ordered(LocalCache.tasks(in: context, filter: .today),
+                                 in: .today, sort: sort)
     let inbox = LocalCache.tasks(in: context, filter: .triage)
     // An empty Today has nothing to draw early: the live read is just as fast.
     guard !(today.isEmpty && inbox.isEmpty) else {
@@ -227,7 +242,8 @@ final class TodaySnapshotWriter {
       today: Array(todayRows),
       inbox: Array(inboxRows),
       areas: structure.areas.map { .init(area: $0, position: $0.position) },
-      projects: structure.projects.map { .init(project: $0, position: $0.position) })
+      projects: structure.projects.map { .init(project: $0, position: $0.position) },
+      sort: sort == ListSort.manual ? nil : sort)
     guard let data = try? JSONEncoder.taskConvo.encode(snapshot) else { return }
     Self.io.async { Self.write(data, to: url) }
   }
