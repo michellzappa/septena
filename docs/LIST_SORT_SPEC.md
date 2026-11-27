@@ -31,13 +31,17 @@ The `listSort` enum in `registry/entities.json`:
 | `manual` | Manual | the stored manual order (default) | — |
 | `when` | When | earliest When date first | at the bottom |
 | `deadline` | Deadline | earliest deadline first | at the bottom |
-| `title` | Title | A to Z, ignoring case and accents | an empty title at the bottom |
+| `title` | Title | A to Z, ignoring case and accents (case folding covers Latin letters) | an empty title at the bottom |
 | `created` | Created | newest first (`createdAt`, else the `created` day) | at the bottom |
 
 ## 3. The rule (shared core)
 
-`sort_tasks(tasks, sort) -> [id]` in `core/crates/septena-core/src/sort.rs`
-(JSON name `sortTasks`). Vectors: `registry/conformance/list-sort.json`.
+`sort_tasks(tasks, sort) -> [id]` in `core/crates/septena-core/src/sort.rs`.
+Hosts call it through the JSON entry point:
+`invoke_json("sortTasks", {"tasks": [TaskSnapshot…], "sort": "<value>"})`
+returns a JSON array of task ids. It has no typed FFI export: that would put
+the native slices over their size budget. Vectors:
+`registry/conformance/list-sort.json`.
 
 - The host passes the tasks of **one group**, already in manual order.
 - The sort is stable: manual order breaks every tie.

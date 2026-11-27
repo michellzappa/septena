@@ -15,7 +15,8 @@ use crate::registry::enums::list_sort;
 use crate::views::{TaskSnapshot, parse_day};
 
 /// The task ids of `tasks` in the order of `sort` (a `listSort` enum value).
-#[cfg_attr(feature = "ffi", uniffi::export)]
+/// Hosts call it through `invoke_json("sortTasks", …)`: a typed FFI export
+/// would put the native slices over their size budget.
 pub fn sort_tasks(tasks: Vec<TaskSnapshot>, sort: String) -> Result<Vec<String>, CoreError> {
     let mut rows: Vec<&TaskSnapshot> = tasks.iter().collect();
     match sort.as_str() {
@@ -66,18 +67,20 @@ fn created_ms(task: &TaskSnapshot) -> Option<i64> {
         .or_else(|| parse_day(&task.created).map(|d| d.start_ms(0)))
 }
 
-/// A title compared without case. `base` also ignores accents, so "école"
-/// sorts next to "ecole", not after "zebra"; `full` orders the two.
+/// A title compared without case. `base` also ignores accents, so "École"
+/// sorts next to "ecole", not after "zebra"; `full` orders the two. Case
+/// folding is ASCII after the accents come off, which covers Latin letters.
+/// Full Unicode case tables would put the native slices over budget.
 struct TitleKey {
     base: String,
     full: String,
 }
 
 fn title_key(title: &str) -> TitleKey {
-    let full = nfc(title.trim()).to_lowercase();
+    let full = nfc(title.trim());
     TitleKey {
-        base: strip_marks(&full),
-        full,
+        base: strip_marks(&full).to_ascii_lowercase(),
+        full: full.to_ascii_lowercase(),
     }
 }
 
