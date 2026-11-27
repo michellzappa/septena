@@ -342,10 +342,6 @@ enum ContainerNotesCopy {
     String(localized: "Notes History", comment: "Menu item and sheet title for project/area notes revisions")
   }
 
-  static var historyButtonTitle: String {
-    String(localized: "History", comment: "Compact button title for opening project/area notes history")
-  }
-
   static var editNotesMenuTitle: String {
     String(localized: "Edit Notes", comment: "Context menu item on project or area notes")
   }

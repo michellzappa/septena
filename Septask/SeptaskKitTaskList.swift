@@ -2346,10 +2346,7 @@ final class SeptaskKitTaskListController: NSViewController {
     KitContainerNotesPopover.present(
       isArea: isArea,
       notes: text,
-      relativeTo: anchor,
-      onHistory: { [weak self] in
-        self?.showContainerNotesHistory(isArea: isArea, id: id)
-      }
+      relativeTo: anchor
     ) { [weak self] newText in
       let value: String? = newText.isEmpty ? nil : newText
       Task { @MainActor in

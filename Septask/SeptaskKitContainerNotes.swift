@@ -611,20 +611,17 @@ final class KitContainerNotesPopover: NSObject {
   private let handle = KitPopoverHandle()
   private let original: String
   private let onCommit: (String) -> Void
-  private let onHistory: (() -> Void)?
 
-  private init(original: String, onCommit: @escaping (String) -> Void, onHistory: (() -> Void)?) {
+  private init(original: String, onCommit: @escaping (String) -> Void) {
     self.original = original
     self.onCommit = onCommit
-    self.onHistory = onHistory
   }
 
   /// The popover retains its content, and the content's close handler keeps
   /// this presenter alive until it has committed.
   static func present(isArea: Bool, notes: String, relativeTo anchor: NSView,
-                      onHistory: (() -> Void)? = nil,
                       onCommit: @escaping (String) -> Void) {
-    let presenter = KitContainerNotesPopover(original: notes, onCommit: onCommit, onHistory: onHistory)
+    let presenter = KitContainerNotesPopover(original: notes, onCommit: onCommit)
     presenter.show(isArea: isArea, relativeTo: anchor)
   }
 
@@ -639,15 +636,6 @@ final class KitContainerNotesPopover: NSObject {
     headerRow.orientation = .horizontal
     headerRow.alignment = .centerY
     headerRow.spacing = 8
-    if onHistory != nil, TaskHistory.isAvailable {
-      let historyBtn = NSButton(title: ContainerNotesCopy.historyButtonTitle,
-                                target: self, action: #selector(openHistory))
-      historyBtn.bezelStyle = .inline
-      historyBtn.controlSize = .small
-      historyBtn.font = SeptaskKitTheme.meta
-      historyBtn.refusesFirstResponder = true
-      headerRow.addArrangedSubview(historyBtn)
-    }
 
     textView.isRichText = false
     textView.importsGraphics = false
@@ -702,12 +690,6 @@ final class KitContainerNotesPopover: NSObject {
                        focus: textView,
                        handle: handle,
                        onClose: { [self] in commit() })
-  }
-
-  @objc private func openHistory() {
-    let callback = onHistory
-    handle.close()
-    DispatchQueue.main.async { callback?() }
   }
 
   private func commit() {
