@@ -9,7 +9,7 @@ import { grantRow } from "../entitlement/entitlement.js";
 import { PLUS_LINK_MAX_MONTHS, PLUS_LINK_MAX_USES, addMonths } from "../store/plusLinks.js";
 import { verifyAccessJwt } from "./access.js";
 import { ADMIN_GRANT_ID, refreshAccounts, sweepAccounts } from "./accounts.js";
-import { PAGE_HEADERS, renderAdmin } from "./page.js";
+import { ADMIN_PAGES, PAGE_HEADERS, renderAdmin, type AdminPage, type AdminView } from "./page.js";
 import { signupView, signupsByEmail, signupsCsv } from "./signups.js";
 import { SERIES_DAYS, dayKey, recordMetrics } from "./metrics.js";
 import { forgetTraffic, trafficView } from "./plausible.js";
@@ -43,33 +43,44 @@ async function requireAdmin(c: Ctx, next: Next) {
 
 admin.use("*", requireAdmin);
 
-async function renderPage(c: Ctx, opts: { query?: string; newUrl?: string; error?: string } = {}): Promise<Response> {
+/// Each page loads only what it shows.
+const NEEDS: Record<AdminPage, { accounts?: true; links?: true; signups?: true; history?: true; traffic?: true; releases?: true }> = {
+  overview: { accounts: true, signups: true, history: true, traffic: true },
+  website: { signups: true, traffic: true },
+  product: { accounts: true, releases: true },
+  plans: { accounts: true, links: true },
+  accounts: { accounts: true },
+  signups: { signups: true },
+};
+
+async function renderPage(c: Ctx, page: AdminPage, opts: { query?: string; newUrl?: string; error?: string } = {}): Promise<Response> {
   const accounts = accountStoreFor(c.env);
   if (!accounts) return c.notFound();
+  const need = NEEDS[page];
   const query = (opts.query ?? "").trim().slice(0, 200);
   const isEmail = query.includes("@");
   const now = Date.now();
   const [list, plus, signups, found, identity, history, traffic, releases] = await Promise.all([
-    accounts.listAccounts(),
-    accounts.listPlusLinks(),
-    signupView(c.env),
+    need.accounts ? accounts.listAccounts() : [],
+    need.links ? accounts.listPlusLinks() : { links: [], uses: [] },
+    need.signups ? signupView(c.env) : null,
     isEmail ? signupsByEmail(c.env, query) : [],
     isEmail ? accounts.resolveIdentity("email", query) : null,
-    accounts.listMetricDays(dayKey(now - (SERIES_DAYS + 7) * 86_400_000)),
-    trafficView(c.env),
-    macReleases(c.env),
+    need.history ? accounts.listMetricDays(dayKey(now - (SERIES_DAYS + 7) * 86_400_000)) : [],
+    need.traffic ? trafficView(c.env) : { state: "off" as const },
+    need.releases ? macReleases(c.env) : [],
   ]);
-  const html = renderAdmin({
+  const view: AdminView = {
     admin: c.get("email"), accounts: list, links: plus.links, uses: plus.uses, signups, query, history, traffic, releases,
     emailSignups: found, emailUserId: identity?.userId ?? null, newUrl: opts.newUrl, error: opts.error, now,
-  });
-  return new Response(html, { status: opts.error ? 400 : 200, headers: PAGE_HEADERS });
+  };
+  return new Response(renderAdmin(page, view), { status: opts.error ? 400 : 200, headers: PAGE_HEADERS });
 }
 
-admin.get("/", (c) => renderPage(c));
+for (const p of ADMIN_PAGES) admin.get(p.path || "/", (c) => renderPage(c, p.id));
 
 // A search is a POST so an email address never lands in a URL or a log.
-admin.post("/search", async (c) => renderPage(c, { query: String((await c.req.parseBody()).q ?? "") }));
+admin.post("/search", async (c) => renderPage(c, "accounts", { query: String((await c.req.parseBody()).q ?? "") }));
 
 admin.get("/signups.csv", async (c) => {
   const csv = await signupsCsv(c.env);
@@ -83,12 +94,14 @@ admin.get("/signups.csv", async (c) => {
   });
 });
 
-const back = (c: Ctx) => c.redirect("/admin", 303);
+const back = (c: Ctx, page: AdminPage = "overview") =>
+  c.redirect(`/admin${ADMIN_PAGES.find((p) => p.id === page)!.path}`, 303);
 
 admin.post("/refresh", async (c) => {
   await sweepAccounts(c.env, 60_000);
   await Promise.all([recordMetrics(c.env), forgetTraffic(c.env)]);
-  return back(c);
+  const page = String((await c.req.parseBody()).back ?? "");
+  return back(c, ADMIN_PAGES.some((p) => p.id === page) ? page as AdminPage : "overview");
 });
 
 const zPlan = z.enum(["plus", "pro"]);
@@ -103,13 +116,13 @@ const zLink = z.object({
 
 admin.post("/links", async (c) => {
   const input = zLink.safeParse(await c.req.parseBody());
-  if (!input.success) return renderPage(c, { error: "A link needs a label (up to 60 characters), a plan, a length and a number of people." });
+  if (!input.success) return renderPage(c, "plans", { error: "A link needs a label (up to 60 characters), a plan, a length and a number of people." });
   const made = await createPlusLink(c.env, input.data);
-  return renderPage(c, { newUrl: made?.url });
+  return renderPage(c, "plans", { newUrl: made?.url });
 });
 
 admin.post("/links/:id/close", async (c) =>
-  await accountStoreFor(c.env)?.closePlusLink(c.req.param("id")) ? back(c) : c.notFound());
+  await accountStoreFor(c.env)?.closePlusLink(c.req.param("id")) ? back(c, "plans") : c.notFound());
 
 admin.post("/links/:id/revoke", async (c) => {
   const { who } = await c.req.parseBody();
@@ -117,7 +130,7 @@ admin.post("/links/:id/revoke", async (c) => {
   const users = await revokePlusLink(c.env, c.req.param("id"), who === "all" ? null : who);
   if (!users) return c.notFound();
   await refreshAccounts(c.env, users);
-  return back(c);
+  return back(c, "plans");
 });
 
 /// One account of the index, or null: an id that is not listed gets no store.
@@ -139,7 +152,7 @@ admin.post("/accounts/:userId/plan", async (c) => {
   );
   logEvent("entitlement_grant", { userId, name: "admin", plan, months });
   await refreshAccounts(c.env, [userId]);
-  return back(c);
+  return back(c, "accounts");
 });
 
 /// Takes back the plan this page gave. A link's grant is the link's to end.
@@ -149,5 +162,5 @@ admin.post("/accounts/:userId/plan/end", async (c) => {
   const removed = await storeFor(c.env, userId).deleteEntitlement(ADMIN_GRANT_ID);
   logEvent("entitlement_grant_revoked", { userId, name: "admin", removed });
   await refreshAccounts(c.env, [userId]);
-  return back(c);
+  return back(c, "accounts");
 });

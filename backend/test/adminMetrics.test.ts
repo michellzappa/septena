@@ -7,7 +7,7 @@ installWorkerTestHooks();
 // Growth on the admin page (ADR 0059).
 
 const { change, cumulative, lastDays, perDay, snapshotSeries, weeklyCohorts, windowChange } = await import("../src/admin/metrics.ts");
-const { renderAdmin } = await import("../src/admin/page.ts");
+const { ADMIN_PAGES, renderAdmin } = await import("../src/admin/page.ts");
 const { embedUrl } = await import("../src/admin/plausible.ts");
 
 const DAY = 86_400_000;
@@ -67,19 +67,34 @@ describe("admin growth", () => {
       admin: "mz@example.com", accounts: [row(1, NOW, summary({ closedTasks: 1 }))] as never, links: [], uses: [], signups: null, query: "",
       emailSignups: [], emailUserId: null, history: [], releases: [], now: NOW,
     };
-    const off = renderAdmin({ ...base, traffic: { state: "off" } });
+    const off = renderAdmin("website", { ...base, traffic: { state: "off" } });
     assert.match(off, /Plausible is not connected/);
-    assert.match(off, /id="growth"/);
+    assert.match(off, /<a href="\/admin\/website" aria-current="page">Website<\/a>/);
     const view = {
       site: "septena.app", days: [{ day: "2026-11-26", visitors: 5, pageviews: 9 }],
       totals: { visitors: 5, visits: 6, pageviews: 9, bounceRate: 40, visitDuration: 75 },
       sources: [{ name: "<script>", visitors: 3, n: 3, rate: null }], pages: [], countries: [],
       goals: [{ name: "Signup", visitors: 1, n: 1, rate: 20 }], missingGoals: ["Download click"], downloads: [], ctaPlacements: [], fetchedAt: NOW,
     };
-    const on = renderAdmin({ ...base, traffic: { state: "ok", view } });
+    const on = renderAdmin("website", { ...base, traffic: { state: "ok", view } });
     assert.ok(on.includes("&lt;script&gt;") && !on.includes("<script>"));
     assert.match(on, /20\.00%/);
     assert.match(on, /No events in 30 days: Download click/);
+  });
+
+  it("renders every page with its own tab marked and the brand accent", () => {
+    const base = {
+      admin: "mz@example.com", accounts: [row(1, NOW, summary({ closedTasks: 1 }))] as never, links: [], uses: [], signups: null, query: "",
+      emailSignups: [], emailUserId: null, history: [], releases: [], now: NOW, traffic: { state: "off" as const },
+    };
+    for (const p of ADMIN_PAGES) {
+      const html = renderAdmin(p.id, base);
+      assert.equal((html.match(/aria-current="page"/g) ?? []).length, 1, p.id);
+      assert.ok(html.includes(`href="/admin${p.path}" aria-current="page"`), p.id);
+      assert.match(html, /--accent: #E05212/i, p.id);
+    }
+    assert.match(renderAdmin("accounts", base), /1 of 1/);
+    assert.doesNotMatch(renderAdmin("overview", base), /<table><thead><tr><th>Account<\/th>/, "the account table is its own page");
   });
 
   it("embeds only a plausible.io share link", () => {
