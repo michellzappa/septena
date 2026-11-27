@@ -23,6 +23,7 @@ mod fade;
 mod json;
 mod nfc;
 mod nfc_table;
+mod project_checklist;
 mod recurrence;
 mod refs;
 mod reminders;
