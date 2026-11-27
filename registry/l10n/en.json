@@ -12,54 +12,6 @@
       "plans.outcomes.agents.rows.connected.cells.plus"
     ]
   },
-  "$10 a month. You save $48 against paying monthly.": {
-    "text": "$10 a month. You save $48 against paying monthly.",
-    "paths": [
-      "plans.currencies.1.pro.year.detail"
-    ]
-  },
-  "$120 a year": {
-    "text": "$120 a year",
-    "paths": [
-      "plans.currencies.1.pro.year.label"
-    ]
-  },
-  "$14 a month": {
-    "text": "$14 a month",
-    "paths": [
-      "plans.currencies.1.pro.month.label"
-    ]
-  },
-  "$210 once": {
-    "text": "$210 once",
-    "paths": [
-      "plans.currencies.1.plus.pass.label"
-    ]
-  },
-  "$30 a year for 7 years. Half the annual rate.": {
-    "text": "$30 a year for 7 years. Half the annual rate.",
-    "paths": [
-      "plans.currencies.1.plus.pass.detail"
-    ]
-  },
-  "$5 a month. You save $24 against paying monthly.": {
-    "text": "$5 a month. You save $24 against paying monthly.",
-    "paths": [
-      "plans.currencies.1.plus.year.detail"
-    ]
-  },
-  "$60 a year": {
-    "text": "$60 a year",
-    "paths": [
-      "plans.currencies.1.plus.year.label"
-    ]
-  },
-  "$7 a month": {
-    "text": "$7 a month",
-    "paths": [
-      "plans.currencies.1.plus.month.label"
-    ]
-  },
   "1 change was not sent yet and will be lost.": {
     "text": "1 change was not sent yet and will be lost.",
     "paths": [
@@ -740,15 +692,7 @@
     "text": "Cancel at any time.",
     "paths": [
       "plans.prices.monthly.detail",
-      "plans.proPrices.pro_monthly.detail",
-      "plans.currencies.0.plus.month.detail",
-      "plans.currencies.0.pro.month.detail",
-      "plans.currencies.1.plus.month.detail",
-      "plans.currencies.1.pro.month.detail",
-      "plans.currencies.2.plus.month.detail",
-      "plans.currencies.2.pro.month.detail",
-      "plans.currencies.3.plus.month.detail",
-      "plans.currencies.3.pro.month.detail"
+      "plans.proPrices.pro_monthly.detail"
     ]
   },
   "Capture": {
@@ -3265,34 +3209,10 @@
       "settings.copy.import_export.importJsonDetail.label"
     ]
   },
-  "Prices exclude applicable local sales tax. Outside EUR, USD, GBP and BRL, the App Store and Google Play charge their matching local price.": {
-    "text": "Prices exclude applicable local sales tax. Outside EUR, USD, GBP and BRL, the App Store and Google Play charge their matching local price.",
-    "paths": [
-      "plans.currencies.1.footnote"
-    ]
-  },
-  "Prices include UK VAT. Outside EUR, USD, GBP and BRL, the App Store and Google Play charge their matching local price.": {
-    "text": "Prices include UK VAT. Outside EUR, USD, GBP and BRL, the App Store and Google Play charge their matching local price.",
-    "paths": [
-      "plans.currencies.2.footnote"
-    ]
-  },
-  "Prices include VAT where it applies. Outside EUR, USD, GBP and BRL, the App Store and Google Play charge their matching local price.": {
-    "text": "Prices include VAT where it applies. Outside EUR, USD, GBP and BRL, the App Store and Google Play charge their matching local price.",
-    "paths": [
-      "plans.currencies.0.footnote"
-    ]
-  },
-  "Prices include VAT where it applies. Outside the euro area, the App Store charges its matching local price.": {
-    "text": "Prices include VAT where it applies. Outside the euro area, the App Store charges its matching local price.",
+  "Prices include VAT where it applies. Outside the euro area, the App Store and Google Play charge their matching local price.": {
+    "text": "Prices include VAT where it applies. Outside the euro area, the App Store and Google Play charge their matching local price.",
     "paths": [
       "plans.priceFootnote"
-    ]
-  },
-  "Prices include applicable local taxes. Outside EUR, USD, GBP and BRL, the App Store and Google Play charge their matching local price.": {
-    "text": "Prices include applicable local taxes. Outside EUR, USD, GBP and BRL, the App Store and Google Play charge their matching local price.",
-    "paths": [
-      "plans.currencies.3.footnote"
     ]
   },
   "Print / Ink": {
@@ -3420,54 +3340,6 @@
     "text": "Quick Find…",
     "paths": [
       "actions.actions.app.quickFind.title"
-    ]
-  },
-  "R$ 120 a year for 7 years. Half the annual rate.": {
-    "text": "R$ 120 a year for 7 years. Half the annual rate.",
-    "paths": [
-      "plans.currencies.3.plus.pass.detail"
-    ]
-  },
-  "R$ 20 a month. You save R$ 108 against paying monthly.": {
-    "text": "R$ 20 a month. You save R$ 108 against paying monthly.",
-    "paths": [
-      "plans.currencies.3.plus.year.detail"
-    ]
-  },
-  "R$ 240 a year": {
-    "text": "R$ 240 a year",
-    "paths": [
-      "plans.currencies.3.plus.year.label"
-    ]
-  },
-  "R$ 29 a month": {
-    "text": "R$ 29 a month",
-    "paths": [
-      "plans.currencies.3.plus.month.label"
-    ]
-  },
-  "R$ 40 a month. You save R$ 216 against paying monthly.": {
-    "text": "R$ 40 a month. You save R$ 216 against paying monthly.",
-    "paths": [
-      "plans.currencies.3.pro.year.detail"
-    ]
-  },
-  "R$ 480 a year": {
-    "text": "R$ 480 a year",
-    "paths": [
-      "plans.currencies.3.pro.year.label"
-    ]
-  },
-  "R$ 58 a month": {
-    "text": "R$ 58 a month",
-    "paths": [
-      "plans.currencies.3.pro.month.label"
-    ]
-  },
-  "R$ 840 once": {
-    "text": "R$ 840 once",
-    "paths": [
-      "plans.currencies.3.plus.pass.label"
     ]
   },
   "Read-only agenda in Today and Upcoming": {
@@ -5800,54 +5672,6 @@
       "surfaces.prompts.items.disconnectAgent.message"
     ]
   },
-  "£100 a year": {
-    "text": "£100 a year",
-    "paths": [
-      "plans.currencies.2.pro.year.label"
-    ]
-  },
-  "£12 a month": {
-    "text": "£12 a month",
-    "paths": [
-      "plans.currencies.2.pro.month.label"
-    ]
-  },
-  "£175 once": {
-    "text": "£175 once",
-    "paths": [
-      "plans.currencies.2.plus.pass.label"
-    ]
-  },
-  "£25 a year for 7 years. Half the annual rate.": {
-    "text": "£25 a year for 7 years. Half the annual rate.",
-    "paths": [
-      "plans.currencies.2.plus.pass.detail"
-    ]
-  },
-  "£4.17 a month. You save £22 against paying monthly.": {
-    "text": "£4.17 a month. You save £22 against paying monthly.",
-    "paths": [
-      "plans.currencies.2.plus.year.detail"
-    ]
-  },
-  "£50 a year": {
-    "text": "£50 a year",
-    "paths": [
-      "plans.currencies.2.plus.year.label"
-    ]
-  },
-  "£6 a month": {
-    "text": "£6 a month",
-    "paths": [
-      "plans.currencies.2.plus.month.label"
-    ]
-  },
-  "£8.33 a month. You save £44 against paying monthly.": {
-    "text": "£8.33 a month. You save £44 against paying monthly.",
-    "paths": [
-      "plans.currencies.2.pro.year.detail"
-    ]
-  },
   "“{title}” deleted": {
     "text": "“{title}” deleted",
     "placeholders": [
@@ -5867,15 +5691,13 @@
   "€10 a month. You save €48 against paying monthly.": {
     "text": "€10 a month. You save €48 against paying monthly.",
     "paths": [
-      "plans.proPrices.pro_annual.detail",
-      "plans.currencies.0.pro.year.detail"
+      "plans.proPrices.pro_annual.detail"
     ]
   },
   "€120 a year": {
     "text": "€120 a year",
     "paths": [
       "plans.proPrices.pro_annual.label",
-      "plans.currencies.0.pro.year.label",
       "plans.cards.pro.priceLabel"
     ]
   },
@@ -5888,36 +5710,31 @@
   "€14 a month": {
     "text": "€14 a month",
     "paths": [
-      "plans.proPrices.pro_monthly.label",
-      "plans.currencies.0.pro.month.label"
+      "plans.proPrices.pro_monthly.label"
     ]
   },
   "€210 once": {
     "text": "€210 once",
     "paths": [
-      "plans.pass.label",
-      "plans.currencies.0.plus.pass.label"
+      "plans.pass.label"
     ]
   },
   "€30 a year for 7 years. Half the annual rate.": {
     "text": "€30 a year for 7 years. Half the annual rate.",
     "paths": [
-      "plans.pass.rateDetail",
-      "plans.currencies.0.plus.pass.detail"
+      "plans.pass.rateDetail"
     ]
   },
   "€5 a month. You save €24 against paying monthly.": {
     "text": "€5 a month. You save €24 against paying monthly.",
     "paths": [
-      "plans.prices.annual.detail",
-      "plans.currencies.0.plus.year.detail"
+      "plans.prices.annual.detail"
     ]
   },
   "€60 a year": {
     "text": "€60 a year",
     "paths": [
-      "plans.prices.annual.label",
-      "plans.currencies.0.plus.year.label"
+      "plans.prices.annual.label"
     ]
   },
   "€60 a year or €7 a month": {
@@ -5929,8 +5746,7 @@
   "€7 a month": {
     "text": "€7 a month",
     "paths": [
-      "plans.prices.monthly.label",
-      "plans.currencies.0.plus.month.label"
+      "plans.prices.monthly.label"
     ]
   }
 }
