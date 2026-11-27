@@ -1945,14 +1945,13 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push(`  static let quickFindEmptyDetail: String = ${L(qf.emptyState.detail, qf.emptyState, "detail")}`);
   lines.push(`  static let quickFindCompletedLabel: String = ${L(qf.completed.label, qf.completed, "label")}`);
   const checklist = surfaces.checklistProjects;
-  for (const field of ["useAsChecklist", "useForGroceries", "addItem", "onList", "checked", "projectType", "moveToGroup", "ungrouped"]) {
+  for (const field of ["useAsChecklist", "addItem", "onList", "checked", "projectType", "moveToGroup", "ungrouped"]) {
     const swiftName = "checklist" + field[0].toUpperCase() + field.slice(1);
     lines.push(`  static let ${swiftName}: String = ${L(checklist[field], checklist, field)}`);
   }
   lines.push(tmplFn("checklistAddItemToGroup", tmplKey(checklist.addItemToGroup, checklist, "addItemToGroup")));
   lines.push(`  static let standardProjectTitle: String = ${L(checklist.project, checklist, "project")}`);
   lines.push(`  static let checklistProjectTitle: String = ${L(checklist.checklist, checklist, "checklist")}`);
-  lines.push(`  static let groceriesProjectTitle: String = ${L(checklist.groceries, checklist, "groceries")}`);
   const ls = surfaces.listSort;
   lines.push("  /// Sort By copy (`surfaces.json` `listSort`, docs/LIST_SORT_SPEC.md).");
   lines.push(`  static let listSortMenuTitle: String = ${L(ls.menuTitle, ls, "menuTitle")}`);

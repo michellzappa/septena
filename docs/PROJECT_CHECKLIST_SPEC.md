@@ -20,16 +20,16 @@ Search the current project as the user types in **Add item**. A matching checked
 
 Reuse the name, group, and position. Scheduling and quantity entered for a particular trip should not prefill the next one. Typing alone leaves the list unchanged. Match case-insensitively and rank exact matches ahead of prefixes.
 
-## Groups and Groceries
+## Groups
 
 - **Checklist groups are optional and local to one project.** Packing can have Clothes, Toiletries, and Electronics. A short list can stay flat. Adding within a group assigns it directly. Moving an item changes its saved group. Keep group order stable and show headings in the active list only when they have active items.
-- **Groceries is a Checklist preset.** It seeds category headings such as Produce, Dairy, Pantry, and Frozen. For a new item entered from the main Add item field, use a small offline vocabulary to assign a clear match. Leave unknown or ambiguous items ungrouped. Use the same categorization data across clients and sync the assigned group.
+- **Any Checklist can group recognizable grocery items.** For a new item entered from the main Add item field, use a small offline vocabulary to assign a clear match. Create a heading such as Produce, Dairy, Pantry, or Frozen when it is first needed. Leave unknown or ambiguous items ungrouped. Use the same categorization data across clients and sync the assigned group.
 - **Explicit placement wins.** The group the user adds into, or moves an item to, takes priority over a grocery suggestion. If they move oat milk to Pantry, it returns to Pantry on every re-add. Show the saved group in autocomplete and provide a **Move to group** action on the row.
 - Keep checked items together under **Checked**, with their saved group available when useful. Checking the last item in an aisle collapses that aisle out of the active list without discarding its group.
 
 ## First release
 
-The first release includes reusable rows, autocomplete, optional project groups, and the Groceries preset. Bulk reset and automatic categorization for other kinds of checklists can follow when repeated use warrants them.
+The first release includes reusable rows, autocomplete, and optional project groups with automatic grouping for recognized grocery items. Bulk reset and automatic categorization for other kinds of checklists can follow when repeated use warrants them.
 
 Use the same row and undo behavior across Apple, Android, and Web. Preserve the project mode, row state, and group assignments through sync and export.
 

@@ -1749,8 +1749,7 @@ private fun NewProjectDialog(
     var selectedAreaId by remember(initialAreaId) { mutableStateOf(initialAreaId) }
     var checklistMode by remember { mutableStateOf<String?>(null) }
     var typeMenuOpen by remember { mutableStateOf(false) }
-    val modes = listOf(null to "project", RegistryEntityEnums.ChecklistMode.PLAIN to "checklist",
-        RegistryEntityEnums.ChecklistMode.GROCERIES to "groceries")
+    val modes = listOf(null to "project", RegistryEntityEnums.ChecklistMode.PLAIN to "checklist")
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
 

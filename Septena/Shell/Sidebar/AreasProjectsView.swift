@@ -903,9 +903,6 @@ struct ProjectDetailView: View {
         Button(RegistrySurfaces.checklistUseAsChecklist) {
           Task { try await projectsMutator.useAsChecklist(id: project.id) }
         }
-        Button(RegistrySurfaces.checklistUseForGroceries) {
-          Task { try await projectsMutator.useAsChecklist(id: project.id, mode: .groceries) }
-        }
       }
       // Sort By for this project's tasks (docs/LIST_SORT_SPEC.md §6).
       ListSortMenu(filter: .project(project.id))

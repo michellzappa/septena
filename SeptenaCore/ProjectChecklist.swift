@@ -36,8 +36,8 @@ struct ProjectChecklist: Decodable {
     let groceries: Bool
   }
 
-  static func layout(rows: [SeptenaTask], query: String? = nil, mode: ProjectChecklistMode) -> Self? {
-    call("projectChecklist", Input(rows: rows.map(Row.init), query: query, groceries: mode == .groceries))
+  static func layout(rows: [SeptenaTask], query: String? = nil) -> Self? {
+    call("projectChecklist", Input(rows: rows.map(Row.init), query: query, groceries: query != nil))
   }
 
   static func patch(checked: Bool) -> [String: BackendJSON]? {
@@ -59,13 +59,13 @@ struct ProjectChecklist: Decodable {
 extension ProjectChecklist {
   @MainActor
   static func add(
-    title: String, project: String, mode: ProjectChecklistMode, heading explicitHeading: String?,
+    title: String, project: String, heading explicitHeading: String?,
     headings: [SeptenaTask], mutator: TaskMutator
   ) {
     let title = title.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !title.isEmpty else { return }
     var heading = explicitHeading
-    if heading == nil, let key = layout(rows: [], query: title, mode: mode)?.suggestedGroup {
+    if heading == nil, let key = layout(rows: [], query: title)?.suggestedGroup {
       let name: String?
       switch key {
       case "produce": name = String(localized: "Produce")

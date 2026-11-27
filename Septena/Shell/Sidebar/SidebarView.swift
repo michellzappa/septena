@@ -2108,7 +2108,6 @@ struct NewProjectSheet: View {
         Picker(RegistrySurfaces.checklistProjectType, selection: $mode) {
           Text(RegistrySurfaces.standardProjectTitle).tag(nil as ProjectChecklistMode?)
           Text(RegistrySurfaces.checklistProjectTitle).tag(ProjectChecklistMode?.some(.plain))
-          Text(RegistrySurfaces.groceriesProjectTitle).tag(ProjectChecklistMode?.some(.groceries))
         }
         Section("Area") {
           Button { selectedAreaId = nil } label: {
