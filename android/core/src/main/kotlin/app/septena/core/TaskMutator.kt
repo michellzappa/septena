@@ -806,17 +806,15 @@ class TaskMutator(
         return true
     }
 
-    companion object {
-        /** The not-before time of a draft's queued insert: never, until a title write releases it. */
-        val DEFERRED_PUSH: Instant = Instant.ofEpochMilli(Long.MAX_VALUE)
-    }
-
     private fun validateTitle(title: String) {
         val maximum = RegistryEntityLimits.TEXT_MAX
         require(title.length.toLong() <= maximum) { "Task title exceeds the registry limit of $maximum characters" }
     }
 
     companion object {
+        /** The not-before time of a draft's queued insert: never, until a title write releases it. */
+        val DEFERRED_PUSH: Instant = Instant.ofEpochMilli(Long.MAX_VALUE)
+
         /** True when [fields] describe a fixed-schedule (not after-completion) repeating task. */
         fun isFixedRepeating(fields: Map<String, JsonValue>): Boolean =
             fields[RegistryEntityFields.Task.RECURRENCE_UNIT].stringValue() != null &&
