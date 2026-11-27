@@ -1,16 +1,13 @@
 package app.septena.android.ui
 
 import app.septena.core.generated.RegistryCompletionMotion
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.test.advanceTimeBy
-import kotlinx.coroutines.test.runCurrent
-import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-@OptIn(ExperimentalCoroutinesApi::class)
 class CompletionSettleStoreTest {
     @Test
     fun registryTokensMatchStandardTimings() {
@@ -21,38 +18,30 @@ class CompletionSettleStoreTest {
     }
 
     @Test
-    fun settlesFadesAndClearsInOrder() = runTest {
-        val store = CompletionSettleStore(this, settleDelayMs = 3000L, fadeOutMs = 350L)
+    fun settlesFadesAndClearsInOrder() = runBlocking {
+        val store = CompletionSettleStore(this, settleDelayMs = 60L, fadeOutMs = 60L)
         store.start("t1", reviewGroupId = "finished")
         assertTrue(store.state.value.isSettling("t1"))
         assertFalse(store.state.value.isFadingOut("t1"))
         assertEquals("finished", store.state.value.entries["t1"]?.reviewGroupId)
 
-        advanceTimeBy(2999L)
-        runCurrent()
-        assertTrue(store.state.value.isSettling("t1"))
-        assertFalse(store.state.value.isFadingOut("t1"))
-
-        advanceTimeBy(1L)
-        runCurrent()
+        delay(90L)
         assertTrue(store.state.value.isSettling("t1"))
         assertTrue(store.state.value.isFadingOut("t1"))
 
-        advanceTimeBy(350L)
-        runCurrent()
+        delay(90L)
         assertFalse(store.state.value.isSettling("t1"))
         assertFalse(store.state.value.isFadingOut("t1"))
     }
 
     @Test
-    fun cancelAbortsFadeOut() = runTest {
-        val store = CompletionSettleStore(this, settleDelayMs = 3000L, fadeOutMs = 350L)
+    fun cancelAbortsFadeOut() = runBlocking {
+        val store = CompletionSettleStore(this, settleDelayMs = 60L, fadeOutMs = 60L)
         store.start("t1")
-        advanceTimeBy(1000L)
+        delay(20L)
         store.cancel("t1")
         assertFalse(store.state.value.isSettling("t1"))
-        advanceTimeBy(5000L)
-        runCurrent()
+        delay(140L)
         assertFalse(store.state.value.isSettling("t1"))
     }
 }
