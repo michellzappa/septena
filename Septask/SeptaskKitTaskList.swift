@@ -113,6 +113,9 @@ final class SeptaskKitTaskListController: NSViewController {
     /// counterpart of SwiftUI's `QuickAddTriggerRow`. It carries no task, so
     /// `shouldSelectRow` already keeps it out of selection and arrow-nav.
     case newTask
+    /// Foot of an area page's project card: the clickable "New Project" line
+    /// (#706), the same add-row language as `newTask`. It carries no task.
+    case newProject(areaId: String)
     /// "Import all N from Reminders" — a quiet action LINE inside the Inbox,
     /// shown only when more than one is waiting. A line rather than a header
     /// button because the Inbox header's trailing slot belongs to the `+`, and
@@ -151,6 +154,7 @@ final class SeptaskKitTaskListController: NSViewController {
       case .fadedFooter: return "faded-footer"
       case .loggedFooter: return "logged-footer"
       case .newTask: return "new-task"
+      case .newProject: return "new-project"
       case .reminder(let item, _): return "reminder:" + item.id
       case .notice(let notice): return "notice:" + notice.id.rawValue
       case .noticeStep(let step): return step.selectionID
@@ -197,7 +201,7 @@ final class SeptaskKitTaskListController: NSViewController {
       case .notice(let notice): return !notice.steps.isEmpty
       // Rides the Inbox card with the reminder rows it acts on.
       case .importAllReminders: return true
-      case .projectTarget, .event, .newTask, .reminder: return true
+      case .projectTarget, .event, .newTask, .newProject, .reminder: return true
       // Get started steps read as tasks, so they ride a card like tasks.
       case .noticeStep: return true
       case .task(let task, _, _): return !task.isHeading
@@ -345,6 +349,9 @@ final class SeptaskKitTaskListController: NSViewController {
   /// `KitSidebarDestination` (not a bare `TaskFilter`) because Next is a
   /// sidebar destination without a filter of its own.
   var onNavigate: ((KitSidebarDestination) -> Void)?
+  /// The area page's "New Project" row was clicked (#706). The window routes
+  /// it to the sidebar, which creates, selects and renames in place.
+  var onNewProjectInArea: ((String) -> Void)?
   /// Tab pressed while the list holds focus — the window owns moving focus
   /// to the sidebar (see `focusList()`'s sibling, `focusSidebar()`).
   var onFocusSidebar: (() -> Void)?
@@ -1309,21 +1316,23 @@ final class SeptaskKitTaskListController: NSViewController {
           let areaProjects = snapshot.projects.filter {
             $0.area == areaID && $0.status == .active
           }
-          if !areaProjects.isEmpty {
-            let progress = projectProgress()
-            let openCounts = SeptaskKitSidebarController.showsCounts ? LocalCache.projectOpenCounts(in: context) : [:]
-            projectRows = [.header(id: "area-projects-\(areaID)",
-                                   title: String(localized: "Projects",
-                                                 comment: "SeptaskKit: area page section"),
-                                   icon: .symbol("folder"),
-                                   count: areaProjects.count)]
-              + areaProjects.map {
-                .projectTarget(id: $0.id,
-                               title: $0.title,
-                               progress: progress[$0.id] ?? 0,
-                               count: openCounts[$0.id] ?? 0)
-              }
-          }
+          // The block shows also when the area has no projects yet, so the
+          // "New Project" row at its foot is always there (#706).
+          let progress = areaProjects.isEmpty ? [:] : projectProgress()
+          let openCounts = SeptaskKitSidebarController.showsCounts && !areaProjects.isEmpty
+            ? LocalCache.projectOpenCounts(in: context) : [:]
+          projectRows = [.header(id: "area-projects-\(areaID)",
+                                 title: String(localized: "Projects",
+                                               comment: "SeptaskKit: area page section"),
+                                 icon: .symbol("folder"),
+                                 count: areaProjects.count)]
+            + areaProjects.map {
+              .projectTarget(id: $0.id,
+                             title: $0.title,
+                             progress: progress[$0.id] ?? 0,
+                             count: openCounts[$0.id] ?? 0)
+            }
+            + [.newProject(areaId: areaID)]
         }
         newRows = titleRows + notesRows + direct.map(unchipped)
           + projectRows
@@ -2074,7 +2083,7 @@ final class SeptaskKitTaskListController: NSViewController {
       case .task(let task, _, _):
         ids.insert(task.id)
       case .header, .loggedFooter, .fadedFooter,
-           .screenTitle, .logbookBar, .tagFilterBar, .projectTarget, .containerNotes,
+           .screenTitle, .logbookBar, .tagFilterBar, .projectTarget, .newProject, .containerNotes,
            .notice, .noticeStep, .doNotice, .event, .notesProposal:
         return ids
       }
@@ -4198,6 +4207,11 @@ final class SeptaskKitTaskListController: NSViewController {
       createTask(inInbox: true)
       return
     }
+    // Return on the area page's "New Project" line creates, as a click does.
+    if rows.indices.contains(row), case .newProject(let areaId) = rows[row] {
+      onNewProjectInArea?(areaId)
+      return
+    }
     // Return on a Get started step does the step.
     if rows.indices.contains(row), let step = rows[row].noticeStep {
       openNoticeStep(step.id)
@@ -5408,6 +5422,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
     // where the trigger row joins `keyboardOrderedTaskIds`. Every other
     // taskless row (headers, screen title, logged footer) stays unselectable.
     if case .newTask = rows[row] { return true }
+    if case .newProject = rows[row] { return true }
     // Get started steps are list rows too; the notice header above them is
     // not (it has no task and no step).
     if case .noticeStep = rows[row] { return true }
@@ -5471,7 +5486,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
     // its own section, not glued to the last task (mz, 2026-11-20).
     case .fadedFooter, .loggedFooter:
       return KitLoggedFooterCell.topGap + SeptenaTypeScale.size(.footnote) + 24
-    case .newTask: return SeptaskKitTheme.rowHeight
+    case .newTask, .newProject: return SeptaskKitTheme.rowHeight
     case .notesProposal(_, _, let currentNotes, let proposal):
       return KitNotesProposalLayout.height(
         currentNotes: currentNotes,
@@ -6128,7 +6143,16 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       let identifier = NSUserInterfaceItemIdentifier("newTaskCell")
       let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? KitNewTaskCell
         ?? KitNewTaskCell(identifier: identifier)
+      cell.configure(kind: .task)
       cell.onTap = { [weak self] in self?.createTask(inInbox: true) }
+      return cell
+
+    case .newProject(let areaId):
+      let identifier = NSUserInterfaceItemIdentifier("newProjectCell")
+      let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? KitNewTaskCell
+        ?? KitNewTaskCell(identifier: identifier)
+      cell.configure(kind: .project)
+      cell.onTap = { [weak self] in self?.onNewProjectInArea?(areaId) }
       return cell
 
     case .notesProposal(let isArea, let id, let currentNotes, let proposal):
@@ -7703,9 +7727,14 @@ final class KitLoggedFooterCell: NSTableCellView {
 /// reliably receives the click.
 @MainActor
 final class KitNewTaskCell: NSTableCellView {
+  /// What the line adds. `.project` is the area page's "New Project" line
+  /// (#706): a plus glyph in the checkbox column instead of the empty box.
+  enum Kind { case task, project }
+
   /// Keeps the overlay inside the content column — see `KitContentColumnPin`.
   private var hitPin: KitContentColumnPin!
   private let checkbox = KitCheckboxView()
+  private let plus = NSImageView()
   private let label = NSTextField(labelWithString: "")
   private let hit = NSButton()
   private var leadingConstraint: NSLayoutConstraint!
@@ -7736,6 +7765,13 @@ final class KitNewTaskCell: NSTableCellView {
     label.stringValue = title
     label.kitA11yIgnore()
 
+    plus.translatesAutoresizingMaskIntoConstraints = false
+    plus.image = NSImage(systemSymbolName: "plus", accessibilityDescription: nil)?
+      .withSymbolConfiguration(.init(pointSize: 13, weight: .medium))
+    plus.contentTintColor = SeptaskKitTheme.inkSecondary
+    plus.isHidden = true
+    plus.kitA11yIgnore()
+
     hit.translatesAutoresizingMaskIntoConstraints = false
     hit.isBordered = false
     hit.isTransparent = true
@@ -7746,6 +7782,7 @@ final class KitNewTaskCell: NSTableCellView {
     hit.action = #selector(fire)
 
     addSubview(checkbox)
+    addSubview(plus)
     addSubview(label)
     // Last, so it layers above the content and takes every click in the row.
     addSubview(hit)
@@ -7762,6 +7799,8 @@ final class KitNewTaskCell: NSTableCellView {
       checkbox.centerYAnchor.constraint(equalTo: centerYAnchor),
       checkbox.widthAnchor.constraint(equalToConstant: KitCheckboxView.tapSize),
       checkbox.heightAnchor.constraint(equalToConstant: KitCheckboxView.tapSize),
+      plus.centerXAnchor.constraint(equalTo: checkbox.centerXAnchor),
+      plus.centerYAnchor.constraint(equalTo: checkbox.centerYAnchor),
       label.leadingAnchor.constraint(equalTo: checkbox.trailingAnchor, constant: 7),
       label.centerYAnchor.constraint(equalTo: centerYAnchor),
       trailingConstraint,
@@ -7772,6 +7811,21 @@ final class KitNewTaskCell: NSTableCellView {
   }
 
   required init?(coder: NSCoder) { fatalError("KitNewTaskCell is code-only") }
+
+  func configure(kind: Kind) {
+    let title: String
+    switch kind {
+    case .task:
+      title = String(localized: "New task",
+                     comment: "Quick-add line at the foot of Today's Inbox")
+    case .project:
+      title = RegistryActions.title(.areaNewProject)
+    }
+    checkbox.isHidden = kind == .project
+    plus.isHidden = kind != .project
+    label.stringValue = title
+    kitA11yButton(label: title)
+  }
 
   /// Same centered-column inset the task rows and the card background use.
   override func layout() {

@@ -191,7 +191,7 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             val nextPosition = StructureOrder.nextAppendPosition(
                 projects.map { it.fields[RegistryEntityFields.Project.POSITION].numberValue() },
             )
-            graph.registryEntityMutator.create(
+            val created = graph.registryEntityMutator.create(
                 RegistryEntityNames.PROJECT,
                 linkedMapOf(
                     RegistryEntityFields.Project.TITLE to JsonValue.StringValue(trimmed),
@@ -201,6 +201,8 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                     RegistryEntityFields.Project.POSITION to JsonValue.IntegerValue(nextPosition),
                 ),
             )
+            // Recorded at the gesture, after the create lands: Undo removes the project.
+            graph.taskUndoHistory.recordCreatedEntity(created)
             true
         }
     }

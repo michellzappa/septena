@@ -307,7 +307,7 @@ fun TaskHomeScreen(
             if (result == SnackbarResult.ActionPerformed) {
                 val undone = runCatching {
                     withContext(Dispatchers.IO) {
-                        graph.taskUndoHistory.undo(graph.taskMutator, graph.conversationMutator)
+                        graph.taskUndoHistory.undo(graph.taskMutator, graph.conversationMutator, graph.registryEntityMutator)
                     }
                 }.getOrDefault(false)
                 if (undone) {
@@ -541,7 +541,7 @@ fun TaskHomeScreen(
                 shortcutScope.launch {
                     val undone = runCatching {
                         withContext(Dispatchers.IO) {
-                            graph.taskUndoHistory.undo(graph.taskMutator, graph.conversationMutator)
+                            graph.taskUndoHistory.undo(graph.taskMutator, graph.conversationMutator, graph.registryEntityMutator)
                         }
                     }.getOrDefault(false)
                     if (undone) {

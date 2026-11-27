@@ -22,6 +22,8 @@ class TaskUndoHistory {
         data object RestoreDeleted : UndoOperation
         data object DeleteRestored : UndoOperation
         data object DeleteCreated : UndoOperation
+        /** A non-task row the gesture created (a project from the area page, #706). */
+        data class DeleteCreatedEntity(val entity: String) : UndoOperation
     }
 
     /** One task around a gesture's write, with its conversation when the gesture may change that too. */
@@ -76,6 +78,12 @@ class TaskUndoHistory {
     suspend fun recordCreated(task: SyncRecord) {
         if (task.entity != RegistryEntityNames.TASK || task.deletedAt != null) return
         record(Entry(listOf(Step(taskId = task.id, operation = UndoOperation.DeleteCreated))))
+    }
+
+    /** Called after a user gesture creates a non-task row (a project), so Undo can remove it. */
+    suspend fun recordCreatedEntity(created: SyncRecord) {
+        if (created.entity == RegistryEntityNames.TASK || created.deletedAt != null) return
+        record(Entry(listOf(Step(taskId = created.id, operation = UndoOperation.DeleteCreatedEntity(created.entity)))))
     }
 
     private fun step(before: SyncRecord?, after: SyncRecord?): Step? {
@@ -149,6 +157,7 @@ class TaskUndoHistory {
     suspend fun undo(
         mutator: TaskMutator,
         conversationMutator: ConversationMutator? = null,
+        entityMutator: RegistryEntityMutator? = null,
     ): Boolean = mutex.withLock {
         val entry = entries.lastOrNull() ?: return@withLock false
         var undone = false
@@ -161,6 +170,9 @@ class TaskUndoHistory {
                 UndoOperation.RestoreDeleted -> mutator.restore(step.taskId) != null
                 UndoOperation.DeleteRestored,
                 UndoOperation.DeleteCreated -> mutator.delete(step.taskId) != null
+                is UndoOperation.DeleteCreatedEntity -> runCatching {
+                    entityMutator?.delete(operation.entity, step.taskId) != null
+                }.getOrDefault(false)
             }
             undone = undone || replayed
         }

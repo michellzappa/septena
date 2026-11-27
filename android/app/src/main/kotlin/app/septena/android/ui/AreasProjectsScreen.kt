@@ -60,6 +60,7 @@ import app.septena.core.generated.RegistryTaskAttributeIds
 import app.septena.core.stringValue
 import app.septena.ui.ChevronRightGlyph
 import app.septena.ui.MoreDotsGlyph
+import app.septena.ui.PlusGlyph
 import app.septena.ui.ProjectProgressRingGlyph
 import app.septena.ui.TaskCardMetrics
 import app.septena.ui.TaskCardPosition
@@ -395,7 +396,7 @@ fun AreasProjectsScreen(
                                 onDrop = { ids -> viewModel.moveTasksToProject(ids, project.id) },
                             )
                             TaskCardSlice(
-                                position = cardPosition(index, state.projects.size),
+                                position = cardPosition(index, state.projects.size + 1),
                                 isSelected = isDropTargeted,
                                 isDark = isDark,
                                 hasActiveTexture = hasActiveTexture,
@@ -443,6 +444,43 @@ fun AreasProjectsScreen(
                                         size = 13.dp,
                                     )
                                 }
+                            }
+                        }
+                    }
+                    // Foot of the project card: the "New Project" add line (#706), also when
+                    // the area has no projects yet. Same create as the ⋯ menu item.
+                    item(key = "area-new-project") {
+                        val newProjectTitle = actionTitle(RegistryActionIds.AREA_NEW_PROJECT, languageTag)
+                        TaskCardSlice(
+                            position = cardPosition(state.projects.size, state.projects.size + 1),
+                            isSelected = false,
+                            isDark = isDark,
+                            hasActiveTexture = hasActiveTexture,
+                            modifier = taskListMotion(),
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(TaskCardMetrics.IconTextGap),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable(onClickLabel = newProjectTitle) { dialog = PlacesDialog.CreateProject }
+                                    .padding(horizontal = TaskCardMetrics.ContentInset, vertical = 11.dp),
+                            ) {
+                                Box(
+                                    contentAlignment = Alignment.Center,
+                                    modifier = Modifier.width(TaskCardMetrics.LeadingColumnWidth),
+                                ) {
+                                    PlusGlyph(tint = mutedInk, size = 15.dp)
+                                }
+                                Text(
+                                    text = newProjectTitle,
+                                    fontSize = 16.sp,
+                                    lineHeight = 20.sp,
+                                    color = mutedInk,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f),
+                                )
                             }
                         }
                     }

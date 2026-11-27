@@ -1598,16 +1598,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
   }
 
   private func recordProjectCreate(_ project: Project) {
-    let mutator = projectsMutator
-    recordStructure(
-      name: RegistryActions.title(.sidebarNewProject),
-      undo: { Task { try? await mutator.delete(id: project.id) } },
-      redo: {
-        Task {
-          _ = try? await mutator.createWithExplicitID(id: project.id, title: project.title,
-                                                      area: project.area)
-        }
-      })
+    TaskUndo.recordProjectCreate(project, projects: projectsMutator)
   }
 
   @objc private func newProjectLoose() { newProject(inArea: nil, atIndex: nil) }
@@ -1641,6 +1632,10 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
   }
 
   @objc func newProject() { newProject(inArea: selectedAreaID, atIndex: nil) }
+
+  /// The area page's "New Project" row (#706): the same create, select and
+  /// rename-in-place the sidebar's own New Project does.
+  func newProject(inArea areaId: String) { newProject(inArea: areaId, atIndex: nil) }
 
   private func newProject(inArea areaId: String?, atIndex index: Int?) {
     if let areaId { setCollapsed(false, forKey: "area:\(areaId)") }

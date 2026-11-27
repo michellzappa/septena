@@ -110,6 +110,10 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     // Same path Quick Find uses: steer the sidebar, which drives the list —
     // so a group-header click always leaves the two in agreement.
     list.onNavigate = { [weak sidebar] destination in sidebar?.select(destination) }
+    // The area page's "New Project" row creates through the sidebar, so the
+    // new project is selected and renamed in place there, as the sidebar's
+    // own New Project does.
+    list.onNewProjectInArea = { [weak sidebar] areaId in sidebar?.newProject(inArea: areaId) }
 
     let window = KitShellWindow(contentViewController: split)
     window.title = String(localized: "Septena",

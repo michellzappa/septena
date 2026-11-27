@@ -3719,6 +3719,23 @@ export function SeptenaApp() {
               </button>
             )}
 
+            {/* Area page: a visible New Project (#706). Same creator as the sidebar's. */}
+            {destination.kind === "area" && (
+              <button
+                type="button"
+                onClick={() => {
+                  setCreatingAreaId(destination.id);
+                  setCreatingInsertIndex(null);
+                  setNewContainerTitle("");
+                  setCreatingKind("project");
+                }}
+                className="inline-flex items-center gap-1 rounded-lg bg-[var(--bg-hover)] px-2.5 py-1 font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              >
+                <Plus className="h-3 w-3" />
+                {registryText(ACTIONS_CATALOG.actions["area.newProject"].title, prefs.language)}
+              </button>
+            )}
+
             {destination.kind === "project" && (
               <button
                 type="button"

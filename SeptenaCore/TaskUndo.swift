@@ -691,6 +691,20 @@ enum TaskUndo {
            })
   }
 
+  /// Undo for a new project deletes it. Redo re-creates it under the SAME id,
+  /// so anything later filed into it (and later undo steps) still resolve.
+  /// Call AFTER the create lands, at the user gesture.
+  static func recordProjectCreate(_ project: Project, projects: ProjectsMutator) {
+    record(name: RegistryActions.title(.sidebarNewProject),
+           undo: { Task { @MainActor in try? await projects.delete(id: project.id) } },
+           redo: {
+             Task { @MainActor in
+               _ = try? await projects.createWithExplicitID(id: project.id, title: project.title,
+                                                            area: project.area)
+             }
+           })
+  }
+
   /// What an area delete takes away: the area row, each of its projects (as
   /// a project delete takes it) and every task filed directly in the area.
   /// Capture BEFORE the delete.
