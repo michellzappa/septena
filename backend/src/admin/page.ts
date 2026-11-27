@@ -34,7 +34,7 @@ export const PAGE_HEADERS = {
   "Cache-Control": "no-store",
   "Referrer-Policy": "same-origin",
   "X-Robots-Tag": "noindex, nofollow",
-  "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; frame-src https://plausible.io; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
+  "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; img-src https://septena.app; frame-src https://plausible.io; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
 };
 
 export interface AdminView {
@@ -57,10 +57,10 @@ export interface AdminView {
 
 const CSS = `
   :root { color-scheme: light dark;
-    --bg: #faf9f7; --card: #fff; --line: #e8e5e0; --text: #26231f; --dim: #74706a; --ok: #1d7a3d; --bad: #c0392b;
+    --bg: #faf9f7; --card: #fff; --line: #e8e5e0; --text: #26231f; --dim: #74706a; --bad: #c0392b;
     --accent: ${BRAND.light}; --accent-soft: color-mix(in oklab, var(--accent) 12%, transparent); }
   @media (prefers-color-scheme: dark) { :root {
-    --bg: #1b1a18; --card: #24221f; --line: #34312d; --text: #f4f2ee; --dim: #a29d96; --ok: #57c77d; --bad: #ff6b5e;
+    --bg: #1b1a18; --card: #24221f; --line: #34312d; --text: #f4f2ee; --dim: #a29d96; --bad: #ff6b5e;
     --accent: ${BRAND.dark}; } }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 -apple-system, BlinkMacSystemFont, system-ui, sans-serif; }
@@ -69,7 +69,7 @@ const CSS = `
   .top .in { max-width: 1180px; margin: 0 auto; padding: 12px 16px 0; }
   .brand { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
   .brand h1 { font-size: 17px; margin: 0; display: flex; gap: 8px; align-items: center; }
-  .mark { width: 18px; height: 18px; border-radius: 6px; background: var(--accent); display: inline-block; }
+  .mark { width: 22px; height: 22px; display: block; }
   .who { display: flex; gap: 10px; align-items: center; }
   .tabs { display: flex; gap: 4px; overflow-x: auto; margin-top: 8px; }
   .tabs a { color: var(--dim); padding: 8px 10px; border-bottom: 2px solid transparent; white-space: nowrap; font-weight: 500; }
@@ -81,7 +81,7 @@ const CSS = `
   .card > header { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }
   .card > header p { margin: 0; }
   .bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
-  .dim { color: var(--dim); } .ok { color: var(--ok); } .warn { color: var(--bad); }
+  .dim { color: var(--dim); } .ok { color: var(--accent); font-weight: 600; } .warn { color: var(--bad); }
   .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
   .tile { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
   .tile b { display: block; font-size: 20px; font-variant-numeric: tabular-nums; }
@@ -102,12 +102,16 @@ const CSS = `
   .note.warn { border-left-color: var(--bad); background: color-mix(in oklab, var(--bad) 10%, transparent); color: var(--text); }
   .cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
   .cols > div > b { display: block; margin-bottom: 4px; }
+  .blist h3 { margin: 0 0 6px; } .blist ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
+  .blist li { position: relative; display: flex; justify-content: space-between; gap: 10px; padding: 5px 8px; border-radius: 6px; overflow: hidden; }
+  .bfill { position: absolute; inset: 0 auto 0 0; background: color-mix(in oklab, var(--accent) 18%, transparent); border-radius: 6px; }
+  .bname, .bn { position: relative; } .bname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bn { font-variant-numeric: tabular-nums; white-space: nowrap; }
   .kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px; }
   .kpi { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: grid; gap: 2px; }
   .kpi b { font-size: 26px; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
   .kpi svg { width: 100%; height: 30px; color: var(--accent); }
-  .delta { font-size: 12px; font-variant-numeric: tabular-nums; } .up { color: var(--ok); } .down { color: var(--bad); }
-  .funnel td.bar { width: 45%; } .meter { height: 8px; border-radius: 4px; background: var(--accent); min-width: 2px; }
+  .delta { font-size: 12px; font-variant-numeric: tabular-nums; } .up { color: var(--accent); } .down { color: var(--dim); }
   .chart { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
   .chart svg { width: 100%; height: 90px; color: var(--accent); display: block; margin-top: 6px; }
   .chart rect:hover { opacity: .7; }
@@ -181,8 +185,7 @@ function linkRow(l: PlusLink, uses: PlusLinkUse[]): string {
     <td><span class="${state === "open" ? "ok" : "dim"}">${state}</span></td><td>${day(l.createdAt)}</td><td>${people}</td><td>${close}${revoke}</td></tr>`;
 }
 
-const counts = (title: string, rows: { name: string; n: number }[]) =>
-  `<div><b>${esc(title)}</b>${rows.map((r) => `<div>${esc(String(r.name))} <span class="dim">${r.n}</span></div>`).join("") || '<div class="dim">none</div>'}</div>`;
+const counts = (title: string, rows: { name: string; n: number }[]) => tallyList(title, rows);
 
 const signupTable = (rows: SignupRow[]) => table(["Email", "List", "Screens", "Task apps", "AI", "Page", "Date"], rows.map((r) =>
   `<tr>${[r.email, r.list, r.platforms, r.tools, r.agents, r.source, r.created_at.slice(0, 10)].map((x) => `<td>${esc(x.replace(/[[\]"]/g, ""))}</td>`).join("")}</tr>`), "No signups.");
@@ -220,8 +223,9 @@ function bars(values: number[], days: string[], unit: string): string {
 
 const deltaText = (abs: number | null, rel: number | null, label: string) => {
   if (abs === null) return `<span class="delta dim">no history yet</span>`;
+  // Direction is the arrow; the accent marks growth, a drop stays quiet.
   const cls = abs > 0 ? "up" : abs < 0 ? "down" : "dim";
-  return `<span class="delta ${cls}">${abs > 0 ? "+" : ""}${fmt(abs)}${rel === null ? "" : ` (${rel > 0 ? "+" : ""}${pct(rel)})`} ${esc(label)}</span>`;
+  return `<span class="delta ${cls}">${abs > 0 ? "▲ +" : abs < 0 ? "▼ " : ""}${fmt(abs)}${rel === null ? "" : ` (${rel > 0 ? "+" : ""}${pct(rel)})`} ${esc(label)}</span>`;
 };
 
 /// A headline number with its change against 7 days before and a 30-day line.
@@ -230,19 +234,23 @@ function kpi(label: string, value: number | string, series: (number | null)[], d
   return `<div class="kpi"><span class="dim">${esc(label)}</span><b>${esc(typeof value === "number" ? fmt(value) : value)}</b>${deltaText(c.abs, c.rel, c.label)}${sparkline(series, days)}</div>`;
 }
 
-function funnel(title: string, steps: { name: string; n: number; note?: string }[]): string {
-  const top = Math.max(1, steps[0]?.n ?? 0);
-  const rows = steps.map((s, i) => {
-    const prev = i === 0 ? null : steps[i - 1].n;
-    return `<tr><td>${esc(s.name)}${s.note ? `<div class="dim">${esc(s.note)}</div>` : ""}</td><td class="n">${fmt(s.n)}</td>
-      <td class="n dim">${prev === null ? "" : pct(ratio(s.n, prev))}</td>
-      <td class="bar"><div class="meter" style="width:${Math.min(100, (s.n / top) * 100).toFixed(1)}%"></div></td></tr>`;
-  });
-  return `<div><h3 style="margin-top:0">${esc(title)}</h3>${table(["Step", "Count", "Of step before", ""], rows, "No data.").replace('class="scroll"', 'class="scroll funnel"')}</div>`;
+/// A funnel as a plain table: one line per step, no notes, no bars.
+function funnel(title: string, steps: { name: string; n: number }[]): string {
+  const first = steps[0]?.n ?? 0;
+  const rows = steps.map((s, i) => `<tr><td>${esc(s.name)}</td><td class="n">${fmt(s.n)}</td>
+      <td class="n">${i === 0 ? "" : pct(ratio(s.n, steps[i - 1].n))}</td><td class="n dim">${i === 0 ? "" : pct(ratio(s.n, first))}</td></tr>`);
+  return `<div><h3 style="margin-top:0">${esc(title)}</h3>${table(["Step", "Count", "Of step before", "Of first step"], rows, "No data.")}</div>`;
 }
 
-const tallyList = (title: string, rows: (Tally | TrafficRow)[], unit = "") =>
-  `<div><b>${esc(title)}</b>${rows.slice(0, 12).map((r) => `<div>${esc(String(r.name))} <span class="dim">${fmt("visitors" in r ? r.visitors : r.n)}${unit}</span></div>`).join("") || '<div class="dim">none</div>'}</div>`;
+/// A ranked list: one line per row, a bar behind it in the accent, the count
+/// and its share on the right. Plausible draws its breakdowns the same way.
+const tallyList = (title: string, rows: (Tally | TrafficRow)[], unit = "") => {
+  const top = rows.slice(0, 10).map((r) => ({ name: String(r.name), n: "visitors" in r ? r.visitors : r.n }));
+  const max = Math.max(1, ...top.map((r) => r.n));
+  const sum = rows.reduce((t, r) => t + ("visitors" in r ? r.visitors : r.n), 0);
+  const items = top.map((r) => `<li><span class="bfill" style="width:${((r.n / max) * 100).toFixed(1)}%"></span><span class="bname">${esc(r.name)}</span><span class="bn">${fmt(r.n)}${esc(unit)}<span class="dim"> ${pct(ratio(r.n, sum))}</span></span></li>`).join("");
+  return `<div class="blist"><h3>${esc(title)}</h3>${items ? `<ol>${items}</ol>` : '<p class="dim">None yet.</p>'}</div>`;
+}
 
 const duration = (s: number) => (s >= 60 ? `${Math.floor(s / 60)}m ${Math.round(s % 60)}s` : `${Math.round(s)}s`);
 
@@ -276,7 +284,7 @@ function websiteSection(t: TrafficResult, signupsByDay: Map<string, number>): st
   <h3>Calls to action, 30 days</h3>
   ${table(["Goal", "Visitors", "Events", "Conversion"], goalRows, "No goals counted.")}
   ${v.missingGoals.length ? `<p class="dim">No events in 30 days: ${esc(v.missingGoals.join(", "))}. Plausible leaves a goal out when it has no events, so a goal that stays here may also be missing in Plausible ▸ Goals.</p>` : ""}
-  <h3>Where they come from</h3><div class="cols">${tallyList("Sources", v.sources)}${tallyList("Pages", v.pages)}${tallyList("Countries", v.countries)}${tallyList("Download clicks by platform", v.downloads)}${tallyList("List-keeper CTA by placement", v.ctaPlacements)}</div>
+  <div class="grid2" style="margin-top:18px">${tallyList("Sources", v.sources)}${tallyList("Pages", v.pages)}</div><div class="cols" style="margin-top:18px">${tallyList("Countries", v.countries)}${tallyList("Download clicks by platform", v.downloads)}${tallyList("List-keeper CTA by placement", v.ctaPlacements)}</div>
   <p class="dim" style="margin-bottom:0">From Plausible, ${esc(v.site)}, ${esc(when(v.fetchedAt, Date.now()))}; cached for 10 minutes. <a href="https://plausible.io/${esc(v.site)}">Open Plausible</a></p>`;
 }
 
@@ -323,12 +331,12 @@ function funnelsSection(v: AdminView): string {
   return `<div class="grid2">
     ${funnel("Website, last 30 days", traffic ? [
       { name: "Visitors", n: traffic.totals.visitors },
-      { name: "Left an email", n: traffic.goals.find((g) => g.name === "Signup")?.visitors ?? 0, note: "Plausible goal Signup" },
+      { name: "Left an email", n: traffic.goals.find((g) => g.name === "Signup")?.visitors ?? 0 },
       { name: "Clicked a download", n: traffic.goals.find((g) => g.name === "Download click")?.visitors ?? 0 },
-    ] : [{ name: "Visitors", n: 0, note: "needs a Plausible Stats API key" }])}
+    ] : [{ name: "Visitors (Plausible not connected)", n: 0 }])}
     ${funnel("Product, every account", [
       { name: "Accounts", n: o.accounts },
-      { name: "Activated", n: o.activated, note: "completed a task" },
+      { name: "Activated (completed a task)", n: o.activated },
       { name: "Two or more devices", n: o.twoDevices },
       { name: "Connected an agent", n: o.withAgent },
       { name: "Started a trial", n: o.trialsStarted },
@@ -348,9 +356,8 @@ function retentionSection(v: AdminView): string {
 
 function clientsSection(v: AdminView): string {
   const mix = clientMix(v.accounts, v.now);
-  const mac = v.releases === null ? `<div><b>Mac downloads</b><div class="warn">GitHub does not answer</div></div>`
-    : `<div><b>Mac downloads</b>${v.releases.map((r) => `<div>${esc(r.tag)} <span class="dim">${fmt(r.installs)} downloads, ${fmt(r.appcast)} update checks</span></div>`).join("") || '<div class="dim">no releases</div>'}
-      <div class="dim">${fmt(v.releases.reduce((n, r) => n + r.installs, 0))} in all</div></div>`;
+  const mac = v.releases === null ? `<div class="blist"><h3>Mac downloads</h3><p class="warn">GitHub does not answer.</p></div>`
+    : tallyList("Mac downloads by release", v.releases.map((r) => ({ name: r.tag, n: r.installs })));
   return `<div class="cols">${tallyList("Devices, 30 days", mix.platforms)}${tallyList("Versions, 30 days", mix.versions)}${tallyList("Agents", agentMix(v.accounts), " accounts")}${tallyList("Sign-in", providerMix(v.accounts), " accounts")}${mac}</div>
   <p class="dim">Store installs and revenue come with RevenueCat (#644, #645).</p>`;
 }
@@ -367,7 +374,7 @@ function shell(page: AdminPage, v: AdminView, body: string): string {
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>${esc(title)} · Septena admin</title><style>${CSS}</style></head>
 <body>
 <div class="top"><div class="in">
-  <div class="brand"><h1><span class="mark" aria-hidden="true"></span>Septena admin</h1>
+  <div class="brand"><h1><img class="mark" src="https://septena.app/icon.svg" alt="" width="22" height="22">Septena admin</h1>
     <div class="who"><span class="dim">${esc(v.admin)}</span>
     <form method="post" action="/admin/refresh"><input type="hidden" name="back" value="${esc(page)}"><button>Refresh counts</button></form></div></div>
   <nav class="tabs" aria-label="Admin pages">${tabs}</nav>
