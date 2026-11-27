@@ -344,6 +344,12 @@
       "destinations.destinations.agent.title"
     ]
   },
+  "Agent comments": {
+    "text": "Agent comments",
+    "paths": [
+      "settings.pages.agents.sections.notifications.items.0.label"
+    ]
+  },
   "Agent connected. Go back to your browser to finish.": {
     "text": "Agent connected. Go back to your browser to finish.",
     "paths": [
@@ -744,6 +750,12 @@
     "text": "Choose a plan",
     "paths": [
       "plans.paywall.choosePlan"
+    ]
+  },
+  "Choose when agent comments notify you. You can override this for any connected agent below.": {
+    "text": "Choose when agent comments notify you. You can override this for any connected agent below.",
+    "paths": [
+      "settings.pages.agents.sections.notifications.footer"
     ]
   },
   "Choose which lists you see and their order.": {
@@ -1149,6 +1161,12 @@
       "plans.upsells.connector_cap.title"
     ]
   },
+  "Daily digest": {
+    "text": "Daily digest",
+    "paths": [
+      "settings.keys.agentCommentNotifications.options.2.title"
+    ]
+  },
   "Dark": {
     "text": "Dark",
     "paths": [
@@ -1542,6 +1560,12 @@
     "text": "Error",
     "paths": [
       "surfaces.prompts.error.title"
+    ]
+  },
+  "Every comment": {
+    "text": "Every comment",
+    "paths": [
+      "settings.keys.agentCommentNotifications.options.0.title"
     ]
   },
   "Every device, a year of history and shared projects.": {
@@ -2542,6 +2566,12 @@
       "surfaces.prompts.text.nameAgent.title"
     ]
   },
+  "Needs my answer or approval": {
+    "text": "Needs my answer or approval",
+    "paths": [
+      "settings.keys.agentCommentNotifications.options.1.title"
+    ]
+  },
   "New Agent Key": {
     "text": "New Agent Key",
     "paths": [
@@ -2669,6 +2699,12 @@
     "text": "No messages yet.",
     "paths": [
       "surfaces.support.copy.noMessages.label"
+    ]
+  },
+  "No notifications": {
+    "text": "No notifications",
+    "paths": [
+      "settings.keys.agentCommentNotifications.options.3.title"
     ]
   },
   "No open tasks in this area yet.": {
@@ -2813,7 +2849,9 @@
   "Notifications": {
     "text": "Notifications",
     "paths": [
-      "settings.pages.general.sections.notifications.header"
+      "settings.copy.access_agents.notificationsLabel.label",
+      "settings.pages.general.sections.notifications.header",
+      "settings.pages.agents.sections.notifications.header"
     ]
   },
   "OK": {
@@ -4907,6 +4945,12 @@
     "text": "Use a different email",
     "paths": [
       "signIn.email.differentEmail"
+    ]
+  },
+  "Use default": {
+    "text": "Use default",
+    "paths": [
+      "settings.copy.access_agents.notificationsDefault.label"
     ]
   },
   "Use my Claude": {
