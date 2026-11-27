@@ -124,6 +124,18 @@
       "linux": "planned",
       "watchos": "not_applicable"
     },
+    "lists.sort": {
+      "title": "Sort By",
+      "agent": "none",
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "ships",
+      "android": "ships",
+      "windows": "planned",
+      "linux": "planned",
+      "watchos": "not_applicable"
+    },
     "lists.repeating": {
       "title": "Repeating",
       "agent": "none",

@@ -1678,6 +1678,13 @@
       "back": "Back"
     }
   },
+  "listSort": {
+    "id": "listSort",
+    "featureId": "lists.sort",
+    "menuTitle": "Sort By",
+    "icon": "action.sort",
+    "sortedBy": "Sorted by {sort}"
+  },
   "fadeSweep": {
     "id": "fadeSweep",
     "featureId": "fade.sweep",

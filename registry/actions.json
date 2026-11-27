@@ -704,6 +704,14 @@
         { "kind": "divider" },
         {
           "kind": "submenu",
+          "id": "sortBy",
+          "title": "Sort By",
+          "icon": "action.sort",
+          "items": [{ "kind": "slot", "slot": "listSortOptions" }]
+        },
+        { "kind": "divider" },
+        {
+          "kind": "submenu",
           "id": "textSize",
           "title": "Text Size",
           "icon": "action.text_size",

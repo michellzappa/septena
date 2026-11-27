@@ -151,6 +151,7 @@
     "notice.weekly_sweep": { "sfSymbol": "circle.dashed", "material": "blur_circular", "lucide": "circle-dashed" },
     "action.text_size": { "sfSymbol": "textformat.size", "material": "format_size", "lucide": "a-large-small" },
     "action.window": { "sfSymbol": "macwindow", "material": "web_asset", "lucide": "app-window" },
-    "action.sidebar_counts": { "sfSymbol": "number", "material": "numbers", "lucide": "hash" }
+    "action.sidebar_counts": { "sfSymbol": "number", "material": "numbers", "lucide": "hash" },
+    "action.sort": { "sfSymbol": "arrow.up.arrow.down", "material": "swap_vert", "lucide": "arrow-up-down" }
   }
 }

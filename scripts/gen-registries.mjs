@@ -552,6 +552,11 @@ function validateFirstRun(surfaces, icons, caps, settings) {
 function validateSurfaces(surfaces, icons, caps, plans) {
   assert(surfaces.version === 1, "surfaces.json: version must be 1");
   assert(surfaces.notices.maxConcurrentExplainers === 1, "surfaces.json: maxConcurrentExplainers must be 1");
+  const ls = surfaces.listSort;
+  assert(ls && ls.icon in icons.icons, "surfaces.json: listSort missing or unknown icon");
+  assert(ls.featureId in caps.capabilities, `surfaces.json: listSort unknown featureId "${ls.featureId}"`);
+  assert(typeof ls.menuTitle === "string" && ls.menuTitle.length > 0, "surfaces.json: listSort.menuTitle missing");
+  assert(typeof ls.sortedBy === "string" && ls.sortedBy.includes("{sort}"), "surfaces.json: listSort.sortedBy must contain {sort}");
   const upsellIds = new Set(plans.upsells.map((u) => u.id));
   for (const n of surfaces.notices.items) {
     assert(n.icon in icons.icons, `surfaces.json: notice ${n.id} unknown icon "${n.icon}"`);
@@ -1943,6 +1948,12 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push(`  static let quickFindEmptyTitle: String = ${L(qf.emptyState.title, qf.emptyState, "title")}`);
   lines.push(`  static let quickFindEmptyDetail: String = ${L(qf.emptyState.detail, qf.emptyState, "detail")}`);
   lines.push(`  static let quickFindCompletedLabel: String = ${L(qf.completed.label, qf.completed, "label")}`);
+  const ls = surfaces.listSort;
+  lines.push("  /// Sort By copy (`surfaces.json` `listSort`, docs/LIST_SORT_SPEC.md).");
+  lines.push(`  static let listSortMenuTitle: String = ${L(ls.menuTitle, ls, "menuTitle")}`);
+  lines.push(`  static let listSortSymbol: String = ${swiftStr(icons.icons[ls.icon].sfSymbol)}`);
+  lines.push("  /// \"Sorted by {sort}\": the list header line when the sort is not Manual.");
+  lines.push(tmplFn("listSortSortedBy", tmplKey(ls.sortedBy, ls, "sortedBy")));
   lines.push("  /// The block of `kind`. Each kind appears exactly once (the generator checks it).");
   lines.push("  static func taskPageBlock(_ kind: RegistryTaskPageBlockKind) -> RegistryTaskPageBlock {");
   lines.push("    guard let b = taskPageBlocks.first(where: { $0.kind == kind }) else { preconditionFailure(\"no task page block \\(kind)\") }");
@@ -2528,7 +2539,7 @@ function generateTS({ entities, rules, icons, tokens, caps, settings, dests, act
   lines.push(`export const DESIGN_TOKENS = ${JSON.stringify({ accentPolicy: tokens.accentPolicy, fruitAccents: tokens.fruitAccents ?? [], textures: tokens.textures ?? [], selection: tokens.selection, colors: tokens.colors, multicolorGlyphs: tokens.multicolorGlyphs?.glyphs ?? {}, accentPalette: tokens.accentPalette, radii: tokens.radii, spacing: tokens.spacing, desktopColumn: tokens.desktopColumn, textScale: tokens.textScale })} as const;`);
   lines.push(`export const CAPABILITIES = ${JSON.stringify(caps.capabilities)} as const;`);
   lines.push(`export const ACTIONS_CATALOG = ${JSON.stringify({ actions: actions.actions, contextMenus: actions.contextMenus, menuBar: actions.menuBar, shortcutsSheet: actions.shortcutsSheet })} as const;`);
-  lines.push(`export const SURFACES_CATALOG = ${JSON.stringify({ notices: surfaces.notices, prompts: surfaces.prompts, toasts: surfaces.toasts, taskAttributes: surfaces.taskAttributes, taskDateBoard: surfaces.taskDateBoard, taskPage: surfaces.taskPage, waiting: surfaces.waiting, sharing: surfaces.sharing, accountSwitch: surfaces.accountSwitch, deviceSignIn: surfaces.deviceSignIn, quickFind: surfaces.quickFind, support: surfaces.support })} as const;`);
+  lines.push(`export const SURFACES_CATALOG = ${JSON.stringify({ notices: surfaces.notices, prompts: surfaces.prompts, toasts: surfaces.toasts, taskAttributes: surfaces.taskAttributes, taskDateBoard: surfaces.taskDateBoard, taskPage: surfaces.taskPage, waiting: surfaces.waiting, sharing: surfaces.sharing, accountSwitch: surfaces.accountSwitch, deviceSignIn: surfaces.deviceSignIn, quickFind: surfaces.quickFind, listSort: surfaces.listSort, support: surfaces.support })} as const;`);
   lines.push(`export const FIRST_RUN = ${JSON.stringify(surfaces.firstRun)} as const;`);
   lines.push("/** Plan limits (registry/plans.json). The server's plan table: every gate reads these, never a plan name. */");
   lines.push(`export const PLAN_LIMITS = ${JSON.stringify(plans.limits)} as const;`);

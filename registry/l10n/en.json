@@ -1188,6 +1188,12 @@
       "plans.outcomes.agents.rows.share.cells.pro"
     ]
   },
+  "Created": {
+    "text": "Created",
+    "paths": [
+      "settings.keys.listSort.options.4.title"
+    ]
+  },
   "Created from {name}": {
     "text": "Created from {name}",
     "placeholders": [
@@ -1224,6 +1230,7 @@
   "Deadline": {
     "text": "Deadline",
     "paths": [
+      "settings.keys.listSort.options.2.title",
       "surfaces.taskAttributes.deadline.label"
     ]
   },
@@ -2381,6 +2388,12 @@
     "text": "Manage Subscription",
     "paths": [
       "plans.actions.manage"
+    ]
+  },
+  "Manual": {
+    "text": "Manual",
+    "paths": [
+      "settings.keys.listSort.options.0.title"
     ]
   },
   "Mark Done": {
@@ -4315,6 +4328,22 @@
       "settings.copy.ai_explainer.intro.label"
     ]
   },
+  "Sort By": {
+    "text": "Sort By",
+    "paths": [
+      "actions.menuBar.view.items.sortBy.title",
+      "surfaces.listSort.menuTitle"
+    ]
+  },
+  "Sorted by {sort}": {
+    "text": "Sorted by {sort}",
+    "placeholders": [
+      "sort"
+    ],
+    "paths": [
+      "surfaces.listSort.sortedBy"
+    ]
+  },
   "Spreadsheet-friendly table of tasks": {
     "text": "Spreadsheet-friendly table of tasks",
     "paths": [
@@ -4840,6 +4869,7 @@
   "Title": {
     "text": "Title",
     "paths": [
+      "settings.keys.listSort.options.3.title",
       "surfaces.taskDetail.fields.title"
     ]
   },
@@ -5163,6 +5193,7 @@
   "When": {
     "text": "When",
     "paths": [
+      "settings.keys.listSort.options.1.title",
       "surfaces.taskAttributes.when.label"
     ]
   },

@@ -166,6 +166,25 @@
       "platforms": ["ios", "ipados", "macos", "web", "android", "windows", "linux"],
       "featureId": "settings.display"
     },
+    "listSort": {
+      "scope": "synced",
+      "storageKey": "septena.lists.sort",
+      "type": "record",
+      "maxEntries": 256,
+      "keyMaxLength": 64,
+      "enum": "listSort",
+      "default": {},
+      "options": [
+        { "value": "manual", "title": "Manual" },
+        { "value": "when", "title": "When" },
+        { "value": "deadline", "title": "Deadline" },
+        { "value": "title", "title": "Title" },
+        { "value": "created", "title": "Created" }
+      ],
+      "ui": false,
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows", "linux"],
+      "featureId": "lists.sort"
+    },
     "appearanceMode": {
       "scope": "device",
       "storageKey": "septena.appearance.mode",

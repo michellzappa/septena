@@ -125,6 +125,11 @@ export const SETTING_VALUES = {
   /// Per-account sidebar section overrides ("top" | "bottom") keyed by smart-list ID.
   smartListPlacement: z.record(z.string().max(64), z.enum(["top", "bottom"]))
     .refine((r) => Object.keys(r).length <= 32, "too many smart list placement overrides"),
+  /// Per-account Sort By choice keyed by list ("today", "anytime",
+  /// "project:<id>", "area:<id>"). Manual is the absence of a key
+  /// (docs/LIST_SORT_SPEC.md §5).
+  listSort: z.record(z.string().max(64), z.enum(ENTITY_ENUMS.listSort).exclude(["manual"]))
+    .refine((r) => Object.keys(r).length <= 256, "too many list sort entries"),
 } satisfies Record<string, z.ZodTypeAny>;
 
 export type SettingKey = keyof typeof SETTING_VALUES;
