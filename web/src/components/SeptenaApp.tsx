@@ -50,6 +50,7 @@ import {
   BADGE_GROUP_IDS,
   destinationGroups,
   destinationInfo,
+  newTaskTargetOf,
   reviewGroupOf,
   type SidebarDestination,
 } from "@/lib/destinations";
@@ -1916,6 +1917,27 @@ export function SeptenaApp() {
     [draggedTaskId, engine, showToast, syncState.snapshot.tasks],
   );
 
+  // New task from the open list, routed by registry newTaskTarget (iOS triggerInlineNewTask):
+  // "here" and "tomorrow" focus this list's add field (Upcoming's add field schedules tomorrow);
+  // "today" opens Today and focuses the add field there once Today has rendered.
+  const newTaskTarget = newTaskTargetOf(destination);
+  const [pendingTodayNewTask, setPendingTodayNewTask] = useState(false);
+  const startNewTask = useCallback(() => {
+    if (newTaskTarget === "today" && !(destination.kind === "smart" && destination.id === "today")) {
+      setPendingTodayNewTask(true);
+      navigateTo({ kind: "smart", id: "today" });
+      return;
+    }
+    composerRef.current?.focus();
+  }, [destination, navigateTo, newTaskTarget]);
+  useEffect(() => {
+    if (!pendingTodayNewTask) return;
+    if (!(destination.kind === "smart" && destination.id === "today")) return;
+    setPendingTodayNewTask(false);
+    const frame = requestAnimationFrame(() => composerRef.current?.focus());
+    return () => cancelAnimationFrame(frame);
+  }, [destination, pendingTodayNewTask]);
+
   // Full registry keyboard shortcuts (registry/actions.json + registry/destinations.json).
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -2005,12 +2027,12 @@ export function SeptenaApp() {
 
       if (primary && !e.shiftKey && !e.altKey && key === "n") {
         e.preventDefault();
-        composerRef.current?.focus();
+        startNewTask();
         return;
       }
       if (!primary && !e.altKey && key === "n") {
         e.preventDefault();
-        composerRef.current?.focus();
+        startNewTask();
         return;
       }
       if (!primary && !e.altKey && e.key === "/") {
@@ -2167,6 +2189,7 @@ export function SeptenaApp() {
     shortcutsOpen,
     showToast,
     sidebarDestinations.all,
+    startNewTask,
     sweepTasks,
     taskPageId,
     toggleDone,
@@ -2195,7 +2218,6 @@ export function SeptenaApp() {
         subtitle: null as string | null,
         emptyTitle: empty?.title ?? GENERIC_EMPTY_STATE.title,
         emptyDetail: empty?.detail ?? GENERIC_EMPTY_STATE.detail,
-        supportsInlineCreate: reg?.supportsInlineCreate ?? false,
       };
     }
     if (destination.kind === "area") {
@@ -2205,7 +2227,6 @@ export function SeptenaApp() {
         subtitle: "Area",
         emptyTitle: GENERIC_EMPTY_STATE.title,
         emptyDetail: GENERIC_EMPTY_STATE.detail,
-        supportsInlineCreate: true,
       };
     }
     const proj = projectById.get(destination.id);
@@ -2215,7 +2236,6 @@ export function SeptenaApp() {
       subtitle: parentArea ? parentArea.title : "Project",
       emptyTitle: GENERIC_EMPTY_STATE.title,
       emptyDetail: GENERIC_EMPTY_STATE.detail,
-      supportsInlineCreate: true,
     };
   }, [areaById, destination, lang, logbookTab, projectById]);
 
@@ -3199,7 +3219,7 @@ export function SeptenaApp() {
 
     // Global commands
     items.push(
-      makeCmd("app.newTask", () => composerRef.current?.focus(), {
+      makeCmd("app.newTask", startNewTask, {
         keywords: ["add", "create", "task"],
       }),
       makeCmd(
@@ -3294,6 +3314,7 @@ export function SeptenaApp() {
     shareForTask,
     showToast,
     sidebarOpen,
+    startNewTask,
     taskPageId,
     toggleDone,
     undoSnap.canUndo,
@@ -4450,7 +4471,7 @@ export function SeptenaApp() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => composerRef.current?.focus()}
+                      onClick={startNewTask}
                       className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left hover:bg-[var(--bg-hover)]"
                     >
                       <span>Add your first task — Lands in Inbox at the top of Today</span>
@@ -4664,7 +4685,9 @@ export function SeptenaApp() {
               )}
 
             {/* Inline Quick-Add Composer — aligned on the same 22px leading axis as task checkboxes */}
-            {pageMeta.supportsInlineCreate && (
+            {/* Shown where a new task lands in this list (registry newTaskTarget "here" or
+                "tomorrow"); a "today" list sends N and New Task to Today instead. */}
+            {newTaskTarget !== "today" && (
               <form
                 onSubmit={(e) => void handleQuickAddInline(e)}
                 className={`mb-5 flex items-center gap-2.5 rounded-[14px] border border-[var(--border-subtle)]/75 px-3 py-2.5 focus-within:border-[var(--accent)] ${

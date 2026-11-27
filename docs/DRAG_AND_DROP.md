@@ -69,6 +69,9 @@ creates is `newTaskTarget` in `registry/destinations.json`: here, here on
 tomorrow (Upcoming), or Today. On an area page the orb opens New Task / New
 Project in Area. Quick Add stays a sheet (widget, home-screen action, Do
 screen).
+The web reads the same field (`newTaskTargetOf` in `web/src/lib/destinations.ts`):
+the add field shows only where the target is here or tomorrow, and N, ⌘N and
+New Task on a Today list open Today and focus its add field.
 
 **Android moves a heading the same way** (#779 parity). Long-press a project
 heading and slide it. The drag carries headings only
