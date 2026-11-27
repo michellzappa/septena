@@ -57,10 +57,10 @@ export interface AdminView {
 
 const CSS = `
   :root { color-scheme: light dark;
-    --bg: #faf9f7; --card: #fff; --line: #e8e5e0; --text: #26231f; --dim: #74706a; --ok: #1d7a3d; --bad: #c0392b;
+    --bg: #faf9f7; --card: #fff; --line: #e8e5e0; --text: #26231f; --dim: #74706a; --bad: #c0392b;
     --accent: ${BRAND.light}; --accent-soft: color-mix(in oklab, var(--accent) 12%, transparent); }
   @media (prefers-color-scheme: dark) { :root {
-    --bg: #1b1a18; --card: #24221f; --line: #34312d; --text: #f4f2ee; --dim: #a29d96; --ok: #57c77d; --bad: #ff6b5e;
+    --bg: #1b1a18; --card: #24221f; --line: #34312d; --text: #f4f2ee; --dim: #a29d96; --bad: #ff6b5e;
     --accent: ${BRAND.dark}; } }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 -apple-system, BlinkMacSystemFont, system-ui, sans-serif; }
@@ -81,7 +81,7 @@ const CSS = `
   .card > header { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }
   .card > header p { margin: 0; }
   .bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
-  .dim { color: var(--dim); } .ok { color: var(--ok); } .warn { color: var(--bad); }
+  .dim { color: var(--dim); } .ok { color: var(--accent); font-weight: 600; } .warn { color: var(--bad); }
   .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
   .tile { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
   .tile b { display: block; font-size: 20px; font-variant-numeric: tabular-nums; }
@@ -106,7 +106,7 @@ const CSS = `
   .kpi { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: grid; gap: 2px; }
   .kpi b { font-size: 26px; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
   .kpi svg { width: 100%; height: 30px; color: var(--accent); }
-  .delta { font-size: 12px; font-variant-numeric: tabular-nums; } .up { color: var(--ok); } .down { color: var(--bad); }
+  .delta { font-size: 12px; font-variant-numeric: tabular-nums; } .up { color: var(--accent); } .down { color: var(--dim); }
   .funnel td.bar { width: 45%; } .meter { height: 8px; border-radius: 4px; background: var(--accent); min-width: 2px; }
   .chart { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
   .chart svg { width: 100%; height: 90px; color: var(--accent); display: block; margin-top: 6px; }
@@ -220,8 +220,9 @@ function bars(values: number[], days: string[], unit: string): string {
 
 const deltaText = (abs: number | null, rel: number | null, label: string) => {
   if (abs === null) return `<span class="delta dim">no history yet</span>`;
+  // Direction is the arrow; the accent marks growth, a drop stays quiet.
   const cls = abs > 0 ? "up" : abs < 0 ? "down" : "dim";
-  return `<span class="delta ${cls}">${abs > 0 ? "+" : ""}${fmt(abs)}${rel === null ? "" : ` (${rel > 0 ? "+" : ""}${pct(rel)})`} ${esc(label)}</span>`;
+  return `<span class="delta ${cls}">${abs > 0 ? "▲ +" : abs < 0 ? "▼ " : ""}${fmt(abs)}${rel === null ? "" : ` (${rel > 0 ? "+" : ""}${pct(rel)})`} ${esc(label)}</span>`;
 };
 
 /// A headline number with its change against 7 days before and a 30-day line.

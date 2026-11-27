@@ -43,8 +43,9 @@ every account row.
 Rules for the layout: every block is a titled card with one line that says
 what it counts. A number has its label and its window ("7 days", "30 days",
 "every account"). The accent marks the open tab, the primary button of a
-form, links, chart marks and the funnel meters. Green and red mean only up
-and down. An empty state says what is missing and the one step that fixes
+form, links, chart marks, the funnel meters and a rise (▲). A drop (▼) is
+gray. Red is only for a fault: a lapsed plan, a failing webhook, a source
+that does not answer. An empty state says what is missing and the one step that fixes
 it. The pages work at phone width.
 
 ## 4. Definitions
