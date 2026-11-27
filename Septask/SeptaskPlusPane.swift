@@ -42,9 +42,11 @@ struct SeptaskPlusPane: View {
         }
       }
 
-      if !status.isPro {
+      // What each plan above the account's costs: Plus and Pro, or only Pro
+      // for an account on Plus (ADR 0059).
+      ForEach(tiersAbove) { tier in
         Section {
-          ForEach(RegistryPlans.prices) { price in
+          ForEach(tier.prices) { price in
             LabeledContent {
               if price.highlighted {
                 Image(systemName: "checkmark.circle.fill").foregroundStyle(.tint)
@@ -55,9 +57,13 @@ struct SeptaskPlusPane: View {
             }
           }
         } header: {
-          Text(RegistryPlans.name)
+          Text(tier.card?.title ?? tier.title)
         } footer: {
-          Text(RegistryPlans.checkoutOpen ? RegistryPlans.priceFootnote : RegistryPlans.checkoutNotice)
+          if tier == tiersAbove.last {
+            Text(RegistryPlans.checkoutOpen ? RegistryPlans.priceFootnote : RegistryPlans.checkoutNotice)
+          } else if let detail = tier.card?.detail {
+            Text(detail)
+          }
         }
       }
 
@@ -125,9 +131,17 @@ struct SeptaskPlusPane: View {
     .sheet(isPresented: $showingSheet) { SeptaskPlusSheet() }
   }
 
-  /// "Manage Subscription" once the account pays, "See Plus" before.
+  /// The plans above the account's: none on Pro, Pro on Plus, else both.
+  private var tiersAbove: [PlanTier] {
+    if status.isPro { return [] }
+    if case .plus = status.plan { return [.pro] }
+    return PlanTier.allCases
+  }
+
+  /// "See Pro" for an account on Plus, "Manage Subscription" on Pro or a
+  /// store subscription with nothing above it, "See Plus" before.
   private var sheetButtonTitle: String {
-    if case .plus = status.plan { return RegistryPlans.Action.manage }
+    if case .plus = status.plan { return status.isPro ? RegistryPlans.Action.manage : RegistryPlans.Paywall.seePro }
     if status.hasAppleSubscription { return RegistryPlans.Action.manage }
     return RegistryPlans.Paywall.seePlus
   }

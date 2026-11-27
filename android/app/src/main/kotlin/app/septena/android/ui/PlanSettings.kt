@@ -199,7 +199,11 @@ internal fun PlusOffer(plans: PlanSettingsModel, languageTag: String, syncState:
     }
     HorizontalDivider()
 
-    if (!plans.isPro) PlanPrices(document, languageTag)
+    // What each plan above the account's costs (ADR 0059): Plus and Pro, or only Pro on Plus.
+    if (!plans.isPro) {
+        if (!plans.isPlus || plans.plan is AccountPlan.Trial) PlanPrices(document, "prices", plansText(languageTag, "name"), languageTag)
+        PlanPrices(document, "proPrices", proCard(languageTag, "title"), languageTag, proCard(languageTag, "detail"))
+    }
 
     if (plans.plan == AccountPlan.Device) {
         ListItem(
@@ -252,11 +256,12 @@ internal fun PlusOffer(plans: PlanSettingsModel, languageTag: String, syncState:
     }
 }
 
-/** What Plus costs. An account on Pro does not see it: nothing to buy. */
+/** What one plan costs (`prices` for Plus, `proPrices` for Pro). An account on Pro sees neither. */
 @Composable
-private fun PlanPrices(document: JsonValue.ObjectValue, languageTag: String) {
-    SectionHeader(plansText(languageTag, "name"))
-    document.objects("prices").forEach { price ->
+private fun PlanPrices(document: JsonValue.ObjectValue, key: String, title: String, languageTag: String, detail: String? = null) {
+    SectionHeader(title)
+    detail?.let { SectionFooter(it) }
+    document.objects(key).forEach { price ->
         val highlighted = price.fields["highlighted"].booleanValue() == true
         ListItem(
             headlineContent = {
@@ -268,6 +273,8 @@ private fun PlanPrices(document: JsonValue.ObjectValue, languageTag: String) {
             supportingContent = { Text(registryText(price.fields["detail"].stringValue(), languageTag)) },
         )
     }
+    // One checkout line under the last plan, not one per plan.
+    if (key != "proPrices") return
     val checkoutOpen = (document.fields["checkout"] as? JsonValue.ObjectValue)?.fields?.get("open").booleanValue() == true
     SectionFooter(if (checkoutOpen) plansText(languageTag, "priceFootnote") else plansText(languageTag, "checkout", "notice"))
 }

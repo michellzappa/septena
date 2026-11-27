@@ -130,10 +130,11 @@ final class PlanStatus {
     return false
   }
 
-  /// The plan pane shows its Manage button: the account is on a plan that
-  /// was bought, or it still pays for an App Store subscription under a grant.
+  /// The plan pane shows its button: the account is on a plan that was
+  /// bought, it still pays for an App Store subscription under a grant, or a
+  /// Plus grant can move up to Pro (ADR 0059).
   var showsPlanButton: Bool {
-    plan != nil && (!isGranted || hasAppleSubscription)
+    plan != nil && (!isGranted || hasAppleSubscription || !isPro)
   }
 
   /// The account pays an App Store subscription that is active now.
