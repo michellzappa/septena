@@ -11,7 +11,8 @@ limits; changes §1, §3, §6, §7 on 2026-11-20),
 [ADR 0023](adr/0023-sync-across-devices-is-plus.md) (free account syncs one
 device; changes §1, §3, §3.2, §4 on 2026-11-22),
 [ADR 0059](adr/0059-pro-sells-like-plus.md) (Pro sells like Plus on 2026-11-26),
-[ADR 0060](adr/0060-revenuecat-subscriptions-and-pinned-currencies.md) (RevenueCat across stores and pinned EUR/USD/GBP currencies on 2026-11-26).
+[ADR 0060](adr/0060-revenuecat-subscriptions-and-pinned-currencies.md) (RevenueCat across stores and pinned EUR/USD/GBP currencies on 2026-11-26),
+[ADR 0061](adr/0061-seven-year-plus-pass.md) (7-Year Plus Pass at half the annual rate on 2026-11-27).
 **Builds on:** the backend (`docs/SEPTASK_BACKEND.md`, auth in §7), the
 existing tip jar (`Septena/Shell/Settings/SupportStore.swift`,
 `SeptenaPlus.swift`, `Config/Septena.storekit`).
@@ -162,8 +163,9 @@ party. No per-user tracking, no SDKs.
 - No StoreKit introductory offer. The trial is the server-side 14-day reverse
   trial (§3), with no card. Two trials would confuse the paywall. *(default,
   2026-11-22)*
-- *(default)* No lifetime product. A lifetime sale pays once for a server
-  that costs money every month.
+- One non-renewing pass for Plus only (ADR 0061):
+  - `com.septena.tasks.sync.plus.7year` — Apple **Non-Renewing Subscription** (never a Non-Consumable), Google Play one-time product, Stripe one-time Checkout. Grants 7 years of Plus (`expiresAt = max(now, currentPlusExpiresAt) + 7 years`). No 7-year Pro pass.
+- No lifetime product (7-Year Pass replaces open-ended lifetime, ADR 0061).
 - *(default)* Family Sharing off at launch (it needs per-member backend
   accounts; revisit after sharing ships).
 - One subscription covers Septena Life too, when Septena Life moves to the
@@ -652,8 +654,8 @@ on every device.
 - **Currencies (ADR 0060):** EUR is the baseline. Top markets are pinned to
   clean `.00` prices on App Store Connect, Google Play and Web/Windows
   checkout; all other store storefronts auto-equalize from the EUR base:
-  - **Plus:** `€7 / €60` (incl. VAT), `$7 / $60` (+ applicable tax), `£6 / £50` (incl. VAT), `R$ 29 / R$ 240` (BRL PPP, incl. taxes)
-  - **Pro:** `€14 / €120` (incl. VAT), `$14 / $120` (+ applicable tax), `£12 / £100` (incl. VAT), `R$ 58 / R$ 480` (BRL PPP, incl. taxes)
+  - **Plus:** `€7 / €60 / €210 (7 yrs)` (incl. VAT), `$7 / $60 / $210 (7 yrs)` (+ applicable tax), `£6 / £50 / £175 (7 yrs)` (incl. VAT), `R$ 29 / R$ 240 / R$ 840 (7 yrs)` (BRL PPP, incl. taxes) — 7-Year Pass decided in ADR 0061
+  - **Pro:** `€14 / €120` (incl. VAT), `$14 / $120` (+ applicable tax), `£12 / £100` (incl. VAT), `R$ 58 / R$ 480` (BRL PPP, incl. taxes) — subscription-only (ADR 0061)
   - **Web & Windows:** Fixed EUR, USD, GBP and BRL prices matching the pinned
     store numbers (no dynamic FX conversion on subscriptions). Stripe Tax
     calculates VAT; Envisioning Technology files EU VAT through the One Stop
@@ -715,7 +717,7 @@ before any public release that uses the backend.
 | Trial length | Decided 2026-11-19: 14 days |
 | Does the watch need the subscription? | No, it syncs through the paired phone |
 | Is the hosted Claude connector paid? | Yes, it runs on our server |
-| Lifetime product | None |
+| Lifetime / one-time product | No lifetime product. 7-Year Plus Pass at €210 / $210 / £175 / R$ 840 (50% off annual × 7, Plus only; Apple Non-Renewing Subscription, Play/Stripe one-time), paired with free Cloudflare self-hosting (ADR 0011, ADR 0061, decided 2026-11-27) |
 | Family Sharing | Off at launch |
 | How long the server keeps a lapsed user's data | Tasks: always (it is a free account). Attachment bytes and old history: 12 months, with a warning mail first (§6.4) |
 | Tip jar in the task app | Removed |

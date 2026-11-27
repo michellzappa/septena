@@ -95,7 +95,7 @@ export function PlanBenefitRow({ benefit, lang }: { benefit: { icon: string; tit
   );
 }
 
-/** The plan's price: the highlighted one strong, the other after it. */
+/** The plan's price: the highlighted one strong, the other after it, and the 7-Year Pass under Plus (ADR 0061). */
 export function PlanPriceLine({ tier, lang }: { tier: PlanTier; lang: string }) {
   const prices = tierPrices(tier);
   const main = prices.find((p) => p.highlighted) ?? prices[0];
@@ -110,6 +110,12 @@ export function PlanPriceLine({ tier, lang }: { tier: PlanTier; lang: string }) 
             {registryText(p.label, lang)}
           </p>
         ))}
+      {tier === "plus" ? (
+        <div className="mt-2">
+          <p className="text-[13px] font-medium text-[var(--text-primary)]">{registryText(PLAN_UI.pass.label, lang)}</p>
+          <p className="text-xs text-[var(--text-secondary)]">{registryText(PLAN_UI.pass.rateDetail, lang)}</p>
+        </div>
+      ) : null}
     </div>
   );
 }

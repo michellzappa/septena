@@ -145,6 +145,11 @@ private struct PlanPriceLine: View {
       ForEach(tier.prices.filter { $0.id != main?.id }) { other in
         Text(other.label).font(.subheadline).foregroundStyle(.secondary)
       }
+      if tier == .plus {
+        Text(RegistryPlans.pass.label).font(.subheadline).foregroundStyle(.secondary)
+          .padding(.top, 2)
+        Text(RegistryPlans.pass.rateDetail).font(.footnote).foregroundStyle(.secondary)
+      }
     }
     .fixedSize(horizontal: false, vertical: true)
   }

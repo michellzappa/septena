@@ -65,6 +65,7 @@ a new ADR and set the old one to `superseded by NNNN`.
 | [0058](0058-admin-growth-from-daily-snapshots-then-an-event-stream.md) | Admin growth comes from daily snapshots now, and from an event stream at scale (amends 0043) | accepted |
 | [0059](0059-pro-sells-like-plus.md) | Pro sells like Plus, one subscription group (amends 0045, 0052) | accepted |
 | [0060](0060-revenuecat-subscriptions-and-pinned-currencies.md) | Standardize on RevenueCat across stores and pin EUR, USD and GBP currencies (amends 0026) | accepted |
+| [0061](0061-seven-year-plus-pass.md) | Offer a 7-year one-time Plus pass at half the annual rate (amends 0023, 0060) | accepted |
 | [0062](0062-native-linux-app-shares-the-desktop-shell.md) | Build the native Linux app on the shared Compose desktop shell (extends 0013, 0025) | accepted |
 
 ## Template

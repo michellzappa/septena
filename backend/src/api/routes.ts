@@ -93,7 +93,7 @@ import {
   type JwsTransaction,
   type NotificationV2,
 } from "../entitlement/appleJws.js";
-import { appleRow, rejectReason } from "../entitlement/apple.js";
+import { appleRow, passForProduct, rejectReason } from "../entitlement/apple.js";
 import { attachmentKey, attachmentRefusal } from "./attachments.js";
 import { agentUpload } from "../shadow/attachments.js";
 import { notesHistoryRest } from "./notesHistoryRest.js";
@@ -1057,6 +1057,25 @@ api.post("/entitlement/device", async (c) => {
   return c.json({ syncing: true });
 });
 
+/// For a fixed-duration non-renewing pass (ADR 0061), preserve an existing
+/// transaction's computed expiry on restore/replay, or stack a new pass on top
+/// of any active Plus expiry so early extensions never lose remaining time.
+async function passOptionsFor(
+  store: ReturnType<typeof storeFor>,
+  tx: JwsTransaction,
+  now = Date.now(),
+): Promise<{ existingExpiresAt?: number | null; stackFrom?: number }> {
+  if (tx.expiresDate !== undefined || !passForProduct(tx.productId)) return {};
+  const existing = await store.entitlements();
+  const rowId = `apple:${tx.originalTransactionId}`;
+  const same = existing.find((r) => r.id === rowId);
+  if (same && same.expiresAt !== null) return { existingExpiresAt: same.expiresAt };
+  const activePlusEnd = existing
+    .filter((r) => r.id !== rowId && r.plan !== "pro" && r.source !== "trial" && r.expiresAt !== null && isRowActive(r, now))
+    .reduce((max, r) => Math.max(max, r.expiresAt ?? 0), 0);
+  return activePlusEnd > 0 ? { stackFrom: activePlusEnd } : {};
+}
+
 /// A StoreKit 2 transaction the app holds (after purchase, and for every item
 /// of Transaction.currentEntitlements on restore).
 api.post("/entitlement/apple", async (c) => {
@@ -1088,8 +1107,9 @@ api.post("/entitlement/apple", async (c) => {
     logEvent("entitlement_apple", { ok: false, reason: reject, userId });
     return c.json({ error: reject }, 422);
   }
-  const row = appleRow(tx, { renewal });
   const store = storeFor(c.env, userId);
+  const passOpts = await passOptionsFor(store, tx);
+  const row = appleRow(tx, { renewal, ...passOpts });
   const written = await store.putEntitlement(row, "app");
   await Promise.all([
     rememberOriginalTransaction(c.env, userId, tx.originalTransactionId),
@@ -1140,8 +1160,10 @@ api.post("/webhooks/apple", async (c) => {
     logEvent("apple_webhook", { ok: true, ...evt, ignored: "unknown_user" });
     return c.json({ ok: true });
   }
-  const row = appleRow(tx, { renewal, notification: n });
-  const written = await storeFor(c.env, userId).putEntitlement(row, "webhook");
+  const store = storeFor(c.env, userId);
+  const passOpts = await passOptionsFor(store, tx);
+  const row = appleRow(tx, { renewal, notification: n, ...passOpts });
+  const written = await store.putEntitlement(row, "webhook");
   await rememberOriginalTransaction(c.env, userId, tx.originalTransactionId);
   logEvent("apple_webhook", { ok: true, ...evt, userId, status: row.status, written });
   return c.json({ ok: true });

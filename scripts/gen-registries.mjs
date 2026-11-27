@@ -826,6 +826,19 @@ function validatePlans(plans, icons, caps, importSources) {
   }
   assert(Array.isArray(plans.proPrices) && plans.proPrices.length > 0, "plans.json: proPrices missing (ADR 0059)");
 
+  // ADR 0061: 7-Year Plus Pass (one-time / Apple Non-Renewing Subscription, Plus only).
+  const pass = plans.pass;
+  assert(pass && typeof pass === "object", "plans.json: pass missing (ADR 0061)");
+  assert(!priceIds.has(pass.id), `plans.json: duplicate price "${pass.id}"`);
+  priceIds.add(pass.id);
+  assert(pass.plan === "plus", "plans.json: pass.plan must be plus (ADR 0061: no Pro single buy)");
+  assert(/^com\.septena\.tasks\.sync\.plus\.[a-z0-9]+$/.test(pass.productId), `plans.json: pass productId "${pass.productId}" must start com.septena.tasks.sync.plus.`);
+  assert(Number.isInteger(pass.years) && pass.years > 0, "plans.json: pass.years must be a positive integer");
+  assert(Number.isInteger(pass.amountMinor) && pass.amountMinor > 0, "plans.json: pass.amountMinor must be a positive integer");
+  assert(pass.currency === "EUR", "plans.json: pass.currency must be EUR");
+  for (const f of ["title", "detail", "label", "rateDetail", "action"]) assert(typeof pass[f] === "string" && pass[f].length > 0, `plans.json: pass.${f} missing`);
+  assert(pass.label.includes(String(pass.amountMinor / 100)), `plans.json: pass.label must state ${pass.amountMinor / 100}`);
+
   // ADR 0060: pinned currencies (EUR baseline + USD, GBP, BRL) for the pricing
   // page and web checkout. EUR amounts must stay in lockstep with prices/proPrices.
   assert(plans.defaultCurrency === "EUR", "plans.json: defaultCurrency must be EUR (ADR 0060)");
@@ -853,11 +866,18 @@ function validatePlans(plans, icons, caps, importSources) {
         assert(typeof entry.detail === "string" && entry.detail.length > 0, `plans.json: currency ${cur.code}.${tier}.${iv} needs detail`);
       }
     }
+    const curPass = cur.plus?.pass;
+    assert(curPass && Number.isInteger(curPass.amountMinor) && curPass.amountMinor > 0, `plans.json: currency ${cur.code}.plus.pass needs positive integer amountMinor`);
+    const passWhole = String(curPass.amountMinor / 100);
+    assert(typeof curPass.label === "string" && curPass.label.includes(passWhole), `plans.json: currency ${cur.code}.plus.pass label must state ${passWhole}`);
+    assert(typeof curPass.detail === "string" && curPass.detail.length > 0, `plans.json: currency ${cur.code}.plus.pass needs detail`);
+    assert(cur.pro?.pass === undefined, `plans.json: currency ${cur.code}.pro must not have a pass (ADR 0061)`);
   }
   const eurCur = plans.currencies.find((c) => c.code === plans.defaultCurrency);
   assert(eurCur, "plans.json: defaultCurrency must exist in currencies");
   for (const pr of plans.prices) assert(eurCur.plus[pr.interval].amountMinor === pr.amountMinor, `plans.json: EUR plus.${pr.interval} must match prices.${pr.id}`);
   for (const pr of plans.proPrices) assert(eurCur.pro[pr.interval].amountMinor === pr.amountMinor, `plans.json: EUR pro.${pr.interval} must match proPrices.${pr.id}`);
+  assert(eurCur.plus.pass.amountMinor === plans.pass.amountMinor, "plans.json: EUR plus.pass must match pass.amountMinor");
 
   assert(JSON.stringify(plans.levels.map((l) => l.id)) === JSON.stringify(PLAN_LEVELS), `plans.json: levels must be ${PLAN_LEVELS.join(", ")}`);
   assert(JSON.stringify(plans.cards.map((c) => c.id)) === JSON.stringify(PLAN_LEVELS), `plans.json: cards must be ${PLAN_LEVELS.join(", ")}`);
@@ -2203,6 +2223,21 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  let detail: String");
   lines.push("}");
   lines.push("");
+  lines.push("/// One-time non-renewing pass for Plus (ADR 0061).");
+  lines.push("struct RegistryPlanPass: Sendable, Hashable, Identifiable {");
+  lines.push("  let id: String");
+  lines.push("  let plan: String");
+  lines.push("  let productId: String");
+  lines.push("  let years: Int");
+  lines.push("  let amountMinor: Int");
+  lines.push("  let currency: String");
+  lines.push("  let title: String");
+  lines.push("  let detail: String");
+  lines.push("  let label: String");
+  lines.push("  let rateDetail: String");
+  lines.push("  let action: String");
+  lines.push("}");
+  lines.push("");
   lines.push("struct RegistryPlanCard: Sendable, Hashable, Identifiable {");
   lines.push("  let id: String");
   lines.push("  let title: String");
@@ -2263,6 +2298,8 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  static var proPrices: [RegistryPlanPrice] { [");
   for (const pr of P.proPrices) lines.push(`    RegistryPlanPrice(id: ${swiftStr(pr.id)}, productId: ${swiftStr(pr.productId)}, amountMinor: ${pr.amountMinor}, currency: ${swiftStr(pr.currency)}, interval: ${swiftStr(pr.interval)}, highlighted: ${pr.highlighted}, label: ${L(pr.label, pr, "label")}, detail: ${L(pr.detail, pr, "detail")}),`);
   lines.push("  ] }");
+  lines.push("  /// The 7-Year Plus Pass (ADR 0061): one-time Non-Renewing Subscription, Plus only.");
+  lines.push(`  static var pass: RegistryPlanPass { RegistryPlanPass(id: ${swiftStr(P.pass.id)}, plan: ${swiftStr(P.pass.plan)}, productId: ${swiftStr(P.pass.productId)}, years: ${P.pass.years}, amountMinor: ${P.pass.amountMinor}, currency: ${swiftStr(P.pass.currency)}, title: ${L(P.pass.title, P.pass, "title")}, detail: ${L(P.pass.detail, P.pass, "detail")}, label: ${L(P.pass.label, P.pass, "label")}, rateDetail: ${L(P.pass.rateDetail, P.pass, "rateDetail")}, action: ${L(P.pass.action, P.pass, "action")}) }`);
   for (const tier of ["plus", "pro"]) {
     lines.push(`  static var ${tier}Benefits: [RegistryPlanBenefit] { [`);
     for (const b of P.benefits[tier]) lines.push(`    RegistryPlanBenefit(id: ${swiftStr(b.id)}, icon: ${swiftStr(b.icon)}, title: ${L(b.title, b, "title")}, detail: ${L(b.detail, b, "detail")}),`);
@@ -2497,10 +2534,12 @@ function generateTS({ entities, rules, icons, tokens, caps, settings, dests, act
   lines.push(`export const PLAN_LIMITS = ${JSON.stringify(plans.limits)} as const;`);
   lines.push(`export const PLAN_TRIAL_DAYS = ${plans.trial.days};`);
   lines.push(`export const PLAN_PRODUCTS = ${JSON.stringify(plans.prices.map((p) => p.productId))} as const;`);
-  lines.push("/** The plan each store product gives (ADR 0059). A product not listed gives nothing. */");
-  lines.push(`export const PLAN_PRODUCT_PLANS = ${JSON.stringify(Object.fromEntries([...plans.prices.map((p) => [p.productId, "plus"]), ...plans.proPrices.map((p) => [p.productId, "pro"])]))} as const;`);
+  lines.push("/** The plan each store product gives (ADR 0059, ADR 0061). A product not listed gives nothing. */");
+  lines.push(`export const PLAN_PRODUCT_PLANS = ${JSON.stringify(Object.fromEntries([...plans.prices.map((p) => [p.productId, "plus"]), ...plans.proPrices.map((p) => [p.productId, "pro"]), [plans.pass.productId, plans.pass.plan]]))} as const;`);
+  lines.push("/** Fixed-duration non-renewing pass products (ADR 0061). Apple omits expiresDate on these; the server computes expiry from purchaseDate + years. */");
+  lines.push(`export const PLAN_PASS_PRODUCTS = ${JSON.stringify({ [plans.pass.productId]: { plan: plans.pass.plan, years: plans.pass.years } })} as const;`);
   lines.push("/** The plan page and the plan sheet's words, prices and benefits (registry/plans.json, docs/PREMIUM_LANGUAGE.md). English; localize with registryText(). */");
-  lines.push(`export const PLAN_UI = ${JSON.stringify({ name: plans.name, shortName: plans.shortName, proName: plans.proName, headline: plans.headline, subhead: plans.subhead, checkout: plans.checkout, trial: { title: plans.trial.title, detail: plans.trial.detail }, priceFootnote: plans.priceFootnote, prices: plans.prices, proPrices: plans.proPrices, cards: plans.cards, benefits: { plus: plans.benefits.plus, pro: plans.benefits.pro }, upsells: plans.upsells, promises: plans.promises, paywall: plans.paywall, status: plans.status, compareURL: plans.compareURL })} as const;`);
+  lines.push(`export const PLAN_UI = ${JSON.stringify({ name: plans.name, shortName: plans.shortName, proName: plans.proName, headline: plans.headline, subhead: plans.subhead, checkout: plans.checkout, trial: { title: plans.trial.title, detail: plans.trial.detail }, priceFootnote: plans.priceFootnote, prices: plans.prices, proPrices: plans.proPrices, pass: plans.pass, cards: plans.cards, benefits: { plus: plans.benefits.plus, pro: plans.benefits.pro }, upsells: plans.upsells, promises: plans.promises, paywall: plans.paywall, status: plans.status, compareURL: plans.compareURL })} as const;`);
   lines.push("/** Upsell copy by moment id (registry/plans.json `upsells`). Server refusals quote it, so the words match the app. */");
   lines.push(`export const PLAN_UPSELLS = ${JSON.stringify(Object.fromEntries(plans.upsells.map((u) => [u.id, { title: u.title, detail: u.detail }])))} as const;`);
   lines.push("/** Sign-in methods, order per platform and screen copy (registry/sign-in.json, ADR 0047). Copy is English; localize with registryText(). GET /v1/auth/methods says which methods are on. */");
