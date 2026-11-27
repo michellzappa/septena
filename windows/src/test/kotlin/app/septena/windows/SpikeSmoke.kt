@@ -1,13 +1,19 @@
 package app.septena.windows
 
 import app.septena.core.DayClock
+import app.septena.core.JsonValue
+import app.septena.core.QuickFindSubtitle
+import app.septena.core.QuickFindTarget
 import app.septena.core.RecurrenceRule
 import app.septena.core.RecurrenceRules
+import app.septena.core.SyncOperation
 import app.septena.core.TaskStatus
 import app.septena.core.asTaskRecord
 import app.septena.core.generated.RegistryDestinationIds
 import app.septena.core.generated.RegistryEntityEnums
+import app.septena.core.generated.RegistryEntityFields
 import app.septena.core.generated.RegistryEntityFields.Task
+import app.septena.core.generated.RegistryEntityNames
 import app.septena.core.booleanValue
 import app.septena.core.stringValue
 import app.septena.sharedcore.RescheduleMode
@@ -71,10 +77,70 @@ fun main() = runBlocking {
         }
         checkPlaceParity(directory.toPath(), clock)
         checkTaskEditor(directory.toPath(), clock)
+        checkQuickFind(directory.toPath(), clock)
     } finally {
         check(directory.deleteRecursively()) { "SQLite files remained locked after close" }
     }
-    println("Windows spike smoke passed: list membership, offline persistence, task edits, places, filing, editor undo, peer pull, cleanup")
+    println("Windows spike smoke passed: lists, offline persistence, task edits, places, editor undo, Quick Find, peer pull, cleanup")
+}
+
+private suspend fun checkQuickFind(directory: Path, clock: DayClock) {
+    val fixture = FixtureTransport(clock)
+    SpikeWorkspace(directory.resolve("find.db"), fixture, clock).use { workspace ->
+        workspace.sync()
+        val area = workspace.addArea("Operations")
+        val project = workspace.addProject("Deployment", area)
+        val section = workspace.addSection("Verification", project)
+        val open = workspace.add("Release checklist", section)
+        val completed = workspace.add("Completed notes")
+        val link = "https://example.com/installer"
+        workspace.saveText(completed, completed.title, "Release checklist for the pilot. See $link?utm_source=fixture")
+        checkNotNull(workspace.complete(completed.id))
+        workspace.sync()
+
+        val tagId = "findtag00001"
+        fixture.push(listOf(
+            SyncOperation.Upsert("find-tag", RegistryEntityNames.TAG, tagId, mapOf(
+                RegistryEntityFields.Tag.NAME to JsonValue.StringValue("Rollout"),
+            )),
+            SyncOperation.Upsert("find-task-tag", RegistryEntityNames.TASK, open.id, mapOf(
+                Task.TAGS to JsonValue.ArrayValue(listOf(JsonValue.StringValue(tagId))),
+            )),
+            SyncOperation.Upsert("find-reference", RegistryEntityNames.TASK_REF, "findref00001", mapOf(
+                RegistryEntityFields.TaskRef.TASK_ID to JsonValue.StringValue(open.id),
+                RegistryEntityFields.TaskRef.KEY to JsonValue.StringValue("url:$link"),
+                RegistryEntityFields.TaskRef.SNAPSHOT to JsonValue.ObjectValue(mapOf(
+                    "title" to JsonValue.StringValue("Delivery handbook"),
+                )),
+            )),
+        ))
+        workspace.sync()
+        fixture.online = false
+
+        val snapshot = workspace.quickFindSnapshot()
+        check(snapshot.search("  ").isEmpty())
+        val ranked = snapshot.search("  RELEASE     checklist ")
+        check((ranked.first().target as QuickFindTarget.Task).taskId == open.id)
+        check(ranked.any { hit ->
+            (hit.target as? QuickFindTarget.Task)?.taskId == completed.id && hit.subtitleKey == QuickFindSubtitle.Completed
+        })
+        check(snapshot.search("checklist unrelated-token").isEmpty())
+        val provided = snapshot.search("#rollout handbook").single().target as QuickFindTarget.Task
+        check(provided.taskId == open.id)
+        val pointing = snapshot.search("$link?utm_campaign=lookup").map { (it.target as QuickFindTarget.Task).taskId }
+        check(pointing == listOf(open.id, completed.id))
+        check(snapshot.search("Operations").single().target == QuickFindTarget.Area(area.id))
+        check(snapshot.search("Deployment").single().target == QuickFindTarget.Project(project.id))
+        check(snapshot.search("Verification").isEmpty()) { "Headings should not appear as standalone tasks" }
+        val lists = workspace.lists("en")
+        val foundTask = checkNotNull(workspace.task(open.id)).asTaskRecord()
+        check(quickFindTaskLocation(provided, foundTask, lists) == section)
+
+        val later = workspace.add("New local follow-up")
+        check(snapshot.search("local follow-up").isEmpty())
+        val refreshed = workspace.quickFindSnapshot()
+        check((refreshed.search("local follow-up").single().target as QuickFindTarget.Task).taskId == later.id)
+    }
 }
 
 private suspend fun checkTaskEditor(directory: Path, clock: DayClock) {

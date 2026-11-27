@@ -97,6 +97,7 @@ import app.septena.ui.CalendarAgendaRow
 import app.septena.core.RegistryActionContext
 import app.septena.core.RegistryActionResolver
 import app.septena.core.RegistryCatalog
+import app.septena.core.QuickFindTarget
 import app.septena.core.formatUpcomingDayHeader
 import app.septena.core.generated.RegistryActionIds
 import app.septena.core.generated.RegistryDestinationIds
@@ -341,13 +342,15 @@ fun TaskHomeScreen(
         quickFindOpen = false
         when (target) {
             is QuickFindTarget.Task -> {
+                val projectId = target.projectId
+                val areaId = target.areaId
                 val destination = when {
-                    target.projectId != null -> state.projects.firstOrNull {
-                        (it.location as? TaskHomeLocation.Project)?.id == target.projectId
-                    }?.location ?: TaskHomeLocation.Project(target.projectId, "")
-                    target.areaId != null -> state.areas.firstOrNull {
-                        (it.location as? TaskHomeLocation.Area)?.id == target.areaId
-                    }?.location ?: TaskHomeLocation.Area(target.areaId, "")
+                    projectId != null -> state.projects.firstOrNull {
+                        (it.location as? TaskHomeLocation.Project)?.id == projectId
+                    }?.location ?: TaskHomeLocation.Project(projectId, "")
+                    areaId != null -> state.areas.firstOrNull {
+                        (it.location as? TaskHomeLocation.Area)?.id == areaId
+                    }?.location ?: TaskHomeLocation.Area(areaId, "")
                     else -> TaskHomeLocation.SmartList(target.destinationId ?: RegistryDestinationIds.TODAY)
                 }
                 selectHomeLocation(destination)

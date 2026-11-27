@@ -36,11 +36,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.septena.android.AndroidAppGraph
 import app.septena.ui.ChevronLeftGlyph
-import app.septena.core.RegistryCatalog
-import app.septena.core.JsonValue
-import app.septena.core.generated.RegistryActionIds
-import app.septena.core.generated.RegistrySurfaceIds
-import app.septena.core.stringValue
+import app.septena.core.QuickFindCopy
+import app.septena.core.QuickFindResult
+import app.septena.core.QuickFindTarget
 
 /** Registry-driven local search; the shell supplies result routing. */
 @Composable
@@ -111,15 +109,7 @@ fun QuickFindScreen(
                     contentPadding = PaddingValues(bottom = 24.dp),
                 ) {
                     items(state.results, key = QuickFindResult::id) { result ->
-                        val subtitle = result.subtitle ?: result.subtitleKey?.let { key ->
-                            when (key) {
-                                QuickFindSubtitle.Completed -> copy.completedLabel
-                                is QuickFindSubtitle.Destination -> RegistryCatalog.destinationTitle(
-                                    key.id,
-                                    languageTag,
-                                )
-                            }
-                        }
+                        val subtitle = copy.subtitleFor(result, languageTag)
                         ListItem(
                             headlineContent = { Text(result.title) },
                             supportingContent = subtitle?.let { { Text(it) } },
@@ -147,43 +137,5 @@ private fun QuickFindEmptyState(title: String, detail: String, modifier: Modifie
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-    }
-}
-
-private data class QuickFindCopy(
-    val title: String,
-    val backTitle: String,
-    val searchPrompt: String,
-    val emptyTitle: String,
-    val emptyDetail: String,
-    val noResultsTitle: String,
-    val noResultsDetail: String,
-    val completedLabel: String,
-) {
-    companion object {
-        fun fromRegistry(languageTag: String): QuickFindCopy {
-            val surface = RegistryCatalog.surface(RegistrySurfaceIds.QUICK_FIND)
-            fun copy(vararg path: String): String {
-                var value: JsonValue? = surface
-                path.forEach { key ->
-                    value = (value as? JsonValue.ObjectValue)?.fields?.get(key)
-                }
-                val source = value.stringValue().orEmpty()
-                return RegistryCatalog.localizedString(source, languageTag).orEmpty()
-            }
-            return QuickFindCopy(
-                title = RegistryCatalog.actionTitle(
-                    RegistryActionIds.APP_QUICK_FIND,
-                    languageTag = languageTag,
-                ).orEmpty(),
-                backTitle = copy("controls", "back"),
-                searchPrompt = copy("placeholder"),
-                emptyTitle = copy("emptyState", "title"),
-                emptyDetail = copy("emptyState", "detail"),
-                noResultsTitle = copy("noResults", "title"),
-                noResultsDetail = copy("noResults", "detail"),
-                completedLabel = copy("completed", "label"),
-            )
-        }
     }
 }

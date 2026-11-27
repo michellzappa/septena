@@ -33,6 +33,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import app.septena.core.RegistryCatalog
+import app.septena.core.QuickFindSearch
+import app.septena.core.QuickFindTarget
 import app.septena.core.SystemDayClock
 import app.septena.core.TaskRecord
 import app.septena.core.asTaskRecord
@@ -60,10 +62,20 @@ fun main() {
         SpikeWorkspace(directory.resolve("tasks.db"), transport, clock).use { workspace ->
             application(exitProcessOnExit = false) {
                 var busy by remember { mutableStateOf(false) }
-                Window(onCloseRequest = { if (!busy) exitApplication() }, title = "Septena Spike") {
+                var findRequests by remember { mutableStateOf(0) }
+                Window(
+                    onCloseRequest = { if (!busy) exitApplication() },
+                    title = "Septena Spike",
+                    onPreviewKeyEvent = { event ->
+                        if (!busy && event.opensQuickFind()) {
+                            findRequests++
+                            true
+                        } else false
+                    },
+                ) {
                     MaterialTheme {
                         Surface(Modifier.fillMaxSize()) {
-                            DesktopTasks(workspace, transport, onBusyChange = { busy = it })
+                            DesktopTasks(workspace, transport, findRequests, onBusyChange = { busy = it })
                         }
                     }
                 }
@@ -83,7 +95,12 @@ private data class NameEditor(
 )
 
 @Composable
-private fun DesktopTasks(workspace: SpikeWorkspace, transport: FixtureTransport, onBusyChange: (Boolean) -> Unit) {
+private fun DesktopTasks(
+    workspace: SpikeWorkspace,
+    transport: FixtureTransport,
+    findRequests: Int,
+    onBusyChange: (Boolean) -> Unit,
+) {
     val scope = rememberCoroutineScope()
     val languageTag = remember { Locale.getDefault().toLanguageTag() }
     val today = DesktopLocation.Smart(RegistryDestinationIds.TODAY)
@@ -92,6 +109,7 @@ private fun DesktopTasks(workspace: SpikeWorkspace, transport: FixtureTransport,
     var editor by remember { mutableStateOf<NameEditor?>(null) }
     var editingTask by remember { mutableStateOf<TaskRecord?>(null) }
     var movingTask by remember { mutableStateOf<String?>(null) }
+    var quickFind by remember { mutableStateOf<QuickFindSearch?>(null) }
     var status by remember { mutableStateOf("Loading fixture") }
     var error by remember { mutableStateOf<String?>(null) }
     var online by remember { mutableStateOf(true) }
@@ -99,7 +117,7 @@ private fun DesktopTasks(workspace: SpikeWorkspace, transport: FixtureTransport,
     var loaded by remember { mutableStateOf(false) }
     val undo by workspace.undoState.collectAsState()
 
-    fun <T> work(action: suspend () -> T, onSuccess: (T) -> Unit = {}) {
+    fun <T> work(action: suspend () -> T, refresh: Boolean = true, onSuccess: (T) -> Unit = {}) {
         if (busy) return
         busy = true
         onBusyChange(true)
@@ -108,13 +126,15 @@ private fun DesktopTasks(workspace: SpikeWorkspace, transport: FixtureTransport,
             try {
                 val (result, rows) = withContext(Dispatchers.IO) {
                     val result = action()
-                    result to workspace.lists(languageTag)
+                    result to if (refresh) workspace.lists(languageTag) else null
                 }
-                lists = rows
-                if (destination !is DesktopLocation.Smart && rows.places.place(destination) == null) {
-                    destination = today
+                if (rows != null) {
+                    lists = rows
+                    if (destination !is DesktopLocation.Smart && rows.places.place(destination) == null) {
+                        destination = today
+                    }
+                    loaded = true
                 }
-                loaded = true
                 onSuccess(result)
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -132,8 +152,27 @@ private fun DesktopTasks(workspace: SpikeWorkspace, transport: FixtureTransport,
         editor = value
     }
 
+    fun openTask(id: String, hit: QuickFindTarget.Task? = null) {
+        work({
+            checkNotNull(workspace.task(id)?.takeIf { it.deletedAt == null }) {
+                localized("Task is no longer available.", languageTag)
+            }.asTaskRecord()
+        }, refresh = false) { selected ->
+            hit?.let { target -> quickFindTaskLocation(target, selected, lists)?.let { destination = it } }
+            editingTask = selected
+        }
+    }
+
+    fun openQuickFind() {
+        if (!loaded || editor != null || editingTask != null || movingTask != null || quickFind != null) return
+        work({ workspace.quickFindSnapshot() }, refresh = false) { quickFind = it }
+    }
+
     LaunchedEffect(Unit) {
         work({ workspace.sync() }) { status = "Fixture connected" }
+    }
+    LaunchedEffect(findRequests) {
+        if (findRequests > 0) openQuickFind()
     }
 
     val smart = destination as? DesktopLocation.Smart
@@ -187,6 +226,9 @@ private fun DesktopTasks(workspace: SpikeWorkspace, transport: FixtureTransport,
                 Text(place.title, style = MaterialTheme.typography.headlineSmall)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                TextButton(enabled = loaded && !busy, onClick = { openQuickFind() }) {
+                    Text(actionTitle(RegistryActionIds.APP_QUICK_FIND, languageTag))
+                }
                 if (canAdd) {
                     Button(enabled = !busy, onClick = {
                         val target = destination
@@ -258,15 +300,7 @@ private fun DesktopTasks(workspace: SpikeWorkspace, transport: FixtureTransport,
                         checkNotNull(workspace.complete(id)) { localized("Task is no longer available.", languageTag) }
                     }) { status = "Task saved to the outbox" }
                 },
-                onOpenTask = { id ->
-                    work({
-                        checkNotNull(workspace.task(id)?.takeIf { it.deletedAt == null }) {
-                            localized("Task is no longer available.", languageTag)
-                        }.asTaskRecord()
-                    }) { selected ->
-                        editingTask = selected
-                    }
-                },
+                onOpenTask = { id -> openTask(id) },
                 onTaskAction = { id, action ->
                     if (!busy && action == RegistryActionIds.TASK_MOVE) {
                         error = null
@@ -278,6 +312,16 @@ private fun DesktopTasks(workspace: SpikeWorkspace, transport: FixtureTransport,
         }
     }
 
+    quickFind?.let { search ->
+        DesktopQuickFind(search, languageTag, onClose = { quickFind = null }) { target ->
+            quickFind = null
+            when (target) {
+                is QuickFindTarget.Area -> destination = DesktopLocation.Area(target.areaId)
+                is QuickFindTarget.Project -> destination = DesktopLocation.Project(target.projectId)
+                is QuickFindTarget.Task -> openTask(target.taskId, target)
+            }
+        }
+    }
     editor?.let { edit ->
         EditNameDialog(edit, busy, error, languageTag, onDismiss = { editor = null }) { value ->
             work({ edit.save(value) }) { next ->

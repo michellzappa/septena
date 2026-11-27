@@ -4,6 +4,7 @@ import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
 import app.septena.core.DayClock
 import app.septena.core.JsonValue
 import app.septena.core.NotesBase
+import app.septena.core.QuickFindSearch
 import app.septena.core.RecurrenceRule
 import app.septena.core.RegistryEntityMutator
 import app.septena.core.SyncChange
@@ -60,6 +61,9 @@ internal class SpikeWorkspace(
         desktopPlaces(store.records(RegistryEntityNames.AREA), store.records(RegistryEntityNames.PROJECT), tasks ?: store.activeTasks())
 
     suspend fun task(id: String) = store.record(RegistryEntityNames.TASK, id)
+
+    suspend fun quickFindSnapshot(): QuickFindSearch =
+        QuickFindSearch(store, clock, includeArchivedProjects = false).snapshot()
 
     fun today(): LocalDate = clock.today(clock.now())
 

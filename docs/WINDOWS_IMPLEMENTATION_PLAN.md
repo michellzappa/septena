@@ -26,7 +26,9 @@ The second fixture slice adds areas, projects and project sections (`places.area
 
 The third fixture slice adds the task editor for title, notes, When, Deadline and the basic Repeat controls. When and Deadline use the released date rules through the shared mutator. Repeat supports day, week, month and year with a fixed schedule or after completion, pause and removal. Rescheduling a fixed occurrence offers the existing one-task and series choices. Editor Undo uses the same Kotlin history as Android. The fixture check covers separate dates, repeat changes, undo, offline reopen and a peer pull.
 
-Next add Quick Find against SQLite, then conversations and agent actions. Advanced repeat-pattern editing, broader undo coverage for task actions and keyboard behavior stay in the parity backlog. These slices can use fixture workspaces until live W1 is ready. A feature's fixture and CI evidence stays separate from its Win365 result.
+The fourth fixture slice adds local Quick Find (`find.quick-find`) for tasks, active projects and areas. It uses the same Kotlin ranking as Android for titles, notes, tags and references, including pasted links and completed tasks. Windows snapshots the SQLite-backed records when search opens so typing stays independent of sync. The registry shortcut opens the picker. Up and Down select a hit, Enter opens it, and Escape dismisses the picker. A task opens in its editor with the appropriate sidebar destination when one is available.
+
+Next add conversations and agent actions. Command search, archived project navigation, advanced repeat-pattern editing, broader undo coverage for task actions and device keyboard acceptance stay in the parity backlog. These slices can use fixture workspaces until live W1 is ready. A feature's fixture and CI evidence stays separate from its Win365 result. [Compose Desktop keyboard event scopes](https://kotlinlang.org/docs/multiplatform/compose-desktop-keyboard.html)
 
 ## Checkpoint 2 — live W1 on Win365
 
