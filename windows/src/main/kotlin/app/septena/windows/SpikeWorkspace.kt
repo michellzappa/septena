@@ -40,6 +40,8 @@ import app.septena.core.stringValue
 import app.septena.store.SqlDelightTaskStore
 import app.septena.store.db.SeptenaDatabase
 import app.septena.sharedcore.RescheduleMode
+import app.septena.windows.platform.ClientIdentity
+import app.septena.windows.platform.DesktopHost
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
@@ -49,11 +51,12 @@ internal class SpikeWorkspace(
     path: Path,
     transport: FixtureTransport,
     private val clock: DayClock = SystemDayClock(),
+    identity: ClientIdentity = DesktopHost.current().identity,
 ) : AutoCloseable {
     private val driver = openDatabase(path)
     private val store = SqlDelightTaskStore(SeptenaDatabase(driver))
     private val ids = UuidTaskIdGenerator()
-    private val mutator = TaskMutator(store, clock, ids, sourceClient = "Septena Windows")
+    private val mutator = TaskMutator(store, clock, ids, sourceClient = identity.defaultDeviceName)
     private val entityMutator = RegistryEntityMutator(store, clock, ids)
     private val conversationMutator = ConversationMutator(store, ids)
     private val settings = SyncedSettings(store, RegistryPlatformIds.WINDOWS)

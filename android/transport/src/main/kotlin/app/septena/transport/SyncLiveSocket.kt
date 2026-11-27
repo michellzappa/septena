@@ -52,6 +52,7 @@ sealed interface LiveSocketOutcome {
 class SyncLiveSocket(
     private val credentials: SyncCredentials,
     private val clientVersion: String,
+    private val identity: ClientIdentity = ClientIdentity.ANDROID,
     private val baseUrl: String = JsonHttp.DEFAULT_BASE_URL,
     private val pingIntervalMs: Long = DEFAULT_PING_INTERVAL_MS,
     private val readTimeoutMs: Int = DEFAULT_READ_TIMEOUT_MS,
@@ -169,7 +170,7 @@ class SyncLiveSocket(
                 append("Sec-WebSocket-Key: ").append(secKey).append("\r\n")
                 append("Sec-WebSocket-Version: 13\r\n")
                 append("Authorization: Bearer ").append(token).append("\r\n")
-                append("X-Septena-Client: ").append(JsonHttp.CLIENT_NAME).append("\r\n")
+                append("X-Septena-Client: ").append(identity.userAgent).append("\r\n")
                 append("X-Septena-Version: ").append(clientVersion).append("\r\n")
                 append("\r\n")
             }

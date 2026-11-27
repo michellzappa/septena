@@ -17,8 +17,11 @@ val coreNatives = sharedCore.layout.buildDirectory.file("core-natives/septena-co
 dependencies {
     implementation(sharedCore)
     implementation(project(":store"))
+    implementation(project(":transport"))
     implementation(libs.sqldelight.jvm.driver)
     implementation(libs.jna)
+    implementation(libs.jna.platform)
+    testImplementation(libs.junit)
     implementation(libs.kotlinx.coroutines.core)
     implementation(compose.desktop.currentOs)
     implementation(compose.material3)

@@ -55,7 +55,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
 
       - name: Run the core, store and offline sync checks
-        run: android\gradlew.bat -p windows --no-daemon :core:test :store:test smokeTest
+        run: android\gradlew.bat -p windows --no-daemon :core:test :store:test :transport:test :test smokeTest
 
       - name: Build the self-contained desktop image
         run: android\gradlew.bat -p windows --no-daemon createDistributable
@@ -97,7 +97,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
 
       - name: Run the core, store and offline sync checks on Linux
-        run: ./android/gradlew -p windows --no-daemon :core:test :store:test smokeTest
+        run: ./android/gradlew -p windows --no-daemon :core:test :store:test :transport:test :test smokeTest
 
       - name: Build the self-contained Linux desktop image
         run: ./android/gradlew -p windows --no-daemon createDistributable
