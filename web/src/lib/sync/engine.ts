@@ -977,8 +977,12 @@ export class WebSyncEngine {
     await ensureCoreReady();
     const now = new Date().toISOString();
     const todayYMD = localTodayYMD();
+    const seriesId = task.recurrenceSeriesID ?? task.id;
+    const siblings = this.state.snapshot.tasks.filter(
+      (row) => row.id !== task.id && !row.deletedAt && row.recurrenceSeriesID === seriesId,
+    );
     if (!rule.unit) {
-      await this.patchTask(task, {
+      await this.patchTasks([task, ...siblings], {
         recurrenceUnit: null,
         recurrenceInterval: null,
         recurrenceAfterCompletion: false,
@@ -1007,7 +1011,7 @@ export class WebSyncEngine {
               weekdays: rule.weekdays, monthDay: rule.monthDay, ordinalWeekday: rule.ordinalWeekday },
           })
         : missed != null ? anchor : null;
-    await this.patchTask(task, {
+    const seriesFields = {
       recurrenceUnit: rule.unit,
       recurrenceInterval: Math.max(1, rule.interval ?? 1),
       recurrenceAfterCompletion: afterCompletion,
@@ -1017,14 +1021,18 @@ export class WebSyncEngine {
         ? { timeZone: task.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone }
         : {}),
       recurrencePaused: Boolean(rule.paused),
-      recurrenceSeriesID: task.recurrenceSeriesID ?? task.id,
-      recurrenceAnchorDate: anchor,
-      scheduled: task.scheduled ?? anchor,
+      recurrenceSeriesID: seriesId,
       recurrenceWeekdays: rule.weekdays ?? task.recurrenceWeekdays ?? null,
       recurrenceMonthDay: rule.monthDay ?? task.recurrenceMonthDay ?? null,
       recurrenceOrdinalWeekday: rule.ordinalWeekday ?? task.recurrenceOrdinalWeekday ?? null,
+    };
+    await this.patchTask(task, {
+      ...seriesFields,
+      recurrenceAnchorDate: afterCompletion ? null : anchor,
+      scheduled: task.scheduled ?? anchor,
       touchedAt: now,
     });
+    if (siblings.length) await this.patchTasks(siblings, seriesFields);
   }
 
   async moveTask(

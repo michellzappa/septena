@@ -553,6 +553,8 @@ function recurrenceColumns(rule: RecurrenceRuleInput | null): Record<string, unk
       recurrenceUnit: null,
       recurrenceInterval: 1,
       recurrenceAfterCompletion: true,
+      recurrenceMissed: null,
+      recurrenceMissedFrom: null,
       recurrencePaused: false,
       recurrenceWeekdays: null,
       recurrenceMonthDay: null,
@@ -563,6 +565,7 @@ function recurrenceColumns(rule: RecurrenceRuleInput | null): Record<string, unk
     recurrenceUnit: rule.unit,
     recurrenceInterval: rule.interval,
     recurrenceAfterCompletion: rule.afterCompletion,
+    ...(rule.afterCompletion ? { recurrenceMissed: null, recurrenceMissedFrom: null } : {}),
     recurrencePaused: false,
     recurrenceWeekdays: rule.weekdays && rule.weekdays.length > 0 ? rule.weekdays : null,
     recurrenceMonthDay: rule.monthDay ?? null,
@@ -961,7 +964,7 @@ async function completeTask(ctx: WriteContext, id: string) {
           position,
           createdAt: now,
         };
-        for (const k of ["area", "project", "heading", "kind", "notes", "sourceClient", "source"] as const) {
+        for (const k of ["area", "project", "heading", "kind", "notes", "sourceClient", "source", "recurrenceMissed", "recurrenceMissedFrom"] as const) {
           if (str(src[k])) fields[k] = src[k];
         }
         // The next row's date fields are the core's (spec A10): the new day,
