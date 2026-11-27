@@ -309,7 +309,6 @@ object RegistryCatalog {
             val fields = raw as? JsonValue.ObjectValue ?: return@mapNotNull null
             val id = fields.stringAt("id") ?: return@mapNotNull null
             val kind = fields.stringAt("kind") ?: return@mapNotNull null
-            val group = fields.stringAt("group") ?: return@mapNotNull null
             val featureId = fields.stringAt("featureId") ?: return@mapNotNull null
             val depths = fields.arrayAt("depths").orEmpty().mapNotNull { it.stringValue() }
             if (depth !in depths) return@mapNotNull null

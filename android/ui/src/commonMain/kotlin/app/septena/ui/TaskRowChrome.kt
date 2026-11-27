@@ -1515,6 +1515,46 @@ fun ChevronDownGlyph(tint: Color, size: Dp = 16.dp, modifier: Modifier = Modifie
 }
 
 @Composable
+fun ChevronUpGlyph(tint: Color, size: Dp = 16.dp, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier.size(size)) {
+        val w = this.size.width
+        val h = this.size.height
+        val stroke = (w * 0.13f).coerceAtLeast(1.5.dp.toPx())
+        val path = Path().apply {
+            moveTo(w * 0.22f, h * 0.64f)
+            lineTo(w * 0.50f, h * 0.34f)
+            lineTo(w * 0.78f, h * 0.64f)
+        }
+        drawPath(path, tint, style = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round))
+    }
+}
+
+/** Open full task page (registry icon `action.open` / `open_in_full`): two diagonal expand arrows. */
+@Composable
+fun OpenTaskPageGlyph(tint: Color, size: Dp = 16.dp, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier.size(size)) {
+        val w = this.size.width
+        val h = this.size.height
+        val stroke = (w * 0.10f).coerceAtLeast(1.3.dp.toPx())
+        val arrows = Path().apply {
+            // Upper-right arrowhead + shaft
+            moveTo(w * 0.54f, h * 0.16f)
+            lineTo(w * 0.84f, h * 0.16f)
+            lineTo(w * 0.84f, h * 0.46f)
+            moveTo(w * 0.84f, h * 0.16f)
+            lineTo(w * 0.56f, h * 0.44f)
+            // Lower-left arrowhead + shaft
+            moveTo(w * 0.46f, h * 0.84f)
+            lineTo(w * 0.16f, h * 0.84f)
+            lineTo(w * 0.16f, h * 0.54f)
+            moveTo(w * 0.16f, h * 0.84f)
+            lineTo(w * 0.44f, h * 0.56f)
+        }
+        drawPath(arrows, tint, style = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round))
+    }
+}
+
+@Composable
 fun ChevronRightGlyph(tint: Color, size: Dp = 14.dp, modifier: Modifier = Modifier) {
     Canvas(modifier = modifier.size(size)) {
         val w = this.size.width

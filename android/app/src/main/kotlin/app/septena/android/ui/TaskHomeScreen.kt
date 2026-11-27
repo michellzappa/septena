@@ -117,7 +117,9 @@ import app.septena.ui.SeptenaGlyph
 import app.septena.ui.SeptenaIconKind
 import app.septena.ui.StarGlyph
 import app.septena.ui.TaskCardMetrics
+import app.septena.ui.TaskCardPosition
 import app.septena.ui.TaskDragStackOverlay
+import app.septena.ui.TaskListItem
 import app.septena.ui.TaskReorderDragState
 import app.septena.ui.reorderPositions
 import app.septena.ui.TaskHomeContent
@@ -139,6 +141,8 @@ fun TaskHomeScreen(
     var openedTaskId by rememberSaveable { mutableStateOf<String?>(null) }
     var openedTaskAttribute by rememberSaveable { mutableStateOf<String?>(null) }
     var openedTaskSendBack by rememberSaveable { mutableStateOf(false) }
+    /** Task expanded in place in the list (Things-style inline foldout, ADR 0029). */
+    var expandedTaskId by rememberSaveable { mutableStateOf<String?>(null) }
     /** The task whose Add Reference dialog is open (row menu). */
     var referenceTaskId by rememberSaveable { mutableStateOf<String?>(null) }
     /** The task whose Assign To dialog is open (row menu). */
@@ -161,9 +165,13 @@ fun TaskHomeScreen(
     val state by homeViewModel.state.collectAsStateWithLifecycle()
     val doing by graph.doing.ui.collectAsStateWithLifecycle()
     val selectHomeLocation: (TaskHomeLocation) -> Unit = { location ->
+        expandedTaskId = null
         logbookShowingDeleted = false
         homeViewModel.select(location)
         showingListsHome = false
+    }
+    LaunchedEffect(state.selectedIds) {
+        if (state.selectedIds.isNotEmpty()) expandedTaskId = null
     }
     LaunchedEffect(launchAction) {
         when (launchAction) {
@@ -173,6 +181,7 @@ fun TaskHomeScreen(
                 quickFindOpen = false
                 openedTaskId = null
                 openedTaskAttribute = null
+                expandedTaskId = null
                 graph.doing.showList()
                 selectHomeLocation(TaskHomeLocation.SmartList(launchAction.destinationId))
                 onConsumeLaunchAction()
@@ -180,6 +189,7 @@ fun TaskHomeScreen(
             is WidgetLaunchAction.OpenTask -> {
                 settingsOpen = false
                 quickFindOpen = false
+                expandedTaskId = null
                 graph.doing.showList()
                 launchAction.destinationId?.let { selectHomeLocation(TaskHomeLocation.SmartList(it)) }
                 openedTaskId = launchAction.taskId
@@ -191,6 +201,7 @@ fun TaskHomeScreen(
                 quickFindOpen = false
                 openedTaskId = null
                 openedTaskAttribute = null
+                expandedTaskId = null
                 showingListsHome = false
                 homeQuickAddDraft = QuickAddDraft(today = launchAction.today)
                 onConsumeLaunchAction()
@@ -218,12 +229,17 @@ fun TaskHomeScreen(
         surfaceField(RegistrySurfaceIds.TASK_ROW_MENU, "accessibilityLabel", languageTag)
     }
     val shareTitle = RegistryCatalog.actionTitle(RegistryActionIds.TASK_SHARE, languageTag = languageTag).orEmpty()
+    val toggleExpandTask: (String) -> Unit = { id ->
+        expandedTaskId = if (expandedTaskId == id) null else id
+    }
     val openTaskWithAttribute: (String, String?) -> Unit = { id, attribute ->
+        expandedTaskId = null
         openedTaskId = id
         openedTaskAttribute = attribute
         openedTaskSendBack = false
     }
     val openTaskSendBack: (String) -> Unit = { id ->
+        expandedTaskId = null
         openedTaskId = id
         openedTaskAttribute = null
         openedTaskSendBack = true
@@ -233,7 +249,10 @@ fun TaskHomeScreen(
             actionId == RegistryActionIds.TASK_OPEN -> openTaskWithAttribute(id, null)
             RegistryCatalog.actionOpensAttribute(actionId) != null ->
                 openTaskWithAttribute(id, RegistryCatalog.actionOpensAttribute(actionId))
-            actionId == RegistryActionIds.TASK_DO -> graph.doing.begin(id)
+            actionId == RegistryActionIds.TASK_DO -> {
+                expandedTaskId = null
+                graph.doing.begin(id)
+            }
             actionId == RegistryActionIds.TASK_TOGGLE_STAR -> homeViewModel.toggleStar(id)
             actionId == RegistryActionIds.TASK_ADD_REFERENCE -> referenceTaskId = id
             actionId == ASSIGN_SUBMENU -> assignTaskId = id
@@ -245,7 +264,10 @@ fun TaskHomeScreen(
                 }
                 localContext.startActivity(Intent.createChooser(intent, shareTitle))
             }
-            actionId == RegistryActionIds.TASK_DELETE -> homeViewModel.delete(id)
+            actionId == RegistryActionIds.TASK_DELETE -> {
+                if (expandedTaskId == id) expandedTaskId = null
+                homeViewModel.delete(id)
+            }
             actionId == RegistryActionIds.TASK_RESTORE -> homeViewModel.restore(id)
             actionId == RegistryActionIds.TASK_DELETE_PERMANENTLY -> {
                 pendingPurgeRequest = PurgeTasksRequest(listOf(id), RegistryPromptIds.DELETE_PERMANENTLY)
@@ -495,20 +517,23 @@ fun TaskHomeScreen(
                 settingsOpen = false
                 quickFindOpen = false
                 openedTaskId = null
+                expandedTaskId = null
                 homeQuickAddDraft = defaultQuickAddDraft(state.location)
                 true
             }
             primary && event.key == Key.K -> {
                 settingsOpen = false
+                expandedTaskId = null
                 quickFindOpen = !quickFindOpen
                 true
             }
             primary && event.key == Key.Comma -> {
                 quickFindOpen = false
+                expandedTaskId = null
                 settingsOpen = !settingsOpen
                 true
             }
-            primary && event.key == Key.Z && openedTaskId == null && homeQuickAddDraft == null && !quickFindOpen && !settingsOpen -> {
+            primary && event.key == Key.Z && openedTaskId == null && expandedTaskId == null && homeQuickAddDraft == null && !quickFindOpen && !settingsOpen -> {
                 shortcutScope.launch {
                     val undone = runCatching {
                         withContext(Dispatchers.IO) {
@@ -528,6 +553,7 @@ fun TaskHomeScreen(
                 settingsOpen = false
                 quickFindOpen = false
                 openedTaskId = null
+                expandedTaskId = null
                 selectHomeLocation(target)
                 true
             }
@@ -538,6 +564,10 @@ fun TaskHomeScreen(
                     openedTaskId = null
                     openedTaskAttribute = null
                     openedTaskSendBack = false
+                    true
+                }
+                expandedTaskId != null -> {
+                    expandedTaskId = null
                     true
                 }
                 state.selectedIds.isNotEmpty() -> {
@@ -647,15 +677,18 @@ fun TaskHomeScreen(
                         onComplete = homeViewModel::complete,
                         rowMenuGroups = rowMenuGroups,
                         rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
-                        onOpenTask = { openTaskWithAttribute(it, null) },
+                        expandedTaskId = expandedTaskId,
+                        onToggleExpandTask = toggleExpandTask,
+                        onCollapseExpandedTask = { expandedTaskId = null },
+                        onOpenFullPage = { openTaskWithAttribute(it, null) },
                         onSendBackReview = openTaskSendBack,
                         onTaskAction = onTaskAction,
                         onToggleStarFilter = homeViewModel::toggleStarFilter,
-                        onQuickFind = { quickFindOpen = true },
-                        onOpenSettings = { settingsOpen = true },
+                        onQuickFind = { expandedTaskId = null; quickFindOpen = true },
+                        onOpenSettings = { expandedTaskId = null; settingsOpen = true },
                         onSelectHomeLocation = selectHomeLocation,
                         logbookShowingDeleted = logbookShowingDeleted,
-                        onLogbookShowingDeletedChange = { logbookShowingDeleted = it },
+                        onLogbookShowingDeletedChange = { expandedTaskId = null; logbookShowingDeleted = it },
                         onRequestEmptyTrash = {
                             val ids = state.deletedTasks.map { it.id }
                             if (ids.isNotEmpty()) {
@@ -670,7 +703,7 @@ fun TaskHomeScreen(
             // Mobile phone layout: Things / iOS root Lists Homepage (no hamburger drawer).
             // Back gesture from any list returns to the Lists Homepage.
             BackHandler(
-                enabled = !showingListsHome && !settingsOpen && !quickFindOpen && openedTaskId == null && state.selectedIds.isEmpty(),
+                enabled = !showingListsHome && !settingsOpen && !quickFindOpen && openedTaskId == null && expandedTaskId == null && state.selectedIds.isEmpty(),
             ) {
                 showingListsHome = true
             }
@@ -742,19 +775,22 @@ fun TaskHomeScreen(
                     homeViewModel = homeViewModel,
                     languageTag = languageTag,
                     showNavigationAction = true,
-                    onOpenNavigation = { showingListsHome = true },
+                    onOpenNavigation = { expandedTaskId = null; showingListsHome = true },
                     onComplete = homeViewModel::complete,
                     rowMenuGroups = rowMenuGroups,
                     rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
-                    onOpenTask = { openTaskWithAttribute(it, null) },
+                    expandedTaskId = expandedTaskId,
+                    onToggleExpandTask = toggleExpandTask,
+                    onCollapseExpandedTask = { expandedTaskId = null },
+                    onOpenFullPage = { openTaskWithAttribute(it, null) },
                     onSendBackReview = openTaskSendBack,
                     onTaskAction = onTaskAction,
                     onToggleStarFilter = homeViewModel::toggleStarFilter,
-                    onQuickFind = { quickFindOpen = true },
-                    onOpenSettings = { settingsOpen = true },
+                    onQuickFind = { expandedTaskId = null; quickFindOpen = true },
+                    onOpenSettings = { expandedTaskId = null; settingsOpen = true },
                     onSelectHomeLocation = selectHomeLocation,
                     logbookShowingDeleted = logbookShowingDeleted,
-                    onLogbookShowingDeletedChange = { logbookShowingDeleted = it },
+                    onLogbookShowingDeletedChange = { expandedTaskId = null; logbookShowingDeleted = it },
                     onRequestEmptyTrash = {
                         val ids = state.deletedTasks.map { it.id }
                         if (ids.isNotEmpty()) {
@@ -1080,8 +1116,11 @@ private fun TaskHomeScaffold(
     onOpenNavigation: () -> Unit = {},
     rowMenuGroups: List<List<TaskRowMenuAction>>,
     rowMenuAccessibilityLabel: String,
+    expandedTaskId: String?,
+    onToggleExpandTask: (String) -> Unit,
+    onCollapseExpandedTask: () -> Unit,
     onComplete: (String) -> Unit,
-    onOpenTask: (String) -> Unit,
+    onOpenFullPage: (String) -> Unit,
     onSendBackReview: (String) -> Unit,
     onTaskAction: (String, String) -> Unit,
     onToggleStarFilter: () -> Unit,
@@ -1563,6 +1602,23 @@ private fun TaskHomeScaffold(
                     },
                     modifier = Modifier.fillMaxSize().padding(contentPadding),
                 ) {
+                    val expandedTaskContent: @Composable (TaskListItem, TaskCardPosition, Modifier) -> Unit = { task, position, rowModifier ->
+                        TaskInlineFoldout(
+                            graph = graph,
+                            taskId = task.id,
+                            fallbackTitle = task.title,
+                            fallbackCompleted = task.isCompleted,
+                            position = position,
+                            isDark = isDark,
+                            hasActiveTexture = appearance.hasActiveTexture,
+                            onOpenFullPage = { id ->
+                                onCollapseExpandedTask()
+                                onOpenFullPage(id)
+                            },
+                            onCollapse = onCollapseExpandedTask,
+                            modifier = rowModifier,
+                        )
+                    }
                     when (val location = state.location) {
                         is TaskHomeLocation.Area -> AreasProjectsScreen(
                             graph = graph,
@@ -1584,8 +1640,10 @@ private fun TaskHomeScaffold(
                                 }?.location ?: TaskHomeLocation.Project(projectId, "")
                                 onSelectHomeLocation(project)
                             },
-                            onOpenTask = onOpenTask,
+                            onOpenTask = onToggleExpandTask,
                             onMagicPlusDrop = { draft -> quickAddDraft = draft },
+                            expandedTaskId = expandedTaskId,
+                            expandedTaskContent = expandedTaskContent,
                         )
                         is TaskHomeLocation.Project -> AreasProjectsScreen(
                             graph = graph,
@@ -1597,7 +1655,7 @@ private fun TaskHomeScaffold(
                             fadedTitle = fadedTitle,
                             headerContent = sectionHeader,
                             onComplete = onComplete,
-                            onOpenTask = onOpenTask,
+                            onOpenTask = onToggleExpandTask,
                             rowMenuGroups = rowMenuGroups,
                             rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
                             onTaskAction = onTaskAction,
@@ -1607,6 +1665,8 @@ private fun TaskHomeScaffold(
                                 onSelectHomeLocation(TaskHomeLocation.SmartList(RegistryDestinationIds.TODAY))
                             },
                             onMagicPlusDrop = { draft -> quickAddDraft = draft },
+                            expandedTaskId = expandedTaskId,
+                            expandedTaskContent = expandedTaskContent,
                         )
                         is TaskHomeLocation.SmartList -> {
                             val isTodayList = location.destinationId == RegistryDestinationIds.TODAY
@@ -1628,6 +1688,8 @@ private fun TaskHomeScaffold(
                                 RegistryDestinationIds.ANYTIME,
                                 RegistryDestinationIds.STARRED,
                             )
+                            val allowMainInlineExpand = !isReviewList && !showingDeletedTab &&
+                                location.destinationId != RegistryDestinationIds.RECENTLY_DELETED
                             val inboxPositions = state.inboxTasks.map { it.position }
                             val taskPositions = displayedTasks.map { it.position }
                             TaskHomeContent(
@@ -1665,7 +1727,10 @@ private fun TaskHomeScaffold(
                                 listKey = location.destinationId to showingDeletedTab,
                             selection = selection,
                             onComplete = onComplete,
-                            onOpenTask = onOpenTask,
+                            onOpenTask = if (allowMainInlineExpand) onToggleExpandTask else onOpenFullPage,
+                            onOpenCollapsibleTask = onToggleExpandTask,
+                            expandedTaskId = expandedTaskId,
+                            expandedTaskContent = expandedTaskContent,
                             onTaskAction = onTaskAction,
                             onOpenGroupTarget = openGroupTarget,
                             onDropInboxHeader = if (isTodayList && state.canQuickAdd) {
@@ -1806,8 +1871,8 @@ private fun TaskHomeScaffold(
 
             // Round Magic Plus orb (matches iPhone `MagicPlusOrb`): visible on
             // creatable smart lists, areas and projects; hides during multi-select,
-            // while a snackbar is up, or when the software keyboard is showing.
-            if (canCreateHere && !selecting && !snackbarVisible && !imeVisible && !reorderDrag.isDragging) {
+            // while an inline foldout is open, while a snackbar is up, or when the software keyboard is showing.
+            if (canCreateHere && !selecting && expandedTaskId == null && !snackbarVisible && !imeVisible && !reorderDrag.isDragging) {
                 MagicPlusOrb(
                     drag = magicPlusDrag,
                     isViewingProject = state.location is TaskHomeLocation.Project,

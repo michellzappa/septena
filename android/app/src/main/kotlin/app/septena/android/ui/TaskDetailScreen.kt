@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -66,6 +67,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -124,35 +126,36 @@ import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.Locale
 
-private data class DetailListItem(
+internal data class DetailListItem(
     val id: String,
     val title: String,
     val parentAreaId: String? = null,
 )
 
-private data class ChecklistLine(
+internal data class ChecklistLine(
     val id: String,
     val title: String,
     val checked: Boolean,
     val position: Double,
 )
 
-private data class TagLine(val id: String, val name: String)
+internal data class TagLine(val id: String, val name: String)
 
-private data class TaskDetailData(
+internal data class TaskDetailData(
     val task: SyncRecord,
     val areas: List<DetailListItem>,
     val projects: List<DetailListItem>,
     val checklist: List<ChecklistLine>,
     val tags: List<TagLine>,
+    val attachmentCount: Int = 0,
     /** The task's conversation hands it to the user for review (`needs_verify`). */
     val needsReview: Boolean = false,
 )
 
-private data class RepeatUnitOption(val value: String, val title: String)
-private data class RepeatChoice(val value: Int, val title: String, val shortTitle: String? = null)
+internal data class RepeatUnitOption(val value: String, val title: String)
+internal data class RepeatChoice(val value: Int, val title: String, val shortTitle: String? = null)
 
-private val CHECKLIST_TITLE_MAX_LENGTH = RegistryEntities.all
+internal val CHECKLIST_TITLE_MAX_LENGTH = RegistryEntities.all
     .getValue(RegistryEntityNames.CHECKLIST_ITEM)
     .columns
     .getValue(RegistryEntityFields.ChecklistItem.TITLE)
@@ -815,6 +818,7 @@ fun TaskDetailScreen(
                             .align(Alignment.TopCenter)
                             .verticalScroll(rememberScrollState())
                             .navigationBarsPadding()
+                            .imePadding()
                             .padding(top = 4.dp, bottom = 48.dp),
                     ) {
                         if (doPage != null) {
@@ -1727,7 +1731,7 @@ private fun AttributeFoldRow(
 
 /** One choice in an embedded list picker. Clean iOS checkmark row; a tap commits it. */
 @Composable
-private fun ChoiceRow(
+internal fun ChoiceRow(
     title: String,
     selected: Boolean,
     enabled: Boolean,
@@ -1758,7 +1762,7 @@ private fun ChoiceRow(
 }
 
 @Composable
-private fun RepeatEditor(
+internal fun RepeatEditor(
     labels: TaskDetailLabels,
     units: List<RepeatUnitOption>,
     selectedUnit: String?,
@@ -1994,7 +1998,7 @@ private fun RepeatEditor(
 }
 
 @Composable
-private fun ChecklistRow(
+internal fun ChecklistRow(
     item: ChecklistLine,
     title: String,
     emptyTitle: String,
@@ -2007,6 +2011,7 @@ private fun ChecklistRow(
     onCommitTitle: () -> Unit,
     onToggle: (Boolean) -> Unit,
     onDelete: () -> Unit,
+    horizontalPadding: Dp = TaskCardMetrics.ContentInset,
 ) {
     var wasFocused by remember(item.id) { mutableStateOf(false) }
     val mutedInk = MaterialTheme.colorScheme.onSurfaceVariant
@@ -2015,7 +2020,7 @@ private fun ChecklistRow(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = TaskCardMetrics.ContentInset, vertical = 6.dp),
+            .padding(horizontal = horizontalPadding, vertical = 6.dp),
     ) {
         SeptenaTaskCheckbox(
             checked = item.checked,
@@ -2070,14 +2075,14 @@ private fun ChecklistRow(
     }
 }
 
-private data class TaskTagPickerLabels(
+internal data class TaskTagPickerLabels(
     val filterPlaceholder: String,
     val addTitle: String,
     val emptyTitle: String,
     val emptyDetail: String,
 )
 
-private fun taskTagPickerLabels(languageTag: String): TaskTagPickerLabels {
+internal fun taskTagPickerLabels(languageTag: String): TaskTagPickerLabels {
     val surface = RegistryCatalog.surface(RegistrySurfaceIds.TASK_TAGS_PICKER)
     fun label(field: String): String {
         val key = surface?.fields?.get(field).stringValue().orEmpty()
@@ -2091,7 +2096,7 @@ private fun taskTagPickerLabels(languageTag: String): TaskTagPickerLabels {
     )
 }
 
-private data class TaskDetailLabels(
+internal data class TaskDetailLabels(
     val title: String,
     val back: String,
     val cancel: String,
@@ -2174,7 +2179,7 @@ private data class TaskDetailLabels(
     }
 }
 
-private suspend fun loadTaskDetail(graph: AndroidAppGraph, taskId: String): TaskDetailData? {
+internal suspend fun loadTaskDetail(graph: AndroidAppGraph, taskId: String): TaskDetailData? {
     val task = graph.taskStore.record(RegistryEntityNames.TASK, taskId) ?: return null
     val areas = graph.taskStore.records(RegistryEntityNames.AREA)
         .filter { it.deletedAt == null }
@@ -2216,10 +2221,20 @@ private suspend fun loadTaskDetail(graph: AndroidAppGraph, taskId: String): Task
             row.fields[RegistryEntityFields.Tag.NAME].stringValue()?.let { name -> TagLine(row.id, name) }
         }
         .sortedBy { it.name.lowercase() }
+    val attachmentCount = graph.taskStore.records(RegistryEntityNames.ATTACHMENT)
+        .count { it.deletedAt == null && it.fields[RegistryEntityFields.Attachment.TASK_ID].stringValue() == taskId }
     val conversation = graph.taskStore.record(RegistryEntityNames.CONVO, taskId)?.let { record ->
         TaskConversation.from(record, graph.taskStore.turns(taskId))
     }
-    return TaskDetailData(task, areas, projects, checklist, tags, needsReview = conversation?.needsHumanReview == true)
+    return TaskDetailData(
+        task = task,
+        areas = areas,
+        projects = projects,
+        checklist = checklist,
+        tags = tags,
+        attachmentCount = attachmentCount,
+        needsReview = conversation?.needsHumanReview == true,
+    )
 }
 
 /** When the task was added: the creation instant in the device zone, else its creation day. */

@@ -246,6 +246,9 @@ fun TaskHomeContent(
     onAcceptReview: ((String) -> Unit)? = null,
     onSendBackReview: ((String) -> Unit)? = null,
     collapsibleGroup: CollapsibleTaskGroup? = null,
+    onOpenCollapsibleTask: ((String) -> Unit)? = null,
+    expandedTaskId: String? = null,
+    expandedTaskContent: (@Composable (task: TaskListItem, position: TaskCardPosition, modifier: Modifier) -> Unit)? = null,
 ) {
     val orderedSelectionIds = if (selection.isActive) {
         (inboxTasks + tasks).map(TaskListItem::id).filter { it in selection.selectedIds }
@@ -351,6 +354,8 @@ fun TaskHomeContent(
                     onReorderRow = onReorderInboxRow,
                     onReorderGroupHeader = null,
                     onApplyFilingSuggestion = onApplyFilingSuggestion,
+                    expandedTaskId = expandedTaskId,
+                    expandedTaskContent = expandedTaskContent,
                 )
             }
 
@@ -456,40 +461,44 @@ fun TaskHomeContent(
                     if (dayTasks.isNotEmpty()) {
                         val slicePositions = List(dayTasks.size) { i -> cardPosition(i, dayTasks.size) }
                         itemsIndexed(dayTasks, key = { _, (_, task) -> "task:${task.id}" }) { localIdx, (globalIdx, task) ->
-                            TaskCardRow(
-                                task = task,
-                                position = slicePositions[localIdx],
-                                completeTitle = completeTitle,
-                                canComplete = canComplete,
-                                todayTitle = todayTitle,
-                                todayTint = todayTint,
-                                fadedTitle = fadedTitle,
-                                showTodayIndicator = false,
-                                showFadedIndicator = showFadedIndicator,
-                                isDark = isDarkTheme,
-                                hasActiveTexture = hasActiveTexture,
-                                onComplete = onComplete,
-                                onOpenTask = onOpenTask,
-                                rowMenuGroups = rowMenuGroups,
-                                rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
-                                selection = selection,
-                                onTaskAction = onTaskAction,
-                                canReorder = canReorder && onReorderTaskRow != null,
-                                orderedDragIds = orderedSelectionIds,
-                                onApplyFilingSuggestion = onApplyFilingSuggestion,
-                                dropModifier = taskListMotion()
-                                    .magicPlusRowDrop(
-                                        id = "mp-task-${task.id}",
-                                        enabled = onDropTaskRow != null,
-                                        onDrop = { before -> onDropTaskRow?.invoke(globalIdx, before) },
-                                    )
-                                    .taskReorderRowDrop(
-                                        id = "reorder-task-${task.id}",
-                                        taskId = task.id,
-                                        enabled = canReorder && onReorderTaskRow != null,
-                                        onDrop = { ids, before -> onReorderTaskRow?.invoke(ids, globalIdx, before) },
-                                    ),
-                            )
+                            if (expandedTaskId == task.id && expandedTaskContent != null) {
+                                expandedTaskContent(task, slicePositions[localIdx], taskListMotion())
+                            } else {
+                                TaskCardRow(
+                                    task = task,
+                                    position = slicePositions[localIdx],
+                                    completeTitle = completeTitle,
+                                    canComplete = canComplete,
+                                    todayTitle = todayTitle,
+                                    todayTint = todayTint,
+                                    fadedTitle = fadedTitle,
+                                    showTodayIndicator = false,
+                                    showFadedIndicator = showFadedIndicator,
+                                    isDark = isDarkTheme,
+                                    hasActiveTexture = hasActiveTexture,
+                                    onComplete = onComplete,
+                                    onOpenTask = onOpenTask,
+                                    rowMenuGroups = rowMenuGroups,
+                                    rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
+                                    selection = selection,
+                                    onTaskAction = onTaskAction,
+                                    canReorder = canReorder && onReorderTaskRow != null,
+                                    orderedDragIds = orderedSelectionIds,
+                                    onApplyFilingSuggestion = onApplyFilingSuggestion,
+                                    dropModifier = taskListMotion()
+                                        .magicPlusRowDrop(
+                                            id = "mp-task-${task.id}",
+                                            enabled = onDropTaskRow != null,
+                                            onDrop = { before -> onDropTaskRow?.invoke(globalIdx, before) },
+                                        )
+                                        .taskReorderRowDrop(
+                                            id = "reorder-task-${task.id}",
+                                            taskId = task.id,
+                                            enabled = canReorder && onReorderTaskRow != null,
+                                            onDrop = { ids, before -> onReorderTaskRow?.invoke(ids, globalIdx, before) },
+                                        ),
+                                )
+                            }
                         }
                     }
                 }
@@ -524,6 +533,8 @@ fun TaskHomeContent(
                     reviewSendBackTitle = reviewSendBackTitle,
                     onAcceptReview = onAcceptReview,
                     onSendBackReview = onSendBackReview,
+                    expandedTaskId = expandedTaskId,
+                    expandedTaskContent = expandedTaskContent,
                 )
             }
 
@@ -552,13 +563,15 @@ fun TaskHomeContent(
                         isDark = isDarkTheme,
                         hasActiveTexture = hasActiveTexture,
                         onComplete = onComplete,
-                        onOpenTask = onOpenTask,
+                        onOpenTask = onOpenCollapsibleTask ?: onOpenTask,
                         rowMenuGroups = rowMenuGroups,
                         rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
                         selection = selection,
                         onTaskAction = onTaskAction,
                         onOpenGroupTarget = null,
                         onDropRow = null,
+                        expandedTaskId = expandedTaskId,
+                        expandedTaskContent = expandedTaskContent,
                     )
                 }
             }
@@ -599,6 +612,8 @@ private fun LazyListScope.taskCardRows(
     reviewSendBackTitle: String = "",
     onAcceptReview: ((String) -> Unit)? = null,
     onSendBackReview: ((String) -> Unit)? = null,
+    expandedTaskId: String? = null,
+    expandedTaskContent: (@Composable (task: TaskListItem, position: TaskCardPosition, modifier: Modifier) -> Unit)? = null,
 ) {
     // Compute contiguous card runs so each group paints continuous rounded glass card slices.
     val positions = computeCardPositions(tasks)
@@ -670,6 +685,8 @@ private fun LazyListScope.taskCardRows(
                     onTaskAction = onTaskAction,
                     modifier = taskListMotion(),
                 )
+            } else if (expandedTaskId == task.id && expandedTaskContent != null) {
+                expandedTaskContent(task, positions[index], taskListMotion())
             } else {
                 TaskCardRow(
                     task = task,
