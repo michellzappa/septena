@@ -500,6 +500,30 @@ The product is Septena; the code targets keep the working names `Septask` (iOS),
   you add a `.keyboardShortcut` to a command that iPad also compiles, check the
   system menu for the same keys. Not greppable (the collision depends on the
   platform's menus); this note is the guardrail.
+- **Area, Project, and Tag `position == 0` means UNSET — never sort `0` first
+  and never write 0-based reorders.** Canonical Apple ordering
+  (`SeptenaCore/TaskStructureOrder.swift`) assigns **1-based** positions
+  (`1..N`) on reorder and leaves new/never-reordered rows at `position = 0` (or
+  `null`). Both `0` and `null` MUST sink to the bottom in case-insensitive
+  alphabetical order, never ahead of `1, 2, 3…`. Sorting with
+  `position ?? 0` or `position ?: Double.MAX_VALUE` (or SQL
+  `ORDER BY position IS NULL, position`) breaks parity across devices — Web
+  (#702), Android (#758), and `TaskStore.ts` all hit this exact bug.
+  - **Reads:** use the shared helper on every surface (sidebars, pickers,
+    grouped lists, MCP/REST): `TaskStructureOrder.orderedAreas/orderedProjects`
+    (Apple), `StructureOrder.orderByPosition` (`android/core`),
+    `orderByPosition` (`web/src/lib/listOrder.ts`), and
+    `ORDER BY (position IS NULL OR position = 0), NULLIF(position, 0), lower(title), id`
+    (`backend/src/store/TaskStore.ts`).
+  - **Writes:** explicit reorders always write `1..N` (`idx + 1`). Appending a
+    new Area or Project without an explicit index writes `max + 1` only when
+    every existing sibling already has a positive position, and `0` otherwise
+    (`StructureOrder.nextAppendPosition` / `nextStructurePosition`) so a new
+    item never jumps ahead of existing `0` rows.
+  - **List-grouped views:** Today (when `todayGroupByList` is on), Anytime, and
+    Favorites all group in exact sidebar order (unfiled → each area's direct
+    tasks then its projects → standalone projects) via `TaskListOrder.byList`
+    (Apple), `groupTasksByList` (Web), and `groupByAreaAndProject` (Android).
 
 ## Where truth lives (priority order)
 

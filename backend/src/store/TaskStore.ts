@@ -2400,8 +2400,9 @@ export class TaskStore extends DurableObject<Env> {
   }
 
   readTags(): Row[] {
+    // 0 is the Apple/cross-platform "unset" sentinel (`TaskStructureOrder`): sink 0 and NULL to bottom.
     return this.sql.exec(
-      "SELECT * FROM tags WHERE deletedAt IS NULL ORDER BY position IS NULL, position, lower(name), id",
+      "SELECT * FROM tags WHERE deletedAt IS NULL ORDER BY (position IS NULL OR position = 0), NULLIF(position, 0), lower(name), id",
     ).toArray().map((r) => decodeRow(ENTITIES.tag, r) as Row);
   }
 
@@ -2415,14 +2416,14 @@ export class TaskStore extends DurableObject<Env> {
 
   readAreas(limit: number): Row[] {
     return this.sql.exec(
-      "SELECT * FROM areas WHERE deletedAt IS NULL ORDER BY position IS NULL, position, title LIMIT ?",
+      "SELECT * FROM areas WHERE deletedAt IS NULL ORDER BY (position IS NULL OR position = 0), NULLIF(position, 0), lower(title), id LIMIT ?",
       Math.min(Math.max(limit, 1), 500),
     ).toArray().map((r) => decodeRow(ENTITIES.area, r) as Row);
   }
 
   readProjects(status: "active" | "done" | "cancelled" | "all", limit: number): Row[] {
     const n = Math.min(Math.max(limit, 1), 500);
-    const order = "ORDER BY position IS NULL, position, title LIMIT ?";
+    const order = "ORDER BY (position IS NULL OR position = 0), NULLIF(position, 0), lower(title), id LIMIT ?";
     const rows = status === "all"
       ? this.sql.exec(`SELECT * FROM projects WHERE deletedAt IS NULL ${order}`, n)
       : this.sql.exec(`SELECT * FROM projects WHERE deletedAt IS NULL AND status = ? ${order}`, status, n);
