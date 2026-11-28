@@ -182,6 +182,10 @@ fun TaskHomeScreen(
     LaunchedEffect(state.selectedIds) {
         if (state.selectedIds.isNotEmpty()) expandedTaskId = null
     }
+    // Set when a new task must open on Today once Today has loaded: Magic Plus
+    // from a list whose `newTaskTarget` is today, and the Quick Add shortcut,
+    // tile and widget +.
+    var pendingTodayNewTask by remember { mutableStateOf(false) }
     LaunchedEffect(launchAction) {
         when (launchAction) {
             null -> Unit
@@ -212,7 +216,15 @@ fun TaskHomeScreen(
                 openedTaskAttribute = null
                 expandedTaskId = null
                 showingListsHome = false
-                homeQuickAddDraft = QuickAddDraft(today = launchAction.today)
+                // The standard inline new task on Today, the same draft Magic
+                // Plus opens (not the Quick Add sheet). The Do screen has no
+                // list behind it, so it keeps the sheet.
+                if (doing.current?.takeIf { doing.isFullHere } != null) {
+                    homeQuickAddDraft = QuickAddDraft(today = launchAction.today)
+                } else {
+                    pendingTodayNewTask = true
+                    selectHomeLocation(TaskHomeLocation.SmartList(RegistryDestinationIds.TODAY))
+                }
                 onConsumeLaunchAction()
             }
             is WidgetLaunchAction.JoinShare -> {
@@ -251,7 +263,6 @@ fun TaskHomeScreen(
     // Magic Plus tap / app.newTask from this list (`newTaskTarget` in destinations.json,
     // Apple `triggerInlineNewTask`): a draft here, a draft here on tomorrow, or a jump
     // to Today, where the draft opens once Today has loaded.
-    var pendingTodayNewTask by remember { mutableStateOf(false) }
     val newTaskFromHere: () -> Unit = {
         val destId = (state.location as? TaskHomeLocation.SmartList)?.destinationId
         val target = destId?.let(RegistryCatalog::destinationNewTaskTarget) ?: RegistryCatalog.NEW_TASK_HERE
