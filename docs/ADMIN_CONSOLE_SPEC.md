@@ -20,6 +20,7 @@ millions of accounts. It never shows what a user wrote (ADR 0043).
 | Website | Visitors (7 d with change, 30 d), bounce, visit length, visitors and signups per day, CTA goals with conversion, sources, pages, countries, download clicks by platform, list-keeper CTA by placement. Lists site events with no Plausible goal. | Plausible Stats API v2 (`PLAUSIBLE_API_KEY`; the site is in the Envisioning Plausible account, ADR 0058). Without a key: a shared dashboard, embedded (`PLAUSIBLE_SHARED_LINK`). |
 | Retention by week | Per start week: size, activated, active this week, 2+ devices, paying. | Account index |
 | Clients and agents | Devices and versions seen in 30 d, agents per client, sign-in providers, Mac downloads per release. | Account index, GitHub releases |
+| Appearance | Accent color, texture, and (for accounts with a texture) texture intensity and motion, as the share of active signed-in accounts (30 d). Kept in the daily snapshot as `appearance.<setting>.<value>`. Accounts without sign-in keep their settings on the device and are not counted (#859). | Account index (synced settings in `accountSummary`) + `metric_days` |
 | Plans and usage | Paid (year/month), granted, Pro, trial, lapsed, tasks, files. | Account index |
 | Plan links, Accounts, Signups | As in ADR 0043 and 0045. Signups add counts by page and people vs rows. | AccountStore, D1 `septena-signups` |
 
@@ -35,7 +36,7 @@ every account row.
 |---|---|---|
 | Overview | `/admin` | The morning read: growth cards (number, change against 7 days before, 30-day line), the ratio row, the website and product funnels. |
 | Website | `/admin/website` | Traffic cards, visitors and signups per day, calls to action with conversion, where visitors come from. |
-| Product | `/admin/product` | Retention by start week, devices and versions, agents, sign-in methods, Mac downloads, usage counts. |
+| Product | `/admin/product` | Retention by start week, devices and versions, agents, sign-in methods, Mac downloads, appearance mix, usage counts. |
 | Plans | `/admin/plans` | Plan counts, then plan links: make, close, take back. |
 | Accounts | `/admin/accounts` | Search and the account table: give or take back a plan. |
 | Signups | `/admin/signups` | Signup counts by list, screen, task app, week and page; the latest 50; CSV. |
@@ -63,6 +64,11 @@ it. The pages work at phone width.
   device with no version runs a build from before the header ("older
   build"). The server keeps every version a device ran for 90 days
   (`device_versions`), which gives release adoption.
+- **Appearance**: the synced value of `accentColor`, `canvasTexture`,
+  `textureIntensity` and `textureMotion` (`registry/settings.json`) of a
+  signed-in account. A setting with no row counts as its registry default. A
+  value outside the registry enum or range counts as "other". Intensity is
+  counted as the default, below it, or above it.
 - **Change**: today's value against the snapshot 7 days before; for daily
   counts, the last 7 days against the 7 before.
 
