@@ -119,6 +119,8 @@ struct SidebarRootView: View {
   /// Right-click → Change Emoji. The picker the area page's icon opens.
   @State private var emojiAreaTarget: Area?
   @State private var emojiDraft = ""
+  /// Right-click → Move… (`project.move`): the task Move sheet, areas only.
+  @State private var moveProjectTarget: Project?
 
   /// Right-click → Delete (confirm before mutating).
   @State private var deleteProjectTarget: Project?
@@ -133,17 +135,29 @@ struct SidebarRootView: View {
   var body: some View {
     #if os(macOS)
     sidebarMac.modifier(rightClickAlerts).sheet(item: $emojiAreaTarget, content: areaEmojiSheet)
+      .sheet(item: $moveProjectTarget, content: projectMoveSheet)
     #else
     if usesPushNavigation {
       sidebarSplit.modifier(rightClickAlerts).sheet(item: $emojiAreaTarget, content: areaEmojiSheet)
+      .sheet(item: $moveProjectTarget, content: projectMoveSheet)
     } else {
       sidebarPhone.modifier(rightClickAlerts).sheet(item: $emojiAreaTarget, content: areaEmojiSheet)
+      .sheet(item: $moveProjectTarget, content: projectMoveSheet)
     }
     #endif
   }
 
   private func areaEmojiSheet(_ area: Area) -> some View {
     EmojiPickerContent(emoji: $emojiDraft) { setAreaEmoji(area, $0) }
+  }
+
+  private func projectMoveSheet(_ project: Project) -> some View {
+    MovePickerSheet(areas: areas, projects: [], currentAreaId: project.area,
+                    noneTitle: String(localized: "No Area")) { areaId, _ in
+      moveProject(project, to: areaId)
+    }
+    .presentationDetents([.medium, .large])
+    .septenaSheetChrome()
   }
 
   private func setAreaEmoji(_ area: Area, _ value: String) {
@@ -1366,34 +1380,13 @@ struct SidebarRootView: View {
           })
         case .projectMarkDone: return .init { setProjectStatus(project, to: .done) }
         case .projectCancel: return .init { setProjectStatus(project, to: .cancelled) }
+        case .projectMove: return .init { moveProjectTarget = project }
         case .projectShare: return .init { SeptaskSharing.present(projectID: project.id) }
         // A shared project ends from its Share screen.
         case .projectDelete: return project.share == nil ? .init { deleteProjectTarget = project } : nil
         default: return nil
         }
-      },
-      slot: { id in
-        guard id == "moveToAreaDestinations" else { return [] }
-        return projectAreaDestinations(project)
       }))
-  }
-
-  /// Move to Area ▸ — No Area, then every area; the current parent is
-  /// checked and inert. Same slot the AppKit sidebar fills.
-  private func projectAreaDestinations(_ project: Project) -> [RegistryMenuNode] {
-    var nodes: [RegistryMenuNode] = [
-      RegistryMenuEntry.slot(id: "area.none", title: String(localized: "No Area"),
-                             sfSymbol: "tray", isOn: project.area == nil,
-                             perform: project.area == nil ? nil : { moveProject(project, to: nil) }),
-    ]
-    if !areas.isEmpty { nodes.append(.divider(id: "areas.divider")) }
-    for area in areas {
-      nodes.append(RegistryMenuEntry.slot(
-        id: "area.\(area.id)", title: area.title,
-        listIcon: .area(emoji: area.emoji), isOn: project.area == area.id,
-        perform: project.area == area.id ? nil : { moveProject(project, to: area.id) }))
-    }
-    return nodes
   }
 
   /// Registry `sidebar.area`, the same menu the AppKit sidebar renders.

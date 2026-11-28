@@ -2484,6 +2484,7 @@
     "text": "Move",
     "paths": [
       "actions.actions.task.move.shortTitle",
+      "actions.actions.project.move.shortTitle",
       "actions.contextMenus.task.row.move.title"
     ]
   },
@@ -2536,12 +2537,6 @@
     "text": "Move only this task, or update the repeating schedule to the new date?",
     "paths": [
       "surfaces.prompts.items.rescheduleFixedRepeat.message"
-    ]
-  },
-  "Move to Area": {
-    "text": "Move to Area",
-    "paths": [
-      "actions.contextMenus.sidebar.project.moveToArea.title"
     ]
   },
   "Move to Suggested List": {
@@ -2620,7 +2615,8 @@
   "Move…": {
     "text": "Move…",
     "paths": [
-      "actions.actions.task.move.title"
+      "actions.actions.task.move.title",
+      "actions.actions.project.move.title"
     ]
   },
   "Name": {

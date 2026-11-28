@@ -857,7 +857,8 @@ struct ProjectDetailView: View {
     }
     .toolbar { projectDetailToolbar }
     .sheet(isPresented: $showingMoveToArea) {
-      AreaPickerSheet(areas: areas, currentAreaId: project.area) { newAreaId in
+      MovePickerSheet(areas: areas, projects: [], currentAreaId: project.area,
+                      noneTitle: String(localized: "No Area")) { newAreaId, _ in
         moveToArea(newAreaId)
       }
       .presentationDetents([.medium, .large])
@@ -957,7 +958,7 @@ struct ProjectDetailView: View {
       Button {
         showingMoveToArea = true
       } label: {
-        Label("Move to Area…", systemImage: "folder")
+        Label(RegistryActions.title(.projectMove), systemImage: RegistryIcons.sfSymbol(for: "action.move"))
       }
       Button {
         SeptaskSharing.present(projectID: project.id)
@@ -1174,76 +1175,5 @@ struct ProjectDetailView: View {
         errorMessage = error.localizedDescription
       }
     }
-  }
-}
-
-
-// MARK: - Area picker (used by Project "Move to Area…")
-
-struct AreaPickerSheet: View {
-  let areas: [Area]
-  let currentAreaId: String?
-  let onPick: (String?) -> Void
-  @Environment(\.dismiss) private var dismiss
-
-  var body: some View {
-    NavigationStack {
-      List {
-        Button {
-          if currentAreaId != nil { onPick(nil) }
-          dismiss()
-        } label: {
-          row(label: "No Area", icon: "tray", selected: currentAreaId == nil)
-        }
-        .buttonStyle(PlainHoverRowButtonStyle())
-        .listRowBackground(SelectableListRowBackground(isSelected: currentAreaId == nil))
-
-        ForEach(areas) { area in
-          let isCurrent = currentAreaId == area.id
-          Button {
-            if !isCurrent { onPick(area.id) }
-            dismiss()
-          } label: {
-            row(label: area.title, icon: "square.stack.3d.up.fill",
-                emoji: area.emoji, selected: isCurrent)
-          }
-          .buttonStyle(PlainHoverRowButtonStyle())
-          .listRowBackground(SelectableListRowBackground(isSelected: isCurrent))
-        }
-      }
-      .navigationTitle("Move to Area")
-      .septenaInlineTitle()
-      .toolbar {
-        ToolbarItem(placement: .cancellationAction) {
-          DrawerCloseButton { dismiss() }
-        }
-      }
-    }
-    .macSheetFrame(width: 460, height: 480)
-  }
-
-  @ViewBuilder
-  private func row(label: String, icon: String, emoji: String? = nil, selected: Bool) -> some View {
-    HStack(spacing: 12) {
-      if icon == "square.stack.3d.up.fill" {
-        AreaIcon(diameter: 15, lineWidth: 1.1, emoji: emoji)
-          .frame(width: 22)
-      } else {
-        Image(systemName: icon)
-          .scaledFont(size: 15)
-          .foregroundStyle(Theme.iconMuted)
-          .frame(width: 22)
-      }
-      Text(label)
-        .fontWeight(selected ? .semibold : .regular)
-        .foregroundStyle(Theme.inkPrimary)
-      Spacer()
-      if selected {
-        Image(systemName: "checkmark")
-          .scaledFont(size: 13, weight: .semibold)
-          .foregroundStyle(AppearancePreferences.shared.accentSwiftUIColor)
-      }
-    }
-    .contentShape(Rectangle())
   }
 }

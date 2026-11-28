@@ -784,6 +784,19 @@ enum KitMoveMenu {
     }
     return rows
   }
+
+  /// Project ▸ Move… list — No Area, then every area in sidebar order.
+  static func areaDestinations(areas: [Area]) -> [PickerRow] {
+    var rows: [PickerRow] = [
+      PickerRow(title: String(localized: "No Area", comment: "SeptaskKit: project Move picker"),
+                target: .none, emoji: nil, indent: false, projectId: nil)
+    ]
+    for area in areas {
+      rows.append(PickerRow(title: area.title, target: .area(area.id),
+                            emoji: area.emoji, indent: false, projectId: nil))
+    }
+    return rows
+  }
 }
 
 /// A table cell that draws the list's selection wash itself, on its own
