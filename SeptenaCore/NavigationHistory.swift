@@ -43,12 +43,16 @@ struct NavigationHistory<Entry: Equatable> {
   /// The previous destination that still exists, or nil. Entries that no
   /// longer exist are dropped on the way.
   mutating func goBack(exists: (Entry) -> Bool = { _ in true }) -> Entry? {
-    step(from: &back, to: &forward, exists: exists)
+    var source = back, target = forward
+    defer { back = source; forward = target }
+    return step(from: &source, to: &target, exists: exists)
   }
 
   /// The next destination that still exists, or nil.
   mutating func goForward(exists: (Entry) -> Bool = { _ in true }) -> Entry? {
-    step(from: &forward, to: &back, exists: exists)
+    var source = forward, target = back
+    defer { forward = source; back = target }
+    return step(from: &source, to: &target, exists: exists)
   }
 
   private mutating func step(from source: inout [Entry], to target: inout [Entry],
