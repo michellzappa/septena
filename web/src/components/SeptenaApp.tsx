@@ -44,6 +44,7 @@ import {
   type CoreProjection,
 } from "@/lib/core";
 import { evaluateConversation, groupTurnsByTask } from "@/lib/conversation";
+import { historyStepForKey, isMacPlatform } from "@/lib/historyKeys";
 import { addDays, attributeLabel, todayLabel, tomorrowLabel, type DateBoardAttribute } from "@/lib/dateBoard";
 import {
   SIDEBAR_DESTINATIONS,
@@ -2025,6 +2026,16 @@ export function SeptenaApp() {
         target?.tagName === "TEXTAREA" ||
         target?.tagName === "SELECT" ||
         target?.isContentEditable;
+
+      // app.goBack / app.goForward (#849): Ctrl-[ / Ctrl-] off the Mac. On a
+      // Mac the browser already maps Cmd-[ / Cmd-] (src/lib/historyKeys.ts).
+      const historyStep = historyStepForKey(e, { isMac: isMacPlatform(), typing: Boolean(typing) });
+      if (historyStep) {
+        e.preventDefault();
+        if (historyStep === "back") window.history.back();
+        else window.history.forward();
+        return;
+      }
 
       // Global shortcuts even when browsing or typing
       if (

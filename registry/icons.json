@@ -73,6 +73,8 @@
     "action.move_up": { "sfSymbol": "chevron.up", "material": "keyboard_arrow_up", "lucide": "chevron-up" },
     "action.move_down": { "sfSymbol": "chevron.down", "material": "keyboard_arrow_down", "lucide": "chevron-down" },
     "action.add": { "sfSymbol": "plus", "material": "add", "lucide": "plus" },
+    "action.go_back": { "sfSymbol": "chevron.backward", "material": "arrow_back", "lucide": "arrow-left" },
+    "action.go_forward": { "sfSymbol": "chevron.forward", "material": "arrow_forward", "lucide": "arrow-right" },
     "action.search": { "sfSymbol": "magnifyingglass", "material": "search", "lucide": "search" },
     "action.sidebar": { "sfSymbol": "sidebar.leading", "material": "side_navigation", "lucide": "panel-left" },
     "action.notes": { "sfSymbol": "text.alignleft", "material": "notes", "lucide": "align-left" },

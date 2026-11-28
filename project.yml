@@ -627,6 +627,7 @@ targets:
       - path: SeptenaCore/TaskBackend/PlusAccountOwnership.swift
       - path: SeptenaCore/AppSettings.swift
       - path: SeptenaCore/Generated/RegistryConstants.swift
+      - path: SeptenaCore/NavigationHistory.swift
     dependencies:
       - package: SeptenaSharedCore
     configFiles:

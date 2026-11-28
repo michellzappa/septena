@@ -35,6 +35,8 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     // Registered before any list content loads, so nothing that runs during
     // that load can build a second shell.
     current = controller
+    // A shell starts with no history, whatever the last one left.
+    controller.syncHistoryMirror()
     controller.restoreDestination()
     controller.syncDo()
     controller.window?.makeKeyAndOrderFront(nil)
@@ -62,6 +64,9 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
   private var currentDestinationKey: String?
   /// Its title, for the way back from the Do screen.
   private var destinationTitle = ""
+  /// Back / Forward through the lists this window showed (⌘[ / ⌘], #849),
+  /// by `KitSidebarDestination.key`.
+  private var history = NavigationHistory<String>()
   /// Split-view resize observer (sidebar-hidden mirror). Process-lived like
   /// the window, but removed on close all the same.
   private var layoutObserver: NSObjectProtocol?
@@ -305,6 +310,10 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
       inspector?.flushPendingEdits()
       currentDestinationKey = destination.key
       UserDefaults.standard.set(destination.key, forKey: SeptaskKitStateKey.lastDestination)
+      // A step Back or Forward lands here too; the history ignores a visit
+      // to the destination it already holds.
+      history.visit(destination.key)
+      syncHistoryMirror()
     }
     // A pick in a sidebar the user opened over the Do screen leaves the
     // screen. Any other change (a rebuild, a deleted project) only moves the
@@ -485,6 +494,42 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
   func go(to filter: TaskFilter) {
     leaveDoScreenForList()
     sidebar?.select(filter)
+  }
+
+  var canGoBack: Bool { history.canGoBack }
+  var canGoForward: Bool { history.canGoForward }
+
+  /// ⌘[ — the previous list this window showed. A deleted area or project
+  /// is skipped. Selecting the row drives the list, as every jump does.
+  func goBack() {
+    guard let sidebar else { return }
+    let key = history.goBack(exists: { sidebar.hasDestination(key: $0) })
+    syncHistoryMirror()
+    guard let key else { return }
+    leaveDoScreenForList()
+    sidebar.select(key: key)
+  }
+
+  /// ⌘] — the list Back left.
+  func goForward() {
+    guard let sidebar else { return }
+    let key = history.goForward(exists: { sidebar.hasDestination(key: $0) })
+    syncHistoryMirror()
+    guard let key else { return }
+    leaveDoScreenForList()
+    sidebar.select(key: key)
+  }
+
+  /// Go ▸ Back / Forward turn off at either end. A `Commands` body
+  /// re-evaluates on `@AppStorage`, so the shell mirrors the two states there.
+  private func syncHistoryMirror() {
+    let defaults = UserDefaults.standard
+    if defaults.bool(forKey: SeptaskKitStateKey.canGoBack) != history.canGoBack {
+      defaults.set(history.canGoBack, forKey: SeptaskKitStateKey.canGoBack)
+    }
+    if defaults.bool(forKey: SeptaskKitStateKey.canGoForward) != history.canGoForward {
+      defaults.set(history.canGoForward, forKey: SeptaskKitStateKey.canGoForward)
+    }
   }
   func revealTask(id taskId: String, in filter: TaskFilter, opensPage: Bool = false) {
     leaveDoScreenForList()
@@ -750,6 +795,9 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     if let doObserver { NotificationCenter.default.removeObserver(doObserver) }
     doObserver = nil
     Self.current = nil
+    // The next shell starts with no history: turn Back / Forward off.
+    history = NavigationHistory()
+    syncHistoryMirror()
   }
 
   /// The window's undo manager is the ONE shared task stack, whatever pane
@@ -797,6 +845,10 @@ enum SeptaskKitStateKey {
   static let sidebarHidden = "septaskKitSidebarHidden"
   /// The Do screen collapsed the sidebar: it opens again when the screen goes.
   static let doHidSidebar = "septaskKitDoHidSidebar"
+  /// Mirrors of the shell's Back / Forward history (#849), so Go ▸ Back and
+  /// Go ▸ Forward turn off at either end. A new shell starts with none.
+  static let canGoBack = "septaskKitCanGoBack"
+  static let canGoForward = "septaskKitCanGoForward"
 }
 
 /// Hosts the middle split pane's child (the task list) with manual
@@ -894,6 +946,20 @@ enum SeptaskKitCommands {
   static func showInspector() { shell?.showInspector() }
   static func toggleSidebar() { shell?.toggleSidebar() }
   static func toggleSidebarCounts() { shell?.toggleSidebarCounts() }
+  /// Back / Forward target the shell whenever one exists, like the other
+  /// navigation commands (`canNavigate`).
+  static var canGoBack: Bool { SeptaskKitWindowController.existing?.canGoBack ?? false }
+  static var canGoForward: Bool { SeptaskKitWindowController.existing?.canGoForward ?? false }
+  static func goBack() {
+    guard let controller = SeptaskKitWindowController.existing else { return }
+    controller.focusWindow()
+    controller.goBack()
+  }
+  static func goForward() {
+    guard let controller = SeptaskKitWindowController.existing else { return }
+    controller.focusWindow()
+    controller.goForward()
+  }
   static func row(_ command: SeptaskKitWindowController.RowCommand) {
     shell?.rowCommand(command)
   }

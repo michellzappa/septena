@@ -444,6 +444,22 @@
       "availability": { "selection": "none" },
       "featureId": "find.quick-find"
     },
+    "app.goBack": {
+      "title": "Back",
+      "icon": "action.go_back",
+      "role": "default",
+      "shortcut": { "key": "[", "modifiers": ["primary"] },
+      "availability": { "selection": "none" },
+      "featureId": "mac.keyboard"
+    },
+    "app.goForward": {
+      "title": "Forward",
+      "icon": "action.go_forward",
+      "role": "default",
+      "shortcut": { "key": "]", "modifiers": ["primary"] },
+      "availability": { "selection": "none" },
+      "featureId": "mac.keyboard"
+    },
     "app.pauseAgents": {
       "title": "Pause all agents",
       "activeTitle": "Resume all agents",
@@ -737,6 +753,9 @@
       "id": "go",
       "title": "Go",
       "items": [
+        { "kind": "action", "id": "app.goBack" },
+        { "kind": "action", "id": "app.goForward" },
+        { "kind": "divider" },
         { "kind": "slot", "slot": "smartLists" },
         { "kind": "divider" },
         { "kind": "action", "id": "app.quickFind" },
@@ -786,7 +805,7 @@
     {
       "id": "general",
       "title": "General",
-      "actionIds": ["app.newTask", "app.quickAdd", "app.quickFind", "app.toggleSidebar", "app.settings", "app.keyboardShortcuts"]
+      "actionIds": ["app.newTask", "app.quickAdd", "app.quickFind", "app.goBack", "app.goForward", "app.toggleSidebar", "app.settings", "app.keyboardShortcuts"]
     },
     {
       "id": "taskList",

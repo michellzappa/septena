@@ -226,6 +226,9 @@ object RegistryCatalog {
     fun actionTitle(id: String, field: String = "title", languageTag: String = "en"): String? =
         action(id)?.stringAt(field)?.let { localizedString(it, languageTag) ?: it }
 
+    /** The key of an action's registry shortcut (`shortcut.key`, e.g. "[" for app.goBack). */
+    fun actionShortcutKey(id: String): String? = action(id)?.objectAt("shortcut")?.stringAt("key")
+
     fun actionAddTitle(id: String, languageTag: String = "en"): String? =
         actionTitle(id, field = ACTION_ADD_TITLE_FIELD, languageTag = languageTag)
 

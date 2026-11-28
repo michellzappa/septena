@@ -22,6 +22,7 @@ pub mod rules {
     pub const DELETE_GRACE_SECONDS: i64 = 120;
     pub const DO_STALE_HOURS: i64 = 4;
     pub const DO_LAPSE_HOURS: i64 = 24;
+    pub const NAVIGATION_HISTORY_LIMIT: i64 = 50;
 }
 
 /// Wire limits (`registry/entities.json` `limits`).

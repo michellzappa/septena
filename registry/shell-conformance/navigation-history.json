@@ -1,0 +1,115 @@
+{
+  "version": 1,
+  "description": "Back / Forward through the lists one window visited (#849, Cmd-[ / Cmd-]). Shell state, not a core rule (the core owns no destination state), so it lives outside registry/conformance, which only the core runs. Run by SeptenaCoreTests (Swift NavigationHistory) and android/core (Kotlin NavigationHistory). Entries are opaque destination keys. Steps: visit an entry, go back or forward (expect is the entry returned, null when nothing is left), or remove an entry (a deleted area or project: Back and Forward skip it). expected is the state after the last step. limit overrides registry/rules.json navigationHistoryLimit for that case.",
+  "cases": [
+    {
+      "name": "visits push and back returns in reverse order",
+      "steps": [
+        { "op": "visit", "entry": "today" },
+        { "op": "visit", "entry": "area.a1" },
+        { "op": "visit", "entry": "project.p1" },
+        { "op": "back", "expect": "area.a1" },
+        { "op": "back", "expect": "today" },
+        { "op": "back", "expect": null }
+      ],
+      "expected": { "current": "today", "back": [], "forward": ["project.p1", "area.a1"] }
+    },
+    {
+      "name": "forward replays what back undid",
+      "steps": [
+        { "op": "visit", "entry": "today" },
+        { "op": "visit", "entry": "area.a1" },
+        { "op": "visit", "entry": "project.p1" },
+        { "op": "back", "expect": "area.a1" },
+        { "op": "back", "expect": "today" },
+        { "op": "forward", "expect": "area.a1" }
+      ],
+      "expected": { "current": "area.a1", "back": ["today"], "forward": ["project.p1"] }
+    },
+    {
+      "name": "a new visit clears the forward stack",
+      "steps": [
+        { "op": "visit", "entry": "today" },
+        { "op": "visit", "entry": "area.a1" },
+        { "op": "back", "expect": "today" },
+        { "op": "visit", "entry": "upcoming" },
+        { "op": "forward", "expect": null }
+      ],
+      "expected": { "current": "upcoming", "back": ["today"], "forward": [] }
+    },
+    {
+      "name": "visiting the list on screen does nothing",
+      "steps": [
+        { "op": "visit", "entry": "today" },
+        { "op": "visit", "entry": "area.a1" },
+        { "op": "back", "expect": "today" },
+        { "op": "visit", "entry": "today" }
+      ],
+      "expected": { "current": "today", "back": [], "forward": ["area.a1"] }
+    },
+    {
+      "name": "the first visit has nothing to go back to",
+      "steps": [
+        { "op": "visit", "entry": "today" },
+        { "op": "back", "expect": null },
+        { "op": "forward", "expect": null }
+      ],
+      "expected": { "current": "today", "back": [], "forward": [] }
+    },
+    {
+      "name": "back skips a deleted project",
+      "steps": [
+        { "op": "visit", "entry": "today" },
+        { "op": "visit", "entry": "project.p1" },
+        { "op": "visit", "entry": "anytime" },
+        { "op": "remove", "entry": "project.p1" },
+        { "op": "back", "expect": "today" }
+      ],
+      "expected": { "current": "today", "back": [], "forward": ["anytime"] }
+    },
+    {
+      "name": "forward skips a deleted area",
+      "steps": [
+        { "op": "visit", "entry": "today" },
+        { "op": "visit", "entry": "area.a1" },
+        { "op": "visit", "entry": "anytime" },
+        { "op": "back", "expect": "area.a1" },
+        { "op": "back", "expect": "today" },
+        { "op": "remove", "entry": "area.a1" },
+        { "op": "forward", "expect": "anytime" }
+      ],
+      "expected": { "current": "anytime", "back": ["today"], "forward": [] }
+    },
+    {
+      "name": "back with only deleted entries stays put",
+      "steps": [
+        { "op": "visit", "entry": "project.p1" },
+        { "op": "visit", "entry": "today" },
+        { "op": "remove", "entry": "project.p1" },
+        { "op": "back", "expect": null }
+      ],
+      "expected": { "current": "today", "back": [], "forward": [] }
+    },
+    {
+      "name": "the back stack drops its oldest entry at the limit",
+      "limit": 3,
+      "steps": [
+        { "op": "visit", "entry": "l1" },
+        { "op": "visit", "entry": "l2" },
+        { "op": "visit", "entry": "l3" },
+        { "op": "visit", "entry": "l4" },
+        { "op": "visit", "entry": "l5" }
+      ],
+      "expected": { "current": "l5", "back": ["l2", "l3", "l4"], "forward": [] }
+    },
+    {
+      "name": "tag filters are destinations too",
+      "steps": [
+        { "op": "visit", "entry": "today" },
+        { "op": "visit", "entry": "today.tag.t1" },
+        { "op": "back", "expect": "today" }
+      ],
+      "expected": { "current": "today", "back": [], "forward": ["today.tag.t1"] }
+    }
+  ]
+}

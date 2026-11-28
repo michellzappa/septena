@@ -6,6 +6,7 @@ import app.septena.android.AndroidAppGraph
 import app.septena.core.JsonValue
 import app.septena.core.ListSortPreferences
 import app.septena.core.ListSortRules
+import app.septena.core.NavigationHistory
 import app.septena.core.ProjectShare
 import app.septena.core.RegistryActionContext
 import app.septena.core.RegistryActionResolver
@@ -165,6 +166,8 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
     private val location = MutableStateFlow<TaskHomeLocation>(
         TaskHomeLocation.SmartList(RegistryDestinationIds.TODAY),
     )
+    /** Back / Forward through the lists this window showed (#849), by [historyKey]. */
+    private val history = NavigationHistory<String>().apply { visit(historyKey(location.value)) }
     private val starredOnly = MutableStateFlow(false)
     private val selectedIds = MutableStateFlow<Set<String>>(emptySet())
     private val errorMessage = MutableStateFlow<String?>(null)
@@ -247,7 +250,34 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         val opensFaded = location == TaskHomeLocation.SmartList(RegistryDestinationIds.FADED)
         val opensAgent = location == TaskHomeLocation.SmartList(RegistryDestinationIds.AGENT)
         if (opensFaded) graph.fadeSweepStore.setFadedGroupExpanded(true)
-        this.location.value = if (opensFaded || opensAgent) TaskHomeLocation.SmartList(RegistryDestinationIds.REVIEW) else location
+        val shown = if (opensFaded || opensAgent) TaskHomeLocation.SmartList(RegistryDestinationIds.REVIEW) else location
+        this.location.value = shown
+        // A step Back or Forward lands here too; the history ignores a visit
+        // to the destination it already holds.
+        history.visit(historyKey(shown))
+    }
+
+    /**
+     * Steps Back (Ctrl or Cmd with [) and returns the list to show, or null at the end. A deleted
+     * area or project is skipped. The caller shows it through the same path as a tap.
+     */
+    fun historyBack(): TaskHomeLocation? =
+        history.goBack { historyLocation(it) != null }?.let(::historyLocation)
+
+    /** Steps Forward (Ctrl or Cmd with ]); see [historyBack]. */
+    fun historyForward(): TaskHomeLocation? =
+        history.goForward { historyLocation(it) != null }?.let(::historyLocation)
+
+    /** The live location for a history key, with its current title; null when it was deleted. */
+    private fun historyLocation(key: String): TaskHomeLocation? {
+        val (kind, id) = key.split(":", limit = 2).takeIf { it.size == 2 } ?: return null
+        val current = state.value
+        return when (kind) {
+            "smart" -> TaskHomeLocation.SmartList(id)
+            "area" -> current.areas.firstOrNull { (it.location as? TaskHomeLocation.Area)?.id == id }?.location
+            "project" -> current.projects.firstOrNull { (it.location as? TaskHomeLocation.Project)?.id == id }?.location
+            else -> null
+        }
     }
 
     fun toggleFadedGroup() {
@@ -1894,4 +1924,11 @@ private fun JsonValue?.numberValue(): Double? = when (this) {
     is JsonValue.IntegerValue -> value.toDouble()
     is JsonValue.DecimalValue -> value
     else -> null
+}
+
+/** Stable history key: a renamed area or project stays the same entry. */
+private fun historyKey(location: TaskHomeLocation): String = when (location) {
+    is TaskHomeLocation.SmartList -> "smart:${location.destinationId}"
+    is TaskHomeLocation.Area -> "area:${location.id}"
+    is TaskHomeLocation.Project -> "project:${location.id}"
 }
