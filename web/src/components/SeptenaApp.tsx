@@ -26,6 +26,7 @@ import {
   Undo2,
   Wifi,
   X,
+  FlaskConical,
 } from "lucide-react";
 import { SeptenaApiClient } from "@/lib/api/client";
 import {
@@ -131,6 +132,7 @@ import { FirstRunModal } from "./FirstRunModal";
 import { HeaderWash } from "./HeaderWash";
 import { KeyboardShortcutsModal, formatShortcutKeycaps } from "./KeyboardShortcutsModal";
 import { SupportModal, supportKey } from "./SupportModal";
+import { BetaModal, useBeta } from "./BetaModal";
 import { QuickAddModal, type QuickAddInitial } from "./QuickAddModal";
 import { QuickFindModal, type CommandBarItem } from "./QuickFindModal";
 import { RegistryIcon } from "./RegistryIcon";
@@ -309,6 +311,12 @@ export function SeptenaApp() {
   // Contact Support (ADR 0054): the modal and the unread replies' dot.
   const [supportOpen, setSupportOpen] = useState(false);
   const [supportUnread, setSupportUnread] = useState(0);
+  /** The message field's first line when Contact Support opens from a beta item. */
+  const [supportPrefill, setSupportPrefill] = useState<string | null>(null);
+  // The beta checklist (docs/BETA_ONBOARDING_SPEC.md §7): testers only. Read
+  // at sign-in and again when Settings opens, for the row's count.
+  const [betaOpen, setBetaOpen] = useState(false);
+  const { beta, write: writeBeta } = useBeta(api, bootPhase === "signed_in", settingsOpen);
   // The dot on Settings, About, Contact Support: read when Settings opens.
   useEffect(() => {
     if (!settingsOpen) return;
@@ -2109,7 +2117,14 @@ export function SeptenaApp() {
       }
 
       const anyModalOpen =
-        quickFindOpen || quickAddOpen || settingsOpen || shortcutsOpen || supportOpen || sweepTasks !== null || firstRunOpen;
+        quickFindOpen ||
+        quickAddOpen ||
+        settingsOpen ||
+        shortcutsOpen ||
+        supportOpen ||
+        betaOpen ||
+        sweepTasks !== null ||
+        firstRunOpen;
       if (anyModalOpen) return;
 
       if (primary && !e.altKey && key === "z" && !typing) {
@@ -2267,6 +2282,7 @@ export function SeptenaApp() {
     activeSelectedTasks,
     bootPhase,
     collapseInlineTask,
+    betaOpen,
     completeMany,
     destination,
     engine,
@@ -3444,8 +3460,13 @@ export function SeptenaApp() {
       onDeleteAccount={handleDeleteAccount}
       onShowWelcomeAgain={() => setFirstRunOpen(true)}
       onOpenShortcuts={() => setShortcutsOpen(true)}
-      onOpenSupport={() => setSupportOpen(true)}
+      onOpenSupport={() => {
+        setSupportPrefill(null);
+        setSupportOpen(true);
+      }}
       supportUnread={supportUnread}
+      beta={beta}
+      onOpenBeta={() => setBetaOpen(true)}
     />
     </>
   );
@@ -4431,6 +4452,39 @@ export function SeptenaApp() {
 
         <div className="relative z-10 flex-1 overflow-y-auto px-4 py-4 md:px-10 md:py-6">
           <div className="mx-auto max-w-2xl pb-16">
+            {/* The beta welcome card (docs/BETA_ONBOARDING_SPEC.md §7): once, at
+                the top of Today, until either button closes it for good. */}
+            {destination.kind === "smart" && destination.id === "today" && beta && beta.cardDismissedAt == null && (
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/90 px-4 py-2.5 text-xs">
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <FlaskConical className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
+                  <span className="text-[var(--text-secondary)]">
+                    <strong className="font-medium text-[var(--text-primary)]">{beta.copy.cardTitle}</strong>{" "}
+                    {beta.copy.cardBody}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      writeBeta({ dismissCard: true });
+                      setBetaOpen(true);
+                    }}
+                    className="rounded-md bg-[var(--bg-selected)] px-2.5 py-1 font-medium text-[var(--text-primary)]"
+                  >
+                    {beta.copy.cardOpen}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => writeBeta({ dismissCard: true })}
+                    className="text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                  >
+                    {beta.copy.cardDismiss}
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Due Timed Reminder Banner */}
             {dueReminderTask && (
               <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--accent)]/40 bg-[var(--bg-elevated)] px-4 py-2.5 text-xs shadow-sm">
@@ -5356,8 +5410,25 @@ export function SeptenaApp() {
         open={supportOpen}
         language={lang}
         api={api}
-        onClose={() => setSupportOpen(false)}
+        onClose={() => {
+          setSupportOpen(false);
+          setSupportPrefill(null);
+        }}
         onUnreadChange={setSupportUnread}
+        initialText={supportPrefill}
+      />
+
+      <BetaModal
+        open={betaOpen}
+        language={lang}
+        beta={beta}
+        onClose={() => setBetaOpen(false)}
+        onWrite={writeBeta}
+        onSendNote={(subject) => {
+          setBetaOpen(false);
+          setSupportPrefill(subject);
+          setSupportOpen(true);
+        }}
       />
 
       <KeyboardShortcutsModal
