@@ -1,4 +1,4 @@
-# Septask Android — bridge app plan
+# Android bridge app plan (superseded)
 
 > **Superseded on architecture** (2026-11-19). This plan assumes CloudKit
 > stays the store and Android reaches it through the gateway. Septena leaves

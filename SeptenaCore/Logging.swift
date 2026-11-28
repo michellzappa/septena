@@ -28,7 +28,7 @@ extension Notification.Name {
   /// Posted when a task *view* option flips (currently only
   /// `SettingsKey.todayGroupByList`, from the View menu / the Tasks "···"
   /// menu / Settings). SwiftUI surfaces bind the key through `@AppStorage` and
-  /// repaint themselves; Septask's AppKit list reads `UserDefaults` directly
+  /// repaint themselves; Septena's AppKit list reads `UserDefaults` directly
   /// and has no observation of it, so it needs this nudge to rebuild its rows.
   static let septenaTaskViewOptionsChanged = Notification.Name("septena.taskViewOptionsChanged")
 }

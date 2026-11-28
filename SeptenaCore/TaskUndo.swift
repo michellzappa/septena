@@ -3,7 +3,7 @@ import SwiftData
 
 // MARK: - TaskUndo
 //
-// ONE undo stack for every task surface: Septena and Septask, iOS and macOS,
+// ONE undo stack for every task surface: Septena Life and Septena, iOS and macOS,
 // SwiftUI and AppKit.
 //
 // Why this lives in core rather than in a shell: undo was built first inside

@@ -2,7 +2,7 @@ import { fromBase64Url, sha256Base64Url } from "../util.js";
 
 // Verifies a native Sign in with Apple identity token (a JWT signed by Apple)
 // and returns the stable user id (`sub`). `sub` is per developer team, so
-// Septena and Septask on every platform see the same value for one person.
+// Septena Life and Septena on every platform see the same value for one person.
 //
 // Replay guard: the app sends Apple the SHA-256 of a one-time raw nonce and
 // sends us the raw nonce; the token's `nonce` claim must match its hash.

@@ -24,7 +24,7 @@ struct KeyboardShortcutGroup: Identifiable {
 
 enum KeyboardShortcutsCatalogue {
   // Navigation differs per shell: Septena's tab hops + smart-list jumps vs
-  // Septask's plain ⌘-digit smart lists (its Go menu), numbered by the
+  // Septena's plain ⌘-digit smart lists (its Go menu), numbered by the
   // user's sidebar.
   @MainActor private static var navigation: KeyboardShortcutGroup {
     let prefs = SmartListPreferences.shared

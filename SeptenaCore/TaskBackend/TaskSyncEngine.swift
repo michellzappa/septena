@@ -3,7 +3,7 @@ import Observation
 import SwiftData
 
 // The app-side task sync client (docs/SEPTASK_BACKEND.md §6, §7, §9).
-// Active only in Septask, which is backend-only and never starts CloudKit
+// Active only in Septena, which is backend-only and never starts CloudKit
 // (phase 4, 2026-11-19). In Septena every entry point is a no-op.
 //
 // Local edit → backend:
@@ -30,7 +30,7 @@ import SwiftData
 // window stays on screen behind other apps, so its list must keep up with
 // edits from the phone or Claude. Only iOS closes the socket in background.
 //
-// Settings: Septask's account-wide settings sync as the `setting` entity
+// Settings: Septena's account-wide settings sync as the `setting` entity
 // (TaskSyncSettings.swift), through the same outbox, shadow and pull.
 //
 // Signed out: nothing is sent or pulled, but every local edit is still
@@ -194,7 +194,7 @@ final class TaskSyncEngine {
 
   // MARK: - Lifecycle
 
-  /// Called from `SeptenaServices.start()`. No-op outside Septask.
+  /// Called from `SeptenaServices.start()`. No-op outside Septena.
   func start() {
     guard !isRunning, !DemoSeedMode.isOn else { return }
     guard let store = store() else { return }

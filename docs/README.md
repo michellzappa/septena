@@ -36,14 +36,15 @@ GitHub labels: `spec`, `adr`, `ready-for-agent`, `needs-mz`, and one
 
 ## Current platform direction
 
-Septena and Septask leave iCloud. Data moves to the own backend
+Septena leaves iCloud. Data moves to the own backend
 (`api.septena.app`). See [ADR 0002](adr/0002-own-backend-replaces-icloud.md).
 The backend source is the Cloudflare Worker in `../backend/` (it also serves
 MCP at `api.septena.app/mcp`).
 New specs design for the backend only. Docs that assume CloudKit is the
 product are stale on that point, even when the rest still holds.
 
-This repo is the task app, **Septena** (working name Septask), with a paid sync
+This repo is the task app, ***Septena** (the code targets still use the working
+name `Septask` until #856 renames them), with a paid sync
 subscription. The life OS left on 2026-11-21 ([ADR 0017](adr/0017-move-septena-life-out-of-repo.md)).
 See [ADR 0007](adr/0007-septena-is-the-task-app.md).
 
@@ -73,7 +74,7 @@ See [ADR 0007](adr/0007-septena-is-the-task-app.md).
 | [VERSIONING.md](VERSIONING.md) | current |
 | [OPEN_SOURCE_LIMITATIONS.md](OPEN_SOURCE_LIMITATIONS.md), [BUILDING_YOUR_OWN.md](BUILDING_YOUR_OWN.md) | iCloud-era; review at cutover |
 
-### Septask and tasks
+### Task app
 
 | Doc | Status |
 |---|---|
@@ -125,14 +126,14 @@ See [ADR 0007](adr/0007-septena-is-the-task-app.md).
 | [HAPTICS_SPEC.md](HAPTICS_SPEC.md) | building: H1–H4 done, H5 (device tuning) open |
 | [TASK_DATES_SPEC.md](TASK_DATES_SPEC.md) | accepted (ADR 0027): When, deadline, Today and overdue as core actions + one read model |
 | [REGISTRY_AUDIT.md](REGISTRY_AUDIT.md) | audit 2026-11-21; hard-coded copy vs registry, l10n proposal (#214–#219) |
-| [SEPTASK_ANDROID_PLAN.md](SEPTASK_ANDROID_PLAN.md) | superseded by ANDROID_CLIENT_SPEC.md |
+| [ANDROID_BRIDGE_PLAN.md](ANDROID_BRIDGE_PLAN.md) | superseded by ANDROID_CLIENT_SPEC.md |
 | [TASK_CONVERSATIONS_PLAN.md](TASK_CONVERSATIONS_PLAN.md) | shipped — historical, still the design rationale |
-| [TASK_CONVERSATIONS_PHASE0.md](TASK_CONVERSATIONS_PHASE0.md), [PHASE1](TASK_CONVERSATIONS_PHASE1.md), [SEPTASK_CONVERSATIONS_PLAN.md](SEPTASK_CONVERSATIONS_PLAN.md) | shipped — historical |
+| [TASK_CONVERSATIONS_PHASE0.md](TASK_CONVERSATIONS_PHASE0.md), [PHASE1](TASK_CONVERSATIONS_PHASE1.md), [APPKIT_CONVERSATIONS_PLAN.md](APPKIT_CONVERSATIONS_PLAN.md) | shipped — historical |
 | [AI_TASKS_EXPLAINER.md](AI_TASKS_EXPLAINER.md) | user copy; iCloud claims change at cutover |
 | [TASK_ROW_LANGUAGE_SPEC.md](TASK_ROW_LANGUAGE_SPEC.md), [TRIAGE_BAND_SPEC.md](TRIAGE_BAND_SPEC.md), [QUICK_ADD_CONTRACT.md](QUICK_ADD_CONTRACT.md) | built |
 | [ORDERING_AND_HEADINGS_PLAN.md](ORDERING_AND_HEADINGS_PLAN.md), [DRAG_AND_DROP.md](DRAG_AND_DROP.md) | shipped — historical |
 | [RECENTLY_DELETED_SPEC.md](RECENTLY_DELETED_SPEC.md), [TASK_LIST_OBSERVATION_PLAN.md](TASK_LIST_OBSERVATION_PLAN.md) | proposal |
-| [SEPTASK_APPKIT_PARITY.md](SEPTASK_APPKIT_PARITY.md), [SEPTASK_APPKIT_SURFACES.md](SEPTASK_APPKIT_SURFACES.md), [SEPTASK_APPKIT_LOCALIZATION_HANDOFF.md](SEPTASK_APPKIT_LOCALIZATION_HANDOFF.md) | AppKit shell notes |
+| [APPKIT_PARITY.md](APPKIT_PARITY.md), [SEPTASK_APPKIT_SURFACES.md](SEPTASK_APPKIT_SURFACES.md), [APPKIT_LOCALIZATION_HANDOFF.md](APPKIT_LOCALIZATION_HANDOFF.md) | AppKit shell notes |
 | [RELEASING-MAC.md](RELEASING-MAC.md), [RELEASING-ANDROID.md](RELEASING-ANDROID.md); store copy and panels are in the private `septena/studio` repo | current |
 | Marketing image skills (photo, composite, 3D, bento) | moved to `septena/studio` on 2026-11-27 |
 | [NATIVE_SCENES_SPEC.md](NATIVE_SCENES_SPEC.md) | superseded (ADR 0022 rejected): website scenes draw from the registries |

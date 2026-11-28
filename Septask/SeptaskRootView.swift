@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Septask's root. There is no tab bar (removed 2026-11-22, Things /
+/// Septena's root. There is no tab bar (removed 2026-11-22, Things /
 /// Reminders model): on iPhone the sidebar list (Today, Upcoming, smart lists,
 /// areas, projects) IS the root of one `NavigationStack`, and every list
 /// pushes onto it. The app opens on Today with the list one Back away. On iPad
@@ -13,7 +13,7 @@ import SwiftUI
 /// group, or Upcoming day — or creates a Project/Area on the list root.
 /// Search lives in the trailing nav bar.
 ///
-/// Septask has no Next page (removed 2026-11-19: it showed life-OS content,
+/// Septena has no Next page (removed 2026-11-19: it showed life-OS content,
 /// not tasks; Today covers "what's next" for tasks).
 struct SeptaskRootView: View {
   @Environment(NavigationState.self) private var nav
@@ -81,7 +81,7 @@ struct SeptaskRootView: View {
       .resolvesAdaptiveNavigation()
       .doFlowSheets()
       // The app-global modals, one `.sheet(item:)` like RootTabView — the
-      // subset with a Septask surface. The mood check-in and new-meal sheets
+      // subset with a Septena surface. The mood check-in and new-meal sheets
       // left with the Next page (2026-11-19). Anything else ever set shows
       // empty rather than crashing.
       .sheet(item: $nav.presentedModal) { modal in
@@ -91,7 +91,7 @@ struct SeptaskRootView: View {
             .septenaModalSheet(detents: [.medium, .large],
                                macWidth: 560, macHeight: 420)
         case .addInfo:
-          // Septask's quick capture IS the task composer — no multi-section
+          // Septena's quick capture IS the task composer — no multi-section
           // palette here (the tasks-only twin of AddInfoSheet), whatever
           // section the request names.
           withEnvironment(SeptaskQuickAdd())
@@ -271,7 +271,7 @@ struct SeptaskRootView: View {
 ///
 /// The SAME `AddTaskPage` Septena's quick-add palette shows, in its
 /// self-hosted mode: Septena feeds the page's query from `AddInfoSheet`'s
-/// search bar, which Septask doesn't compile, so here the page draws its own
+/// search bar, which Septena doesn't compile, so here the page draws its own
 /// focused title field plus Cancel / Add, and files to the Inbox. (Presenting
 /// the page bare used to leave the sheet with no text field at all.)
 private struct SeptaskQuickAdd: View {

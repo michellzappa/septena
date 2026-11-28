@@ -249,7 +249,7 @@ export async function ingestTelemetry(env: Env, req: Request): Promise<Response>
   return json({ ok: true });
 }
 
-/** Ingests the separate, opt-in, once-per-week Septask diagnostics snapshot. */
+/** Ingests the separate, opt-in, once-per-week Septena diagnostics snapshot. */
 export async function ingestWeeklyDiagnostics(env: Env, req: Request): Promise<Response> {
   const ip = req.headers.get("CF-Connecting-IP") ?? "unknown";
   if (await rateLimited(env, `weekly-diagnostics-ip:${ip}`, 30, 3600)) {

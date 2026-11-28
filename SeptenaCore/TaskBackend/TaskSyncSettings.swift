@@ -1,16 +1,16 @@
 import Foundation
 
-// Septask's synced settings (docs/SEPTASK_BACKEND.md §5.2 `settings`). Septask
+// Septena's synced settings (docs/SEPTASK_BACKEND.md §5.2 `settings`). Septena
 // syncs no CloudKit record, so the few account-wide settings it uses ride the
 // task backend as the `setting` entity: one row per key, `value` = JSON.
 //
-// Where the values live on the device: a JSON `AppSettings` blob in Septask's
+// Where the values live on the device: a JSON `AppSettings` blob in Septena's
 // own defaults (`storeKey`), holding ONLY the keys below. It is NOT the shared
-// `SettingsEntity` row. Septena and Septask open the same SwiftData store, and
-// Septena still syncs that row through CloudKit: if Septask synced it too,
+// `SettingsEntity` row. Septena Life and Septena open the same SwiftData store, and
+// Septena Life still syncs that row through CloudKit: if Septena synced it too,
 // each app's sync would keep writing the other's older value back.
 //
-// In Septask, `SettingsMirror.loadSettings` reads this blob and
+// In Septena, `SettingsMirror.loadSettings` reads this blob and
 // `SettingsMirror.upsert` writes it, so `SettingsStore`
 // and every caller keep their API. A write diffs the keys and hands the
 // changed ones to `TaskSyncEngine.captureSettings()`; a pull writes the blob
@@ -277,7 +277,7 @@ enum SeptaskSyncedSettings {
 
   private static let seededKey = "septask.syncedSettings.seeded"
 
-  /// First run of a CloudKit-free Septask: start the blob from the values
+  /// First run of a CloudKit-free Septena: start the blob from the values
   /// the shared `SettingsEntity` row holds (what CloudKit last synced to this
   /// device). The backend still wins: these values are pushed only for keys
   /// the first pull did not bring (`TaskSyncEngine.reconcileSettings`).
@@ -292,7 +292,7 @@ enum SeptaskSyncedSettings {
 }
 
 extension Notification.Name {
-  /// A pull changed Septask's synced settings. `SettingsStore` reloads and
+  /// A pull changed Septena's synced settings. `SettingsStore` reloads and
   /// copies the values into the device-local mirrors.
   static let septaskSettingsPulled = Notification.Name("septask.settingsPulled")
 }

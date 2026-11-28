@@ -2,7 +2,7 @@
 import AppKit
 
 // The ONE place the AppKit shell builds a transient surface. Every popover,
-// floating panel and filter list in Septask is made here, so chrome (material,
+// floating panel and filter list in Septena is made here, so chrome (material,
 // corner radius, field face, row height) has a single source of truth and
 // cannot drift between surfaces the way it did before
 // (docs/SEPTASK_APPKIT_SURFACES.md).

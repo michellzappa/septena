@@ -31,7 +31,7 @@ struct TaskNavMenu<Trigger: View>: View {
   /// The destination to draw the checkmark on. Defaults to whatever `nav` is
   /// showing. A host that doesn't drive `nav` names its destination directly
   /// (an AppKit-hosted page whose `NavigationState` stub nothing observes, so
-  /// `nav.path` there is always empty). No caller does today: Septask's Next
+  /// `nav.path` there is always empty). No caller does today: Septena's Next
   /// page, the one such host, was removed on 2026-11-19.
   var current: Route? = nil
   /// Where a pick goes. Defaults to `nav.go(to:)` — the SwiftUI shells' whole

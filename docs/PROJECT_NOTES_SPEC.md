@@ -141,7 +141,7 @@ ADR 0012's line about the in-app server no longer applies.
 sentence: project and area notes are the context for every decision; read
 them before acting on a task.
 
-## 6. App (Septena and Septask, iOS and Mac)
+## 6. App (Septena Life and Septena, iOS and Mac)
 
 - **Notes first.** The project and area detail views open with the notes
   field above the task list. Empty notes show the template as placeholder

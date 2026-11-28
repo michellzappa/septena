@@ -11,8 +11,8 @@ assumes the backend is the only store; it has no iCloud path.
 
 ## 1. What a linked project is
 
-A linked project is a Septask project whose tasks come from another service.
-The other service stays the source of truth for the fields it owns. Septask
+A linked project is a Septena project whose tasks come from another service.
+The other service stays the source of truth for the fields it owns. Septena
 adds its own planning on top: Today, scheduled date, manual order, headings,
 area, conversation.
 
@@ -47,7 +47,7 @@ deletedAt.
 
 - `remoteScope` — `owner/repo` for GitHub; `<workspace host>|<subject door>`
   for Starlings (for example `hq.starlings.work|subject:project:abc`).
-- `projectId` — the Septask project the link fills. One link per project
+- `projectId` — the Septena project the link fills. One link per project
   *(default)*. One remote scope per user maps to at most one project.
 - `direction` — `read` or `two-way` (§5).
 - `cursor` — the provider's change cursor (GitHub `since` timestamp or ETag;
@@ -73,7 +73,7 @@ updatedAt, deletedAt.
 - `extUrl` — web URL of the remote item, for "Open in GitHub/Starlings".
 - `extRemoteUpdatedAt` — the remote's last-change stamp, for conflict checks.
 
-A task with `extKey == null` is an ordinary Septask task, also inside a
+A task with `extKey == null` is an ordinary Septena task, also inside a
 linked project (§5.3).
 
 ## 4. Identity and dedupe
@@ -110,7 +110,7 @@ therefore finds the same row.
 
 ### 5.1 Fields that sync
 
-| Septask | GitHub issue | Starlings task |
+| Septena | GitHub issue | Starlings task |
 |---|---|---|
 | title | title | title |
 | notes | body | description |
@@ -119,13 +119,13 @@ therefore finds the same row.
 | status `cancelled` | closed, reason `not_planned` | dropped / cancelled |
 | deadline | — (milestone due date is not per issue) | due date |
 
-### 5.2 Fields that never leave Septask
+### 5.2 Fields that never leave Septena
 
 today, todaySetOn, todayPosition, scheduled, position, heading, area,
 recurrence fields, conversation turns, attachments. These are mz's planning
 layer. A remote change never resets them.
 
-### 5.3 Septask-only tasks in a linked project
+### 5.3 Septena-only tasks in a linked project
 
 A task created in a linked project without `extKey` stays local
 *(default)*. It does not create a remote issue. A later "Send to GitHub /
@@ -137,12 +137,12 @@ gesture, not a side effect of typing in a list.
 
 Labels, milestones, assignees, Starlings pipeline stage, comment count:
 stored as one read-only `extMeta` JSON on the task and shown as chips. They
-are not editable in Septask in v1. Mapping them both ways is the part that
+are not editable in Septena in v1. Mapping them both ways is the part that
 never converges, so v1 does not try.
 
 ## 6. Sync
 
-### 6.1 Inbound (remote → Septask)
+### 6.1 Inbound (remote → Septena)
 
 - **GitHub:** webhooks for `issues` events when the user installs the GitHub
   App on the repo; else poll `GET /repos/{o}/{r}/issues?state=all&since=` on a
@@ -154,7 +154,7 @@ never converges, so v1 does not try.
 - Each remote change becomes one DO upsert of the mapped fields only, with
   actor `link:<id>`.
 
-### 6.2 Outbound (Septask → remote), `two-way` links only
+### 6.2 Outbound (Septena → remote), `two-way` links only
 
 - The DO sees a commit from `app:` or `mcp:` that changes a mapped field on a
   linked task. It queues an outbound op for that link.
@@ -177,13 +177,13 @@ loops (our own write coming back as a webhook).
 |---|---|
 | Issue deleted or repo access lost | Task goes `cancelled`, keeps its local fields, `extKey` stays. Never hard-delete. |
 | Issue transferred to another repo | GitHub redirects the old number; the row updates `extKey` to the new one. If the new repo has no link, the row becomes unlinked (local). |
-| Task deleted in Septask | Local delete only. Never deletes or closes the remote item. |
+| Task deleted in Septena | Local delete only. Never deletes or closes the remote item. |
 | Task moved out of the linked project | The row becomes local (`extKey` cleared). The remote item is untouched. The next inbound change does not pull it back. Keep a per-link ignore list of keys. |
 | Link removed | Rows stay as local tasks *(default)*, or are removed in one undoable step if mz chooses it in the unlink sheet. |
 
 ### 6.5 Moving tasks between lists
 
-A move changes the task's home, so it can reach outside Septask. The rule
+A move changes the task's home, so it can reach outside Septena. The rule
 depends on source and target:
 
 | From → to | What happens |
@@ -196,7 +196,7 @@ depends on source and target:
 
 Rules for every move:
 
-- The task keeps its id and all Septask-owned fields (§4, §5.2).
+- The task keeps its id and all Septena-owned fields (§4, §5.2).
 - Undo is recorded at the gesture (`SeptenaCore/TaskUndo.swift`). For a move
   that wrote to a remote service, undo runs the reverse remote writes where
   possible (transfer back, reopen the original, close the created item). A
@@ -270,7 +270,7 @@ link pauses until another member reconnects it.
   the contribution heatmap and is not reused.
 - **Starlings:** OAuth 2.1 with dynamic client registration and PKCE, which
   every workspace already serves (`/.well-known/meet`, `/mcp`,
-  `/openapi.json`). One authorization per workspace. Septask registers as a
+  `/openapi.json`). One authorization per workspace. Septena registers as a
   client on each workspace the first time mz adds it.
 - Token refresh runs server-side. A connection whose refresh fails goes to
   `expired`, and the app shows one "Reconnect" row in Settings.
@@ -300,8 +300,8 @@ link pauses until another member reconnects it.
 
 | Phase | What | Exit check |
 |---|---|---|
-| ~~L0~~ | GitHub: dropped (ADR 0033). The tables move to L2. Was: `connections` + `links` tables, GitHub App auth, inbound poll, read-only links. | One repo's open issues show as tasks on every device; closing on GitHub completes them in Septask. |
-| ~~L1~~ | GitHub: dropped. Write-back moves to L2. Was: Outbound for complete / reopen / title. Echo suppression. | Completing in Septask closes the issue; no loop in `changes`. |
+| ~~L0~~ | GitHub: dropped (ADR 0033). The tables move to L2. Was: `connections` + `links` tables, GitHub App auth, inbound poll, read-only links. | One repo's open issues show as tasks on every device; closing on GitHub completes them in Septena. |
+| ~~L1~~ | GitHub: dropped. Write-back moves to L2. Was: Outbound for complete / reopen / title. Echo suppression. | Completing in Septena closes the issue; no loop in `changes`. |
 | L2 | Starlings provider, several workspaces, dedupe by `extKey`. | A repo linked both directly and through a Starlings project shows each issue once. |
 | L3 | Notes ↔ body, deadline ↔ due date, "Send to GitHub/Starlings" for local tasks. | Edits round-trip without loss on a real project. |
 

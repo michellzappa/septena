@@ -340,7 +340,7 @@ private struct SeptenaToastOverlay: ViewModifier {
 
 /// The snackbar itself: the glass capsule, its 7 s timer and its motion. ONE
 /// drawing for every shell — the SwiftUI lists attach it through
-/// `.septenaToastOverlay(store:)`, and Septask's AppKit shell hosts it in an
+/// `.septenaToastOverlay(store:)`, and Septena's AppKit shell hosts it in an
 /// `NSHostingView` (`KitToastHost`), so a toast reads the same everywhere.
 /// The `ZStack` always has a child (an empty frame when no toast shows), so
 /// the timer's `.task` always has something to attach to (see the `Group`

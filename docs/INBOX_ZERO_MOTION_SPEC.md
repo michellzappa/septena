@@ -26,7 +26,7 @@ The animation plays when ALL of these are true:
 1. The surface is Today (`filter == .today`).
 2. The Inbox item count goes from ≥ 1 to 0. The count is the number the Inbox
    header shows: on iOS `renderedTodayInboxRows.count`
-   (`TaskListView.triageSection`); on the Septask Mac shell the `count` that
+   (`TaskListView.triageSection`); on the Septena Mac shell the `count` that
    `triageBand(_:)` puts on the `.header(id: "inbox")` row (band plus pending
    Apple Reminders).
 3. A user gesture on an Inbox row caused the drop, in this session. Gestures:
@@ -136,8 +136,8 @@ adds its platform to the setting's `platforms` list.
 
 | Surface | File | Work |
 |---|---|---|
-| Septask iOS / iPadOS (SwiftUI) | `Septena/Shell/Tasks/TaskListView.swift` (`inboxHeader`, `foldableSectionHeader`, the toggle / move / delete paths) | Trigger, header icon motion, haptic, announce. |
-| Septask Mac (AppKit) | `Septask/SeptaskKitTaskList.swift` (`triageBand`, the header row cell) | Same trigger rules; symbol effect on the header's image view; announce. |
+| Septena iOS / iPadOS (SwiftUI) | `Septena/Shell/Tasks/TaskListView.swift` (`inboxHeader`, `foldableSectionHeader`, the toggle / move / delete paths) | Trigger, header icon motion, haptic, announce. |
+| Septena Mac (AppKit) | `Septask/SeptaskKitTaskList.swift` (`triageBand`, the header row cell) | Same trigger rules; symbol effect on the header's image view; announce. |
 | Settings | `registry/settings.json`, `registry/l10n/*.json`, generated constants | New toggle. |
 | Septena Life | none | Out of scope. It shares `TaskListView`; the code path is the same, so no `#if SEPTASK` is needed. |
 

@@ -72,7 +72,7 @@ account synced to the phone (Google, Exchange, Samsung). The client asks for
 windows as `CalendarBridge` (rest of today, next 30 days). Hidden calendars
 use the same synced `calendarHiddenTitles` setting, matched by title. A
 `ContentObserver` on the calendar URI replaces `.EKEventStoreChanged`.
-No backend work. Already listed in `docs/SEPTASK_ANDROID_PLAN.md`
+No backend work. Already listed in `docs/ANDROID_BRIDGE_PLAN.md`
 ("Today calendar strip", late).
 
 ### 5.2 Web and Windows: backend calendar sources

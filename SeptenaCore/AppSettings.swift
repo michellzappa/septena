@@ -60,7 +60,7 @@ struct AppSettings: Codable {
   /// The sweep day (`yyyy-MM-dd`) whose prompt was dismissed. Nil → none.
   var fadeSweepDismissedOn: String? = nil
 
-  /// "Get started" checklist (Septask): true once dismissed or every step is
+  /// "Get started" checklist (Septena): true once dismissed or every step is
   /// complete, synced so finishing onboarding on one device hides it on all
   /// other devices too. Nil → not dismissed.
   var getStartedDismissed: Bool? = nil

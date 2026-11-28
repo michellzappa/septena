@@ -1,6 +1,6 @@
 // Device-local settings keys (@AppStorage / UserDefaults). Extracted from
 // SettingsView.swift so shells that don't compile the full Settings surface
-// (Septask) can still read the shared keys — see docs/SEPTASK.md.
+// (Septena) can still read the shared keys — see docs/SEPTASK.md.
 
 import Foundation
 
@@ -49,10 +49,10 @@ enum SettingsKey {
   /// Where tasks, areas, projects, attachments and conversations sync on this
   /// device: `cloudkit` (absent) or `backend` (api.septena.app). Stored in the
   /// shared app-group defaults (`SeptenaAppGroup.defaults`), not `.standard`:
-  /// Septena and Septask share one SwiftData store, so Septena must see the
-  /// value to freeze the CloudKit task types. Only Septask writes it: it
+  /// Septena Life and Septena share one SwiftData store, so Septena Life must see the
+  /// value to freeze the CloudKit task types. Only Septena writes it: it
   /// writes `backend` at every launch (`TaskStoreMode.markDeviceBackend`),
-  /// since Septask is backend-only. Septask itself never reads it. See
+  /// since Septena is backend-only. Septena itself never reads it. See
   /// `TaskStoreMode`.
   static let taskStoreMode = "septena.taskStore.mode"
   /// Device-local dev override: forces the welcome to present even on an

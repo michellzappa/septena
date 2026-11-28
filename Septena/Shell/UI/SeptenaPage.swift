@@ -35,7 +35,7 @@ enum PageChromeMetrics {
   /// floating chrome bar (gear/switcher/+). Matches the bar's rendered height
   /// (≈60pt circles + 8pt top padding) with a little breathing room.
   ///
-  /// Septask draws no floating chrome bar (its split-view sidebar is the
+  /// Septena draws no floating chrome bar (its split-view sidebar is the
   /// switcher — see `SeptaskRootView`), so there is nothing to clear: every
   /// task surface reserves 0 and content rests at the normal page top instead
   /// of ~62pt lower. The constant is gated at the source so all surfaces
@@ -255,7 +255,7 @@ private struct PageChromeModifier: ViewModifier {
   let id: String
   let title: String
   let localActions: () -> AnyView?
-  /// One page-local toolbar button beside Search on iPhone Septask (the
+  /// One page-local toolbar button beside Search on iPhone Septena (the
   /// Tasks Starred filter). nil → nothing.
   let accessory: () -> AnyView?
   let add: PageAdd?
@@ -297,8 +297,8 @@ private struct PageChromeModifier: ViewModifier {
     // instead of the window overlay. `usesPushNavigation` is true on iPad
     // regular regardless of column width.
     if usesPushNavigation {
-      // Septask never renders the floating iPad overlay bar — that lives only in
-      // Septena's `RootTabView.iPadTabless`. Routing chrome there would strand the
+      // Septena never renders the floating iPad overlay bar — that lives only in
+      // Septena Life's `RootTabView.iPadTabless`. Routing chrome there would strand the
       // gear/"+" off-screen AND leave an empty, background-hidden nav bar with no
       // scroll-edge "pocket", so content hard-cuts at the top instead of the iOS 26
       // soft fade. Put the chrome in the real (translucent) navigation bar like

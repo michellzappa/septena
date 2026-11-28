@@ -63,8 +63,8 @@ enum SeptaskLaunch {
       settings.reconcileWelcomeName(context: context, engine: services.ckEngine)
       settings.reconcileHiddenCalendars(context: context, engine: services.ckEngine)
       // No `reconcileSupporter`: the supporter flag came from Septena through
-      // CloudKit, and Septask no longer reads CloudKit. `engine` above is
-      // only the "push allowed" signal; in Septask the push goes to the task
+      // CloudKit, and Septena no longer reads CloudKit. `engine` above is
+      // only the "push allowed" signal; in Septena the push goes to the task
       // backend (SettingsMirror.upsert), and the engine never starts.
     }
   }
@@ -178,10 +178,10 @@ extension SeptaskLaunchMetrics: MXMetricManagerSubscriber {
 
 /// One-time removal of the old hosted-gateway Claude connection
 /// (mcp.septena.app, a CloudKit web-auth token re-minted every ~8h with an
-/// Apple sign-in). Septask no longer compiles `ClaudeGatewayProvider` or
+/// Apple sign-in). Septena no longer compiles `ClaudeGatewayProvider` or
 /// `ClaudeReconnectNudge`: Claude now connects to the task backend
 /// (`https://api.septena.app/mcp`), paired in Settings ▸ About ▸ Advanced ▸
-/// Task backend. This clears only what Septask itself wrote. The shared App
+/// Task backend. This clears only what Septena itself wrote. The shared App
 /// Group keys (`septena.claudeGateway.enabled` / `.lastRefreshAt` /
 /// `.nudgeOwner` in `group.com.septena.cloud`) stay: Septena still reads them.
 @MainActor
@@ -211,7 +211,7 @@ enum SeptaskLegacyClaudeCleanup {
     center.removePendingNotificationRequests(withIdentifiers: [nudgeNotificationID])
     center.removeDeliveredNotifications(withIdentifiers: [nudgeNotificationID])
     #if os(iOS)
-    // iOS: the item sits in Septask's own keychain access group (no
+    // iOS: the item sits in Septena's own keychain access group (no
     // keychain-access-groups entitlement), so Septena's copy is out of reach.
     // macOS: not deleted. The unsandboxed Mac apps share the login keychain
     // and both used this account name, so a delete could remove Septena's.

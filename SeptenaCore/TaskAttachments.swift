@@ -4,7 +4,7 @@ import UniformTypeIdentifiers
 
 // Task attachments: the SwiftData model, the on-disk file store and the
 // mutator-style store the task UI calls. Split out of
-// CloudKit/TaskAttachmentRecord.swift (#42) so Septask compiles the model
+// CloudKit/TaskAttachmentRecord.swift (#42) so Septena compiles the model
 // without the CKRecord mapping. `cloudKitSystemFields` stays on the model:
 // it is part of the shared SwiftData schema.
 

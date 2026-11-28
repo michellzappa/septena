@@ -1,7 +1,7 @@
 {
   "name": "@septena/mcp-gateway",
   "version": "0.2.0",
-  "description": "Septask task backend and tasks MCP connector (api.septena.app).",
+  "description": "Septena task backend and tasks MCP connector (api.septena.app).",
   "private": true,
   "type": "module",
   "scripts": {

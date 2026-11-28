@@ -1,15 +1,15 @@
 #if os(iOS)
 import UIKit
 
-// Home Screen Quick Action delivery for Septask.
+// Home Screen Quick Action delivery for Septena.
 //
 // This is the slim composition-root twin of the full app's
-// `AppDelegate` + `SeptenaSceneDelegate`. Septask can't compile those
+// `AppDelegate` + `SeptenaSceneDelegate`. Septena can't compile those
 // verbatim — the full-app `AppDelegate` pulls in notification-action
 // handling and life-OS wiring the tasks-only build deliberately omits —
 // so per docs/SEPTASK.md this app-level chrome lives in `Septask/` and
 // reuses only the SHARED pieces that already compile: the `ShortcutAction`
-// enum and `NavigationState.pendingShortcut`. Septask ships two static
+// enum and `NavigationState.pendingShortcut`. Septena ships two static
 // items, "Quick Add" and "Today" (declared in project.yml); Quick Add
 // lands the quick-add composer.
 //

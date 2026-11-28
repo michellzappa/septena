@@ -1,6 +1,6 @@
 import XCTest
 
-/// Captures App Store / marketing screenshots for **Septask** (the focused tasks
+/// Captures App Store / marketing screenshots for **Septena** (the focused tasks
 /// app) from the demo-seeded build. Run via `SEPTENA_APP=septask
 /// appstore/capture.sh iphone69` (in septena/studio), or:
 ///   xcodebuild test -scheme Septask \

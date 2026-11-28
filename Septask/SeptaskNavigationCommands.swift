@@ -3,7 +3,7 @@ import SwiftUI
 import AppKit
 #endif
 
-/// Window-scoped commands published by the active Septask scene. App services
+/// Window-scoped commands published by the active Septena scene. App services
 /// stay shared, but route selection, presentation, and sidebar visibility must
 /// belong to the window the person is actually using.
 struct SeptaskNavigationActions {
