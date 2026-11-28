@@ -32,7 +32,6 @@
   "Add Reference": "Adicionar referência",
   "Add Reference…": "Adicionar referência…",
   "Add Reminder…": "Adicionar lembrete…",
-  "Add a task or move one here when you want to work on it today.": "Adicione uma tarefa ou mova uma para cá quando quiser trabalhar nela hoje.",
   "Add and Do": "Adicionar e fazer",
   "Add as a custom MCP server in any MCP client": "Adicione como servidor MCP personalizado em qualquer cliente MCP",
   "Add the MCP server URL to any MCP client, or paste the setup prompt into your agent. When your browser shows an 8-character code, enter it above. Only enter a code from a window you opened yourself.": "Adicione a URL do servidor MCP em qualquer cliente MCP ou cole o prompt de configuração no seu agente. Quando o navegador mostrar um código de 8 caracteres, digite-o acima. Só digite um código de uma janela que você mesmo abriu.",
@@ -845,5 +844,7 @@
   "€5 a month. You save €24 against paying monthly.": "€5 por mês. Você economiza €24 em relação ao pagamento mensal.",
   "€60 a year": "€60 por ano",
   "€60 a year or €7 a month": "€60 por ano ou €7 por mês",
-  "€7 a month": "€7 por mês"
+  "€7 a month": "€7 por mês",
+  "It can wait. The rest is in your Logbook.": "Isso pode esperar. O resto está no seu Registro.",
+  "Today can stay empty. Add a task when you want one.": "Hoje pode ficar vazio. Adicione uma tarefa quando quiser."
 }

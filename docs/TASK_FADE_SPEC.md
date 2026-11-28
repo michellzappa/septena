@@ -165,6 +165,9 @@ themselves are the Faded group of Review (`docs/REVIEW_SPEC.md`).
 - One button at the bottom: **Let the rest go**. It sets status `cancelled`,
   `dropReason = "faded"`, `completedAt = now` on every row not kept. This is
   one undo entry.
+- After **Let the rest go**, the sheet stays open on one line,
+  `fadeSweep.letGoTitle` ("It can wait. The rest is in your Logbook.", #711),
+  and a **Done** button that closes it.
 - If the user ignores the sweep, nothing is dropped. Faded tasks stay in the
   pile until a sweep passes. AI and timers never drop a task.
 
