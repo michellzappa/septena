@@ -5668,6 +5668,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
     // Row views are recycled: a wash still fading on the row this view USED to
     // be would otherwise ride along onto an unrelated task.
     rowView.cancelPromoteWash()
+    rowView.resetHover()
     applyCardGeometry(rowView, atRow: row)
     return rowView
   }
@@ -5695,6 +5696,9 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
     } else {
       rowView.isCard = false
     }
+    // Clickable rows are exactly the selectable ones (#851): tasks, New task,
+    // New project, project targets, notices and their steps.
+    rowView.isHoverable = self.tableView(tableView, shouldSelectRow: row)
     applySelectionJoins(rowView, atRow: row)
     applyDropLine(rowView, atRow: row)
     rowView.needsDisplay = true
@@ -7903,6 +7907,10 @@ final class KitLoggedFooterCell: NSTableCellView {
   /// overrides ever ran and this footer was inert. Transparent full-bleed
   /// overlay, the `KitNewTaskCell` pattern.
   private let hit = NSButton()
+  /// Pointer hover lifts the text-only link to primary ink (#851): the
+  /// footer has no surface of its own to wash, the SwiftUI and web footers
+  /// do the same.
+  private var hover: KitHoverTracker!
   var onTap: (() -> Void)?
 
   init(identifier: NSUserInterfaceItemIdentifier) {
@@ -7913,6 +7921,9 @@ final class KitLoggedFooterCell: NSTableCellView {
     label.font = SeptaskKitTheme.meta
     label.textColor = SeptaskKitTheme.inkSecondary
     label.kitA11yIgnore()
+    hover = KitHoverTracker(installedOn: hit) { [weak self] hovered in
+      self?.label.textColor = hovered ? SeptaskKitTheme.inkPrimary : SeptaskKitTheme.inkSecondary
+    }
 
     hit.translatesAutoresizingMaskIntoConstraints = false
     hit.isBordered = false

@@ -8,7 +8,7 @@
   --bg-card-glass: rgba(255, 255, 255, 0.80);
   --bg-elevated: #ffffff;
   --bg-pill: rgba(120, 120, 128, 0.12);
-  --bg-hover: rgba(0, 0, 0, 0.032);
+  --bg-hover: rgba(0, 0, 0, 0.05);
   --bg-selected: rgba(0, 122, 255, 0.14);
   --border-subtle: rgba(60, 60, 67, 0.12);
   --border-hairline: rgba(60, 60, 67, 0.11);
@@ -34,7 +34,7 @@
     --bg-card-glass: rgba(30, 30, 34, 0.78);
     --bg-elevated: #222226;
     --bg-pill: rgba(255, 255, 255, 0.09);
-    --bg-hover: rgba(255, 255, 255, 0.045);
+    --bg-hover: rgba(255, 255, 255, 0.05);
     --bg-selected: rgba(10, 132, 255, 0.24);
     --border-subtle: rgba(255, 255, 255, 0.09);
     --border-hairline: rgba(255, 255, 255, 0.08);
@@ -60,7 +60,7 @@
   --bg-card-glass: rgba(30, 30, 34, 0.78);
   --bg-elevated: #222226;
   --bg-pill: rgba(255, 255, 255, 0.09);
-  --bg-hover: rgba(255, 255, 255, 0.045);
+  --bg-hover: rgba(255, 255, 255, 0.05);
   --bg-selected: rgba(10, 132, 255, 0.24);
   --border-subtle: rgba(255, 255, 255, 0.09);
   --border-hairline: rgba(255, 255, 255, 0.08);
@@ -80,6 +80,26 @@
 
 * {
   box-sizing: border-box;
+}
+
+/* Every clickable element shows the pointer (#851). Tailwind v4's preflight
+   sets buttons to `cursor: default`; this puts the pointer back. Plain text
+   stays the default cursor. The hover wash itself is `--bg-hover`, set from
+   registry/tokens.json `selection.pointerHoverOpacity` at runtime (the values
+   above are the pre-hydration fallback). */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="menuitem"],
+  [role="option"],
+  [role="tab"],
+  a[href],
+  summary,
+  select,
+  label:has(> input[type="checkbox"]),
+  label:has(> input[type="file"]) {
+    cursor: pointer;
+  }
 }
 
 html,

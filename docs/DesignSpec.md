@@ -90,6 +90,8 @@ Two failure modes to recognize:
 - **An inset highlight on an ordinary list row** reads as a chip floating *on top of* the row rather than the row itself being selected. Inset is only for palettes and source lists.
 - **Two competing highlight systems on one surface** (a blue outline on the selected row, an accent fill on the drop-hover row) is a bug, full stop. Drop targets and hover reuse the same token as selection.
 
+**Pointer hover is one wash on every platform** (#851). With a mouse, trackpad or Pencil hover, a clickable element shows primary ink at `registry/tokens.json` `selection.pointerHoverOpacity` behind it, in the element's own shape; a text-only link (a "Show N logged items" footer) lifts to primary ink instead. Selection, press and drop target win over hover. Plain text shows no hover. The one primitive per shell: `rowHover` / `inlineHover` / `PlainHoverRowButtonStyle` (SwiftUI, Mac and iPad), `KitHoverTracker` + `SeptaskKitTheme.pointerHoverFill` (AppKit), the ripple hover state layer set from `RegistryPointerHover` in `SeptenaAndroidTheme` (Android), and `--bg-hover` plus the pointer cursor in `globals.css` (web).
+
 Chips use a wash plus *matching* ink rather than a saturated slab with white text, because that form is contrast-safe for any tint in both appearances — the fill is a low-opacity derivative of the ink it carries, so the two can never collide.
 
 ## 5. Typography

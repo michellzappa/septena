@@ -134,6 +134,17 @@ enum SeptaskKitTheme {
     }
     return resolved
   }
+  /// Pointer hover wash for every clickable AppKit surface (task rows,
+  /// sidebar rows, footers). Primary ink at `registry/tokens.json`
+  /// `selection.pointerHoverOpacity` — the same value the SwiftUI shell,
+  /// Android and web read, so hover looks the same on every platform (#851).
+  static let pointerHoverFill = NSColor(name: nil) { appearance in
+    var resolved = NSColor.labelColor
+    appearance.performAsCurrentDrawingAppearance {
+      resolved = NSColor.labelColor.withAlphaComponent(CGFloat(Theme.pointerHoverOpacity))
+    }
+    return resolved
+  }
   /// Theme.sidebarBackground — the source list's backing.
   static let sidebarBackground = NSColor(Theme.sidebarBackground)
 
