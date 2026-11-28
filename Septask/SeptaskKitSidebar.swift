@@ -23,7 +23,7 @@ private extension Int {
 // left of the count badge.
 
 /// Where the sidebar points the detail pane. Every destination is a task
-/// list. (Septask's Next page was removed on 2026-11-19: it showed life-OS
+/// list. (Septena's Next page was removed on 2026-11-19: it showed life-OS
 /// content, not tasks.)
 enum KitSidebarDestination: Equatable {
   case filter(TaskFilter, title: String)
@@ -61,7 +61,7 @@ enum KitSidebarDestination: Equatable {
   init?(route: Route) {
     switch route {
     case .filter(let f):   self = .filter(f, title: route.title)
-    // Septask has no Next destination; Septena's `Route.next` maps to nothing.
+    // Septena has no Next destination; Septena Life's `Route.next` maps to nothing.
     case .next, .area, .project:  return nil
     }
   }

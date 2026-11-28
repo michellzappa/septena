@@ -16,7 +16,7 @@ import SwiftUI
 // default values, and do not let a root inject a shared dependency on its own.
 //
 // App-SPECIFIC values stay with their root (Septena's training draft, support
-// store, and app lock; Septask's iPad chrome). Only things a `Shell/` view can
+// store, and app lock; Septena's iPad chrome). Only things a `Shell/` view can
 // reach belong here.
 
 extension View {

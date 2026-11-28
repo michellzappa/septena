@@ -14,7 +14,7 @@ Bring calm, interactive Home Screen, Lock Screen, and macOS Desktop/Notification
 
 ## 2. Data transport (no CloudKit)
 
-- Reuse `TasksWidgetSnapshotStore` + `TasksWidgetWire` inside Septask's App Group container (verify group ID in `Septask.entitlements` / `SeptaskMac.entitlements` — do not share Septena Life's container where bundle boundaries differ).
+- Reuse `TasksWidgetSnapshotStore` + `TasksWidgetWire` inside Septena's App Group container (verify group ID in `Septask.entitlements` / `SeptaskMac.entitlements` — do not share Septena Life's container where bundle boundaries differ).
 - Publish a fresh JSON snapshot whenever:
   1. Any `TaskMutator` write commits locally.
   2. `TaskSyncClient` applies a backend pull.

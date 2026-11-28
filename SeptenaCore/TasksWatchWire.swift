@@ -1,6 +1,6 @@
 import Foundation
 
-// The Apple Watch wire (docs/WATCH.md). Compiled into the iOS Septask app and
+// The Apple Watch wire (docs/WATCH.md). Compiled into the iOS app (`Septask` target) and
 // SeptaskWatch. Foundation only: the watch compiles no task model.
 //
 // Two channels carry it:

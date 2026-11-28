@@ -199,7 +199,7 @@ struct TaskListStandaloneChrome: ViewModifier {
   func body(content: Content) -> some View {
     #if os(iOS)
     if usesPushNavigation {
-      // Septask has no floating window-level overlay bar (unlike Septena's
+      // Septena has no floating window-level overlay bar (unlike Septena Life's
       // `RootTabView.iPadTabless`), so on iPad / unfolded iPhone Duo the
       // standalone detail column owns its own trailing action (New Task).
       // "Group Today by List" is a global setting: it lives in Settings, not

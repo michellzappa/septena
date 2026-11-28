@@ -7,7 +7,7 @@ compiles no task model: it reads ready-made views and sends verbs.
 ## Architecture
 
 ```
-iPhone (Septask)  ──WatchConnectivity──▶  Watch
+iPhone (Septena)  ──WatchConnectivity──▶  Watch
    │  mints a watch session                │  GET  /v1/tasks?view=today|upcoming|anytime
    │  pushes Today as app context          │  POST /v1/tasks            (create)
    ▼                                       │  POST /v1/tasks/:id/:verb  (complete, today,

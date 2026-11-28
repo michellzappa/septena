@@ -303,7 +303,7 @@ Nothing user-visible or registered changes. ADR 0007 holds:
 
 - `ci.yml`: today's three `Septena*` builds and the life half of
   `SeptenaCoreTests`. Same watchOS runtime caveat as today.
-- `CLAUDE.md`: today's file minus Septask and task sections, plus: "SeptenaKit
+- `CLAUDE.md`: today's file minus the task-app and task sections, plus: "SeptenaKit
   comes from michellzappa/septena at a pinned revision; change it there, then
   bump the pin here"; "MCP tool changes for `mcp.septena.app` land in
   `backend/` in the septena repo".

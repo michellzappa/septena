@@ -3,7 +3,7 @@ import SwiftUI
 
 // The Weekly Sweep sheet (`docs/TASK_FADE_SPEC.md` §5, ADR 0006).
 //
-// Shared by both shells: SwiftUI presents it with `.sheet`; Septask's AppKit
+// Shared by both shells: SwiftUI presents it with `.sheet`; Septena's AppKit
 // task list hosts it in an `NSHostingController` sheet. Shows ONLY the faded
 // tasks for this sweep, one tap ("Keep") per item, and one bottom button
 // ("Let the rest go") that cancels the remaining rows with `dropReason = "faded"`

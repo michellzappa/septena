@@ -18,7 +18,7 @@
   SwiftData. Swift builds on Windows, but SwiftUI and SwiftData do not.
 - Two other clients are planned: the web client (#21, M3) and the Android
   client (#20, M4). The web client reaches Windows browsers first. The
-  Android plan (`docs/SEPTASK_ANDROID_PLAN.md`) is Kotlin and Compose, and it
+  Android plan (`docs/ANDROID_BRIDGE_PLAN.md`) is Kotlin and Compose, and it
   is being rewritten for the backend.
 - Sign-in is Sign in with Apple only. A Windows user may have no Apple ID.
   The Android rewrite needs a second sign-in method for the same reason.
@@ -104,6 +104,6 @@ ships.
 
 - #136 Windows client · #20 Android client · #21 web client · #109 platform pages
 - ADR 0002 own backend · ADR 0008 agent loop in the store
-- `docs/SEPTASK_ANDROID_PLAN.md` (superseded on architecture)
+- `docs/ANDROID_BRIDGE_PLAN.md` (superseded on architecture)
 - Bipe: `bipe-chat/bipe-app` `android/desktop-app/README.md` (check list),
   `android/desktop-runtime/README.md` (storage), `windows/README.md` (OAuth)

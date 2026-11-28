@@ -80,7 +80,7 @@ enum BackendJSON: Codable, Hashable, Sendable {
 
 enum BackendEntity: String, Codable, Sendable, CaseIterable {
   case task, area, project, attachment, checklistItem, taskRef, doSession, tag, convo, turn
-  /// Septask's synced settings, one row per key (TaskSyncSettings.swift).
+  /// Septena's synced settings, one row per key (TaskSyncSettings.swift).
   case setting
 }
 

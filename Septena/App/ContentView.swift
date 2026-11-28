@@ -87,7 +87,7 @@ struct ContentView: View {
     switch route {
     case .filter(let f):  TaskListView(filter: f)
     case .next:
-      // Septask has no Next page (removed 2026-11-19). Nothing routes here;
+      // Septena has no Next page (removed 2026-11-19). Nothing routes here;
       // a stray `.next` lands on Today rather than an empty pane.
       TaskListView(filter: .today)
     case .project(let id): ProjectRouteDestination(id: id).id(route.id)

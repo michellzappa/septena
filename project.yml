@@ -174,7 +174,7 @@ targets:
           - UIApplicationShortcutItemType: com.septena.app.today
             UIApplicationShortcutItemTitle: Today
             UIApplicationShortcutItemIconType: UIApplicationShortcutIconTypeDate
-        # No UIBackgroundModes: Septask registers for no push (CloudKit-free,
+        # No UIBackgroundModes: Septena registers for no push (CloudKit-free,
         # and the backend's silent push is not built yet).
         # The compiled task UI includes the Reminders inbox and the Today
         # calendar strip (EventKit) — access requests crash without these.
@@ -270,7 +270,7 @@ targets:
         CODE_SIGN_ENTITLEMENTS: ShareExtension/SeptaskShare.entitlements
         SWIFT_ACTIVE_COMPILATION_CONDITIONS: "SHARE_EXTENSION"
 
-  # Home Screen & Lock Screen widgets for Septask iOS (docs/TASK_WIDGETS_SPEC.md, #161).
+  # Home Screen & Lock Screen widgets for Septena iOS (docs/TASK_WIDGETS_SPEC.md, #161).
   # Shares sources in lockstep with SeptaskMacWidgets; compiles only pure-Foundation
   # widget wire/store/intents so extension memory stays well below WidgetKit's cap.
   SeptaskWidgets:

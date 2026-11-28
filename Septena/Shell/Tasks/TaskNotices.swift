@@ -48,7 +48,7 @@ struct TaskNotice: Identifiable, Equatable {
     case weeklySweep
     /// Explainer: untouched tasks fade over 14 days (docs/TASK_FADE_SPEC.md §4).
     case fadeIntro
-    /// The first-run checklist (Septask): steps drawn like task rows that
+    /// The first-run checklist (Septena): steps drawn like task rows that
     /// tick off as the user does them.
     case getStarted
     /// Upsell (spec §3.2): the free account's trial ran out.
@@ -117,7 +117,7 @@ struct TaskNoticeStep: Identifiable, Equatable {
 enum TaskNotices {
   /// The notices for Today, in display order. `pool` is the list's open rows
   /// on Today; `requiresSignIn` is true where the app is backend-only and has
-  /// no session (Septask).
+  /// no session (Septena).
   static func today(pool: [SeptenaTask], requiresSignIn: Bool,
                     today: String, context: ModelContext) -> [TaskNotice] {
     var out: [TaskNotice] = []
@@ -301,7 +301,7 @@ enum TaskNotices {
     return notice(.rolledIn, title: RegistryNotices.rolledInTitle(count: count))
   }
 
-  // MARK: - Get started (Septask)
+  // MARK: - Get started (Septena)
   //
   // Shown until every step is done or the user dismisses it. A step is done
   // once ticked, or once the data shows it happened: a task an agent wrote

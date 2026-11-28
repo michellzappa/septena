@@ -597,7 +597,7 @@ function invalidArgs(error: z.ZodError): ToolPayload {
 }
 
 /// The user's zone for "today": the `homeTimezone` setting the app syncs
-/// (the device that last opened Septask), else the zone the app sent when it
+/// (the device that last opened Septena), else the zone the app sent when it
 /// approved this pairing, else UTC.
 async function effectiveTimeZone(store: StoreRpc, grant: McpGrant): Promise<string> {
   const synced = await store.readSetting("homeTimezone");

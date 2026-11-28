@@ -16,7 +16,7 @@ import AppKit
 // pill uses, so the icon and the in-app pill always agree.
 //
 // The toggle lives in the SHARED App Group, not per-app UserDefaults. Septena
-// and Septask badge the same overdue tasks off the same CloudKit zone, so two
+// Life and Septena badge the same overdue tasks off the same CloudKit zone, so two
 // independent opt-ins meant two dock dots for one set of work — which reads as
 // twice as many overdue tasks, not as two apps. One key, one owner.
 // Cross-process propagation is not live: the other app picks up a change on

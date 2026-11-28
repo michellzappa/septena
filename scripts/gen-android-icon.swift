@@ -1,4 +1,4 @@
-// Generates the Android adaptive launcher icon from the Septask default app
+// Generates the Android adaptive launcher icon from the Septena default app
 // icon (#282). Regenerate, never retouch:
 //
 //   swift scripts/gen-android-icon.swift

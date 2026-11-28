@@ -41,7 +41,7 @@ device or app identity. Concretely —
   one app-root signal, `usesPushNavigation`. Gate drop affordances on it; don't
   branch on `UIDevice.idiom`.
 - The behavior lives in the **shared** `Shell/Tasks` + `Shell/Sidebar` folders,
-  which compile into both apps. Write it once → Septena and Septask both get it.
+  which compile into both apps. Write it once → Septena Life and Septena both get it.
   There is no per-app drag code, and there must never be.
 
 Everything below is a consequence of these two facts.
@@ -143,7 +143,7 @@ Non-negotiables that fall out of this:
 
 ---
 
-## 3. Cross-app (Septask ⇄ Septena) — shared by construction, policed by injection
+## 3. Cross-app (Septena ⇄ Septena Life) — shared by construction, policed by injection
 
 The drag/drop code is in shared folders, so **parity is automatic** — but two
 seams can silently break it, and both are composition-root, not compiler,
@@ -158,7 +158,7 @@ failures:
    publish it doesn't crash — it silently disables sidebar drop. That's a
    *sneakier* failure than the usual launch crash. **Any new `@Environment` the
    drag path takes on → add to both roots in the same change.**
-2. **Runtime profile.** Septask runs `RuntimeProfile.tasksOnly`, but the task /
+2. **Runtime profile.** Septena runs `RuntimeProfile.tasksOnly`, but the task /
    area / project mutators all exist there, so every re-home and reorder works.
    No drag capability may depend on a provider store.
 
@@ -267,5 +267,5 @@ Run per change, across **4 schemes × 3 form factors**:
 - [ ] Re-homed task **loses its old `heading`** and **lands at the decided
       end** (Decision A) of the destination.
 - [ ] Multi-select drag preserves relative order of the selection.
-- [ ] Septask (iOS + Mac): all of the above — drop targets render, mutators fire.
+- [ ] Septena (iOS + Mac): all of the above — drop targets render, mutators fire.
 - [ ] Keyboard: Move Up/Down + "Move…" reachable with Full Keyboard Access off.

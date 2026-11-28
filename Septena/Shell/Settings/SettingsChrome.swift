@@ -1,6 +1,6 @@
 // Settings-root chrome shared by both shells (docs/SEPTASK.md): the icon
 // tile for About rows and the top luminance wash — extracted from
-// SettingsView.swift so Septask's Settings can mirror the full app's look
+// SettingsView.swift so Septena's Settings can mirror the full app's look
 // without compiling its destination graph.
 
 import SwiftUI
@@ -55,7 +55,7 @@ struct SettingsTopGradient: View {
 #if os(macOS)
 extension View {
   /// One row of a macOS Settings sidebar (`List(selection:)` in a
-  /// `NavigationSplitView`), shared by Septena and Septask. The native
+  /// `NavigationSplitView`), shared by Septena Life and Septena. The native
   /// selection would paint the app accent, which is the black/white ink, as a
   /// solid bar with inverted text. So the native fill is suppressed and the
   /// selected row wears the app's canonical inset selection instead

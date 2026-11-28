@@ -90,7 +90,7 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   private var showsReviewDepth = false
   /// Task Conversations — the agent's work log for this row. Shown only when
   /// a conversation exists; a task with no agent history gets no header and no
-  /// empty box (docs/SEPTASK_CONVERSATIONS_PLAN.md).
+  /// empty box (docs/APPKIT_CONVERSATIONS_PLAN.md).
   private let conversationLabel = NSTextField(labelWithString: "")
   private let conversationView = KitConversationView()
   /// Who changed the task and what (SeptaskKitHistory.swift). Loads only

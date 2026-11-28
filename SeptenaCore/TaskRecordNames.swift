@@ -7,7 +7,7 @@ import Foundation
 // `TaskStoreMode` freezes these record types in Septena Life, and the
 // backend sync engine keys its pending-change ledger by these record names.
 // The field names and the CKRecord encode/decode stay in the record files,
-// which Septask does not compile.
+// which Septena does not compile.
 
 enum TaskCloudKitSchema {
   /// CKRecord type. Capitalized by CloudKit convention. The record name is

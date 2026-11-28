@@ -1,4 +1,4 @@
-# Septask AppKit shell — parity backlog
+# Septena AppKit shell — parity backlog
 
 What the AppKit shell (`Septask/SeptaskKit*.swift`) still lacks versus the
 SwiftUI task surface it replaced on macOS. **This file is only the gap list.**
@@ -9,7 +9,7 @@ SwiftUI task surface it replaced on macOS. **This file is only the gap list.**
 - Surface tiers (popover / command panel / alert) are in
   `docs/SEPTASK_APPKIT_SURFACES.md`.
 - The port's history — what landed when, and why each thing was built the way
-  it was — is in git. `git log --follow docs/SEPTASK_APPKIT_PARITY.md` reaches
+  it was — is in git. `git log --follow docs/APPKIT_PARITY.md` reaches
   the session-by-session record this file used to carry inline.
 
 Everything below is still *reachable* today: the SwiftUI shell is one menu item
@@ -45,7 +45,7 @@ but it diverges from SwiftUI, so one of the two is wrong.
 ## 2. Task Conversations
 
 The thread renders in the inspector below Notes, per
-`docs/SEPTASK_CONVERSATIONS_PLAN.md`. Two things the plan listed as explicit
+`docs/APPKIT_CONVERSATIONS_PLAN.md`. Two things the plan listed as explicit
 v1 non-goals are still open:
 
 - **[P3] `subtasks` (epic decompose)** render as the stored ids, nothing richer.

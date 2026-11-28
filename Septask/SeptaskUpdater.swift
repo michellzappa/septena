@@ -2,7 +2,7 @@
 import AppKit
 import Sparkle
 
-/// The one process-wide owner of Septask's Sparkle updater.
+/// The one process-wide owner of Septena's Sparkle updater.
 ///
 /// Sparkle owns the update UI, download, signature verification, replacement,
 /// and relaunch. Keeping that lifecycle here means the AppKit shell, SwiftUI

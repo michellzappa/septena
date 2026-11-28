@@ -54,7 +54,7 @@ xcodegen generate
 open Septena.xcodeproj
 ```
 
-The code targets keep the working name Septask. `Septask` builds the phone and tablet app with its watch app, widgets and share extension. `SeptaskMac` builds the desktop app. `SeptenaCoreTests` runs the unit tests for the task logic.
+The code targets still use the old working name Septask until #856 renames them. `Septask` builds the phone and tablet app with its watch app, widgets and share extension. `SeptaskMac` builds the desktop app. `SeptenaCoreTests` runs the unit tests for the task logic.
 
 To sign a build with your own developer account, copy `Config/Secrets.example.xcconfig` to `Config/Secrets.xcconfig` and set `SEPTENA_DEVELOPMENT_TEAM`. [`docs/BUILDING_YOUR_OWN.md`](docs/BUILDING_YOUR_OWN.md) has the details. The other parts build in CI; the workflows are in [`.github/workflows/`](.github/workflows/).
 

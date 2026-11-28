@@ -1,8 +1,8 @@
 #if os(macOS)
 import AppKit
 
-// Task Conversations in the AppKit shell — §2 of docs/SEPTASK_APPKIT_PARITY.md,
-// following docs/SEPTASK_CONVERSATIONS_PLAN.md.
+// Task Conversations in the AppKit shell — §2 of docs/APPKIT_PARITY.md,
+// following docs/APPKIT_CONVERSATIONS_PLAN.md.
 //
 // The SwiftUI reference is `ConversationCard` (Septena/Shell/Tasks/). This is
 // the same content in AppKit, not a second interpretation of it: same turn

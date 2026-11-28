@@ -2,7 +2,7 @@ import SwiftUI
 
 // Identity chrome shared by both shells' Settings (docs/SEPTASK.md): the
 // monogram avatar and the free-tier badge. Extracted from SettingsPanes.swift
-// so Septask's Account surface can mirror the full app's without compiling
+// so Septena's Account surface can mirror the full app's without compiling
 // the whole Settings pane file. Pure presentation, no business logic.
 
 /// Circular monogram avatar. Initials over a neutral fill; a supporter

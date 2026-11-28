@@ -4,13 +4,13 @@ import SwiftUI
 ///
 /// One `@AppStorage` on `SettingsKey.todayGroupByList` is the whole story:
 /// every surface that renders Today already reads that key
-/// (`TaskListView`, `TasksDestinationView`, and Septask's AppKit
+/// (`TaskListView`, `TasksDestinationView`, and Septena's AppKit
 /// `SeptaskKitTaskList`), and Settings ▸ Tasks writes the same one. Exposing
 /// it here is discoverability, not a second source of truth — which is why
 /// this is a shared view rather than a copy per surface.
 ///
-/// Mounted only in the macOS / iPadOS View menu (Septena's `App.swift` and
-/// Septask's `SeptaskCommandMenus`). On iPhone and iPad it lives in Settings
+/// Mounted only in the macOS / iPadOS View menu (Septena Life's `App.swift` and
+/// Septena's `SeptaskCommandMenus`). On iPhone and iPad it lives in Settings
 /// only: it is a global setting, not a per-page option (2026-11-23).
 ///
 /// The title says "Today" because the setting is Today-scoped — Anytime,
@@ -25,7 +25,7 @@ struct TaskViewOptions: View {
 
   /// Wraps a view-option binding so a write also posts
   /// `.septenaTaskViewOptionsChanged`. SwiftUI surfaces bind the key through
-  /// `@AppStorage` and repaint themselves; Septask's AppKit list reads
+  /// `@AppStorage` and repaint themselves; Septena's AppKit list reads
   /// `UserDefaults` directly and would otherwise keep its stale rows until the
   /// next task mutation. Every writer of a task view option goes through this
   /// — the menus here and the registry-driven Settings rows in `SeptaskSettingsView`.

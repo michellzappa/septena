@@ -2,7 +2,7 @@ import SwiftUI
 import SwiftData
 
 // The settings mirror cache — extracted from SettingsView.swift so both
-// shells compile it (Septask injects it for the profile name
+// shells compile it (Septena injects it for the profile name
 // and What's New; docs/SEPTASK.md). No view types referenced.
 
 // MARK: - Store
@@ -32,7 +32,7 @@ final class SettingsStore {
   /// first frame uses the user's saved settings.
   init() {
     paintFromCache()
-    // Septask's settings arrive with the task-backend pull, not a CloudKit
+    // Septena's settings arrive with the task-backend pull, not a CloudKit
     // batch: reload, then copy the synced values into the device-local
     // mirrors the views read. Inbound only (`engine: nil` pushes nothing).
     settingsPulledObserver = NotificationCenter.default.addObserver(

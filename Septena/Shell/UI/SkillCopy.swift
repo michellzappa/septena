@@ -1,5 +1,5 @@
 // Extracted from AboutAdvancedSettingsPanes.swift so shells that don't
-// compile the full Settings surface (Septask) share the one pasteboard
+// compile the full Settings surface (Septena) share the one pasteboard
 // impl — see docs/SEPTASK.md.
 
 import SwiftUI

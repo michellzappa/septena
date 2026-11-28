@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Septask's MCP Skills pane: the tasks brief only (the one skill this app's
+/// Septena's MCP Skills pane: the tasks brief only (the one skill this app's
 /// data exposes), rendered in the full app's skill-page shape — summary,
 /// tool list, conventions body, copy-to-clipboard. Septena's pane renders
 /// every section via SectionRegistry; here the shared `TasksSkill` constant

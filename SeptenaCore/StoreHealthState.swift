@@ -42,7 +42,7 @@ public final class StoreHealthState {
   public private(set) var unreportedFailure: Failure?
 
   /// Posted on every rolled-back save, for surfaces that cannot observe
-  /// `@Observable` state: Septask's Mac shell is pure AppKit
+  /// `@Observable` state: Septena's Mac shell is pure AppKit
   /// (`SeptaskKitWindow`), with no SwiftUI view to hang an alert on. SwiftUI
   /// surfaces use `.storeHealthAlert()` and ignore this.
   public static let failureNotification = Notification.Name("SeptenaStoreHealthSaveFailed")

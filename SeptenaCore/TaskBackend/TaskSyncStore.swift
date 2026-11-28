@@ -11,9 +11,9 @@ import SwiftData
 //
 // Why a separate SwiftData store and not the main one or a JSON file:
 //   - Not the main store: adding model types to the shared `LocalStore`
-//     schema migrates the file Septena and Septask BOTH open. An older build
+//     schema migrates the file Septena Life and Septena BOTH open. An older build
 //     of the other app then cannot open it (`LocalStore` fatalErrors rather
-//     than erase). This store belongs to Septask alone; deleting it loses no
+//     than erase). This store belongs to Septena alone; deleting it loses no
 //     user data, only the queue and the shadow.
 //   - Not JSON: the shadow holds one entry per task, area, project and
 //     attachment (thousands). A JSON file would be rewritten whole on every
@@ -139,7 +139,7 @@ final class TaskSyncStore {
     context.autosaveEnabled = false
   }
 
-  /// Septask-only, next to (never inside) the main store. On the Mac that is
+  /// Septena-only, next to (never inside) the main store. On the Mac that is
   /// `~/Library/Septena/`, the one place the App Data privacy prompt does not
   /// guard (see `TaskStoreLocation`).
   static var url: URL {

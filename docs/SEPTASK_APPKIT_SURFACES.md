@@ -1,4 +1,4 @@
-# Septask AppKit — transient surfaces
+# Septena AppKit shell — transient surfaces
 
 How the AppKit shell shows a popover, a panel, or an alert, and why there is
 only one way to do each. The code is in `Septask/SeptaskKitSurface.swift`; the

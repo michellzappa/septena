@@ -11,7 +11,7 @@ enum SettingsMirror {
   // genuinely need main — they push through CKEngine — so the enum stays
   // `@MainActor` and only this read opts out).
   nonisolated static func loadSettings(context: ModelContext) -> AppSettings? {
-    // Septask syncs no CloudKit record: its settings are the synced-settings
+    // Septena syncs no CloudKit record: its settings are the synced-settings
     // blob (TaskSyncSettings.swift), never the shared `SettingsEntity` row
     // Septena syncs through CloudKit.
     guard let data = UserDefaults.standard.data(forKey: SeptaskSyncedSettings.storeKey) else { return nil }
@@ -19,7 +19,7 @@ enum SettingsMirror {
   }
 
   /// The settings CloudKit last synced to this device (the shared
-  /// `SettingsEntity` row), in either app. Septask reads it once, to seed
+  /// `SettingsEntity` row), in either app. Septena reads it once, to seed
   /// its synced-settings blob (`SeptaskSyncedSettings.seedIfNeeded`).
   static func loadCloudKitSettingsRow(context: ModelContext) -> AppSettings? {
     let singletonID = SettingsCloudKitSchema.singletonID
@@ -112,7 +112,7 @@ enum SettingsMirror {
     upsert(settings: settings, context: context, engine: engine)
   }
 
-  // MARK: - "Get started" checklist (Septask)
+  // MARK: - "Get started" checklist (Septena)
 
   /// Synced dismissal flag for the "Get started" checklist. True once dismissed
   /// or every step is completed on any device.
@@ -204,8 +204,8 @@ enum SettingsMirror {
   static func upsert(settings: AppSettings,
                      context: ModelContext,
                      engine: CKEngine? = nil) {
-    // Septask: write the synced-settings blob and queue the changed keys for
-    // the task backend. `engine` is unused (Septask never starts CloudKit).
+    // Septena: write the synced-settings blob and queue the changed keys for
+    // the task backend. `engine` is unused (Septena never starts CloudKit).
     let data = SeptaskSyncedSettings.encode(settings)
     guard UserDefaults.standard.data(forKey: SeptaskSyncedSettings.storeKey) != data else { return }
     UserDefaults.standard.set(data, forKey: SeptaskSyncedSettings.storeKey)

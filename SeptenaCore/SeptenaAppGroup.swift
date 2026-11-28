@@ -1,6 +1,6 @@
 import Foundation
 
-/// The App Group Septena and Septask share.
+/// The App Group Septena Life and Septena share.
 ///
 /// Both apps are separate processes with separate bundle ids and separate
 /// SwiftData mirrors — CloudKit is the convergence point for DATA. This group
@@ -31,8 +31,8 @@ public enum SeptenaAppGroup {
   ///
   /// `com.septena.shared` is an ordinary preferences domain in
   /// `~/Library/Preferences/`, guarded by no TCC service, and BOTH Mac apps
-  /// read and write it — so the one thing this type exists for (Septena and
-  /// Septask agreeing on device-local state) is preserved exactly.
+  /// read and write it — so the one thing this type exists for (Septena Life and
+  /// Septena agreeing on device-local state) is preserved exactly.
   ///
   /// iOS keeps the real group: its widgets, watch bridge, and share extension
   /// read the suite, and iOS has no App Data prompt.
