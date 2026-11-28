@@ -460,7 +460,12 @@ enum TaskJSONTransfer {
     let existing = try context.fetch(desc).first
     let statusRaw = normalizedTaskStatus(r["status"] as? String)
     let entity = existing ?? TaskEntity(id: id, title: title, statusRaw: statusRaw, createdAt: .now)
-    if existing == nil { context.insert(entity) }
+    if existing == nil {
+      // A row this import adds was added by import (ADR 0064). A row that is
+      // already here keeps how it was first added.
+      entity.addedVia = TaskAddedVia.import.rawValue
+      context.insert(entity)
+    }
     entity.title = title
     entity.statusRaw = statusRaw
     entity.created = r["created"] as? String

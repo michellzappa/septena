@@ -142,7 +142,8 @@ final class SeptaskKitQuickEntry: NSObject, NSTextFieldDelegate, NSWindowDelegat
     Task { @MainActor in
       // The panel can fire before the runtime is warm (start() memoizes).
       await SeptenaServices.shared.start()
-      let task = SeptenaServices.shared.taskMutator.create(title: title, today: today)
+      let task = SeptenaServices.shared.taskMutator.create(title: title, today: today,
+                                                                    addedVia: .quickEntry)
       // Local mutations don't broadcast on their own; both shells listen for
       // this, so the capture appears everywhere at once.
       NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)

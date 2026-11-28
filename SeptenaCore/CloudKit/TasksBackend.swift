@@ -181,6 +181,8 @@ final class CloudKitTasksBackend {
       pendingSync: true,
       source: entity.source,
       sourceClient: entity.sourceClient,
+      // The next occurrence of a series keeps how the series was added.
+      addedVia: entity.addedVia,
       // Completing an agent-authored row is engagement with the recurring
       // task, so the next occurrence should not immediately show a fresh cue.
       acknowledgedAt: entity.source == TaskSource.mcp ? Date() : entity.acknowledgedAt,
@@ -329,6 +331,7 @@ final class CloudKitTasksBackend {
   func create(title: String, area: String?, project: String?,
               scheduled: Date?, deadline: Date?, today: Bool,
               notes: String?, source: String = TaskSource.app,
+              addedVia: TaskAddedVia = .typed,
               acknowledged: Bool = false,
               deferPush: Bool = false,
               atBottom: Bool = false) -> SeptenaTask {
@@ -369,6 +372,8 @@ final class CloudKitTasksBackend {
       // Mirror the gateway's label for agent rows so MCP-authored tasks read as
       // "Claude" regardless of which surface (gateway / local server) wrote them.
       sourceClient: source == TaskSource.mcp ? "Claude" : currentAppClientLabel,
+      // How the task was added (ADR 0064): set here once, never by an edit.
+      addedVia: addedVia.rawValue,
       acknowledgedAt: acknowledged ? now : nil,
       createdAt: now
     )

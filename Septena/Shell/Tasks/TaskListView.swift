@@ -2848,7 +2848,7 @@ struct TaskListView: View {
   private func noticeAction(_ notice: TaskNotice) -> some View {
     if notice.id == .beta {
       HStack(spacing: 8) {
-        Button(notice.primaryTitle ?? "") { openBetaChecklist() }
+        Button(notice.primaryTitle ?? "") { openBetaProject() }
           .buttonStyle(.bordered)
           .controlSize(.small)
         Button(notice.secondaryTitle ?? "") { dismissNotice(.beta) }
@@ -2898,12 +2898,13 @@ struct TaskListView: View {
     }
   }
 
-  /// The beta card's open button: the Beta screen in Settings. Opening it
-  /// closes the card for good, as "Not now" does.
-  private func openBetaChecklist() {
+  /// The beta card's open button: the beta project the server seeded in the
+  /// tester's list. Opening it closes the card for good, as "Not now" does.
+  /// Without a project it only closes the card.
+  private func openBetaProject() {
+    let projectID = BetaCenter.shared.projectID
     TaskNotices.dismiss(.beta, today: clock.today, context: modelContext)
-    SeptaskSettingsLink.request(BetaCenter.surfaceID)
-    nav.showSettings = true
+    if let projectID { nav.go(to: .project(id: projectID)) }
   }
 
   private func dismissNotice(_ id: TaskNotice.ID) {

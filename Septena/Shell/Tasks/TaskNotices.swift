@@ -304,10 +304,10 @@ enum TaskNotices {
   private static var signIn: TaskNotice { notice(.signIn) }
 
   /// The beta welcome card: copy from the server, two buttons (open the
-  /// checklist, not now), each closing the card for good.
+  /// beta project, not now), each closing the card for good.
   private static var beta: TaskNotice? {
     let center = BetaCenter.shared
-    guard center.showsCard, let copy = center.checklist?.copy else { return nil }
+    guard center.showsCard, let copy = center.card?.copy else { return nil }
     return TaskNotice(
       id: .beta, kind: .info, symbol: RegistryIcons.sfSymbol(for: "action.checklist"),
       title: copy.cardTitle, detail: copy.cardBody,

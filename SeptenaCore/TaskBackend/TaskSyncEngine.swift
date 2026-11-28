@@ -736,6 +736,11 @@ final class TaskSyncEngine {
     if entity == .doSession {
       patch = patch.filter { !["taskId", "startedAt", "sourceClient"].contains($0.key) }
     }
+    if entity == .task {
+      // How the task was added is set once, with the insert (ADR 0064). A
+      // later edit never sends it, so no device overwrites it.
+      patch.removeValue(forKey: "addedVia")
+    }
     if !patch.isEmpty {
       enqueueUpsert(entity, id, entity == .project ? withNotesBase(patch, key: key, old: old) : patch, store: store)
     }

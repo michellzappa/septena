@@ -62,16 +62,18 @@ final class TaskMutator {
               today: Bool = false,
               notes: String? = nil,
               source: String = TaskSource.app,
+              addedVia: TaskAddedVia = .typed,
               acknowledged: Bool = false,
               deferPush: Bool = false,
               atBottom: Bool = false) -> SeptenaTask {
     guard let cloudBackend else {
       preconditionFailure("TaskMutator.create called before SeptenaServices.shared.start()")
     }
-    SeptenaLog.info("[TaskMutator] route=cloudKit op=create title=\"\(title)\" source=\(source) acknowledged=\(acknowledged) deferPush=\(deferPush) atBottom=\(atBottom)")
+    SeptenaLog.info("[TaskMutator] route=cloudKit op=create title=\"\(title)\" source=\(source) addedVia=\(addedVia.rawValue) acknowledged=\(acknowledged) deferPush=\(deferPush) atBottom=\(atBottom)")
     return cloudBackend.create(title: title, area: area, project: project,
                                scheduled: scheduled, deadline: deadline, today: today,
-                               notes: notes, source: source, acknowledged: acknowledged,
+                               notes: notes, source: source, addedVia: addedVia,
+                               acknowledged: acknowledged,
                                deferPush: deferPush, atBottom: atBottom)
   }
 
