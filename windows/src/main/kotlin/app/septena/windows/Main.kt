@@ -324,7 +324,7 @@ private fun DesktopTasks(
                 },
                 onOpenGroupTarget = project?.let { current -> { id -> destination = DesktopLocation.Section(current.id, id) } },
                 // One Checked group after a Checklist's rows, with the list's foldable group (#860).
-                collapsibleGroup = (destination as? DesktopLocation.Project)
+                collapsibleGroups = listOfNotNull((destination as? DesktopLocation.Project)
                     ?.let { lists.checkedByProject[it.id] }
                     ?.takeIf { it.isNotEmpty() }
                     ?.let { checked ->
@@ -338,7 +338,7 @@ private fun DesktopTasks(
                             isExpanded = checkedExpanded,
                             onToggle = { checkedExpanded = !checkedExpanded },
                         )
-                    },
+                    }),
             )
         }
     }

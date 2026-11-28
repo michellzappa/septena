@@ -391,7 +391,7 @@ The conformance vectors are the cases every Septena implementation passes: the a
 
 | File | Suites (cases) |
 |---|---|
-| [`convo-derived.json`](https://septena.app/spec/conformance/convo-derived.json) | `cases` (10), `conversationState` (11) |
+| [`convo-derived.json`](https://septena.app/spec/conformance/convo-derived.json) | `cases` (10), `conversationState` (15) |
 | [`do-session.json`](https://septena.app/spec/conformance/do-session.json) | `resolve` (16), `endWins` (4) |
 | [`list-sort.json`](https://septena.app/spec/conformance/list-sort.json) | `cases` (15) |
 | [`project-checklist.json`](https://septena.app/spec/conformance/project-checklist.json) | `layout` (3), `check` (2), `heading` (10) |
@@ -400,8 +400,8 @@ The conformance vectors are the cases every Septena implementation passes: the a
 | [`reminders.json`](https://septena.app/spec/conformance/reminders.json) | `shiftReminderForRecurrence` (6), `shiftReminderOnReschedule` (5), `shouldArmReminder` (8) |
 | [`sync-engine.json`](https://septena.app/spec/conformance/sync-engine.json) | `pullPage` (7), `pullRow` (13), `pushResponse` (7), `rejectionReason` (7) |
 | [`task-dates.json`](https://septena.app/spec/conformance/task-dates.json) | `actions` (53), `normalize` (13), `nextOccurrence` (2) |
-| [`task-fade.json`](https://septena.app/spec/conformance/task-fade.json) | `rowOpacity` (6), `shouldFade` (15) |
-| [`task-views.json`](https://septena.app/spec/conformance/task-views.json) | `cases` (31) |
+| [`task-fade.json`](https://septena.app/spec/conformance/task-fade.json) | `rowOpacity` (6), `shouldFade` (17) |
+| [`task-views.json`](https://septena.app/spec/conformance/task-views.json) | `cases` (39) |
 
 To check your own client, write a module that exports one object per file, with one function per suite you implement. The object's name is the file name without `.json`, in camel case: `task-dates.json` is `taskDates`. Each function takes the case and the file's context and returns what your code computes:
 
