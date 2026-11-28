@@ -951,7 +951,9 @@ export class WebSyncEngine {
         : {};
     await this.patchTask(task, {
       ...filePatch,
-      area: target.area,
+      // A task in a project has no area of its own (same rule as the Apple
+      // TasksBackend.moveToList): the project carries the area.
+      area: target.project ? null : target.area,
       project: target.project,
       heading: target.heading ?? null,
       touchedAt: now,

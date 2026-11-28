@@ -60,6 +60,8 @@ The canonical row (see `HabitRow`, `SupplementRow`, `ChoreRow` in [NextItemsSect
 - **Title**: `.septenaTaskTitle`.
 - **Trailing accessory**: time, status badge, or overdue indicator in `.septenaMeta` / `StatusBadge`.
 
+**Area pages** (mz, 2026-11-28, every platform): an area page lists only the area's own tasks (`project` is nil). A task in one of the area's projects shows on that project's page, never on the area page. After the tasks, the page lists the area's active projects under the `placesScreen` "Projects" heading, one row per project (progress ring, title, open count) that opens the project. The logged and faded footers follow the same split.
+
 Read-only historical entries use `LogRow` ([LogRow.swift](../Septena/Shell/UI/LogRow.swift)): `[Optional status dot] [Title] [Detail] [Microglyph] [Spacer] [Recency]`. The leading dot is used by the per-item detail's recent timeline (done / skipped / missed); omit it elsewhere.
 
 ## 4. Color
