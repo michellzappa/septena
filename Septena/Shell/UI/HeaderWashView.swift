@@ -4,8 +4,9 @@ import SwiftUI
 /// Small bounded in-memory cache of pre-rasterized static `HeaderWashEngine`
 /// textures so scrolling, navigation, and Settings previews blit a GPU texture
 /// instead of re-running procedural 3D noise / marching-squares on the main thread.
+/// Shared by the SwiftUI lists and the Mac AppKit list (`KitHeaderWashView`).
 @MainActor
-private enum HeaderWashBitmapCache {
+enum HeaderWashBitmapCache {
   struct Key: Hashable {
     let params: HeaderWashParams
     let pixelWidth: Int
