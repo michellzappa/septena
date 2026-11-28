@@ -7,6 +7,7 @@ export interface WebDisplayPrefs {
   todayGroupByList: boolean;
   todayShowCompleted: boolean;
   reviewFadedExpanded: boolean;
+  reviewTrackedExpanded: boolean;
   tasksShowFaded: boolean;
   sidebarCounts: boolean;
   loggingAnimationsEnabled: boolean;
@@ -20,6 +21,7 @@ export const DEFAULT_WEB_PREFS: WebDisplayPrefs = {
   todayGroupByList: true,
   todayShowCompleted: true,
   reviewFadedExpanded: false,
+  reviewTrackedExpanded: false,
   tasksShowFaded: true,
   sidebarCounts: true,
   loggingAnimationsEnabled: true,
@@ -33,6 +35,7 @@ const KEYS = {
   todayGroupByList: "septena.today.groupByList",
   todayShowCompleted: "septena.today.showCompleted",
   reviewFadedExpanded: "septena.web.reviewFadedExpanded",
+  reviewTrackedExpanded: "septena.web.reviewTrackedExpanded",
   tasksShowFaded: "septena.tasks.showFaded",
   sidebarCounts: "septena.septask.sidebarCounts",
   loggingAnimationsEnabled: "septena.ui.loggingAnimations",
@@ -69,6 +72,7 @@ export function loadWebPrefs(): WebDisplayPrefs {
       todayGroupByList: readBool(KEYS.todayGroupByList, true),
       todayShowCompleted: readBool(KEYS.todayShowCompleted, true),
       reviewFadedExpanded: readBool(KEYS.reviewFadedExpanded, false),
+      reviewTrackedExpanded: readBool(KEYS.reviewTrackedExpanded, false),
       tasksShowFaded: readBool(KEYS.tasksShowFaded, true),
       sidebarCounts: readBool(KEYS.sidebarCounts, true),
       loggingAnimationsEnabled: readBool(KEYS.loggingAnimationsEnabled, true),

@@ -43,6 +43,7 @@ import {
 } from "@/lib/core";
 import { agentStageTitle } from "@/lib/destinations";
 import { COMPLETION_MOTION } from "@/lib/settle";
+import { trackedLink } from "@/lib/tracked";
 import { assigneeLabel, sharedWaitingTarget, sharingCopy, waitingLabel, waitingName } from "@/lib/waiting";
 import type {
   AreaRow,
@@ -73,6 +74,8 @@ export interface TaskRowItemProps {
   expanded: boolean;
   isDeletedView?: boolean;
   isFadedView?: boolean;
+  /** Review > Tracked (ADR 0066): the row shows the end-state note and its issue link. */
+  isTrackedView?: boolean;
   /** True on off-Today lists (Projects, Areas, Anytime, etc.); false on Today (matching iOS TaskRow.showsTodayIndicator). */
   showsTodayIndicator?: boolean;
   /** True on Projects/Areas when faded tasks are shown inline. */
@@ -1188,6 +1191,7 @@ export function TaskRowItem(props: TaskRowItemProps) {
     expanded,
     isDeletedView,
     isFadedView,
+    isTrackedView = false,
     showsTodayIndicator = true,
     showsFadedIndicator = false,
     todayYMD,
@@ -1199,6 +1203,8 @@ export function TaskRowItem(props: TaskRowItemProps) {
     checklistItems,
     allTags,
     attachments,
+    taskRefs,
+    convo,
     convoProjection,
     convoState,
   } = props;
@@ -1236,6 +1242,8 @@ export function TaskRowItem(props: TaskRowItemProps) {
   const checkedCount = checklistItems.filter((c) => c.checked).length;
   const todayColor = isColorfulAccent ? "var(--today-gold)" : "var(--accent)";
   const hasActiveReminder = Boolean(task.reminderAt && !task.reminderDismissedAt);
+  const rowTrackedLink = isTrackedView ? trackedLink(taskRefs) : null;
+  const rowTrackedNote = isTrackedView ? convo?.endStateNote?.trim() || null : null;
   const rowWaitingLabel = isDone || isCancelled ? null : waitingLabel(task, props.todayYMD, props.lang, props.projectShare);
   const waitingCoversAssignee = Boolean(rowWaitingLabel && !waitingName(task) && sharedWaitingTarget(task, props.projectShare));
   const rowAssigneeLabel = waitingCoversAssignee
@@ -1429,6 +1437,26 @@ export function TaskRowItem(props: TaskRowItemProps) {
             />
             <span>Today</span>
           </span>
+        )}
+
+        {rowTrackedNote && (
+          <span className="inline-flex min-w-0 items-center gap-1 rounded-full bg-[var(--bg-pill)] px-2 py-0.5 text-[11px] font-medium text-[var(--text-secondary)]">
+            <RegistryIcon token="list.tracked" className="h-[11px] w-[11px] shrink-0" />
+            <span className="truncate">{rowTrackedNote}</span>
+          </span>
+        )}
+
+        {rowTrackedLink && (
+          <a
+            href={rowTrackedLink.url}
+            target="_blank"
+            rel="noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="inline-flex min-w-0 items-center gap-1 rounded-full bg-[var(--bg-pill)] px-2 py-0.5 text-[11px] font-medium text-[var(--text-secondary)] hover:text-[var(--accent)] hover:underline"
+          >
+            <span className="truncate">{rowTrackedLink.label}</span>
+            <ExternalLink className="h-[11px] w-[11px] shrink-0" />
+          </a>
         )}
 
         {rowWaitingLabel && !isDeletedView && (

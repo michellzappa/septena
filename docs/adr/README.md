@@ -70,6 +70,7 @@ a new ADR and set the old one to `superseded by NNNN`.
 | [0063](0063-user-stats-are-content-free-daily-counts.md) | User stats are content-free daily counts, never streaks (extends 0006, 0025, 0043, 0058) | proposed |
 | [0064](0064-beta-by-invite-code-tied-to-email.md) | The beta is by invite code, and the thank-you follows the email (extends 0043, 0045, 0047) | accepted |
 | [0065](0065-every-capability-names-its-help.md) | Every capability names its help, and the site build checks it (extends 0015, 0020, 0028) | accepted |
+| [0066](0066-tracked-work-is-a-review-group.md) | Work that goes on elsewhere is a Review group: Tracked (amends 0044, 0046) | accepted |
 
 ## Template
 

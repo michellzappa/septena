@@ -108,6 +108,8 @@ final class SeptaskKitTaskListController: NSViewController {
     case task(SeptenaTask, chip: Chip?, suggestion: SuggestionEngine.Suggestion?)
     case event(Event)
     case fadedFooter(count: Int, expanded: Bool)
+    /// Review ▸ Tracked's fold link (ADR 0066). It starts closed, like Faded.
+    case trackedFooter(count: Int, expanded: Bool)
     case loggedFooter(count: Int, expanded: Bool)
     /// Foot of Today's Inbox card — the clickable "New task" line, the AppKit
     /// counterpart of SwiftUI's `QuickAddTriggerRow`. It carries no task, so
@@ -155,6 +157,7 @@ final class SeptaskKitTaskListController: NSViewController {
       case .task(let task, _, _): return task.id
       case .event(let event): return "e:" + event.id
       case .fadedFooter: return "faded-footer"
+      case .trackedFooter: return "tracked-footer"
       case .loggedFooter: return "logged-footer"
       case .newTask: return "new-task"
       case .newProject: return "new-project"
@@ -197,7 +200,7 @@ final class SeptaskKitTaskListController: NSViewController {
     /// so they break the card run the same way a Today area/project header does.
     var isCardRow: Bool {
       switch self {
-      case .header, .screenTitle, .logbookBar, .tagFilterBar, .fadedFooter, .loggedFooter, .notesProposal, .containerNotes,
+      case .header, .screenTitle, .logbookBar, .tagFilterBar, .fadedFooter, .trackedFooter, .loggedFooter, .notesProposal, .containerNotes,
            .doNotice, .sortIndicator: return false
       // A standalone notice sits on the page with its own card fill. A notice
       // with checklist steps (`Get started`) heads its steps' card so the
@@ -332,6 +335,8 @@ final class SeptaskKitTaskListController: NSViewController {
   private var fromRefKinds: [String: String] = [:]
   /// The newest `issue` reference of the Review rows.
   private var issueRefs: [String: TaskRefRow] = [:]
+  /// Review ▸ Tracked: each tracked task's link (`LocalCache.trackedLinkRefs`).
+  private var trackedLinks: [String: TaskRefRow] = [:]
   private var tagsByID: [String: TaskTag] = [:]
   private var activeTagFilterIDs: Set<String> = []
   private var activeAssigneeFilter: TaskAssigneeFilter? = nil
@@ -623,6 +628,8 @@ final class SeptaskKitTaskListController: NSViewController {
         menu = self.buildHeadingContextMenu()
       } else if self.showingRecentlyDeleted {
         menu = self.buildRecentlyDeletedMenu()
+      } else if let task = self.rows[row].task, self.isTrackedRow(task) {
+        menu = self.buildTrackedMenu()
       } else if self.rows[row].task?.isFaded == true {
         menu = self.buildFadedMenu()
       } else {
@@ -1167,6 +1174,7 @@ final class SeptaskKitTaskListController: NSViewController {
     attachmentCounts = SeptenaServices.shared.taskAttachmentStore.attachmentCountsByTask()
     fromRefKinds = LocalCache.fromRefKinds(in: context)
     issueRefs = filter == .review ? LocalCache.newestIssueRefs(in: context) : [:]
+    trackedLinks = filter == .review ? LocalCache.trackedLinkRefs(in: context) : [:]
     tagsByID = LocalCache.tagsByID(in: context)
 
     let locallyChanged = locallyChanged.union(takePendingReloadIDs())
@@ -2134,7 +2142,7 @@ final class SeptaskKitTaskListController: NSViewController {
         continue
       case .task(let task, _, _):
         ids.insert(task.id)
-      case .header, .loggedFooter, .fadedFooter,
+      case .header, .loggedFooter, .fadedFooter, .trackedFooter,
            .screenTitle, .logbookBar, .tagFilterBar, .projectTarget, .newProject, .containerNotes,
            .notice, .noticeStep, .doNotice, .event, .notesProposal, .sortIndicator:
         return ids
@@ -2326,8 +2334,8 @@ final class SeptaskKitTaskListController: NSViewController {
 
   /// Review (docs/REVIEW_SPEC.md §1): one header per non-empty `ReviewGroup`,
   /// in registry order: what waits on the user, then agent work in progress
-  /// (ADR 0046). Faded is last, behind its toggle. The AppKit twin of
-  /// `TaskListView.reviewGroupRows`.
+  /// (ADR 0046). Tracked and Faded are last, each behind its toggle; both
+  /// start closed. The AppKit twin of `TaskListView.reviewGroupRows`.
   private func reviewGroupRows(_ pool: [SeptenaTask]) -> [Row] {
     let byGroup = ReviewGroup.grouped(pool)
     var result: [Row] = []
@@ -2337,6 +2345,12 @@ final class SeptaskKitTaskListController: NSViewController {
                             title: group.group?.title ?? group.rawValue,
                             icon: .symbol(group.group?.sfSymbol ?? "circle"),
                             count: tasks.count))
+      if group == .tracked {
+        let expanded = UserDefaults.standard.bool(forKey: ReviewGroup.trackedExpandedKey)
+        result.append(.trackedFooter(count: tasks.count, expanded: expanded))
+        if expanded { result += tasks.map(unchipped) }
+        continue
+      }
       result += tasks.map(chipped)
     }
     guard let faded = byGroup[.faded], !faded.isEmpty else { return result }
@@ -2344,6 +2358,11 @@ final class SeptaskKitTaskListController: NSViewController {
     result.append(.fadedFooter(count: faded.count, expanded: expanded))
     if expanded { result += [.notice(TaskNotices.fadedPile)] + faded.map(chipped) }
     return result
+  }
+
+  /// A row of Review ▸ Tracked (ADR 0066): title, note and issue link.
+  private func isTrackedRow(_ task: SeptenaTask) -> Bool {
+    filter == .review && !task.isHeading && task.reviewGroup == .tracked
   }
 
   /// A Finished work row of Review: it draws Accept and Send back.
@@ -2728,6 +2747,13 @@ final class SeptaskKitTaskListController: NSViewController {
       rows.append(contentsOf: faded.map(unchipped))
     }
     return rows
+  }
+
+  /// Folds or unfolds Review ▸ Tracked (device-local, starts closed).
+  func toggleTrackedExpanded() {
+    let defaults = UserDefaults.standard
+    defaults.set(!defaults.bool(forKey: ReviewGroup.trackedExpandedKey), forKey: ReviewGroup.trackedExpandedKey)
+    reload(animated: false)
   }
 
   func toggleFadedExpanded() {
@@ -5051,6 +5077,31 @@ final class SeptaskKitTaskListController: NSViewController {
     }
   }
 
+  /// Review ▸ Tracked's menu (registry `task.tracked`, ADR 0066): Bring Back
+  /// sets `endState = open`; Complete and Delete are the usual handlers. The
+  /// row has no checkbox, so Complete shows for one task too.
+  private func buildTrackedMenu() -> NSMenu {
+    let plural: RegistryTitleVariant = actionableSelection.count > 1 ? .plural : .base
+    return KitRegistryMenu.build(RegistryActions.menu(.taskTracked)) { [weak self] id in
+      guard let self else { return nil }
+      switch id {
+      case .taskBringBack: return .init { self.bringBackSelection() }
+      case .taskToggleComplete: return .init(variant: plural) { self.toggleCompleteSelection() }
+      case .taskDelete: return .init(variant: plural) { self.deleteSelection() }
+      default: return nil
+      }
+    }
+  }
+
+  /// Bring Back (registry `task.bringBack`): the selected tracked tasks go
+  /// back to their lists, as one undo step.
+  private func bringBackSelection() {
+    let ids = actionableSelection.filter { $0.reviewGroup == .tracked }.map(\.id)
+    guard !ids.isEmpty else { return }
+    TaskUndo.bringBack(ids: ids, mutator: mutator)
+    reload()
+  }
+
   /// The Faded pile's menu (registry `task.faded`).
   private func buildFadedMenu() -> NSMenu {
     let plural: RegistryTitleVariant = actionableSelection.count > 1 ? .plural : .base
@@ -5619,6 +5670,9 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       if task.id == composingTaskId {
         return composerRowHeight ?? KitComposerCell.baseHeight
       }
+      if isTrackedRow(task) {
+        return KitTrackedTaskCell.height(for: task, link: trackedLinks[task.id])
+      }
       if isReviewRow(task) {
         return KitReviewTaskCell.height(for: task, issue: issueRefs[task.id],
                                         contextText: KitListPath.text(for: task, in: context),
@@ -5628,7 +5682,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
     case .event: return SeptaskKitTheme.rowHeight
     // Blank band above it as tall as a group title, so the footer reads as
     // its own section, not glued to the last task (mz, 2026-11-20).
-    case .fadedFooter, .loggedFooter:
+    case .fadedFooter, .trackedFooter, .loggedFooter:
       return KitLoggedFooterCell.topGap + SeptenaTypeScale.size(.footnote) + 24
     case .newTask, .newProject: return SeptaskKitTheme.rowHeight
     case .notesProposal(_, _, let currentNotes, let proposal):
@@ -6047,7 +6101,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
   private func clampDropRow(_ row: Int) -> Int? {
     guard let footer = rows.firstIndex(where: {
       switch $0 {
-      case .fadedFooter, .loggedFooter: return true
+      case .fadedFooter, .trackedFooter, .loggedFooter: return true
       default: return false
       }
     }), row > footer else { return nil }
@@ -6346,6 +6400,14 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       cell.onTap = { [weak self] in self?.toggleFadedExpanded() }
       return cell
 
+    case .trackedFooter(let count, let expanded):
+      let identifier = NSUserInterfaceItemIdentifier("loggedFooterCell")
+      let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? KitLoggedFooterCell
+        ?? KitLoggedFooterCell(identifier: identifier)
+      cell.configure(count: count, expanded: expanded, kind: .tracked)
+      cell.onTap = { [weak self] in self?.toggleTrackedExpanded() }
+      return cell
+
     case .loggedFooter(let count, let expanded):
       let identifier = NSUserInterfaceItemIdentifier("loggedFooterCell")
       let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? KitLoggedFooterCell
@@ -6460,6 +6522,13 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
         let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? KitComposerCell
           ?? KitComposerCell(identifier: identifier)
         wireComposer(cell, task: task)
+        return cell
+      }
+      if isTrackedRow(task) {
+        let identifier = NSUserInterfaceItemIdentifier("trackedTaskCell")
+        let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? KitTrackedTaskCell
+          ?? KitTrackedTaskCell(identifier: identifier)
+        cell.configure(with: task, link: trackedLinks[task.id])
         return cell
       }
       if isReviewRow(task) {
@@ -8059,7 +8128,7 @@ final class KitLoggedFooterCell: NSTableCellView {
     super.layout()
   }
 
-  enum Kind { case logged, faded }
+  enum Kind { case logged, faded, tracked }
 
   func configure(count: Int, expanded: Bool, kind: Kind = .logged) {
     let text: String
@@ -8083,6 +8152,20 @@ final class KitLoggedFooterCell: NSTableCellView {
                    comment: "Project/area footer — expand faded tasks (singular)")
           : String(localized: "Show \(count) faded items",
                    comment: "Project/area footer — expand faded tasks (plural)")
+      }
+    case .tracked:
+      if expanded {
+        text = count == 1
+          ? String(localized: "Hide 1 tracked item",
+                   comment: "Review footer — collapse tracked tasks (singular)")
+          : String(localized: "Hide \(count) tracked items",
+                   comment: "Review footer — collapse tracked tasks (plural)")
+      } else {
+        text = count == 1
+          ? String(localized: "Show 1 tracked item",
+                   comment: "Review footer — expand tracked tasks (singular)")
+          : String(localized: "Show \(count) tracked items",
+                   comment: "Review footer — expand tracked tasks (plural)")
       }
     }
     label.stringValue = text

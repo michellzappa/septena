@@ -127,6 +127,7 @@ class RegistryConformanceTest {
                 isAwaitingHuman = input.booleanAt("isAwaitingHuman") ?: false,
                 isProposal = input.booleanAt("isProposal") ?: false,
                 zone = ZoneId.of("UTC"),
+                endState = input.stringAt("endState"),
             )
             assertEquals(
                 case.fields["expected"]?.booleanValue() ?: error("Expected fade boolean"),
@@ -147,10 +148,12 @@ class RegistryConformanceTest {
             val record = SyncRecord(
                 entity = "task",
                 id = id,
-                fields = task.without("id", "deletedAt"),
+                fields = task.without("id", "deletedAt", "endState"),
                 deletedAt = task.stringAt("deletedAt"),
             )
-            val actual = TaskViewRules.membership(TaskSnapshot.from(record), today, now)
+            // `endState` is the conversation's (ADR 0066), not a task field.
+            val snapshot = TaskSnapshot.from(record, endState = task.stringAt("endState"))
+            val actual = TaskViewRules.membership(snapshot, today, now)
             val expected = case.objectAt("expected")
             assertEquals(expected.requiredBoolean("isUnfiled"), actual.isUnfiled, case.requiredString("name"))
             assertEquals(expected.requiredBoolean("isInboxMember"), actual.isInboxMember, case.requiredString("name"))
@@ -162,6 +165,12 @@ class RegistryConformanceTest {
                 value.booleanValue() ?: error("Expected view match boolean")
             }
             assertEquals(expectedViews, actual.matchesView, case.requiredString("name"))
+            assertEquals(expected.requiredBoolean("isTracked"), actual.isTracked, case.requiredString("name"))
+            assertEquals(
+                expected.requiredBoolean("isTracked"),
+                TaskViewRules.isTracked(snapshot, today, now),
+                case.requiredString("name"),
+            )
         }
     }
 
@@ -192,6 +201,27 @@ class RegistryConformanceTest {
             assertEquals(expected.requiredString("stage"), actual.stage, case.requiredString("name"))
             assertEquals(expected.stringAt("badge"), actual.badge, case.requiredString("name"))
             assertEquals(expected.requiredBoolean("pendingReasoning"), actual.pendingReasoning, case.requiredString("name"))
+        }
+        // The core's Review group through the Kotlin wrapper (Tracked: ADR 0066). A claim needs a
+        // claimant here (`claimedBy`), which the vectors leave out, so claim cases stay with the
+        // core's own runner.
+        val stateNow = Instant.parse("2026-11-20T12:00:00Z")
+        for (caseValue in fixture.arrayAt("conversationState")) {
+            val case = caseValue.asObject()
+            val source = case.objectAt("convo")
+            if (source.stringAt("claimUntil") != null) continue
+            val turns = source.arrayAt("thread").map { turnValue ->
+                val turn = turnValue.asObject()
+                SyncTurn(taskId = "task-0001", sequence = turn.requiredLong("seq"), fields = turn.without("seq"))
+            }
+            val conversation = TaskConversation.from(
+                SyncRecord(entity = "convo", id = "task-0001", fields = source.without("thread")),
+                turns,
+            )
+            val actual = conversation.evaluate(stateNow)
+            val expected = case.objectAt("expected")
+            assertEquals(expected.stringAt("reviewGroup"), actual.reviewGroup, case.requiredString("name"))
+            assertEquals(expected.requiredBoolean("needsHumanReview"), actual.needsHumanReview, case.requiredString("name"))
         }
     }
 

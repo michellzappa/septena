@@ -34,6 +34,7 @@ import app.septena.core.TaskViewRules
 import app.septena.core.UuidTaskIdGenerator
 import app.septena.core.WireTimestamp
 import app.septena.core.booleanValue
+import app.septena.core.stringValue
 import app.septena.core.generated.RegistryEntityEnums
 import app.septena.core.generated.RegistryEntityFields
 import app.septena.core.generated.RegistryEntityNames
@@ -410,6 +411,35 @@ class AndroidAppGraph(application: Application) {
                     RegistryEntityFields.Convo.STOPPED_AT to JsonValue.Null,
                     RegistryEntityFields.Convo.ASSIGNEE to
                         JsonValue.StringValue(RegistryEntityEnums.ConvoAssignee.CLAUDE),
+                ),
+            )
+            taskMutator.touch(taskId)
+            true
+        } ?: return false
+        taskUndoHistory.recordTaskAndConvoEdits(listOf(edit))
+        return true
+    }
+
+    /**
+     * Review ▸ Tracked ▸ Bring Back (ADR 0066, docs/REVIEW_SPEC.md §2): the user sets the
+     * conversation's end state to `open`, so the task is back in its lists. Same write path and undo
+     * step as [sendBackReview]. False when the task is not tracked.
+     */
+    suspend fun bringBackTracked(taskId: String): Boolean {
+        val convo = taskStore.record(RegistryEntityNames.CONVO, taskId) ?: return false
+        if (convo.deletedAt != null ||
+            convo.fields[RegistryEntityFields.Convo.END_STATE].stringValue() != RegistryEntityEnums.ConvoEndState.DECOMPOSED
+        ) {
+            return false
+        }
+        val edit = captureTaskAndConvo(taskId) {
+            conversationMutator.update(
+                taskId,
+                mapOf(
+                    RegistryEntityFields.Convo.END_STATE to
+                        JsonValue.StringValue(RegistryEntityEnums.ConvoEndState.OPEN),
+                    // The note belongs to `decomposed`, as on Apple and web.
+                    RegistryEntityFields.Convo.END_STATE_NOTE to JsonValue.Null,
                 ),
             )
             taskMutator.touch(taskId)

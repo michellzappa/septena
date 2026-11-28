@@ -661,6 +661,12 @@
       "tokens.avatarColors.colors.blue.name"
     ]
   },
+  "Bring Back": {
+    "text": "Bring Back",
+    "paths": [
+      "actions.actions.task.bringBack.title"
+    ]
+  },
   "Bring in your tasks": {
     "text": "Bring in your tasks",
     "paths": [
@@ -5113,6 +5119,12 @@
       "tokens.textures.topography.name"
     ]
   },
+  "Tracked": {
+    "text": "Tracked",
+    "paths": [
+      "destinations.destinations.review.groups.tracked.title"
+    ]
+  },
   "Try Plus free for 14 days": {
     "text": "Try Plus free for 14 days",
     "paths": [
@@ -5606,8 +5618,8 @@
       "plans.upsells.agents_full.title"
     ]
   },
-  "Your agent's questions, finished work and tasks in progress show up here, and so do tasks you are waiting on. Faded tasks do too.": {
-    "text": "Your agent's questions, finished work and tasks in progress show up here, and so do tasks you are waiting on. Faded tasks do too.",
+  "Your agent's questions, finished work and tasks in progress show up here. So do tasks you are waiting on, tasks tracked elsewhere and faded tasks.": {
+    "text": "Your agent's questions, finished work and tasks in progress show up here. So do tasks you are waiting on, tasks tracked elsewhere and faded tasks.",
     "paths": [
       "destinations.destinations.review.emptyState.detail"
     ]

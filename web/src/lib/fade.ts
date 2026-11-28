@@ -39,6 +39,7 @@ export function fadeInput(
     isAwaitingHuman: Boolean(conversation?.state.awaitsHuman || isWaitingTask(task, share)),
     showsAgentCue: isProposal(task),
     isProposal: isProposal(task),
+    endState: convo?.endState ?? null,
     touchedAt: task.touchedAt ?? null,
     createdAt: task.createdAt ?? null,
     created: task.created ?? null,

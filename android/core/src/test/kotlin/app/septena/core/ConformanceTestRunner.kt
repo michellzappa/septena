@@ -19,6 +19,7 @@ object ConformanceTestRunner {
         ReviewGroupTest().run {
             registryOrder()
             waitingOrder()
+            trackedOrder()
         }
         StructureOrderTest().run {
             positionZeroAndNullSinkToBottom()

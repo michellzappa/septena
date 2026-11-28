@@ -87,6 +87,7 @@ function toCoreTask(task: TaskRow) {
     recurrenceAfterCompletion: task.recurrenceAfterCompletion ?? null,
     recurrenceAnchorDate: task.recurrenceAnchorDate ?? null,
     assignedToOther: Boolean(task.assignedToOther),
+    endState: task.endState ?? null,
   };
 }
 
@@ -109,6 +110,8 @@ export interface CoreMembership {
   deadlineRed: boolean;
   upcomingDay: string | null;
   arrivedOnOwn: boolean;
+  /** An open task whose work goes on elsewhere (`decomposed`, ADR 0066): in Review > Tracked, in no working list. */
+  isTracked: boolean;
 }
 
 /**
@@ -257,6 +260,8 @@ export interface CoreFadeInput {
   now: string;
   today: string;
   utcOffsetSeconds?: number;
+  /** The conversation's end state: a tracked task (`decomposed`) never fades (ADR 0066). */
+  endState?: string | null;
 }
 
 export function fadeFill(input: CoreFadeInput): number | null {
@@ -310,7 +315,7 @@ export interface CoreConversationState {
   isClaimed: boolean;
   agentStage: AgentStage;
   /** The Review group this conversation puts an open task in (docs/REVIEW_SPEC.md §1). */
-  reviewGroup: "questions" | "finished" | null;
+  reviewGroup: "questions" | "finished" | "tracked" | null;
 }
 
 export function deriveConversation(conversation: CoreConversation, now: string): CoreProjection {

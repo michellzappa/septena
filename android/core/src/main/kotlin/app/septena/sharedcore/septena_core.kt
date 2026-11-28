@@ -1518,8 +1518,9 @@ data class ConversationState (
      */
     var `agentStage`: kotlin.String?, 
     /**
-     * The Review group this conversation puts an open task in: `questions`,
-     * `finished`, or none (`docs/REVIEW_SPEC.md` §1).
+     * The Review group this conversation puts an open task in: `finished`,
+     * `questions`, `tracked` (`decomposed`, ADR 0065), or none
+     * (`docs/REVIEW_SPEC.md` §1).
      */
     var `reviewGroup`: kotlin.String?
 ) {
@@ -1635,7 +1636,12 @@ data class FadeInput (
     var `created`: kotlin.String?, 
     var `now`: kotlin.String, 
     var `today`: kotlin.String, 
-    var `utcOffsetSeconds`: kotlin.Int
+    var `utcOffsetSeconds`: kotlin.Int, 
+    /**
+     * The conversation's end state. A tracked task (`decomposed`, ADR 0065)
+     * is in no working list, so it never fades.
+     */
+    var `endState`: kotlin.String? = null
 ) {
     
     companion object
@@ -1665,6 +1671,7 @@ public object FfiConverterTypeFadeInput: FfiConverterRustBuffer<FadeInput> {
             FfiConverterString.read(buf),
             FfiConverterString.read(buf),
             FfiConverterInt.read(buf),
+            FfiConverterOptionalString.read(buf),
         )
     }
 
@@ -1686,7 +1693,8 @@ public object FfiConverterTypeFadeInput: FfiConverterRustBuffer<FadeInput> {
             FfiConverterOptionalString.allocationSize(value.`created`) +
             FfiConverterString.allocationSize(value.`now`) +
             FfiConverterString.allocationSize(value.`today`) +
-            FfiConverterInt.allocationSize(value.`utcOffsetSeconds`)
+            FfiConverterInt.allocationSize(value.`utcOffsetSeconds`) +
+            FfiConverterOptionalString.allocationSize(value.`endState`)
     )
 
     override fun write(value: FadeInput, buf: ByteBuffer) {
@@ -1708,6 +1716,7 @@ public object FfiConverterTypeFadeInput: FfiConverterRustBuffer<FadeInput> {
             FfiConverterString.write(value.`now`, buf)
             FfiConverterString.write(value.`today`, buf)
             FfiConverterInt.write(value.`utcOffsetSeconds`, buf)
+            FfiConverterOptionalString.write(value.`endState`, buf)
     }
 }
 
@@ -2171,7 +2180,13 @@ data class TaskSnapshot (
      * it into personal Today or Upcoming unless the user sets a personal When
      * or Today pin (`docs/PROJECT_SHARING_SPEC.md` §8).
      */
-    var `assignedToOther`: kotlin.Boolean
+    var `assignedToOther`: kotlin.Boolean, 
+    /**
+     * The conversation's end state. `decomposed` on an open task means the
+     * work goes on elsewhere: the task is tracked (ADR 0065) and leaves the
+     * working lists.
+     */
+    var `endState`: kotlin.String? = null
 ) {
     
     companion object
@@ -2211,6 +2226,7 @@ public object FfiConverterTypeTaskSnapshot: FfiConverterRustBuffer<TaskSnapshot>
             FfiConverterOptionalBoolean.read(buf),
             FfiConverterOptionalString.read(buf),
             FfiConverterBoolean.read(buf),
+            FfiConverterOptionalString.read(buf),
         )
     }
 
@@ -2242,7 +2258,8 @@ public object FfiConverterTypeTaskSnapshot: FfiConverterRustBuffer<TaskSnapshot>
             FfiConverterOptionalString.allocationSize(value.`reminderDismissedAt`) +
             FfiConverterOptionalBoolean.allocationSize(value.`recurrenceAfterCompletion`) +
             FfiConverterOptionalString.allocationSize(value.`recurrenceAnchorDate`) +
-            FfiConverterBoolean.allocationSize(value.`assignedToOther`)
+            FfiConverterBoolean.allocationSize(value.`assignedToOther`) +
+            FfiConverterOptionalString.allocationSize(value.`endState`)
     )
 
     override fun write(value: TaskSnapshot, buf: ByteBuffer) {
@@ -2274,6 +2291,7 @@ public object FfiConverterTypeTaskSnapshot: FfiConverterRustBuffer<TaskSnapshot>
             FfiConverterOptionalBoolean.write(value.`recurrenceAfterCompletion`, buf)
             FfiConverterOptionalString.write(value.`recurrenceAnchorDate`, buf)
             FfiConverterBoolean.write(value.`assignedToOther`, buf)
+            FfiConverterOptionalString.write(value.`endState`, buf)
     }
 }
 
@@ -2309,7 +2327,14 @@ data class TaskViewMembership (
     /**
      * R8: the task landed on Today this morning by its own date.
      */
-    var `arrivedOnOwn`: kotlin.Boolean
+    var `arrivedOnOwn`: kotlin.Boolean, 
+    /**
+     * An open task whose work goes on elsewhere (`endState = decomposed`,
+     * ADR 0065). It is in Review > Tracked and in no working list: not in
+     * Upcoming, Anytime or an area or project list, and on Today only when
+     * its deadline is due today or past.
+     */
+    var `isTracked`: kotlin.Boolean
 ) {
     
     companion object
@@ -2335,6 +2360,7 @@ public object FfiConverterTypeTaskViewMembership: FfiConverterRustBuffer<TaskVie
             FfiConverterBoolean.read(buf),
             FfiConverterOptionalString.read(buf),
             FfiConverterBoolean.read(buf),
+            FfiConverterBoolean.read(buf),
         )
     }
 
@@ -2352,7 +2378,8 @@ public object FfiConverterTypeTaskViewMembership: FfiConverterRustBuffer<TaskVie
             FfiConverterOptionalString.allocationSize(value.`dueState`) +
             FfiConverterBoolean.allocationSize(value.`deadlineRed`) +
             FfiConverterOptionalString.allocationSize(value.`upcomingDay`) +
-            FfiConverterBoolean.allocationSize(value.`arrivedOnOwn`)
+            FfiConverterBoolean.allocationSize(value.`arrivedOnOwn`) +
+            FfiConverterBoolean.allocationSize(value.`isTracked`)
     )
 
     override fun write(value: TaskViewMembership, buf: ByteBuffer) {
@@ -2370,6 +2397,7 @@ public object FfiConverterTypeTaskViewMembership: FfiConverterRustBuffer<TaskVie
             FfiConverterBoolean.write(value.`deadlineRed`, buf)
             FfiConverterOptionalString.write(value.`upcomingDay`, buf)
             FfiConverterBoolean.write(value.`arrivedOnOwn`, buf)
+            FfiConverterBoolean.write(value.`isTracked`, buf)
     }
 }
 

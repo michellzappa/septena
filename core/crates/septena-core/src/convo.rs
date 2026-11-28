@@ -65,8 +65,9 @@ pub struct ConversationState {
     /// The Agent smart list stage (`queued`, `working`, `yourTurn`, `stopped`,
     /// `review`, `done`), or none when the task is not agent work.
     pub agent_stage: Option<String>,
-    /// The Review group this conversation puts an open task in: `questions`,
-    /// `finished`, or none (`docs/REVIEW_SPEC.md` §1).
+    /// The Review group this conversation puts an open task in: `finished`,
+    /// `questions`, `tracked` (`decomposed`, ADR 0066), or none
+    /// (`docs/REVIEW_SPEC.md` §1).
     pub review_group: Option<String>,
 }
 
@@ -107,6 +108,8 @@ pub fn conversation_state(conversation: TaskConversation, now: String) -> Result
             Some("finished".to_string())
         } else if facts.open_question && conversation.stopped_at.is_none() {
             Some("questions".to_string())
+        } else if conversation.end_state.as_deref() == Some(convo_end_state::DECOMPOSED) {
+            Some("tracked".to_string())
         } else {
             None
         },
