@@ -4,6 +4,7 @@ import { logEvent, sha256Base64Url } from "../util.js";
 import { accountStoreFor } from "../store/AccountStore.js";
 import { hasUsedTrial, markTrialUsed, startTrialOnce } from "../entitlement/entitlement.js";
 import { issueSession, type IssuedSession } from "./session.js";
+import { grantBetaAtSignIn } from "./betaGrant.js";
 
 // Sign-in S2: email one-time code (ADR 0016 decision 2, ADR 0047, issue #169).
 //
@@ -160,6 +161,7 @@ export async function resolveOrCreateEmailAccount(
       await markTrialUsed(env, marker);
     }
   }
+  await grantBetaAtSignIn(env, userId, normalized, true);
   return { userId, created };
 }
 

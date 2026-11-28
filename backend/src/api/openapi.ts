@@ -199,8 +199,10 @@ export const ROUTES: RouteDoc[] = [
 ];
 
 /// /v1 routes that are not part of the contract, and why.
-export const INTERNAL_ROUTES: Array<{ method: Method; path: string; why: string }> = [
+export const INTERNAL_ROUTES: Array<{ method: Method | "OPTIONS"; path: string; why: string }> = [
   { method: "POST", path: "/webhooks/apple", why: "Called by the App Store only." },
+  { method: "POST", path: "/beta/join", why: "Called by septena.app/beta only (ADR 0064)." },
+  { method: "OPTIONS", path: "/beta/join", why: "The CORS preflight for septena.app/beta." },
   { method: "POST", path: "/support/replies", why: "Called by the support workspace only (signed)." },
   { method: "GET", path: "/auth/oidc/:provider/start", why: "A browser redirect in the web sign-in flow, not an API call." },
   { method: "GET", path: "/auth/oidc/:provider/callback", why: "The provider's redirect back, not an API call." },

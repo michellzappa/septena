@@ -93,7 +93,7 @@ See [ADR 0007](adr/0007-septena-is-the-task-app.md).
 | [REVIEW_SPEC.md](REVIEW_SPEC.md) | accepted (ADR 0044, 0046; store rules built) |
 | [DAILY_REVIEW_SPEC.md](DAILY_REVIEW_SPEC.md) | proposal (#618): a short end-of-day review in Review |
 | [USER_STATS_SPEC.md](USER_STATS_SPEC.md) | proposal (ADR 0063; #817, #820, #56, #818): content-free daily counts, never streaks |
-| [BETA_ONBOARDING_SPEC.md](BETA_ONBOARDING_SPEC.md) | proposal (ADR 0064): invite codes, TestFlight by API, Pro that follows the email, the beta mails |
+| [BETA_ONBOARDING_SPEC.md](BETA_ONBOARDING_SPEC.md) | accepted (ADR 0064): invite codes, TestFlight by API, Pro that follows the email, the beta mails |
 | [DECISIONS_SPEC.md](DECISIONS_SPEC.md) | proposal (#620, ADR 0048): decisions and open questions as typed log entries |
 | [TASK_FADE_SPEC.md](TASK_FADE_SPEC.md) | accepted (§6 amended by ADR 0014, proposals by ADR 0039) |
 | [INBOX_ZERO_MOTION_SPEC.md](INBOX_ZERO_MOTION_SPEC.md) | shipped — historical (#298) |

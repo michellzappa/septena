@@ -1,6 +1,6 @@
 # Beta onboarding
 
-- Status: proposed (2026-11-28)
+- Status: accepted (2026-11-28); built in `backend/src/api/beta.ts`, `backend/src/store/betaInvites.ts` and septena/site `app/beta/page.tsx`
 - Decision: [ADR 0064](adr/0064-beta-by-invite-code-tied-to-email.md)
 - Surfaces: septena/site `/beta`, `api.septena.app` (join, grants, mail,
   admin), App Store Connect (TestFlight group)
@@ -176,7 +176,11 @@ Subject: **How is Septena so far?**
 > enough: {feedback link}
 >
 > {only when no account has the grant yet:} Your Pro year isn’t on an
-> account yet. Sign in to Septena, then open this link: {plan link}
+> account yet. Sign in to Septena, then open the claim link in my first mail,
+> “You’re in the Septena beta”.
+
+Only a hash of the plan link is stored, so this mail points at the welcome
+mail instead of repeating the link. The launch mail does the same.
 >
 > Michell
 
@@ -189,12 +193,14 @@ Subject: **Your year of Pro has started**
 >
 > Michell
 
-## 5. Open decisions
+## 5. Decisions
 
-| Decision | Draft answer |
+Decided 2026-11-28 (mz took the defaults; overrule any of them):
+
+| Decision | Answer |
 |---|---|
-| Does the Pro year need a sent note, as Codex’s page said? | No. Joining is enough. It keeps the mails simple and the promise exact. |
-| Pro during the beta, or only from launch? | Pro from the join, ending 12 months after launch. Testers then test the Pro features. |
+| Does the Pro year need a sent note, as Codex’s page said? | No. Joining is enough. |
+| Pro during the beta, or only from launch? | Pro from the claim, ending 12 months after launch. |
 | A day-4 check-in mail? | Yes, one, and none after it. |
 
 ## 6. Work, in order
@@ -203,7 +209,7 @@ Subject: **Your year of Pro has started**
    ES256 signer from `scripts/testflight-distribute.mjs`), grant hook in
    sign-in, plan link at join, the four mails, day-4 cron, admin section,
    `gen:contract`. Unit tests for the store and the grant hook.
-2. Secrets on the backend Worker from the local App Store Connect key.
+2. Secrets on the backend Worker from the local App Store Connect key: `backend/scripts/setup-beta-secrets.sh`.
 3. Privacy page: a “Beta” block (what is stored, that Apple gets the email).
 4. Site: the page in §3, the join form, the three-step drawing, Codex’s
    Support form changes.

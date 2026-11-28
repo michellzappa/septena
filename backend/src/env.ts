@@ -81,6 +81,14 @@ export interface Env {
   /// REVIEWER_CODE, until REVIEWER_MODE_UNTIL (optional ISO date). Any one
   /// unset or malformed turns it off. All three are secrets.
   REVIEWER_CODE?: string;
+  /// The beta by invite code (ADR 0064): an App Store Connect API key that can
+  /// add TestFlight testers, the app and the external group. Without all five,
+  /// POST /v1/beta/join answers 503.
+  ASC_KEY_P8?: string;
+  ASC_KEY_ID?: string;
+  ASC_ISSUER_ID?: string;
+  ASC_APP_ID?: string;
+  ASC_BETA_GROUP_ID?: string;
   REVIEWER_ACCOUNT_ID?: string;
   REVIEWER_MODE_UNTIL?: string;
   /// The OpenAI apps directory's domain verification token, served as plain

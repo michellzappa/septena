@@ -10,6 +10,7 @@ import {
 import type { Row as TrafficRow, TrafficResult } from "./plausible.js";
 import type { MacRelease } from "./releases.js";
 import { DESIGN_TOKENS, SETTINGS_REGISTRY } from "../generated/registries.js";
+import type { BetaCode } from "../store/betaInvites.js";
 
 // The admin pages (docs/ADMIN_CONSOLE_SPEC.md §3). Each page is one HTML
 // document: no script, no external file. Every value goes through `esc`.
@@ -53,6 +54,8 @@ export interface AdminView {
   newUrl?: string;
   error?: string;
   now: number;
+  /// The beta by invite code (ADR 0064), on the Plans page.
+  beta?: { codes: BetaCode[]; counts: Record<string, { joined: number; granted: number }>; launchAt: number | null; newCode?: string };
 }
 
 const CSS = `
@@ -436,8 +439,37 @@ function plansPage(v: AdminView): string {
   <label>People<input name="maxUses" type="number" min="1" max="500" value="1" required></label>
   <button class="primary">Make a link</button>
 </form>
-<div style="margin-top:14px">${table(["Label", "Plan", "Lasts", "Used", "State", "Made", "Accounts", ""], v.links.map((l) => linkRow(l, v.uses)), "No links yet.")}</div>`,
-    "Close stops new people and keeps the plan for those who have it. Take back ends it.");
+<div style="margin-top:14px">${table(["Label", "Plan", "Lasts", "Used", "State", "Made", "Accounts", ""], v.links.filter((l) => !l.label.startsWith(BETA_LINK_PREFIX)).map((l) => linkRow(l, v.uses)), "No links yet.")}</div>`,
+    "Close stops new people and keeps the plan for those who have it. Take back ends it. Beta testers’ own links are counted under Beta.")
+    + (v.beta ? betaCard(v.beta, v.now) : "");
+}
+
+/// Each tester's plan link carries this label prefix (src/api/beta.ts).
+const BETA_LINK_PREFIX = "beta: ";
+
+function betaCard(b: NonNullable<AdminView["beta"]>, now: number): string {
+  const made = b.newCode ? `<div class="note"><b>New beta code</b><p><code>${esc(b.newCode)}</code></p><span class="dim">Send it with the link <code>https://septena.app/beta?code=${esc(b.newCode)}</code>.</span></div>` : "";
+  const rows = b.codes.map((c) => {
+    const n = b.counts[c.id] ?? { joined: 0, granted: 0 };
+    const state = c.closedAt ? "closed" : c.endsAt !== null && c.endsAt <= now ? "ended" : c.useCount >= c.maxUses ? "used up" : "open";
+    const close = state === "open" ? `<form method="post" action="/admin/beta/codes/${esc(c.id)}/close"><button>Close</button></form>` : "";
+    return `<tr><td><code>${esc(c.code)}</code></td><td>${esc(c.label)}</td><td class="n">${c.useCount} of ${c.maxUses}</td><td class="n">${n.granted}</td>
+      <td><span class="${state === "open" ? "ok" : "dim"}">${state}</span></td><td>${c.endsAt === null ? "no end" : day(c.endsAt)}</td><td>${day(c.createdAt)}</td><td>${close}</td></tr>`;
+  });
+  const launch = b.launchAt !== null
+    ? `<p>Launch day: <b>${day(b.launchAt)}</b>. Every beta Pro grant ends 12 months after it.</p>`
+    : `<form method="post" action="/admin/beta/launch"><label>Launch day<input name="day" type="date" required></label>
+  <details><summary>Set the launch day</summary><p class="dim">This writes the end date on every beta grant and mails every tester “Your year of Pro has started”. It happens once.</p><button class="primary">Set it and send the mail</button></details></form>`;
+  return made + card("Beta", `<form method="post" action="/admin/beta/codes">
+  <label>Code<input name="code" minlength="8" maxlength="32" required pattern="[A-Za-z0-9]{8,32}" placeholder="FIRSTWAVE"></label>
+  <label>Label<input name="label" maxlength="60" required placeholder="Friends, first wave"></label>
+  <label>People<input name="maxUses" type="number" min="1" max="1000" value="20" required></label>
+  <label>Ends<input name="ends" type="date"></label>
+  <button class="primary">Make a code</button>
+</form>
+<div style="margin-top:14px">${table(["Code", "Label", "Joined", "Pro on an account", "State", "Ends", "Made", ""], rows, "No codes yet.")}</div>
+<div style="margin-top:14px">${launch}</div>`,
+    "A person joins on septena.app/beta with their email and a code. Apple sends the TestFlight invite; Septena sends the welcome mail with their Pro link.");
 }
 
 function accountsPage(v: AdminView): string {

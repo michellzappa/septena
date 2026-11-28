@@ -3,6 +3,7 @@ import type { Env } from "../env.js";
 import { randomId, sha256Base64Url } from "../util.js";
 import type { AccountSummary } from "./TaskStore.js";
 import { PlusLinks, type PlusLink, type PlusLinkClaim, type PlusLinkInput, type PlusLinkUse } from "./plusLinks.js";
+import { BetaInvites, type BetaCode, type BetaCodeInput, type BetaJoinStart, type BetaTester } from "./betaInvites.js";
 
 // AccountStore — global Durable Object (SQLite) holding the identity table
 // (ADR 0016, issue #168). Maps `provider:subject` (e.g. `apple:<sub>`,
@@ -115,11 +116,13 @@ export function accountStoreFor(env: Env): DurableObjectStub<AccountStore> | nul
 export class AccountStore extends DurableObject<Env> {
   private sql: SqlStorage;
   private links: PlusLinks;
+  private beta: BetaInvites;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     this.sql = ctx.storage.sql;
     this.links = new PlusLinks(this.sql);
+    this.beta = new BetaInvites(this.sql);
     ctx.blockConcurrencyWhile(async () => {
       this.migrate();
       await this.hashSubjects();
@@ -164,6 +167,7 @@ export class AccountStore extends DurableObject<Env> {
       );
     `);
     this.links.migrate();
+    this.beta.migrate();
   }
 
   /// Rows written before subjects were hashed (2026-11-24 to 25).
@@ -401,6 +405,7 @@ export class AccountStore extends DurableObject<Env> {
     return this.ctx.storage.transactionSync(() => {
       this.sql.exec("DELETE FROM account_index WHERE userId = ?", userId);
       this.links.forgetUser(userId);
+      this.beta.forgetUser(userId);
       this.sql.exec(
         "DELETE FROM email_codes WHERE email IN (SELECT subject FROM identities WHERE userId = ? AND provider = 'email')",
         userId,
@@ -524,5 +529,69 @@ export class AccountStore extends DurableObject<Env> {
 
   revokePlusLink(id: string, userId: string | null, now = Date.now()): string[] | null {
     return this.ctx.storage.transactionSync(() => this.links.revoke(id, userId, now));
+  }
+
+  // ---- The beta by invite code (src/store/betaInvites.ts, ADR 0064) ----
+
+  createBetaCode(input: BetaCodeInput, now = Date.now()): BetaCode | null {
+    return this.beta.createCode(input, now);
+  }
+
+  listBetaCodes(): { codes: BetaCode[]; counts: Record<string, { joined: number; granted: number }>; launchAt: number | null } {
+    return { codes: this.beta.listCodes(), counts: Object.fromEntries(this.beta.codeCounts()), launchAt: this.beta.launchAt() };
+  }
+
+  closeBetaCode(id: string, now = Date.now()): boolean {
+    return this.beta.closeCode(id, now);
+  }
+
+  betaStartJoin(email: string, code: string, now = Date.now()): BetaJoinStart {
+    return this.beta.startJoin(email, code, now);
+  }
+
+  betaFinishJoin(email: string, codeId: string, ascState: "invited" | "failed", ascTesterId: string | null, now = Date.now()): BetaTester {
+    return this.ctx.storage.transactionSync(() => this.beta.finishJoin(email, codeId, ascState, ascTesterId, now));
+  }
+
+  betaTester(email: string): BetaTester | null {
+    return this.beta.tester(email);
+  }
+
+  betaSetPlanLink(email: string, linkId: string, linkHash: string): void {
+    this.beta.setPlanLink(email, linkId, linkHash);
+  }
+
+  betaNoteWelcome(email: string, now = Date.now()): void {
+    this.beta.noteWelcome(email, now);
+  }
+
+  /// A plan link was claimed. When it is a tester's link, notes the account
+  /// and answers the launch date (null before launch). Answers undefined for
+  /// any other link.
+  betaLinkClaimed(linkId: string, userId: string, now = Date.now()): { launchAt: number | null } | undefined {
+    const tester = this.beta.testerForLink(linkId);
+    if (!tester) return undefined;
+    this.beta.noteGranted(tester.email, userId, now);
+    return { launchAt: this.beta.launchAt() };
+  }
+
+  betaTakeCheckinsDue(joinedBefore: number, now = Date.now()): BetaTester[] {
+    return this.ctx.storage.transactionSync(() => this.beta.takeCheckinsDue(joinedBefore, now));
+  }
+
+  betaInvited(): BetaTester[] {
+    return this.beta.invited();
+  }
+
+  /// Sets the launch date once. Answers the accounts that hold a tester's
+  /// link, so the caller can write the end date on each grant. Null when it
+  /// was set before.
+  betaSetLaunch(at: number): { linkId: string; userId: string }[] | null {
+    return this.ctx.storage.transactionSync(() => {
+      if (this.beta.launchAt() !== null) return null;
+      this.beta.setLaunchAt(at);
+      const ids = new Set(this.beta.planLinkIds());
+      return this.links.uses().filter((u) => ids.has(u.linkId) && u.revokedAt === null).map((u) => ({ linkId: u.linkId, userId: u.userId }));
+    });
   }
 }

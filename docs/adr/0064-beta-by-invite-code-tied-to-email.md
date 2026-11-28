@@ -1,6 +1,6 @@
 # 0064. The beta is by invite code, and the thank-you follows the email
 
-- Status: proposed (2026-11-28)
+- Status: accepted (2026-11-28)
 - Date: 2026-11-28
 - Deciders: mz (product), agent (mechanism)
 - Extends: [ADR 0043](0043-plus-links-and-a-counts-only-admin-page.md) (plan links, admin page),
