@@ -55,9 +55,14 @@ struct TaskNotice: Identifiable, Equatable {
     case trialEnd
     /// Upsell (spec §3.2): the free account syncs another device, not this one.
     case secondDevice
+    /// The beta welcome card (docs/BETA_ONBOARDING_SPEC.md §7). Testers
+    /// only; its words come from `GET /v1/beta`, so it has no registry row.
+    case beta
 
-    var registryID: RegistryNoticeID {
+    /// The notice's row in `registry/surfaces.json`. Nil for the beta card.
+    var registryID: RegistryNoticeID? {
       switch self {
+      case .beta: return nil
       case .signIn: return .signIn
       case .rolledIn: return .rolledIn
       case .weeklySweep: return .weeklySweep
@@ -76,6 +81,9 @@ struct TaskNotice: Identifiable, Equatable {
   var detail: String?
   /// Title of the trailing action. The shell wires the action itself by `id`.
   var primaryTitle: String?
+  /// Title of a second action beside the primary one (the beta card's
+  /// "Not now"). The shell wires it by `id`, like the primary one.
+  var secondaryTitle: String? = nil
   /// The `registry/plans.json` upsell this notice shows; the shell opens the
   /// Plus sheet with it. Nil for every other notice.
   var upsellID: String? = nil
@@ -121,6 +129,9 @@ enum TaskNotices {
   static func today(pool: [SeptenaTask], requiresSignIn: Bool,
                     today: String, context: ModelContext) -> [TaskNotice] {
     var out: [TaskNotice] = []
+    // The beta card leads Today: shown once, until the tester opens the
+    // checklist or closes it (docs/BETA_ONBOARDING_SPEC.md §7).
+    if let card = beta { out.append(card) }
     if requiresSignIn, !hasSeen(.signIn) { out.append(signIn) }
     if let upsell = upsell(context: context) { out.append(upsell) }
     if let sweep = weeklySweep(context: context) { out.append(sweep) }
@@ -140,7 +151,7 @@ enum TaskNotices {
   }
 
   private static func isShippedHere(_ notice: TaskNotice) -> Bool {
-    guard let row = RegistryNotices.byId[notice.id.registryID] else { return true }
+    guard let id = notice.id.registryID, let row = RegistryNotices.byId[id] else { return true }
     return RegistryCapabilities.isAvailable(row.featureId, on: RegistryPlatform.current)
   }
 
@@ -163,6 +174,8 @@ enum TaskNotices {
       markSeen(id)
     case .trialEnd, .secondDevice:
       if let upsell = registry(id).upsellId { markUpsellSeen(upsell, context: context) }
+    case .beta:
+      BetaCenter.shared.dismissCard()
     }
   }
 
@@ -243,7 +256,7 @@ enum TaskNotices {
   /// The registry owns symbol, kind, copy and dismissibility; this file owns
   /// only when a notice shows.
   private static func registry(_ id: TaskNotice.ID) -> RegistryNotice {
-    guard let row = RegistryNotices.byId[id.registryID] else {
+    guard let registryID = id.registryID, let row = RegistryNotices.byId[registryID] else {
       preconditionFailure("registry/surfaces.json has no notice \(id.rawValue)")
     }
     return row
@@ -289,6 +302,17 @@ enum TaskNotices {
   }
 
   private static var signIn: TaskNotice { notice(.signIn) }
+
+  /// The beta welcome card: copy from the server, two buttons (open the
+  /// checklist, not now), each closing the card for good.
+  private static var beta: TaskNotice? {
+    let center = BetaCenter.shared
+    guard center.showsCard, let copy = center.checklist?.copy else { return nil }
+    return TaskNotice(
+      id: .beta, kind: .info, symbol: RegistryIcons.sfSymbol(for: "action.checklist"),
+      title: copy.cardTitle, detail: copy.cardBody,
+      primaryTitle: copy.cardOpen, secondaryTitle: copy.cardDismiss, dismissible: false)
+  }
 
   /// Tasks that arrived on Today on their own. Same rule as the row's arrived
   /// dot (`SeptenaTask.showsArrivedToday`, `docs/TASK_DATES_SPEC.md` R8), so

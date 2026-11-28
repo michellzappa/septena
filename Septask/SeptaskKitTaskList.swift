@@ -1739,6 +1739,14 @@ final class SeptaskKitTaskListController: NSViewController {
     reload()
   }
 
+  /// The beta card's open button: the Beta screen in Settings. Opening it
+  /// closes the card for good, as "Not now" does.
+  private func openBetaChecklist() {
+    dismissNotice(.beta)
+    SeptaskSettingsLink.request(BetaCenter.surfaceID)
+    SeptaskKitSettingsWindow.show()
+  }
+
   /// ⌘K on selected notices: dismisses each one, the same as its close
   /// button. Selection moves to the row that takes the first notice's place.
   private func dismissSelectedNotices() {
@@ -1762,8 +1770,9 @@ final class SeptaskKitTaskListController: NSViewController {
     switch id {
     case .signIn: return { SeptaskSignInWindow.present() }
     case .weeklySweep: return { [weak self] in self?.presentWeeklySweepSheet() }
+    case .beta: return { [weak self] in self?.openBetaChecklist() }
     case .trialEnd, .secondDevice:
-      guard let upsell = RegistryNotices.byId[id.registryID]?.upsellId else { return nil }
+      guard let upsell = id.registryID.flatMap({ RegistryNotices.byId[$0] })?.upsellId else { return nil }
       return { [weak self] in self?.presentPlusSheet(upsellID: upsell) }
     default: return nil
     }
@@ -6430,6 +6439,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       let cell = noticeCell(KitNotice(notice))
       cell.isRowSelected = tableView.selectedRowIndexes.contains(row)
       cell.onPrimary = noticePrimaryAction(notice.id)
+      cell.onSecondary = notice.secondaryTitle == nil ? nil : { [weak self] in self?.dismissNotice(notice.id) }
       cell.onDismiss = notice.dismissible ? { [weak self] in self?.dismissNotice(notice.id) } : nil
       return cell
 
