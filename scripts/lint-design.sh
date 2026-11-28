@@ -320,6 +320,18 @@ if command -v node >/dev/null 2>&1; then
   fi
 fi
 
+# ── Retired terms (ADR 0065) ─────────────────────────────────────────────────
+# Copy never uses a name the product dropped (registry/retired-terms.json):
+# same copy as platform-copy. A removal or rename adds the old name there.
+if command -v node >/dev/null 2>&1; then
+  if ! rt_out=$(node scripts/lint-retired-terms.mjs 2>&1); then
+    printf '%s✗ %s%s\n' "$RED" "retired-term" "$OFF"
+    errors=$((errors + 1))
+    printf '%s' "$DIM"; printf '%s\n' "$rt_out" | sed 's/^/    /'
+    printf '%s\n' "$OFF"
+  fi
+fi
+
 # ── Shared cross-platform registries (ADR 0015) ──────────────────────────────
 # Generated Swift and TypeScript bindings must stay in lockstep with
 # `registry/*.json`. Run `node scripts/gen-registries.mjs` after editing any

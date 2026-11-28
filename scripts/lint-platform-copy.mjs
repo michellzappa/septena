@@ -8,7 +8,7 @@
 // changelog). The site (septena/site) runs the same rule on
 // its pages.
 //
-// Scans:
+// Scans (scripts/lib/copy-scan.mjs, shared with lint-retired-terms.mjs):
 //   - every string value in registry/*.json and registry/cast/*.json, minus the
 //     data files and data keys listed below;
 //   - backend/skill.md, backend/onboard.md, Septena/Shell/Tasks/TasksSkill.swift
@@ -26,25 +26,9 @@
 //
 // Run standalone: node scripts/lint-platform-copy.mjs. scripts/lint-design.sh
 // runs it. Prints one line per violation; exit 1 on any.
-import { readFileSync, readdirSync } from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { lintCopy } from "./lib/copy-scan.mjs";
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const NAMES = /\b(iPhone|iPad|Mac|macOS|iOS|iPadOS|Windows|Android|Apple Watch|watchOS)\b/;
-
-// Registry files that are data, not copy.
-const DATA_FILES = new Set([
-  "capabilities.json", // per-platform status cells and platform ids
-  "device-frames.json", // device frame geometry per platform
-  "entities.json", // sync wire schema
-  "readers-allowlist.json", // generator bookkeeping
-  "icons.json", // symbol names per platform
-]);
-// Keys whose value is data in any registry file.
-const DATA_KEYS = new Set(["id", "ids", "key", "keys", "platform", "platforms", "icon", "symbol", "sfSymbol", "material", "lucide", "url", "href", "bundleId", "productId", "$schema", "$comment"]);
-// A root-level `description` documents the file for developers.
-const ROOT_DOC_KEYS = new Set(["description"]);
 
 // category "control-location": the line says where a control is on one
 // platform. Open question for mz (2026-11-26): keep, or move into per-platform
@@ -62,47 +46,12 @@ const ALLOW = [
   { file: "registry/settings.json", path: "copy.access_devices[8].label", category: "device-name", reason: "The kind of a signed-in device in Settings > Account > Devices." },
 ];
 
-const SKILL_FILES = readdirSync(path.join(ROOT, "skills"), { withFileTypes: true })
-  .filter((d) => d.isDirectory()).map((d) => `skills/${d.name}/SKILL.md`).sort();
-const LINE_FILES = ["backend/skill.md", "backend/onboard.md", "Septena/Shell/Tasks/TasksSkill.swift", ...SKILL_FILES];
-
-const hits = [];
-const used = new Set();
-const allowKey = (file, p) => `${file}#${p}`;
-const allowed = new Map(ALLOW.map((a) => [allowKey(a.file, a.path), a]));
-
-function walk(file, value, p, depth) {
-  if (typeof value === "string") {
-    if (!NAMES.test(value)) return;
-    const k = allowKey(file, p);
-    if (allowed.has(k)) used.add(k);
-    else hits.push(`${file}: ${p}: "${value.slice(0, 120)}"`);
-  } else if (Array.isArray(value)) {
-    value.forEach((v, i) => walk(file, v, `${p}[${i}]`, depth + 1));
-  } else if (value && typeof value === "object") {
-    for (const [key, v] of Object.entries(value)) {
-      if (DATA_KEYS.has(key)) continue;
-      if (depth === 0 && ROOT_DOC_KEYS.has(key)) continue;
-      walk(file, v, p ? `${p}.${key}` : key, depth + 1);
-    }
-  }
-}
-
-const jsonFiles = [
-  ...readdirSync(path.join(ROOT, "registry")).filter((f) => f.endsWith(".json") && !DATA_FILES.has(f)).map((f) => `registry/${f}`),
-  ...readdirSync(path.join(ROOT, "registry", "cast")).filter((f) => f.endsWith(".json")).map((f) => `registry/cast/${f}`),
-];
-for (const file of jsonFiles) walk(file, JSON.parse(readFileSync(path.join(ROOT, file), "utf8")), "", 0);
-
-for (const file of LINE_FILES) {
-  readFileSync(path.join(ROOT, file), "utf8").split("\n").forEach((line, i) => {
-    if (NAMES.test(line) && !line.includes("septena-lint:allow platform-copy")) hits.push(`${file}:${i + 1}: ${line.trim().slice(0, 160)}`);
-  });
-}
-
-for (const a of ALLOW) {
-  if (!used.has(allowKey(a.file, a.path))) hits.push(`${a.file}: ${a.path}: allow entry no longer matches; remove it from scripts/lint-platform-copy.mjs`);
-}
+const hits = lintCopy({
+  rule: "platform-copy",
+  script: "scripts/lint-platform-copy.mjs",
+  test: (text) => (NAMES.test(text) ? "names a platform" : null),
+  allow: ALLOW,
+});
 
 if (hits.length) {
   console.log('Copy names a platform. Say "all your devices" or "another device"; per-platform detail belongs in per-platform data.');

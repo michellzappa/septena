@@ -1,0 +1,1 @@
+- [ ] User-facing change? `docs` in `registry/capabilities.json` updated, or a septena/site issue linked (ADR 0065).

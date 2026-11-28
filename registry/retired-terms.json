@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "description": "Names the product no longer uses (ADR 0065). Each entry is the retired word, the word to use instead, the date it was retired and the ADR that retired it. scripts/lint-retired-terms.mjs fails on a term in the app's registry copy and agent briefs; the site's check-copy.mjs --rendered fails on one in a rendered page. When a change removes or renames a concept, the same PR adds the old name here. Terms match as whole words, ignoring case.",
+  "terms": [
+    { "term": "Agent list", "use": "Review", "since": "2026-11-26", "adr": "0046" },
+    { "term": "Your turn", "use": "Questions in Review", "since": "2026-11-26", "adr": "0046", "note": "As a list or group name. A line about whose turn it is in one conversation is allowed by path." },
+    { "term": "Septask", "use": "Septena", "since": "2026-11-19", "adr": "0007", "note": "User-facing copy only. Code targets, file paths and type names keep the working name." }
+  ]
+}
