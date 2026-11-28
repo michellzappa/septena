@@ -118,7 +118,7 @@ public struct SeptaskTaskEntity: AppEntity, Identifiable, Hashable, Sendable {
     let projectTitle = task.project.flatMap { projectTitles[$0] }
     let areaTitle = task.area.flatMap { areaTitles[$0] }
     let onToday = task.isOnToday
-    let completed = task.status == .done
+    let completed = task.status.isFinished
     let assignedToClaude = task.conversation.assignee == .claude && task.conversation.stoppedAt == nil
 
     var parts: [String] = []
@@ -574,7 +574,8 @@ public struct CompleteTaskIntent: AppIntent {
       throw SeptaskIntentError.taskNotFound
     }
 
-    if current.status == .done {
+    // A checked Checklist row is finished too: completing it again is a no-op.
+    if current.status.isFinished {
       let existing = SeptaskTaskEntity.from(task: current, in: context)
       return .result(value: existing, dialog: "“\(current.title)” is already completed.")
     }

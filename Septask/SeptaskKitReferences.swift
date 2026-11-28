@@ -209,7 +209,7 @@ private final class KitReferenceHitButton: NSButton {
 /// A faint chip under the rows: a suggested link, dashed with a plus, or
 /// another task that points at the same thing.
 @MainActor
-private final class KitReferenceChipButton: NSButton {
+final class KitReferenceChipButton: NSButton {
   private let onPress: () -> Void
   private let outline = CAShapeLayer()
 
@@ -268,7 +268,7 @@ private final class KitReferenceChipButton: NSButton {
   @objc private func press() { onPress() }
 }
 
-private extension NSStackView {
+extension NSStackView {
   /// Rows in place of what the stack showed: full width, or no wider than it.
   func kitReplaceArrangedSubviews(with views: [NSView], fillsWidth: Bool = true) {
     for view in arrangedSubviews {

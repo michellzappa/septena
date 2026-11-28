@@ -2003,11 +2003,12 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push(`  static let quickFindEmptyDetail: String = ${L(qf.emptyState.detail, qf.emptyState, "detail")}`);
   lines.push(`  static let quickFindCompletedLabel: String = ${L(qf.completed.label, qf.completed, "label")}`);
   const checklist = surfaces.checklistProjects;
-  for (const field of ["addItem", "onList", "checked", "moveToGroup", "ungrouped"]) {
+  // A Checklist is the standard project list (#860): Apple reads only the
+  // copy of its three differences (check, Checked, add-field suggestions).
+  for (const field of ["addItem", "onList", "checked"]) {
     const swiftName = "checklist" + field[0].toUpperCase() + field.slice(1);
     lines.push(`  static let ${swiftName}: String = ${L(checklist[field], checklist, field)}`);
   }
-  lines.push(tmplFn("checklistAddItemToGroup", tmplKey(checklist.addItemToGroup, checklist, "addItemToGroup")));
   lines.push("  /// The last add-field suggestion: Add \"<typed text>\" (docs/PROJECT_CHECKLIST_SPEC.md).");
   lines.push(tmplFn("checklistAddTyped", tmplKey(checklist.addTyped, checklist, "addTyped")));
   lines.push(`  static let checklistProjectType: String = ${L(checklist.projectType, checklist, "projectType")}`);
