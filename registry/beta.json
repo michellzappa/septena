@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "The beta checklist (ADR 0064, docs/BETA_ONBOARDING_SPEC.md §7). The backend serves it to beta testers only (GET /v1/beta), filtered to the items whose features ship on the asking platform. The site's /beta page and the welcome mail read the same items. `help` is the septena.app page that explains the item. English only: the beta is English.",
+  "description": "The beta checklist (ADR 0064, docs/BETA_ONBOARDING_SPEC.md §7). The backend serves it to beta testers only (GET /v1/beta), filtered to the items whose features ship on the asking platform. The site's /beta page and the welcome mail read the same items. English only: the beta is English. A title links its key words to the septena.app page that explains them, as Markdown links ([Do](/workflows/do)); the backend strips the links for the apps, the site and the welcome mail draw them.",
   "copy": {
     "settingsRow": "Beta",
     "settingsSummary": "{tried} of {total} tried",
@@ -20,72 +20,62 @@
   "items": [
     {
       "id": "inbox-today",
-      "help": "/workflows/today",
       "features": ["lists.inbox"],
-      "title": "Sort your Inbox into Today",
+      "title": "Sort your [Inbox](/workflows/capture) into [Today](/workflows/today)",
       "try": "Capture a few tasks, then move them from the Inbox at the top of Today into Today, an area or a project."
     },
     {
       "id": "do",
-      "help": "/workflows/do",
       "features": ["task.do"],
-      "title": "Do one task",
+      "title": "[Do](/workflows/do) one task",
       "try": "Pick one task to Do and work from it. Check that it stays with you on every screen."
     },
     {
       "id": "second-device",
-      "help": "/help/sync",
       "features": ["sync.backend"],
-      "title": "Use a second device",
+      "title": "Use a [second device](/help/sync)",
       "try": "Sign in on another device. Change a task on one and check that the change arrives on the other."
     },
     {
       "id": "fade",
-      "help": "/workflows/fade",
       "features": ["fade.sweep"],
-      "title": "Let a few tasks fade",
+      "title": "Let a few tasks [fade](/workflows/fade)",
       "try": "Leave some tasks alone for a while. They fade, and once a week Septena asks if you still want them."
     },
     {
       "id": "connect-agent",
-      "help": "/agents",
       "features": ["agents.connector"],
-      "title": "Connect your agent",
+      "title": "Connect your [agent](/agents)",
       "try": "Connect Claude or another agent and give it one task you can check."
     },
     {
       "id": "review-stop",
-      "help": "/help/agent-controls",
       "features": ["lists.review", "agents.stop-pause"],
-      "title": "Review and stop an agent",
+      "title": "[Review](/workflows/agent-delegation) and [stop](/help/agent-controls) an agent",
       "try": "Answer its question, then Accept or Send back its work in Review. Press Stop on a task, or Pause all agents."
     },
     {
       "id": "discuss",
-      "help": "/workflows/discuss",
       "features": ["ai.discuss"],
-      "title": "Discuss a task",
+      "title": "[Discuss](/workflows/discuss) a task",
       "try": "Open a task and press Discuss. Talk it through and see what it suggests."
     },
     {
       "id": "move-in",
-      "help": "/moving-in",
       "features": ["import.things", "import.reminders", "data.import-export"],
-      "title": "Move in from another app",
+      "title": "[Move in](/moving-in) from another app",
       "try": "Bring your tasks over from the app you use now. Tell me what came across wrong."
     },
     {
       "id": "siri",
-      "help": "/help/siri-and-shortcuts",
       "features": ["system.shortcuts", "import.reminders"],
-      "title": "Add a task with Siri or Shortcuts",
+      "title": "Add a task with [Siri or Shortcuts](/help/siri-and-shortcuts)",
       "try": "Add a task with Siri or a Shortcut, or bring your Reminders into the Inbox."
     },
     {
       "id": "capture",
-      "help": "/workflows/capture",
       "features": ["capture.quick-entry", "capture.share-target", "capture.quick-add"],
-      "title": "Capture from anywhere",
+      "title": "[Capture](/workflows/capture) from anywhere",
       "try": "Add a task from wherever you are: Quick Entry, Quick Add or the share sheet."
     }
   ]

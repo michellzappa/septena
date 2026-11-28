@@ -468,7 +468,7 @@ function betaCard(b: NonNullable<AdminView["beta"]>, now: number): string {
   <button class="primary">Make a code</button>
 </form>
 <div style="margin-top:14px">${table(["Code", "Label", "Joined", "Pro on an account", "State", "Ends", "Made", ""], rows, "No codes yet.")}</div>
-<div style="margin-top:14px">${tallyList("Checklist: accounts that ticked it", [...BETA_CHECKLIST.items.map((i) => ({ name: i.title, n: b.progress[i.id] ?? 0 })), { name: "Used it this week (ever)", n: b.progress._ack ?? 0 }])}</div>
+<div style="margin-top:14px">${tallyList("Checklist: accounts that ticked it", [...BETA_CHECKLIST.items.map((i) => ({ name: i.title.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1"), n: b.progress[i.id] ?? 0 })), { name: "Used it this week (ever)", n: b.progress._ack ?? 0 }])}</div>
 <div style="margin-top:14px">${launch}</div>`,
     "A person joins on septena.app/beta with their email and a code. Apple sends the TestFlight invite; Septena sends the welcome mail with their Pro link.");
 }

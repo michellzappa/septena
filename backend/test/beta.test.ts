@@ -126,6 +126,7 @@ describe("POST /v1/beta/join", () => {
     assert.equal(h.mails.length, 1);
     assert.equal(h.mails[0].subject, "You’re in the Septena beta");
     assert.match(h.mails[0].text, /\/plus\/pl_/);
+    assert.match(h.mails[0].html, /<a href="https:\/\/septena\.app\/workflows\/do"[^>]*>Do<\/a>/, "the checklist links its key words");
     assert.doesNotMatch(h.mails[0].text + h.mails[0].html, /[—–]/, "no dashes in the mail");
 
     const back = await h.join({ email: "ana@example.com", code: "whatever" });
@@ -240,6 +241,8 @@ describe("The checklist in the app", () => {
     assert.ok(s.member);
     assert.equal(s.items.length, 10);
     assert.equal(s.copy.title, "Beta");
+    assert.ok(s.items.every((i) => !/[[\]()]/.test(i.title)), "the apps get titles without link syntax");
+    assert.equal(s.items.find((i) => i.id === "do")!.title, "Do one task");
     assert.deepEqual(s.tried, {});
     assert.equal(s.cardDismissedAt, null);
 
