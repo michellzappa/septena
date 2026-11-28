@@ -511,11 +511,15 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             .asSequence()
             .filter { it.deletedAt == null }
             .mapNotNull { record ->
-                runCatching { record to TaskSnapshot.from(record, metadataCatalog.shares) }.getOrNull()
+                runCatching { record to metadataCatalog.snapshot(record) }.getOrNull()
             }
             .toList()
+        // A tracked task (ADR 0065) is out of its area and project list; the core decides.
         val taskRows = allTaskRecords
-            .filter { (_, task) -> task.status == RegistryEntityEnums.TaskStatus.OPEN || task.id in settle.entries }
+            .filter { (_, task) ->
+                (task.status == RegistryEntityEnums.TaskStatus.OPEN && !TaskViewRules.isTracked(task, today, now)) ||
+                    task.id in settle.entries
+            }
         val listSort = ListSortPreferences.fromSynced(graph.syncedSettings).sortFor(
             when (selected) {
                 is AreasProjectsDestination.Area -> ListSortPreferences.areaKey(selected.id)
@@ -570,8 +574,10 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                     val pid = task.project ?: continue
                     val prev = projectStats[pid] ?: (0 to 0)
                     when (task.status) {
-                        // Faded open tasks leave every count and ring (docs/TASK_FADE_SPEC.md §4).
-                        RegistryEntityEnums.TaskStatus.OPEN -> if (!TaskFadeRules.isFaded(task.fadedAt)) projectStats[pid] = (prev.first + 1) to prev.second
+                        // Faded and tracked open tasks leave every count and ring (docs/TASK_FADE_SPEC.md §4, ADR 0065).
+                        RegistryEntityEnums.TaskStatus.OPEN -> if (!TaskFadeRules.isFaded(task.fadedAt) && !TaskViewRules.isTracked(task, today, now)) {
+                            projectStats[pid] = (prev.first + 1) to prev.second
+                        }
                         RegistryEntityEnums.TaskStatus.DONE -> projectStats[pid] = prev.first to (prev.second + 1)
                     }
                 }

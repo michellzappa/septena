@@ -364,6 +364,11 @@ enum SeptaskDeepLinkRouter {
         return .review
       }
       if task.isOnToday { return .today }
+      // A tracked task (ADR 0065) is in Review, not on its project or area page.
+      if task.isTracked {
+        UserDefaults.standard.set(true, forKey: ReviewGroup.trackedExpandedKey)
+        return .review
+      }
       if let p = task.project { return .project(p) }
       if let a = task.area { return .area(a) }
       if task.scheduled != nil || task.deadline != nil { return .upcoming }

@@ -299,6 +299,13 @@ final class SeptaskKitQuickFind {
   /// else Anytime.
   private static func listShowing(_ task: SeptenaTask) -> TaskFilter {
     if task.status != .open { return .logbook }
+    // A tracked task (ADR 0065) is in Review, not on its project or area page.
+    if task.isTracked {
+      if task.isOnToday { return .today }
+      // The jump selects the row, so its group must be open.
+      UserDefaults.standard.set(true, forKey: ReviewGroup.trackedExpandedKey)
+      return .review
+    }
     if let project = task.project { return .project(project) }
     if let area = task.area { return .area(area) }
     if task.isOnToday || task.isInTriageBand { return .today }

@@ -52,6 +52,11 @@ data class TaskSnapshot(
     val sharedWaitingOn: String? = null,
     /** Shared-project Waiting start day (`assignedAt`). */
     val sharedWaitingSince: String? = null,
+    /**
+     * The conversation's `endState` (`convo.endState`), or null without one. The core reads it:
+     * `decomposed` on an open task is Tracked (ADR 0065) and keeps it out of the working lists.
+     */
+    val endState: String? = null,
 ) {
     val isHeading: Boolean get() = kind == RegistryEntityEnums.TaskKind.HEADING
 
@@ -67,7 +72,12 @@ data class TaskSnapshot(
         get() = if (!waitingOn.isNullOrBlank()) waitingSince else sharedWaitingSince
 
     companion object {
-        fun from(record: SyncRecord, shares: Map<String, ProjectShare> = emptyMap()): TaskSnapshot {
+        /** [endState] is the task's conversation `endState` ([TaskConversation.endStates]). */
+        fun from(
+            record: SyncRecord,
+            shares: Map<String, ProjectShare> = emptyMap(),
+            endState: String? = null,
+        ): TaskSnapshot {
             require(record.entity == RegistryEntityNames.TASK) { "Expected a task record" }
             val f = record.fields
             val project = f[RegistryEntityFields.Task.PROJECT].stringValue()
@@ -126,6 +136,7 @@ data class TaskSnapshot(
                 assignedToOther = assignedToOther,
                 sharedWaitingOn = sharedWaitingOn,
                 sharedWaitingSince = if (isSharedWaiting) assignedAt else null,
+                endState = endState,
             )
         }
     }
@@ -145,6 +156,11 @@ data class TaskViewMembership(
     val deadlineRed: Boolean = false,
     /** Core upcoming bucket day (`YYYY-MM-DD`) when the task matches Upcoming, else null. */
     val upcomingDay: String? = null,
+    /**
+     * Core: the open task is Tracked (`endState = decomposed`, ADR 0065). It is out of Today
+     * (unless its deadline is due), Upcoming, Anytime and its area and project lists.
+     */
+    val isTracked: Boolean = false,
 )
 
 /**
@@ -198,15 +214,25 @@ object TaskViewRules {
             dueState = m.dueState,
             deadlineRed = m.deadlineRed,
             upcomingDay = m.upcomingDay,
+            isTracked = m.isTracked,
         )
     }
 
     /**
+     * The core's Tracked flag ([TaskViewMembership.isTracked], ADR 0065) for a task outside a list
+     * loop. A task with no conversation end state cannot be tracked, so it skips the core call.
+     */
+    fun isTracked(task: TaskSnapshot, today: LocalDate, now: Instant): Boolean =
+        task.endState != null &&
+            task.status == RegistryEntityEnums.TaskStatus.OPEN && !task.isHeading && task.deletedAt == null &&
+            membership(task, today, now).isTracked
+
+    /**
      * The Review group of a task (docs/REVIEW_SPEC.md §1), or null when it is not in Review:
-     * the first that fits of what waits on the user, a wait on a person (§6, ADR 0053), agent work
-     * in progress, and Faded (ADR 0046). [conversationGroup] is the core's group for its
-     * conversation; [agentStage] is the core's agent stage, which shows as its own group while the
-     * agent works.
+     * the first that fits of the core's conversation group (Questions, Finished work, Tracked:
+     * ADR 0065), a wait on a person (§6, ADR 0053), agent work in progress, and Faded (ADR 0046).
+     * [conversationGroup] is the core's group for its conversation; [agentStage] is the core's
+     * agent stage, which shows as its own group while the agent works.
      */
     fun reviewGroup(task: TaskSnapshot, conversationGroup: String?, agentStage: String? = null): String? = when {
         task.status != RegistryEntityEnums.TaskStatus.OPEN || task.isHeading || task.deletedAt != null -> null
@@ -284,15 +310,17 @@ object ReviewGroupIds {
     const val WORKING: String = "working"
     const val QUEUED: String = "queued"
     const val STOPPED: String = "stopped"
+    /** Work that goes on elsewhere (`endState = decomposed`, ADR 0065). */
+    const val TRACKED: String = "tracked"
     const val FADED: String = RegistryDestinationIds.FADED
 
     /** Agent work in progress: the core's agent stages that show as Review groups. `done` does not. */
     val AGENT_WORK: Set<String> = setOf(WORKING, QUEUED, STOPPED)
 
     /** Every group, in the order the Review list draws them. */
-    val ORDER: List<String> = listOf(QUESTIONS, FINISHED, WAITING, WORKING, QUEUED, STOPPED, FADED)
+    val ORDER: List<String> = listOf(QUESTIONS, FINISHED, WAITING, WORKING, QUEUED, STOPPED, TRACKED, FADED)
 
-    /** The groups that wait on the user. Only they count in the Review badge; Waiting does not. */
+    /** The groups that wait on the user. Only they count in the Review badge; Waiting and Tracked do not. */
     val BADGE: Set<String> = setOf(QUESTIONS, FINISHED)
 }
 
@@ -326,4 +354,5 @@ internal fun TaskSnapshot.toCore(): CoreTaskSnapshot = CoreTaskSnapshot(
     recurrenceAfterCompletion = null,
     recurrenceAnchorDate = null,
     assignedToOther = assignedToOther,
+    endState = endState,
 )

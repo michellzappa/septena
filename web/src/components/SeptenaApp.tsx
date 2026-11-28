@@ -769,8 +769,6 @@ export function SeptenaApp() {
     activeTags,
     areaById,
     projectById,
-    projectStats,
-    areaOpenCount,
     checklistsByTask,
     refsByTask,
     attachmentsByTask,
@@ -782,29 +780,6 @@ export function SeptenaApp() {
       syncState.snapshot.projects.filter((p) => !p.deletedAt && p.status === "active"),
     );
     const tags = orderByPosition(syncState.snapshot.tags.filter((t) => !t.deletedAt));
-
-    // Project progress = done / (done + open). Cancelled and faded rows do not
-    // count toward either side, matching iOS SidebarView.aggregate (docs/TASK_FADE_SPEC.md §4).
-    // Area count = direct-in-area open non-faded tasks only (nested projects render separately).
-    const pStats = new Map<string, { done: number; total: number }>();
-    const aOpen = new Map<string, number>();
-    for (const t of syncState.snapshot.tasks) {
-      if (t.deletedAt || t.kind === "heading" || t.fadedAt) continue;
-      if (t.project) {
-        if (t.status === "done") {
-          const cur = pStats.get(t.project) ?? { done: 0, total: 0 };
-          cur.done++;
-          cur.total++;
-          pStats.set(t.project, cur);
-        } else if (t.status === "open") {
-          const cur = pStats.get(t.project) ?? { done: 0, total: 0 };
-          cur.total++;
-          pStats.set(t.project, cur);
-        }
-      } else if (t.area && t.status === "open") {
-        aOpen.set(t.area, (aOpen.get(t.area) ?? 0) + 1);
-      }
-    }
 
     const cMap = new Map<string, typeof syncState.snapshot.checklistItems>();
     for (const item of syncState.snapshot.checklistItems) {
@@ -839,8 +814,6 @@ export function SeptenaApp() {
       activeTags: tags,
       areaById: new Map(areas.map((a) => [a.id, a])),
       projectById: new Map(projects.map((p) => [p.id, p])),
-      projectStats: pStats,
-      areaOpenCount: aOpen,
       checklistsByTask: cMap,
       refsByTask: rMap,
       attachmentsByTask: aMap,
@@ -881,9 +854,10 @@ export function SeptenaApp() {
         const settling = settleSnap.entries.has(task.id);
         // While a just-completed/cancelled row lingers in its settle window,
         // evaluate list membership as open so it stays in its exact slot until fade-out.
+        const endState = convoByTask.get(task.id)?.endState ?? null;
         const membershipTask = settling && task.status !== "open"
-          ? { ...task, status: "open" as const, assignedToOther: isAssignedToOther(task, share) }
-          : { ...task, assignedToOther: isAssignedToOther(task, share) };
+          ? { ...task, status: "open" as const, assignedToOther: isAssignedToOther(task, share), endState }
+          : { ...task, assignedToOther: isAssignedToOther(task, share), endState };
         const membership = taskViewMembership(
           membershipTask,
           todayYMD,
@@ -908,6 +882,33 @@ export function SeptenaApp() {
         };
       });
   }, [bootPhase, convoByTask, fade.enabled, nowIso, settleSnap, shareForTask, syncState.snapshot.tasks, todayYMD, turnsByTask, utcOffsetSeconds]);
+
+  // Project progress = done / (done + open). Cancelled and faded rows do not
+  // count toward either side, matching iOS SidebarView.aggregate (docs/TASK_FADE_SPEC.md §4).
+  // Area count = direct-in-area open non-faded tasks only (nested projects render separately).
+  // A tracked task (the core's `isTracked`, ADR 0065) is in Review, not in its area or project.
+  const { projectStats, areaOpenCount } = useMemo(() => {
+    const pStats = new Map<string, { done: number; total: number }>();
+    const aOpen = new Map<string, number>();
+    for (const { task: t, membership } of evaluatedTasks) {
+      if (t.deletedAt || t.fadedAt || membership.isTracked) continue;
+      if (t.project) {
+        if (t.status === "done") {
+          const cur = pStats.get(t.project) ?? { done: 0, total: 0 };
+          cur.done++;
+          cur.total++;
+          pStats.set(t.project, cur);
+        } else if (t.status === "open") {
+          const cur = pStats.get(t.project) ?? { done: 0, total: 0 };
+          cur.total++;
+          pStats.set(t.project, cur);
+        }
+      } else if (t.area && t.status === "open") {
+        aOpen.set(t.area, (aOpen.get(t.area) ?? 0) + 1);
+      }
+    }
+    return { projectStats: pStats, areaOpenCount: aOpen };
+  }, [evaluatedTasks]);
 
   // A new app day syncs, and the engine's daily fade pass follows the sync.
   const syncedDayRef = useRef(todayYMD);
@@ -1110,6 +1111,8 @@ export function SeptenaApp() {
 
       if (task.deletedAt || (task.status !== "open" && !isSettling)) return false;
       if (!prefs.tasksShowFaded && task.fadedAt) return false;
+      // A tracked task waits in Review > Tracked, not in its area or project (ADR 0065).
+      if (membership.isTracked) return false;
       if (destination.kind === "area") {
         if (task.area === destination.id) return true;
         const proj = task.project ? projectById.get(task.project) : null;
@@ -1260,9 +1263,9 @@ export function SeptenaApp() {
   const visibleTasks = useMemo(() => {
     if (!(destination.kind === "smart" && destination.id === "review")) return listedTasks;
     return reviewGroups
-      .filter((g) => g.id !== "faded" || prefs.reviewFadedExpanded)
+      .filter((g) => (g.id !== "faded" || prefs.reviewFadedExpanded) && (g.id !== "tracked" || prefs.reviewTrackedExpanded))
       .flatMap((g) => g.items);
-  }, [destination, listedTasks, prefs.reviewFadedExpanded, reviewGroups]);
+  }, [destination, listedTasks, prefs.reviewFadedExpanded, prefs.reviewTrackedExpanded, reviewGroups]);
 
   // Existing checklists keep their saved checked rows in the normal project view.
   const savedCheckedItems = useMemo(() => {
@@ -1514,6 +1517,22 @@ export function SeptenaApp() {
       );
     },
     [engine, undoStack],
+  );
+
+  // Bring Back (ADR 0065): a tracked task returns to its lists, with undo back into Tracked.
+  const bringBackTracked = useCallback(
+    async (task: TaskRow) => {
+      const before = await engine.bringBackTracked(task);
+      undoStack.record(
+        {
+          label: `${registryText(ACTIONS_CATALOG.actions["task.bringBack"].title, prefs.language)}: “${task.title}”`,
+          undo: () => engine.restoreReview(before),
+          redo: () => engine.bringBackTracked(task).then(() => undefined),
+        },
+        true,
+      );
+    },
+    [engine, prefs.language, undoStack],
   );
 
   // Keep and Let Go for faded tasks, with undo back into the pile.
@@ -2686,6 +2705,10 @@ export function SeptenaApp() {
       destination.kind === "smart" &&
       destination.id === "review" &&
       reviewGroupOf(task, convoState, taskShare) === "faded";
+    const isTrackedView =
+      destination.kind === "smart" &&
+      destination.id === "review" &&
+      reviewGroupOf(task, convoState, taskShare) === "tracked";
     const showsTodayIndicator = !(destination.kind === "smart" && destination.id === "today");
     const showsFadedIndicator = destination.kind === "area" || destination.kind === "project";
 
@@ -2701,6 +2724,7 @@ export function SeptenaApp() {
       expanded: expandedTaskId === task.id,
       isDeletedView,
       isFadedView,
+      isTrackedView,
       showsTodayIndicator,
       showsFadedIndicator,
       projectShare: taskShare,
@@ -2777,6 +2801,30 @@ export function SeptenaApp() {
                   }
                 },
               },
+            ],
+          });
+          return;
+        }
+
+        if (isTrackedView) {
+          // Registry menu `task.tracked`: Bring Back, Complete, Delete.
+          setContextMenu({
+            x: e.clientX,
+            y: e.clientY,
+            items: [
+              {
+                kind: "item",
+                label: registryText(ACTIONS_CATALOG.actions["task.bringBack"].title, lang),
+                onSelect: () => void bringBackTracked(task),
+              },
+              { kind: "divider" },
+              {
+                kind: "item",
+                label: registryText(ACTIONS_CATALOG.actions["task.toggleComplete"].title, lang),
+                onSelect: () => void completeMany([task]),
+              },
+              { kind: "divider" },
+              { kind: "item", label: registryText(ACTIONS_CATALOG.actions["task.delete"].title, lang), destructive: true, onSelect: () => void engine.deleteTask(task) },
             ],
           });
           return;
@@ -5068,6 +5116,23 @@ export function SeptenaApp() {
             ) : destination.kind === "smart" && destination.id === "review" ? (
               <div className="space-y-6">
                 {reviewGroups.map((group) => {
+                  if (group.id === "tracked") {
+                    // Tracked starts collapsed, like Faded (REVIEW_SPEC §2).
+                    return (
+                      <section key={group.id}>
+                        {renderGroupHeader(group, {
+                          expanded: prefs.reviewTrackedExpanded,
+                          onToggle: () =>
+                            handleChangePref("reviewTrackedExpanded", !prefs.reviewTrackedExpanded),
+                        })}
+                        {prefs.reviewTrackedExpanded && (
+                          <div className={taskCardClass}>
+                            {group.items.map((i) => renderTaskRow(i))}
+                          </div>
+                        )}
+                      </section>
+                    );
+                  }
                   if (group.id !== "faded") {
                     return (
                       <section key={group.id}>

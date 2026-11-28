@@ -341,10 +341,6 @@
       "reason": "Discuss conversation parity on Android is tracked as partial in capabilities.json.",
       "issue": "#242"
     },
-    "RegistryEntityEnums.ConvoEndState.DECOMPOSED": {
-      "reason": "Discuss conversation parity on Android is tracked as partial in capabilities.json.",
-      "issue": "#242"
-    },
     "RegistryEntityEnums.ConvoEndState.PROMOTED_TO_TODAY": {
       "reason": "Discuss conversation parity on Android is tracked as partial in capabilities.json.",
       "issue": "#242"

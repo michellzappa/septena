@@ -36,7 +36,12 @@ internal data class TaskRowMetadataCatalog(
     val shares: Map<String, ProjectShare> = emptyMap(),
     /** Tasks an agent handed over for the user to check. */
     val reviewTaskIds: Set<String> = emptySet(),
+    /** The conversation `endState` of each task, by task id ([TaskConversation.endStates]). */
+    val endStates: Map<String, String> = emptyMap(),
 ) {
+    /** The task as the rules read it, with its shared project and conversation end state. */
+    fun snapshot(record: SyncRecord): TaskSnapshot = TaskSnapshot.from(record, shares, endStates[record.id])
+
     companion object {
         suspend fun load(store: TaskStore): TaskRowMetadataCatalog {
             val checklist = mutableMapOf<String, Pair<Int, Int>>()
@@ -62,14 +67,16 @@ internal data class TaskRowMetadataCatalog(
                     add(taskId)
                 }
             }
+            val convos = store.records(EntityNames.CONVO)
             return TaskRowMetadataCatalog(
                 checklistCounts = checklist,
                 tagNames = tags,
                 attachmentTaskIds = attachments,
                 shares = ProjectShare.byProject(store),
-                reviewTaskIds = store.records(EntityNames.CONVO)
+                reviewTaskIds = convos
                     .filter { TaskConversation.needsHumanReview(it) }
                     .mapTo(HashSet(), SyncRecord::id),
+                endStates = TaskConversation.endStates(convos),
             )
         }
     }
@@ -273,6 +280,7 @@ internal fun TaskListItem.withFade(
             today = today.toString(),
             isAwaitingHuman = conversation?.awaitsHuman == true,
             isProposal = isProposal,
+            endState = conversation?.endState ?: snapshot.endState,
         )
     }.getOrNull()
     return copy(opacity = TaskFadeRules.rowOpacity(fill).toFloat())

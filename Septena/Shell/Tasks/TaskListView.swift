@@ -530,6 +530,8 @@ struct TaskListView: View {
   @AppStorage("septena.tasks.projectFadedCollapsed") private var scopeFadedCollapsedData: Data = Data()
   /// Whether Review's Faded group is open.
   @AppStorage(ReviewGroup.fadedExpandedKey) private var reviewFadedExpanded = false
+  /// Whether Review's Tracked group is open (ADR 0065). It starts closed, like Faded.
+  @AppStorage(ReviewGroup.trackedExpandedKey) private var reviewTrackedExpanded = false
   private var scopeFadedCollapsedIds: Set<String> {
     (try? JSONDecoder().decode(Set<String>.self, from: scopeFadedCollapsedData)) ?? []
   }
@@ -586,6 +588,8 @@ struct TaskListView: View {
   @State private var checklistCounts: [String: (done: Int, total: Int)] = [:]
   @State private var fromRefKinds: [String: String] = [:]
   @State private var issueRefs: [String: TaskRefRow] = [:]
+  /// Review ▸ Tracked: each tracked task's link (`LocalCache.trackedLinkRefs`).
+  @State private var trackedLinks: [String: TaskRefRow] = [:]
   /// The task whose Add Reference sheet is open (row menu).
   @State private var referenceTargetId: String?
   /// The task whose Waiting On… sheet is open (docs/REVIEW_SPEC.md §6).
@@ -1445,6 +1449,7 @@ struct TaskListView: View {
   private func refreshReferenceDecorations() {
     fromRefKinds = LocalCache.fromRefKinds(in: modelContext)
     issueRefs = filter == .review ? LocalCache.newestIssueRefs(in: modelContext) : [:]
+    trackedLinks = filter == .review ? LocalCache.trackedLinkRefs(in: modelContext) : [:]
   }
 
   private func refreshTodayNotices() {
@@ -2972,8 +2977,8 @@ struct TaskListView: View {
 
   /// Review (docs/REVIEW_SPEC.md §1): one section per `ReviewGroup`, in
   /// registry order, headers only above non-empty groups. Agent work in
-  /// progress (Working, Queued, Stopped) follows Finished work. Faded is
-  /// last, behind its toggle.
+  /// progress (Working, Queued, Stopped) follows Finished work. Tracked and
+  /// Faded are last, each behind its toggle; both start closed.
   @ViewBuilder
   private var reviewGroupRows: some View {
     let byGroup = ReviewGroup.grouped(visibleItems)
@@ -2986,6 +2991,15 @@ struct TaskListView: View {
           if reviewFadedExpanded {
             fadedPileNotice(tasks)
             cardedRows(tasks)
+          }
+        } else if group == .tracked {
+          groupHeader(icon: group.group?.sfSymbol ?? "circle",
+                      title: group.group?.title ?? group.rawValue)
+          trackedToggleRow(count: tasks.count, isExpanded: reviewTrackedExpanded) {
+            reviewTrackedExpanded.toggle()
+          }
+          if reviewTrackedExpanded {
+            trackedRows(tasks)
           }
         } else {
           groupHeader(icon: group.group?.sfSymbol ?? "circle",
@@ -3025,6 +3039,27 @@ struct TaskListView: View {
       .taskCardChrome(position, isSelected: selection.contains(task.id))
       .taskCardContextMenu(position) { taskContextMenu(for: task) }
     }
+  }
+
+  /// Review ▸ Tracked rows (ADR 0065): title, end-state note and the issue
+  /// link. A tap opens the task page; the row menu is `task.tracked`.
+  @ViewBuilder
+  private func trackedRows(_ rows: [SeptenaTask]) -> some View {
+    ForEach(Array(rows.enumerated()), id: \.element.id) { idx, task in
+      let position = TaskCardPosition(index: idx, count: rows.count)
+      TrackedTaskRow(task: task, link: trackedLinks[task.id], onOpen: { openPage(task) })
+        .asListRow()
+        .taskCardChrome(position, isSelected: selection.contains(task.id))
+        .taskCardContextMenu(position) { taskContextMenu(for: task) }
+    }
+  }
+
+  /// Bring Back (registry `task.bringBack`, ADR 0065): the user sets
+  /// `endState = open`, so the tasks return to their lists. One undo step.
+  private func bringBackTracked(_ ids: [String]) {
+    Haptics.commit()
+    TaskUndo.bringBack(ids: ids, mutator: mutator)
+    Task { await load() }
   }
 
   /// Accept a Review row: completes it and clears the review (with undo).
@@ -3532,13 +3567,38 @@ struct TaskListView: View {
                comment: "Project/area footer — expand faded tasks (plural)")
   }
 
+  private func trackedToggleLabel(count: Int, isExpanded: Bool) -> String {
+    if isExpanded {
+      return count == 1
+        ? String(localized: "Hide 1 tracked item",
+                 comment: "Review footer — collapse tracked tasks (singular)")
+        : String(localized: "Hide \(count) tracked items",
+                 comment: "Review footer — collapse tracked tasks (plural)")
+    }
+    return count == 1
+      ? String(localized: "Show 1 tracked item",
+               comment: "Review footer — expand tracked tasks (singular)")
+      : String(localized: "Show \(count) tracked items",
+               comment: "Review footer — expand tracked tasks (plural)")
+  }
+
+  /// The link that folds Review's Tracked rows: the Faded toggle's twin.
+  private func trackedToggleRow(count: Int, isExpanded: Bool, toggle: @escaping () -> Void) -> some View {
+    toggleRow(label: trackedToggleLabel(count: count, isExpanded: isExpanded), toggle: toggle)
+  }
+
   /// The footer link that folds faded rows, in a project, an area and Review.
   private func fadedToggleRow(count: Int, isExpanded: Bool, toggle: @escaping () -> Void) -> some View {
+    toggleRow(label: fadedToggleLabel(count: count, isExpanded: isExpanded), toggle: toggle)
+  }
+
+  /// One quiet link that folds a group of rows (Faded, Tracked).
+  private func toggleRow(label: String, toggle: @escaping () -> Void) -> some View {
     Button {
       if closeActiveEditIfNeeded() { return }
       toggle()
     } label: {
-      Text(fadedToggleLabel(count: count, isExpanded: isExpanded))
+      Text(label)
         .font(.septenaMeta)
         .monospacedDigit()
         .foregroundStyle(Theme.inkSecondary)
@@ -3773,7 +3833,8 @@ struct TaskListView: View {
     case .review:
       let byGroup = ReviewGroup.grouped(visibleItems)
       return ReviewGroup.allCases.flatMap { group in
-        group == .faded && !reviewFadedExpanded ? [] : (byGroup[group] ?? []).map(\.id)
+        (group == .faded && !reviewFadedExpanded) || (group == .tracked && !reviewTrackedExpanded)
+          ? [] : (byGroup[group] ?? []).map(\.id)
       }
     case .upcoming:
       // Upcoming has no inline trigger (`allowsInlineCreate` false) → sentinel empty.
@@ -4876,6 +4937,28 @@ struct TaskListView: View {
             return .init { restoreTasks(target.ids) }
           case .taskDeletePermanently:
             return .init { requestPurge(ids: target.ids) }
+          default: return nil
+          }
+        })
+    } else if filter == .review, !target.tasks.isEmpty,
+              target.tasks.allSatisfy({ $0.reviewGroup == .tracked }) {
+      // Review ▸ Tracked (registry `task.tracked`, ADR 0065): Bring Back sets
+      // `endState = open`; Complete and Delete are the usual handlers.
+      RegistryMenuContent(nodes: RegistryMenuResolver.resolve(
+        RegistryActions.menu(.taskTracked)) { id in
+          switch id {
+          case .taskBringBack: return .init { bringBackTracked(target.ids) }
+          case .taskToggleComplete:
+            return .init(variant: target.count > 1 ? .plural : .base) {
+              for id in target.ids {
+                if let task = currentTask(id: id) { toggle(task) }
+              }
+            }
+          case .taskDelete:
+            return .init(variant: target.count > 1 ? .plural : .base) {
+              Haptics.warning()
+              for id in target.ids { applyDelete(id) }
+            }
           default: return nil
           }
         })

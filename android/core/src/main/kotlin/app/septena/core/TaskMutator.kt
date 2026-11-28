@@ -772,7 +772,9 @@ class TaskMutator(
         var faded = 0
         for (record in store.records(RegistryEntityNames.TASK)) {
             if (record.deletedAt != null) continue
-            val task = runCatching { TaskSnapshot.from(record, shares) }.getOrNull() ?: continue
+            val task = runCatching {
+                TaskSnapshot.from(record, shares, endState = conversations[record.id]?.endState)
+            }.getOrNull() ?: continue
             if (task.status != app.septena.core.generated.RegistryEntityEnums.TaskStatus.OPEN || task.fadedAt != null) continue
             // A waiting task never fades (docs/REVIEW_SPEC.md §6).
             if (task.isWaiting) continue
@@ -795,6 +797,7 @@ class TaskMutator(
                     today = today,
                     isAwaitingHuman = convo?.awaitsHuman == true,
                     isProposal = TaskProvenance.isProposal(task.source, task.acknowledgedAt),
+                    endState = task.endState,
                 )
             }.getOrDefault(false)
             if (!fades) continue

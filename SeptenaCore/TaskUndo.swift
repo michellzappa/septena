@@ -377,6 +377,23 @@ enum TaskUndo {
            redo: { mutator.restoreConvo(id: id, after) })
   }
 
+  /// Bring Back a tracked task (Review > Tracked, ADR 0065): the user sets
+  /// `endState` to `open`, so the task returns to its working lists. The
+  /// end-state note belongs to `decomposed` and goes with it. One undo step
+  /// restores every conversation as it was.
+  static func bringBack(ids: [String], mutator: TaskMutator) {
+    let before = ids.compactMap { id in mutator.conversation(id: id).map { (id, $0) } }
+    guard !before.isEmpty else { return }
+    for (id, _) in before {
+      mutator.setConvoEndState(id: id, .open, note: nil)
+      mutator.touch(id: id)
+    }
+    let after = before.compactMap { id, _ in mutator.conversation(id: id).map { (id, $0) } }
+    record(name: RegistryActions.title(.taskBringBack),
+           undo: { for (id, convo) in before { mutator.restoreConvo(id: id, convo) } },
+           redo: { for (id, convo) in after { mutator.restoreConvo(id: id, convo) } })
+  }
+
   /// Cancel / reopen. Cancelling parks a task as "won't do" rather than
   /// finishing it, so the inverse is `uncomplete` (status → open) — the same
   /// inverse the AppKit shell already uses, hoisted here so the SwiftUI row

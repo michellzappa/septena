@@ -54,7 +54,11 @@ describe("task rows carry the linked issue and end state", () => {
     });
     await runWriteTool(ctx, "tasks_set_endstate", { id: linked.id, endState: "decomposed", note: `Tracked in ${url(310)}` });
 
-    const list = await listTasks(rpc as never, "UTC", "anytime", 100);
+    // A decomposed task is tracked (ADR 0065): it leaves Anytime, and search still finds it.
+    const anytime = await listTasks(rpc as never, "UTC", "anytime", 100);
+    assert.equal(anytime.tasks.some((t) => t.id === linked.id), false);
+    assert.equal(anytime.tasks.some((t) => t.id === plain.id), true);
+    const list = await listTasks(rpc as never, "UTC", "all", 100);
     const row = list.tasks.find((t) => t.id === linked.id)!;
     assert.equal(row.issue?.number, 310);
     assert.equal(row.refCount, 1);

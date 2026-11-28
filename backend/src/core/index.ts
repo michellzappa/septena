@@ -89,6 +89,8 @@ export interface CoreTask {
   recurrenceAfterCompletion?: boolean | null;
   recurrenceAnchorDate?: string | null;
   assignedToOther?: boolean;
+  /** The conversation's end state (ADR 0065): `decomposed` makes an open task tracked. */
+  endState?: string | null;
 }
 
 export interface CoreMembership {
@@ -103,6 +105,8 @@ export interface CoreMembership {
   deadlineRed: boolean;
   upcomingDay: string | null;
   arrivedOnOwn: boolean;
+  /** An open task whose work goes on elsewhere (`decomposed`, ADR 0065). */
+  isTracked: boolean;
 }
 
 /// Which lists a task belongs to on `today` (`YYYY-MM-DD`) at `now` (ISO).
@@ -182,6 +186,8 @@ export interface CoreFadeInput {
   now: string;
   today: string;
   utcOffsetSeconds?: number;
+  /** A tracked task (`decomposed`) never fades (ADR 0065). */
+  endState?: string | null;
 }
 
 /// Fade progress in 0…1, or null (spec `docs/TASK_FADE_SPEC.md` §4).

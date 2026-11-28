@@ -169,6 +169,7 @@ export function coreTask(t: TaskOut): CoreTask {
     reminderAt: t.reminderAt ?? null,
     reminderSnoozedUntil: t.reminderSnoozedUntil ?? null,
     assignedToOther: t.assignedToOther === true,
+    endState: t.endState ?? null,
   };
 }
 

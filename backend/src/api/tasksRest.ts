@@ -6,7 +6,7 @@ import { zId } from "../store/columns.js";
 import type { Doing, Row } from "../store/TaskStore.js";
 import { addDaysYMD, isValidTz, todayYMD } from "../tz.js";
 import type { TaskOut } from "../tools/taskShared.js";
-import { matchesView } from "../tools/taskShared.js";
+import { matchesView, membership } from "../tools/taskShared.js";
 import { listTasks, taskOut } from "../shadow/mcp.js";
 import { MAX_REF_INPUT, findByRef, zRefs } from "../shadow/refs.js";
 import { DESIGN_TOKENS, ENTITY_LIMITS } from "../generated/registries.js";
@@ -267,6 +267,8 @@ tasksRest.get("/lists", async (c) => {
     if (t.recurrence) repeatingCount++;
     if (matchesView(t, "anytime", today, nowMs)) anytimeCount++;
     if (t.starred) starredCount++;
+    // A tracked task (`decomposed`, ADR 0065) is in Review > Tracked, not in its area or project.
+    if (membership(t, today, nowMs).isTracked) continue;
     if (t.project) {
       projectCounts.set(t.project, (projectCounts.get(t.project) ?? 0) + 1);
     }

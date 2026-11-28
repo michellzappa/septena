@@ -84,6 +84,8 @@ A task fades when all of these are true:
 - its `scheduled` date is nil or in the past;
 - it has no recurrence rule;
 - its conversation is not on the agent's turn, and `assignee` is not `claude`.
+- its conversation's `endState` is not `decomposed`: a tracked task is in no
+  list (ADR 0065).
 
 A fading task gets `fadedAt = now`. It leaves every list, every count, Next
 and the badge. It shows only in the Faded pile. The fade pass runs once per

@@ -6,6 +6,7 @@ import app.septena.core.JsonValue
 import app.septena.core.ProjectShare
 import app.septena.core.RegistryCatalog
 import app.septena.core.TaskFadeRules
+import app.septena.core.TaskConversation
 import app.septena.core.TaskSnapshot
 import app.septena.core.TaskStore
 import app.septena.core.TaskTimeSlot
@@ -60,10 +61,12 @@ internal object SeptenaWidgetLoader {
         )
 
         val shares = ProjectShare.byProject(store)
+        // The conversation end state: a tracked task (ADR 0065) is out of the lists the core says.
+        val endStates = TaskConversation.endStates(store.records(RegistryEntityNames.CONVO))
         val candidates = mutableListOf<Candidate>()
         for (record in store.records(RegistryEntityNames.TASK)) {
             if (record.deletedAt != null) continue
-            val snap = runCatching { TaskSnapshot.from(record, shares) }.getOrNull() ?: continue
+            val snap = runCatching { TaskSnapshot.from(record, shares, endStates[record.id]) }.getOrNull() ?: continue
             if (snap.isHeading || snap.status != RegistryEntityEnums.TaskStatus.OPEN) continue
             val membership = membershipFor(snap, today, now)
             if (membership.matchesView[RegistryDestinationIds.TODAY] != true) continue
@@ -124,10 +127,12 @@ internal object SeptenaWidgetLoader {
         )
 
         val shares = ProjectShare.byProject(store)
+        // The conversation end state: a tracked task (ADR 0065) is out of the lists the core says.
+        val endStates = TaskConversation.endStates(store.records(RegistryEntityNames.CONVO))
         val candidates = mutableListOf<Candidate>()
         for (record in store.records(RegistryEntityNames.TASK)) {
             if (record.deletedAt != null) continue
-            val snap = runCatching { TaskSnapshot.from(record, shares) }.getOrNull() ?: continue
+            val snap = runCatching { TaskSnapshot.from(record, shares, endStates[record.id]) }.getOrNull() ?: continue
             if (snap.isHeading || snap.status != RegistryEntityEnums.TaskStatus.OPEN) continue
             if (TaskFadeRules.isFaded(snap.fadedAt)) continue
             val membership = membershipFor(snap, today, now)

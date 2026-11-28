@@ -31,7 +31,8 @@ enum TaskListRules {
                        project: String?, created: String?, createdAt: Date, scheduled: String?,
                        deadline: String?, deferredDeadline: String?, today: Bool, todaySetOn: String?, source: String?,
                        acknowledgedAt: Date?, starred: Bool, recurrence: Recurrence?,
-                       deletedAt: String?, fadedAt: Date?, assignedToOther: Bool = false) -> SeptenaSharedCore.TaskSnapshot {
+                       deletedAt: String?, fadedAt: Date?, assignedToOther: Bool = false,
+                       endState: String? = nil) -> SeptenaSharedCore.TaskSnapshot {
     SeptenaSharedCore.TaskSnapshot(
       id: id, title: title, status: status,
       kind: kind.isEmpty ? nil : kind,
@@ -45,7 +46,7 @@ enum TaskListRules {
       startTime: nil, durationMinutes: nil, timeZone: nil,
       reminderAt: nil, reminderSnoozedUntil: nil, reminderDismissedAt: nil,
       recurrenceAfterCompletion: recurrence?.afterCompletion, recurrenceAnchorDate: nil,
-      assignedToOther: assignedToOther)
+      assignedToOther: assignedToOther, endState: endState)
   }
 }
 
@@ -58,7 +59,7 @@ extension SeptenaTask {
         created: created, createdAt: createdAt, scheduled: scheduled, deadline: deadline,
         deferredDeadline: deferredDeadline, today: self.today, todaySetOn: todaySetOn, source: source, acknowledgedAt: acknowledgedAt,
         starred: starred, recurrence: recurrence, deletedAt: deletedAt, fadedAt: fadedAt,
-        assignedToOther: isAssignedToOther),
+        assignedToOther: isAssignedToOther, endState: conversationEndState),
       today: today, now: now)
   }
 }
@@ -72,7 +73,37 @@ extension TaskEntity {
         created: created, createdAt: createdAt, scheduled: scheduled, deadline: deadline,
         deferredDeadline: deferredDeadline, today: self.today, todaySetOn: todaySetOn, source: source, acknowledgedAt: acknowledgedAt,
         starred: starred, recurrence: recurrence, deletedAt: deletedAt, fadedAt: fadedAt,
-        assignedToOther: isAssignedToOther),
+        assignedToOther: isAssignedToOther, endState: conversationEndState),
       today: today, now: now)
+  }
+}
+
+extension TaskEntity {
+  /// The conversation's end state as the core reads it (`decomposed` makes
+  /// an open task tracked, ADR 0065). nil when the task has no conversation,
+  /// so a row without one never decodes JSON.
+  var conversationEndState: String? {
+    conversationJSON == nil ? nil : conversation.endState?.rawValue
+  }
+}
+
+extension SeptenaTask {
+  /// The conversation's end state as the core reads it (ADR 0065).
+  var conversationEndState: String? { conversation.endState?.rawValue }
+
+  /// The core's answer: an open task whose work goes on elsewhere
+  /// (`endState = decomposed`, ADR 0065). It is in Review > Tracked and in no
+  /// area or project list.
+  /// A task with no end state skips the core call; the answer is the core's.
+  var isTracked: Bool {
+    conversation.endState != nil && (listMembership()?.isTracked ?? false)
+  }
+}
+
+extension TaskEntity {
+  /// The core's answer: this open task is tracked (ADR 0065). A row with no
+  /// conversation skips the core call.
+  var isTracked: Bool {
+    conversationJSON != nil && (listMembership()?.isTracked ?? false)
   }
 }

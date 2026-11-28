@@ -542,13 +542,15 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
       .unscheduled: open.filter(\.isAnytime).count,
       .starred: starredCount,
     ]
-    let openByProject = Dictionary(grouping: open.compactMap(\.project), by: { $0 })
+    // A tracked task (ADR 0065) leaves its area and project lists and their counts.
+    let listed = open.filter { !$0.isTracked }
+    let openByProject = Dictionary(grouping: listed.compactMap(\.project), by: { $0 })
       .mapValues(\.count)
     // An area's count is its DIRECT tasks only — the ones loose in the area,
     // not in any of its projects. Nested projects render as their own rows
     // with their own counts, so rolling them up would double-count (same
     // rule the SwiftUI sidebar's `areaDirectOpen` follows).
-    let openByArea = Dictionary(grouping: open.filter { $0.project == nil }
+    let openByArea = Dictionary(grouping: listed.filter { $0.project == nil }
                                   .compactMap(\.area), by: { $0 })
       .mapValues(\.count)
     // Project completion rings, same ratio the SwiftUI sidebar draws:

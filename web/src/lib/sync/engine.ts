@@ -1756,6 +1756,20 @@ export class WebSyncEngine {
     );
   }
 
+  /**
+   * Bring Back (ADR 0065): the user takes a tracked task back into the working lists. Sets
+   * `endState = open` and clears the note. Returns the conversation it replaced, for undo.
+   */
+  async bringBackTracked(task: TaskRow): Promise<ConvoRow> {
+    const convo = this.existingConvo(task.id);
+    const convoFields: Record<string, unknown> = { endState: "open", endStateNote: null };
+    await this.commit(
+      [{ entity: "convo", action: "put", id: task.id, row: { ...convo, ...convoFields } }],
+      [{ clientOpId: newClientOpId(), op: "upsert", entity: "convo", id: task.id, fields: convoFields, queuedAt: Date.now() }],
+    );
+    return convo;
+  }
+
   /** Sends a hand-off back with the user's note. Returns the conversation it replaced. */
   async sendBackAgentReview(task: TaskRow, note: string): Promise<ConvoRow> {
     const trimmed = note.trim();

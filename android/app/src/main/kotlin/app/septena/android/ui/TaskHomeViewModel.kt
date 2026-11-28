@@ -17,6 +17,8 @@ import app.septena.core.SmartListSection
 import app.septena.core.StructureOrder
 import app.septena.core.SyncRecord
 import app.septena.core.TaskConversation
+import app.septena.core.TaskRefRecord
+import app.septena.core.TaskRefResolver
 import app.septena.core.TaskFadeRules
 import app.septena.core.TaskSnapshot
 import app.septena.core.TaskViewRules
@@ -81,6 +83,10 @@ data class TaskHomeUiState(
     val tasks: List<TaskListItem> = emptyList(),
     /** Soft-deleted tasks shown in Logbook's Deleted tab (#460 / #202). */
     val deletedTasks: List<TaskListItem> = emptyList(),
+    /** Review's Tracked group (ADR 0065): its header, null when nothing is tracked, and its rows. */
+    val trackedGroup: TaskGroupHeader? = null,
+    val trackedTasks: List<TaskListItem> = emptyList(),
+    val trackedGroupExpanded: Boolean = false,
     /** Review's Faded group: its header, null when nothing faded, and its rows. */
     val fadedGroup: TaskGroupHeader? = null,
     val fadedTasks: List<TaskListItem> = emptyList(),
@@ -116,7 +122,8 @@ data class TaskHomeUiState(
 
     /** The rows the list draws, in order; a folded group draws none. */
     val visibleTasks: List<TaskListItem> by lazy(LazyThreadSafetyMode.PUBLICATION) {
-        inboxTasks + tasks + if (fadedGroupExpanded) fadedTasks else emptyList()
+        inboxTasks + tasks + (if (trackedGroupExpanded) trackedTasks else emptyList()) +
+            if (fadedGroupExpanded) fadedTasks else emptyList()
     }
 }
 
@@ -145,6 +152,8 @@ private data class LoadedTaskHome(
     val inboxTasks: List<TaskListItem>,
     val tasks: List<TaskListItem>,
     val deletedTasks: List<TaskListItem> = emptyList(),
+    val trackedGroup: TaskGroupHeader? = null,
+    val trackedTasks: List<TaskListItem> = emptyList(),
     val fadedGroup: TaskGroupHeader? = null,
     val fadedTasks: List<TaskListItem> = emptyList(),
     val canQuickAdd: Boolean,
@@ -175,6 +184,8 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
     private val errorMessage = MutableStateFlow<String?>(null)
     /** The row in inline edit: it keeps its place in a sorted list until the edit ends (spec §6). */
     private val pinnedTaskId = MutableStateFlow<String?>(null)
+    /** Review ▸ Tracked starts collapsed, like Faded (docs/REVIEW_SPEC.md §2). */
+    private val trackedGroupExpanded = MutableStateFlow(false)
     /** The list key and row order the list showed last, for [pinnedTaskId]. */
     @Volatile private var lastShownOrder: Pair<String?, List<String>> = null to emptyList()
     @Volatile private var filingSuggestionsByTask: Map<String, FilingSuggestion> = emptyMap()
@@ -205,10 +216,11 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         starredOnly,
         selectedIds,
         errorMessage,
-        graph.fadeSweepStore.fadedGroupExpanded,
-    ) { home, starFilter, selected, error, fadedGroupExpanded ->
+        combine(graph.fadeSweepStore.fadedGroupExpanded, trackedGroupExpanded) { faded, tracked -> faded to tracked },
+    ) { home, starFilter, selected, error, (fadedGroupExpanded, trackedExpanded) ->
         val applyStar = starFilter && (home.location as? TaskHomeLocation.SmartList)?.destinationId != RegistryDestinationIds.STARRED
         val fadedTasks = if (applyStar) home.fadedTasks.filter(TaskListItem::isStarred) else home.fadedTasks
+        val trackedTasks = if (applyStar) home.trackedTasks.filter(TaskListItem::isStarred) else home.trackedTasks
         TaskHomeUiState(
             hasLoaded = home.hasLoaded,
             location = home.location,
@@ -219,6 +231,9 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             inboxTasks = if (applyStar) home.inboxTasks.filter(TaskListItem::isStarred) else home.inboxTasks,
             tasks = if (applyStar) home.tasks.filter(TaskListItem::isStarred) else home.tasks,
             deletedTasks = home.deletedTasks,
+            trackedGroup = home.trackedGroup?.takeIf { trackedTasks.isNotEmpty() }?.copy(count = trackedTasks.size),
+            trackedTasks = trackedTasks,
+            trackedGroupExpanded = trackedExpanded,
             fadedGroup = home.fadedGroup?.takeIf { fadedTasks.isNotEmpty() }?.copy(count = fadedTasks.size),
             fadedTasks = fadedTasks,
             fadedGroupExpanded = fadedGroupExpanded,
@@ -228,7 +243,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             reviewCount = home.reviewCount,
             agentRequestTimes = home.agentRequestTimes,
             starredOnly = applyStar,
-            hasOpenStarred = (home.inboxTasks + home.tasks + home.fadedTasks).any { it.isStarred && !it.isCompleted },
+            hasOpenStarred = (home.inboxTasks + home.tasks + home.trackedTasks + home.fadedTasks).any { it.isStarred && !it.isCompleted },
             selectedIds = selected,
             fadedSweepItems = home.fadedSweepItems,
             weeklySweepItems = home.weeklySweepItems,
@@ -288,6 +303,13 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         // A folded row must not stay in a selection the user cannot see.
         if (!expands) selectedIds.value -= state.value.fadedTasks.map(TaskListItem::id).toSet()
         graph.fadeSweepStore.setFadedGroupExpanded(expands)
+    }
+
+    fun toggleTrackedGroup() {
+        val expands = !trackedGroupExpanded.value
+        // A folded row must not stay in a selection the user cannot see.
+        if (!expands) selectedIds.value -= state.value.trackedTasks.map(TaskListItem::id).toSet()
+        trackedGroupExpanded.value = expands
     }
 
     fun toggleStarFilter() {
@@ -921,6 +943,15 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
 
     fun keepFaded(id: String) = editTask(id) { graph.taskMutator.keepFaded(id) }
 
+    /** Review ▸ Tracked ▸ Bring Back (ADR 0065): the conversation's end state goes back to open. */
+    fun bringBack(id: String) {
+        viewModelScope.launch {
+            runCatching { withContext(Dispatchers.IO) { check(graph.bringBackTracked(id)) } }
+                .onSuccess { errorMessage.value = null; noteLocalChangeAndSync() }
+                .onFailure { errorMessage.value = it.message }
+        }
+    }
+
     /** Waiting On… (docs/REVIEW_SPEC.md §6): the name, and the When date (null clears it). */
     fun setWaiting(id: String, name: String, checkBack: String?) =
         editTask(id) { graph.taskMutator.setWaiting(id, name, checkBack, changesWhen = true) }
@@ -1184,7 +1215,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
 
         val metadataCatalog = TaskRowMetadataCatalog.load(graph.taskStore)
         val allSnapshots = taskRecords.mapNotNull { record ->
-            runCatching { record to TaskSnapshot.from(record, metadataCatalog.shares) }.getOrNull()
+            runCatching { record to metadataCatalog.snapshot(record) }.getOrNull()
         }
         val now = graph.clock.now()
         val today = graph.clock.today(now)
@@ -1215,6 +1246,13 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         }
 
         val reviewGroups = groupHeaders(RegistryDestinationIds.REVIEW)
+        // Review ▸ Tracked rows link to the issue the work went to (docs/REVIEW_SPEC.md §2).
+        val refsByTask: Map<String, List<TaskRefRecord>> =
+            if ((selected as? TaskHomeLocation.SmartList)?.destinationId == RegistryDestinationIds.REVIEW) {
+                graph.taskStore.records(EntityNames.TASK_REF).mapNotNull(TaskRefRecord::from).groupBy(TaskRefRecord::taskId)
+            } else {
+                emptyMap()
+            }
 
         // Compute core TaskViewMembership ONCE per open non-heading non-deleted task
         // (avoids ~8,000 redundant JNA roundtrips across Done/Cancelled Logbook rows).
@@ -1227,6 +1265,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         val agentRequestTimes = mutableListOf<java.time.Instant>()
         var agentCount = 0
         var waitingCount = 0
+        var trackedCount = 0
         var starredCount = 0
         var fadedCount = 0
         var deletedCount = 0
@@ -1263,6 +1302,8 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                     if (reviewGroup in ReviewGroupIds.BADGE) reviewCount += 1
                     if (reviewGroup in ReviewGroupIds.AGENT_WORK) agentCount += 1
                     if (reviewGroup == ReviewGroupIds.WAITING) waitingCount += 1
+                    // Tracked is not in the badge, but keeps Review in the sidebar (ADR 0065).
+                    if (reviewGroup == ReviewGroupIds.TRACKED) trackedCount += 1
                     val requestedAt = when {
                         convoState?.needsHumanReview == true -> conversations[snapshot.id]?.endStateAt
                         convoState?.awaitsHuman == true -> conversations[snapshot.id]?.lastTurnAt
@@ -1293,8 +1334,9 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                         )
                     } else {
                         if (snapshot.starred) starredCount += 1
-                        val projId = snapshot.project
-                        val areaId = snapshot.area
+                        // A tracked task leaves its area and project counts (ADR 0065).
+                        val projId = snapshot.project.takeUnless { membership.isTracked }
+                        val areaId = snapshot.area.takeUnless { membership.isTracked }
                         if (projId != null) {
                             projectOpenCounts[projId] = (projectOpenCounts[projId] ?: 0) + 1
                         } else if (areaId != null) {
@@ -1347,7 +1389,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         }
 
         val nonEmptyDestinations = buildSet {
-            if (reviewCount > 0 || agentCount > 0 || waitingCount > 0 || fadedCount > 0 ||
+            if (reviewCount > 0 || agentCount > 0 || waitingCount > 0 || trackedCount > 0 || fadedCount > 0 ||
                 (selected as? TaskHomeLocation.SmartList)?.destinationId == RegistryDestinationIds.REVIEW
             ) {
                 add(RegistryDestinationIds.REVIEW)
@@ -1526,7 +1568,17 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                         ?: record.fields[RegistryEntityFields.Task.POSITION].numberValue()
                     val positioned = PositionedTask(
                         when (resolvedLocation.destinationId) {
-                            RegistryDestinationIds.REVIEW -> if (groupHeader != reviewGroups[ReviewGroupIds.FINISHED]) {
+                            RegistryDestinationIds.REVIEW -> if (groupHeader != null && groupHeader == reviewGroups[ReviewGroupIds.TRACKED]) {
+                                // Title, the end-state note as the context line, and the issue link (ADR 0065).
+                                val link = TaskRefResolver.trackedLink(refsByTask[snapshot.id].orEmpty())
+                                item.copy(
+                                    group = groupHeader,
+                                    position = rowPosition,
+                                    trackedNote = conversation?.endStateNote?.trim()?.takeIf(String::isNotEmpty),
+                                    trackedLinkTitle = link?.let { (ref, url) -> ref.displayTitle(url) },
+                                    trackedLinkUrl = link?.second,
+                                )
+                            } else if (groupHeader != reviewGroups[ReviewGroupIds.FINISHED]) {
                                 item.copy(group = groupHeader, position = rowPosition)
                             } else {
                                 val note = conversation?.endStateNote?.trim()?.takeIf(String::isNotEmpty)
@@ -1595,7 +1647,9 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                 }
                 is TaskHomeLocation.Area -> {
                     val settleEntry = settle.entries[snapshot.id]
-                    val visibleHere = isOpenVisible(snapshot) || (settleEntry != null && !snapshot.isHeading && snapshot.deletedAt == null)
+                    // A tracked task is out of its area and project list (ADR 0065).
+                    val visibleHere = (isOpenVisible(snapshot) && !membership.isTracked) ||
+                        (settleEntry != null && !snapshot.isHeading && snapshot.deletedAt == null)
                     if (snapshot.area != resolvedLocation.id || !visibleHere) continue
                     visible += PositionedTask(
                         taskListItem(
@@ -1616,7 +1670,9 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                 }
                 is TaskHomeLocation.Project -> {
                     val settleEntry = settle.entries[snapshot.id]
-                    val visibleHere = isOpenVisible(snapshot) || (settleEntry != null && !snapshot.isHeading && snapshot.deletedAt == null)
+                    // A tracked task is out of its area and project list (ADR 0065).
+                    val visibleHere = (isOpenVisible(snapshot) && !membership.isTracked) ||
+                        (settleEntry != null && !snapshot.isHeading && snapshot.deletedAt == null)
                     if (snapshot.project != resolvedLocation.id || !visibleHere) continue
                     visible += PositionedTask(
                         taskListItem(
@@ -1677,9 +1733,11 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                 else -> items
             }
         }
-        // Review's Faded group folds, so the list draws it apart from the other rows.
+        // Review's Tracked and Faded groups fold, so the list draws them apart from the other rows.
         val fadedGroup = reviewGroups[ReviewGroupIds.FADED].takeIf { destinationId == RegistryDestinationIds.REVIEW }
-        val (fadedTasks, listedTasks) = orderedTasks.partition { fadedGroup != null && it.group?.key == fadedGroup.key }
+        val trackedGroup = reviewGroups[ReviewGroupIds.TRACKED].takeIf { destinationId == RegistryDestinationIds.REVIEW }
+        val (fadedTasks, unfadedTasks) = orderedTasks.partition { fadedGroup != null && it.group?.key == fadedGroup.key }
+        val (trackedTasks, listedTasks) = unfadedTasks.partition { trackedGroup != null && it.group?.key == trackedGroup.key }
         filingSuggestionsByTask = nextSuggestions
         val listSortKey = when (resolvedLocation) {
             is TaskHomeLocation.SmartList -> ListSortPreferences.smartListKey(resolvedLocation.destinationId)
@@ -1717,6 +1775,8 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             inboxTasks = inbox.sortedTaskItems(),
             tasks = listedTasks,
             deletedTasks = deleted.sortedTaskItems(RegistryDestinationIds.RECENTLY_DELETED),
+            trackedGroup = trackedGroup,
+            trackedTasks = trackedTasks.map { it.copy(group = null) },
             fadedGroup = fadedGroup,
             fadedTasks = fadedTasks.map { it.copy(group = null) },
             canQuickAdd = canQuickAdd,

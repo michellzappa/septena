@@ -34,6 +34,7 @@ function fakeTask(id: string, title: string, upcomingDay: string | null): Upcomi
       deadlineRed: false,
       upcomingDay,
       arrivedOnOwn: false,
+      isTracked: false,
     },
   };
 }

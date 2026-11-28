@@ -331,6 +331,8 @@ fun TaskHomeScreen(
             actionId == RegistryActionIds.TASK_KEEP_FADED -> homeViewModel.keepFaded(id)
             actionId == RegistryActionIds.TASK_WAITING_ON -> waitingTaskId = id
             actionId == RegistryActionIds.TASK_GOT_IT_BACK -> homeViewModel.gotItBack(id)
+            actionId == RegistryActionIds.TASK_BRING_BACK -> homeViewModel.bringBack(id)
+            actionId == RegistryActionIds.TASK_TOGGLE_COMPLETE -> homeViewModel.complete(id)
             actionId == RegistryActionIds.TASK_LET_GO_FADED -> homeViewModel.letGoFaded(id)
             actionId == RegistryActionIds.TASK_SELECT -> homeViewModel.toggleSelection(id)
         }
@@ -1247,6 +1249,9 @@ private fun TaskHomeScaffold(
         !(destinationId == RegistryDestinationIds.LOGBOOK && logbookShowingDeleted)
     val imeVisible = WindowInsets.isImeVisible
     val formLabels = remember(languageTag) { TaskFormLabels.fromRegistry(languageTag) }
+    val trackedRowMenuGroups = remember(languageTag) {
+        taskRowMenuGroups(TRACKED_ROW_MENU, RegistryDestinationIds.REVIEW, languageTag, offersDo = false)
+    }
     val selectToggleLabel = remember(languageTag) {
         RegistryCatalog.actionTitle(RegistryActionIds.TASK_SELECT, languageTag = languageTag).orEmpty()
     }
@@ -1990,15 +1995,28 @@ private fun TaskHomeScaffold(
                             reviewSendBackTitle = reviewSendBackTitle,
                             onAcceptReview = if (isReviewList) onComplete else null,
                             onSendBackReview = if (isReviewList) onSendBackReview else null,
-                            collapsibleGroup = state.fadedGroup?.let { header ->
-                                CollapsibleTaskGroup(
-                                    header = header,
-                                    tasks = state.fadedTasks,
-                                    isExpanded = state.fadedGroupExpanded,
-                                    onToggle = homeViewModel::toggleFadedGroup,
-                                    banner = fadedBanner,
-                                )
-                            },
+                            collapsibleGroups = listOfNotNull(
+                                // Tracked (ADR 0065): its own row menu, and a row opens the task page.
+                                state.trackedGroup?.let { header ->
+                                    CollapsibleTaskGroup(
+                                        header = header,
+                                        tasks = state.trackedTasks,
+                                        isExpanded = state.trackedGroupExpanded,
+                                        onToggle = homeViewModel::toggleTrackedGroup,
+                                        rowMenuGroups = trackedRowMenuGroups,
+                                        onOpenTask = onOpenFullPage,
+                                    )
+                                },
+                                state.fadedGroup?.let { header ->
+                                    CollapsibleTaskGroup(
+                                        header = header,
+                                        tasks = state.fadedTasks,
+                                        isExpanded = state.fadedGroupExpanded,
+                                        onToggle = homeViewModel::toggleFadedGroup,
+                                        banner = fadedBanner,
+                                    )
+                                },
+                            ),
                         )
                         }
                     }
@@ -2173,6 +2191,8 @@ private fun taskRowMenuGroups(
 ): List<List<TaskRowMenuAction>> {
     val supportedActions = if (menuId == "task.recentlyDeleted") {
         setOf(RegistryActionIds.TASK_RESTORE, RegistryActionIds.TASK_DELETE_PERMANENTLY)
+    } else if (menuId == TRACKED_ROW_MENU) {
+        setOf(RegistryActionIds.TASK_BRING_BACK, RegistryActionIds.TASK_TOGGLE_COMPLETE, RegistryActionIds.TASK_DELETE)
     } else {
         setOfNotNull(
             RegistryActionIds.TASK_DO.takeIf { offersDo },
@@ -2239,6 +2259,9 @@ private fun List<TaskRowMenuAction>.withAssign(menuId: String, languageTag: Stri
 
 private const val TASK_ROW_MENU = "task.row"
 
+/** The row menu of Review ▸ Tracked (registry/actions.json `task.tracked`, ADR 0065). */
+private const val TRACKED_ROW_MENU = "task.tracked"
+
 /** The `task.row` submenu that opens the member list. */
 private const val ASSIGN_SUBMENU = "assign"
 
@@ -2261,7 +2284,9 @@ private fun actionMenuIcon(actionId: String): TaskMenuActionIcon = when (actionI
     RegistryActionIds.TASK_KEEP_FADED -> TaskMenuActionIcon.Check
     RegistryActionIds.TASK_LET_GO_FADED -> TaskMenuActionIcon.Cancel
     RegistryActionIds.TASK_WAITING_ON -> TaskMenuActionIcon.Assign
-    RegistryActionIds.TASK_GOT_IT_BACK -> TaskMenuActionIcon.Restore
+    RegistryActionIds.TASK_GOT_IT_BACK,
+    RegistryActionIds.TASK_BRING_BACK -> TaskMenuActionIcon.Restore
+    RegistryActionIds.TASK_TOGGLE_COMPLETE -> TaskMenuActionIcon.Check
     else -> TaskMenuActionIcon.None
 }
 

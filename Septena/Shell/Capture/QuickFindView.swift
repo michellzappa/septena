@@ -410,6 +410,8 @@ struct QuickFindView: View {
   // MARK: - Routing helpers
 
   private func routeForTask(_ t: TaskEntity) -> Route {
+    // A tracked task (ADR 0065) is in Review, not on its project or area page.
+    if t.status == .open, t.isTracked { return .filter(t.isOnToday ? .today : .review) }
     if let pid = t.project, let p = projects.first(where: { $0.id == pid }) {
       return .project(id: p.id)
     }

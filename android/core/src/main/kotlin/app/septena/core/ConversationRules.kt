@@ -92,6 +92,17 @@ data class TaskConversation(
     )
 
     companion object {
+        /**
+         * The `endState` of every live conversation, by task id (a conversation's id is its task's).
+         * [TaskSnapshot.endState] and [TaskFadeRules] take it so the core sees Tracked (ADR 0065).
+         */
+        fun endStates(records: Iterable<SyncRecord>): Map<String, String> = buildMap {
+            for (record in records) {
+                if (record.deletedAt != null) continue
+                record.fields[RegistryEntityFields.Convo.END_STATE].stringValue()?.let { put(record.id, it) }
+            }
+        }
+
         /** The conversation hands the task to the user to check. The end state alone decides it, so no turns are read. */
         fun needsHumanReview(record: SyncRecord): Boolean =
             record.deletedAt == null && record.fields["endState"].stringValue() != null &&

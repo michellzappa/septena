@@ -200,6 +200,120 @@ final class KitReviewTaskCell: NSTableCellView {
   }
 }
 
+/// One row of Review ▸ Tracked (ADR 0065, docs/REVIEW_SPEC.md §2): the
+/// title, the end-state note as the context line, and the issue link from
+/// the task's references, which opens in the browser. The row has no
+/// checkbox: Complete, Bring Back and Delete are in its menu (`task.tracked`).
+@MainActor
+final class KitTrackedTaskCell: NSTableCellView {
+  private let titleLabel = NSTextField(labelWithString: "")
+  private let noteLabel = NSTextField(labelWithString: "")
+  private let linkButton = NSButton()
+  private var leadingConstraint: NSLayoutConstraint!
+  private var trailingConstraint: NSLayoutConstraint!
+  private var link: TaskRefRow?
+
+  init(identifier: NSUserInterfaceItemIdentifier) {
+    super.init(frame: .zero)
+    self.identifier = identifier
+
+    titleLabel.font = SeptaskKitTheme.taskTitle
+    titleLabel.textColor = .labelColor
+    titleLabel.lineBreakMode = .byTruncatingTail
+    titleLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
+    noteLabel.font = SeptaskKitTheme.meta
+    noteLabel.textColor = SeptaskKitTheme.inkSecondary
+    noteLabel.lineBreakMode = .byTruncatingTail
+    noteLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
+    linkButton.isBordered = false
+    linkButton.bezelStyle = .inline
+    linkButton.font = SeptaskKitTheme.chip
+    linkButton.contentTintColor = .linkColor
+    linkButton.imagePosition = .imageLeading
+    linkButton.lineBreakMode = .byTruncatingTail
+    linkButton.target = self
+    linkButton.action = #selector(linkTapped)
+    // Space in a selected row must never trigger a row button (CLAUDE.md).
+    linkButton.refusesFirstResponder = true
+    linkButton.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
+    let stack = NSStackView(views: [titleLabel, noteLabel, linkButton])
+    stack.orientation = .vertical
+    stack.alignment = .leading
+    stack.spacing = 3
+    stack.translatesAutoresizingMaskIntoConstraints = false
+    stack.setContentHuggingPriority(.defaultLow, for: .horizontal)
+    addSubview(stack)
+
+    leadingConstraint = stack.leadingAnchor.constraint(
+      equalTo: leadingAnchor,
+      constant: KitCardRowView.horizontalInset + SeptaskKitLayout.rowLeadingPad)
+    trailingConstraint = stack.trailingAnchor.constraint(
+      lessThanOrEqualTo: trailingAnchor,
+      constant: -(KitCardRowView.horizontalInset + 10))
+    NSLayoutConstraint.activate([
+      leadingConstraint,
+      trailingConstraint,
+      stack.topAnchor.constraint(equalTo: topAnchor, constant: 10),
+    ])
+  }
+
+  required init?(coder: NSCoder) { fatalError("KitTrackedTaskCell is code-only") }
+
+  override func layout() {
+    let inset = SeptaskKitLayout.inset(for: bounds.width)
+    leadingConstraint.constant = inset + SeptaskKitLayout.rowLeadingPad
+    trailingConstraint.constant = -(inset + 10)
+    super.layout()
+  }
+
+  /// `link` is the newest `issue` reference with a URL, else the first
+  /// reference with one (`LocalCache.trackedLinkRefs`).
+  func configure(with task: SeptenaTask, link: TaskRefRow?) {
+    self.link = link
+    titleLabel.stringValue = task.title
+    let note = Self.noteText(for: task)
+    noteLabel.stringValue = note ?? ""
+    noteLabel.isHidden = note == nil
+    if let link {
+      linkButton.title = link.title
+      linkButton.image = NSImage(systemSymbolName: link.sfSymbol, accessibilityDescription: nil)
+      linkButton.toolTip = link.link?.absoluteString
+      linkButton.isHidden = false
+    } else {
+      linkButton.isHidden = true
+    }
+    setAccessibilityElement(true)
+    setAccessibilityRole(.group)
+    setAccessibilityLabel([task.title, note].compactMap { $0 }.joined(separator: ". "))
+  }
+
+  override func accessibilityChildren() -> [Any]? {
+    linkButton.isHidden ? [] : [linkButton]
+  }
+
+  @objc private func linkTapped() {
+    guard let link else { return }
+    TaskRefActions.open(link, navigation: nil)
+  }
+
+  static func noteText(for task: SeptenaTask) -> String? {
+    let note = task.conversation.endStateNote?.trimmingCharacters(in: .whitespacesAndNewlines)
+    return note?.isEmpty == false ? note : nil
+  }
+
+  static func height(for task: SeptenaTask, link: TaskRefRow?) -> CGFloat {
+    let titleHeight = ceil(SeptaskKitTheme.taskTitle.ascender - SeptaskKitTheme.taskTitle.descender) + 2
+    let noteHeight: CGFloat = noteText(for: task) == nil
+      ? 0 : 3 + ceil(SeptaskKitTheme.meta.ascender - SeptaskKitTheme.meta.descender) + 2
+    let linkHeight: CGFloat = link == nil
+      ? 0 : 3 + max(16, ceil(SeptaskKitTheme.chip.ascender - SeptaskKitTheme.chip.descender) + 4)
+    return 10 + titleHeight + noteHeight + linkHeight + 10
+  }
+}
+
 /// The list a task is in, as one line: "Area › Project", or just the area
 /// or the project. Nil when the task is in no list. The Review row and the
 /// inspector's review depth both read it.

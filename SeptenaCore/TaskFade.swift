@@ -76,12 +76,14 @@ enum TaskFade {
                          createdAt: Date,
                          created: String?,
                          now: Date,
-                         today: String) -> Bool {
+                         today: String,
+                         endState: String? = nil) -> Bool {
     let input = coreInput(isOpen: isOpen, isHeading: isHeading, isDeleted: isDeleted, isFaded: isFaded,
                           deadline: deadline, scheduled: scheduled, hasRecurrence: hasRecurrence,
                           isAgentTurn: isAgentTurn, isAssignedToClaude: isAssignedToClaude,
                           isAwaitingHuman: isAwaitingHuman, showsAgentCue: false, isProposal: isProposal,
-                          touchedAt: touchedAt, createdAt: createdAt, created: created, now: now, today: today)
+                          touchedAt: touchedAt, createdAt: createdAt, created: created, now: now, today: today,
+                          endState: endState)
     return (try? SeptenaSharedCore.shouldFade(input: input)) ?? false
   }
 
@@ -104,12 +106,14 @@ enum TaskFade {
                        createdAt: Date,
                        created: String?,
                        now: Date,
-                       today: String) -> Double? {
+                       today: String,
+                       endState: String? = nil) -> Double? {
     let input = coreInput(isOpen: isOpen, isHeading: isHeading, isDeleted: isDeleted, isFaded: isFaded,
                           deadline: deadline, scheduled: scheduled, hasRecurrence: hasRecurrence,
                           isAgentTurn: isAgentTurn, isAssignedToClaude: isAssignedToClaude,
                           isAwaitingHuman: isAwaitingHuman, showsAgentCue: showsAgentCue, isProposal: isProposal,
-                          touchedAt: touchedAt, createdAt: createdAt, created: created, now: now, today: today)
+                          touchedAt: touchedAt, createdAt: createdAt, created: created, now: now, today: today,
+                          endState: endState)
     return try? SeptenaSharedCore.fadeFill(input: input)
   }
 
@@ -117,7 +121,7 @@ enum TaskFade {
                                 deadline: String?, scheduled: String?, hasRecurrence: Bool,
                                 isAgentTurn: Bool, isAssignedToClaude: Bool, isAwaitingHuman: Bool,
                                 showsAgentCue: Bool, isProposal: Bool, touchedAt: Date?, createdAt: Date, created: String?,
-                                now: Date, today: String) -> FadeInput {
+                                now: Date, today: String, endState: String?) -> FadeInput {
     FadeInput(
       isOpen: isOpen, isHeading: isHeading, isDeleted: isDeleted, isFaded: isFaded,
       deadline: deadline, scheduled: scheduled, hasRecurrence: hasRecurrence,
@@ -130,7 +134,8 @@ enum TaskFade {
       created: created,
       now: SharedCoreValues.instant(now),
       today: today,
-      utcOffsetSeconds: SharedCoreValues.utcOffsetSeconds(at: now)
+      utcOffsetSeconds: SharedCoreValues.utcOffsetSeconds(at: now),
+      endState: endState
     )
   }
 
