@@ -1960,6 +1960,20 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
     lines.push(`  static let ${swiftName}: String = ${L(checklist[field], checklist, field)}`);
   }
   lines.push(tmplFn("checklistAddItemToGroup", tmplKey(checklist.addItemToGroup, checklist, "addItemToGroup")));
+  lines.push("  /// The last add-field suggestion: Add \"<typed text>\" (docs/PROJECT_CHECKLIST_SPEC.md).");
+  lines.push(tmplFn("checklistAddTyped", tmplKey(checklist.addTyped, checklist, "addTyped")));
+  lines.push(`  static let checklistProjectType: String = ${L(checklist.projectType, checklist, "projectType")}`);
+  lines.push(`  static let standardProjectTitle: String = ${L(checklist.project, checklist, "project")}`);
+  lines.push(`  static let checklistProjectTitle: String = ${L(checklist.checklist, checklist, "checklist")}`);
+  lines.push("  /// The heading title for a core grocery group key (`checklistProjects.groups`), nil for an unknown key.");
+  lines.push("  static func checklistGroupTitle(_ key: String) -> String? {");
+  lines.push("    switch key {");
+  for (const [key, title] of Object.entries(checklist.groups)) {
+    lines.push(`    case ${swiftStr(key)}: return ${L(title, checklist.groups, key)}`);
+  }
+  lines.push("    default: return nil");
+  lines.push("    }");
+  lines.push("  }");
   const ls = surfaces.listSort;
   lines.push("  /// Sort By copy (`surfaces.json` `listSort`, docs/LIST_SORT_SPEC.md).");
   lines.push(`  static let listSortMenuTitle: String = ${L(ls.menuTitle, ls, "menuTitle")}`);
@@ -2879,10 +2893,10 @@ const rustModName = (s) => rustConstName(s).toLowerCase();
 const rustStr = (s) => JSON.stringify(s);
 
 function generateRustCore(bundle) {
-  const { entities, rules, dests } = bundle;
+  const { entities, rules, dests, surfaces } = bundle;
   const lines = [
     "// GENERATED FILE — DO NOT EDIT BY HAND.",
-    "// Sources: registry/entities.json, registry/rules.json, registry/destinations.json",
+    "// Sources: registry/entities.json, registry/rules.json, registry/destinations.json, registry/surfaces.json",
     "// Regenerate: node scripts/gen-registries.mjs",
     "#![allow(dead_code)]",
     "",
@@ -2944,6 +2958,20 @@ function generateRustCore(bundle) {
     assert(!seen.has(name), `Rust: destination IDs collide at ${id}`);
     seen.add(name);
     lines.push(`    pub const ${name}: &str = ${rustStr(id)};`);
+  }
+  lines.push("}");
+  lines.push("");
+  // The core's grocery vocabulary returns these keys; hosts look up the
+  // heading title by key. A core test checks that both lists match.
+  const groupKeys = Object.keys(surfaces.checklistProjects.groups);
+  const groupArray = `[${groupKeys.map(rustStr).join(", ")}]`;
+  lines.push("/// Checklist group keys (`registry/surfaces.json` `checklistProjects.groups`).");
+  lines.push("pub mod checklist_groups {");
+  if (groupArray.length <= 72) lines.push(`    pub const KEYS: &[&str] = &${groupArray};`);
+  else {
+    lines.push("    pub const KEYS: &[&str] = &[");
+    for (const key of groupKeys) lines.push(`        ${rustStr(key)},`);
+    lines.push("    ];");
   }
   lines.push("}");
   lines.push("");

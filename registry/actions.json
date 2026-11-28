@@ -330,6 +330,13 @@
       "availability": { "selection": "single", "platforms": ["ios", "ipados", "android"] },
       "featureId": "places.projects"
     },
+    "project.useAsChecklist": {
+      "title": "Use as Checklist",
+      "icon": "action.checklist",
+      "role": "default",
+      "availability": { "selection": "single" },
+      "featureId": "places.projects"
+    },
     "project.markDone": { "title": "Mark Done", "icon": "action.complete", "role": "default", "availability": { "selection": "single" }, "featureId": "places.projects" },
     "project.cancel": {
       "title": "Cancel Project",
@@ -662,6 +669,7 @@
         "icon": "action.move",
         "items": [{ "kind": "slot", "slot": "moveToAreaDestinations" }]
       },
+      { "kind": "action", "id": "project.useAsChecklist" },
       { "kind": "action", "id": "project.share" },
       { "kind": "divider" },
       { "kind": "action", "id": "project.markDone" },

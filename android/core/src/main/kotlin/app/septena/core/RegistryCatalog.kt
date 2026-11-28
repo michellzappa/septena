@@ -348,6 +348,11 @@ object RegistryCatalog {
     /** The task attribute that an action opens (actions.json `opensAttribute`), or null. */
     fun actionOpensAttribute(actionId: String): String? = action(actionId)?.stringAt("opensAttribute")
 
+    /** The heading title for a core grocery group key (surfaces.json `checklistProjects.groups`), or null. */
+    fun checklistGroupTitle(key: String, languageTag: String = "en"): String? =
+        surface("checklistProjects")?.objectAt("groups")?.stringAt(key)
+            ?.let { localizedString(it, languageTag) ?: it }
+
     fun localizedString(key: String, languageTag: String = "en"): String? {
         val translations = document("localizations")
         val locale = translations.fields.keys.firstOrNull { it.equals(languageTag, ignoreCase = true) }

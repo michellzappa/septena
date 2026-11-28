@@ -63,7 +63,11 @@ pub fn run_conformance(fixture: String, json: String) -> Result<ConformanceRepor
             }
         }
         "project-checklist" => {
-            for (section, function) in [("layout", "projectChecklist"), ("check", "checklistCheckPatch")] {
+            for (section, function) in [
+                ("layout", "projectChecklist"),
+                ("check", "checklistCheckPatch"),
+                ("heading", "checklistHeading"),
+            ] {
                 for case in cases(&doc, section) {
                     run.check(section, case, function, case["input"].clone(), false);
                 }

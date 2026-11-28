@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Reusable project checklists keep checked rows out of the active groups, match titles in project order, and assign only known new groceries.",
+  "description": "Reusable project checklists keep checked rows out of the active groups, match titles in project order, assign only known new groceries, and give a suggested group one stable heading per project.",
   "layout": [
     {
       "name": "active items retain their groups and checked matches can be reopened",
@@ -74,6 +74,88 @@
       "name": "reopening retains the same item and leaves it undated",
       "input": { "checked": false },
       "expected": { "status": "open" }
+    }
+  ],
+  "heading": [
+    {
+      "name": "a new group gets the stable heading id",
+      "input": { "projectId": "groceries", "group": "produce", "title": "Produce", "rows": [{ "id": "milk", "title": "Milk", "status": "open" }] },
+      "expected": { "heading": "recur-cf529633d718726e", "create": true }
+    },
+    {
+      "name": "the stable id differs per project",
+      "input": { "projectId": "packing", "group": "produce", "title": "Produce", "rows": [] },
+      "expected": { "heading": "recur-1fa5ae5dd3673fd2", "create": true }
+    },
+    {
+      "name": "a heading another device created with the stable id is reused, whatever its title",
+      "input": {
+        "projectId": "groceries", "group": "produce", "title": "Produce",
+        "rows": [{ "id": "recur-cf529633d718726e", "title": "Obst & Gemüse", "status": "open", "kind": "heading", "project": "groceries" }]
+      },
+      "expected": { "heading": "recur-cf529633d718726e", "create": false }
+    },
+    {
+      "name": "a heading the user made with the same title is reused, case- and accent-insensitive",
+      "input": {
+        "projectId": "groceries", "group": "produce", "title": "Produce",
+        "rows": [{ "id": "mine", "title": " PRODÚCE ", "status": "open", "kind": "heading", "project": "groceries" }]
+      },
+      "expected": { "heading": "mine", "create": false }
+    },
+    {
+      "name": "the stable id wins over a same-title heading",
+      "input": {
+        "projectId": "groceries", "group": "produce", "title": "Produce",
+        "rows": [
+          { "id": "mine", "title": "Produce", "status": "open", "kind": "heading" },
+          { "id": "recur-cf529633d718726e", "title": "Produce", "status": "open", "kind": "heading" }
+        ]
+      },
+      "expected": { "heading": "recur-cf529633d718726e", "create": false }
+    },
+    {
+      "name": "a deleted stable heading is not created again",
+      "input": {
+        "projectId": "groceries", "group": "produce", "title": "Produce",
+        "rows": [{ "id": "recur-cf529633d718726e", "title": "Produce", "status": "open", "kind": "heading", "deletedAt": "2026-11-27T10:00:00Z" }]
+      },
+      "expected": { "heading": null, "create": false }
+    },
+    {
+      "name": "a deleted same-title heading is not created again",
+      "input": {
+        "projectId": "groceries", "group": "produce", "title": "Produce",
+        "rows": [{ "id": "mine", "title": "Produce", "status": "open", "kind": "heading", "deletedAt": "2026-11-27T10:00:00Z" }]
+      },
+      "expected": { "heading": null, "create": false }
+    },
+    {
+      "name": "a live same-title heading wins over a deleted stable heading",
+      "input": {
+        "projectId": "groceries", "group": "produce", "title": "Produce",
+        "rows": [
+          { "id": "recur-cf529633d718726e", "title": "Produce", "status": "open", "kind": "heading", "deletedAt": "2026-11-27T10:00:00Z" },
+          { "id": "mine", "title": "Produce", "status": "open", "kind": "heading" }
+        ]
+      },
+      "expected": { "heading": "mine", "create": false }
+    },
+    {
+      "name": "task rows and other projects' headings with the same title do not count",
+      "input": {
+        "projectId": "groceries", "group": "produce", "title": "Produce",
+        "rows": [
+          { "id": "task", "title": "Produce", "status": "open" },
+          { "id": "other", "title": "Produce", "status": "open", "kind": "heading", "project": "packing" }
+        ]
+      },
+      "expected": { "heading": "recur-cf529633d718726e", "create": true }
+    },
+    {
+      "name": "no suggested group leaves the row ungrouped",
+      "input": { "projectId": "groceries", "group": null, "title": null, "rows": [] },
+      "expected": { "heading": null, "create": false }
     }
   ]
 }
