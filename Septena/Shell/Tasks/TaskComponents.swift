@@ -251,6 +251,10 @@ struct CheckableRow<Leading: View, Trailing: View>: View {
   /// marker lives in `TaskRow`'s trailing cluster (right-aligned), not here.
   var showsNotesGlyph: Bool = false
   var subtitle: String? = nil
+  /// Set when the subtitle names a list (the task's area or project): the
+  /// subtitle is then its own button that opens that list, and a tap on the
+  /// rest of the row still reaches the row (#842).
+  var onSubtitleTap: (() -> Void)? = nil
   /// Fixed minimum height for the title's single-line box, centered on the
   /// checkbox line. Task rows opt in (via `TaskRow`) so the CLOSED row's title
   /// `Text` and the OPEN inline editor's title field (`InlineTitleTextView` on
@@ -331,11 +335,14 @@ struct CheckableRow<Leading: View, Trailing: View>: View {
           .frame(minHeight: titleBandHeight ?? 0, alignment: .center)
           .alignmentGuide(.rowTitleCenter) { d in d[VerticalAlignment.center] }
         if let subtitle {
-          Text(subtitle)
-            .font(.septenaMeta)
-            .foregroundStyle(Theme.inkSecondary)
-            .lineLimit(1)
-            .truncationMode(.tail)
+          if let onSubtitleTap {
+            // `.borderless`, not `.plain`: the button takes only its own
+            // label's taps, and the row's tap gesture keeps every other point.
+            Button(action: onSubtitleTap) { subtitleText(subtitle) }
+              .buttonStyle(.borderless)
+          } else {
+            subtitleText(subtitle)
+          }
         }
       }
       .frame(maxWidth: .infinity, alignment: .leading)
@@ -354,6 +361,14 @@ struct CheckableRow<Leading: View, Trailing: View>: View {
       guard new > old, !reduceMotion, animationsEnabled else { return }
       playPromoteWash()
     }
+  }
+
+  private func subtitleText(_ text: String) -> some View {
+    Text(text)
+      .font(.septenaMeta)
+      .foregroundStyle(Theme.inkSecondary)
+      .lineLimit(1)
+      .truncationMode(.tail)
   }
 
   private func playPromoteWash() {
@@ -391,6 +406,7 @@ extension CheckableRow where Leading == TaskCheckboxSlot {
     title: String,
     showsNotesGlyph: Bool = false,
     subtitle: String? = nil,
+    onSubtitleTap: (() -> Void)? = nil,
     titleBandHeight: CGFloat? = nil,
     titleLineLimit: Int = 2,
     isSelected: Bool = false,
@@ -412,6 +428,7 @@ extension CheckableRow where Leading == TaskCheckboxSlot {
       title: title,
       showsNotesGlyph: showsNotesGlyph,
       subtitle: subtitle,
+      onSubtitleTap: onSubtitleTap,
       titleBandHeight: titleBandHeight,
       titleLineLimit: titleLineLimit,
       isSelected: isSelected,
@@ -660,6 +677,8 @@ struct TaskRow: View {
   var heroMatchIsSource: Bool = true
   let onToggle: () -> Void
   var onTap: (() -> Void)? = nil
+  /// Opens the list the subtitle names. Nil keeps the subtitle plain text.
+  var onOpenList: ((Route) -> Void)? = nil
 
   @Environment(PromoteFlashStore.self) private var promoteFlash
   @Environment(DayClock.self) private var clock
@@ -690,11 +709,11 @@ struct TaskRow: View {
 
   /// Project wins over area (a task in a project implies its area), each
   /// honoring its suppression flag. Mirrors the old `TaskListView.metaLine`.
-  private var subtitle: String? {
+  private var subtitle: (title: String, route: Route)? {
     if !suppressProject, let pid = task.project,
-       let p = projects.first(where: { $0.id == pid }) { return p.title }
+       let p = projects.first(where: { $0.id == pid }) { return (p.title, .project(id: p.id)) }
     if !suppressArea, let aid = task.area,
-       let a = areas.first(where: { $0.id == aid }) { return a.title }
+       let a = areas.first(where: { $0.id == aid }) { return (a.title, .area(id: a.id)) }
     return nil
   }
 
@@ -704,6 +723,11 @@ struct TaskRow: View {
     let box = TaskCheckboxModel(task: task, accent: accent,
                                 showsTodayIndicator: showsTodayIndicator,
                                 showsFadedIndicator: showsFadedIndicator)
+    let list = subtitle
+    let openList: (() -> Void)? = {
+      guard let list, let onOpenList else { return nil }
+      return { onOpenList(list.route) }
+    }()
     return CheckableRow(
       tint: box.tint,
       isDone: box.isDone,
@@ -714,7 +738,8 @@ struct TaskRow: View {
       isInactive: isInactive,
       title: task.title,
       showsNotesGlyph: hasNotes,
-      subtitle: subtitle,
+      subtitle: list?.title,
+      onSubtitleTap: openList,
       // Pin the title box to the checkbox band so it matches the inline editor's
       // field (closest reliable view↔edit match). Normal rows already stand at
       // this height (the checkbox sets it), so nothing visibly changes here.

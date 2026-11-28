@@ -1757,11 +1757,18 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             is TaskHomeLocation.Area -> projectTitle
             is TaskHomeLocation.Project -> null
         }
+        // The same key a group header opens, so a tap on the subtitle opens that list.
+        val subtitleTargetKey = when {
+            subtitle == null -> null
+            projectTitle != null -> snapshot.project?.let { "project:$it" }
+            else -> snapshot.area?.let { "area:$it" }
+        }
         return buildTaskListItem(
             record = record,
             snapshot = snapshot,
             membership = membership,
             subtitle = subtitle,
+            subtitleTargetKey = subtitleTargetKey,
             catalog = catalog,
             today = today,
             now = now,

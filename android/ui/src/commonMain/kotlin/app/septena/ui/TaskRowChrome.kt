@@ -512,6 +512,8 @@ fun TaskCardRow(
     canReorder: Boolean = false,
     orderedDragIds: List<String> = emptyList(),
     onApplyFilingSuggestion: ((String) -> Unit)? = null,
+    /** Opens the list the subtitle names ([TaskListItem.subtitleTargetKey]). Null keeps it plain text. */
+    onOpenSubtitle: ((String) -> Unit)? = null,
 ) {
     val showTodayPill = showTodayIndicator && task.isOnToday && !task.isCompleted && !task.isFaded
     val showFadedPill = showFadedIndicator && task.isFaded && !task.isCompleted
@@ -785,6 +787,14 @@ fun TaskCardRow(
                             .padding(start = startPad, top = 3.dp),
                     ) {
                         task.subtitle?.let { sub ->
+                            // The area / project name is its own target: it opens that list,
+                            // the rest of the row opens the task (#842). Off while selecting.
+                            val subtitleTarget = task.subtitleTargetKey
+                            val openSubtitle = if (subtitleTarget != null && onOpenSubtitle != null && !selecting) {
+                                Modifier.clickable(role = Role.Button) { onOpenSubtitle(subtitleTarget) }
+                            } else {
+                                Modifier
+                            }
                             Text(
                                 text = sub,
                                 fontSize = 12.5.sp,
@@ -792,7 +802,7 @@ fun TaskCardRow(
                                 color = mutedInk,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.align(Alignment.CenterVertically),
+                                modifier = Modifier.align(Alignment.CenterVertically).then(openSubtitle),
                             )
                         }
                         task.assigneeName?.let { assignee ->
