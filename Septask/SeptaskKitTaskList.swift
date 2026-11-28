@@ -4343,6 +4343,12 @@ final class SeptaskKitTaskListController: NSViewController {
       onNewProjectInArea?(areaId)
       return
     }
+    // Return on a project in the area page's project card opens it, as a
+    // click does (#850).
+    if rows.indices.contains(row), case .projectTarget(let id, let title, _, _) = rows[row] {
+      onNavigate?(.filter(.project(id), title: title))
+      return
+    }
     // Return on a Get started step does the step.
     if rows.indices.contains(row), let step = rows[row].noticeStep {
       openNoticeStep(step.id)
@@ -5557,6 +5563,10 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
     // taskless row (headers, screen title, logged footer) stays unselectable.
     if case .newTask = rows[row] { return true }
     if case .newProject = rows[row] { return true }
+    // A project in an area page's project card is a row too (#850): ↑/↓ reach
+    // it in screen order and Return opens it. It carries no task, so
+    // `actionableSelection` keeps every task command off it.
+    if case .projectTarget = rows[row] { return true }
     // Get started steps are list rows too; the notice header above them is
     // not (it has no task and no step).
     if case .noticeStep = rows[row] { return true }

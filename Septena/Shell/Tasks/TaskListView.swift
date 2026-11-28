@@ -43,6 +43,12 @@ struct TaskListView: View {
   /// title + notes (and any project roll-up) *inside* the scrolling list, so
   /// the header scrolls away with the rows instead of pinning at the top.
   let embeddedHeader: () -> AnyView
+  /// Selection ids (`SelectableNavRow`) of the embedded header's own rows —
+  /// an area page's project rows and its "New Project" line — in screen
+  /// order. They lead the ↑/↓ order and take Return through
+  /// `onActivateNavRow` (#850).
+  var embeddedNavRowIDs: [String] = []
+  var onActivateNavRow: (String) -> Void = { _ in }
 
   @AppStorage(SettingsKey.todayShowCompleted) private var todayShowCompleted: Bool = true
   /// Global switch: show faded tasks inside projects and areas (collapsed
@@ -128,11 +134,15 @@ struct TaskListView: View {
     filter: TaskFilter,
     embedded: Bool = false,
     excludeProjectedTasks: Bool = false,
+    embeddedNavRowIDs: [String] = [],
+    onActivateNavRow: @escaping (String) -> Void = { _ in },
     @ViewBuilder embeddedHeader: @escaping () -> H
   ) {
     self.filter = filter
     self.embedded = embedded
     self.excludeProjectedTasks = excludeProjectedTasks
+    self.embeddedNavRowIDs = embeddedNavRowIDs
+    self.onActivateNavRow = onActivateNavRow
     self.embeddedHeader = { AnyView(embeddedHeader()) }
     // Memoized: this init re-runs on every parent render (the values are
     // discarded for installed views), so a per-construction fetch was waste.
@@ -637,14 +647,20 @@ struct TaskListView: View {
   /// ids are left out here: move, delete, schedule, copy and the rest find
   /// nothing to act on when only steps are selected.
   private var selectionScope: ListSelectionScope<String> {
-    ListSelectionScope(selection: selection.filter { TaskNoticeStep.stepID(fromSelection: $0) == nil },
+    ListSelectionScope(selection: selection.filter { !Self.isNonTaskRow($0) },
                        orderedIDs: keyboardOrderedTaskIds)
   }
 
   /// A task (or the New task line) is selected, not only Get started steps.
   /// Gates the task commands' menu and shortcut entries.
   private var hasTaskSelection: Bool {
-    selection.contains { TaskNoticeStep.stepID(fromSelection: $0) == nil }
+    selection.contains { !Self.isNonTaskRow($0) }
+  }
+
+  /// A list row that is not a task: a Get started step or an embedded
+  /// navigation row (`SelectableNavRow`). No task command applies to one.
+  private static func isNonTaskRow(_ id: String) -> Bool {
+    TaskNoticeStep.stepID(fromSelection: id) != nil || SelectableNavRow.isNavRow(id)
   }
 
   /// The selected Get started steps, in list order.
@@ -1869,7 +1885,7 @@ struct TaskListView: View {
 
   private var selectableVisibleTaskIDs: [String] {
     keyboardOrderedTaskIds.filter { id in
-      id != Self.quickAddScrollID && TaskNoticeStep.stepID(fromSelection: id) == nil
+      id != Self.quickAddScrollID && !Self.isNonTaskRow(id)
     }
   }
 
@@ -2076,6 +2092,12 @@ struct TaskListView: View {
     }
     if id == Self.quickAddScrollID {
       startCreate()  // folds any open editor first, same press
+      return
+    }
+    // A project row (or "New Project") in the area page's header: Return
+    // does what its click does (#850).
+    if SelectableNavRow.isNavRow(id) {
+      onActivateNavRow(id)
       return
     }
     // A Get started step: Return, a double-click or a tap does the step.
@@ -2621,6 +2643,8 @@ struct TaskListView: View {
       }
     } else {
       embeddedHeader()
+        // The header's navigation rows draw their selection from the list's.
+        .environment(\.selectableScrollSelection, selection)
         .plainListChrome()
         .inlineEditDimmed(isInlineEditing, onDismiss: collapseEdit)
     }
@@ -3756,15 +3780,16 @@ struct TaskListView: View {
       // un-headed block first (its card carries the foot quick-add), then
       // each heading's members (`projectLayout`); `visibleItems` alone
       // interleaves headed and un-headed rows. Faded & logged scopes follow.
-      var ids: [String]
+      // The embedded header's own rows (an area's projects) render first.
+      var ids: [String] = embedded ? embeddedNavRowIDs : []
       if isProjectFilter {
         let layout = projectLayout
         let attached = attachesQuickAddToVisibleCard
-        ids = layout.unheaded.map(\.id) + (attached ? quickAddOrderedIds : [])
+        ids += layout.unheaded.map(\.id) + (attached ? quickAddOrderedIds : [])
         for section in layout.sections { ids.append(contentsOf: section.members.map(\.id)) }
         if !attached { ids.append(contentsOf: quickAddOrderedIds) }
       } else {
-        ids = visibleItems.map(\.id) + quickAddOrderedIds
+        ids += visibleItems.map(\.id) + quickAddOrderedIds
       }
       if isScopeFadedExpanded {
         ids.append(contentsOf: fadedScopeItems.map(\.id))
@@ -3915,7 +3940,7 @@ struct TaskListView: View {
     if let id = selection.first(where: { currentTask(id: $0) != nil }) { return id }
     // Never a Get started step: no task command applies to one.
     guard let first = keyboardOrderedTaskIds.first(where: {
-      TaskNoticeStep.stepID(fromSelection: $0) == nil
+      !Self.isNonTaskRow($0)
     }) else { return nil }
     selectOnly(first)
     return first

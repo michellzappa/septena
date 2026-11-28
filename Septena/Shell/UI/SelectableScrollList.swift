@@ -262,6 +262,83 @@ private struct TouchOrPointerTap: ViewModifier {
 }
 #endif
 
+// MARK: - Navigation rows
+
+/// A row that is not a task but joins the list's ↑/↓ traversal and takes
+/// Return: an area page's project rows and its "New Project" line (#850).
+/// The owner of such rows (an embedded header) is not the list's owner, so
+/// the list host passes its `selection` down as `selectableScrollSelection`
+/// and puts the row's id in `orderedIDs`. Every task command looks the id up
+/// as a task, finds none and does nothing (the `getstarted.` step contract).
+enum SelectableNavRow {
+  static let prefix = "navrow."
+
+  static func id(_ raw: String) -> String { prefix + raw }
+
+  static func isNavRow(_ selection: String) -> Bool { selection.hasPrefix(prefix) }
+}
+
+private struct SelectableScrollSelectionKey: EnvironmentKey {
+  static let defaultValue: Set<String> = []
+}
+
+extension EnvironmentValues {
+  /// The host list's selection, for navigation rows drawn outside the host
+  /// (see `SelectableNavRow`). Empty everywhere else.
+  var selectableScrollSelection: Set<String> {
+    get { self[SelectableScrollSelectionKey.self] }
+    set { self[SelectableScrollSelectionKey.self] = newValue }
+  }
+}
+
+extension View {
+  /// Make a navigation row a keyboard target in a `SelectableScrollList`:
+  /// tagged for `scrollTo`, measured for clip-aware scrolling, and exposing
+  /// the `.isSelected` trait. It adds NO tap handling: the row keeps its own
+  /// Button, so a click or tap opens it at once, as before. The selected fill
+  /// is the row's card chrome, as on a task row.
+  func selectableScrollTarget(id: String, isSelected: Bool) -> some View {
+    modifier(SelectableScrollTargetModifier(id: id, isSelected: isSelected))
+  }
+}
+
+/// Reads the host list's selection for one navigation row and makes the row
+/// a keyboard target. `content` gets whether the row is selected, to pass to
+/// its card chrome. A view of its own because the row is built in a closure
+/// whose owner sits outside the list, where the selection is not in scope.
+struct SelectableNavRowReader<Content: View>: View {
+  let id: String
+  @ViewBuilder let content: (_ isSelected: Bool) -> Content
+  @Environment(\.selectableScrollSelection) private var selection
+
+  var body: some View {
+    let isSelected = selection.contains(id)
+    content(isSelected).selectableScrollTarget(id: id, isSelected: isSelected)
+  }
+}
+
+private struct SelectableScrollTargetModifier: ViewModifier {
+  let id: String
+  let isSelected: Bool
+  @Environment(\.selectableRowActions) private var actions
+
+  func body(content: Content) -> some View {
+    content
+      .background {
+        if actions.selectable {
+          GeometryReader { geo in
+            Color.clear.preference(
+              key: SelectableRowFrameKey.self,
+              value: [id: geo.frame(in: .named(SelectableScrollListMetrics.coordinateSpace))]
+            )
+          }
+        }
+      }
+      .id(id)
+      .accessibilityAddTraits(isSelected ? .isSelected : [])
+  }
+}
+
 // MARK: - Container
 
 /// A selectable, keyboard-navigable scroll list. Compose `content` exactly like

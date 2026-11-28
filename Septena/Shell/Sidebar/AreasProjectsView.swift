@@ -238,7 +238,9 @@ struct AreaDetailView: View {
     TaskListView(
       filter: .area(area.id),
       embedded: true,
-      excludeProjectedTasks: true
+      excludeProjectedTasks: true,
+      embeddedNavRowIDs: navRowIDs,
+      onActivateNavRow: activateNavRow
     ) {
       VStack(alignment: .leading, spacing: 0) {
         VStack(alignment: .leading, spacing: 10) {
@@ -307,29 +309,33 @@ struct AreaDetailView: View {
         ForEach(Array(areaProjects.enumerated()), id: \.element.id) { idx, project in
           // The card wears the selection fill from touch-down, like a
           // sidebar row (`NavigationPressStyle`, SelectionLanguage.swift).
-          NavigationPressReader { pressed in
-            Button { openProject(project) } label: {
-              projectRow(project)
+          // ↑/↓ reach the row and Return opens it, as on a task row (#850);
+          // the keyboard selection wears the same card fill as a press.
+          SelectableNavRowReader(id: Self.navRowID(project: project.id)) { selected in
+            NavigationPressReader { pressed in
+              Button { openProject(project) } label: {
+                projectRow(project)
+              }
+              .buttonStyle(NavigationPressStyle(hoverCornerRadius: Theme.cornerRadiusSmall))
+              .modifier(TaskMoveDrop(perform: { ids in
+                handleProjectDrop(ids: ids, project: project)
+              }))
+              .taskCardChrome(TaskCardPosition(index: idx, count: cardCount),
+                              isSelected: pressed || selected)
             }
-            .buttonStyle(NavigationPressStyle(hoverCornerRadius: Theme.cornerRadiusSmall))
-            .modifier(TaskMoveDrop(perform: { ids in
-              handleProjectDrop(ids: ids, project: project)
-            }))
-            .taskCardChrome(TaskCardPosition(index: idx, count: cardCount),
-                            isSelected: pressed)
           }
         }
-        NavigationPressReader { pressed in
-          Button {
-            notesFocused = false
-            Haptics.press()
-            showingNewProject = true
-          } label: {
-            newProjectRow
+        SelectableNavRowReader(id: Self.newProjectNavRowID) { selected in
+          NavigationPressReader { pressed in
+            Button {
+              startNewProject()
+            } label: {
+              newProjectRow
+            }
+            .buttonStyle(NavigationPressStyle(hoverCornerRadius: Theme.cornerRadiusSmall))
+            .taskCardChrome(TaskCardPosition(index: areaProjects.count, count: cardCount),
+                            isSelected: pressed || selected)
           }
-          .buttonStyle(NavigationPressStyle(hoverCornerRadius: Theme.cornerRadiusSmall))
-          .taskCardChrome(TaskCardPosition(index: areaProjects.count, count: cardCount),
-                          isSelected: pressed)
         }
       }
     }
@@ -423,6 +429,35 @@ struct AreaDetailView: View {
 
   private var projectsInArea: [Project] {
     projects.filter { $0.area == area.id && $0.status == .active }
+  }
+
+  // MARK: Keyboard rows (#850)
+
+  private static let newProjectNavRowID = SelectableNavRow.id("new-project")
+
+  private static func navRowID(project id: String) -> String {
+    SelectableNavRow.id("project." + id)
+  }
+
+  /// The project card's rows in screen order: each project, then "New
+  /// Project". They lead the area list's ↑/↓ order.
+  private var navRowIDs: [String] {
+    projectsInArea.map { Self.navRowID(project: $0.id) } + [Self.newProjectNavRowID]
+  }
+
+  /// Return on a project card row does what its click does.
+  private func activateNavRow(_ id: String) {
+    if id == Self.newProjectNavRowID {
+      startNewProject()
+    } else if let project = projectsInArea.first(where: { Self.navRowID(project: $0.id) == id }) {
+      openProject(project)
+    }
+  }
+
+  private func startNewProject() {
+    notesFocused = false
+    Haptics.press()
+    showingNewProject = true
   }
 
   /// A project lives *inside* this area, so on the iPhone push stack append it
