@@ -752,6 +752,23 @@ actor TaskBackendClient {
     guard status == 204 || status == 200 else { throw Self.httpError(status, data) }
   }
 
+  // MARK: - Beta checklist (ADR 0064, docs/BETA_ONBOARDING_SPEC.md §7)
+
+  /// `GET /v1/beta?platform=…`: `{ member: false }`, or the tester's
+  /// checklist for this platform.
+  func betaState(platform: String) async throws -> BetaWire.State {
+    let (data, status) = try await authed(path: "/v1/beta?platform=\(platform)", method: "GET", body: nil)
+    guard status == 200 else { throw Self.httpError(status, data) }
+    return try decode(BetaWire.State.self, from: data, what: "beta")
+  }
+
+  /// `POST /v1/beta/progress`: one change. 204, or 404 for a non-tester.
+  func betaProgress(_ change: BetaWire.Progress) async throws {
+    let body = try JSONEncoder().encode(change)
+    let (data, status) = try await authed(path: "/v1/beta/progress", method: "POST", body: body)
+    guard status == 204 else { throw Self.httpError(status, data) }
+  }
+
   // MARK: - HTTP
 
   /// Sends with a bearer token. On 401 it refreshes once and retries. A

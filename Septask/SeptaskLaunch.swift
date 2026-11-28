@@ -84,6 +84,8 @@ enum SeptaskLaunch {
     // The plan, fresh for Today's upsell notices (spec §3.2). The server
     // judges it; a change posts `.septenaTasksChanged`.
     Task { @MainActor in await PlanStatus.shared.refresh() }
+    // The beta checklist and its Today card (testers only, ADR 0064).
+    Task { @MainActor in await BetaCenter.shared.refresh() }
     // Opened after midnight (or after a few days away): a backgrounded app
     // does not reliably receive `NSCalendarDayChanged`, so the foreground is
     // the reliable place to advance fixed-schedule repeats. Idempotent —

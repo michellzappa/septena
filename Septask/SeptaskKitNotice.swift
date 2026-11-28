@@ -31,6 +31,9 @@ struct KitNotice {
   var detail: String?
   /// Bordered trailing button. Nil means no primary action.
   var primaryTitle: String?
+  /// A second bordered button, before the primary one (the beta card's
+  /// "Not now"). Shown only with a primary button.
+  var secondaryTitle: String? = nil
   /// Quiet text at the trailing edge (the time of a Do).
   var trailing: String?
   /// True draws a small close button at the trailing edge.
@@ -48,7 +51,7 @@ extension KitNotice {
   init(_ notice: TaskNotice) {
     self.init(kind: notice.kind, symbol: notice.symbol, title: notice.title,
               detail: notice.detail, primaryTitle: notice.primaryTitle,
-              dismissible: notice.dismissible, headsCard: !notice.steps.isEmpty)
+              secondaryTitle: notice.secondaryTitle, dismissible: notice.dismissible, headsCard: !notice.steps.isEmpty)
   }
 }
 
@@ -95,10 +98,12 @@ final class KitNoticeCell: NSTableCellView, KitSelfSelectingCell {
   /// needs a real control.
   private let hit = NSButton()
   private let primary = NSButton(title: "", target: nil, action: nil)
+  private let secondary = NSButton(title: "", target: nil, action: nil)
   private let dismiss = NSButton()
   private var pin: KitContentColumnPin!
   private var fillBottom: NSLayoutConstraint!
   private var textToPrimary: NSLayoutConstraint!
+  private var textToSecondary: NSLayoutConstraint!
   private var textToDismiss: NSLayoutConstraint!
   private var primaryToDismiss: NSLayoutConstraint!
   private var primaryToEdge: NSLayoutConstraint!
@@ -106,6 +111,7 @@ final class KitNoticeCell: NSTableCellView, KitSelfSelectingCell {
 
   var onPress: (() -> Void)?
   var onPrimary: (() -> Void)?
+  var onSecondary: (() -> Void)?
   var onDismiss: (() -> Void)?
 
   init(identifier: NSUserInterfaceItemIdentifier) {
@@ -147,6 +153,17 @@ final class KitNoticeCell: NSTableCellView, KitSelfSelectingCell {
     primary.setContentHuggingPriority(.required, for: .horizontal)
     primary.setContentCompressionResistancePriority(.required, for: .horizontal)
 
+    // The same push button as the primary one, so both actions read alike.
+    secondary.translatesAutoresizingMaskIntoConstraints = false
+    secondary.bezelStyle = .push
+    secondary.controlSize = .small
+    secondary.font = .systemFont(ofSize: NSFont.systemFontSize(for: .small))
+    secondary.refusesFirstResponder = true
+    secondary.target = self
+    secondary.action = #selector(fireSecondary)
+    secondary.setContentHuggingPriority(.required, for: .horizontal)
+    secondary.setContentCompressionResistancePriority(.required, for: .horizontal)
+
     dismiss.translatesAutoresizingMaskIntoConstraints = false
     dismiss.isBordered = false
     dismiss.imagePosition = .imageOnly
@@ -184,6 +201,7 @@ final class KitNoticeCell: NSTableCellView, KitSelfSelectingCell {
     // Over the content, under the two real buttons.
     fill.addSubview(hit)
     fill.addSubview(primary)
+    fill.addSubview(secondary)
     fill.addSubview(dismiss)
     textField = titleLabel
 
@@ -193,6 +211,8 @@ final class KitNoticeCell: NSTableCellView, KitSelfSelectingCell {
       lessThanOrEqualTo: primary.leadingAnchor, constant: -10)
     textToDismiss = textStack.trailingAnchor.constraint(
       lessThanOrEqualTo: dismiss.leadingAnchor, constant: -8)
+    textToSecondary = textStack.trailingAnchor.constraint(
+      lessThanOrEqualTo: secondary.leadingAnchor, constant: -10)
     primaryToDismiss = primary.trailingAnchor.constraint(
       equalTo: dismiss.leadingAnchor, constant: -8)
     primaryToEdge = primary.trailingAnchor.constraint(
@@ -215,6 +235,8 @@ final class KitNoticeCell: NSTableCellView, KitSelfSelectingCell {
       hit.leadingAnchor.constraint(equalTo: fill.leadingAnchor),
       hit.trailingAnchor.constraint(equalTo: fill.trailingAnchor),
       primary.centerYAnchor.constraint(equalTo: fill.centerYAnchor),
+      secondary.centerYAnchor.constraint(equalTo: fill.centerYAnchor),
+      secondary.trailingAnchor.constraint(equalTo: primary.leadingAnchor, constant: -6),
       dismiss.centerYAnchor.constraint(equalTo: fill.centerYAnchor),
       dismiss.trailingAnchor.constraint(equalTo: fill.trailingAnchor, constant: -10),
       dismiss.widthAnchor.constraint(equalToConstant: 16),
@@ -245,6 +267,9 @@ final class KitNoticeCell: NSTableCellView, KitSelfSelectingCell {
     let hasPrimary = notice.primaryTitle != nil
     primary.isHidden = !hasPrimary
     primary.title = notice.primaryTitle ?? ""
+    let hasSecondary = hasPrimary && notice.secondaryTitle != nil
+    secondary.isHidden = !hasSecondary
+    secondary.title = notice.secondaryTitle ?? ""
     dismiss.isHidden = !notice.dismissible
     trailingLabel.stringValue = notice.trailing ?? ""
     trailingLabel.isHidden = notice.trailing == nil
@@ -253,7 +278,8 @@ final class KitNoticeCell: NSTableCellView, KitSelfSelectingCell {
 
     // Text runs up to whichever control comes first; the primary button sits
     // against the close button when both exist, else against the edge.
-    textToPrimary.isActive = hasPrimary
+    textToPrimary.isActive = hasPrimary && !hasSecondary
+    textToSecondary.isActive = hasSecondary
     textToDismiss.isActive = !hasPrimary && notice.dismissible
     primaryToDismiss.isActive = hasPrimary && notice.dismissible
     primaryToEdge.isActive = hasPrimary && !notice.dismissible
@@ -269,7 +295,7 @@ final class KitNoticeCell: NSTableCellView, KitSelfSelectingCell {
   }
 
   override func accessibilityChildren() -> [Any]? {
-    [primary, dismiss].filter { !$0.isHidden }
+    [secondary, primary, dismiss].filter { !$0.isHidden }
   }
 
   override func accessibilityPerformPress() -> Bool {
@@ -281,6 +307,7 @@ final class KitNoticeCell: NSTableCellView, KitSelfSelectingCell {
   override func resetCursorRects() {
     if !hit.isHidden { addCursorRect(convert(hit.frame, from: fill), cursor: .pointingHand) }
     if !primary.isHidden { addCursorRect(convert(primary.frame, from: fill), cursor: .pointingHand) }
+    if !secondary.isHidden { addCursorRect(convert(secondary.frame, from: fill), cursor: .pointingHand) }
     if !dismiss.isHidden { addCursorRect(convert(dismiss.frame, from: fill), cursor: .pointingHand) }
   }
 
@@ -304,6 +331,7 @@ final class KitNoticeCell: NSTableCellView, KitSelfSelectingCell {
 
   @objc private func firePress() { onPress?() }
   @objc private func firePrimary() { onPrimary?() }
+  @objc private func fireSecondary() { onSecondary?() }
   @objc private func fireDismiss() { onDismiss?() }
 }
 

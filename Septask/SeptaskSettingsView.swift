@@ -100,6 +100,7 @@ struct SeptaskSettingsView: View {
     .task(id: TaskSyncEngine.shared.signedIn) {
       await PlanStatus.shared.refresh()
       await AgentRoster.shared.refresh()
+      await BetaCenter.shared.refresh()
     }
     #else
     NavigationStack(path: $path) {
@@ -115,6 +116,7 @@ struct SeptaskSettingsView: View {
       .task(id: TaskSyncEngine.shared.signedIn) {
         await PlanStatus.shared.refresh()
         await AgentRoster.shared.refresh()
+        await BetaCenter.shared.refresh()
       }
       .toolbar {
         ToolbarItem(placement: .confirmationAction) {
@@ -176,6 +178,7 @@ struct SeptaskSettingsView: View {
               profileCardContent
             }
           }
+          betaSection
         } else {
           Section {
             ForEach(visibleItems) { item in
@@ -209,6 +212,8 @@ struct SeptaskSettingsView: View {
         }
       }
     }
+
+    betaSection
 
     if !mainTabs.isEmpty {
       Section {
@@ -247,10 +252,51 @@ struct SeptaskSettingsView: View {
 
   private func owningDesktopTab(for pageID: String) -> String {
     if RegistrySettings.tabById[pageID] != nil { return pageID }
+    // The Beta screen is its own sidebar row (testers only).
+    if pageID == BetaCenter.surfaceID { return pageID }
     if let parent = Self.parentPage(of: pageID) { return owningDesktopTab(for: parent) }
     return RegistrySettings.TabID.general
   }
   #endif
+
+  // MARK: - Beta (testers only, docs/BETA_ONBOARDING_SPEC.md §7)
+
+  /// The Beta row: under the account card on iPhone and iPad, under the
+  /// account in the Mac sidebar. Nothing for an account that is not a
+  /// tester's. Its words come from `GET /v1/beta`.
+  @ViewBuilder
+  private var betaSection: some View {
+    if let beta = BetaCenter.shared.checklist {
+      Section {
+        #if os(macOS)
+        betaRowLabel(beta)
+          .settingsSidebarRow(BetaCenter.surfaceID, selection: selectedTab)
+        #else
+        NavigationLink(value: BetaCenter.surfaceID) {
+          betaRowLabel(beta)
+        }
+        #endif
+      }
+    }
+  }
+
+  private func betaRowLabel(_ beta: BetaChecklist) -> some View {
+    HStack(spacing: 12) {
+      Label {
+        Text(beta.copy.settingsRow)
+      } icon: {
+        Image(systemName: RegistryIcons.sfSymbol(for: "action.checklist"))
+          #if os(macOS)
+          .foregroundStyle(Color.accentColor)
+          #endif
+      }
+      Spacer(minLength: 8)
+      Text(beta.summary)
+        .font(.subheadline)
+        .foregroundStyle(.secondary)
+        .lineLimit(1)
+    }
+  }
 
   // MARK: - Profile & Sync Card
 
@@ -594,6 +640,8 @@ struct SeptaskSettingsView: View {
     switch pageID {
     case SupportView.surfaceID:
       SupportView()
+    case BetaCenter.surfaceID:
+      BetaChecklistView()
     case RegistrySettings.PageID.account:
       SeptaskAccountPane()
     case RegistrySettings.PageID.aiPreferences:

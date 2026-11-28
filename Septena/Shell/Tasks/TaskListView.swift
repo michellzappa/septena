@@ -2849,6 +2849,16 @@ struct TaskListView: View {
 
   @ViewBuilder
   private func noticeAction(_ notice: TaskNotice) -> some View {
+    if notice.id == .beta {
+      HStack(spacing: 8) {
+        Button(notice.primaryTitle ?? "") { openBetaChecklist() }
+          .buttonStyle(.bordered)
+          .controlSize(.small)
+        Button(notice.secondaryTitle ?? "") { dismissNotice(.beta) }
+          .buttonStyle(.bordered)
+          .controlSize(.small)
+      }
+    }
     if notice.id == .weeklySweep {
       Button(notice.primaryTitle ?? "") {
         let candidates = TaskNotices.sweepCandidates(context: modelContext)
@@ -2889,6 +2899,14 @@ struct TaskListView: View {
       SeptaskSettingsLink.request(pageID)
       nav.showSettings = true
     }
+  }
+
+  /// The beta card's open button: the Beta screen in Settings. Opening it
+  /// closes the card for good, as "Not now" does.
+  private func openBetaChecklist() {
+    TaskNotices.dismiss(.beta, today: clock.today, context: modelContext)
+    SeptaskSettingsLink.request(BetaCenter.surfaceID)
+    nav.showSettings = true
   }
 
   private func dismissNotice(_ id: TaskNotice.ID) {
