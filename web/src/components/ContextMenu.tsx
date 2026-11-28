@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Check, ChevronRight } from "lucide-react";
+import { useEscapeToClose } from "@/lib/useEscapeToClose";
 
 export type ContextMenuEntry =
   | { kind: "divider" }
@@ -41,18 +42,14 @@ export function ContextMenu({
   useEffect(() => {
     if (!menu) return;
     const handleClose = () => onClose();
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
     window.addEventListener("click", handleClose);
     window.addEventListener("scroll", handleClose, true);
-    window.addEventListener("keydown", handleKey);
     return () => {
       window.removeEventListener("click", handleClose);
       window.removeEventListener("scroll", handleClose, true);
-      window.removeEventListener("keydown", handleKey);
     };
   }, [menu, onClose]);
+  useEscapeToClose(Boolean(menu), onClose);
 
   if (!menu) return null;
 

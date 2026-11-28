@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
 import { X } from "lucide-react";
 import { TaskDetailEditor, type TaskRowItemProps } from "./TaskRowItem";
+import { useEscapeToClose } from "@/lib/useEscapeToClose";
 
 interface TaskPageDrawerProps {
   open: boolean;
@@ -15,17 +15,7 @@ interface TaskPageDrawerProps {
  * presenting all canonical taskPage blocks in registry order alongside the list.
  */
 export function TaskPageDrawer({ open, itemProps, onClose }: TaskPageDrawerProps) {
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        onClose();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose, open]);
+  useEscapeToClose(open, onClose);
 
   if (!open || !itemProps) return null;
 

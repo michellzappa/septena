@@ -12,6 +12,7 @@ import { SIDEBAR_DESTINATIONS } from "@/lib/destinations";
 import { SURFACES_CATALOG, registryText } from "@/lib/generated/registries";
 import type { ActiveDestination, AreaRow, ProjectRow, SmartDestination, TagRow, TaskRow } from "@/lib/types";
 import { RegistryIcon } from "./RegistryIcon";
+import { useEscapeToClose } from "@/lib/useEscapeToClose";
 
 export interface CommandBarItem {
   id: string;
@@ -172,6 +173,8 @@ export function QuickFindModal({
     el?.scrollIntoView({ block: "nearest" });
   }, [activeIndex, open]);
 
+  useEscapeToClose(open, onClose);
+
   if (!open) return null;
 
   const activate = (item: ResultItem) => {
@@ -216,9 +219,6 @@ export function QuickFindModal({
               } else if (e.key === "Enter" && results[activeIndex]) {
                 e.preventDefault();
                 activate(results[activeIndex]);
-              } else if (e.key === "Escape") {
-                e.preventDefault();
-                onClose();
               }
             }}
             placeholder={placeholder}

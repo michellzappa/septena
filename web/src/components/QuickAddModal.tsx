@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Folder, Link2, Star, Sun, X } from "lucide-react";
 import type { AreaRow, ProjectRow, TaskAddedVia } from "@/lib/types";
 import { DateBoardButton } from "./DateBoard";
+import { useEscapeToClose } from "@/lib/useEscapeToClose";
 
 export interface QuickAddInitial {
   /** How the sheet was reached, recorded on the new task (ADR 0064). Default "quick_add". */
@@ -73,6 +74,8 @@ export function QuickAddModal({
     setTimeout(() => titleRef.current?.focus(), 0);
   }, [initial, open]);
 
+  useEscapeToClose(open, onClose);
+
   if (!open) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -115,10 +118,7 @@ export function QuickAddModal({
         onSubmit={(e) => void handleSubmit(e)}
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => {
-          if (e.key === "Escape") {
-            e.preventDefault();
-            onClose();
-          } else if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+          if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
             e.preventDefault();
             void handleSubmit(e);
           }

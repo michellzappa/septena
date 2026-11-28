@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { FIRST_RUN, SETTINGS_REGISTRY, registryText } from "@/lib/generated/registries";
 import type { SeptenaApiClient } from "@/lib/api/client";
+import { useEscapeToClose } from "@/lib/useEscapeToClose";
 
 interface FirstRunModalProps {
   open: boolean;
@@ -57,6 +58,7 @@ export function FirstRunModal({
   );
 
   const [stepIdx, setStepIdx] = useState(0);
+  useEscapeToClose(open, onClose);
   const [copiedWhich, setCopiedWhich] = useState<"setup" | "url" | null>(null);
   const [codeExpanded, setCodeExpanded] = useState(false);
   const [pairCode, setPairCode] = useState("");

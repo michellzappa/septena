@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { SURFACES_CATALOG, registryText } from "@/lib/generated/registries";
 import type { AccountSwitchSummary } from "@/lib/sync/accountSwitch";
+import { useEscapeToClose } from "@/lib/useEscapeToClose";
 
 // The question before a sign-in with another account replaces the tasks on
 // this device (#575). Same choices as Apple's `SeptaskAccountSwitchPrompt`:
@@ -36,16 +37,7 @@ export function AccountSwitchDialog({ summary, language, onChoose }: AccountSwit
     }
   };
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        void choose("cancel");
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  });
+  useEscapeToClose(true, () => void choose("cancel"));
 
   const lines = [
     copy("body", language),

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { ACTIONS_CATALOG, DOMAIN_RULES, SURFACES_CATALOG, registryText } from "@/lib/generated/registries";
 import type { AreaRow, ProjectRow, TaskRow } from "@/lib/types";
+import { useEscapeToClose } from "@/lib/useEscapeToClose";
 
 interface FadeSweepModalProps {
   tasks: TaskRow[];
@@ -41,6 +42,7 @@ export function FadeSweepModal({
   // Rows dropped by Let the rest go. Non-zero shows the permission line (#711).
   const [letGoCount, setLetGoCount] = useState(0);
   const [busy, setBusy] = useState(false);
+  useEscapeToClose(true, onClose);
 
   const text = (key: string, vars?: Record<string, string | number>) => registryText(key, language, vars);
   const areaById = new Map(areas.map((a) => [a.id, a]));

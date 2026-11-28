@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Check, Inbox } from "lucide-react";
+import { useEscapeToClose } from "@/lib/useEscapeToClose";
 
 export interface MovePickerTarget {
   /** Null is the "no container" row (No Area). */
@@ -43,6 +44,7 @@ export function MovePickerDialog({
   const currentIndex = rows.findIndex((t) => t.id === currentId);
   const [active, setActive] = useState(currentIndex >= 0 ? currentIndex : 0);
   const activeIndex = Math.min(active, Math.max(rows.length - 1, 0));
+  useEscapeToClose(true, onClose);
 
   const choose = (target: MovePickerTarget | undefined) => {
     if (!target) return;
@@ -58,10 +60,7 @@ export function MovePickerDialog({
         className="w-full max-w-sm overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)] shadow-2xl"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => {
-          if (e.key === "Escape") {
-            e.preventDefault();
-            onClose();
-          } else if (e.key === "ArrowDown") {
+          if (e.key === "ArrowDown") {
             e.preventDefault();
             setActive(Math.min(activeIndex + 1, rows.length - 1));
           } else if (e.key === "ArrowUp") {

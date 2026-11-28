@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect } from "react";
 import { X } from "lucide-react";
 import { ACTIONS_CATALOG, registryText } from "@/lib/generated/registries";
 import type { SmartDestination } from "@/lib/types";
+import { useEscapeToClose } from "@/lib/useEscapeToClose";
 
 interface KeyboardShortcutsModalProps {
   open: boolean;
@@ -41,17 +41,7 @@ export function KeyboardShortcutsModal({
   orderedDestinations,
   onClose,
 }: KeyboardShortcutsModalProps) {
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        onClose();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose, open]);
+  useEscapeToClose(open, onClose);
 
   if (!open) return null;
 

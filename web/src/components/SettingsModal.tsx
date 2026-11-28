@@ -82,6 +82,7 @@ import { PlanBenefitRow, PlanHead, PlanMark, PlanPriceLine, PlanSheet } from "./
 import { SignInMethodsSection } from "./SignInMethodsSection";
 import { AccountAvatar, AvatarEditor, type AccountAvatarController } from "./Avatar";
 import { avatarCopy } from "@/lib/avatar";
+import { useEscapeToClose } from "@/lib/useEscapeToClose";
 
 export type SettingsTab = (typeof SETTINGS_REGISTRY.desktopTabs)[number]["id"];
 
@@ -401,6 +402,14 @@ export function SettingsModal({
       void loadIcal();
     }
   }, [accountAvatar.store, activePageId, loadAccess, loadEntitlement, loadIcal, open, tab]);
+
+  // Escape closes an open confirmation first, then Settings. The avatar editor
+  // and the plan sheet register their own layer on top.
+  useEscapeToClose(open, () => {
+    if (deleteDialogOpen) setDeleteDialogOpen(false);
+    else if (confirmRotateIcal) setConfirmRotateIcal(false);
+    else onClose();
+  });
 
   if (!open) return null;
 
