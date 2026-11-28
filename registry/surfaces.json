@@ -1353,6 +1353,7 @@
   },
   "taskDateBoard": {
     "id": "taskDateBoard",
+    "openFocus": "none",
     "overdue": {
       "label": "Overdue"
     },

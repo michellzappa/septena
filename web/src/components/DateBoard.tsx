@@ -14,6 +14,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import {
+  DATE_BOARD_FOCUSES_ON_OPEN,
   DEFAULT_START_TIME,
   QUICK_DURATIONS,
   addDays,
@@ -106,11 +107,15 @@ export function DateBoardPopover(props: DateBoardPopoverProps) {
   const focusRows = rows.filter((row) => !(row.kind === "time" && timeOpen));
   const cellCount = days.length + focusRows.length;
 
-  const [focus, setFocus] = useState(() => {
+  // The first arrow key focuses the cell that holds the task's value, else Today.
+  const startFocus = (() => {
     if (value !== null && days.includes(value)) return days.indexOf(value);
     if (!beyondStrip) return 0;
     return days.length + Math.max(0, focusRows.findIndex((row) => row.kind === "calendar"));
-  });
+  })();
+  // null while no cell is focused: the board opens that way, so a cell that
+  // only holds the task's value never reads as the keyboard highlight.
+  const [focus, setFocus] = useState<number | null>(() => (DATE_BOARD_FOCUSES_ON_OPEN ? startFocus : null));
 
   const boardRef = useRef<HTMLDivElement | null>(null);
   const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
@@ -185,11 +190,12 @@ export function DateBoardPopover(props: DateBoardPopoverProps) {
         const vertical = e.key === "ArrowUp" || e.key === "ArrowDown";
         setCalendarDay(addDays(calendarDay, vertical ? step * 7 : step));
       } else {
-        setFocus((i) => Math.max(0, Math.min(cellCount - 1, i + step)));
+        setFocus((i) => (i === null ? startFocus : Math.max(0, Math.min(cellCount - 1, i + step))));
       }
     } else if (e.key === "Enter") {
       e.preventDefault();
       if (calendarDay) pick(calendarDay);
+      else if (focus === null) return;
       else if (focus < days.length) pick(days[focus]);
       else if (focusRows[focus - days.length]) activate(focusRows[focus - days.length]);
     }

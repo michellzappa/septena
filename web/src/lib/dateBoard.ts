@@ -51,6 +51,13 @@ const registryRows = SURFACES_CATALOG.taskDateBoard.rows as unknown as readonly 
 const icons = ICONS as unknown as Record<string, { lucide: string }>;
 const actionTitles = ACTIONS_CATALOG.actions as unknown as Record<string, { title: string }>;
 
+/**
+ * True when the board opens with its start cell focused (`taskDateBoard.openFocus`).
+ * False: no cell is focused until the first arrow key or the pointer (#847).
+ */
+export const DATE_BOARD_FOCUSES_ON_OPEN =
+  (SURFACES_CATALOG.taskDateBoard as unknown as { openFocus: string }).openFocus === "currentValue";
+
 /** The rows under the day strip, in registry order (`surfaces.json` `taskDateBoard.rows`). */
 export function dateBoardRows(attribute: DateBoardAttribute, lang: string): DateBoardRow[] {
   return registryRows

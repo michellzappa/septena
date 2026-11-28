@@ -1404,7 +1404,13 @@ private final class KitDateBoard: NSView {
   private var cells: [KitDateCell] = []
   private var dayCells: [KitDateCell] = []
   private var rowCells: [KitDateCell] = []
-  private var focusIndex = 0
+  /// nil while no cell is focused. The board opens that way
+  /// (`RegistrySurfaces.dateBoardFocusesOnOpen`), so a cell that only holds
+  /// the task's value never reads as the keyboard highlight.
+  private var focusIndex: Int?
+  /// The cell the first arrow key focuses: the one that holds the task's
+  /// value, else Today.
+  private var startFocusIndex = 0
 
   /// The one child of `pageHost` — the week board, or the month calendar.
   private let pageHost = NSView()
@@ -1685,18 +1691,19 @@ private final class KitDateBoard: NSView {
       cell.onHover = { [weak self] hovered in self?.focus(cell: hovered) }
     }
 
-    // Start on the cell that already holds the task's value, so the arrows
-    // walk from where the user is rather than from the top. With no value,
-    // that is today — the first cell.
+    // The first arrow key starts on the cell that already holds the task's
+    // value, so the arrows walk from where the user is rather than from the
+    // top. With no value, that is today — the first cell.
     if let initial, let index = Self.dayOffsets.firstIndex(where: { offset in
       guard let date = KitDayFormat.day(offset: offset) else { return false }
       return Calendar.current.isDate(date, inSameDayAs: initial)
     }) {
-      focusIndex = index
+      startFocusIndex = index
     } else if beyondStrip, let calendarCell, let index = cells.firstIndex(where: { $0 === calendarCell }) {
       // Past the strip: start on "Pick another date", which opens on it.
-      focusIndex = index
+      startFocusIndex = index
     }
+    if RegistrySurfaces.dateBoardFocusesOnOpen { focusIndex = startFocusIndex }
     boardPage = stack
   }
 
@@ -1802,7 +1809,7 @@ private final class KitDateBoard: NSView {
   /// The date the focused strip cell stands for, so the calendar opens where
   /// the user already was rather than on today.
   private func currentFocusDate() -> Date? {
-    guard Self.dayOffsets.indices.contains(focusIndex) else { return nil }
+    guard let focusIndex, Self.dayOffsets.indices.contains(focusIndex) else { return nil }
     return KitDayFormat.day(offset: Self.dayOffsets[focusIndex])
   }
 
@@ -1860,7 +1867,8 @@ private final class KitDateBoard: NSView {
   private func refreshCells() {
     rowCells.forEach { $0.isFocused = false }
     cells = dayCells + rowCells.filter { !$0.isHidden }
-    focusIndex = min(focusIndex, cells.count - 1)
+    if let focusIndex { self.focusIndex = min(focusIndex, cells.count - 1) }
+    startFocusIndex = min(startFocusIndex, cells.count - 1)
     applyFocus()
   }
 
@@ -1878,8 +1886,14 @@ private final class KitDateBoard: NSView {
 
   /// Clamped, not wrapping: walking off either end of a short list and
   /// silently landing at the other end is how a user picks the wrong date.
+  /// With no focused cell, the first press focuses the start cell.
   private func step(_ delta: Int) {
-    let next = focusIndex + delta
+    guard let current = focusIndex else {
+      focusIndex = startFocusIndex
+      applyFocus()
+      return
+    }
+    let next = current + delta
     guard cells.indices.contains(next) else { return }
     focusIndex = next
     applyFocus()
@@ -1906,7 +1920,10 @@ private final class KitDateBoard: NSView {
     switch event.keyCode {
     case 126, 123: step(-1)                     // ↑ / ← — earlier
     case 125, 124: step(1)                      // ↓ / → — later
-    case 36, 76, 49: cells[focusIndex].activate()  // Return / Enter / Space
+    case 36, 76, 49:                            // Return / Enter / Space
+      // Nothing is focused until an arrow key or the pointer picks a cell.
+      guard let focusIndex, cells.indices.contains(focusIndex) else { return }
+      cells[focusIndex].activate()
     case 53: onCancel()                         // Escape
     default: super.keyDown(with: event)
     }
