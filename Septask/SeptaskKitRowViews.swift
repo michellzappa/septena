@@ -868,6 +868,46 @@ extension NSTableView {
   }
 }
 
+// MARK: - Pointer hover
+
+/// The one pointer-hover primitive for the AppKit shell (#851). It puts a
+/// tracking area on a view and reports enter / exit, so a view can paint
+/// `SeptaskKitTheme.pointerHoverFill` (or brighten its ink) while the pointer
+/// is over it. `.inVisibleRect` keeps the area equal to the view's visible
+/// bounds, so no `updateTrackingAreas` override is needed.
+///
+/// `NSTrackingArea` does not retain its owner: the view that installs the
+/// tracker must keep a strong reference to it.
+@MainActor
+final class KitHoverTracker: NSResponder {
+  private(set) var isHovered = false
+  private let onChange: (Bool) -> Void
+
+  init(installedOn view: NSView, onChange: @escaping (Bool) -> Void) {
+    self.onChange = onChange
+    super.init()
+    view.addTrackingArea(NSTrackingArea(
+      rect: .zero,
+      options: [.mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect],
+      owner: self,
+      userInfo: nil))
+  }
+
+  required init?(coder: NSCoder) { fatalError("KitHoverTracker is code-only") }
+
+  override func mouseEntered(with event: NSEvent) { set(true) }
+  override func mouseExited(with event: NSEvent) { set(false) }
+
+  /// A recycled row view must not keep the hover of the row it showed before.
+  func reset() { set(false) }
+
+  private func set(_ value: Bool) {
+    guard value != isHovered else { return }
+    isHovered = value
+    onChange(value)
+  }
+}
+
 // MARK: - Card row background
 
 /// The grouped-card surface the SwiftUI list draws its rows on: white card,
@@ -900,6 +940,29 @@ final class KitCardRowView: NSTableRowView {
   }
 
   var isCard = true { didSet { syncGlassBackdrop() } }
+  /// The row is clickable (the list controller sets it from
+  /// `shouldSelectRow`), so pointer hover paints the hover wash on its card
+  /// slice. Headers, the screen title and other inert rows stay false.
+  var isHoverable = false {
+    didSet { if oldValue != isHoverable { syncGlassBackdrop(); needsDisplay = true } }
+  }
+  /// Installed on the first move into a window (never during `init`, where
+  /// AppKit already calls the overrides below).
+  private var hoverTracker: KitHoverTracker?
+  /// Hover shows only when no stronger state owns the slice.
+  private var showsHover: Bool {
+    isCard && isHoverable && (hoverTracker?.isHovered ?? false)
+      && !isSelected && !isComposing && !isEditingTitle
+  }
+  func resetHover() { hoverTracker?.reset() }
+  private func installHoverTracker() {
+    guard hoverTracker == nil else { return }
+    hoverTracker = KitHoverTracker(installedOn: self) { [weak self] _ in
+      guard let self else { return }
+      self.syncGlassBackdrop()
+      self.needsDisplay = true
+    }
+  }
   var isFirstInGroup = true { didSet { syncGlassBackdrop() } }
   var isLastInGroup = true { didSet { syncGlassBackdrop() } }
 
@@ -1002,6 +1065,7 @@ final class KitCardRowView: NSTableRowView {
     overlay.slicePath = slicePath(roundTop: isFirstInGroup, roundBottom: isLastInGroup)
     overlay.isFirstInGroup = isFirstInGroup
     overlay.showSelection = isSelected && !isComposing && !isEditingTitle
+    overlay.showHover = showsHover
     overlay.selectionEmphasized = septaskSelectionIsActive
     overlay.promoteWash = promoteWash
     overlay.needsDisplay = true
@@ -1061,6 +1125,7 @@ final class KitCardRowView: NSTableRowView {
   override func viewDidMoveToWindow() {
     super.viewDidMoveToWindow()
     septaskObserveKeyWindow()
+    installHoverTracker()
     syncGlassBackdrop()
     needsDisplay = true
   }
@@ -1108,6 +1173,10 @@ final class KitCardRowView: NSTableRowView {
     // cannot overhang as a second rectangle. Composer owns the surface.
     if isSelected && !isComposing && !isEditingTitle {
       SeptaskKitTheme.listSelectionFill(emphasized: septaskSelectionIsActive).setFill()
+      slice.fill()
+    }
+    if showsHover {
+      SeptaskKitTheme.pointerHoverFill.setFill()
       slice.fill()
     }
     // Promote wash — SwiftUI's `playPromoteWash()`, same gold at the same
@@ -1212,6 +1281,10 @@ final class KitSidebarRowView: NSTableRowView {
     return view
   }()
 
+  /// Pointer hover draws the same pill in `pointerHoverFill` (#851). Every
+  /// sidebar row is a navigation target, so every row hovers.
+  private var hoverTracker: KitHoverTracker?
+
   override init(frame frameRect: NSRect) {
     super.init(frame: frameRect)
     addSubview(pill, positioned: .below, relativeTo: nil)
@@ -1222,10 +1295,17 @@ final class KitSidebarRowView: NSTableRowView {
     addSubview(pill, positioned: .below, relativeTo: nil)
   }
 
+  func resetHover() { hoverTracker?.reset() }
+
   /// See `KitCardRowView.viewDidMoveToWindow`.
   override func viewDidMoveToWindow() {
     super.viewDidMoveToWindow()
     septaskObserveKeyWindow()
+    if hoverTracker == nil {
+      hoverTracker = KitHoverTracker(installedOn: self) { [weak self] _ in
+        self?.refreshPill()
+      }
+    }
     refreshPill()
   }
 
@@ -1262,13 +1342,18 @@ final class KitSidebarRowView: NSTableRowView {
   }
 
   private func refreshPill() {
-    let show = isSelected || isTargetForDropOperation
-    pill.isHidden = !show
-    guard show else { return }
+    let selected = isSelected || isTargetForDropOperation
+    let hovered = !selected && (hoverTracker?.isHovered ?? false)
+    pill.isHidden = !(selected || hovered)
+    guard selected || hovered else { return }
     let emphasized = isTargetForDropOperation || septaskSelectionIsActive
-    var color = SeptaskKitTheme.listSelectionFill(emphasized: emphasized).cgColor
+    let fill: () -> NSColor = {
+      hovered ? SeptaskKitTheme.pointerHoverFill
+        : SeptaskKitTheme.listSelectionFill(emphasized: emphasized)
+    }
+    var color = fill().cgColor
     effectiveAppearance.performAsCurrentDrawingAppearance {
-      color = SeptaskKitTheme.listSelectionFill(emphasized: emphasized).cgColor
+      color = fill().cgColor
     }
     pill.layer?.backgroundColor = color
     pill.frame = pillRect
@@ -1349,6 +1434,7 @@ private final class KitCardGlassOverlayView: NSView {
   var slicePath: NSBezierPath?
   var isFirstInGroup = false
   var showSelection = false
+  var showHover = false
   var selectionEmphasized = false
   var promoteWash: CGFloat = 0
 
@@ -1374,6 +1460,10 @@ private final class KitCardGlassOverlayView: NSView {
     }
     if showSelection {
       SeptaskKitTheme.listSelectionFill(emphasized: selectionEmphasized).setFill()
+      slice.fill()
+    }
+    if showHover {
+      SeptaskKitTheme.pointerHoverFill.setFill()
       slice.fill()
     }
     if promoteWash > 0 {

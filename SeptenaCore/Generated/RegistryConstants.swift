@@ -316,7 +316,7 @@ enum RegistryTokens {
     static let unemphasizedAlphaLight: Double = 0.1
     static let unemphasizedAlphaDark: Double = 0.14
     static let chipSelectedFillOpacity: Double = 0.22
-    static let pointerHoverOpacity: Double = 0.012
+    static let pointerHoverOpacity: Double = 0.05
   }
   enum Radii {
     static let card: Double = 22
@@ -960,7 +960,7 @@ enum RegistryDestinations {
 
   static let all: [RegistryDestination] = [
     RegistryDestination(id: .inbox, navigationKey: "triage", serverView: "triage", title: RegistryL10n.t("Inbox"), iconId: "list.inbox", sfSymbol: "tray.full", sidebarSection: "top", visibility: "todayBand", canHide: false, canMoveSection: false, supportsManualOrder: false, newTaskTarget: "here", emptyTitle: RegistryL10n.t("Inbox is empty"), emptyDetail: RegistryL10n.t("New tasks wait at the top of Today until you schedule or file them."), featureId: "lists.inbox"),
-    RegistryDestination(id: .today, navigationKey: "today", serverView: "today", title: RegistryL10n.t("Today"), iconId: "list.today", sfSymbol: "sun.max.fill", sidebarSection: "top", visibility: "always", canHide: false, canMoveSection: false, supportsManualOrder: true, newTaskTarget: "here", emptyTitle: RegistryL10n.t("Nothing on Today"), emptyDetail: RegistryL10n.t("Add a task or move one here when you want to work on it today."), featureId: "lists.today"),
+    RegistryDestination(id: .today, navigationKey: "today", serverView: "today", title: RegistryL10n.t("Today"), iconId: "list.today", sfSymbol: "sun.max.fill", sidebarSection: "top", visibility: "always", canHide: false, canMoveSection: false, supportsManualOrder: true, newTaskTarget: "here", emptyTitle: RegistryL10n.t("Nothing on Today"), emptyDetail: RegistryL10n.t("Today can stay empty. Add a task when you want one."), featureId: "lists.today"),
     RegistryDestination(id: .review, navigationKey: "review", serverView: "all", title: RegistryL10n.t("Review"), iconId: "list.review", sfSymbol: "eye", sidebarSection: "top", visibility: "whenNonEmpty", canHide: true, canMoveSection: false, supportsManualOrder: false, newTaskTarget: "today", emptyTitle: RegistryL10n.t("Nothing to review"), emptyDetail: RegistryL10n.t("Your agent's questions, finished work and tasks in progress show up here, and so do tasks you are waiting on. Faded tasks do too."), featureId: "lists.review"),
     RegistryDestination(id: .agent, navigationKey: "agent", serverView: "all", title: RegistryL10n.t("Agent"), iconId: "list.agent", sfSymbol: "person.2.badge.gearshape", sidebarSection: "top", visibility: "reviewGroup", canHide: false, canMoveSection: false, supportsManualOrder: false, newTaskTarget: "today", emptyTitle: RegistryL10n.t("No agent work"), emptyDetail: RegistryL10n.t("Tasks you assign to Claude show up in Review, grouped by where the work stands."), featureId: "lists.agent"),
     RegistryDestination(id: .upcoming, navigationKey: "upcoming", serverView: "upcoming", title: RegistryL10n.t("Upcoming"), iconId: "list.upcoming", sfSymbol: "calendar", sidebarSection: "top", visibility: "always", canHide: true, canMoveSection: false, supportsManualOrder: false, newTaskTarget: "tomorrow", emptyTitle: RegistryL10n.t("Nothing upcoming"), emptyDetail: RegistryL10n.t("Tasks with a future When or Deadline date appear here."), featureId: "lists.upcoming"),
@@ -2109,6 +2109,8 @@ enum RegistrySurfaces {
   static let agentPromptAcceptedLabel: String = RegistryL10n.t("Accepted")
   /// The weekly fade sweep's title (`surfaces.json` `fadeSweep`).
   static let fadeSweepTitle: String = RegistryL10n.t("Faded Tasks")
+  /// The sweep's closing line after Let the rest go (#711, a permission line).
+  static let fadeSweepLetGoTitle: String = RegistryL10n.t("It can wait. The rest is in your Logbook.")
   /// Quick Find copy (`surfaces.json` `quickFind`).
   static let quickFindPlaceholder: String = RegistryL10n.t("Search tasks, projects, areas…")
   static let quickFindCommandPlaceholder: String = RegistryL10n.t("Search or run a command…")

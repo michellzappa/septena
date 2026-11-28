@@ -6,8 +6,12 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.LocalActivity
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material.ripple.RippleAlpha
 import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LocalRippleConfiguration
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RippleConfiguration
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
@@ -29,6 +33,7 @@ import app.septena.core.RegistryCatalog
 import app.septena.core.booleanValue
 import app.septena.core.generated.RegistryCompletionMotion
 import app.septena.core.generated.RegistryIconIds
+import app.septena.core.generated.RegistryPointerHover
 import app.septena.core.stringValue
 import app.septena.ui.CompletionMotionConfig
 import app.septena.ui.LocalCompletionMotion
@@ -53,6 +58,7 @@ val LocalMagicPlusColors = staticCompositionLocalOf { MagicPlusColors(Color.Unsp
  * (ADR 0019): the fruit accent from registry/tokens.json, light or dark mode,
  * and the text size step.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SeptenaAndroidTheme(store: AppearanceStore, content: @Composable () -> Unit) {
     val appearance by store.state.collectAsStateWithLifecycle()
@@ -113,9 +119,26 @@ fun SeptenaAndroidTheme(store: AppearanceStore, content: @Composable () -> Unit)
             pulseRingMs = RegistryCompletionMotion.PULSE_RING_MS,
         ),
     ) {
-        MaterialTheme(colorScheme = colors, content = content)
+        MaterialTheme(colorScheme = colors) {
+            // Pointer hover (mouse, trackpad, ChromeOS) on every clickable:
+            // the ripple's hover state layer uses the shared token, so hover
+            // matches iPad, Mac and web (#851). Press, focus and drag keep
+            // the Material 3 defaults.
+            CompositionLocalProvider(
+                LocalRippleConfiguration provides RippleConfiguration(rippleAlpha = SeptenaRippleAlpha),
+                content = content,
+            )
+        }
     }
 }
+
+/** Material 3 default state-layer alphas, with hover from `registry/tokens.json`. */
+private val SeptenaRippleAlpha = RippleAlpha(
+    draggedAlpha = 0.16f,
+    focusedAlpha = 0.10f,
+    hoveredAlpha = RegistryPointerHover.OPACITY,
+    pressedAlpha = 0.10f,
+)
 
 /** Resolved theme colors for one fruit accent in one mode. */
 internal data class RegistryThemeColors(

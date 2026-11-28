@@ -164,6 +164,8 @@ function validateTokens(tokens) {
       assert(/^#[0-9a-fA-F]{6}$/.test(tokens.colors?.[role] ?? ""), `tokens.json: multicolorGlyphs "${icon}" role "${role}" must name a hex in colors`);
     }
   }
+  const hover = tokens.selection?.pointerHoverOpacity;
+  assert(typeof hover === "number" && hover > 0 && hover < 0.2, "tokens.json: selection.pointerHoverOpacity must be a number in (0, 0.2)");
   assert(Array.isArray(tokens.textScale?.steps) && tokens.textScale.steps.length === 5, "tokens.json: textScale must have 5 steps");
   const cm = tokens.motion?.completion;
   assert(cm && typeof cm === "object", "tokens.json: missing motion.completion");
@@ -1948,6 +1950,8 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   }
   lines.push("  /// The weekly fade sweep's title (`surfaces.json` `fadeSweep`).");
   lines.push(`  static let fadeSweepTitle: String = ${L(surfaces.fadeSweep.title, surfaces.fadeSweep, "title")}`);
+  lines.push("  /// The sweep's closing line after Let the rest go (#711, a permission line).");
+  lines.push(`  static let fadeSweepLetGoTitle: String = ${L(surfaces.fadeSweep.letGoTitle, surfaces.fadeSweep, "letGoTitle")}`);
   const qf = surfaces.quickFind;
   lines.push("  /// Quick Find copy (`surfaces.json` `quickFind`).");
   lines.push(`  static let quickFindPlaceholder: String = ${L(qf.placeholder, qf, "placeholder")}`);
@@ -2566,7 +2570,7 @@ function generateTS({ entities, rules, icons, tokens, caps, settings, dests, act
   lines.push(`export const DESIGN_TOKENS = ${JSON.stringify({ accentPolicy: tokens.accentPolicy, fruitAccents: tokens.fruitAccents ?? [], textures: tokens.textures ?? [], selection: tokens.selection, colors: tokens.colors, multicolorGlyphs: tokens.multicolorGlyphs?.glyphs ?? {}, accentPalette: tokens.accentPalette, radii: tokens.radii, spacing: tokens.spacing, desktopColumn: tokens.desktopColumn, textScale: tokens.textScale, motion: tokens.motion })} as const;`);
   lines.push(`export const CAPABILITIES = ${JSON.stringify(caps.capabilities)} as const;`);
   lines.push(`export const ACTIONS_CATALOG = ${JSON.stringify({ actions: actions.actions, contextMenus: actions.contextMenus, menuBar: actions.menuBar, shortcutsSheet: actions.shortcutsSheet })} as const;`);
-  lines.push(`export const SURFACES_CATALOG = ${JSON.stringify({ notices: surfaces.notices, prompts: surfaces.prompts, toasts: surfaces.toasts, taskAttributes: surfaces.taskAttributes, taskDateBoard: surfaces.taskDateBoard, taskPage: surfaces.taskPage, waiting: surfaces.waiting, sharing: surfaces.sharing, accountSwitch: surfaces.accountSwitch, deviceSignIn: surfaces.deviceSignIn, quickFind: surfaces.quickFind, checklistProjects: surfaces.checklistProjects, listSort: surfaces.listSort, support: surfaces.support })} as const;`);
+  lines.push(`export const SURFACES_CATALOG = ${JSON.stringify({ notices: surfaces.notices, prompts: surfaces.prompts, toasts: surfaces.toasts, taskAttributes: surfaces.taskAttributes, taskDateBoard: surfaces.taskDateBoard, taskPage: surfaces.taskPage, waiting: surfaces.waiting, sharing: surfaces.sharing, accountSwitch: surfaces.accountSwitch, deviceSignIn: surfaces.deviceSignIn, quickFind: surfaces.quickFind, checklistProjects: surfaces.checklistProjects, listSort: surfaces.listSort, support: surfaces.support, fadeSweep: surfaces.fadeSweep })} as const;`);
   lines.push(`export const FIRST_RUN = ${JSON.stringify(surfaces.firstRun)} as const;`);
   lines.push("/** Plan limits (registry/plans.json). The server's plan table: every gate reads these, never a plan name. */");
   lines.push(`export const PLAN_LIMITS = ${JSON.stringify(plans.limits)} as const;`);
@@ -2742,6 +2746,11 @@ function generateKotlinCore(bundle) {
     const literal = Number.isInteger(value) ? `${value}L` : `${value}`;
     lines.push(`    const val ${kotlinConstName(key)}: ${type} = ${literal}`);
   }
+  lines.push("}");
+  lines.push("");
+  lines.push("/** Pointer hover wash: primary ink at this opacity (`registry/tokens.json` `selection.pointerHoverOpacity`, #851). */");
+  lines.push("object RegistryPointerHover {");
+  lines.push(`    const val OPACITY: Float = ${Number(tokens.selection.pointerHoverOpacity)}f`);
   lines.push("}");
   lines.push("");
   lines.push("/** Standard task-completion settle and checkbox motion (`registry/tokens.json` `motion.completion`). */");

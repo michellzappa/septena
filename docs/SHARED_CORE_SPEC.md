@@ -100,7 +100,8 @@ parsing, the watch.
 - Jobs: `core-rust` (generator check, `cargo test` with all vectors,
   licences), `core-apple` (iOS, iOS simulator and macOS slices, XCFramework,
   Swift harness on macOS), `core-android` (three Android ABIs, size only),
-  `core-jvm` (Linux and Windows, Kotlin harness through JNA), `core-wasm`
+  `core-jvm` (Linux x64, Linux ARM64 and Windows x64, Kotlin harness
+  through JNA), `core-wasm`
   (WASM package, Node harness, Brotli size).
 - Each job writes its numbers to the job summary and fails over budget.
 - **Releases (C5, #251):** a tag `core-vX.Y.Z` runs

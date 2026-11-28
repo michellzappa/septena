@@ -8,6 +8,8 @@ import SwiftUI
 // tasks for this sweep, one tap ("Keep") per item, and one bottom button
 // ("Let the rest go") that cancels the remaining rows with `dropReason = "faded"`
 // in ONE undo entry. Closing or ignoring drops nothing — doing nothing is safe.
+// After Let the rest go the sheet stays open on one permission line (#711)
+// until the user taps Done.
 
 struct TaskFadeSweepSheet: View {
   /// Tasks to review (faded since the last sweep, or the current Faded pile
@@ -21,6 +23,9 @@ struct TaskFadeSweepSheet: View {
   @Environment(TaskMutator.self) private var mutator
   @State private var remaining: [SeptenaTask]
   @State private var keptCount: Int = 0
+  /// Rows dropped by Let the rest go. Non-zero switches the end state to the
+  /// permission line (#711).
+  @State private var letGoCount: Int = 0
 
   init(tasks: [SeptenaTask],
        areas: [Area],
@@ -108,12 +113,15 @@ struct TaskFadeSweepSheet: View {
       Image(systemName: "checkmark.circle")
         .scaledFont(size: 32)
         .foregroundStyle(Theme.inkSecondary)
-      Text(keptCount > 0
+      Text(letGoCount > 0
+           ? RegistrySurfaces.fadeSweepLetGoTitle
+           : keptCount > 0
            ? String(localized: "You kept everything.", comment: "Sweep sheet empty after keeping all")
            : String(localized: "No faded tasks to check.", comment: "Sweep sheet empty"))
         .font(.septenaLabel)
         .foregroundStyle(Theme.inkPrimary)
-      if keptCount > 0 {
+        .multilineTextAlignment(.center)
+      if keptCount > 0 && letGoCount == 0 {
         Text(String(localized: "Kept tasks are back in their lists.",
                     comment: "Sweep sheet empty detail"))
           .font(.septenaMeta)
@@ -170,7 +178,10 @@ struct TaskFadeSweepSheet: View {
     mutator.dropFaded(ids: ids)
     TaskUndo.recordSweepDrop(before: snapshots, mutator: mutator)
     TaskFade.markSweepCompleted(at: DayClock.appNow)
-    onClose()
+    a11yAnimate(.easeOut(duration: 0.2)) {
+      letGoCount = ids.count
+      remaining.removeAll()
+    }
   }
 
   private func reasonLine(for task: SeptenaTask) -> String {

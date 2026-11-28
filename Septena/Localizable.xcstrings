@@ -20769,6 +20769,48 @@
         }
       }
     },
+    "It can wait. The rest is in your Logbook." : {
+      "comment" : "Generated from registry surfaces.fadeSweep.letGoTitle. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das kann warten. Der Rest ist in deinem Protokoll."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Puede esperar. El resto está en tu Registro."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ça peut attendre. Le reste est dans votre Journal."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Può aspettare. Il resto è nel tuo Registro."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Het kan wachten. De rest staat in je Logboek."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Isso pode esperar. O resto está no seu Registro."
+          }
+        }
+      }
+    },
     "It lands in your Inbox until you schedule or file it" : {
       "comment" : "Generated from registry surfaces.notices.items.getStarted.steps.addTask.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -41184,6 +41226,48 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "HOY"
+          }
+        }
+      }
+    },
+    "Today can stay empty. Add a task when you want one." : {
+      "comment" : "Generated from registry destinations.destinations.today.emptyState.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Heute darf leer bleiben. Füge eine Aufgabe hinzu, wenn du eine möchtest."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hoy puede quedarse vacío. Añade una tarea cuando quieras."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aujourd’hui peut rester vide. Ajoutez une tâche quand vous le souhaitez."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Oggi può restare vuoto. Aggiungi un’attività quando vuoi."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vandaag mag leeg blijven. Voeg een taak toe wanneer je wilt."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hoje pode ficar vazio. Adicione uma tarefa quando quiser."
           }
         }
       }

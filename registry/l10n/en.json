@@ -253,12 +253,6 @@
       "settings.pages.devices_access.sections.sign_in_approval.header"
     ]
   },
-  "Add a task or move one here when you want to work on it today.": {
-    "text": "Add a task or move one here when you want to work on it today.",
-    "paths": [
-      "destinations.destinations.today.emptyState.detail"
-    ]
-  },
   "Add and Do": {
     "text": "Add and Do",
     "paths": [
@@ -2181,6 +2175,12 @@
     "text": "It also removes your tasks from this device and signs you out. You can’t undo this.",
     "paths": [
       "settings.copy.delete_account.consequence.label"
+    ]
+  },
+  "It can wait. The rest is in your Logbook.": {
+    "text": "It can wait. The rest is in your Logbook.",
+    "paths": [
+      "surfaces.fadeSweep.letGoTitle"
     ]
   },
   "It lands in your Inbox until you schedule or file it": {
@@ -4904,6 +4904,12 @@
     "paths": [
       "destinations.destinations.today.title",
       "actions.actions.task.toggleToday.shortTitle"
+    ]
+  },
+  "Today can stay empty. Add a task when you want one.": {
+    "text": "Today can stay empty. Add a task when you want one.",
+    "paths": [
+      "destinations.destinations.today.emptyState.detail"
     ]
   },
   "Today shows what to do now. Anything you skipped stays on the Get started list.": {

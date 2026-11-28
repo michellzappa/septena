@@ -1095,6 +1095,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     // unselected content band showing (too small).
     row.extraTopMargin = (item as? Node).map { topLevelAreaOrProjectKeys.contains($0.key) ? 16 : 0 } ?? 0
     row.selectionHighlightStyle = .none
+    row.resetHover()
     row.needsDisplay = true
     return row
   }

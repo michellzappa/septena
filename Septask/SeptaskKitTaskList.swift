@@ -1075,7 +1075,7 @@ final class SeptaskKitTaskListController: NSViewController {
   }
 
   /// View ▸ Group Today by List flipped. Not a `reload()`: the setting is read
-  /// globally (`todayGroupsByList`, and `taskContextText` through it), not
+  /// globally (`todayGroupsByList`, and `taskContext` through it), not
   /// carried in the `Row` value, so the animated diff can't see that a
   /// surviving row now wants a context subtitle and a taller slot — it kept
   /// its cached one-line height and clipped the second line. Rebuild hard
@@ -5668,6 +5668,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
     // Row views are recycled: a wash still fading on the row this view USED to
     // be would otherwise ride along onto an unrelated task.
     rowView.cancelPromoteWash()
+    rowView.resetHover()
     applyCardGeometry(rowView, atRow: row)
     return rowView
   }
@@ -5695,6 +5696,9 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
     } else {
       rowView.isCard = false
     }
+    // Clickable rows are exactly the selectable ones (#851): tasks, New task,
+    // New project, project targets, notices and their steps.
+    rowView.isHoverable = self.tableView(tableView, shouldSelectRow: row)
     applySelectionJoins(rowView, atRow: row)
     applyDropLine(rowView, atRow: row)
     rowView.needsDisplay = true
@@ -6478,8 +6482,9 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       let identifier = NSUserInterfaceItemIdentifier("taskCell")
       let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? SeptaskKitTaskCell
         ?? SeptaskKitTaskCell(identifier: identifier)
+      let listContext = taskContext(for: task)
       cell.configure(with: task, filter: filter, chip: chip,
-                     contextText: taskContextText(for: task),
+                     contextText: listContext?.title,
                      checklistSummary: checklistCounts[task.id],
                      attachmentCount: attachmentCounts[task.id] ?? 0,
                      fromKind: fromRefKinds[task.id].map(RegistryTaskReferences.kind),
@@ -6488,6 +6493,10 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
         self?.applyFilingSuggestion(taskID: task.id)
       }
       cell.onToggle = { [weak self] id in self?.toggle(id: id) }
+      // The list name after the title opens that list, as its group header does (#842).
+      cell.onOpenContext = listContext.map { list in
+        { [weak self] in self?.onNavigate?(.filter(list.target, title: list.title)) }
+      }
       // Deferred one runloop tick — same reentrancy hazard as the composer's
       // `deferCommitAndCollapse` (see its doc comment): `onRename` fires from
       // `controlTextDidEndEditing`, itself mid-resign-first-responder, and
@@ -6513,7 +6522,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
   /// Matches SwiftUI `TaskListView.staticRow`'s project/area suppression:
   /// scoped pages already name their context, while grouped Today/Anytime
   /// pages use headers; the remaining surfaces keep the quiet second line.
-  private func taskContextText(for task: SeptenaTask) -> String? {
+  private func taskContext(for task: SeptenaTask) -> (title: String, target: TaskFilter)? {
     let snapshot = StructureCache.snapshot(in: context)
     let suppressProject: Bool = switch filter {
     case .project, .unscheduled: true
@@ -6528,11 +6537,11 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
 
     if !suppressProject, let projectID = task.project,
        let project = snapshot.projects.first(where: { $0.id == projectID }) {
-      return project.title
+      return (project.title, .project(project.id))
     }
     if !suppressArea, let areaID = task.area,
        let area = snapshot.areas.first(where: { $0.id == areaID }) {
-      return area.title
+      return (area.title, .area(area.id))
     }
     return nil
   }
@@ -6589,6 +6598,10 @@ enum KitMotion {
 final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
   var onToggle: ((String) -> Void)?
   var onRename: ((String, String) -> Void)?
+  /// Opens the list the title suffix names. Nil leaves the suffix plain text.
+  var onOpenContext: (() -> Void)? {
+    didSet { needsLayout = true }
+  }
 
   private let checkbox = KitCheckboxView()
   private let title = NSTextField(labelWithString: "")
@@ -6619,6 +6632,15 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
   private var taskId = ""
   private var plainTitle = ""
   private var editing = false
+  /// The title text up to the list-name suffix, and the suffix itself, so
+  /// `layout()` can put `contextHit` over the suffix glyphs.
+  private var contextPrefix: NSAttributedString?
+  private var contextSuffix: NSAttributedString?
+  /// Click target over the list-name suffix. It has to be a real `NSButton`:
+  /// `NSTableView` claims clicks on the title `NSTextField` (same reason as
+  /// `KitGroupHeaderCell.hit`). Hidden when the suffix is absent, truncated
+  /// or the title is being renamed, so those clicks reach the table.
+  private let contextHit = NSButton()
   // Content floats in a centered, max-width column (Things-style) rather than
   // stretching edge-to-edge — see `layout()`.
   private var leadingConstraint: NSLayoutConstraint!
@@ -6820,9 +6842,20 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     assigneeChip.kitA11yIgnore()
     waitingChip.kitA11yIgnore()
 
+    contextHit.isBordered = false
+    contextHit.isTransparent = true
+    contextHit.title = ""
+    contextHit.setButtonType(.momentaryChange)
+    contextHit.refusesFirstResponder = true
+    contextHit.isHidden = true
+    contextHit.target = self
+    contextHit.action = #selector(openContext)
+    contextHit.kitA11yIgnore()
+
     addSubview(checkbox)
     addSubview(title)
     addSubview(trailing)
+    addSubview(contextHit)
     textField = title
     // Row announces as one unit (title + notes); the checkbox stays its own
     // element so VoiceOver can still toggle without hopping through glyphs.
@@ -6869,6 +6902,50 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     leadingConstraint.constant = inset + SeptaskKitLayout.rowLeadingPad
     trailingConstraint.constant = -(inset + 8)
     super.layout()
+    layoutContextHit()
+  }
+
+  /// Put `contextHit` over the suffix glyphs. The title draws its text after
+  /// the cell's 2pt line-fragment padding, one line, no wrap. A suffix that
+  /// does not fit is truncated away (see `configure`), so it gets no target.
+  private func layoutContextHit() {
+    let padding: CGFloat = 2
+    guard onOpenContext != nil, !editing, !title.isHidden,
+          let prefix = contextPrefix, let suffix = contextSuffix,
+          // After a rename the field can hold the plain title until the row
+          // is configured again: no suffix on screen, no target.
+          title.stringValue == prefix.string + suffix.string else {
+      setContextHitHidden(true)
+      return
+    }
+    let prefixWidth = ceil(prefix.size().width)
+    let suffixWidth = ceil(suffix.size().width)
+    guard prefixWidth + suffixWidth <= title.bounds.width - 2 * padding else {
+      setContextHitHidden(true)
+      return
+    }
+    let frame = title.frame
+    contextHit.frame = NSRect(x: frame.minX + padding + prefixWidth,
+                              y: frame.minY,
+                              width: suffixWidth,
+                              height: frame.height)
+    setContextHitHidden(false)
+  }
+
+  /// Show or hide `contextHit` and refresh the cursor rects with it. A shown
+  /// target refreshes every time, because its frame can move.
+  private func setContextHitHidden(_ hidden: Bool) {
+    guard contextHit.isHidden != hidden || !hidden else { return }
+    contextHit.isHidden = hidden
+    window?.invalidateCursorRects(for: self)
+  }
+
+  @objc private func openContext() { onOpenContext?() }
+
+  /// Pointing hand over the list name only: the platform's "this is a link".
+  override func resetCursorRects() {
+    super.resetCursorRects()
+    if !contextHit.isHidden { addCursorRect(contextHit.frame, cursor: .pointingHand) }
   }
 
   /// Forwarded to the checkbox — the promote cue's ring half. Kept on the cell
@@ -6909,6 +6986,9 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     plainTitle = task.title
     editing = false
     title.isEditable = false
+    contextPrefix = nil
+    contextSuffix = nil
+    onOpenContext = nil
 
     if task.isHeading {
       checkbox.isHidden = true
@@ -6999,13 +7079,18 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     // the suffix away with it; that is the accepted cost of the one-line row.
     let composed = NSMutableAttributedString(string: task.title, attributes: titleAttributes)
     if let contextText, !contextText.isEmpty {
-      composed.append(NSAttributedString(
-        string: "  " + contextText,
-        // Deliberately NOT `titleAttributes`: the suffix keeps its quiet meta
-        // font and never takes the strikethrough of a completed title — the
-        // task is done, its list is not.
-        attributes: [.font: SeptaskKitTheme.meta,
-                     .foregroundColor: SeptaskKitTheme.inkSecondary]))
+      // Deliberately NOT `titleAttributes`: the suffix keeps its quiet meta
+      // font and never takes the strikethrough of a completed title — the
+      // task is done, its list is not.
+      let metaAttributes: [NSAttributedString.Key: Any] = [
+        .font: SeptaskKitTheme.meta,
+        .foregroundColor: SeptaskKitTheme.inkSecondary,
+      ]
+      composed.append(NSAttributedString(string: "  ", attributes: metaAttributes))
+      contextPrefix = NSAttributedString(attributedString: composed)
+      let suffix = NSAttributedString(string: contextText, attributes: metaAttributes)
+      contextSuffix = suffix
+      composed.append(suffix)
     }
     title.attributedStringValue = composed
 
@@ -7233,6 +7318,7 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
   func beginEditing() {
     guard !editing else { return }
     editing = true
+    setContextHitHidden(true)
     title.isEditable = true
     // Truncation while the field editor is attached makes AppKit fight the
     // insertion-point scroll — the caret jumps to the far right as you type
@@ -7903,6 +7989,10 @@ final class KitLoggedFooterCell: NSTableCellView {
   /// overrides ever ran and this footer was inert. Transparent full-bleed
   /// overlay, the `KitNewTaskCell` pattern.
   private let hit = NSButton()
+  /// Pointer hover lifts the text-only link to primary ink (#851): the
+  /// footer has no surface of its own to wash, the SwiftUI and web footers
+  /// do the same.
+  private var hover: KitHoverTracker!
   var onTap: (() -> Void)?
 
   init(identifier: NSUserInterfaceItemIdentifier) {
@@ -7913,6 +8003,9 @@ final class KitLoggedFooterCell: NSTableCellView {
     label.font = SeptaskKitTheme.meta
     label.textColor = SeptaskKitTheme.inkSecondary
     label.kitA11yIgnore()
+    hover = KitHoverTracker(installedOn: hit) { [weak self] hovered in
+      self?.label.textColor = hovered ? SeptaskKitTheme.inkPrimary : SeptaskKitTheme.inkSecondary
+    }
 
     hit.translatesAutoresizingMaskIntoConstraints = false
     hit.isBordered = false
