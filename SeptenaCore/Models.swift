@@ -10,6 +10,11 @@ enum TaskStatus: String, Codable, Hashable {
   case done
   case cancelled
   case checklistChecked
+
+  /// Checked off: a completed task, or a checked Checklist row (#860). Surfaces
+  /// that draw a checkmark or skip a second completion read this, so a checked
+  /// row never looks or acts open.
+  var isFinished: Bool { self == .done || self == .checklistChecked }
 }
 
 /// Provenance values stamped on a row's `source` field — what authored it.

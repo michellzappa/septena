@@ -1446,6 +1446,10 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
         guard let self else { return nil }
         switch id {
         case .projectRename: return .init { self.renameSelected() }
+        case .projectUseAsChecklist:
+          return project.checklistMode == nil ? .init {
+            Task { try await self.projectsMutator.useAsChecklist(id: project.id) }
+          } : nil
         case .projectMarkDone: return .init { self.markSelectedProjectDone() }
         case .projectCancel: return .init { self.cancelSelectedProject() }
         case .projectMove: return .init { self.presentProjectMovePicker(for: project, row: row) }
@@ -1652,15 +1656,15 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
   /// rename-in-place the sidebar's own New Project does.
   func newProject(inArea areaId: String) { newProject(inArea: areaId, atIndex: nil) }
 
-  private func newProject(inArea areaId: String?, atIndex index: Int?) {
+  private func newProject(inArea areaId: String?, atIndex index: Int?, mode: ProjectChecklistMode? = nil) {
     if let areaId { setCollapsed(false, forKey: "area:\(areaId)") }
     let snapshot = StructureCache.snapshot(in: context)
     let beforeSiblings = projectOrder(inArea: areaId, snapshot: snapshot)
     Task { [weak self] in
       guard let self,
             let project = try? await self.projectsMutator.create(
-              title: RegistryActions.title(.sidebarNewProject),
-              area: areaId)
+              title: mode == nil ? RegistryActions.title(.sidebarNewProject) : RegistrySurfaces.checklistProjectTitle,
+              area: areaId, checklistMode: mode)
       else { return }
       if let index {
         var ids = beforeSiblings.filter { $0 != project.id }
@@ -1771,6 +1775,10 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     magicDropBadge.isHidden = true
   }
 
+  @objc private func newChecklistFromFooter() {
+    newProject(inArea: selectedAreaID, atIndex: nil, mode: .plain)
+  }
+
   private func presentMagicPlusMenu(from button: NSView) {
     let menu = NSMenu()
     if let areaId = selectedAreaID, let areaTitle = selectedAreaTitle {
@@ -1792,6 +1800,12 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     looseProject.target = self
     looseProject.image = NSImage(systemSymbolName: "number", accessibilityDescription: nil)
     menu.addItem(looseProject)
+    let checklist = NSMenuItem(title: RegistrySurfaces.checklistProjectTitle,
+                               action: #selector(newChecklistFromFooter), keyEquivalent: "")
+    checklist.target = self
+    checklist.image = NSImage(systemSymbolName: "checklist", accessibilityDescription: nil)
+    menu.addItem(checklist)
+
     let areaItem = NSMenuItem(
       title: RegistryActions.title(.sidebarNewArea),
       action: #selector(newArea),

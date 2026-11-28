@@ -118,7 +118,8 @@ struct TaskListView: View {
 
   @State private var areas: [Area]
   @State private var projects: [Project]
-  @State private var checklistAddHeading: String?
+  /// Checklist projects whose Checked group the user folded (#860). Expanded by default.
+  @State private var checklistCheckedCollapsed: Set<String> = []
 
   /// Which area/project cluster (if any) is currently the hovered drop
   /// target during a drag. All rows + header sharing the same key light
@@ -2561,11 +2562,7 @@ struct TaskListView: View {
     case .project:
       return AnyView(Group {
         AnyView(starFilterBar)
-        if checklistMode != nil {
-          AnyView(checklistRows())
-        } else {
-          AnyView(projectGroupedRows)
-        }
+        AnyView(projectGroupedRows)
       })
     case .review:
       return AnyView(Group {
@@ -3224,57 +3221,42 @@ struct TaskListView: View {
     headingsStorage = storedProjectHeadings()
   }
 
-  private var checklistMode: ProjectChecklistMode? {
-    guard case .project(let id) = filter else { return nil }
-    return projects.first { $0.id == id }?.checklistMode
+  /// The project on screen when it is a Checklist (#860): the standard project
+  /// list, with Checked as a group and empty headings hidden.
+  private var checklistProjectId: String? {
+    guard case .project(let id) = filter,
+          ProjectChecklist.isChecklist(projects.first(where: { $0.id == id })) else { return nil }
+    return id
   }
 
-  @ViewBuilder
-  private func checklistRows() -> some View {
-    if case .project(let id) = filter {
-      let headings = projectHeadingList
-      let rows = headings + items
-      let byID = Dictionary(uniqueKeysWithValues: rows.map { ($0.id, $0) })
-      if let layout = ProjectChecklist.layout(rows: rows) {
-        ProjectChecklistAddView(rows: rows, initialHeading: checklistAddHeading) { title, heading in
-          ProjectChecklist.add(title: title, project: id, heading: heading,
-                               headings: headings, mutator: mutator)
-        } reopen: { item in
-          TaskUndo.toggleProjectChecklist(id: item, mutator: mutator)
-        }
-        .padding(.vertical, 8)
+  /// Checked rows of a Checklist project, in list order.
+  private var checklistCheckedItems: [SeptenaTask] {
+    guard checklistProjectId != nil else { return [] }
+    return chipFiltered(items.filter { $0.status == .checklistChecked })
+  }
 
-        cardedRows(layout.ungrouped.compactMap { byID[$0] }, grouped: true)
-        ForEach(layout.groups, id: \.id) { group in
-          if let heading = byID[group.id] {
-            AnyView(headingRow(heading))
-            cardedRows(group.items.compactMap { byID[$0] }, grouped: true, magicContext: heading.title)
-            Button(RegistrySurfaces.checklistAddItemToGroup(group: heading.title)) { checklistAddHeading = group.id }
-              .font(.septenaMeta)
-          }
-        }
-        if !layout.checked.isEmpty {
-          Text(RegistrySurfaces.checklistChecked)
-            .font(.septenaMeta)
-            .foregroundStyle(.secondary)
-          ForEach(layout.checked.compactMap { byID[$0] }) { task in
-            HStack {
-              Button {
-                TaskUndo.toggleProjectChecklist(id: task.id, mutator: mutator)
-              } label: {
-                Label(task.title, systemImage: "checkmark.circle.fill")
-              }
-              Spacer()
-              if !headings.isEmpty {
-                Menu(task.heading.flatMap { byID[$0]?.title } ?? RegistrySurfaces.checklistMoveToGroup) {
-                  Button(RegistrySurfaces.checklistUngrouped) { mutator.setHeading(id: task.id, heading: nil) }
-                  ForEach(headings) { heading in
-                    Button(heading.title) { mutator.setHeading(id: task.id, heading: heading.id) }
-                  }
-                }
-              }
-            }
-          }
+  /// The headings of a Checklist that hold active rows (core `projectChecklist`
+  /// groups). Nil for a regular project: every heading shows.
+  private var checklistActiveHeadingIds: Set<String>? {
+    guard checklistProjectId != nil,
+          let layout = ProjectChecklist.layout(rows: projectHeadingList + items) else { return nil }
+    return Set(layout.groups.map(\.id))
+  }
+
+  /// One Checked group after the active rows, built from status, with the
+  /// list's standard foldable header and rows.
+  @ViewBuilder
+  private var checklistCheckedSection: some View {
+    if let pid = checklistProjectId {
+      let checked = checklistCheckedItems
+      if !checked.isEmpty {
+        let collapsed = checklistCheckedCollapsed.contains(pid)
+        AnyView(foldableSectionHeader(icon: "checkmark.circle", title: RegistrySurfaces.checklistChecked,
+                                      count: checked.count, isCollapsed: collapsed) {
+          if collapsed { checklistCheckedCollapsed.remove(pid) } else { checklistCheckedCollapsed.insert(pid) }
+        })
+        if !collapsed {
+          cardedRows(checked, grouped: true)
         }
       }
     }
@@ -3295,11 +3277,14 @@ struct TaskListView: View {
                appendQuickAdd: attachesQuickAddToVisibleCard,
                reorderable: true,
                grouped: true)
-    ForEach(layout.sections) { section in
+    // A Checklist hides a heading with no active rows; the heading row stays.
+    let active = checklistActiveHeadingIds
+    ForEach(layout.sections.filter { active?.contains($0.id) ?? true }) { section in
       AnyView(headingRow(section.heading))
       cardedRows(section.members, reorderable: true, grouped: true,
                  magicContext: section.heading.title)
     }
+    AnyView(checklistCheckedSection)
   }
 
   /// One heading of a project page and the open rows filed under it.
@@ -4454,7 +4439,7 @@ struct TaskListView: View {
       row(task, quickMenu: quickMenu)
         .asTaskRow(id: task.id,
                    isSelected: selection.contains(task.id),
-                   isComplete: task.status == .done)
+                   isComplete: task.status == .done || task.status == .checklistChecked)
     }
   }
 
@@ -4471,6 +4456,7 @@ struct TaskListView: View {
       presentation: .inline,
       deferredCreate: draftEditIds.contains(task.id),
       allowsHeadingPrefix: isProjectFilter,
+      checklistProjectId: draftEditIds.contains(task.id) ? checklistProjectId : nil,
       onClose: { collapseEdit() },
       onToggleComplete: { toggle(task) },
       titleMatchID: "edit-title-\(task.id)",
@@ -4479,8 +4465,15 @@ struct TaskListView: View {
       heroMatchIsSource: expandedEditId == task.id,
       showsTodayIndicator: filter != .today,
       onDone: {
-        if draftEditIds.contains(task.id) { draftEditIds.remove(task.id) }
+        let wasDraft = draftEditIds.contains(task.id)
+        if wasDraft { draftEditIds.remove(task.id) }
         clearQuickAddCaptureSlot(for: task.id)
+        // A new Checklist item with no heading joins the core's suggested group.
+        if wasDraft, let pid = checklistProjectId,
+           let saved = LocalCache.task(id: task.id, in: modelContext), saved.heading == nil {
+          ProjectChecklist.placeNewItem(id: saved.id, title: saved.title, project: pid,
+                                        mutator: mutator, in: modelContext)
+        }
         if LocalCache.task(id: task.id, in: modelContext) == nil {
           removeLocally(id: task.id)
           selection.remove(task.id)

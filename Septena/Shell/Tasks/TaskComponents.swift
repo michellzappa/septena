@@ -528,7 +528,7 @@ struct TaskCheckboxModel {
     // yet" form. Human captures stay solid; only MCP triage-band rows read so.
     let isProposal = task.isInTriageBand && task.source == TaskSource.mcp
     tint = accent
-    isDone = task.status == .done
+    isDone = task.status == .done || task.status == .checklistChecked
     // A row in Recently Deleted is out of every list, Today included, so it
     // never shows Today status or fading.
     let isDeleted = task.deletedAt != nil
@@ -701,7 +701,7 @@ struct TaskRow: View {
   }
 
   private var isInactive: Bool {
-    task.status == .done || task.status == .cancelled
+    task.status == .done || task.status == .cancelled || task.status == .checklistChecked
   }
   private var hasNotes: Bool {
     !(task.notes ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty

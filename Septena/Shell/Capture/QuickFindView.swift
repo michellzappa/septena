@@ -310,11 +310,11 @@ struct QuickFindView: View {
       out.append(QuickFindHit(
         id: "t:\(t.id)",
         taskID: t.id,
-        kind: .task(done: t.status == .done, today: t.isOnToday),
+        kind: .task(done: t.status.isFinished, today: t.isOnToday),
         title: t.title,
         subtitle: taskSubtitle(t),
         shortcut: nil,
-        score: s + (t.status == .done ? (pointing[t.id] == nil ? -1 : -5_000) : 0),
+        score: s + (t.status.isFinished ? (pointing[t.id] == nil ? -1 : -5_000) : 0),
         route: routeForTask(t),
         command: nil
       ))

@@ -82,6 +82,10 @@ struct TaskComposerCard: View {
   /// `# <Heading>` converts it into a project heading (#209). False everywhere
   /// else, where headings are not supported.
   var allowsHeadingPrefix: Bool = false
+  /// The Checklist project a new inline item is added to (#860), else nil.
+  /// While the user types, the core's matches show under the title: a checked
+  /// row to reopen, an active row as On list, and Add "…" for the typed text.
+  var checklistProjectId: String? = nil
   /// Inline collapse hook — how the form asks its host row to fold shut (Return
   /// to save, etc.). The scaffold/`.adaptiveDetail` owns closing in `.drawer`.
   let onClose: (() -> Void)?
@@ -212,10 +216,14 @@ struct TaskComposerCard: View {
   @State private var pastedImages: [PastedImage] = []
   /// Shown under the pasted images when a paste could not be used.
   @State private var pasteError: String?
+  /// The add-field suggestions for the typed title; read on a title change,
+  /// never in `body`.
+  @State private var checklistSuggestions: [ProjectChecklist.Suggestion] = []
 
   init(mode: Mode, areas: [Area], projects: [Project], accent: Color,
        presentation: Presentation = .drawer, deferredCreate: Bool = false,
        allowsHeadingPrefix: Bool = false,
+       checklistProjectId: String? = nil,
        onClose: (() -> Void)? = nil,
        onToggleComplete: (() -> Void)? = nil,
        titleMatchID: String? = nil, checkboxMatchID: String? = nil,
@@ -230,6 +238,7 @@ struct TaskComposerCard: View {
     self.presentation = presentation
     self.deferredCreate = deferredCreate
     self.allowsHeadingPrefix = allowsHeadingPrefix
+    self.checklistProjectId = checklistProjectId
     self.onClose = onClose
     self.onToggleComplete = onToggleComplete
     self.titleMatchID = titleMatchID
@@ -362,6 +371,10 @@ struct TaskComposerCard: View {
               draft == (lastPersistedDraft ?? seededDraft) else { return }
         seededIdentity = nil
         seed()
+      }
+      .onChange(of: draft.title) { _, newValue in
+        guard let pid = checklistProjectId, isCreating else { return }
+        checklistSuggestions = ProjectChecklist.suggestions(project: pid, query: newValue, in: modelContext)
       }
       .onChange(of: draft.title) { oldValue, newValue in
         // A title is one line, so a line break in the field is never text —
@@ -497,6 +510,7 @@ struct TaskComposerCard: View {
       return AnyView(VStack(alignment: .leading, spacing: presentation == .inline ? 10 : 14) {
         notesField
         quickEntryChips
+        checklistSuggestionList
         pastedImagesStrip
       })
     case .attributes:
@@ -947,6 +961,49 @@ struct TaskComposerCard: View {
     }
     .buttonStyle(.plain)
     .background(Capsule().fill(accent.opacity(0.28)))
+  }
+
+  // MARK: - Checklist add-field suggestions (#860)
+
+  /// The core's matches for the typed title, then Add "…" with the exact text.
+  /// Choosing a checked row reopens that row (same id, saved group) and drops
+  /// this blank draft; an active row is already on the list. Typing alone
+  /// never changes the list.
+  @ViewBuilder
+  private var checklistSuggestionList: some View {
+    let typed = draft.title.trimmingCharacters(in: .whitespacesAndNewlines)
+    if checklistProjectId != nil, isCreating, !typed.isEmpty {
+      FlowLayout(spacing: 8) {
+        ForEach(checklistSuggestions) { suggestion in
+          if suggestion.isChecked {
+            chip(icon: "checkmark.circle", leading: "arrow.uturn.backward", text: suggestion.label) {
+              reopenChecklistSuggestion(suggestion)
+            }
+          } else {
+            Text(suggestion.label)
+              .font(.septenaLabel)
+              .lineLimit(1)
+              .foregroundStyle(Theme.inkSecondary)
+              .padding(.horizontal, 11)
+              .padding(.vertical, 6)
+          }
+        }
+        chip(icon: "checklist", leading: "plus", text: RegistrySurfaces.checklistAddTyped(title: typed)) {
+          commit()
+        }
+      }
+      .accessibilityElement(children: .contain)
+      .accessibilityLabel(RegistrySurfaces.checklistAddItem)
+      .transition(.opacity)
+    }
+  }
+
+  private func reopenChecklistSuggestion(_ suggestion: ProjectChecklist.Suggestion) {
+    // Empty the draft first: the host drops a blank new row on close.
+    draft.title = ""
+    checklistSuggestions = []
+    TaskUndo.toggleProjectChecklist(id: suggestion.task.id, mutator: mutator)
+    close()
   }
 
   // MARK: - Paste chip (#210)

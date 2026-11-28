@@ -2121,9 +2121,6 @@ enum RegistrySurfaces {
   static let checklistAddItem: String = RegistryL10n.t("Add item")
   static let checklistOnList: String = RegistryL10n.t("On list")
   static let checklistChecked: String = RegistryL10n.t("Checked")
-  static let checklistMoveToGroup: String = RegistryL10n.t("Move to group")
-  static let checklistUngrouped: String = RegistryL10n.t("Ungrouped")
-  static func checklistAddItemToGroup(group: String) -> String { RegistryL10n.format("Add item to %@", english: "Add item to %@", args: [group]) }
   /// The last add-field suggestion: Add "<typed text>" (docs/PROJECT_CHECKLIST_SPEC.md).
   static func checklistAddTyped(title: String) -> String { RegistryL10n.format("Add “%@”", english: "Add “%@”", args: [title]) }
   static let checklistProjectType: String = RegistryL10n.t("Project type")

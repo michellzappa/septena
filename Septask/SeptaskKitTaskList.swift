@@ -66,7 +66,6 @@ enum KitDrag {
 //           the checkbox refuses first responder for the same reason.
 @MainActor
 final class SeptaskKitTaskListController: NSViewController {
-  private let checklistAddPopover = KitPopoverHandle()
 
   /// A row's list-membership capsule ("# BFF", "📁 Admin") — shown only where
   /// the surrounding group doesn't already say where the task lives.
@@ -1320,13 +1319,10 @@ final class SeptaskKitTaskListController: NSViewController {
       let faded = showsFadedInLists ? LocalCache.fadedTasks(in: context, scope: filter) : []
       let notesRows = containerNotesRows()
       if case .project(let projectId) = filter {
-        if checklistMode(projectId) != nil {
-          newRows = titleRows + notesRows + checklistRows(pool: pool, projectId: projectId)
-        } else {
-          newRows = titleRows + notesRows + projectGrouped(open: open, projectId: projectId)
-            + fadedFooterRows(faded: faded)
-            + loggedFooterRows(completed: completed)
-        }
+        newRows = titleRows + notesRows + projectGrouped(open: open, projectId: projectId)
+          + checklistCheckedRows(pool: pool, projectId: projectId)
+          + fadedFooterRows(faded: faded)
+          + loggedFooterRows(completed: completed)
       } else {
         // Area: flat (headings only live inside a project), and only
         // area-direct open work — same `excludeProjectedTasks` split.
@@ -2613,7 +2609,11 @@ final class SeptaskKitTaskListController: NSViewController {
       return !headingIds.contains(h)
     }
     var result: [Row] = unheaded.map(unchipped)
-    for heading in headings {
+    // A Checklist hides a heading with no active rows (core `projectChecklist`
+    // groups); the heading row stays.
+    let activeHeadings = checklistMode(projectId) == nil ? nil
+      : ProjectChecklist.layout(rows: headings + open).map { Set($0.groups.map(\.id)) }
+    for heading in headings where activeHeadings?.contains(heading.id) ?? true {
       result.append(.task(heading, chip: nil, suggestion: nil))
       let members = open.filter { $0.heading == heading.id }
       result.append(contentsOf: members.map(unchipped))
@@ -2625,42 +2625,18 @@ final class SeptaskKitTaskListController: NSViewController {
     StructureCache.snapshot(in: context).projects.first { $0.id == project }?.checklistMode
   }
 
-  private func checklistRows(pool: [SeptenaTask], projectId: String) -> [Row] {
-    let tasks = LocalCache.headings(inProject: projectId, in: context) + pool
-    guard let layout = ProjectChecklist.layout(rows: tasks) else { return [] }
-    let byID = Dictionary(uniqueKeysWithValues: tasks.map { ($0.id, $0) })
-    var result = layout.ungrouped.compactMap { byID[$0] }.map(unchipped)
-    for group in layout.groups {
-      if let heading = byID[group.id] {
-        result.append(.task(heading, chip: nil, suggestion: nil))
-        result.append(contentsOf: group.items.compactMap { byID[$0] }.map(unchipped))
-      }
-    }
-    result.append(.newTask)
-    if !layout.checked.isEmpty {
-      result.append(.header(id: "checklist-checked", title: RegistrySurfaces.checklistChecked,
-                            icon: .symbol("checkmark.circle"), count: layout.checked.count))
-      result.append(contentsOf: layout.checked.compactMap { byID[$0] }.map(unchipped))
-    }
-    return result
-  }
-
-  private func presentChecklistAdd(project: String, anchor: NSView? = nil) {
-    let headings = LocalCache.headings(inProject: project, in: context)
-    let tasks = LocalCache.tasks(in: context, filter: .project(project))
-    let handle = checklistAddPopover
-    let mutator = self.mutator
-    let content = ProjectChecklistAddView(rows: headings + tasks, initialHeading: focusedTaskForCreate()?.heading) {
-      title, heading in
-      ProjectChecklist.add(title: title, project: project, heading: heading, headings: headings, mutator: mutator)
-      handle.close()
-    } reopen: { id in
-      TaskUndo.toggleProjectChecklist(id: id, mutator: mutator)
-      handle.close()
-    }
-    let hosting = NSHostingView(rootView: content.padding(12).frame(width: 320))
-    let target = anchor ?? view
-    KitPopover.present(hosting, relativeTo: target.bounds, of: target, handle: handle)
+  /// A Checklist's one Checked group after the active rows, built from status
+  /// (#860): the list's standard header and task rows. The AppKit list has no
+  /// foldable group header (Inbox and every Today group use this same fixed
+  /// header), so Checked stays expanded here; the SwiftUI list folds it with
+  /// its Inbox header.
+  private func checklistCheckedRows(pool: [SeptenaTask], projectId: String) -> [Row] {
+    guard checklistMode(projectId) != nil else { return [] }
+    let checked = pool.filter { $0.status == .checklistChecked }
+    guard !checked.isEmpty else { return [] }
+    return [.header(id: "checklist-checked", title: RegistrySurfaces.checklistChecked,
+                    icon: .symbol("checkmark.circle"), count: checked.count)]
+      + checked.map(unchipped)
   }
 
   /// Things-style footer: "Show N logged items" / collapsed by default,
@@ -4109,10 +4085,6 @@ final class SeptaskKitTaskListController: NSViewController {
   }
 
   func createTask(inInbox: Bool = false) {
-    if case .project(let project) = filter, checklistMode(project) != nil {
-      presentChecklistAdd(project: project)
-      return
-    }
     // Save and close whatever is open FIRST, synchronously — a live ⌘R
     // rename included, whose own commit would otherwise land a tick later,
     // on top of the row this creates. Read the anchor afterwards: closing a
@@ -4608,6 +4580,12 @@ final class SeptaskKitTaskListController: NSViewController {
           nil)
       }
       recordNewTaskUndo(id: taskId)
+      // A new Checklist item with no heading joins the core's suggested group.
+      if case .project(let project) = filter, checklistMode(project) != nil,
+         let created = LocalCache.task(id: taskId, in: context), created.heading == nil {
+        ProjectChecklist.placeNewItem(id: taskId, title: created.title, project: project,
+                                      mutator: mutator, in: context)
+      }
     }
 
     guard let row = rows.firstIndex(where: { $0.task?.id == taskId }) else {
@@ -4790,6 +4768,18 @@ final class SeptaskKitTaskListController: NSViewController {
   /// Never call this on a refresh; see `refreshComposerRow`.
   private func wireComposer(_ cell: KitComposerCell, task: SeptenaTask) {
     cell.configure(with: task, listName: listName(for: task))
+    // A new item in a Checklist shows the core's matches under its title (#860).
+    if task.id == pendingNewTaskId, case .project(let project) = filter, checklistMode(project) != nil {
+      cell.checklistProjectID = project
+    } else {
+      cell.checklistProjectID = nil
+    }
+    cell.onReopenChecklistItem = { [weak self, weak cell] id in
+      guard let self else { return }
+      cell?.clearTitleForReopen()
+      TaskUndo.toggleProjectChecklist(id: id, mutator: self.mutator)
+      self.collapseComposer(commit: true)
+    }
     composerRowHeight = cell.expandedHeight
     bindComposerActions(cell, task: task)
   }
@@ -6368,15 +6358,8 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       let identifier = NSUserInterfaceItemIdentifier("newTaskCell")
       let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? KitNewTaskCell
         ?? KitNewTaskCell(identifier: identifier)
-      if case .project(let project) = filter, checklistMode(project) != nil {
-        cell.configure(kind: .checklist)
-        cell.onTap = { [weak self, weak cell] in
-          self?.presentChecklistAdd(project: project, anchor: cell)
-        }
-      } else {
-        cell.configure(kind: .task)
-        cell.onTap = { [weak self] in self?.createTask(inInbox: true) }
-      }
+      cell.configure(kind: .task)
+      cell.onTap = { [weak self] in self?.createTask(inInbox: true) }
       return cell
 
     case .newProject(let areaId):
@@ -8124,7 +8107,7 @@ final class KitLoggedFooterCell: NSTableCellView {
 final class KitNewTaskCell: NSTableCellView {
   /// What the line adds. `.project` is the area page's "New Project" line
   /// (#706): a plus glyph in the checkbox column instead of the empty box.
-  enum Kind { case task, project, checklist }
+  enum Kind { case task, project }
 
   /// Keeps the overlay inside the content column — see `KitContentColumnPin`.
   private var hitPin: KitContentColumnPin!
@@ -8213,8 +8196,6 @@ final class KitNewTaskCell: NSTableCellView {
     case .task:
       title = String(localized: "New task",
                      comment: "Quick-add line at the foot of Today's Inbox")
-    case .checklist:
-      title = RegistrySurfaces.checklistAddItem
     case .project:
       title = RegistryActions.title(.areaNewProject)
     }
