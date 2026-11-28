@@ -1,0 +1,307 @@
+{
+  "version": 1,
+  "id": "fractional",
+  "who": "Runs the finances of three small companies, one day a week each, and is building a house with a sister. An agent does the first draft of every forecast.",
+  "icp": {
+    "core": true,
+    "cohort": "dailyAI"
+  },
+  "people": [
+    "Lena",
+    "Arjun"
+  ],
+  "look": {
+    "accent": "persimmon",
+    "texture": "stippleDrift",
+    "appearance": "dark"
+  },
+  "areas": [
+    {
+      "title": "Clients",
+      "emoji": "📊"
+    },
+    {
+      "title": "Practice",
+      "emoji": "🧮"
+    },
+    {
+      "title": "House",
+      "emoji": "🧱"
+    },
+    {
+      "title": "Family",
+      "emoji": "🫶"
+    }
+  ],
+  "projects": [
+    {
+      "title": "Year-end close",
+      "area": "Clients"
+    },
+    {
+      "title": "Brewery forecast",
+      "area": "Clients",
+      "progress": 0.5
+    },
+    {
+      "title": "House build",
+      "area": "House",
+      "progress": 0.25
+    }
+  ],
+  "moments": [
+    {
+      "id": "close",
+      "plot": "Year-end close for the design agency, a forecast for the brewery, and the builder wants a decision on windows.",
+      "project": "Year-end close",
+      "order": [
+        "Year-end close",
+        "Brewery forecast",
+        "Practice",
+        "House build"
+      ],
+      "rolledIn": 2,
+      "tasks": [
+        {
+          "id": "accruals",
+          "title": "List the accruals for the agency",
+          "group": "Year-end close",
+          "today": true,
+          "notes": "December rent, the two freelancers, and the conference they already booked."
+        },
+        {
+          "id": "bank",
+          "title": "Match the last bank statements",
+          "group": "Year-end close",
+          "today": true,
+          "unread": true,
+          "notes": "Arjun sent the November statements twice. Use the second set."
+        },
+        {
+          "id": "audit-pack",
+          "title": "Start the audit pack",
+          "group": "Year-end close",
+          "today": true
+        },
+        {
+          "id": "assets",
+          "title": "Update the asset register",
+          "group": "Year-end close"
+        },
+        {
+          "id": "close-plan",
+          "title": "Agree the close calendar with Arjun",
+          "group": "Year-end close",
+          "done": true
+        },
+        {
+          "id": "kegs",
+          "title": "Ask the brewery for their keg counts",
+          "group": "Inbox",
+          "today": true,
+          "proposal": true
+        },
+        {
+          "id": "vat-number",
+          "title": "VAT number?",
+          "group": "Inbox",
+          "today": true,
+          "muted": true
+        },
+        {
+          "id": "scenarios",
+          "title": "Three scenarios for the brewery forecast",
+          "group": "Brewery forecast",
+          "today": true
+        },
+        {
+          "id": "hours",
+          "title": "Send my hours to the three clients",
+          "group": "Practice",
+          "today": true
+        },
+        {
+          "id": "windows",
+          "title": "Choose the window frames with Lena",
+          "group": "House build",
+          "today": true
+        }
+      ],
+      "capture": {
+        "title": "Remind Arjun about the petty cash",
+        "group": "Year-end close"
+      },
+      "anytime": [
+        "accruals",
+        "bank",
+        "audit-pack",
+        "scenarios",
+        "windows"
+      ],
+      "picked": [
+        "accruals",
+        "windows"
+      ],
+      "open": [
+        "accruals",
+        "bank"
+      ],
+      "file": {
+        "title": "Ask the builder about the deposit date",
+        "notes": "Lena thinks it is due on signing. The contract says first delivery.",
+        "with": [
+          "windows",
+          "scenarios"
+        ]
+      },
+      "dated": {
+        "title": "Draft accounts to the agency board",
+        "notes": "Accounts, the two open questions, and a one-page summary.",
+        "when": 5,
+        "due": 7
+      },
+      "repeating": {
+        "title": "Cash report for the brewery",
+        "group": "Brewery forecast",
+        "notes": "Bank, what is owed, payroll in two weeks.",
+        "repeat": "Every {weekday}",
+        "with": [
+          "scenarios",
+          "windows"
+        ]
+      },
+      "attachments": {
+        "task": "audit-pack",
+        "notes": "Last year’s pack as the template. The auditor asked for the lease this time.",
+        "files": [
+          "audit-pack-last-year.pdf",
+          "office-lease.pdf",
+          "audit-checklist.xlsx"
+        ]
+      },
+      "upcoming": [
+        {
+          "in": 1,
+          "tasks": [
+            {
+              "id": "site-visit",
+              "title": "Site visit with Lena and the builder",
+              "group": "House build"
+            }
+          ]
+        },
+        {
+          "in": 2,
+          "tasks": [
+            {
+              "ref": "assets",
+              "due": 4
+            }
+          ]
+        },
+        {
+          "in": 3,
+          "tasks": [
+            {
+              "id": "brewery-day",
+              "title": "Day at the brewery",
+              "group": "Brewery forecast"
+            }
+          ]
+        },
+        {
+          "in": 5,
+          "tasks": [
+            {
+              "id": "own-invoices",
+              "title": "Send my own invoices",
+              "group": "Practice",
+              "repeat": "Every month"
+            }
+          ]
+        },
+        {
+          "in": 7,
+          "tasks": [
+            "repeating"
+          ]
+        }
+      ],
+      "agent": {
+        "title": "Draft the brewery’s three forecasts",
+        "notes": "Last year’s sales by month, the new taproom, and the price rise in March. One page for each forecast.",
+        "due": 3,
+        "question": "What should the low case assume?",
+        "options": [
+          "The taproom opens late",
+          "Pubs drop after the rise"
+        ],
+        "artifact": "Three brewery forecasts",
+        "bodies": [
+          "The low case opens the taproom in June instead of March. Cash stays positive, but only just in May.",
+          "The low case loses one pub in ten after the price rise. Cash stays positive, and the taproom covers most of the gap by summer."
+        ],
+        "otherBody": "Three forecasts, one page each. The low case your way: {answer}",
+        "otherAnswer": "Both, at half the size",
+        "handoff": "Read the forecasts",
+        "acceptance": "The brewery has a low, a middle and a high case."
+      },
+      "discuss": {
+        "title": "Answer Lena about the window budget",
+        "group": "House build",
+        "notes": "She wants the wooden frames. They cost a third more than we planned.",
+        "question": "What do you want to suggest?",
+        "options": [
+          "Wood at the front only",
+          "Wood, and skip the shutters"
+        ],
+        "artifact": "Message to Lena",
+        "bodies": [
+          "Wooden frames at the front, where people see them, and the plain ones at the back. That keeps us inside the budget.",
+          "Wooden frames all round, and we leave the shutters for next year. It comes to the same total."
+        ],
+        "otherBody": "Here is what I think we can do: {answer}",
+        "otherAnswer": "Ask the builder for a second price",
+        "draftHandoff": "Read the message",
+        "handoff": "Your next step: send it to Lena tonight",
+        "acceptance": "Lena and I agree on the frames.",
+        "with": [
+          "accruals",
+          "scenarios",
+          "windows"
+        ]
+      },
+      "review": [
+        {
+          "title": "Draft the brewery’s three forecasts",
+          "group": "Brewery forecast",
+          "note": "Three cases in the same layout. The price rise is in all three.",
+          "artifact": "Three brewery forecasts"
+        },
+        {
+          "title": "Match the agency’s card spend",
+          "group": "Year-end close",
+          "note": "212 lines. Nine have no receipt yet.",
+          "artifact": "Card spend matched"
+        }
+      ],
+      "faded": [
+        "Learn the new reporting tool",
+        "Write a month-end guide for clients",
+        "Tidy the client folders",
+        "Find a fourth client",
+        "Read the forecasting book",
+        "Make a price sheet",
+        "Build a cash template",
+        "Visit the agency’s second office",
+        "Sort the old receipts box",
+        "Learn some Python",
+        "Write about part-time finance work",
+        "Frame the first house drawing",
+        "Choose tiles for the bathroom",
+        "Try a kneeling chair",
+        "Cancel the old phone plan"
+      ]
+    }
+  ]
+}

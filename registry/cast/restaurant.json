@@ -1,6 +1,7 @@
 {
   "version": 1, "id": "restaurant",
-  "who": "Owns a neighbourhood restaurant and is opening a second, smaller place.",
+  "who": "Owns a neighbourhood restaurant and is opening a second, smaller place. An agent lines up the supplier quotes.",
+  "icp": { "core": true, "cohort": "todoistUsers" },
   "people": ["Kofi", "Mira"],
   "look": { "accent": "persimmon", "texture": "topography", "appearance": "light" },
   "areas": [{ "title": "Kitchen", "emoji": "🍳" }, { "title": "Floor", "emoji": "🍷" }, { "title": "Books", "emoji": "📒" }, { "title": "Me", "emoji": "🚲" }],

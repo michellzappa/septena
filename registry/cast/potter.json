@@ -1,6 +1,7 @@
 {
   "version": 1, "id": "potter",
   "who": "A potter with a small shop. Throws in the week, sells at weekends, lives above it with a cat.",
+  "icp": { "core": false, "cohort": "toDoMovers" },
   "people": ["Lurdes", "Anouk"],
   "look": { "accent": "tamarillo", "texture": "ridges", "appearance": "light" },
   "areas": [{ "title": "Studio", "emoji": "🏺" }, { "title": "Shop", "emoji": "🧾" }, { "title": "Home", "emoji": "🐈" }],

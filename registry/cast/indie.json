@@ -1,0 +1,311 @@
+{
+  "version": 1,
+  "id": "indie",
+  "who": "Makes a small paid app for amateur choirs on their own, and takes contract work two days a week to pay for it. An agent reads the support mail and drafts the replies.",
+  "icp": {
+    "core": true,
+    "cohort": "dailyAI"
+  },
+  "people": [
+    "Rosa",
+    "Mateus"
+  ],
+  "look": {
+    "accent": "yuzu",
+    "texture": "ridges",
+    "appearance": "light"
+  },
+  "areas": [
+    {
+      "title": "App",
+      "emoji": "🎶"
+    },
+    {
+      "title": "Contract",
+      "emoji": "💼"
+    },
+    {
+      "title": "Money",
+      "emoji": "🪙"
+    },
+    {
+      "title": "Home",
+      "emoji": "🪴"
+    }
+  ],
+  "projects": [
+    {
+      "title": "Version 2",
+      "area": "App"
+    },
+    {
+      "title": "Shop redesign",
+      "area": "Contract",
+      "progress": 0.6
+    },
+    {
+      "title": "Balcony",
+      "area": "Home",
+      "progress": 0.3
+    }
+  ],
+  "moments": [
+    {
+      "id": "release",
+      "plot": "Version 2 goes out next week, and the contract wants three days this week instead of two.",
+      "project": "Version 2",
+      "order": [
+        "Version 2",
+        "Contract",
+        "Shop redesign",
+        "Balcony"
+      ],
+      "rolledIn": 1,
+      "tasks": [
+        {
+          "id": "import",
+          "title": "Test the import from the old version",
+          "group": "Version 2",
+          "today": true,
+          "notes": "Rosa’s choir has 400 pieces. If it works for them, it works."
+        },
+        {
+          "id": "screens",
+          "title": "New screenshots for the store page",
+          "group": "Version 2",
+          "today": true,
+          "unread": true,
+          "notes": "Use the alto part. Everyone uses the soprano part."
+        },
+        {
+          "id": "whats-new",
+          "title": "Write what is new in 2.0",
+          "group": "Version 2",
+          "today": true
+        },
+        {
+          "id": "upgrade",
+          "title": "Decide the upgrade price",
+          "group": "Version 2"
+        },
+        {
+          "id": "beta",
+          "title": "Read the last beta notes",
+          "group": "Version 2",
+          "done": true
+        },
+        {
+          "id": "ghent",
+          "title": "Reply to the choir in Ghent",
+          "group": "Inbox",
+          "today": true,
+          "proposal": true
+        },
+        {
+          "id": "rotate",
+          "title": "crash on rotate?",
+          "group": "Inbox",
+          "today": true,
+          "muted": true
+        },
+        {
+          "id": "invoice",
+          "title": "Invoice Mateus for the shop work",
+          "group": "Contract",
+          "today": true
+        },
+        {
+          "id": "standup",
+          "title": "Stand-up with the shop team",
+          "group": "Shop redesign",
+          "today": true
+        },
+        {
+          "id": "plants",
+          "title": "Water the balcony",
+          "group": "Balcony",
+          "today": true
+        }
+      ],
+      "capture": {
+        "title": "Ask Rosa to try the new metronome",
+        "group": "Version 2"
+      },
+      "anytime": [
+        "import",
+        "screens",
+        "whats-new",
+        "invoice",
+        "plants"
+      ],
+      "picked": [
+        "import",
+        "invoice"
+      ],
+      "open": [
+        "import",
+        "screens"
+      ],
+      "file": {
+        "title": "Check the tax on app sales abroad",
+        "notes": "The store pays out in four currencies now. Mateus’s accountant may know.",
+        "with": [
+          "import",
+          "invoice"
+        ]
+      },
+      "dated": {
+        "title": "Submit version 2 for review",
+        "notes": "Build, notes, screenshots. Leave two days for a rejection.",
+        "when": 2,
+        "due": 3
+      },
+      "repeating": {
+        "title": "Answer the support queue",
+        "group": "App",
+        "notes": "Oldest first. The agent has drafts waiting for most of them.",
+        "repeat": "Every {weekday}",
+        "with": [
+          "import",
+          "plants"
+        ]
+      },
+      "attachments": {
+        "task": "screens",
+        "notes": "Six screens, light and dark. The rehearsal view goes first.",
+        "files": [
+          "store-screens.zip",
+          "captions.txt"
+        ]
+      },
+      "upcoming": [
+        {
+          "in": 1,
+          "tasks": [
+            {
+              "id": "third-day",
+              "title": "Third contract day, at the shop",
+              "group": "Shop redesign"
+            }
+          ]
+        },
+        {
+          "in": 2,
+          "tasks": [
+            {
+              "ref": "whats-new",
+              "due": 3
+            }
+          ]
+        },
+        {
+          "in": 4,
+          "tasks": [
+            {
+              "id": "forum",
+              "title": "Post the release on the choir forum",
+              "group": "App"
+            }
+          ]
+        },
+        {
+          "in": 5,
+          "tasks": [
+            {
+              "id": "rehearsal",
+              "title": "Sit in on Rosa’s rehearsal",
+              "group": "Version 2"
+            }
+          ]
+        },
+        {
+          "in": 7,
+          "tasks": [
+            "repeating",
+            {
+              "id": "payout",
+              "title": "Check the store payout",
+              "group": "Money",
+              "repeat": "Every month"
+            }
+          ]
+        }
+      ],
+      "agent": {
+        "title": "Group the beta feedback into themes",
+        "notes": "Ninety-two messages from eleven choirs. Which problems come up more than once?",
+        "due": 2,
+        "question": "What should come first?",
+        "options": [
+          "What stops a rehearsal",
+          "What most choirs ask for"
+        ],
+        "artifact": "Beta feedback by theme",
+        "bodies": [
+          "Two problems stop a rehearsal: the page turn lags on older tablets, and the import drops repeat signs. Fix both before the release.",
+          "Most choirs ask for the same three things: a bigger page-turn button, a rehearsal timer and shared notes for the section leader."
+        ],
+        "otherBody": "Ninety-two messages, grouped into six themes. Sorted your way: {answer}",
+        "otherAnswer": "Only what Rosa’s choir reported",
+        "handoff": "Read the themes",
+        "acceptance": "You know what to fix before the release."
+      },
+      "discuss": {
+        "title": "Tell Mateus about the third day",
+        "group": "Contract",
+        "notes": "He wants three days this week. Two is the deal, and the release needs the rest.",
+        "question": "What do you want to say?",
+        "options": [
+          "Three days, then back to two",
+          "Two days, as agreed"
+        ],
+        "artifact": "Message to Mateus",
+        "bodies": [
+          "Happy to help this week. I can do three days, and from next week we go back to two, because version 2 ships.",
+          "I would like to keep it to two days this week. Version 2 goes out and needs the rest. I can do an extra day the week after."
+        ],
+        "otherBody": "Thanks for asking first. Here is what I can do: {answer}",
+        "otherAnswer": "A half day, from home",
+        "draftHandoff": "Read the message",
+        "handoff": "Your next step: send it before lunch",
+        "acceptance": "Mateus knows how many days to plan.",
+        "with": [
+          "import",
+          "invoice",
+          "plants"
+        ]
+      },
+      "review": [
+        {
+          "title": "Group the beta feedback into themes",
+          "group": "Version 2",
+          "note": "Six themes, each with the choirs that raised it.",
+          "artifact": "Beta feedback by theme"
+        },
+        {
+          "title": "Draft replies to the support mail",
+          "group": "App",
+          "note": "Fourteen drafts. Three need a decision from you.",
+          "artifact": "Support replies"
+        }
+      ],
+      "faded": [
+        "Write a post about pricing",
+        "Draw the icon myself",
+        "Translate the app into Dutch",
+        "Rewrite the sync in one weekend",
+        "Record a demo video",
+        "Start a list for choir directors",
+        "Try a lifetime price",
+        "Stickers for the release",
+        "Clean up old branches",
+        "Read the indie business book",
+        "Set up a press page",
+        "Try a second app idea",
+        "Answer the 2019 feature request",
+        "Rename the project folders",
+        "Learn a little Rust"
+      ]
+    }
+  ]
+}

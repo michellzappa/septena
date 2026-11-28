@@ -37,6 +37,12 @@ scene needs no new content.
 
 Rules for the content:
 
+- The cast follows the ICPs (Starlings `/strategy/icps-and-market-size-septena-the-task-app`,
+  mz 2026-11-28). Each person says whether they are the core ICP (a
+  multi-area operator who uses AI every day) and which acquisition cohort
+  they come from (`icp`). More than half of the cast is core, and the site
+  draws the home page's first person from the core people only.
+
 - People are unnamed and faceless. The list is the portrait, and no screen may
   read as a testimonial. Names in a list belong to the people around them.
 - A person carries several areas, whatever their job is.
@@ -70,3 +76,8 @@ translated one.
 
 - Review page: `septena.app/scenes/cast` (septena-site `components/scenes/cast-gallery.tsx`)
 - ADR 0015 (registries), ADR 0022 (rejected: the site draws scenes in code)
+- 2026-11-28: the cast was redone for the ICPs. The allotment chair, the
+  farmer, the vet nurse and the PhD student left. A studio principal, an
+  engineering manager, an indie app maker and a part-time finance lead
+  joined. Founder, tech lead, restaurant owner, photographer, potter and
+  translator stayed.

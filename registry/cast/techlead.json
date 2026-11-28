@@ -1,6 +1,7 @@
 {
   "version": 1, "id": "techlead",
-  "who": "Leads a small platform team. Back from parental leave last week, sleeping badly.",
+  "who": "Leads a small platform team. Lets an agent read the logs before anyone else does. Back from parental leave last week, sleeping badly.",
+  "icp": { "core": true, "cohort": "dailyAI" },
   "people": ["Tobias", "Maren"],
   "look": { "accent": "jabuticaba", "texture": "fieldMatrix", "appearance": "light" },
   "areas": [{ "title": "Platform", "emoji": "🛠️" }, { "title": "Team", "emoji": "🧑‍🚀" }, { "title": "Family", "emoji": "🍼" }, { "title": "Flat", "emoji": "🔑" }],

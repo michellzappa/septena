@@ -1,0 +1,317 @@
+{
+  "version": 1,
+  "id": "principal",
+  "who": "Runs a four-person brand studio with a partner. Has an agent draft the first pass of every proposal and reads each line before it goes. Two children, one school run.",
+  "icp": {
+    "core": true,
+    "cohort": "dailyAI"
+  },
+  "people": [
+    "Ines",
+    "Baptiste"
+  ],
+  "look": {
+    "accent": "acai",
+    "texture": "stippleDrift",
+    "appearance": "dark"
+  },
+  "areas": [
+    {
+      "title": "Studio",
+      "emoji": "🖋️"
+    },
+    {
+      "title": "Clients",
+      "emoji": "🤝"
+    },
+    {
+      "title": "Money",
+      "emoji": "🧾"
+    },
+    {
+      "title": "Home",
+      "emoji": "🏡"
+    },
+    {
+      "title": "School",
+      "emoji": "🎒"
+    }
+  ],
+  "projects": [
+    {
+      "title": "Orchard rebrand",
+      "area": "Clients"
+    },
+    {
+      "title": "Studio website",
+      "area": "Studio",
+      "progress": 0.4
+    },
+    {
+      "title": "School fair",
+      "area": "School",
+      "progress": 0.2
+    }
+  ],
+  "moments": [
+    {
+      "id": "pitch",
+      "plot": "The orchard co-op wants the rebrand proposal on Friday, and the school fair needs a stall.",
+      "project": "Orchard rebrand",
+      "order": [
+        "Orchard rebrand",
+        "Studio",
+        "Money",
+        "School fair"
+      ],
+      "rolledIn": 2,
+      "tasks": [
+        {
+          "id": "proposal",
+          "title": "Finish the co-op proposal",
+          "group": "Orchard rebrand",
+          "today": true,
+          "notes": "Three routes, one price each. Baptiste thinks two routes is braver."
+        },
+        {
+          "id": "workshop",
+          "title": "Plan the workshop with the growers",
+          "group": "Orchard rebrand",
+          "today": true,
+          "unread": true,
+          "notes": "Half of them pick apples until noon. Afternoon, in the packing shed."
+        },
+        {
+          "id": "labels",
+          "title": "Pull the old labels from the archive",
+          "group": "Orchard rebrand",
+          "today": true
+        },
+        {
+          "id": "scope",
+          "title": "Write what the price does not cover",
+          "group": "Orchard rebrand"
+        },
+        {
+          "id": "kickoff",
+          "title": "Kickoff call with the co-op board",
+          "group": "Orchard rebrand",
+          "done": true
+        },
+        {
+          "id": "figures",
+          "title": "Ask the co-op for their sales figures",
+          "group": "Inbox",
+          "today": true,
+          "proposal": true
+        },
+        {
+          "id": "font",
+          "title": "font licence?",
+          "group": "Inbox",
+          "today": true,
+          "muted": true
+        },
+        {
+          "id": "bakery",
+          "title": "Chase the bakery invoice",
+          "group": "Money",
+          "today": true
+        },
+        {
+          "id": "juniors",
+          "title": "Read the two junior portfolios",
+          "group": "Studio",
+          "today": true
+        },
+        {
+          "id": "stall",
+          "title": "Ask Ines what the stall needs",
+          "group": "School fair",
+          "today": true
+        }
+      ],
+      "capture": {
+        "title": "Send Baptiste the cider photos",
+        "group": "Orchard rebrand"
+      },
+      "anytime": [
+        "proposal",
+        "workshop",
+        "labels",
+        "bakery",
+        "stall"
+      ],
+      "picked": [
+        "proposal",
+        "stall"
+      ],
+      "open": [
+        "proposal",
+        "workshop"
+      ],
+      "file": {
+        "title": "Ask the accountant about the deposit",
+        "notes": "Half up front, or a third? Baptiste says a third scares nobody.",
+        "with": [
+          "proposal",
+          "bakery",
+          "stall"
+        ]
+      },
+      "dated": {
+        "title": "Send the proposal",
+        "notes": "PDF and a short note. Ines reads it before it goes.",
+        "when": 3,
+        "due": 4
+      },
+      "repeating": {
+        "title": "Studio money check",
+        "group": "Money",
+        "notes": "Cash, what is owed, what is late.",
+        "repeat": "Every {weekday}",
+        "with": [
+          "bakery",
+          "proposal"
+        ]
+      },
+      "attachments": {
+        "task": "labels",
+        "notes": "Labels from 1962, 1988 and the one with the bee. Ask the board before we scan the bee.",
+        "files": [
+          "labels-1962.jpg",
+          "labels-1988.jpg",
+          "bee-label.jpg"
+        ]
+      },
+      "upcoming": [
+        {
+          "in": 1,
+          "tasks": [
+            {
+              "id": "fair-rota",
+              "title": "Sign up for the fair rota",
+              "group": "School fair"
+            }
+          ]
+        },
+        {
+          "in": 2,
+          "tasks": [
+            {
+              "ref": "scope",
+              "due": 4
+            }
+          ]
+        },
+        {
+          "in": 3,
+          "tasks": [
+            {
+              "id": "site-copy",
+              "title": "Approve the website copy",
+              "group": "Studio website"
+            }
+          ]
+        },
+        {
+          "in": 5,
+          "tasks": [
+            {
+              "id": "vat",
+              "title": "File the VAT return",
+              "group": "Money",
+              "repeat": "Every three months"
+            }
+          ]
+        },
+        {
+          "in": 7,
+          "tasks": [
+            "repeating",
+            {
+              "id": "partner-lunch",
+              "title": "Lunch with Baptiste, no laptops",
+              "group": "Studio"
+            }
+          ]
+        }
+      ],
+      "agent": {
+        "title": "Turn the workshop notes into three routes",
+        "notes": "Forty minutes of growers talking. Keep their words, not ours.",
+        "due": 3,
+        "question": "How far should the routes go?",
+        "options": [
+          "Close to the old labels",
+          "One safe, one brave"
+        ],
+        "artifact": "Three routes from the workshop",
+        "bodies": [
+          "All three routes keep the old bee and the hand lettering. They differ in colour and in how much of the orchard shows.",
+          "Route one stays near the old labels. Route two drops the bee and leads with the orchard map. Route three sits between them."
+        ],
+        "otherBody": "Three routes, built from the growers’ own words. Your direction: {answer}",
+        "otherAnswer": "Whatever the oldest grower liked",
+        "handoff": "Read the routes",
+        "acceptance": "You can pick the routes for the proposal."
+      },
+      "discuss": {
+        "title": "Answer the co-op about the budget",
+        "group": "Orchard rebrand",
+        "notes": "They asked if we can do it for less. Ines says yes to less work, never to a lower rate.",
+        "question": "What do you want to offer?",
+        "options": [
+          "Fewer routes, same rate",
+          "Spread it over two years"
+        ],
+        "artifact": "Reply to the co-op",
+        "bodies": [
+          "Thank you for being open about the budget. We can do it for less by showing two routes instead of three. The rate stays the same.",
+          "Thank you for being open about the budget. We can keep the full scope and spread the fee over two years, in four parts."
+        ],
+        "otherBody": "Thank you for being open about the budget. Here is what we can do: {answer}",
+        "otherAnswer": "Drop the workshop, keep the routes",
+        "draftHandoff": "Read the reply",
+        "handoff": "Your next step: send it after lunch",
+        "acceptance": "The co-op knows what the budget buys.",
+        "with": [
+          "proposal",
+          "bakery",
+          "stall"
+        ]
+      },
+      "review": [
+        {
+          "title": "Turn the workshop notes into three routes",
+          "group": "Orchard rebrand",
+          "note": "Three routes, each with the grower quote it came from.",
+          "artifact": "Three routes from the workshop"
+        },
+        {
+          "title": "Sort the studio receipts by client",
+          "group": "Money",
+          "note": "Forty-one receipts. Six have no client yet.",
+          "artifact": "Receipts by client"
+        }
+      ],
+      "faded": [
+        "Write the studio manifesto",
+        "Learn letterpress",
+        "Repaint the studio door",
+        "Podcast about type",
+        "Clean up the fonts folder",
+        "Try four-day weeks",
+        "Book the type fair in Lisbon",
+        "Frame the first invoice",
+        "Print a studio zine",
+        "Business cards on thicker paper",
+        "Sort the sample shelf",
+        "Visit the paper mill",
+        "Give a talk at the art school",
+        "Read the pricing book",
+        "Plant herbs on the roof"
+      ]
+    }
+  ]
+}

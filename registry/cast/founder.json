@@ -1,6 +1,7 @@
 {
   "version": 1, "id": "founder",
-  "who": "Runs a six-person company that makes software for sailing schools. A sibling gets married in three weeks.",
+  "who": "Runs a six-person company that makes software for sailing schools. Hands comparisons and first drafts to an agent. A sibling gets married in three weeks.",
+  "icp": { "core": true, "cohort": "dailyAI" },
   "people": ["Noor", "Idris"],
   "look": { "accent": "haskap", "texture": "fieldMatrix", "appearance": "dark" },
   "areas": [{ "title": "Company", "emoji": "⛵️" }, { "title": "Hiring", "emoji": "🪑" }, { "title": "Family", "emoji": "💍" }, { "title": "Paperwork", "emoji": "🗂️" }],
