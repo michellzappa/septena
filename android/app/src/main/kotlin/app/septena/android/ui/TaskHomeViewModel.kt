@@ -16,6 +16,7 @@ import app.septena.core.SmartListResolver
 import app.septena.core.SmartListSection
 import app.septena.core.StructureOrder
 import app.septena.core.SyncRecord
+import app.septena.core.TaskAddedVia
 import app.septena.core.TaskConversation
 import app.septena.core.TaskFadeRules
 import app.septena.core.TaskSnapshot
@@ -636,6 +637,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                         notes = draft.notes.trim().takeIf(String::isNotEmpty),
                         heading = if (draft.projectId != null) draft.headingId else null,
                         position = draft.position,
+                        addedVia = TaskAddedVia.QUICK_ADD,
                     )
                     val fields = runCatching {
                         draft.whenDay?.let { graph.taskMutator.setWhen(created.id, it) }

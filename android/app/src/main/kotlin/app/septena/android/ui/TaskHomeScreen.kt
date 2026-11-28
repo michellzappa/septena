@@ -1238,7 +1238,7 @@ private fun TaskHomeScaffold(
     val selecting = state.selectedIds.isNotEmpty()
     val destinationId = (state.location as? TaskHomeLocation.SmartList)?.destinationId
     val betaSignedIn by graph.credentials.signedIn.collectAsStateWithLifecycle()
-    // The beta card (docs/BETA_ONBOARDING_SPEC.md §7) reads the checklist each time Today opens.
+    // The beta card (ADR 0064) reads the beta state each time Today opens.
     LaunchedEffect(destinationId == RegistryDestinationIds.TODAY, betaSignedIn) {
         if (destinationId == RegistryDestinationIds.TODAY) graph.beta.refresh(betaSignedIn)
     }
@@ -1463,9 +1463,14 @@ private fun TaskHomeScaffold(
         if (destinationId == RegistryDestinationIds.TODAY) {
             BetaTodayCard(
                 graph = graph,
-                languageTag = languageTag,
                 isDark = isDark,
                 hasActiveTexture = appearance.hasActiveTexture,
+                onOpenProject = { projectId ->
+                    val project = state.projects.firstOrNull {
+                        (it.location as? TaskHomeLocation.Project)?.id == projectId
+                    }?.location ?: TaskHomeLocation.Project(projectId, "")
+                    onSelectHomeLocation(project)
+                },
                 modifier = Modifier.padding(bottom = 10.dp),
             )
         }
