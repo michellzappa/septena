@@ -76,6 +76,7 @@ import app.septena.core.RegistryActionContext
 import app.septena.core.RegistryActionResolver
 import app.septena.core.RegistryCatalog
 import app.septena.core.generated.RegistryActionIds
+import app.septena.core.generated.RegistryEntityEnums
 import app.septena.core.generated.RegistryDestinationIds
 import app.septena.core.generated.RegistryPlatformIds
 import app.septena.core.generated.RegistryPromptIds
@@ -129,7 +130,7 @@ internal fun ListsHomePage(
     onQuickFind: () -> Unit,
     onOpenSettings: () -> Unit,
     onCreateArea: (String, Int?) -> Unit,
-    onCreateProject: (String, String?, Int?) -> Unit,
+    onCreateProject: (String, String?, Int?, String?) -> Unit,
     onMoveProjectToArea: (String, String?) -> Unit = { _, _ -> },
     onRenameArea: (String, String) -> Unit = { _, _ -> },
     onRenameProject: (String, String) -> Unit = { _, _ -> },
@@ -244,7 +245,7 @@ internal fun ListsHomePage(
                             magicDraft = null
                             when (draft) {
                                 is HomeMagicDraft.Area -> onCreateArea(name, draft.index)
-                                is HomeMagicDraft.Project -> onCreateProject(name, draft.areaId, draft.index)
+                                is HomeMagicDraft.Project -> onCreateProject(name, draft.areaId, draft.index, null)
                             }
                         },
                         onCancelMagicDraft = { magicDraft = null },
@@ -340,9 +341,9 @@ internal fun ListsHomePage(
             initialAreaId = newProjectInitialAreaId,
             languageTag = languageTag,
             onDismiss = { newProjectDialogOpen = false },
-            onConfirm = { name, areaId ->
+            onConfirm = { name, areaId, checklistMode ->
                 newProjectDialogOpen = false
-                onCreateProject(name, areaId, null)
+                onCreateProject(name, areaId, null, checklistMode)
             },
         )
     }
@@ -364,7 +365,7 @@ internal fun TabletSidebarPane(
     onSetAreaEmoji: (String, String?) -> Unit,
     onOpenSettings: () -> Unit,
     onCreateArea: (String, Int?) -> Unit,
-    onCreateProject: (String, String?, Int?) -> Unit,
+    onCreateProject: (String, String?, Int?, String?) -> Unit,
     onMoveProjectToArea: (String, String?) -> Unit,
     onRenameArea: (String, String) -> Unit,
     onRenameProject: (String, String) -> Unit,
@@ -419,7 +420,7 @@ internal fun TabletSidebarPane(
                     magicDraft = null
                     when (draft) {
                         is HomeMagicDraft.Area -> onCreateArea(name, draft.index)
-                        is HomeMagicDraft.Project -> onCreateProject(name, draft.areaId, draft.index)
+                        is HomeMagicDraft.Project -> onCreateProject(name, draft.areaId, draft.index, null)
                     }
                 },
                 onCancelMagicDraft = { magicDraft = null },
@@ -513,9 +514,9 @@ internal fun TabletSidebarPane(
             initialAreaId = newProjectInitialAreaId,
             languageTag = languageTag,
             onDismiss = { newProjectDialogOpen = false },
-            onConfirm = { name, areaId ->
+            onConfirm = { name, areaId, checklistMode ->
                 newProjectDialogOpen = false
-                onCreateProject(name, areaId, null)
+                onCreateProject(name, areaId, null, checklistMode)
             },
         )
     }
@@ -1743,7 +1744,7 @@ private fun NewProjectDialog(
     initialAreaId: String?,
     languageTag: String,
     onDismiss: () -> Unit,
-    onConfirm: (String, String?) -> Unit,
+    onConfirm: (String, String?, String?) -> Unit,
 ) {
     val promptId = RegistryPromptIds.NEW_PROJECT
     val promptFields = remember { RegistryCatalog.surface(promptId)?.fields.orEmpty() }
@@ -1756,6 +1757,9 @@ private fun NewProjectDialog(
 
     var name by remember { mutableStateOf("") }
     var selectedAreaId by remember(initialAreaId) { mutableStateOf(initialAreaId) }
+    var checklistMode by remember { mutableStateOf<String?>(null) }
+    var typeMenuOpen by remember { mutableStateOf(false) }
+    val modes = listOf(null to "project", RegistryEntityEnums.ChecklistMode.PLAIN to "checklist")
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
@@ -1773,9 +1777,24 @@ private fun NewProjectDialog(
                     label = { Text(placeholder) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(onDone = { if (name.isNotBlank()) onConfirm(name, selectedAreaId) }),
+                    keyboardActions = KeyboardActions(onDone = { if (name.isNotBlank()) onConfirm(name, selectedAreaId, checklistMode) }),
                     modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
                 )
+                Box {
+                    val key = modes.first { it.first == checklistMode }.second
+                    TextButton(onClick = { typeMenuOpen = true }) { Text(checklistCopy(key, languageTag)) }
+                    DropdownMenu(expanded = typeMenuOpen, onDismissRequest = { typeMenuOpen = false }) {
+                        for ((mode, label) in modes) {
+                            DropdownMenuItem(
+                                text = { Text(checklistCopy(label, languageTag)) },
+                                onClick = {
+                                    checklistMode = mode
+                                    typeMenuOpen = false
+                                },
+                            )
+                        }
+                    }
+                }
                 if (areas.isNotEmpty()) {
                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         AreaPickerOptionRow(
@@ -1799,7 +1818,7 @@ private fun NewProjectDialog(
             }
         },
         confirmButton = {
-            TextButton(enabled = name.isNotBlank(), onClick = { onConfirm(name, selectedAreaId) }) {
+            TextButton(enabled = name.isNotBlank(), onClick = { onConfirm(name, selectedAreaId, checklistMode) }) {
                 Text(confirmTitle)
             }
         },

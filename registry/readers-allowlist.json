@@ -448,10 +448,6 @@
     "RegistryActionIds.APP_CONTACT_SUPPORT": {
       "reason": "Android has no Help menu; Contact Support opens from Settings (ADR 0054)",
       "issue": "#676"
-    },
-    "RegistryActionIds.PROJECT_USE_AS_CHECKLIST": {
-      "reason": "Phase 0 of #860 restores the Use as Checklist action; the Android phase of #860 binds it.",
-      "issue": "#860"
     }
   },
   "ships": {

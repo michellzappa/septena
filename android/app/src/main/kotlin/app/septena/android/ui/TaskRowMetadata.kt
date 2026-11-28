@@ -215,7 +215,8 @@ internal fun buildTaskListItem(
         waitingText = waitingText,
         subtitle = subtitle,
         subtitleTargetKey = subtitleTargetKey,
-        isCompleted = snapshot.status == RegistryEntityEnums.TaskStatus.DONE,
+        isCompleted = snapshot.status == RegistryEntityEnums.TaskStatus.DONE ||
+            snapshot.status == RegistryEntityEnums.TaskStatus.CHECKLIST_CHECKED,
         isOnToday = membership.isOnToday,
         isStarred = snapshot.starred,
         isFaded = isFaded,

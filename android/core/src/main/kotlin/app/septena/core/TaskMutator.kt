@@ -559,6 +559,36 @@ class TaskMutator(
         return row.deletedAt == null && row.fields[RegistryEntityFields.Project.CHECKLIST_MODE].stringValue() != null
     }
 
+    /** True when [id] is a live row of a Checklist project (#860). */
+    suspend fun isChecklistRow(id: String): Boolean {
+        val task = store.record(RegistryEntityNames.TASK, id)?.asTaskRecord() ?: return false
+        return task.deletedAt == null && isChecklistItem(task)
+    }
+
+    /**
+     * A new Checklist item added with no heading joins the core's suggested
+     * group under one stable heading per project (core `checklistHeading`).
+     * [groupTitle] gives the registry title of a group key. Unknown items stay
+     * ungrouped. Returns the heading id, or null.
+     */
+    suspend fun placeChecklistItem(id: String, title: String, groupTitle: (String) -> String?): String? {
+        val task = store.record(RegistryEntityNames.TASK, id)?.asTaskRecord() ?: return null
+        if (task.deletedAt != null || !isChecklistItem(task)) return null
+        if (task.fields[RegistryEntityFields.Task.HEADING].stringValue() != null) return null
+        val project = task.fields[RegistryEntityFields.Task.PROJECT].stringValue() ?: return null
+        val group = ProjectChecklistRules.layout(emptyList(), title).suggestedGroup ?: return null
+        val name = groupTitle(group) ?: return null
+        val headings = store.records(RegistryEntityNames.TASK).filter { row ->
+            row.fields[RegistryEntityFields.Task.PROJECT].stringValue() == project &&
+                row.fields[RegistryEntityFields.Task.KIND].stringValue() == RegistryEntityEnums.TaskKind.HEADING
+        }
+        val decision = ProjectChecklistRules.heading(project, group, name, headings)
+        val heading = decision.heading ?: return null
+        if (decision.create) createHeading(name, project, id = heading)
+        updateFields(id, mapOf(RegistryEntityFields.Task.HEADING to JsonValue.StringValue(heading)))
+        return heading
+    }
+
     suspend fun toggleProjectChecklist(id: String): TaskRecord? {
         val task = store.record(RegistryEntityNames.TASK, id)?.asTaskRecord() ?: return null
         if (task.deletedAt != null || !isChecklistItem(task)) return null
@@ -593,6 +623,10 @@ class TaskMutator(
     suspend fun reopen(id: String): TaskRecord? {
         val existing = store.record(RegistryEntityNames.TASK, id)?.asTaskRecord() ?: return null
         if (existing.deletedAt != null || existing.status == TaskStatus.OPEN) return null
+        // A checked Checklist row reopens with the core patch: open, still undated.
+        if (existing.status == TaskStatus.CHECKLIST_CHECKED && isChecklistItem(existing)) {
+            return writeChecklistState(existing)
+        }
         return updateFields(
             id,
             linkedMapOf(

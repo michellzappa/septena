@@ -429,6 +429,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         title: String,
         areaId: String? = null,
         insertIndex: Int? = null,
+        checklistMode: String? = null,
         onCreated: (TaskHomeLocation.Project) -> Unit = {},
     ) {
         val trimmed = title.trim()
@@ -453,6 +454,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                     val fields = buildMap<String, JsonValue> {
                         put(RegistryEntityFields.Project.TITLE, JsonValue.StringValue(trimmed))
                         put(RegistryEntityFields.Project.STATUS, JsonValue.StringValue(RegistryEntityEnums.ProjectStatus.ACTIVE))
+                        checklistMode?.let { put(RegistryEntityFields.Project.CHECKLIST_MODE, JsonValue.StringValue(it)) }
                         put(RegistryEntityFields.Project.POSITION, JsonValue.IntegerValue(appendPos))
                         areaId?.let { put(RegistryEntityFields.Project.AREA, JsonValue.StringValue(it)) }
                     }
@@ -731,7 +733,10 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             }
             batchGesture { ids ->
                 if (!isLogbook) {
-                    for (id in ids) graph.completionSettle.start(id, reviewGroupId = reviewKeys[id])
+                    // A Checklist row moves to Checked at once: no settle (#860).
+                    for (id in ids) {
+                        if (!graph.taskMutator.isChecklistRow(id)) graph.completionSettle.start(id, reviewGroupId = reviewKeys[id])
+                    }
                 }
                 graph.completeTasks(ids)
             }
@@ -858,16 +863,28 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             return
         }
         val destId = (location.value as? TaskHomeLocation.SmartList)?.destinationId
-        if (destId != RegistryDestinationIds.LOGBOOK) {
-            val reviewGroupKey = if (destId == RegistryDestinationIds.REVIEW) {
-                loaded.value.tasks.firstOrNull { it.id == id }?.group?.key
-            } else {
-                null
-            }
-            graph.completionSettle.start(id, reviewGroupId = reviewGroupKey)
+        val reviewGroupKey = if (destId == RegistryDestinationIds.REVIEW) {
+            loaded.value.tasks.firstOrNull { it.id == id }?.group?.key
+        } else {
+            null
         }
         viewModelScope.launch {
             runCatching {
+                // A Checklist row checks and reopens with the core patch and moves at
+                // once: no settle. Its checked row reopens here too (#860).
+                val checklist = withContext(Dispatchers.IO) { graph.taskMutator.isChecklistRow(id) }
+                if (checklist) {
+                    withContext(Dispatchers.IO) {
+                        val checked = graph.taskStore.record(EntityNames.TASK, id)
+                            ?.fields?.get(RegistryEntityFields.Task.STATUS).stringValue() ==
+                            app.septena.core.generated.RegistryEntityEnums.TaskStatus.CHECKLIST_CHECKED
+                        if (checked) graph.reopenTask(id) else graph.completeTask(id)
+                    }
+                    return@runCatching
+                }
+                if (destId != RegistryDestinationIds.LOGBOOK) {
+                    graph.completionSettle.start(id, reviewGroupId = reviewGroupKey)
+                }
                 withContext(Dispatchers.IO) { graph.completeTask(id) }
             }
                 .onSuccess {

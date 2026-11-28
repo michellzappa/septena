@@ -345,7 +345,8 @@ fun TaskDetailScreen(
     val taskFields = data?.task?.fields.orEmpty()
     val deleted = data?.task?.deletedAt != null
     val status = taskFields[RegistryEntityFields.Task.STATUS].stringValue()
-    val isCompleted = status == RegistryEntityEnums.TaskStatus.DONE
+    val isCompleted = status == RegistryEntityEnums.TaskStatus.DONE ||
+        status == RegistryEntityEnums.TaskStatus.CHECKLIST_CHECKED
     val isStarred = taskFields[RegistryEntityFields.Task.STARRED].booleanValue() == true
     val scheduled = taskFields[RegistryEntityFields.Task.SCHEDULED].stringValue()
     val isToday = taskFields[RegistryEntityFields.Task.TODAY].booleanValue() == true
@@ -479,17 +480,8 @@ fun TaskDetailScreen(
     fun toggleComplete() {
         if (!canEdit) return
         if (isCompleted) {
-            write {
-                check(
-                    graph.taskMutator.updateFields(
-                        taskId,
-                        mapOf(
-                            RegistryEntityFields.Task.STATUS to JsonValue.StringValue(RegistryEntityEnums.TaskStatus.OPEN),
-                            RegistryEntityFields.Task.COMPLETED_AT to JsonValue.Null,
-                        ),
-                    ) != null,
-                )
-            }
+            // `reopen` gives a checked Checklist row the core reopen patch (#860).
+            write { check(graph.taskMutator.reopen(taskId) != null) }
         } else {
             save { check(graph.completeTask(taskId)) }
         }

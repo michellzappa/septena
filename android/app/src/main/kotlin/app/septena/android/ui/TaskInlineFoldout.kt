@@ -92,6 +92,7 @@ import app.septena.ui.DeadlineFlagGlyph
 import app.septena.ui.OpenTaskPageGlyph
 import app.septena.ui.PlusSmallGlyph
 import app.septena.ui.RepeatSmallGlyph
+import app.septena.ui.PlusGlyph
 import app.septena.ui.SeptenaGlyph
 import app.septena.ui.SeptenaIconKind
 import app.septena.ui.SeptenaTaskCheckbox
@@ -301,7 +302,11 @@ internal fun TaskInlineFoldout(
     val taskFields = data?.task?.fields.orEmpty()
     val deleted = data?.task?.deletedAt != null
     val status = taskFields[RegistryEntityFields.Task.STATUS].stringValue()
-    val isCompleted = if (data != null) status == RegistryEntityEnums.TaskStatus.DONE else fallbackCompleted
+    val isCompleted = if (data != null) {
+        status == RegistryEntityEnums.TaskStatus.DONE || status == RegistryEntityEnums.TaskStatus.CHECKLIST_CHECKED
+    } else {
+        fallbackCompleted
+    }
     val isStarred = taskFields[RegistryEntityFields.Task.STARRED].booleanValue() == true
     val scheduled = taskFields[RegistryEntityFields.Task.SCHEDULED].stringValue()
     val isToday = taskFields[RegistryEntityFields.Task.TODAY].booleanValue() == true
@@ -389,6 +394,19 @@ internal fun TaskInlineFoldout(
                 InlineTitleTokens.Kind.Project -> selectedProjectId == null
                 InlineTitleTokens.Kind.Area -> rawAreaId == null && selectedProjectId == null
             }
+        }
+    }
+    // Checklist add-field suggestions (#860): while a new item in a Checklist is
+    // typed, the core's matches, then Add "…". Typing alone changes nothing.
+    var checklistMatches by remember(taskId) { mutableStateOf<List<ChecklistSuggestion>?>(null) }
+    val suggestsChecklist = isDraft && data != null && storedTitle.isBlank() && selectedProjectId != null
+    LaunchedEffect(taskId, suggestsChecklist, titleDraft) {
+        checklistMatches = if (suggestsChecklist && selectedProjectId != null) {
+            withContext(Dispatchers.IO) {
+                runCatching { graph.checklistSuggestions(selectedProjectId, titleDraft, languageTag) }.getOrNull()
+            }
+        } else {
+            null
         }
     }
     val chipDayFormat = remember(languageTag) {
@@ -484,17 +502,8 @@ internal fun TaskInlineFoldout(
     fun toggleComplete() {
         if (!canEdit) return
         if (isCompleted) {
-            write {
-                check(
-                    graph.taskMutator.updateFields(
-                        taskId,
-                        mapOf(
-                            RegistryEntityFields.Task.STATUS to JsonValue.StringValue(RegistryEntityEnums.TaskStatus.OPEN),
-                            RegistryEntityFields.Task.COMPLETED_AT to JsonValue.Null,
-                        ),
-                    ) != null,
-                )
-            }
+            // `reopen` gives a checked Checklist row the core reopen patch (#860).
+            write { check(graph.taskMutator.reopen(taskId) != null) }
         } else {
             save { check(graph.completeTask(taskId)) }
             onCollapse()
@@ -829,6 +838,52 @@ internal fun TaskInlineFoldout(
                                 onClick = { applyDraftToken(token) },
                             )
                         }
+                    }
+                }
+
+                val matches = checklistMatches
+                if (matches != null && titleDraft.isNotBlank()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                            .semantics { contentDescription = checklistCopy("addItem", languageTag) },
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        matches.forEach { match ->
+                            InlineAttributePill(
+                                label = match.label,
+                                isSet = !match.isChecked,
+                                isActive = false,
+                                isDark = isDark,
+                                // An active row is already on the list: nothing to do.
+                                enabled = canEdit && match.isChecked,
+                                tint = accent,
+                                icon = { tint -> SeptenaGlyph(kind = SeptenaIconKind.Logbook, tint = tint, size = 13.dp) },
+                                onClick = {
+                                    // Reopen the same row; the blank draft drops on fold.
+                                    titleDraft = ""
+                                    textIsDirty = false
+                                    graph.launch {
+                                        graph.reopenTask(match.taskId)
+                                        graph.sync.noteLocalChange()
+                                        graph.sync.requestSync()
+                                    }
+                                    onCollapse()
+                                },
+                            )
+                        }
+                        InlineAttributePill(
+                            label = checklistAddTyped(titleDraft.trim(), languageTag),
+                            isSet = false,
+                            isActive = false,
+                            isDark = isDark,
+                            enabled = canEdit,
+                            tint = accent,
+                            icon = { tint -> PlusGlyph(tint = tint, size = 13.dp) },
+                            onClick = ::handleCollapse,
+                        )
                     }
                 }
 
