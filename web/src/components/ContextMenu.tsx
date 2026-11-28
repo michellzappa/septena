@@ -23,6 +23,7 @@ export interface ContextMenuState {
   x: number;
   y: number;
   items: ContextMenuEntry[];
+  trigger?: HTMLElement;
 }
 
 export function ContextMenu({
@@ -42,7 +43,10 @@ export function ContextMenu({
     if (!menu) return;
     const handleClose = () => onClose();
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") {
+        onClose();
+        menu.trigger?.focus();
+      }
     };
     window.addEventListener("click", handleClose);
     window.addEventListener("scroll", handleClose, true);
@@ -102,6 +106,7 @@ export function ContextMenu({
       <button
         key={`${entry.label}-${idx}`}
         type="button"
+        autoFocus={Boolean(menu.trigger) && !inSubmenu && idx === 0}
         onMouseEnter={() => {
           if (!inSubmenu) setOpenSubmenuIdx(null);
         }}

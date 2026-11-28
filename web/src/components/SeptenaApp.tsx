@@ -4812,7 +4812,8 @@ export function SeptenaApp() {
             {/* Task Lists — iOS grouped rounded cards on soft gray canvas */}
             {checklistProject?.checklistMode ? (
               <ProjectChecklist key={checklistProject.id} project={checklistProject} tasks={syncState.snapshot.tasks}
-                engine={engine} toggle={toggleDone} open={(task) => setTaskPageId(task.id)} />
+                engine={engine} toggle={toggleDone} open={(task) => setTaskPageId(task.id)}
+                openContextMenu={setContextMenu} language={lang} />
             ) : listedTasks.length === 0 && projectHeadings.length === 0 && completedTodayTasks.length === 0 ? (
               <div className="py-16 text-center">
                 <p className="text-sm font-medium text-[var(--text-secondary)]">{pageMeta.emptyTitle}</p>

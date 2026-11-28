@@ -1,8 +1,11 @@
 "use client";
 
+import { Ellipsis } from "lucide-react";
 import { useMemo, useState } from "react";
 import { callCore, occurrenceId } from "../lib/core";
+import { ACTIONS_CATALOG, registryText } from "../lib/generated/registries";
 import type { ProjectRow, TaskRow } from "../lib/types";
+import type { ContextMenuState } from "./ContextMenu";
 import type { WebSyncEngine } from "../lib/sync/engine";
 
 const groceryGroups: Record<string, string> = {
@@ -23,13 +26,15 @@ interface Layout {
 }
 
 export function ProjectChecklist({
-  project, tasks, engine, toggle, open,
+  project, tasks, engine, toggle, open, openContextMenu, language,
 }: {
   project: ProjectRow;
   tasks: TaskRow[];
   engine: WebSyncEngine;
   toggle: (task: TaskRow) => Promise<void>;
   open: (task: TaskRow) => void;
+  openContextMenu: (menu: ContextMenuState) => void;
+  language: string;
 }) {
   const [title, setTitle] = useState("");
   const [group, setGroup] = useState<string | null>(null);
@@ -77,12 +82,32 @@ export function ProjectChecklist({
     setTitle("");
   });
 
+  const showRowMenu = (row: TaskRow, x: number, y: number, trigger?: HTMLElement) => {
+    if (busy) return;
+    const action = ACTIONS_CATALOG.actions["task.delete"];
+    openContextMenu({
+      x,
+      y,
+      trigger,
+      items: [{
+        kind: "item",
+        label: registryText(action.title, language),
+        destructive: action.role === "destructive",
+        onSelect: () => void perform(() => engine.deleteTask(row)),
+      }],
+    });
+  };
+
   const renderRows = (ids: string[]) => ids.flatMap((id) => {
     const row = byId.get(id);
     if (!row) return [];
     const checked = row.status === "checklistChecked";
     return (
-      <li key={id} className="flex items-center gap-2 py-2">
+      <li key={id} className="flex items-center gap-2 py-2"
+        onContextMenu={(event) => {
+          event.preventDefault();
+          showRowMenu(row, event.clientX, event.clientY);
+        }}>
         <input type="checkbox" aria-label={row.title} checked={checked} disabled={busy}
           onChange={() => void perform(() => toggle(row))} />
         <button type="button" className="flex-1 text-left" onClick={() => open(row)}>{row.title}</button>
@@ -96,8 +121,16 @@ export function ProjectChecklist({
             {headings.map((heading) => <option key={heading.id} value={heading.id}>{heading.title}</option>)}
           </select>
         )}
-        <button type="button" disabled={busy} aria-label={`Delete ${row.title}`}
-          onClick={() => void perform(() => engine.deleteTask(row))}>Delete</button>
+        <button type="button" disabled={busy}
+          aria-label={`${registryText("Task actions", language)} · ${row.title}`}
+          className="rounded p-1 text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+          onClick={(event) => {
+            event.stopPropagation();
+            const anchor = event.currentTarget.getBoundingClientRect();
+            showRowMenu(row, anchor.left, anchor.bottom, event.currentTarget);
+          }}>
+          <Ellipsis className="h-4 w-4" aria-hidden="true" />
+        </button>
       </li>
     );
   });
