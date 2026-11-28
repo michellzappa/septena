@@ -2,7 +2,7 @@
 // lists every marketing screen shows. Content rules here keep a list real:
 // connected, uneven, typed as a person types, and only what Septena ships.
 
-const PERSON_KEYS = { required: ["version", "id", "who", "people", "areas", "projects", "moments"], optional: ["look", "legacy"] };
+const PERSON_KEYS = { required: ["version", "id", "who", "people", "areas", "projects", "moments"], optional: ["look"] };
 const MOMENT_KEYS = { required: ["id", "plot", "project", "order", "tasks", "capture", "anytime", "picked", "open", "file", "dated", "repeating", "attachments", "upcoming", "agent", "discuss", "review", "faded"], optional: ["rolledIn"] };
 const TASK_KEYS = { required: ["id", "title", "group"], optional: ["today", "done", "proposal", "unread", "muted", "notes", "due", "repeat", "files"] };
 const CONVERSATION = ["title", "notes", "question", "options", "artifact", "bodies", "otherBody", "otherAnswer", "handoff", "acceptance"];
@@ -34,7 +34,6 @@ export function validateCast(people, { tokens, caps, inboxTitle }, assert) {
   const accents = new Set(tokens.fruitAccents.map((item) => item.id));
   const textures = new Set(tokens.textures.map((item) => item.id));
   for (const id of FEATURES) assert(caps.capabilities[id]?.ios === "ships", `cast: every person shows ${id}, which does not ship on ios`);
-  assert(people.filter(({ person }) => person.legacy).length <= 1, "cast: at most one legacy person");
   const owners = { name: new Map(), look: new Map(), title: new Map() };
   const own = (kind, value, id) => {
     const holder = owners[kind].get(value);
@@ -52,7 +51,6 @@ export function validateCast(people, { tokens, caps, inboxTitle }, assert) {
     keys(person, PERSON_KEYS, "person");
     assert(person.version === 1, `${at}: version must be 1`);
     assert(file === `${person.id}.json` && /^[a-z]+$/.test(person.id), `${at}: the file is named after the id`);
-    const strict = !person.legacy;
     list(person.people, "people", 2); list(person.areas, "areas", 3); list(person.projects, "projects", 2); list(person.moments, "moments");
     for (const area of person.areas) { keys(area, KEYS.area, `area ${area.title}`); assert(area.title.length <= NAV_MAX, `${at}: area "${area.title}" is too long for the sidebar`); }
     const areas = new Set(person.areas.map((item) => item.title));
@@ -63,12 +61,13 @@ export function validateCast(people, { tokens, caps, inboxTitle }, assert) {
     }
     const places = new Set([...areas, ...person.projects.map((item) => item.title)]);
     assert(places.size === person.areas.length + person.projects.length, `${at}: area and project titles must be unique`);
-    if (strict) {
+    {
       keys(person.look, KEYS.look, "look");
       assert(accents.has(person.look.accent), `${at}: unknown accent ${person.look.accent}`);
       assert(textures.has(person.look.texture), `${at}: unknown texture ${person.look.texture}`);
       assert(["light", "dark"].includes(person.look.appearance), `${at}: appearance is light or dark`);
-      own("look", Object.values(person.look).join("/"), person.id);
+      // Each person's apps wear their own accent and texture (mz, 2026-11-28).
+      own("look", `${person.look.accent}/${person.look.texture}`, person.id);
       for (const name of person.people) own("name", name, person.id);
     }
 
@@ -152,7 +151,6 @@ export function validateCast(people, { tokens, caps, inboxTitle }, assert) {
         const holes = [...text.matchAll(/\{([^}]*)\}/g)].map((match) => match[1]);
         for (const hole of holes) assert(/^weekday([+-]\d+)?$/.test(hole) || hole === "answer", `${where}: unknown placeholder {${hole}}`);
       }
-      if (!strict) continue;
       assert(new Set(titles).size === titles.length, `${where}: a title appears twice: ${titles.find((title, i) => titles.indexOf(title) !== i)}`);
       for (const title of titles) own("title", title, person.id);
       for (const text of strings) {
