@@ -106,6 +106,15 @@ therefore valid for its own account only.
   conversation. It becomes a private task in their Inbox.
 - **Leaving, removal and Stop sharing** keep such tasks the same way, in the
   project, which becomes private.
+- **A refused write is never silent** (#617). When the server refuses a
+  write (a shared project's rule such as `shared_project` or
+  `shared_move_out`, or any other reason), the next pull puts the server's
+  row back, and the app says so with the `changeNotSaved` alert
+  (`registry/surfaces.json`): Apple through `StoreHealthState`, Android
+  through `SyncController.refusedWrite`. The web shows its "could not be
+  synced" banner.
+- **Notes save when the editor goes away**, not only on blur: leaving the
+  page or the app saves the draft (#617).
 - **No store deletes on a guess.** A membership that ended says whether the
   copy stays, and an answer that does not know says keep.
 - A project that ended for everyone is removed from its store after a day.

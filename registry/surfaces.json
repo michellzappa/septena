@@ -294,6 +294,15 @@
         "featureId": "agents.connector"
       },
       {
+        "id": "changeNotSaved",
+        "kind": "fork",
+        "title": "A change couldn’t be saved",
+        "message": "One edit was rolled back and is not stored. Anything you typed just now may need retyping. Later changes still save normally.",
+        "confirmTitle": "OK",
+        "options": [],
+        "featureId": "sync.backend"
+      },
+      {
         "id": "agentKeyCreated",
         "kind": "fork",
         "title": "Your agent key",

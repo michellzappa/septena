@@ -280,13 +280,14 @@ class SqlDelightTaskStore(private val database: SeptenaDatabase) : TaskStore {
                         queries.deleteOutbox(result.clientOpId)
                     }
                     SyncResultStatus.REJECTED -> {
-                        // A shared project's rule: the next pull brings the real row.
-                        if (result.reason !in ShareRejections.reasons) queries.upsertRejected(
+                        // A shared project's rule: the next pull brings the real row, so a retry
+                        // cannot help. It is still listed: a refused write never vanishes (#617).
+                        queries.upsertRejected(
                             client_op_id = result.clientOpId,
                             op_json = row.operationJson,
                             reason = result.reason?.takeIf(String::isNotBlank) ?: "The server rejected this change",
                             rejected_at_ms = at.toEpochMilli(),
-                            retryable = 1L,
+                            retryable = if (result.reason in ShareRejections.reasons) 0L else 1L,
                         )
                         restoreRejectedOperation(
                             operation = operation,

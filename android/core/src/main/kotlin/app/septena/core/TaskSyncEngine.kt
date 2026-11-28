@@ -9,7 +9,8 @@ import app.septena.sharedcore.PushPlan
 import app.septena.sharedcore.checkPullPage
 import app.septena.sharedcore.planPushResponse
 
-data class SyncSummary(val pushedOperations: Int, val pulledPages: Int)
+/** [rejectedOperations]: writes this sync could not save (refused by the server or by local checks). */
+data class SyncSummary(val pushedOperations: Int, val pulledPages: Int, val rejectedOperations: Int = 0)
 
 /** Shared pull/push orchestration. Store and transport adapters remain replaceable for JVM conformance. */
 class TaskSyncEngine(
@@ -21,6 +22,7 @@ class TaskSyncEngine(
         val batchLimit = RegistryEntityLimits.MAX_OPS_PER_PUSH.toInt()
         var pushedCount = 0
         var pulledPages = 0
+        rejectedCount = 0
 
         while (true) {
             val queued = store.claimPendingOperations(batchLimit, clock.now())
@@ -36,7 +38,15 @@ class TaskSyncEngine(
             pulledPages += pullUntilCaughtUp()
         }
 
-        return SyncSummary(pushedOperations = pushedCount, pulledPages = pulledPages)
+        return SyncSummary(pushedOperations = pushedCount, pulledPages = pulledPages, rejectedOperations = rejectedCount)
+    }
+
+    private var rejectedCount = 0
+
+    /** Every push result goes through here, so a refused write is counted once. */
+    private suspend fun applyResults(results: List<SyncOperationResult>) {
+        rejectedCount += results.count { it.status == SyncResultStatus.REJECTED }
+        store.applyPushResults(results, clock.now())
     }
 
     private suspend fun pushOperations(operations: List<SyncOperation>) {
@@ -56,7 +66,7 @@ class TaskSyncEngine(
                 false
             }
         }
-        if (rejected.isNotEmpty()) store.applyPushResults(rejected, clock.now())
+        if (rejected.isNotEmpty()) applyResults(rejected)
         pushValidatedOperations(valid)
     }
 
@@ -76,7 +86,7 @@ class TaskSyncEngine(
             return
         }
         when (val plan = planPushResponse(sentIds, PushOutcome.Response(response.results.map(SyncOperationResult::clientOpId)))) {
-            PushPlan.ApplyResults -> store.applyPushResults(response.results, clock.now())
+            PushPlan.ApplyResults -> applyResults(response.results)
             else -> act(plan, operations, null)
         }
     }
@@ -84,9 +94,8 @@ class TaskSyncEngine(
     private suspend fun act(plan: PushPlan, operations: List<SyncOperation>, failure: SyncHttpFailure?) {
         when (plan) {
             PushPlan.ApplyResults -> error("A push failure cannot apply results")
-            is PushPlan.RejectOne -> store.applyPushResults(
+            is PushPlan.RejectOne -> applyResults(
                 listOf(SyncOperationResult(plan.clientOpId, SyncResultStatus.REJECTED, reason = plan.reason)),
-                clock.now(),
             )
             is PushPlan.Bisect -> {
                 val split = plan.splitAt.toInt()

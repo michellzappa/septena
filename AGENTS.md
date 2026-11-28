@@ -456,6 +456,10 @@ The product is Septena; the code targets keep the working names `Septask` (iOS),
   `StoreHealthState.failureNotification` and raises the same words as an
   `NSAlert` sheet, guarded against stacking (a wedged context fails every save
   the same way).
+  A write the backend refuses raises the same alert
+  (`StoreHealthState.noteRefusedWrite`, from `TaskSyncEngine.noteRejected`):
+  the repair pull takes the edit back, so it is a lost write too (#617). The
+  copy is the registry prompt `changeNotSaved`, which Android shows as well.
   Related, still open: `deferPush` means a new row is local-only until the
   first title write, so a crash in that window leaves a titleless task.
 - **A stored `@Model` property must not reuse an `NSManagedObject` method

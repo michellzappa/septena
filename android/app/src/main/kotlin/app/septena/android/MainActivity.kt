@@ -26,6 +26,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import app.septena.android.ui.ChangeNotSavedDialog
 import app.septena.android.ui.DoFloat
 import app.septena.android.ui.FirstRunScreen
 import app.septena.android.ui.SeptenaAndroidTheme
@@ -85,6 +86,8 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                     }
+                    // A write a sync could not save is never silent (#617).
+                    if (signedIn) ChangeNotSavedDialog(graph.sync)
                     // Over the app, so the app keeps its state for the return.
                     if (floating) DoFloat(graph)
                 }
