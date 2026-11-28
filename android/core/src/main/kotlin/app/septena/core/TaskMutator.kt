@@ -53,6 +53,8 @@ class TaskMutator(
         source: String = app.septena.core.generated.RegistryEntityEnums.TaskSource.APP,
         heading: String? = null,
         position: Double? = null,
+        /** How the user added the task (ADR 0064). Written once here, never on later edits. */
+        addedVia: TaskAddedVia = TaskAddedVia.TYPED,
         /**
          * An inline-create draft (empty title): the row stays on this device
          * until its first title write, like Apple's `deferPush`.
@@ -70,6 +72,7 @@ class TaskMutator(
         kind = null,
         heading = heading,
         position = position,
+        addedVia = addedVia,
         deferPush = deferPush,
     )
 
@@ -100,6 +103,7 @@ class TaskMutator(
         kind: String?,
         heading: String?,
         position: Double?,
+        addedVia: TaskAddedVia = TaskAddedVia.TYPED,
         explicitId: String? = null,
         deferPush: Boolean = false,
     ): TaskRecord {
@@ -121,6 +125,7 @@ class TaskMutator(
             notes = notes,
             source = source,
             sourceClient = sourceClient,
+            addedVia = addedVia,
             kind = kind,
             heading = heading,
             position = position,
@@ -671,7 +676,7 @@ class TaskMutator(
             RegistryEntityFields.Task.TITLE, RegistryEntityFields.Task.KIND, RegistryEntityFields.Task.HEADING,
             RegistryEntityFields.Task.AREA, RegistryEntityFields.Task.PROJECT, RegistryEntityFields.Task.NOTES,
             RegistryEntityFields.Task.STARRED, RegistryEntityFields.Task.TAGS, RegistryEntityFields.Task.POSITION,
-            RegistryEntityFields.Task.SOURCE, RegistryEntityFields.Task.SOURCE_CLIENT,
+            RegistryEntityFields.Task.SOURCE, RegistryEntityFields.Task.SOURCE_CLIENT, RegistryEntityFields.Task.ADDED_VIA,
             RegistryEntityFields.Task.RECURRENCE_UNIT, RegistryEntityFields.Task.RECURRENCE_INTERVAL,
             RegistryEntityFields.Task.RECURRENCE_AFTER_COMPLETION, RegistryEntityFields.Task.RECURRENCE_WEEKDAYS,
             RegistryEntityFields.Task.RECURRENCE_MONTH_DAY, RegistryEntityFields.Task.RECURRENCE_ORDINAL_WEEKDAY,

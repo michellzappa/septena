@@ -17,6 +17,7 @@ import androidx.lifecycle.lifecycleScope
 import app.septena.android.ui.SeptenaAndroidTheme
 import app.septena.android.ui.ShareCaptureScreen
 import app.septena.android.widgets.SeptenaWidgetIntents
+import app.septena.core.TaskAddedVia
 import app.septena.core.TaskRefOther
 import app.septena.core.generated.RegistryEntityEnums
 import kotlinx.coroutines.Dispatchers
@@ -75,6 +76,7 @@ class ShareCaptureActivity : ComponentActivity() {
                                                 notes = notes.ifBlank { null },
                                                 today = today,
                                                 source = "share_extension",
+                                                addedVia = TaskAddedVia.SHARE,
                                             )
                                             draft.sourceUrl?.let { url ->
                                                 // The task is saved: a link that is no reference does not undo it.

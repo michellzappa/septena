@@ -28,6 +28,7 @@ import app.septena.core.DoStamp
 import app.septena.core.JsonValue
 import app.septena.core.RegistryCatalog
 import app.septena.core.SyncRecord
+import app.septena.core.TaskAddedVia
 import app.septena.core.TaskStore
 import app.septena.core.WireTimestamp
 import app.septena.core.booleanValue
@@ -342,6 +343,7 @@ object TaskDataTransferCodec {
                 today = row["today"].booleanValue() == true,
                 scheduled = row["scheduled"].stringValue(),
                 deadline = row["deadline"].stringValue(),
+                addedVia = TaskAddedVia.IMPORT,
             )
             if (row["starred"].booleanValue() == true) {
                 graph.taskMutator.setStarred(created.id, true)
