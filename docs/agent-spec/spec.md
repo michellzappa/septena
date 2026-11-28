@@ -73,6 +73,7 @@ Required on create: `title`, `status`. Can be deleted.
 | `reminderDismissedAt` | stamp | may be null |
 | `source` | text, ≤ 64 | may be null |
 | `sourceClient` | text, ≤ 64 | may be null |
+| `addedVia` | one of `taskAddedVia` | may be null |
 | `acknowledgedAt` | stamp | may be null |
 | `createdAt` | stamp | may be null |
 | `touchedAt` | stamp | may be null |
@@ -252,6 +253,7 @@ One step of a task's conversation, in its `thread`. Turns are appended, never ch
 | `taskStatus` | `open`, `done`, `cancelled`, `checklistChecked` |
 | `checklistMode` | `plain`, `groceries` |
 | `taskSource` | `app`, `mcp` |
+| `taskAddedVia` | `typed`, `quick_entry`, `quick_add`, `share`, `shortcut`, `import`, `agent`, `api` |
 | `projectStatus` | `active`, `done`, `cancelled` |
 | `taskKind` | `heading` |
 | `listSort` | `manual`, `when`, `deadline`, `title`, `created` |

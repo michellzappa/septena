@@ -58,12 +58,9 @@ interface SupportModalProps {
   onClose: () => void;
   /** The unread count after a read, for the dot on the Settings row. */
   onUnreadChange: (unread: number) => void;
-  /** Text to put in the message field when the form opens (the Beta screen's
-   *  "Send a note" passes "Beta: {item}"). Without it the field keeps its text. */
-  initialText?: string | null;
 }
 
-export function SupportModal({ open, language, api, onClose, onUnreadChange, initialText }: SupportModalProps) {
+export function SupportModal({ open, language, api, onClose, onUnreadChange }: SupportModalProps) {
   const [messages, setMessages] = useState<SupportMessage[]>([]);
   const [text, setText] = useState("");
   const [email, setEmail] = useState("");
@@ -71,13 +68,6 @@ export function SupportModal({ open, language, api, onClose, onUnreadChange, ini
   const [state, setState] = useState<SendState>({ kind: "idle" });
   const signedIn = api.isAuthenticated;
   const needsEmail = !signedIn;
-
-  useEffect(() => {
-    if (open && initialText) {
-      setText(`${initialText}\n\n`);
-      setState({ kind: "idle" });
-    }
-  }, [initialText, open]);
 
   useEffect(() => {
     if (!open) return;

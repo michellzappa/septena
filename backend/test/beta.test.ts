@@ -6,7 +6,10 @@ installWorkerTestHooks();
 
 // The beta by invite code (ADR 0064, docs/BETA_ONBOARDING_SPEC.md).
 
-const { betaJoin, grantBetaAtSignIn, setBetaLaunch, sweepBeta, afterJoin, betaState, betaProgress, betaItemsFor } = await import("../src/api/beta.ts");
+const { betaJoin, grantBetaAtSignIn, setBetaLaunch, sweepBeta, afterJoin, betaState, betaProgress, betaAnswerPage, betaAnswerSave, zBetaProgressBody } = await import("../src/api/beta.ts");
+const { BETA_CHECKLIST } = await import("../src/generated/registries.ts");
+const { testerStats } = await import("../src/store/AccountStore.ts");
+const { renderAdmin, betaFunnel } = await import("../src/admin/page.ts");
 const { claimPlusLink, betaGrantEnd } = await import("../src/api/plusLinks.ts");
 const { normalizeBetaCode } = await import("../src/store/betaInvites.ts");
 const { Hono } = await import("hono");
@@ -128,6 +131,7 @@ describe("POST /v1/beta/join", () => {
     assert.match(h.mails[0].text, /\/plus\/pl_/);
     assert.match(h.mails[0].html, /<a href="https:\/\/septena\.app\/workflows\/do"[^>]*>Do<\/a>/, "the checklist links its key words");
     assert.doesNotMatch(h.mails[0].text + h.mails[0].html, /[—–]/, "no dashes in the mail");
+    assert.match(h.mails[0].text, /notes which of these parts you used and when, never what you wrote/);
 
     const back = await h.join({ email: "ana@example.com", code: "whatever" });
     assert.equal(back.json.state, "already_joined");
@@ -229,40 +233,298 @@ describe("The Pro year follows the email", () => {
 });
 
 describe("The checklist in the app", () => {
-  it("shows nothing to an account that is not a tester's, and the items to one that is", async () => {
+  async function tester() {
     const h = await harness();
     h.accounts.createBetaCode({ code: "FIRSTWAVE", label: "Friends", maxUses: 5, endsAt: null });
     fakeApple();
     await h.join({ email: "ana@example.com", code: "FIRSTWAVE" });
-    assert.deepEqual(await betaState(h.env, userId(1), "ios"), { member: false });
-    assert.equal(await betaProgress(h.env, userId(1), { item: "do", tried: true }), false, "a non-tester cannot write");
     await grantBetaAtSignIn(h.env, userId(1), "ana@example.com", true);
-    const s = await betaState(h.env, userId(1), "ios");
-    assert.ok(s.member);
-    assert.equal(s.items.length, 10);
-    assert.equal(s.copy.title, "Beta");
-    assert.ok(s.items.every((i) => !/[[\]()]/.test(i.title)), "the apps get titles without link syntax");
-    assert.equal(s.items.find((i) => i.id === "do")!.title, "Do one task");
-    assert.deepEqual(s.tried, {});
-    assert.equal(s.cardDismissedAt, null);
+    return { ...h, store: await h.taskStore(userId(1)) };
+  }
 
-    assert.equal(await betaProgress(h.env, userId(1), { item: "do", tried: true }), true);
-    await betaProgress(h.env, userId(1), { ack: true });
-    await betaProgress(h.env, userId(1), { dismissCard: true });
-    const after = await betaState(h.env, userId(1), "ios");
-    assert.ok(after.member && after.tried.do && after.ackAt && after.cardDismissedAt);
-    await betaProgress(h.env, userId(1), { item: "do", tried: false });
-    const untick = await betaState(h.env, userId(1), "ios");
-    assert.ok(untick.member && !untick.tried.do);
-    assert.equal(h.accounts.listBetaCodes().progress._ack, 1);
+  it("seeds the Septena beta project once, when the grant lands", async () => {
+    const h = await tester();
+    const t = h.accounts.betaTester("ana@example.com")!;
+    assert.ok(t.seededAt && t.seedProjectId);
+    const map = JSON.parse(t.seedTaskIds!) as Record<string, string>;
+    assert.deepEqual(Object.keys(map), BETA_CHECKLIST.items.map((i) => i.id));
+    const project = h.store.readContainer("project", t.seedProjectId!)!;
+    assert.equal(project.title, "Septena beta");
+    assert.equal(project.area ?? null, null);
+    assert.equal(project.notes, BETA_CHECKLIST.project.notes);
+    const doTask = h.store.readTask(map.do)!.task;
+    assert.equal(doTask.title, "Do one task");
+    assert.equal(doTask.project, t.seedProjectId);
+    assert.equal(doTask.status, "open");
+    assert.equal(doTask.source, "app");
+    assert.equal(doTask.addedVia ?? null, null);
+    assert.equal(doTask.notes, BETA_CHECKLIST.items.find((i) => i.id === "do")!.try);
+    const refs = h.store.readTaskRefs(map["review-stop"]);
+    assert.deepEqual(refs.map((r) => (r.snapshot as { title: string }).title), ["Review", "stop"]);
+    assert.deepEqual(refs.map((r) => [r.key, r.role]), [
+      ["url:https://septena.app/workflows/agent-delegation", "about"], ["url:https://septena.app/help/agent-controls", "about"],
+    ]);
+    assert.equal(h.store.history("project", t.seedProjectId!, null, 5)[0].actor, "system:beta", "the server writes the seed");
+
+    // Deleting the project does not bring it back: not on a new GET, a new
+    // sign-in or the sweep.
+    h.store.push([{ clientOpId: "del-project-1", op: "delete", entity: "project", id: t.seedProjectId! }], "app:septask-ios");
+    await grantBetaAtSignIn(h.env, userId(1), "ana@example.com", true);
+    await betaState(h.env, userId(1));
+    await sweepBeta(h.env);
+    const projects = h.store.readProjects("all", 50);
+    assert.equal(projects.filter((p) => p.title === "Septena beta").length, 0);
+    assert.equal(h.accounts.betaTester("ana@example.com")!.seedProjectId, t.seedProjectId);
   });
 
-  it("lists only what ships on the platform", () => {
-    const web = betaItemsFor("web").map((i) => i.id);
-    assert.ok(!web.includes("do"), "Do is not built on the web");
-    assert.ok(!web.includes("siri"));
-    assert.ok(web.includes("connect-agent"));
-    assert.ok(betaItemsFor("macos").map((i) => i.id).includes("siri"));
+  it("seeds a tester granted before seeding shipped, on their next GET", async () => {
+    const h = await harness();
+    h.accounts.createBetaCode({ code: "FIRSTWAVE", label: "Friends", maxUses: 5, endsAt: null });
+    fakeApple();
+    await h.join({ email: "ana@example.com", code: "FIRSTWAVE" });
+    // The grant as it landed before this deploy: the tester row, no seed.
+    h.accounts.betaLinkClaimed(h.accounts.betaTester("ana@example.com")!.planLinkId!, userId(1));
+    assert.equal(h.accounts.betaTester("ana@example.com")!.seededAt, null);
+    const s = await betaState(h.env, userId(1));
+    assert.ok(s.member && s.projectId);
+    assert.equal((await h.taskStore(userId(1))).readProjects("all", 50).filter((p) => p.title === "Septena beta").length, 1);
+    await betaState(h.env, userId(1));
+    assert.equal((await h.taskStore(userId(1))).readProjects("all", 50).filter((p) => p.title === "Septena beta").length, 1, "once");
+  });
+
+  it("answers member false to everyone else, and the card and project to a tester", async () => {
+    const h = await tester();
+    assert.deepEqual(await betaState(h.env, userId(9)), { member: false });
+    assert.equal(await betaProgress(h.env, userId(9), { dismissCard: true }), false);
+    const s = await betaState(h.env, userId(1));
+    assert.deepEqual(Object.keys(s).sort(), ["cardDismissedAt", "copy", "member", "projectId"]);
+    assert.ok(s.member);
+    assert.equal(s.projectId, h.accounts.betaTester("ana@example.com")!.seedProjectId);
+    assert.equal(s.cardDismissedAt, null);
+    assert.deepEqual(Object.keys(s.copy).sort(), ["cardBody", "cardDismiss", "cardOpen", "cardTitle"]);
+    assert.match(s.copy.cardBody, /Septena beta project/);
+    assert.equal(await betaProgress(h.env, userId(1), { dismissCard: true }), true);
+    const after = await betaState(h.env, userId(1));
+    assert.ok(after.member && after.cardDismissedAt);
+    assert.equal(zBetaProgressBody.safeParse({ item: "do", tried: true }).success, false, "ticks are tasks now");
+  });
+
+  it("measures each item from the account's own data, apart from what was ticked", async () => {
+    const h = await tester();
+    const t = h.accounts.betaTester("ana@example.com")!;
+    const map = JSON.parse(t.seedTaskIds!) as Record<string, string>;
+    const s = h.store;
+    const APP = "app:septask-ios";
+    const AGENT = "mcp:Claude";
+    let n = 0;
+    const op = () => `op-${String(++n).padStart(6, "0")}`;
+    const push = (actor: string, ...ops: Record<string, unknown>[]) =>
+      s.push(ops.map((o) => ({ clientOpId: op(), ...o })) as never, actor).result.results;
+    const usage = () => s.betaUsage({ seededTaskIds: map, seededProjectId: t.seedProjectId, joinedAt: t.joinedAt });
+
+    const none = usage();
+    assert.ok(Object.values(none.did).every((v) => v === null), "a fresh account did nothing");
+    assert.ok(Object.values(none.ticked).every((v) => v === false));
+
+    // Seeded tasks never count: Do of the seeded task, moving it to Today.
+    push(APP, { op: "upsert", entity: "doSession", id: "do-seeded", fields: { taskId: map.do, startedAt: new Date().toISOString() } });
+    push(APP, { op: "upsert", entity: "task", id: map.capture, fields: { today: true } });
+    assert.equal(usage().did.do, null);
+
+    // Ticked is not did: the seeded task is done, the feature unused.
+    push(APP, { op: "upsert", entity: "task", id: map.fade, fields: { status: "done" } });
+    const ticked = usage();
+    assert.equal(ticked.ticked.fade, true);
+    assert.equal(ticked.did.fade, null);
+
+    // inbox-today: an Inbox task the user files later.
+    push(APP, { op: "upsert", entity: "task", id: "inbox1", fields: { title: "x", status: "open", addedVia: "typed" } });
+    assert.equal(usage().did["inbox-today"], null);
+    push(APP, { op: "upsert", entity: "task", id: "inbox1", fields: { today: true } });
+    assert.ok(usage().did["inbox-today"]);
+
+    // do
+    push(APP, { op: "upsert", entity: "doSession", id: "do-own", fields: { taskId: "inbox1", startedAt: new Date().toISOString() } });
+    assert.ok(usage().did.do);
+
+    // second-device: the second device with a session.
+    ensureSession(s, "sid-a"); s.deviceAccess("sid-a", "septask-ios", null);
+    assert.equal(usage().did["second-device"], null);
+    ensureSession(s, "sid-b"); s.deviceAccess("sid-b", "septask-mac", null);
+    assert.ok(usage().did["second-device"]);
+
+    // fade: the sweep answered.
+    push(APP, { op: "upsert", entity: "setting", id: "fadeSweptAt", fields: { value: new Date().toISOString() } });
+    assert.ok(usage().did.fade);
+
+    // connect-agent
+    s.recordConnection("fam-1", "client-1", "Claude", "tasks:read tasks:write");
+    assert.ok(usage().did["connect-agent"]);
+
+    // review-stop: Pause all agents.
+    push(APP, { op: "upsert", entity: "setting", id: "agentsPaused", fields: { value: true } });
+    assert.ok(usage().did["review-stop"]);
+
+    // discuss: a user turn in a thread the app's model runs. A thread with
+    // only a connected agent's turns does not count.
+    push(APP, { op: "upsert", entity: "task", id: "talk1", fields: { title: "t", status: "open" } });
+    push(AGENT, { op: "appendTurn", taskId: "talk1", turn: { role: "provider", step: "confirm", provider: "claude", question: "Which?", ts: new Date().toISOString() } });
+    push(APP, { op: "appendTurn", taskId: "talk1", turn: { role: "user", step: "confirm", chosen: "A", ts: new Date().toISOString() } });
+    assert.equal(usage().did.discuss, null);
+    push(APP, { op: "appendTurn", taskId: "talk1", turn: { role: "provider", step: "confirm", provider: "onDevice", question: "Is this it?", ts: new Date().toISOString() } });
+    assert.ok(usage().did.discuss);
+
+    // move-in, siri, capture: how the task was added.
+    push(APP, { op: "upsert", entity: "task", id: "imp1", fields: { title: "i", status: "open", addedVia: "import" } });
+    push(APP, { op: "upsert", entity: "task", id: "sir1", fields: { title: "s", status: "open", addedVia: "shortcut" } });
+    assert.equal(usage().did.capture, null);
+    push(APP, { op: "upsert", entity: "task", id: "cap1", fields: { title: "c", status: "open", addedVia: "share" } });
+    const all = usage();
+    for (const id of ["move-in", "siri", "capture"]) assert.ok(all.did[id], id);
+    assert.ok(Object.values(all.did).every((v) => typeof v === "number"), "every item measured");
+
+    // A deleted device or agent still counts once stored.
+    const saved = h.accounts.betaSaveUsage("ana@example.com", all);
+    s.forgetConnection("fam-1");
+    const later = h.accounts.betaSaveUsage("ana@example.com", usage());
+    assert.equal(later.did["connect-agent"], saved.did["connect-agent"]);
+  });
+
+  it("counts review-stop from an Accept, a completed agent loop, active days and a normal week", async () => {
+    const h = await tester();
+    const t = h.accounts.betaTester("ana@example.com")!;
+    const map = JSON.parse(t.seedTaskIds!) as Record<string, string>;
+    const s = h.store;
+    const APP = "app:septask-ios";
+    const AGENT = "mcp:Claude";
+    let n = 0;
+    const push = (actor: string, ...ops: Record<string, unknown>[]) =>
+      s.push(ops.map((o) => ({ clientOpId: `loop-${String(++n).padStart(6, "0")}`, ...o })) as never, actor).result.results;
+    const usage = () => s.betaUsage({ seededTaskIds: map, seededProjectId: t.seedProjectId, joinedAt: t.joinedAt });
+
+    push(APP, { op: "upsert", entity: "task", id: "job1", fields: { title: "j", status: "open" } },
+      { op: "upsert", entity: "convo", id: "job1", fields: { assignee: "claude" } });
+    push(AGENT, { op: "appendTurn", taskId: "job1", turn: { role: "provider", step: "decide", provider: "claude", question: "Which one?", options: ["A", "B"], ts: new Date().toISOString() } });
+    push(APP, { op: "appendTurn", taskId: "job1", turn: { role: "user", step: "decide", chosen: "A", inReplyTo: 1, ts: new Date().toISOString() } });
+    const handoff = push(AGENT, { op: "upsert", entity: "convo", id: "job1", fields: { endState: "needs_verify", endStateNote: "Check the draft." } });
+    assert.equal(handoff[0].status, "applied");
+    assert.equal(usage().loops.total, 0, "not accepted yet");
+    push(APP, { op: "upsert", entity: "task", id: "job1", fields: { status: "done" } });
+    const u = usage();
+    assert.ok(u.did["review-stop"], "Accept in Review");
+    assert.deepEqual(u.loops, { total: 1, week: 1 });
+
+    // A loop with no answered question is not a loop.
+    push(APP, { op: "upsert", entity: "task", id: "job2", fields: { title: "j2", status: "open" } });
+    push(AGENT, { op: "upsert", entity: "convo", id: "job2", fields: { endState: "needs_verify", endStateNote: "Check it." } });
+    push(APP, { op: "upsert", entity: "task", id: "job2", fields: { status: "done" } });
+    assert.equal(usage().loops.total, 1);
+
+    // A normal week: the user added job1 and job2 (agents and the seed do
+    // not count), completed both, and moved one to Today.
+    push(AGENT, { op: "upsert", entity: "task", id: "byagent", fields: { title: "a", status: "open", addedVia: "agent" } });
+    push(APP, { op: "upsert", entity: "task", id: "job3", fields: { title: "j3", status: "open" } });
+    push(APP, { op: "upsert", entity: "task", id: "job3", fields: { today: true } });
+    push(APP, { op: "upsert", entity: "task", id: map.do, fields: { status: "done" } });
+    const w = usage();
+    assert.deepEqual(w.week, { added: 3, done: 2, movedToday: 1 });
+    assert.ok(w.firstTaskAt && w.firstDoneAt);
+    assert.equal(w.activeDays.w1, 1, "every change today is one active day");
+    assert.equal(w.week1ThirdDayAt, null);
+
+    // The product-wide counts ride on the account summary.
+    const summary = s.accountSummary()!;
+    assert.equal(summary.agentLoops7d, 1);
+    assert.equal(summary.userTasksAdded7d, 3);
+    assert.equal(summary.userTasksDone7d, 3, "the summary does not know the seed");
+    assert.equal(summary.userMovedToday7d, 1);
+    // The daily snapshot (recordMetrics) is the overview: the sums land there.
+    const { overview } = await import("../src/admin/accounts.ts");
+    const o = overview([{ summary, createdAt: Date.now() }, { summary, createdAt: Date.now() }] as never);
+    assert.deepEqual([o.agentLoops7d, o.userTasksAdded7d, o.userTasksDone7d, o.userMovedToday7d], [2, 6, 6, 2]);
+  });
+
+  it("counts active days per week from the join", async () => {
+    const h = await tester();
+    const t = h.accounts.betaTester("ana@example.com")!;
+    const s = h.store;
+    s.push([{ clientOpId: "days-000001", op: "upsert", entity: "task", id: "d1", fields: { title: "d", status: "open" } }], "app:septask-ios");
+    // Same rows, read as if the join had been 10 days ago: today is in week 2.
+    const u = s.betaUsage({ seededTaskIds: {}, seededProjectId: null, joinedAt: t.joinedAt - 10 * DAY });
+    assert.equal(u.activeDays.w1, 0);
+    assert.equal(u.activeDays.w2 >= 1, true);
+  });
+
+  it("asks the day-7 question once and records the answer only on a POST", async () => {
+    const h = await tester();
+    await sweepBeta(h.env, Date.now() + 6 * DAY);
+    assert.equal(h.mails.filter((m) => m.subject === "One question about Septena").length, 0, "not before day 7");
+    await sweepBeta(h.env, Date.now() + 8 * DAY);
+    await sweepBeta(h.env, Date.now() + 9 * DAY);
+    const asked = h.mails.filter((m) => m.subject === "One question about Septena");
+    assert.equal(asked.length, 1);
+    assert.equal(h.mails.filter((m) => m.subject === "How is Septena so far?").length, 1, "the day-4 check-in stays");
+    assert.doesNotMatch(asked[0].text + asked[0].html, /[—–]/);
+    const url = /https:\/\/api\.septena\.app\/beta\/answer\/(ba_[A-Za-z0-9_-]{32})\?a=very/.exec(asked[0].text);
+    assert.ok(url, "a link per answer");
+    const token = url[1];
+    const app = new Hono();
+    app.get("/beta/answer/:token", betaAnswerPage as never);
+    app.post("/beta/answer/:token", betaAnswerSave as never);
+    const call = (path: string, init?: RequestInit) => app.fetch(new Request(`${ORIGIN}${path}`, init), h.env, { waitUntil() {}, passThroughOnException() {} } as never);
+
+    const shown = await call(`/beta/answer/${token}?a=very`);
+    assert.equal(shown.status, 200);
+    assert.match(await shown.text(), /Very disappointed/);
+    assert.equal(h.accounts.betaTester("ana@example.com")!.answer, null, "opening the link answers nothing");
+    assert.equal((await call(`/beta/answer/ba_${"x".repeat(32)}?a=very`)).status, 404);
+    assert.equal((await call(`/beta/answer/${token}?a=maybe`)).status, 404);
+
+    const post = (a: string) => call(`/beta/answer/${token}`, { method: "POST", body: new URLSearchParams({ a }) });
+    assert.equal((await post("very")).status, 200);
+    assert.equal(h.accounts.betaTester("ana@example.com")!.answer, "very");
+    await post("somewhat");
+    assert.equal(h.accounts.betaTester("ana@example.com")!.answer, "somewhat", "a later answer replaces it");
+  });
+
+  it("shows counts, the funnel and one tester on the admin page, with no email list", async () => {
+    const h = await tester();
+    await betaState(h.env, userId(1));
+    const listed = h.accounts.listBetaCodes();
+    assert.equal(listed.testers.length, 1);
+    assert.ok(!JSON.stringify(listed.testers).includes("ana@example.com"), "the card's rows carry no full email");
+    assert.match(listed.testers[0].mask, /^.•••@/, "only a masked address");
+    assert.deepEqual(betaFunnel(listed.testers), [1, 1, 0, 0, 0, 0]);
+    const view = {
+      admin: "mz@example.com", accounts: [], links: [], uses: [], signups: null, query: "", emailSignups: [], emailUserId: null,
+      history: [], traffic: { state: "off" }, releases: [], now: Date.now(),
+      beta: { ...listed, lookup: { email: "ana@example.com", tester: testerStats(h.accounts.betaTester("ana@example.com")!) } },
+    };
+    const html = renderAdmin("plans", view as never);
+    assert.match(html, /Activation/);
+    assert.match(html, /Did it/);
+    assert.match(html, /bar: 40%/);
+    assert.match(html, /action="\/admin\/beta\/tester"/);
+    assert.equal((html.match(/ana@example\.com/g) ?? []).length, 1, "only the looked-up address, once");
+    const noLookup = renderAdmin("plans", { ...view, beta: { ...listed } } as never);
+    assert.ok(!noLookup.includes("ana@example.com"));
+  });
+});
+
+describe("addedVia", () => {
+  it("takes the registry values from an app push and nothing else", async () => {
+    const { zPushBody } = await import("../src/store/ops.ts");
+    const op = (addedVia: unknown) => ({ ops: [{ clientOpId: "addv-0001", op: "upsert", entity: "task", id: "t1", fields: { title: "x", status: "open", addedVia } }] });
+    for (const v of ["typed", "quick_entry", "quick_add", "share", "shortcut", "import", "agent", "api", null]) assert.ok(zPushBody.safeParse(op(v)).success, String(v));
+    assert.equal(zPushBody.safeParse(op("siri")).success, false);
+  });
+
+  it("is agent on a task an MCP connector creates", async () => {
+    const { store } = await createTestTaskStore();
+    const { runWriteTool } = await import("../src/shadow/writes.ts");
+    const out = await runWriteTool({ store: store as never, timeZone: "UTC", agentName: "Claude" }, "tasks_create", { title: "From the agent" }) as { id?: string; task?: { id: string } };
+    const id = out.id ?? out.task!.id;
+    assert.equal(store.readTask(id)!.task.addedVia, "agent");
   });
 });
 

@@ -32,6 +32,37 @@ public enum TaskSource {
   public static let things = "things"
 }
 
+/// How a task was added (`addedVia`, registry `taskAddedVia`, ADR 0064 beta
+/// measurement). Stamped ONCE when the row is created, by the path that
+/// created it, and never changed by a later edit. Raw values are the
+/// registry enum's values; `TaskBackendMapping` sends only values the
+/// generated `RegistryEntityEnums.taskAddedVia` lists. Rows from before the
+/// field read as nil (unknown).
+public enum TaskAddedVia: String, CaseIterable, Sendable {
+  /// Normal in-app creation (task list, inline row, composer). The default.
+  case typed
+  /// The Mac Quick Entry panel.
+  case quickEntry = "quick_entry"
+  /// The iPhone/iPad Quick Add sheet.
+  case quickAdd = "quick_add"
+  /// The Share extension, into the Inbox.
+  case share
+  /// App Intents: Siri, Shortcuts, widgets.
+  case shortcut
+  /// Things import, Apple Reminders into the Inbox, JSON import.
+  case `import`
+  /// Written by an agent through the backend. The app never stamps it.
+  case agent
+  /// Written through the public API. The app never stamps it.
+  case api
+
+  /// The value the backend accepts, or nil when the registry does not list it.
+  public static func wireValue(_ raw: String?) -> String? {
+    guard let raw, RegistryEntityEnums.taskAddedVia.contains(raw) else { return nil }
+    return raw
+  }
+}
+
 /// Values stamped on a task row's `kind` field — what *shape* of row it is.
 /// A heading is a `TaskEntity` (so it inherits sync/order/drag for free) that
 /// renders as a section divider inside a project and NEVER appears in any
@@ -131,6 +162,8 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
   var source: String? = nil
   /// Friendly label for `source` (e.g. "Claude"). Permanent.
   var sourceClient: String? = nil
+  /// How the task was added (`TaskAddedVia` raw value). Permanent.
+  var addedVia: String? = nil
   /// Set once the user engages an agent-created row; clears the cue. Transient.
   var acknowledgedAt: Date? = nil
   /// Canonical creation instant. Drives the cue decay window.
@@ -481,6 +514,7 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     deletedAt: String?,
     source: String? = nil,
     sourceClient: String? = nil,
+    addedVia: String? = nil,
     acknowledgedAt: Date? = nil,
     createdAt: Date = .distantPast,
     position: Double = 0,
@@ -526,6 +560,7 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     self.deletedAt = deletedAt
     self.source = source
     self.sourceClient = sourceClient
+    self.addedVia = addedVia
     self.acknowledgedAt = acknowledgedAt
     self.createdAt = createdAt
     self.position = position

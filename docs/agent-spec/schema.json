@@ -48,6 +48,19 @@
         "mcp"
       ]
     },
+    "taskAddedVia": {
+      "type": "string",
+      "enum": [
+        "typed",
+        "quick_entry",
+        "quick_add",
+        "share",
+        "shortcut",
+        "import",
+        "agent",
+        "api"
+      ]
+    },
     "projectStatus": {
       "type": "string",
       "enum": [
@@ -592,6 +605,16 @@
             {
               "type": "string",
               "maxLength": 64
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "addedVia": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/taskAddedVia"
             },
             {
               "type": "null"

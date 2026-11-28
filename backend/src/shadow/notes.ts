@@ -435,7 +435,7 @@ export async function runNotesTool(ctx: NotesContext, name: NotesToolName, args:
       const now = new Date().toISOString();
       const fields: Record<string, unknown> = {
         title: args.title, kind: "heading", status: "open", project,
-        created: todayYMD(ctx.timeZone), createdAt: now, source: "mcp",
+        created: todayYMD(ctx.timeZone), createdAt: now, source: "mcp", addedVia: "agent",
         position: bottomKey(rows),
       };
       const r = await pushOne(store, actor, { op: "upsert", entity: "task", id, fields }, undefined, why);

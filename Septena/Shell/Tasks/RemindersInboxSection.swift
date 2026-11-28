@@ -292,7 +292,8 @@ struct RemindersInboxSection: View {
     let created = mutator.create(
       title: pair.view.title,
       deadline: pair.view.dueDate,
-      notes: pair.view.notes
+      notes: pair.view.notes,
+      addedVia: .import
     )
     try? bridge.delete([pair.reminder])
     pairs.removeAll { $0.view.id == pair.view.id }
@@ -303,7 +304,7 @@ struct RemindersInboxSection: View {
       rebuild: { [mutator] in
         [mutator.create(title: pair.view.title,
                         deadline: pair.view.dueDate,
-                        notes: pair.view.notes).id]
+                        notes: pair.view.notes, addedVia: .import).id]
       })
     showDone(ids: [created.id])
     onImported()
@@ -332,7 +333,8 @@ struct RemindersInboxSection: View {
       let created = mutator.create(
         title: pair.view.title,
         deadline: pair.view.dueDate,
-        notes: pair.view.notes
+        notes: pair.view.notes,
+        addedVia: .import
       )
       createdIDs.append(created.id)
       succeeded.append(pair.reminder)
@@ -349,7 +351,7 @@ struct RemindersInboxSection: View {
           batch.map { pair in
             mutator.create(title: pair.view.title,
                            deadline: pair.view.dueDate,
-                           notes: pair.view.notes).id
+                           notes: pair.view.notes, addedVia: .import).id
           }
         })
       showDone(ids: createdIDs)

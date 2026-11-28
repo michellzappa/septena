@@ -65,6 +65,7 @@ import {
   type SharedEntity,
 } from "./shares.js";
 import { mergeNotes } from "./mergeText.js";
+import type { BetaUsage } from "./betaInvites.js";
 import { AGENT_KEY_CLIENT, AGENT_KEY_CLIENT_NAME, AGENT_KEY_EXPIRES_AT, SESSION_HEADER, SessionBook, type RenewResult, type SessionGrant } from "./sessions.js";
 
 /// Task fields only the app writes (docs/TASK_FADE_SPEC.md §3): the fade
@@ -96,6 +97,13 @@ export interface AccountSummary {
   webhooks: number;
   failingWebhooks: number;
   entitlements: Pick<EntitlementRow, "id" | "source" | "productId" | "expiresAt" | "status" | "plan" | "environment" | "signedAt">[];
+  /// The last 7 days (ADR 0064 measurement): completed agent loops, and the
+  /// tasks the user added, completed and moved to Today. Counts only.
+  /// Optional: summaries from before it lack them.
+  agentLoops7d?: number;
+  userTasksAdded7d?: number;
+  userTasksDone7d?: number;
+  userMovedToday7d?: number;
   /// The synced appearance settings (#859): a choice from a fixed list, never
   /// text the user typed. Only for a signed-in account. Optional: summaries
   /// from before it lack it.
@@ -201,6 +209,19 @@ export interface AgentWebhookPublic {
 export interface AgentWebhookCreated extends AgentWebhookPublic {
   secret: string;
 }
+
+/// The conversation end states that close it as done.
+const DONE_END_STATES = new Set(["agent_done", "human_done", "agent_assisted_done"]);
+
+/// A logged task insert: the diff of a new row carries its status from null.
+const isInsert = (diff: ChangeDiff) => "title" in diff && Array.isArray(diff.status) && diff.status[0] === null;
+
+/// True when the diff moves `field` from a value that fails `test` to one
+/// that passes it.
+const becomes = (diff: ChangeDiff, field: string, test: (v: unknown) => boolean) => {
+  const d = diff[field];
+  return Array.isArray(d) && test(d[1]) && !test(d[0]);
+};
 
 /// Agent writers (the MCP connector) carry an `mcp:` actor. Everything else
 /// (`app:<client>`) is the human.
@@ -3513,7 +3534,217 @@ export class TaskStore extends DurableObject<Env> {
       webhooks: count("SELECT COUNT(*) AS n FROM agent_webhooks WHERE enabled = 1"),
       failingWebhooks: count("SELECT COUNT(*) AS n FROM agent_webhooks WHERE enabled = 1 AND failureCount > 0"),
       entitlements,
+      ...this.weekCounts(now),
       ...(signedIn ? { appearance: appearanceFromSettings((key) => this.readSetting(key)) } : {}),
+    };
+  }
+
+  // ---- measured use (ADR 0064 §7, docs/BETA_ONBOARDING_SPEC.md §7) ----
+  //
+  // Content-free: every reading below is a time or a count. A "user" write is
+  // one an app session made (`app:`); agents (`mcp:`), the server
+  // (`system:`) and the other members of a shared project (`member:`) are
+  // not the user.
+
+  /// The task changes the user made, oldest first, with their diffs.
+  private userTaskChanges(since: string | null = null): { rev: number; id: string; op: string; at: string; diff: ChangeDiff }[] {
+    const rows = this.sql.exec<{ rev: number; id: string; op: string; at: string; diff: string }>(
+      `SELECT rev, id, op, at, diff FROM changes WHERE entity = 'task' AND actor LIKE 'app:%' AND diff IS NOT NULL${since ? " AND at >= ?" : ""} ORDER BY rev`,
+      ...(since ? [since] : []),
+    ).toArray();
+    return rows.map((r) => ({ rev: r.rev, id: r.id, op: r.op, at: r.at, diff: JSON.parse(r.diff) as ChangeDiff }));
+  }
+
+  /// The diff of a task's insert: its first change, when that change is an
+  /// insert (the log keeps a year, so an older task has none).
+  private insertDiff(taskId: string): ChangeDiff | null {
+    const r = this.sql.exec<{ op: string; diff: string | null }>(
+      "SELECT op, diff FROM changes WHERE entity = 'task' AND id = ? ORDER BY rev LIMIT 1", taskId,
+    ).toArray()[0];
+    if (!r?.diff || r.op !== "upsert") return null;
+    const diff = JSON.parse(r.diff) as ChangeDiff;
+    return isInsert(diff) ? diff : null;
+  }
+
+  /// Times of the user's own new tasks (not headings, not imports), the
+  /// tasks they completed and the tasks they moved to Today.
+  private userTaskMoments(since: string | null, exclude: Set<string>): { added: number[]; done: number[]; movedToday: number[] } {
+    const out = { added: [] as number[], done: [] as number[], movedToday: [] as number[] };
+    const skip = new Set<string>();
+    for (const id of this.sql.exec<{ id: string }>("SELECT id FROM tasks WHERE kind = 'heading' OR addedVia = 'import'").toArray().map((r) => r.id)) skip.add(id);
+    for (const c of this.userTaskChanges(since)) {
+      if (exclude.has(c.id) || c.op !== "upsert") continue;
+      const at = Date.parse(c.at);
+      if (isInsert(c.diff)) {
+        if (!skip.has(c.id)) out.added.push(at);
+        continue;
+      }
+      if (becomes(c.diff, "status", (v) => v === "done")) out.done.push(at);
+      if (becomes(c.diff, "today", (v) => v === true)) out.movedToday.push(at);
+    }
+    return out;
+  }
+
+  /// When each completed agent loop closed: a task an agent worked (a write
+  /// by an `mcp:` actor, a claim included), where a provider question got a
+  /// user answer, and the user set a done end state (Accept in Review).
+  private agentLoopTimes(exclude: Set<string>): number[] {
+    const closed = new Map<string, number>();
+    for (const r of this.sql.exec<{ id: string; at: string; diff: string }>(
+      "SELECT id, at, diff FROM changes WHERE entity = 'convo' AND actor LIKE 'app:%' AND diff LIKE '%\"endState\"%' ORDER BY rev",
+    ).toArray()) {
+      if (exclude.has(r.id) || closed.has(r.id)) continue;
+      if (becomes(JSON.parse(r.diff) as ChangeDiff, "endState", (v) => typeof v === "string" && DONE_END_STATES.has(v))) closed.set(r.id, Date.parse(r.at));
+    }
+    const out: number[] = [];
+    for (const [id, at] of closed) {
+      const worked = this.sql.exec("SELECT 1 FROM changes WHERE actor LIKE 'mcp:%' AND (id = ? OR id LIKE ?) LIMIT 1", id, `${id}:%`).toArray().length > 0;
+      if (!worked) continue;
+      const answered = this.sql.exec(
+        `SELECT 1 FROM turns p WHERE p.taskId = ? AND p.role = 'provider' AND p.question IS NOT NULL
+           AND EXISTS (SELECT 1 FROM turns u WHERE u.taskId = p.taskId AND u.role = 'user' AND u.seq > p.seq) LIMIT 1`, id,
+      ).toArray().length > 0;
+      if (answered) out.push(at);
+    }
+    return out;
+  }
+
+  /// The product-wide week (accountSummary): loops and the user's own
+  /// adds, completions and moves to Today in the last 7 days.
+  private weekCounts(now: number, exclude: Set<string> = new Set()) {
+    const since = now - 7 * DAY_MS;
+    const m = this.userTaskMoments(new Date(since).toISOString(), exclude);
+    return {
+      agentLoops7d: this.agentLoopTimes(exclude).filter((t) => t >= since).length,
+      userTasksAdded7d: m.added.length,
+      userTasksDone7d: m.done.length,
+      userMovedToday7d: m.movedToday.length,
+    };
+  }
+
+  /// What a beta tester did (ADR 0064): per item of registry/beta.json the
+  /// first time the account did it, or null, from its own rows. The seeded
+  /// beta project and its tasks never count. `ticked`: the seeded task of
+  /// the item is done. The rules are in docs/BETA_ONBOARDING_SPEC.md §7.
+  betaUsage(input: { seededTaskIds: Record<string, string>; seededProjectId: string | null; joinedAt: number; now?: number }): BetaUsage {
+    const now = input.now ?? Date.now();
+    const seeded = new Set(Object.values(input.seededTaskIds));
+    const notSeeded = (col: string) => seeded.size ? ` AND ${col} NOT IN (${[...seeded].map(() => "?").join(", ")})` : "";
+    const seededArgs = [...seeded];
+    const first = (...times: (number | null | undefined)[]): number | null => {
+      const ok = times.filter((t): t is number => typeof t === "number" && Number.isFinite(t));
+      return ok.length ? Math.min(...ok) : null;
+    };
+    const ms = (v: unknown) => (typeof v === "string" ? Date.parse(v) : typeof v === "number" ? v : null);
+    const one = <T extends SqlStorageValue>(query: string, ...args: SqlStorageValue[]) => (this.sql.exec<{ v: SqlStorageValue }>(query, ...args).toArray()[0]?.v ?? null) as T | null;
+
+    // inbox-today: a task made with no area, project or Today that the user
+    // later gave one of them.
+    let inboxToday: number | null = null;
+    const inboxBorn = new Map<string, boolean>();
+    for (const c of this.userTaskChanges()) {
+      if (seeded.has(c.id) || c.op !== "upsert" || isInsert(c.diff)) continue;
+      const filed = becomes(c.diff, "today", (v) => v === true) || becomes(c.diff, "area", Boolean) || becomes(c.diff, "project", Boolean);
+      if (!filed) continue;
+      if (!inboxBorn.has(c.id)) {
+        const born = this.insertDiff(c.id);
+        inboxBorn.set(c.id, !!born && !born.area?.[1] && !born.project?.[1] && born.today?.[1] !== true);
+      }
+      if (inboxBorn.get(c.id)) { inboxToday = Date.parse(c.at); break; }
+    }
+
+    const doAt = ms(one<string>(`SELECT MIN(startedAt) AS v FROM do_sessions WHERE 1 = 1${notSeeded("taskId")}`, ...seededArgs));
+    const secondDevice = one<number>("SELECT firstSeen AS v FROM devices d WHERE EXISTS (SELECT 1 FROM sessions s WHERE s.sid = d.sid) ORDER BY firstSeen LIMIT 1 OFFSET 1");
+
+    let fadeDropped: number | null = null;
+    for (const r of this.sql.exec<{ id: string; at: string; diff: string }>(
+      "SELECT id, at, diff FROM changes WHERE entity = 'task' AND diff LIKE '%\"dropReason\"%' ORDER BY rev",
+    ).toArray()) {
+      if (seeded.has(r.id)) continue;
+      if (becomes(JSON.parse(r.diff) as ChangeDiff, "dropReason", (v) => v === "faded")) { fadeDropped = Date.parse(r.at); break; }
+    }
+    const fadeRow = ms(one<string>(`SELECT MIN(COALESCE(completedAt, updatedAt)) AS v FROM tasks WHERE dropReason = 'faded'${notSeeded("id")}`, ...seededArgs));
+    const fadeSwept = ms(this.readSetting("fadeSweptAt"));
+
+    const agentAt = one<number>("SELECT MIN(createdAt) AS v FROM connections");
+
+    let reviewStop: number | null = null;
+    for (const r of this.sql.exec<{ entity: string; id: string; at: string; diff: string }>(
+      `SELECT entity, id, at, diff FROM changes WHERE actor LIKE 'app:%' AND diff IS NOT NULL
+         AND ((entity = 'convo' AND (diff LIKE '%"endState"%' OR diff LIKE '%"stoppedAt"%')) OR (entity = 'setting' AND id = 'agentsPaused'))
+       ORDER BY rev`,
+    ).toArray()) {
+      if (seeded.has(r.id)) continue;
+      const d = JSON.parse(r.diff) as ChangeDiff;
+      const hit = r.entity === "setting"
+        ? becomes(d, "value", (v) => v === true)
+        : (d.endState?.[0] === "needs_verify" && d.endState[1] !== "needs_verify") || becomes(d, "stoppedAt", Boolean);
+      if (hit) { reviewStop = Date.parse(r.at); break; }
+    }
+    const stopped = ms(one<string>(`SELECT MIN(stoppedAt) AS v FROM convos WHERE stoppedAt IS NOT NULL${notSeeded("id")}`, ...seededArgs));
+
+    // discuss: the user spoke in a thread the app's own model runs (a
+    // provider turn that is not a connected agent's).
+    const discuss = ms(one<string>(
+      `SELECT MIN(u.ts) AS v FROM turns u WHERE u.role = 'user'${notSeeded("u.taskId")}
+         AND EXISTS (SELECT 1 FROM turns p WHERE p.taskId = u.taskId AND p.role = 'provider' AND COALESCE(p.provider, '') != 'claude')`,
+      ...seededArgs,
+    ));
+
+    const addedVia = (ways: string[]) => ms(one<string>(
+      `SELECT MIN(COALESCE(createdAt, updatedAt)) AS v FROM tasks WHERE addedVia IN (${ways.map(() => "?").join(", ")})${notSeeded("id")}`,
+      ...ways, ...seededArgs,
+    ));
+
+    const did: Record<string, number | null> = {
+      "inbox-today": inboxToday,
+      do: first(doAt),
+      "second-device": first(secondDevice),
+      fade: first(fadeSwept, fadeDropped, fadeRow),
+      "connect-agent": first(agentAt),
+      "review-stop": first(reviewStop, stopped),
+      discuss: first(discuss),
+      "move-in": addedVia(["import"]),
+      siri: addedVia(["shortcut"]),
+      capture: addedVia(["quick_entry", "quick_add", "share"]),
+    };
+
+    const ticked: Record<string, boolean> = {};
+    for (const [item, taskId] of Object.entries(input.seededTaskIds)) {
+      ticked[item] = one<string>("SELECT status AS v FROM tasks WHERE id = ? AND deletedAt IS NULL", taskId) === "done";
+    }
+
+    // Active days: distinct UTC days with a user change, the seeded beta
+    // rows and settings left out, and so are writes of the fade clock alone
+    // (the app writes those by itself).
+    const weekDays = [new Map<string, number>(), new Map<string, number>(), new Map<string, number>(), new Map<string, number>()];
+    for (const r of this.sql.exec<{ entity: string; id: string; fields: string | null; at: string }>(
+      "SELECT entity, id, fields, at FROM changes WHERE actor LIKE 'app:%' AND entity != 'setting' AND at >= ? AND at < ? ORDER BY rev",
+      new Date(input.joinedAt).toISOString(), new Date(input.joinedAt + 28 * DAY_MS).toISOString(),
+    ).toArray()) {
+      const owner = r.id.split(":")[0];
+      if (seeded.has(owner) || r.id === input.seededProjectId) continue;
+      const fields = r.fields ? (JSON.parse(r.fields) as string[]) : null;
+      if (fields?.length && fields.every((f) => f === "fadedAt" || f === "touchedAt")) continue;
+      const at = Date.parse(r.at);
+      const week = Math.floor((at - input.joinedAt) / (7 * DAY_MS));
+      const day = r.at.slice(0, 10);
+      if (week >= 0 && week < 4 && !weekDays[week].has(day)) weekDays[week].set(day, at);
+    }
+    const week1 = [...weekDays[0].values()].sort((a, b) => a - b);
+
+    const all = this.userTaskMoments(null, seeded);
+    const loops = this.agentLoopTimes(seeded);
+    const week = this.weekCounts(now, seeded);
+    return {
+      did,
+      ticked,
+      activeDays: { w1: weekDays[0].size, w2: weekDays[1].size, w4: weekDays[3].size },
+      week1ThirdDayAt: week1[2] ?? null,
+      loops: { total: loops.length, week: week.agentLoops7d },
+      week: { added: week.userTasksAdded7d, done: week.userTasksDone7d, movedToday: week.userMovedToday7d },
+      firstTaskAt: first(...all.added),
+      firstDoneAt: first(...all.done),
     };
   }
 

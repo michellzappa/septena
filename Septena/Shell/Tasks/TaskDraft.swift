@@ -93,7 +93,8 @@ struct TaskDraft: Equatable {
   /// applied as a follow-up when set.
   @MainActor
   @discardableResult
-  func create(via mutator: TaskMutator, deferPush: Bool = false, atBottom: Bool = false) -> SeptenaTask {
+  func create(via mutator: TaskMutator, deferPush: Bool = false, atBottom: Bool = false,
+              addedVia: TaskAddedVia = .typed) -> SeptenaTask {
     let task = mutator.create(
       title: trimmedTitle,
       area: areaId,
@@ -102,6 +103,7 @@ struct TaskDraft: Equatable {
       deadline: deadline,
       today: pinToday,
       notes: trimmedNotes.isEmpty ? nil : trimmedNotes,
+      addedVia: addedVia,
       deferPush: deferPush,
       atBottom: atBottom
     )

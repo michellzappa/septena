@@ -43,7 +43,6 @@ import {
   Users,
   Wrench,
   X,
-  FlaskConical,
 } from "lucide-react";
 import {
   DESIGN_TOKENS,
@@ -81,10 +80,8 @@ import type {
 import { HeaderWashPreview } from "./HeaderWash";
 import { PlanBenefitRow, PlanHead, PlanMark, PlanPriceLine, PlanSheet } from "./PlanLanguage";
 import { SignInMethodsSection } from "./SignInMethodsSection";
-import { betaSummary } from "./BetaModal";
 import { AccountAvatar, AvatarEditor, type AccountAvatarController } from "./Avatar";
 import { avatarCopy } from "@/lib/avatar";
-import type { BetaMember } from "@/lib/types";
 
 export type SettingsTab = (typeof SETTINGS_REGISTRY.desktopTabs)[number]["id"];
 
@@ -110,10 +107,6 @@ interface SettingsModalProps {
   onOpenSupport: () => void;
   /** Unread support replies: a dot on the Contact Support row. */
   supportUnread: number;
-  /** A tester's beta checklist (GET /v1/beta). Null: no Beta row. */
-  beta?: BetaMember | null;
-  /** Opens the Beta screen. */
-  onOpenBeta?: () => void;
   /** The tab to show when the modal opens. Without it, the last tab stays. */
   initialTab?: SettingsTab;
   /** Called when the user switches tabs inside Settings so the URL stays in sync. */
@@ -276,8 +269,6 @@ export function SettingsModal({
   onOpenShortcuts,
   onOpenSupport,
   supportUnread,
-  beta,
-  onOpenBeta,
   initialTab,
   onTabChange,
   accountAvatar,
@@ -2243,31 +2234,8 @@ export function SettingsModal({
   const renderPageContent = (pageId: string) => {
     const page = PAGE_BY_ID.get(pageId);
     if (!page) return null;
-    // The Beta row (docs/BETA_ONBOARDING_SPEC.md §7): testers only, at the top
-    // of General. Its words come from GET /v1/beta, not the settings registry.
-    const betaRow =
-      pageId === "general" && beta && onOpenBeta ? (
-        <section>
-          <div className="rounded-xl border border-[var(--border-subtle)] px-3.5">
-            <button
-              type="button"
-              onClick={() => {
-                onClose();
-                onOpenBeta();
-              }}
-              className="flex w-full items-center gap-2.5 py-2.5 text-left text-xs text-[var(--text-primary)] hover:opacity-80"
-            >
-              <FlaskConical className="h-4 w-4 shrink-0 text-[var(--accent)]" />
-              <span className="min-w-0 flex-1 truncate font-medium">{beta.copy.settingsRow}</span>
-              <span className="shrink-0 text-[11px] text-[var(--text-muted)]">{betaSummary(beta)}</span>
-              <ChevronRight className="h-3.5 w-3.5 shrink-0 text-[var(--text-muted)]" />
-            </button>
-          </div>
-        </section>
-      ) : null;
     return (
       <div className="space-y-5">
-        {betaRow}
         {page.sections
           .filter((sec) => appliesToWeb(sec.platforms))
           .map((sec) => {

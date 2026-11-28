@@ -572,7 +572,7 @@ export class SeptenaApiClient {
     return zEntitlement.parse(await res.json());
   }
 
-  /** The beta checklist (GET /v1/beta, docs/BETA_ONBOARDING_SPEC.md §7). */
+  /** The tester state behind the Today card (GET /v1/beta, docs/BETA_ONBOARDING_SPEC.md §7). */
   async getBeta(): Promise<BetaState> {
     const res = await this.authedFetch("/v1/beta?platform=web", { method: "GET" });
     if (!res.ok) {
@@ -583,7 +583,7 @@ export class SeptenaApiClient {
     return zBetaState.parse(await res.json());
   }
 
-  /** One checklist change (POST /v1/beta/progress). 404: not a tester. */
+  /** Closes the Today card (POST /v1/beta/progress). 404: not a tester. */
   async postBetaProgress(body: BetaProgress): Promise<void> {
     const res = await this.authedFetch("/v1/beta/progress", {
       method: "POST",

@@ -671,6 +671,7 @@ extension TaskSyncEngine {
     take("reminderDismissedAt") { t.reminderDismissedAt = $0.stringValue }
     take("source") { t.source = $0.stringValue }
     take("sourceClient") { t.sourceClient = $0.stringValue }
+    take("addedVia") { t.addedVia = $0.stringValue }
     take("acknowledgedAt") { t.acknowledgedAt = Self.parseStamp($0.stringValue) }
     take("createdAt") { t.createdAt = Self.parseStamp($0.stringValue) ?? .distantPast }
     // Fade (docs/TASK_FADE_SPEC.md §3). A pulled touch wins like any field,

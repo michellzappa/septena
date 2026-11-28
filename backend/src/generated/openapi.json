@@ -2519,7 +2519,7 @@
         "tags": [
           "account"
         ],
-        "summary": "The beta checklist for this platform. `member: false` for an account that is not a beta tester's.",
+        "summary": "The beta state of this account: the seeded Septena beta project and the Today card copy. `member: false` for an account that is not a beta tester's.",
         "security": [
           {
             "appSession": []
@@ -2597,7 +2597,7 @@
         "tags": [
           "account"
         ],
-        "summary": "Tick or untick a checklist item, say you used Septena this week, or close the welcome card.",
+        "summary": "Close the beta welcome card on Today for good.",
         "security": [
           {
             "appSession": []
@@ -2613,60 +2613,16 @@
           "content": {
             "application/json": {
               "schema": {
-                "anyOf": [
-                  {
-                    "type": "object",
-                    "properties": {
-                      "item": {
-                        "type": "string",
-                        "enum": [
-                          "inbox-today",
-                          "do",
-                          "second-device",
-                          "fade",
-                          "connect-agent",
-                          "review-stop",
-                          "discuss",
-                          "move-in",
-                          "siri",
-                          "capture"
-                        ]
-                      },
-                      "tried": {
-                        "type": "boolean"
-                      }
-                    },
-                    "required": [
-                      "item",
-                      "tried"
-                    ],
-                    "additionalProperties": false
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "ack": {
-                        "const": true
-                      }
-                    },
-                    "required": [
-                      "ack"
-                    ],
-                    "additionalProperties": false
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "dismissCard": {
-                        "const": true
-                      }
-                    },
-                    "required": [
-                      "dismissCard"
-                    ],
-                    "additionalProperties": false
+                "type": "object",
+                "properties": {
+                  "dismissCard": {
+                    "const": true
                   }
-                ]
+                },
+                "required": [
+                  "dismissCard"
+                ],
+                "additionalProperties": false
               }
             }
           }
@@ -4100,6 +4056,26 @@
                                     {
                                       "type": "string",
                                       "maxLength": 64
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "addedVia": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "typed",
+                                        "quick_entry",
+                                        "quick_add",
+                                        "share",
+                                        "shortcut",
+                                        "import",
+                                        "agent",
+                                        "api"
+                                      ]
                                     },
                                     {
                                       "type": "null"

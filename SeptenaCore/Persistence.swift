@@ -170,6 +170,11 @@ final class TaskEntity {
   var source: String?
   /// Friendly label for `source` (e.g. "Claude"). Permanent, optional.
   var sourceClient: String?
+  /// How the task was added (`TaskAddedVia` raw value, ADR 0064). Stamped
+  /// once at creation by the creating path; pulled from the backend for
+  /// rows made elsewhere. PERMANENT: no edit path writes it. Optional, so
+  /// the SwiftData store migrates lightweight; old rows read nil (unknown).
+  var addedVia: String?
   /// Transient freshness cue. `nil` until the user engages with an
   /// agent-created row (open / complete / edit / "Mark seen"); stamped
   /// then so the cue clears and — being synced — stays cleared on every
@@ -233,6 +238,7 @@ final class TaskEntity {
        cloudKitSystemFields: Data? = nil,
        source: String? = nil,
        sourceClient: String? = nil,
+       addedVia: String? = nil,
        acknowledgedAt: Date? = nil,
        createdAt: Date = Date.distantPast,
        kind: String = "",
@@ -279,6 +285,7 @@ final class TaskEntity {
     self.cloudKitSystemFields = cloudKitSystemFields
     self.source = source
     self.sourceClient = sourceClient
+    self.addedVia = addedVia
     self.acknowledgedAt = acknowledgedAt
     self.createdAt = createdAt
     self.kind = kind
@@ -687,6 +694,7 @@ extension SeptenaTask {
       deletedAt: e.deletedAt,
       source: e.source,
       sourceClient: e.sourceClient,
+      addedVia: e.addedVia,
       acknowledgedAt: e.acknowledgedAt,
       createdAt: e.createdAt,
       position: e.position,

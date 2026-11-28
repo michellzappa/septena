@@ -73,6 +73,26 @@ pub mod enums {
         pub const MCP: &str = "mcp";
         pub const ALL: &[&str] = &["app", "mcp"];
     }
+    pub mod task_added_via {
+        pub const TYPED: &str = "typed";
+        pub const QUICK_ENTRY: &str = "quick_entry";
+        pub const QUICK_ADD: &str = "quick_add";
+        pub const SHARE: &str = "share";
+        pub const SHORTCUT: &str = "shortcut";
+        pub const IMPORT: &str = "import";
+        pub const AGENT: &str = "agent";
+        pub const API: &str = "api";
+        pub const ALL: &[&str] = &[
+            "typed",
+            "quick_entry",
+            "quick_add",
+            "share",
+            "shortcut",
+            "import",
+            "agent",
+            "api",
+        ];
+    }
     pub mod project_status {
         pub const ACTIVE: &str = "active";
         pub const DONE: &str = "done";

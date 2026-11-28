@@ -1,10 +1,14 @@
 import type { Context } from "hono";
 import { z } from "zod";
 import type { Env } from "../env.js";
-import { escapeHtml, logEvent, sha256Base64Url } from "../util.js";
-import { BETA_CHECKLIST, CAPABILITIES, DESIGN_TOKENS } from "../generated/registries.js";
+import { escapeHtml, logEvent, randomId, sha256Base64Url } from "../util.js";
+import { BETA_CHECKLIST, DESIGN_TOKENS } from "../generated/registries.js";
 import { accountStoreFor } from "../store/AccountStore.js";
-import type { BetaTester } from "../store/betaInvites.js";
+import { BETA_ANSWERS, type BetaAnswer, type BetaTester, type BetaUsage } from "../store/betaInvites.js";
+import { zPushBody, type Op } from "../store/ops.js";
+import { parseRef, taskRefId } from "../core/index.js";
+import { newTaskId } from "../tools/writeTasks.js";
+import { PAGE_CSS } from "../shadow/oauth.js";
 import { grantRow } from "../entitlement/entitlement.js";
 import { plusLinkGrantId } from "../store/plusLinks.js";
 import { betaGrantEnd, createPlusLink } from "./plusLinks.js";
@@ -221,16 +225,27 @@ export async function setBetaLaunch(env: Env, at: number): Promise<boolean> {
   return true;
 }
 
-/// Hourly: the day-4 check-in, once per tester.
+/// How old a tester's measurement may get before the sweep reads it again.
+const USAGE_REFRESH_MS = 6 * 60 * 60 * 1000;
+
+/// Hourly: the day-4 check-in and the day-7 question, once per tester; the
+/// seed for granted testers who have none yet; and a fresh measurement for
+/// the testers whose reading is oldest.
 export async function sweepBeta(env: Env, now = Date.now()): Promise<void> {
   const accounts = accountStoreFor(env);
-  if (!accounts || !env.EMAIL) return;
+  if (!accounts) return;
+  for (const t of await accounts.betaUnseeded()) await seedBetaProject(env, t.grantedUserId!);
+  for (const t of await accounts.betaStaleUsage(now - USAGE_REFRESH_MS)) {
+    await refreshBetaUsage(env, t, now).catch((e) => logEvent("beta_usage_failed", { error: String(e) }));
+  }
+  if (!env.EMAIL) return;
   const due = await accounts.betaTakeCheckinsDue(now - CHECKIN_AFTER_MS, now);
   for (const t of due) {
     // The plan link URL is not stored (only its hash), so the reminder
     // points at the welcome mail, which holds it.
     await sendMail(env, t.email, checkinMail(t.grantedUserId === null));
   }
+  await sendQuestions(env, now);
 }
 
 // ---- the mails ----
@@ -280,9 +295,10 @@ export function welcomeMail(email: string, linkUrl: string): Mail {
   return render("You’re in the Septena beta", [
     { p: "Thanks for testing Septena." },
     { p: `Apple sends its own mail from TestFlight. Open it on your phone or tablet to install. On a Mac, [download the app here](${MAC}).` },
-    { p: "These are the parts I most want your notes on. Once you sign in with this address, the app keeps the same list in Settings, under Beta, and you tick what you tried." },
+    { p: "These are the parts I most want your notes on. Once you sign in with this address, the same list is a project called Septena beta in your list, and you tick what you tried." },
     { ol: BETA_CHECKLIST.items.map((i) => `**${absoluteLinks(i.title)}.** ${i.try}`) },
     { p: `For the agent items, [the agents page](${AGENTS}) shows how to connect yours.` },
+    { p: "The beta notes which of these parts you used and when, never what you wrote." },
     { p: "When something breaks, confuses you or works well, tell me. Say what you tried and what you expected. If an agent was involved, add the prompt." },
     { button: "Send a note", href: FEEDBACK },
     { p: `Your year of Pro starts the day Septena launches. It goes to any account you make with **${email}**. If you sign in with another address, or with Hide My Email, [open this link once to claim it](${linkUrl}).` },
@@ -307,59 +323,208 @@ export function launchMail(expiresAt: number, unclaimed: boolean): Mail {
   ]);
 }
 
-// ---- the checklist in the app (registry/beta.json) ----
+// ---- the checklist in the app (registry/beta.json, spec §7) ----
 
 const LINK = /\[([^\]]+)\]\(([^)]+)\)/g;
 /// A title links its key words to their septena.app page in Markdown. The
 /// apps draw text, so they get the words alone.
 export const plainTitle = (title: string) => title.replace(LINK, "$1");
 const absoluteLinks = (title: string) => title.replace(LINK, (_m, label, href) => `[${label}](${SITE}${href})`);
+const titleLinks = (title: string) => [...title.matchAll(LINK)].map(([, label, href]) => ({ label, url: `${SITE}${href}` }));
 
 export const BETA_PLATFORMS = ["ios", "ipados", "macos", "web", "android", "windows", "linux"] as const;
-type BetaPlatform = (typeof BETA_PLATFORMS)[number];
-const ITEM_IDS = BETA_CHECKLIST.items.map((i) => i.id) as [string, ...string[]];
+export const BETA_ITEM_IDS = BETA_CHECKLIST.items.map((i) => i.id);
 
+/// `platform` is still asked for so older builds keep their URL; the
+/// answer no longer depends on it.
 export const zBetaQuery = z.object({ platform: z.enum(BETA_PLATFORMS) }).strict();
 
-/// One change from the checklist screen: an item ticked or unticked, the
-/// weekly "I used it for real", or the welcome card closed for good.
-export const zBetaProgressBody = z.union([
-  z.object({ item: z.enum(ITEM_IDS), tried: z.boolean() }).strict(),
-  z.object({ ack: z.literal(true) }).strict(),
-  z.object({ dismissCard: z.literal(true) }).strict(),
-]);
+/// The welcome card on Today was closed for good.
+export const zBetaProgressBody = z.object({ dismissCard: z.literal(true) }).strict();
 
-/// The items whose features ship on this platform.
-export function betaItemsFor(platform: BetaPlatform) {
-  return BETA_CHECKLIST.items.filter((i) =>
-    i.features.some((f) => (CAPABILITIES as Record<string, Record<string, unknown>>)[f]?.[platform] === "ships"));
+/// The server writes the seed as itself, never as the user or an agent.
+export const BETA_SEED_ACTOR = "system:beta";
+
+/// The ops that write the beta project: one project with the registry notes
+/// and one open task per item, with one `about` reference per link in its
+/// title. Checked against the push schema like any app push.
+export function betaSeedOps(now = new Date()): { ops: Op[]; projectId: string; taskIds: Record<string, string> } {
+  const at = now.toISOString();
+  const day = at.slice(0, 10);
+  const base = `beta-${randomId(12).replace(/[^A-Za-z0-9_-]/g, "x")}`;
+  let n = 0;
+  const opId = () => `${base}-${n++}`;
+  const projectId = newTaskId();
+  const ops: Op[] = [{
+    clientOpId: opId(), op: "upsert", entity: "project", id: projectId,
+    fields: { title: BETA_CHECKLIST.project.title, status: "active", notes: BETA_CHECKLIST.project.notes, created: day },
+  }];
+  const taskIds: Record<string, string> = {};
+  BETA_CHECKLIST.items.forEach((item, i) => {
+    let id = newTaskId();
+    while (id === projectId || Object.values(taskIds).includes(id)) id = newTaskId();
+    taskIds[item.id] = id;
+    ops.push({
+      clientOpId: opId(), op: "upsert", entity: "task", id,
+      fields: {
+        title: plainTitle(item.title), status: "open", project: projectId, notes: item.try,
+        created: day, createdAt: at, touchedAt: at, source: "app", position: i + 1,
+      },
+    });
+    titleLinks(item.title).forEach((link, j) => {
+      const key = parseRef(link.url).key;
+      ops.push({
+        clientOpId: opId(), op: "upsert", entity: "taskRef", id: taskRefId(id, key, 0),
+        fields: { taskId: id, key, role: "about", snapshot: { title: link.label, url: link.url }, position: j + 1, createdAt: at },
+      });
+    });
+  });
+  zPushBody.parse({ ops });
+  return { ops, projectId, taskIds };
 }
 
-/// GET /v1/beta?platform=…: `{ member: false }` for every account that is not
-/// a tester's, so the app shows nothing. A tester gets the copy, the items
-/// for this platform and what they ticked.
-export async function betaState(env: Env, userId: string, platform: BetaPlatform) {
-  const state = await accountStoreFor(env)?.betaForUser(userId);
-  if (!state) return { member: false as const };
-  const items = betaItemsFor(platform);
-  const tried = Object.fromEntries(items.filter((i) => state.progress[i.id]).map((i) => [i.id, state.progress[i.id]]));
+/// Seeds the beta project into a tester's account, once. Never throws: a
+/// sign-in or a claim must not fail on this. A deleted project does not come
+/// back (`seededAt` stays).
+export async function seedBetaProject(env: Env, userId: string): Promise<void> {
+  const accounts = accountStoreFor(env);
+  if (!accounts) return;
+  let email: string | null = null;
+  try {
+    const tester = await accounts.betaTakeSeed(userId);
+    if (!tester) return;
+    email = tester.email;
+    const { ops, projectId, taskIds } = betaSeedOps();
+    const { result } = await storeFor(env, userId).push(ops, BETA_SEED_ACTOR, "beta checklist");
+    if (result.results[0]?.status !== "applied") throw new Error(`project ${result.results[0]?.status}`);
+    await accounts.betaFinishSeed(tester.email, projectId, taskIds);
+    logEvent("beta_seeded", { userId, refused: result.results.filter((r) => r.status !== "applied").length });
+  } catch (e) {
+    logEvent("beta_seed_failed", { userId, error: String(e) });
+    if (email) await accounts.betaDropSeed(email).catch(() => undefined);
+  }
+}
+
+/// Reads what the tester did from their account and stores it on the tester
+/// row (the admin page counts from there). Null when the account is not a
+/// tester's.
+export async function refreshBetaUsage(env: Env, tester: BetaTester, now = Date.now()): Promise<BetaUsage | null> {
+  const accounts = accountStoreFor(env);
+  if (!accounts || !tester.grantedUserId) return null;
+  const usage = await storeFor(env, tester.grantedUserId).betaUsage({
+    seededTaskIds: tester.seedTaskIds ? JSON.parse(tester.seedTaskIds) as Record<string, string> : {},
+    seededProjectId: tester.seedProjectId,
+    joinedAt: tester.joinedAt,
+    now,
+  });
+  return accounts.betaSaveUsage(tester.email, usage, now);
+}
+
+/// GET /v1/beta: `{ member: false }` for every account that is not a
+/// tester's, so the app shows nothing. A tester gets the card copy and the
+/// seeded project. The call also seeds (a tester granted before seeding
+/// shipped) and refreshes the measurement.
+export async function betaState(env: Env, userId: string, ctx?: { waitUntil(p: Promise<unknown>): void }) {
+  const accounts = accountStoreFor(env);
+  let tester = await accounts?.betaForUser(userId);
+  if (!accounts || !tester) return { member: false as const };
+  if (tester.seededAt === null) {
+    await seedBetaProject(env, userId);
+    tester = (await accounts.betaForUser(userId)) ?? tester;
+  }
+  const refresh = refreshBetaUsage(env, tester).catch((e) => logEvent("beta_usage_failed", { error: String(e) }));
+  if (ctx) ctx.waitUntil(refresh); else await refresh;
+  const { cardTitle, cardBody, cardOpen, cardDismiss } = BETA_CHECKLIST.copy;
   return {
     member: true as const,
-    joinedAt: state.joinedAt,
-    copy: BETA_CHECKLIST.copy,
-    items: items.map(({ id, title, try: tryText }) => ({ id, title: plainTitle(title), try: tryText })),
-    tried,
-    ackAt: state.progress._ack ?? null,
-    cardDismissedAt: state.progress._card ?? null,
-    feedbackURL: FEEDBACK,
+    projectId: tester.seedProjectId,
+    cardDismissedAt: tester.cardDismissedAt,
+    copy: { cardTitle, cardBody, cardOpen, cardDismiss },
   };
 }
 
 /// POST /v1/beta/progress. False when the account is not a tester's.
-export async function betaProgress(env: Env, userId: string, body: z.infer<typeof zBetaProgressBody>): Promise<boolean> {
+export async function betaProgress(env: Env, userId: string, _body: z.infer<typeof zBetaProgressBody>): Promise<boolean> {
+  return (await accountStoreFor(env)?.betaDismissCard(userId)) ?? false;
+}
+
+// ---- the day-7 question (Sean Ellis) ----
+
+const ANSWER_TOKEN_RE = /^ba_[A-Za-z0-9_-]{32}$/;
+const ANSWER_LABEL: Record<BetaAnswer, string> = {
+  very: "Very disappointed",
+  somewhat: "Somewhat disappointed",
+  not: "Not disappointed",
+};
+export const BETA_QUESTION_AFTER_MS = 7 * 86_400_000;
+
+export function questionMail(answerUrl: (a: BetaAnswer) => string): Mail {
+  return render("One question about Septena", [
+    { p: "You have had Septena for a week now. I have one question, and one tap answers it." },
+    { p: "**How would you feel if you could no longer use Septena?**" },
+    ...BETA_ANSWERS.map((a) => ({ button: ANSWER_LABEL[a], href: answerUrl(a) })),
+    { p: "You can change your answer later with the same buttons." },
+    { p: "Michell" },
+  ]);
+}
+
+/// Mails the question to the testers who joined a week ago, once each.
+async function sendQuestions(env: Env, now: number): Promise<void> {
   const accounts = accountStoreFor(env);
-  if (!accounts) return false;
-  if ("item" in body) return accounts.betaSetProgress(userId, body.item, body.tried);
-  if ("ack" in body) return accounts.betaSetProgress(userId, "_ack", true);
-  return accounts.betaSetProgress(userId, "_card", true);
+  if (!accounts) return;
+  for (const t of await accounts.betaQuestionsDue(now - BETA_QUESTION_AFTER_MS)) {
+    const token = `ba_${randomId(24)}`;
+    if (!(await accounts.betaTakeQuestion(t.email, await sha256Base64Url(token), now))) continue;
+    await sendMail(env, t.email, questionMail((a) => `${env.API_PUBLIC_URL}/beta/answer/${token}?a=${a}`));
+  }
+}
+
+function answerPage(title: string, main: string, status = 200): Response {
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><title>${escapeHtml(title)}</title>
+<style>${PAGE_CSS}
+  button { width: 100%; padding: 12px; border: 0; border-radius: 10px; background: ${BRAND.light}; color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+  form { margin: 0 0 14px; }
+</style></head><body><main class="card">${main}</main></body></html>`;
+  return new Response(html, {
+    status,
+    headers: {
+      "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "Referrer-Policy": "no-referrer",
+      "X-Robots-Tag": "noindex, nofollow",
+      "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'",
+    },
+  });
+}
+
+const goneAnswer = () => answerPage("Septena", "<h1>This link no longer works</h1><p>It may be from an older mail.</p>", 404);
+
+async function answerToken(c: Ctx): Promise<string | null> {
+  const token = c.req.param("token") ?? "";
+  if (!ANSWER_TOKEN_RE.test(token)) return null;
+  return (await accountStoreFor(c.env)?.betaHasAnswerToken(await sha256Base64Url(token))) ? token : null;
+}
+
+const zAnswer = z.enum(BETA_ANSWERS);
+
+/// GET /beta/answer/:token?a=…: shows the answer and a button. Nothing is
+/// stored, so a mail scanner that opens the link answers nothing.
+export async function betaAnswerPage(c: Ctx): Promise<Response> {
+  const token = await answerToken(c);
+  const a = zAnswer.safeParse(c.req.query("a"));
+  if (!token || !a.success) return goneAnswer();
+  return answerPage("Septena", `<h1>How would you feel if you could no longer use Septena?</h1>
+  <p>Your answer: <strong>${escapeHtml(ANSWER_LABEL[a.data])}</strong>.</p>
+  <form method="post" action="/beta/answer/${token}"><input type="hidden" name="a" value="${a.data}"><button type="submit">Send my answer</button></form>`);
+}
+
+/// POST /beta/answer/:token: stores the answer; a later one replaces it.
+export async function betaAnswerSave(c: Ctx): Promise<Response> {
+  const token = await answerToken(c);
+  const a = zAnswer.safeParse((await c.req.parseBody()).a);
+  if (!token || !a.success) return goneAnswer();
+  await accountStoreFor(c.env)!.betaAnswer(await sha256Base64Url(token), a.data);
+  logEvent("beta_answered", { answer: a.data });
+  return answerPage("Septena", `<h1>Thank you</h1>
+  <p>I have your answer. If something made you pick it, I would like to hear it.</p>
+  <p><a href="${FEEDBACK}">Send a note</a></p>`);
 }

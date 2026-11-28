@@ -778,7 +778,9 @@ api.post("/auth/device", async (c) => {
 api.get("/beta", async (c) => {
   const q = zBetaQuery.safeParse(c.req.query());
   if (!q.success) return c.json({ error: "invalid_request", issues: q.error.issues.slice(0, 5) }, 400);
-  return c.json(await betaState(c.env, c.get("userId"), q.data.platform), 200, { "Cache-Control": "no-store" });
+  let ctx: { waitUntil(p: Promise<unknown>): void } | undefined;
+  try { ctx = c.executionCtx; } catch { /* no execution context: measure inline */ }
+  return c.json(await betaState(c.env, c.get("userId"), ctx), 200, { "Cache-Control": "no-store" });
 });
 
 api.post("/beta/progress", async (c) => {

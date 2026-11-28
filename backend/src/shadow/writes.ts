@@ -595,6 +595,9 @@ async function createTask(ctx: WriteContext, input: CreateTaskInput) {
     createdAt: now,
     source: ctx.source?.source ?? "mcp",
     sourceClient: ctx.source?.sourceClient ?? agentSourceClient(ctx.agentName),
+    // The connector made it (ADR 0064); an app client on this path (the
+    // watch) says nothing about how.
+    ...(ctx.source ? {} : { addedVia: "agent" }),
     today: input.today === true,
     starred: input.starred === true,
     position,

@@ -69,6 +69,16 @@ export async function claimPlusLink(
   // A beta tester's link (ADR 0064): note the account, and after launch the
   // grant ends a year after the launch date.
   const beta = await accounts.betaLinkClaimed(claim.linkId, userId);
+  // The grant landed: the tester's checklist becomes a project in their
+  // list, once (spec §7). Never fails the claim.
+  if (beta) {
+    try {
+      const { seedBetaProject } = await import("./beta.js");
+      await seedBetaProject(env, userId);
+    } catch (e) {
+      logEvent("beta_seed_failed", { userId, error: String(e) });
+    }
+  }
   if (beta?.launchAt) {
     const expiresAt = betaGrantEnd(beta.launchAt);
     await store.putEntitlement(grantRow(plusLinkGrantId(claim.linkId), claim.plan, expiresAt, "beta"), "admin");

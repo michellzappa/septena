@@ -3,7 +3,7 @@ import type { Env } from "../env.js";
 import { randomId, sha256Base64Url } from "../util.js";
 import type { AccountSummary } from "./TaskStore.js";
 import { PlusLinks, type PlusLink, type PlusLinkClaim, type PlusLinkInput, type PlusLinkUse } from "./plusLinks.js";
-import { BetaInvites, type BetaCode, type BetaCodeInput, type BetaJoinStart, type BetaTester } from "./betaInvites.js";
+import { BetaInvites, parseUsage, type BetaAnswer, type BetaCode, type BetaCodeInput, type BetaJoinStart, type BetaTester, type BetaUsage } from "./betaInvites.js";
 import { defaultAvatar, type StoredAvatar } from "./avatar.js";
 
 // AccountStore — global Durable Object (SQLite) holding the identity table
@@ -105,6 +105,41 @@ export function normalizeSubject(provider: string, subject: string): string {
   const trimmed = subject.trim();
   if (!trimmed) throw new Error("empty identity subject");
   return provider === "email" ? trimmed.toLowerCase() : trimmed;
+}
+
+/// One tester as the Beta card counts it: no full email, no task text.
+/// `mask` (first letter and the domain) tells rows apart; `ref` opens the
+/// one-tester view without putting the address in the page.
+export interface BetaTesterStats {
+  mask: string;
+  ref: string;
+  codeId: string;
+  joinedAt: number;
+  grantedAt: number | null;
+  usage: BetaUsage | null;
+  answer: BetaAnswer | null;
+  answeredAt: number | null;
+}
+
+/// "a•••@example.com": enough to tell testers apart on the card.
+export function maskEmail(email: string): string {
+  const at = email.indexOf("@");
+  return at > 0 ? `${email[0]}•••${email.slice(at)}` : "•••";
+}
+
+/// A stable, opaque handle for one tester (FNV-1a of the address).
+export function testerRef(email: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < email.length; i++) { h ^= email.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+  return `t${h.toString(36)}`;
+}
+
+export function testerStats(t: BetaTester): BetaTesterStats {
+  const usage = parseUsage(t.usage);
+  return {
+    mask: maskEmail(t.email), ref: testerRef(t.email),
+    codeId: t.codeId, joinedAt: t.joinedAt, grantedAt: t.grantedUserId ? t.grantedAt : null, usage, answer: t.answer, answeredAt: t.answeredAt,
+  };
 }
 
 /// Returns the global `AccountStore` stub, or null when the binding is absent
@@ -573,8 +608,13 @@ export class AccountStore extends DurableObject<Env> {
     return this.beta.createCode(input, now);
   }
 
-  listBetaCodes(): { codes: BetaCode[]; counts: Record<string, { joined: number; granted: number }>; launchAt: number | null; progress: Record<string, number> } {
-    return { codes: this.beta.listCodes(), counts: Object.fromEntries(this.beta.codeCounts()), launchAt: this.beta.launchAt(), progress: this.beta.progressCounts() };
+  /// The Beta card: codes, counts per code, the launch day and every invited
+  /// tester's measured rows without the email (counts are made from them).
+  listBetaCodes(): { codes: BetaCode[]; counts: Record<string, { joined: number; granted: number }>; launchAt: number | null; testers: BetaTesterStats[] } {
+    return {
+      codes: this.beta.listCodes(), counts: Object.fromEntries(this.beta.codeCounts()), launchAt: this.beta.launchAt(),
+      testers: this.beta.invited().map(testerStats),
+    };
   }
 
   closeBetaCode(id: string, now = Date.now()): boolean {
@@ -591,6 +631,11 @@ export class AccountStore extends DurableObject<Env> {
 
   betaTester(email: string): BetaTester | null {
     return this.beta.tester(email);
+  }
+
+  /// The tester behind a `ref` from the Beta card's table.
+  betaTesterByRef(ref: string): BetaTester | null {
+    return this.beta.invited().find((t) => testerRef(t.email) === ref) ?? null;
   }
 
   betaSetPlanLink(email: string, linkId: string, linkHash: string): void {
@@ -616,20 +661,53 @@ export class AccountStore extends DurableObject<Env> {
   }
 
   /// The beta state of one account, or null when it is not a tester's.
-  betaForUser(userId: string): { joinedAt: number; progress: Record<string, number> } | null {
-    const t = this.beta.testerForUser(userId);
-    return t ? { joinedAt: t.joinedAt, progress: this.beta.progress(userId) } : null;
+  betaForUser(userId: string): BetaTester | null {
+    return this.beta.testerForUser(userId);
   }
 
   /// False when the account is not a tester's.
-  betaSetProgress(userId: string, key: string, on: boolean, now = Date.now()): boolean {
-    if (!this.beta.testerForUser(userId)) return false;
-    this.beta.setProgress(userId, key, on, now);
-    return true;
+  betaDismissCard(userId: string, now = Date.now()): boolean {
+    return this.beta.dismissCard(userId, now);
   }
 
-  betaProgressCounts(): Record<string, number> {
-    return this.beta.progressCounts();
+  betaTakeSeed(userId: string, now = Date.now()): BetaTester | null {
+    return this.ctx.storage.transactionSync(() => this.beta.takeSeed(userId, now));
+  }
+
+  betaFinishSeed(email: string, projectId: string, taskIds: Record<string, string>): void {
+    this.beta.finishSeed(email, projectId, taskIds);
+  }
+
+  betaDropSeed(email: string): void {
+    this.beta.dropSeed(email);
+  }
+
+  betaUnseeded(limit = 20): BetaTester[] {
+    return this.beta.unseeded(limit);
+  }
+
+  betaSaveUsage(email: string, usage: BetaUsage, now = Date.now()): BetaUsage {
+    return this.ctx.storage.transactionSync(() => this.beta.saveUsage(email, usage, now));
+  }
+
+  betaStaleUsage(before: number, limit = 25): BetaTester[] {
+    return this.beta.staleUsage(before, limit);
+  }
+
+  betaQuestionsDue(joinedBefore: number): BetaTester[] {
+    return this.beta.questionsDue(joinedBefore);
+  }
+
+  betaTakeQuestion(email: string, tokenHash: string, now = Date.now()): boolean {
+    return this.beta.takeQuestion(email, tokenHash, now);
+  }
+
+  betaHasAnswerToken(tokenHash: string): boolean {
+    return this.beta.hasAnswerToken(tokenHash);
+  }
+
+  betaAnswer(tokenHash: string, answer: BetaAnswer, now = Date.now()): boolean {
+    return this.beta.answer(tokenHash, answer, now);
   }
 
   betaInvited(): BetaTester[] {

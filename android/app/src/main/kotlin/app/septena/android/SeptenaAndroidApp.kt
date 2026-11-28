@@ -112,8 +112,8 @@ class AndroidAppGraph(application: Application) {
     val shares = SeptenaShareClient(access)
     /** The account's avatar and the members' photos (#857). */
     val avatars = AvatarStore(application, SeptenaAvatarClient(credentials, clientVersion), appScope)
-    /** The beta checklist (docs/BETA_ONBOARDING_SPEC.md §7): the Settings row, the Beta screen, the Today card. */
-    internal val beta = app.septena.android.ui.BetaChecklistModel(app.septena.transport.SeptenaBetaClient(access), appScope)
+    /** The beta (ADR 0064): the one Today card. The checklist itself is a seeded project. */
+    internal val beta = app.septena.android.ui.BetaModel(app.septena.transport.SeptenaBetaClient(access), appScope)
     /** Contact Support (ADR 0054): the client and this device's support key. */
     val support = SeptenaSupportClient(credentials, clientVersion)
     val supportKeys = app.septena.android.auth.SupportKeyStore(application)
