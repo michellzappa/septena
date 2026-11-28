@@ -44,6 +44,8 @@ import app.septena.core.generated.RegistryPlacesScreenIds
 import app.septena.core.generated.RegistryPromptIds
 import app.septena.core.generated.RegistrySurfaceIds
 import app.septena.core.stringValue
+import app.septena.ui.CollapsibleTaskGroup
+import app.septena.ui.TaskGroupHeader
 import app.septena.ui.TaskHomeContent
 import app.septena.ui.TaskMenuActionIcon
 import app.septena.ui.TaskRowMenuAction
@@ -115,6 +117,8 @@ private fun DesktopTasks(
     var online by remember { mutableStateOf(true) }
     var busy by remember { mutableStateOf(false) }
     var loaded by remember { mutableStateOf(false) }
+    // A Checklist's Checked group starts expanded (#860).
+    var checkedExpanded by remember { mutableStateOf(true) }
     val undo by workspace.undoState.collectAsState()
 
     fun <T> work(action: suspend () -> T, refresh: Boolean = true, onSuccess: (T) -> Unit = {}) {
@@ -319,6 +323,22 @@ private fun DesktopTasks(
                     }
                 },
                 onOpenGroupTarget = project?.let { current -> { id -> destination = DesktopLocation.Section(current.id, id) } },
+                // One Checked group after a Checklist's rows, with the list's foldable group (#860).
+                collapsibleGroup = (destination as? DesktopLocation.Project)
+                    ?.let { lists.checkedByProject[it.id] }
+                    ?.takeIf { it.isNotEmpty() }
+                    ?.let { checked ->
+                        CollapsibleTaskGroup(
+                            header = TaskGroupHeader(
+                                key = "checklist-checked",
+                                title = checklistChecked(languageTag),
+                                count = checked.size,
+                            ),
+                            tasks = checked,
+                            isExpanded = checkedExpanded,
+                            onToggle = { checkedExpanded = !checkedExpanded },
+                        )
+                    },
             )
         }
     }
@@ -484,3 +504,9 @@ private fun actionTitle(id: String, languageTag: String): String =
 
 private fun localized(label: String, languageTag: String): String =
     RegistryCatalog.localizedString(label, languageTag) ?: label
+
+/** The Checked group title (registry `checklistProjects.checked`). */
+private fun checklistChecked(languageTag: String): String {
+    val raw = RegistryCatalog.surface(RegistrySurfaceIds.CHECKLIST_PROJECTS)?.fields?.get("checked").stringValue().orEmpty()
+    return RegistryCatalog.localizedString(raw, languageTag) ?: raw
+}

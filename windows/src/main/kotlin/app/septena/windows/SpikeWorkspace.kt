@@ -7,6 +7,7 @@ import app.septena.core.JsonValue
 import app.septena.core.NotesBase
 import app.septena.core.QuickFindSearch
 import app.septena.core.RecurrenceRule
+import app.septena.core.RegistryCatalog
 import app.septena.core.RegistryEntityMutator
 import app.septena.core.SyncChange
 import app.septena.core.SyncOperation
@@ -40,6 +41,7 @@ import app.septena.core.stringValue
 import app.septena.store.SqlDelightTaskStore
 import app.septena.store.db.SeptenaDatabase
 import app.septena.sharedcore.RescheduleMode
+import java.util.Locale
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
@@ -64,7 +66,11 @@ internal class SpikeWorkspace(
 
     suspend fun lists(languageTag: String): DesktopTaskLists {
         val records = store.activeTasks()
-        return desktopTaskLists(records, places(records), clock, languageTag).copy(
+        val checked = store.records(RegistryEntityNames.TASK).filter {
+            it.deletedAt == null &&
+                it.fields[RegistryEntityFields.Task.STATUS].stringValue() == RegistryEntityEnums.TaskStatus.CHECKLIST_CHECKED
+        }
+        return desktopTaskLists(records, places(records), clock, languageTag, checked).copy(
             agentsPaused = settings.value(RegistrySettingKeys.AGENTS_PAUSED).booleanValue() == true,
         )
     }
@@ -178,7 +184,12 @@ internal class SpikeWorkspace(
         return when (location) {
             is DesktopLocation.Smart -> mutator.create(title, today = location.id == RegistryDestinationIds.TODAY)
             is DesktopLocation.Area -> mutator.create(title, area = location.id)
-            is DesktopLocation.Project -> mutator.create(title, project = location.id)
+            is DesktopLocation.Project -> mutator.create(title, project = location.id).also { created ->
+                // A new Checklist item with no section joins the core's suggested group (#860).
+                mutator.placeChecklistItem(created.id, created.title) { group ->
+                    RegistryCatalog.checklistGroupTitle(group, Locale.getDefault().toLanguageTag())
+                }
+            }
             is DesktopLocation.Section -> mutator.create(title, project = location.projectId, heading = location.id)
         }
     }
@@ -290,7 +301,16 @@ internal class SpikeWorkspace(
     }
 
     suspend fun rename(id: String, title: String) = mutator.rename(id, title)
-    suspend fun complete(id: String) = mutator.complete(id)
+    /**
+     * The row checkbox. A Checklist row checks and reopens with the core patch
+     * as one undo step, so Undo brings back the date it cleared (#860).
+     */
+    suspend fun complete(id: String): TaskRecord? {
+        if (!mutator.isChecklistRow(id)) return mutator.complete(id)
+        val checked = task(id)?.fields?.get(RegistryEntityFields.Task.STATUS).stringValue() ==
+            RegistryEntityEnums.TaskStatus.CHECKLIST_CHECKED
+        return editTask(id) { if (checked) mutator.reopen(id) else mutator.complete(id) }
+    }
     suspend fun sync() = syncEngine.sync()
     suspend fun rejected() = store.notSyncedOperations()
 

@@ -25,6 +25,8 @@ internal data class DesktopTaskLists(
     val places: DesktopPlaces = DesktopPlaces(),
     val byPlace: Map<DesktopLocation, List<TaskListItem>> = emptyMap(),
     val agentsPaused: Boolean = false,
+    /** A Checklist project's checked rows (#860), shown as one Checked group after its rows. */
+    val checkedByProject: Map<String, List<TaskListItem>> = emptyMap(),
 ) {
     fun rows(destination: String): List<TaskListItem> = byDestination[destination].orEmpty()
 
@@ -39,6 +41,7 @@ internal fun desktopTaskLists(
     places: DesktopPlaces,
     clock: DayClock,
     languageTag: String,
+    checkedRecords: List<SyncRecord> = emptyList(),
 ): DesktopTaskLists {
     val now = clock.now()
     val today = clock.today(now)
@@ -97,5 +100,14 @@ internal fun desktopTaskLists(
             byPlace[section].orEmpty().map { row -> row.copy(group = header) }
         }
     }
-    return DesktopTaskLists(inbox, lists, places, byPlace)
+    // Checked is a view over status, never a heading (#860 decision 3). A section
+    // with no open rows draws no header here, so a Checklist's empty headings hide.
+    val checkedByProject = checkedRecords.asSequence()
+        .map(TaskSnapshot::from)
+        .filter { it.deletedAt == null && !it.isHeading && it.status == RegistryEntityEnums.TaskStatus.CHECKLIST_CHECKED }
+        .filter { it.project != null }
+        .groupBy({ it.project!! }) { task ->
+            TaskListItem(id = task.id, title = task.title, isCompleted = true, isStarred = task.starred)
+        }
+    return DesktopTaskLists(inbox, lists, places, byPlace, checkedByProject = checkedByProject)
 }

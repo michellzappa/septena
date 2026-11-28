@@ -51,6 +51,12 @@ Clients call these functions through the core. They never re-implement them. Vec
   - Typing alone never changes the list.
 - **Placement of a new item.** The heading the user adds from wins. With none, the client takes `suggestedGroup`, looks up its title in the registry, and calls `checklistHeading`. Otherwise the item stays ungrouped.
 
+## Platforms
+
+- **Web, iOS, iPadOS, macOS, Android:** the full host contract above.
+- **watchOS:** the watch reads its lists from the backend REST API, which returns open rows only. It checks through `POST /v1/tasks/:id/complete`, where the backend applies `checklistCheckPatch` to a Checklist row. A checked row never shows as open, and checking uses the checklist check. The watch has no project add field.
+- **Windows:** check, reopen, the Checked group, hidden empty headings and suggested-group placement. Add-field suggestions, New Project → Checklist and Use as Checklist wait for the Windows places UI (#896).
+
 ## Create and convert
 
 Offer **Checklist** in the new-project flow. Show **Use as Checklist** in the existing project menu. Conversion sets `checklistMode` only. It keeps the project id, name, area, sidebar position, headings and open rows. Done tasks stay done and stay in the Logbook. There is no "convert back" yet.
