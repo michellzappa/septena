@@ -492,7 +492,8 @@ describe("The checklist in the app", () => {
     await betaState(h.env, userId(1));
     const listed = h.accounts.listBetaCodes();
     assert.equal(listed.testers.length, 1);
-    assert.ok(!JSON.stringify(listed.testers).includes("@"), "the card's rows carry no email");
+    assert.ok(!JSON.stringify(listed.testers).includes("ana@example.com"), "the card's rows carry no full email");
+    assert.match(listed.testers[0].mask, /^.•••@/, "only a masked address");
     assert.deepEqual(betaFunnel(listed.testers), [1, 1, 0, 0, 0, 0]);
     const view = {
       admin: "mz@example.com", accounts: [], links: [], uses: [], signups: null, query: "", emailSignups: [], emailUserId: null,
@@ -514,7 +515,7 @@ describe("addedVia", () => {
   it("takes the registry values from an app push and nothing else", async () => {
     const { zPushBody } = await import("../src/store/ops.ts");
     const op = (addedVia: unknown) => ({ ops: [{ clientOpId: "addv-0001", op: "upsert", entity: "task", id: "t1", fields: { title: "x", status: "open", addedVia } }] });
-    for (const v of ["typed", "quick-entry", "quick-add", "share", "shortcut", "import", "agent", "api", null]) assert.ok(zPushBody.safeParse(op(v)).success, String(v));
+    for (const v of ["typed", "quick_entry", "quick_add", "share", "shortcut", "import", "agent", "api", null]) assert.ok(zPushBody.safeParse(op(v)).success, String(v));
     assert.equal(zPushBody.safeParse(op("siri")).success, false);
   });
 

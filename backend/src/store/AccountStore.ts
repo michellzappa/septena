@@ -107,8 +107,12 @@ export function normalizeSubject(provider: string, subject: string): string {
   return provider === "email" ? trimmed.toLowerCase() : trimmed;
 }
 
-/// One tester as the Beta card counts it: no email, no task text.
+/// One tester as the Beta card counts it: no full email, no task text.
+/// `mask` (first letter and the domain) tells rows apart; `ref` opens the
+/// one-tester view without putting the address in the page.
 export interface BetaTesterStats {
+  mask: string;
+  ref: string;
   codeId: string;
   joinedAt: number;
   grantedAt: number | null;
@@ -117,9 +121,23 @@ export interface BetaTesterStats {
   answeredAt: number | null;
 }
 
+/// "a•••@example.com": enough to tell testers apart on the card.
+export function maskEmail(email: string): string {
+  const at = email.indexOf("@");
+  return at > 0 ? `${email[0]}•••${email.slice(at)}` : "•••";
+}
+
+/// A stable, opaque handle for one tester (FNV-1a of the address).
+export function testerRef(email: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < email.length; i++) { h ^= email.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+  return `t${h.toString(36)}`;
+}
+
 export function testerStats(t: BetaTester): BetaTesterStats {
   const usage = parseUsage(t.usage);
   return {
+    mask: maskEmail(t.email), ref: testerRef(t.email),
     codeId: t.codeId, joinedAt: t.joinedAt, grantedAt: t.grantedUserId ? t.grantedAt : null, usage, answer: t.answer, answeredAt: t.answeredAt,
   };
 }
@@ -613,6 +631,11 @@ export class AccountStore extends DurableObject<Env> {
 
   betaTester(email: string): BetaTester | null {
     return this.beta.tester(email);
+  }
+
+  /// The tester behind a `ref` from the Beta card's table.
+  betaTesterByRef(ref: string): BetaTester | null {
+    return this.beta.invited().find((t) => testerRef(t.email) === ref) ?? null;
   }
 
   betaSetPlanLink(email: string, linkId: string, linkHash: string): void {

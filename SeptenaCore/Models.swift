@@ -42,9 +42,9 @@ public enum TaskAddedVia: String, CaseIterable, Sendable {
   /// Normal in-app creation (task list, inline row, composer). The default.
   case typed
   /// The Mac Quick Entry panel.
-  case quickEntry = "quick-entry"
+  case quickEntry = "quick_entry"
   /// The iPhone/iPad Quick Add sheet.
-  case quickAdd = "quick-add"
+  case quickAdd = "quick_add"
   /// The Share extension, into the Inbox.
   case share
   /// App Intents: Siri, Shortcuts, widgets.

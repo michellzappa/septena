@@ -272,7 +272,7 @@ or an agent that was disconnected still counts).
 | discuss | The earliest user turn in a thread that has a provider turn whose provider is not `claude`: the app's own model ran it. A thread with only a connected agent's turns does not count. |
 | move-in | A task with `addedVia` "import". |
 | siri | A task with `addedVia` "shortcut". |
-| capture | A task with `addedVia` "quick-entry", "quick-add" or "share". |
+| capture | A task with `addedVia` "quick_entry", "quick_add" or "share". |
 
 **Ticked** = the seeded task for the item is done.
 

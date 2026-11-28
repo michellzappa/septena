@@ -540,7 +540,7 @@ function betaCard(b: NonNullable<AdminView["beta"]>, now: number): string {
   return made + card("Beta", `<form method="post" action="/admin/beta/codes">
   <label>Code<input name="code" minlength="8" maxlength="32" required pattern="[A-Za-z0-9]{8,32}" placeholder="FIRSTWAVE"></label>
   <label>Label<input name="label" maxlength="60" required placeholder="Friends, first wave"></label>
-  <label>People<input name="maxUses" type="number" min="1" max="1000" value="20" required></label>
+  <label>People<input name="maxUses" type="number" min="1" max="1000" value="50" required></label>
   <label>Ends<input name="ends" type="date"></label>
   <button class="primary">Make a code</button>
 </form>
@@ -558,11 +558,26 @@ ${table(["Item", "Did it", "Ticked it"], itemRows, "No items.")}
 </div>
 <h3>One question on day 7</h3>
 <div class="tiles">${BETA_ANSWERS.map((a) => tile(per(a), ANSWER_WORDS[a])).join("")}${tile(share, "very disappointed (bar: 40%)")}</div>
+<h3>Every tester</h3>
+${table(["Tester", "Code", "Joined", "Pro on account", "Did", "Ticked", "Active days w1", "Agent loops", "Day 7", ""], b.testers.map((t) => testerRow(t, codeLabel(b, t.codeId))), "No testers yet.")}
+<p class="dim">Did and Ticked count the checklist items, out of ${BETA_CHECKLIST.items.length}. Open a row for the items, the steps and the weeks.</p>
 <h3>One tester</h3>
 <form method="post" action="/admin/beta/tester"><label>Tester email<input name="email" type="email" maxlength="254" required></label><button class="primary">Look up</button></form>
 ${b.lookup ? betaLookup(b.lookup, now) : ""}
 <div style="margin-top:14px">${launch}</div>`,
     "A person joins on septena.app/beta with their email and a code. Apple sends the TestFlight invite; Septena sends the welcome mail with their Pro link. Counts only: what testers did and when, never what they wrote.");
+}
+
+const codeLabel = (b: NonNullable<AdminView["beta"]>, id: string) => b.codes.find((c) => c.id === id)?.label ?? "";
+
+function testerRow(t: BetaTesterStats, code: string): string {
+  const u = t.usage;
+  const did = u ? Object.values(u.did).filter((v) => v != null).length : 0;
+  const ticked = u ? Object.values(u.ticked).filter(Boolean).length : 0;
+  return `<tr><td><code>${esc(t.mask)}</code></td><td>${esc(code)}</td><td>${day(t.joinedAt)}</td><td>${t.grantedAt ? day(t.grantedAt) : "no"}</td>
+    <td class="n">${u ? did : "n/a"}</td><td class="n">${u ? ticked : "n/a"}</td><td class="n">${u?.activeDays.w1 ?? 0}</td><td class="n">${u?.loops.total ?? 0}</td>
+    <td>${t.answer ? esc(ANSWER_WORDS[t.answer]) : ""}</td>
+    <td><form method="post" action="/admin/beta/tester"><input type="hidden" name="ref" value="${esc(t.ref)}"><button>Open</button></form></td></tr>`;
 }
 
 function betaLookup(l: NonNullable<NonNullable<AdminView["beta"]>["lookup"]>, now: number): string {

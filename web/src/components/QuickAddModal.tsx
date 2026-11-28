@@ -6,8 +6,8 @@ import type { AreaRow, ProjectRow, TaskAddedVia } from "@/lib/types";
 import { DateBoardButton } from "./DateBoard";
 
 export interface QuickAddInitial {
-  /** How the sheet was reached, recorded on the new task (ADR 0064). Default "quick-add". */
-  addedVia?: Extract<TaskAddedVia, "quick-add" | "share">;
+  /** How the sheet was reached, recorded on the new task (ADR 0064). Default "quick_add". */
+  addedVia?: Extract<TaskAddedVia, "quick_add" | "share">;
   title?: string;
   notes?: string;
   referenceUrl?: string;

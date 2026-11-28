@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { Env } from "../env.js";
 import { logEvent } from "../util.js";
 import { createPlusLink, revokePlusLink } from "../api/plusLinks.js";
-import { USER_ID_RE, accountStoreFor, testerStats, type BetaTesterStats } from "../store/AccountStore.js";
+import { USER_ID_RE, accountStoreFor, maskEmail, testerStats, type BetaTesterStats } from "../store/AccountStore.js";
 import { storeFor } from "../api/session.js";
 import { grantRow } from "../entitlement/entitlement.js";
 import { PLUS_LINK_MAX_MONTHS, PLUS_LINK_MAX_USES, addMonths } from "../store/plusLinks.js";
@@ -163,13 +163,17 @@ admin.post("/beta/codes/:id/close", async (c) =>
 // One tester by email: a POST, so the address never lands in a URL or a
 // log. It reads the tester's account again before it shows the rows.
 admin.post("/beta/tester", async (c) => {
-  const email = z.string().trim().toLowerCase().max(254).email().safeParse((await c.req.parseBody()).email);
-  if (!email.success) return renderPage(c, "plans", { error: "Type the tester’s email address." });
+  const body = await c.req.parseBody();
   const accounts = accountStoreFor(c.env);
-  const tester = await accounts?.betaTester(email.data);
+  // From the table: an opaque ref. From the form: the address.
+  const ref = typeof body.ref === "string" && /^t[0-9a-z]{1,13}$/.test(body.ref) ? body.ref : null;
+  const email = ref ? null : z.string().trim().toLowerCase().max(254).email().safeParse(body.email);
+  if (!ref && !email?.success) return renderPage(c, "plans", { error: "Type the tester’s email address." });
+  const tester = ref ? await accounts?.betaTesterByRef(ref) : await accounts?.betaTester(email!.data!);
   if (tester?.grantedUserId) await refreshBetaUsage(c.env, tester).catch((e) => logEvent("beta_usage_failed", { error: String(e) }));
-  const fresh = tester ? await accounts?.betaTester(email.data) : null;
-  return renderPage(c, "plans", { betaLookup: { email: email.data, tester: fresh ? testerStats(fresh) : null } });
+  const fresh = tester ? await accounts?.betaTester(tester.email) : null;
+  const shown = ref ? (fresh ? maskEmail(fresh.email) : "that tester") : email!.data!;
+  return renderPage(c, "plans", { betaLookup: { email: shown, tester: fresh ? testerStats(fresh) : null } });
 });
 
 admin.post("/beta/launch", async (c) => {

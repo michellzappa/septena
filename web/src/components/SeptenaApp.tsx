@@ -5422,7 +5422,7 @@ export function SeptenaApp() {
             deadline: input.deadline,
             area: input.area,
             project: input.project,
-            addedVia: quickAddInitial?.addedVia ?? "quick-add",
+            addedVia: quickAddInitial?.addedVia ?? "quick_add",
           });
           if (input.referenceUrl) {
             try {

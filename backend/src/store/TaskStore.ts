@@ -3706,7 +3706,7 @@ export class TaskStore extends DurableObject<Env> {
       discuss: first(discuss),
       "move-in": addedVia(["import"]),
       siri: addedVia(["shortcut"]),
-      capture: addedVia(["quick-entry", "quick-add", "share"]),
+      capture: addedVia(["quick_entry", "quick_add", "share"]),
     };
 
     const ticked: Record<string, boolean> = {};

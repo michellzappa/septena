@@ -42,7 +42,7 @@ export const ENTITY_ENUMS = {
   taskStatus: ["open","done","cancelled","checklistChecked"] as const,
   checklistMode: ["plain","groceries"] as const,
   taskSource: ["app","mcp"] as const,
-  taskAddedVia: ["typed","quick-entry","quick-add","share","shortcut","import","agent","api"] as const,
+  taskAddedVia: ["typed","quick_entry","quick_add","share","shortcut","import","agent","api"] as const,
   projectStatus: ["active","done","cancelled"] as const,
   taskKind: ["heading"] as const,
   listSort: ["manual","when","deadline","title","created"] as const,

@@ -75,8 +75,8 @@ pub mod enums {
     }
     pub mod task_added_via {
         pub const TYPED: &str = "typed";
-        pub const QUICK_ENTRY: &str = "quick-entry";
-        pub const QUICK_ADD: &str = "quick-add";
+        pub const QUICK_ENTRY: &str = "quick_entry";
+        pub const QUICK_ADD: &str = "quick_add";
         pub const SHARE: &str = "share";
         pub const SHORTCUT: &str = "shortcut";
         pub const IMPORT: &str = "import";
@@ -84,8 +84,8 @@ pub mod enums {
         pub const API: &str = "api";
         pub const ALL: &[&str] = &[
             "typed",
-            "quick-entry",
-            "quick-add",
+            "quick_entry",
+            "quick_add",
             "share",
             "shortcut",
             "import",
