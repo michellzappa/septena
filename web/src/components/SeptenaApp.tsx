@@ -171,6 +171,8 @@ function sumRows(groups: Array<{ items: unknown[] }>): number {
 }
 
 const NOTICES = SURFACES_CATALOG.notices.items;
+const AREA_PROJECTS_HEADING =
+  SURFACES_CATALOG.prompts.placesScreen.labels.find((l) => l.id === "areaProjectsHeading")?.label ?? "Projects";
 const WEEKLY_SWEEP_NOTICE = NOTICES.find((n) => n.id === "weeklySweep")!;
 const FADED_PILE_NOTICE = NOTICES.find((n) => n.id === "fadedPile")!;
 
@@ -1111,14 +1113,13 @@ export function SeptenaApp() {
 
       if (task.deletedAt || (task.status !== "open" && !isSettling)) return false;
       if (!prefs.tasksShowFaded && task.fadedAt) return false;
-      if (destination.kind === "area") {
-        if (task.area === destination.id) return true;
-        const proj = task.project ? projectById.get(task.project) : null;
-        return proj?.area === destination.id;
-      }
+      // An area page lists only the area's own tasks. A task in one of the
+      // area's projects shows on that project's page; the area page lists the
+      // projects separately (1:1 with iOS, Mac and Android).
+      if (destination.kind === "area") return !task.project && task.area === destination.id;
       return task.project === destination.id;
     });
-  }, [destination, evaluatedTasks, logbookTab, prefs.tasksShowFaded, projectById, settleSnap, shareForTask]);
+  }, [destination, evaluatedTasks, logbookTab, prefs.tasksShowFaded, settleSnap, shareForTask]);
 
   // Progressive disclosure (matching iOS TaskListView.swift): only surface tags
   // that actually appear on tasks in the current list; empty → zero chrome.
@@ -1327,12 +1328,17 @@ export function SeptenaApp() {
           if (!tags.includes(tagFilterId)) return false;
         }
         if (destination.kind === "project") return task.project === destination.id;
-        if (task.area === destination.id) return true;
-        const proj = task.project ? projectById.get(task.project) : null;
-        return proj?.area === destination.id;
+        return !task.project && task.area === destination.id;
       })
       .sort((a, b) => String(b.task.completedAt ?? "").localeCompare(String(a.task.completedAt ?? "")));
-  }, [destination, evaluatedTasks, projectById, settleSnap, tagFilterId]);
+  }, [destination, evaluatedTasks, settleSnap, tagFilterId]);
+
+  // Area page: the area's active projects, in sidebar order, listed after the
+  // area's own tasks as links to each project page.
+  const areaPageProjects = useMemo(
+    () => (destination.kind === "area" ? activeProjects.filter((p) => p.area === destination.id) : []),
+    [activeProjects, destination],
+  );
 
   // On Today: foldable Inbox band at top (matching iOS/Mac, docs/TRIAGE_BAND_SPEC.md).
   const { todayInboxTasks, todayCommittedTasks } = useMemo(() => {
@@ -4927,7 +4933,8 @@ export function SeptenaApp() {
             )}
 
             {/* Task Lists — iOS grouped rounded cards on soft gray canvas */}
-            {listedTasks.length === 0 && projectHeadings.length === 0
+            {listedTasks.length === 0 && areaPageProjects.length > 0 ? null
+              : listedTasks.length === 0 && projectHeadings.length === 0
               && completedTodayTasks.length === 0 && savedCheckedItems.length === 0 ? (
               <div className="py-16 text-center">
                 <p className="text-sm font-medium text-[var(--text-secondary)]">{pageMeta.emptyTitle}</p>
@@ -5207,6 +5214,46 @@ export function SeptenaApp() {
               </div>
             ) : (
               <div className={taskCardClass}>{visibleTasks.map((i) => renderTaskRow(i))}</div>
+            )}
+
+            {areaPageProjects.length > 0 && (
+              <section aria-label={registryText(AREA_PROJECTS_HEADING, lang)} className={listedTasks.length > 0 ? "pt-5" : ""}>
+                {renderSectionHeader({
+                  leading: <Folder className="h-4 w-4 text-[var(--text-muted)]" />,
+                  title: registryText(AREA_PROJECTS_HEADING, lang),
+                  count: areaPageProjects.length,
+                })}
+                <div className={taskCardClass}>
+                  {areaPageProjects.map((proj) => {
+                    const stats = projectStats.get(proj.id) ?? { done: 0, total: 0 };
+                    const open = stats.total - stats.done;
+                    return (
+                      <a
+                        key={proj.id}
+                        href={destinationPath({ kind: "project", id: proj.id })}
+                        onClick={(e) => {
+                          if (!isPlainLeftClick(e)) return;
+                          e.preventDefault();
+                          navigateTo({ kind: "project", id: proj.id });
+                        }}
+                        onContextMenu={(e) => openProjectContextMenu(e, proj)}
+                        className="flex w-full items-center gap-2.5 px-3 py-2.5 text-[15px] text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-hover)]"
+                      >
+                        <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center">
+                          {proj.checklistMode ? <span aria-hidden="true">☑</span> : <ProjectRing done={stats.done} total={stats.total} />}
+                        </span>
+                        <span className="flex min-w-0 flex-1 items-center gap-1.5">
+                          <span className="truncate">{proj.title}</span>
+                          {renderSharedMark(proj, "h-3 w-3")}
+                        </span>
+                        {prefs.sidebarCounts && open > 0 && (
+                          <span className="font-mono-tabular text-[13px] text-[var(--text-muted)]">{open}</span>
+                        )}
+                      </a>
+                    );
+                  })}
+                </div>
+              </section>
             )}
 
             {savedCheckedItems.length > 0 && destination.kind === "project" && (() => {
