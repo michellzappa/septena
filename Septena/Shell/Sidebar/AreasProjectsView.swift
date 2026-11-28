@@ -355,6 +355,8 @@ struct AreaDetailView: View {
         areaOverflowMenu
       }
       if !usesPushNavigation {
+        // Search is a capsule of its own (registry/surfaces.json `topBar`).
+        ToolbarSpacer(.fixed, placement: .topBarTrailing)
         ToolbarItem(placement: .topBarTrailing) { QuickFindToolbarButton() }
       }
     }
@@ -936,6 +938,8 @@ struct ProjectDetailView: View {
     #if os(iOS)
     if !usesPushNavigation {
       ToolbarItem(placement: .topBarTrailing) { projectOverflowMenu }
+      // Search is a capsule of its own (registry/surfaces.json `topBar`).
+      ToolbarSpacer(.fixed, placement: .topBarTrailing)
       ToolbarItem(placement: .topBarTrailing) { QuickFindToolbarButton() }
     } else {
       ToolbarItem(placement: .primaryAction) { projectOverflowMenu }

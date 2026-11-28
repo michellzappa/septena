@@ -92,6 +92,7 @@ import app.septena.android.AndroidAppGraph
 import app.septena.android.calendar.AndroidCalendarReader
 import app.septena.android.doing.DoCopy
 import app.septena.android.widgets.WidgetLaunchAction
+import app.septena.core.TopBar
 import app.septena.core.JsonValue
 import app.septena.core.generated.RegistrySettingKeys
 import app.septena.core.stringValue
@@ -1650,38 +1651,45 @@ private fun TaskHomeScaffold(
                         } else {
                             {}
                         },
-                        // Home top nav is Star + Search (matching iOS; Settings lives in sidebar & title nav menu).
+                        // The phone top bar from the registry (surfaces.json `topBar`, screen
+                        // `list`): More (Sort By) · Star · Search, in that order on every platform.
                         actions = {
-                            if (showStarFilterButton) {
-                                IconButton(
-                                    onClick = onToggleStarFilter,
-                                    modifier = Modifier.semantics { contentDescription = starredFilterTitle },
-                                ) {
-                                    StarGlyph(
-                                        filled = state.starredOnly,
-                                        tint = if (state.starredOnly) {
-                                            MaterialTheme.colorScheme.secondary
-                                        } else {
-                                            MaterialTheme.colorScheme.onSurface
-                                        },
-                                        size = 21.dp,
-                                    )
+                            TopBar.order(TopBar.Screen.LIST, "trailing").forEach { button ->
+                                when (button) {
+                                    TopBar.Button.MORE -> state.listSort?.let { currentSort ->
+                                        ListSortMenuButton(
+                                            copy = listSortCopy,
+                                            current = currentSort,
+                                            expanded = sortMenuOpen,
+                                            onExpandedChange = { sortMenuOpen = it },
+                                            onPick = homeViewModel::setListSort,
+                                        )
+                                    }
+                                    // Star shows while the list holds an open starred task, or while
+                                    // its filter is on (so it can be turned off again).
+                                    TopBar.Button.STAR -> if (showStarFilterButton && (state.hasOpenStarred || state.starredOnly)) {
+                                        IconButton(
+                                            onClick = onToggleStarFilter,
+                                            modifier = Modifier.semantics { contentDescription = starredFilterTitle },
+                                        ) {
+                                            StarGlyph(
+                                                filled = state.starredOnly,
+                                                tint = if (state.starredOnly) {
+                                                    MaterialTheme.colorScheme.secondary
+                                                } else {
+                                                    MaterialTheme.colorScheme.onSurface
+                                                },
+                                                size = 21.dp,
+                                            )
+                                        }
+                                    }
+                                    TopBar.Button.SEARCH -> IconButton(
+                                        onClick = onQuickFind,
+                                        modifier = Modifier.semantics { contentDescription = quickFindTitle },
+                                    ) {
+                                        SearchGlyph(tint = MaterialTheme.colorScheme.onSurface)
+                                    }
                                 }
-                            }
-                            state.listSort?.let { currentSort ->
-                                ListSortMenuButton(
-                                    copy = listSortCopy,
-                                    current = currentSort,
-                                    expanded = sortMenuOpen,
-                                    onExpandedChange = { sortMenuOpen = it },
-                                    onPick = homeViewModel::setListSort,
-                                )
-                            }
-                            IconButton(
-                                onClick = onQuickFind,
-                                modifier = Modifier.semantics { contentDescription = quickFindTitle },
-                            ) {
-                                SearchGlyph(tint = MaterialTheme.colorScheme.onSurface)
                             }
                         },
                     )
@@ -2058,7 +2066,8 @@ private fun ListSortMenuButton(
             onClick = { onExpandedChange(true) },
             modifier = Modifier.semantics { contentDescription = copy.menuTitle },
         ) {
-            SortGlyph(tint = MaterialTheme.colorScheme.onSurface)
+            // Sort By lives inside More (registry `topBar`): the button is the `action.more` glyph.
+            MoreGlyph(tint = MaterialTheme.colorScheme.onSurface)
         }
         val isDark = LocalSeptenaDarkTheme.current
         DropdownMenu(
@@ -2099,22 +2108,13 @@ private fun ListSortMenuButton(
     }
 }
 
-/** The `action.sort` glyph of registry/icons.json (Material `swap_vert`): an up and a down arrow. */
+/** The `action.more` glyph of registry/icons.json (Material `more_horiz`): three dots in a row. */
 @Composable
-private fun SortGlyph(tint: Color) {
+private fun MoreGlyph(tint: Color) {
     Canvas(modifier = Modifier.size(21.dp)) {
-        val stroke = 1.9.dp.toPx()
-        val head = size.width * 0.16f
-        val upX = size.width * 0.34f
-        val downX = size.width * 0.66f
-        val top = size.height * 0.18f
-        val bottom = size.height * 0.82f
-        drawLine(tint, Offset(upX, top), Offset(upX, bottom), strokeWidth = stroke, cap = StrokeCap.Round)
-        drawLine(tint, Offset(upX, top), Offset(upX - head, top + head), strokeWidth = stroke, cap = StrokeCap.Round)
-        drawLine(tint, Offset(upX, top), Offset(upX + head, top + head), strokeWidth = stroke, cap = StrokeCap.Round)
-        drawLine(tint, Offset(downX, top), Offset(downX, bottom), strokeWidth = stroke, cap = StrokeCap.Round)
-        drawLine(tint, Offset(downX, bottom), Offset(downX - head, bottom - head), strokeWidth = stroke, cap = StrokeCap.Round)
-        drawLine(tint, Offset(downX, bottom), Offset(downX + head, bottom - head), strokeWidth = stroke, cap = StrokeCap.Round)
+        val radius = 1.8.dp.toPx()
+        val y = size.height / 2f
+        listOf(0.22f, 0.5f, 0.78f).forEach { x -> drawCircle(tint, radius = radius, center = Offset(size.width * x, y)) }
     }
 }
 

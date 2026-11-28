@@ -94,6 +94,8 @@ data class TaskHomeUiState(
     val agentRequestTimes: List<java.time.Instant> = emptyList(),
     /** Top-nav Star filter toggle: shows only starred tasks in the current list. */
     val starredOnly: Boolean = false,
+    /** The list holds an open starred task: the top bar's Star shows (registry `topBar` `openStarred`). */
+    val hasOpenStarred: Boolean = false,
     /** Task ids picked by a long-press; non-empty means the list is in selection mode. */
     val selectedIds: Set<String> = emptySet(),
     /** All currently faded open tasks ready for the Faded sweep sheet. */
@@ -226,6 +228,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             reviewCount = home.reviewCount,
             agentRequestTimes = home.agentRequestTimes,
             starredOnly = applyStar,
+            hasOpenStarred = (home.inboxTasks + home.tasks + home.fadedTasks).any { it.isStarred && !it.isCompleted },
             selectedIds = selected,
             fadedSweepItems = home.fadedSweepItems,
             weeklySweepItems = home.weeklySweepItems,
