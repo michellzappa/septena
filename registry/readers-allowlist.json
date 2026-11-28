@@ -479,10 +479,6 @@
       "reason": "Web ships task provenance chips without referencing taskPage.provenance surface ID yet.",
       "issue": "#285"
     },
-    "web:task.checklists": {
-      "reason": "Web ships task checklists with local UI labels rather than reading registry action/surface IDs yet.",
-      "issue": "#285"
-    },
     "web:task.share": {
       "reason": "Web ships task sharing without referencing the task.share action ID yet.",
       "issue": "#285"
