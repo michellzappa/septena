@@ -20,7 +20,7 @@ Apps link a **released** shared core, never a local Rust build (ADR 0025).
 | `SeptenaSharedCore-X.Y.Z.swift` | The Swift bindings |
 | `septena-core-kotlin-X.Y.Z.zip` | The Kotlin bindings (Android and the JVM) |
 | `septena-core-android-jnilibs-X.Y.Z.zip` | `arm64-v8a`, `armeabi-v7a`, `x86_64` in Gradle's `jniLibs` layout |
-| `septena-core-jvm-natives-X.Y.Z.jar` | Linux and Windows natives in JNA's resource layout (Windows app) |
+| `septena-core-jvm-natives-X.Y.Z.jar` | Linux x64, Linux ARM64 and Windows x64 natives in JNA's resource layout (`linux-x86-64/`, `linux-aarch64/`, `win32-x86-64/`; Windows and Linux apps) |
 | `septena-core-wasm-web-X.Y.Z.tgz` | The `wasm-bindgen --target web` package (web client) |
 | `release.json` | Every asset with its URL and SHA-256 |
 
