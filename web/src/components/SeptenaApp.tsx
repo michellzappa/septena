@@ -136,6 +136,7 @@ import { RegistryIcon } from "./RegistryIcon";
 import { SettingsModal, type SettingsTab } from "./SettingsModal";
 import { PlanMark, PlanSheet } from "./PlanLanguage";
 import { planColors, upsellMoment } from "@/lib/plans";
+import { BootSplash } from "./BootSplash";
 import { SignInScreen } from "./SignInScreen";
 import { TaskPageDrawer } from "./TaskPageDrawer";
 import { WaitingOnDialog } from "./WaitingOnDialog";
@@ -3462,11 +3463,7 @@ export function SeptenaApp() {
   }
 
   if (bootPhase === "loading") {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-[var(--bg-canvas)] text-sm text-[var(--text-muted)]">
-        Loading Septena…
-      </main>
-    );
+    return <BootSplash language={prefs.language} />;
   }
 
   if (bootPhase === "signed_out") {

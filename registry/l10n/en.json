@@ -2306,6 +2306,12 @@
       "settings.pages.smart_lists.title"
     ]
   },
+  "Loading Septena": {
+    "text": "Loading Septena",
+    "paths": [
+      "signIn.copy.loading"
+    ]
+  },
   "Logbook": {
     "text": "Logbook",
     "paths": [

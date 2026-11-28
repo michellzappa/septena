@@ -36,7 +36,7 @@ const FIELDS = {
   ]),
   importSources: new Set(["detail"]),
   signIn: new Set([
-    "title", "heading", "subheading", "terms", "termsLabel", "privacyLabel", "emailLabel", "emailPlaceholder", "sendCode",
+    "title", "heading", "subheading", "terms", "termsLabel", "privacyLabel", "loading", "emailLabel", "emailPlaceholder", "sendCode",
     "codeSent", "codeLabel", "signIn", "resend", "differentEmail", "invalidEmail", "wrongCode", "tooManyTries",
     "codeExpired", "rateLimited", "network", "detail", "button", "manualDetail",
     "footer", "remove", "cancel", "addProvider", "addEmail", "addAppleDetail", "alreadyLinked",

@@ -2706,6 +2706,7 @@ enum RegistrySignIn {
     static func terms(terms: String, privacy: String) -> String { RegistryL10n.format("By continuing, you agree to the %@ and the %@.", english: "By continuing, you agree to the %@ and the %@.", args: [terms, privacy]) }
     static var termsLabel: String { RegistryL10n.t("Terms of Use") }
     static var privacyLabel: String { RegistryL10n.t("Privacy Policy") }
+    static var loading: String { RegistryL10n.t("Loading Septena") }
   }
   enum Email {
     static var emailLabel: String { RegistryL10n.t("Email") }

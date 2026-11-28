@@ -144,7 +144,33 @@ body {
   min-height: 0;
 }
 
+/* Boot view (#853, BootSplash.tsx). Lives in the prerendered index.html, so
+   it paints from the first frame with the theme's canvas color. */
+.septena-boot {
+  display: flex;
+  min-height: 100vh;
+  min-height: 100dvh;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-canvas);
+}
+
+.septena-boot-mark {
+  width: 72px;
+  height: 72px;
+  user-select: none;
+  animation: septena-boot-pulse 2400ms ease-in-out infinite;
+}
+
+@keyframes septena-boot-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.55; transform: scale(0.96); }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .septena-boot-mark {
+    animation: none;
+  }
   .animate-check-pop,
   .animate-check-mark,
   .animate-check-ring {
