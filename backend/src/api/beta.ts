@@ -280,12 +280,9 @@ export function welcomeMail(email: string, linkUrl: string): Mail {
   return render("You’re in the Septena beta", [
     { p: "Thanks for testing Septena." },
     { p: `Apple sends its own mail from TestFlight. Open it on your phone or tablet to install. On a Mac, [download the app here](${MAC}).` },
-    { p: "Once you sign in with this address, the app shows your beta checklist in Settings, under Beta. Start with these three:" },
-    { ol: [
-      "Move a real piece of your list in. Give some tasks a day, and finish a few.",
-      `[Connect Claude or another agent](${AGENTS}). Give it one task you can check, answer its question in the app, then Accept or Send back its work in Review.`,
-      "While an agent works on a task, press Stop, or Pause all agents, and see what happens.",
-    ] },
+    { p: "These are the parts I most want your notes on. Once you sign in with this address, the app keeps the same list in Settings, under Beta, and you tick what you tried." },
+    { ol: BETA_CHECKLIST.items.map((i) => `**${i.title}.** ${i.try}`) },
+    { p: `For the agent items, [the agents page](${AGENTS}) shows how to connect yours.` },
     { p: "When something breaks, confuses you or works well, tell me. Say what you tried and what you expected. If an agent was involved, add the prompt." },
     { button: "Send a note", href: FEEDBACK },
     { p: `Your year of Pro starts the day Septena launches. It goes to any account you make with **${email}**. If you sign in with another address, or with Hide My Email, [open this link once to claim it](${linkUrl}).` },
