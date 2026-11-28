@@ -157,6 +157,7 @@ private struct SeptaskMainWindow: View {
             .toolbar {
               ToolbarItem(placement: .confirmationAction) {
                 Button(RegistrySupport.closeTitle) { support.isPresentingSheet = false }
+                  .keyboardShortcut(.cancelAction)
               }
             }
         }

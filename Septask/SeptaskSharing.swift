@@ -137,6 +137,7 @@ private struct ShareProjectView: View {
       .toolbar {
         ToolbarItem(placement: .confirmationAction) {
           Button("Done", action: onClose)
+            .keyboardShortcut(.cancelAction)
         }
       }
     }
@@ -319,6 +320,7 @@ private struct JoinShareView: View {
       .toolbar {
         ToolbarItem(placement: .cancellationAction) {
           Button(RegistryPrompts.cancelTitle, action: onClose)
+            .keyboardShortcut(.cancelAction)
         }
         ToolbarItem(placement: .confirmationAction) {
           Button(RegistrySharing.join) { join() }

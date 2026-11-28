@@ -119,6 +119,7 @@ struct SeptaskSettingsView: View {
       .toolbar {
         ToolbarItem(placement: .confirmationAction) {
           Button("Done") { dismiss() }
+            .keyboardShortcut(.cancelAction)
         }
       }
     }

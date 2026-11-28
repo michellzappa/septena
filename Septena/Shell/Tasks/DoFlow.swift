@@ -247,6 +247,7 @@ private struct DoStopNoteSheet: View {
       .toolbar {
         ToolbarItem(placement: .cancellationAction) {
           Button(RegistryDoing.stopNoteSkipTitle) { dismiss() }
+            .keyboardShortcut(.cancelAction)
         }
         ToolbarItem(placement: .confirmationAction) {
           Button(RegistryDoing.stopNoteSaveTitle) {

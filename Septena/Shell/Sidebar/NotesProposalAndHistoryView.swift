@@ -304,6 +304,7 @@ struct NotesHistorySheet: View {
       .toolbar {
         ToolbarItem(placement: .confirmationAction) {
           Button("Done") { close() }
+            .keyboardShortcut(.cancelAction)
         }
       }
     }

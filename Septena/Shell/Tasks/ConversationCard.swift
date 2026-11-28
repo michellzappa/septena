@@ -451,7 +451,7 @@ struct AIExplainerView: View {
       }
       .navigationTitle(RegistrySettings.copy("ai_explainer", "title"))
       .septenaInlineTitle()
-      .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+      .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() }.keyboardShortcut(.cancelAction) } }
     }
   }
 

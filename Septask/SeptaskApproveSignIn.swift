@@ -43,6 +43,7 @@ struct SeptaskApproveSignInFlow: View {
         .toolbar {
           ToolbarItem(placement: .cancellationAction) {
             Button(isDone ? "Done" : "Cancel") { dismiss() }
+              .keyboardShortcut(.cancelAction)
           }
         }
     }

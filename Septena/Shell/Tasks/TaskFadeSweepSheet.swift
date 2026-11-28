@@ -58,6 +58,7 @@ struct TaskFadeSweepSheet: View {
           Button(String(localized: "Not now", comment: "Sweep sheet dismiss without dropping")) {
             onClose()
           }
+            .keyboardShortcut(.cancelAction)
         }
       }
     }
