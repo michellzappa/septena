@@ -41,6 +41,11 @@ pub struct FadeInput {
     pub today: String,
     #[serde(default)]
     pub utc_offset_seconds: i32,
+    /// The conversation's end state. A tracked task (`decomposed`, ADR 0065)
+    /// is in no working list, so it never fades.
+    #[serde(default)]
+    #[cfg_attr(feature = "ffi", uniffi(default = None))]
+    pub end_state: Option<String>,
 }
 
 /// Row opacity for a fade fill in 0…1. No fill, or a fill at or below 0, is opaque.
@@ -112,6 +117,7 @@ fn is_candidate(input: &FadeInput) -> bool {
         && !input.is_agent_turn
         && !input.is_assigned_to_claude
         && !input.is_awaiting_human
+        && input.end_state.as_deref() != Some(crate::registry::enums::convo_end_state::DECOMPOSED)
 }
 
 fn is_eligible(input: &FadeInput, today: Day) -> bool {

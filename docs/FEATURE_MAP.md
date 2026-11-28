@@ -8,10 +8,10 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 
 | Status | iPhone | iPad | Mac | Web | Android | Windows | linux | Watch |
 |---|---|---|---|---|---|---|---|---|
-| ships | 62 | 63 | 63 | 54 | 58 | 0 | 0 | 1 |
+| ships | 63 | 64 | 64 | 55 | 59 | 0 | 0 | 1 |
 | partial | 1 | 1 | 1 | 1 | 2 | 0 | 0 | 3 |
-| planned | 2 | 2 | 2 | 6 | 3 | 64 | 64 | 2 |
-| - | 4 | 3 | 3 | 8 | 6 | 5 | 5 | 63 |
+| planned | 2 | 2 | 2 | 6 | 3 | 65 | 65 | 2 |
+| - | 4 | 3 | 3 | 8 | 6 | 5 | 5 | 64 |
 
 **Agent** lists the MCP tools at `api.septena.app/mcp` that reach the feature; **none** means an agent cannot reach it.
 
@@ -21,6 +21,7 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 | `lists.today` | Today | ships | ships | ships | ships | ships | planned | planned | partial | `tasks_list`, `tasks_move_to_today` |
 | `lists.review` | Review (questions, finished work, agent work in progress, faded tasks) | ships | ships | ships | ships | ships | planned | planned | - | `tasks_list`, `tasks_set_endstate` |
 | `review.waiting` | Waiting: work handed to a person, in Review | ships | ships | ships | ships | ships | planned | planned | - | `tasks_set_waiting`, `tasks_list` |
+| `review.tracked` | Tracked: tasks whose work goes on elsewhere, in Review | ships | ships | ships | ships | ships | planned | planned | - | `tasks_set_endstate`, `tasks_list` |
 | `lists.agent` | Agent work by stage (Working, Queued, Stopped groups in Review) | ships | ships | ships | ships | ships | planned | planned | - | `tasks_pending_reasoning`, `tasks_claim`, `tasks_release`, `tasks_agent_events`, `tasks_set_assignee` |
 | `lists.upcoming` | Upcoming | ships | ships | ships | ships | ships | planned | planned | - | `tasks_list`, `tasks_defer` |
 | `lists.anytime` | Anytime | ships | ships | ships | ships | ships | planned | planned | - | `tasks_list` |

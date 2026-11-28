@@ -8490,6 +8490,10 @@
         }
       }
     },
+    "Bring Back" : {
+      "comment" : "Generated from registry actions.actions.task.bringBack.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Bring in your tasks" : {
       "comment" : "Generated from registry surfaces.notices.items.getStarted.steps.importTasks.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -41649,6 +41653,10 @@
         }
       }
     },
+    "Tracked" : {
+      "comment" : "Generated from registry destinations.destinations.review.groups.tracked.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Training" : {
       "localizations" : {
         "pt-BR" : {
@@ -45067,6 +45075,10 @@
           }
         }
       }
+    },
+    "Your agent's questions, finished work and tasks in progress show up here. So do tasks you are waiting on, tasks tracked elsewhere and faded tasks." : {
+      "comment" : "Generated from registry destinations.destinations.review.emptyState.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Your agents do the work" : {
       "comment" : "Generated from registry surfaces.firstRun.steps.welcome.points.1.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",

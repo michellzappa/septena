@@ -26,6 +26,8 @@
     "list.logbook": { "sfSymbol": "checkmark", "material": "check", "lucide": "check" },
     "list.faded": { "sfSymbol": "circle.dashed", "material": "blur_circular", "lucide": "circle-dashed" },
     "list.waiting": { "sfSymbol": "hourglass", "material": "hourglass_empty", "lucide": "hourglass" },
+    "list.tracked": { "sfSymbol": "arrow.up.forward.square", "material": "open_in_new", "lucide": "square-arrow-out-up-right" },
+    "action.bring_back": { "sfSymbol": "arrow.uturn.backward", "material": "undo", "lucide": "undo-2" },
     "action.waiting": { "sfSymbol": "hourglass", "material": "hourglass_empty", "lucide": "hourglass" },
     "action.got_it_back": { "sfSymbol": "arrow.uturn.backward.circle", "material": "assignment_return", "lucide": "undo-2" },
     "list.starred": { "sfSymbol": "star.fill", "material": "star", "lucide": "star" },

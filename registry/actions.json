@@ -182,6 +182,7 @@
     },
     "task.waitingOn": { "title": "Waiting On…", "icon": "action.waiting", "role": "default", "availability": { "selection": "single", "excludeDestinations": ["recentlyDeleted"] }, "featureId": "review.waiting" },
     "task.gotItBack": { "title": "Got It Back", "icon": "action.got_it_back", "role": "default", "availability": { "selection": "any", "excludeDestinations": ["recentlyDeleted"] }, "featureId": "review.waiting" },
+    "task.bringBack": { "title": "Bring Back", "icon": "action.bring_back", "role": "default", "availability": { "selection": "any", "onlyDestinations": ["review"] }, "featureId": "review.tracked" },
     "task.deadline": {
       "opensAttribute": "deadline",
       "title": "Deadline…",
@@ -668,6 +669,13 @@
     "task.faded": [
       { "kind": "action", "id": "task.keepFaded" },
       { "kind": "action", "id": "task.letGoFaded" },
+      { "kind": "divider" },
+      { "kind": "action", "id": "task.delete" }
+    ],
+    "task.tracked": [
+      { "kind": "action", "id": "task.bringBack" },
+      { "kind": "divider" },
+      { "kind": "action", "id": "task.toggleComplete" },
       { "kind": "divider" },
       { "kind": "action", "id": "task.delete" }
     ],

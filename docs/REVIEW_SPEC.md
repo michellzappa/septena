@@ -3,6 +3,7 @@
 **Status:** accepted 2026-11-25 ([ADR 0044](adr/0044-review-is-one-place.md)),
 amended 2026-11-26 ([ADR 0046](adr/0046-agent-work-is-a-review-group.md),
 [ADR 0053](adr/0053-waiting-on-people-is-a-review-group.md): the Waiting
+group; [ADR 0065](adr/0065-tracked-work-is-a-review-group.md): the Tracked
 group). The store rules (§3) are built. §5 says what is not.
 
 Review is the one list of everything that waits on the user, and of agent
@@ -19,11 +20,20 @@ separate Agent list (ADR 0046).
 | **Working** | An agent holds a live claim on the open task. | The claim ends, the agent asks or hands over, or the user takes the task back. | It stays. It does not fade. |
 | **Queued** | Agent work (§3) with no live claim, not stopped and not terminal. | An agent claims it, or the user takes the task back or closes it. | It stays. |
 | **Stopped** | The user stopped the agent on this task. | The user resumes the agent, takes the task back or closes it. | It stays. |
+| **Tracked** | `endState = decomposed` on an open task: the work goes on elsewhere (an issue, another tracker, smaller tasks). | The agent hands it over with `needs_verify` (it moves to Finished work), the user taps Bring Back (`endState = open`), or the user closes it. | It stays. It does not fade. |
 | **Faded** | The fade pass set `fadedAt` (`TASK_FADE_SPEC.md` §4), or a proposal expired (ADR 0039). | The user keeps, opens or edits it, or lets it go. A hand-off, a question or a user's deadline also ends the fade. | It stays. A timer never drops a task. |
 | **Projects** | The project faded (`TASK_FADE_SPEC.md` §4.2, #585). | Keep, Done or Let go. | It stays, dimmed in the sidebar. |
 
-A task shows in one group: the first that fits. Headings, deleted tasks and
-closed tasks show in none.
+A task shows in one group: the first that fits. One exception: the core's
+group comes first (Questions, Finished work, Tracked), so a tracked task that
+also waits on a person shows in Tracked. Headings, deleted tasks and closed
+tasks show in none.
+
+**Tracked leaves the working lists** (ADR 0065). A tracked task is not on
+Today, in Upcoming, in Anytime or in its area or project list. A deadline due
+today or past still puts it on Today; a When date or a Today pin does not.
+Search and Quick Find still find it. The rule is the core's
+(`taskViewMembership.isTracked`, vectors `task-views.json`).
 
 **Not in Review:** the Inbox band (new captures and proposals are decided on
 Today), overdue tasks, and the Today rollover (§6 of the fade spec).
@@ -33,8 +43,13 @@ Today), overdue tasks, and the Today rollover (§6 of the fade spec).
 - Sidebar: right below Today, while it has an item. Go ▸ Review and Quick Find
   always open it.
 - Badge: Questions plus Finished work. Waiting, Working, Queued, Stopped,
-  Faded and Projects do not count.
+  Tracked, Faded and Projects do not count.
 - Faded starts collapsed. Its notice opens the keep-or-let-go sheet on any day.
+- Tracked starts collapsed, like Faded. A row shows the title, the end-state
+  note as its context line, and the issue link from the task's references,
+  which opens in the browser. The row menu (`task.tracked` in
+  `registry/actions.json`): Bring Back (sets `endState = open`, the user
+  only), Complete, Delete.
 - The weekly prompt on Today opens the same sheet.
 - Opening a row in any group but Faded (tap, click, double-click, Return)
   opens the task page, where the conversation is. It never expands the row
