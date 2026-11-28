@@ -145,6 +145,8 @@ internal fun SettingsScreen(graph: AndroidAppGraph, onBack: () -> Unit) {
     }
     // The account card and the Account page show the plan (`planStatus`).
     LaunchedEffect(signedIn) { plans.refresh(signedIn) }
+    // The Beta row (tester only) reads the checklist each time Settings opens.
+    LaunchedEffect(signedIn) { graph.beta.refresh(signedIn) }
     val pageTitle = if (currentPageId == PlanSettingsModel.PAGE) plans.title(languageTag) else titleFor(currentPageId)
     val currentTitle = pageTitle.takeIf(String::isNotEmpty)
         ?: RegistryCatalog.actionTitle(RegistryActionIds.APP_SETTINGS, languageTag = languageTag).orEmpty()
@@ -231,7 +233,9 @@ internal fun SettingsScreen(graph: AndroidAppGraph, onBack: () -> Unit) {
             ) {
                 val pageId = currentPageId
                 if (pageId == null) {
-                    rootGroups.forEach { group ->
+                    rootGroups.forEachIndexed { index, group ->
+                        // The Beta row sits under the account card, for a tester only (§7).
+                        if (index == 1) BetaSettingsRow(graph, languageTag)
                         val visibleItems = group.items.filter { it.isVisible(signedIn) }
                         if (visibleItems.isNotEmpty()) {
                             if (group.header != null) {

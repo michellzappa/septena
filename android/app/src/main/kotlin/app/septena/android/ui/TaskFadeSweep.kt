@@ -268,6 +268,7 @@ internal fun FadeSweepBannerCard(
     onReview: () -> Unit,
     onDismiss: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
+    title: String? = null,
 ) {
     TaskCardSlice(
         position = TaskCardPosition.Solo,
@@ -282,6 +283,15 @@ internal fun FadeSweepBannerCard(
                 .padding(horizontal = TaskCardMetrics.ContentInset, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
+            title?.takeIf(String::isNotBlank)?.let {
+                Text(
+                    text = it,
+                    fontSize = 14.5.sp,
+                    lineHeight = 20.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
             Text(
                 text = message,
                 fontSize = 14.5.sp,

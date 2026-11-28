@@ -109,6 +109,8 @@ class AndroidAppGraph(application: Application) {
     private val transport = UrlConnectionSyncTransport(credentials, clientVersion)
     val access = SeptenaAccessClient(credentials, clientVersion)
     val shares = SeptenaShareClient(access)
+    /** The beta checklist (docs/BETA_ONBOARDING_SPEC.md §7): the Settings row, the Beta screen, the Today card. */
+    internal val beta = app.septena.android.ui.BetaChecklistModel(app.septena.transport.SeptenaBetaClient(access), appScope)
     /** Contact Support (ADR 0054): the client and this device's support key. */
     val support = SeptenaSupportClient(credentials, clientVersion)
     val supportKeys = app.septena.android.auth.SupportKeyStore(application)
