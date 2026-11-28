@@ -22,7 +22,7 @@ import { CoreInputError, doEndWins, findIssueRefs, parseRef, resolveDoSessions, 
 import type { Op, OpResult, PullResult, PushResult, Turn } from "./ops.js";
 import type { EntitlementRow } from "../entitlement/entitlement.js";
 import type { IcalTask } from "../ical.js";
-import { DOMAIN_RULES, ENTITY_LIMITS, TURN_FIELDS } from "../generated/registries.js";
+import { DOMAIN_RULES, ENTITY_ENUMS, ENTITY_LIMITS, SETTINGS_REGISTRY, TURN_FIELDS } from "../generated/registries.js";
 import { MCP_REFRESH_TTL_S } from "../shadow/tokens.js";
 import { logEvent, randomId } from "../util.js";
 import { REFUSALS, type RefusalCode } from "../errors.js";
@@ -96,6 +96,38 @@ export interface AccountSummary {
   webhooks: number;
   failingWebhooks: number;
   entitlements: Pick<EntitlementRow, "id" | "source" | "productId" | "expiresAt" | "status" | "plan" | "environment" | "signedAt">[];
+  /// The synced appearance settings (#859): a choice from a fixed list, never
+  /// text the user typed. Only for a signed-in account. Optional: summaries
+  /// from before it lack it.
+  appearance?: Appearance;
+}
+
+/// The appearance settings the admin page counts (#859), from
+/// `registry/settings.json`. "other" is a value outside the registry.
+export interface Appearance {
+  accentColor: string;
+  canvasTexture: string;
+  textureIntensity: number | "other";
+  textureMotion: string;
+}
+
+/// Reads the appearance settings with `read` (a missing row is null). A
+/// missing row counts as the registry default; a value outside the registry
+/// enum or range counts as "other".
+export function appearanceFromSettings(read: (key: string) => unknown): Appearance {
+  const keys = SETTINGS_REGISTRY.keys;
+  const choice = (key: "accentColor" | "canvasTexture" | "textureMotion"): string => {
+    const spec = keys[key];
+    const v = read(key);
+    if (v === null || v === undefined) return spec.default;
+    const allowed: readonly string[] = ENTITY_ENUMS[spec.enum];
+    return typeof v === "string" && allowed.includes(v) ? v : "other";
+  };
+  const spec = keys.textureIntensity;
+  const v = read("textureIntensity");
+  const intensity = v === null || v === undefined ? spec.default
+    : typeof v === "number" && Number.isInteger(v) && v >= spec.min && v <= spec.max ? v : "other";
+  return { accentColor: choice("accentColor"), canvasTexture: choice("canvasTexture"), textureIntensity: intensity, textureMotion: choice("textureMotion") };
 }
 
 /// `GET /v1/access`: every place the account is signed in.
@@ -3481,6 +3513,7 @@ export class TaskStore extends DurableObject<Env> {
       webhooks: count("SELECT COUNT(*) AS n FROM agent_webhooks WHERE enabled = 1"),
       failingWebhooks: count("SELECT COUNT(*) AS n FROM agent_webhooks WHERE enabled = 1 AND failureCount > 0"),
       entitlements,
+      ...(signedIn ? { appearance: appearanceFromSettings((key) => this.readSetting(key)) } : {}),
     };
   }
 

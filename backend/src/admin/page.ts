@@ -4,12 +4,12 @@ import type { PlusLink, PlusLinkUse } from "../store/plusLinks.js";
 import { deviceLabel, lastSeen, overview, planView } from "./accounts.js";
 import type { SignupRow, SignupView } from "./signups.js";
 import {
-  SERIES_DAYS, agentMix, change, clientMix, releaseAdoption, cumulative, lastDays, perDay, providerMix, snapshotSeries, weeklyCohorts, windowChange,
+  SERIES_DAYS, agentMix, appearanceMix, change, clientMix, releaseAdoption, cumulative, lastDays, perDay, providerMix, snapshotSeries, weeklyCohorts, windowChange,
   type MetricDay, type Tally,
 } from "./metrics.js";
 import type { Row as TrafficRow, TrafficResult } from "./plausible.js";
 import type { MacRelease } from "./releases.js";
-import { DESIGN_TOKENS } from "../generated/registries.js";
+import { DESIGN_TOKENS, SETTINGS_REGISTRY } from "../generated/registries.js";
 
 // The admin pages (docs/ADMIN_CONSOLE_SPEC.md §3). Each page is one HTML
 // document: no script, no external file. Every value goes through `esc`.
@@ -366,6 +366,23 @@ function clientsSection(v: AdminView): string {
   <p class="dim">A device with no version runs a build from before the version header. Store installs and revenue come with RevenueCat (#644, #645).</p>`;
 }
 
+/// The appearance mix (#859): accent, texture, and for a texture its
+/// intensity and motion. Names come from registry/tokens.json.
+function appearanceSection(v: AdminView): string {
+  const mix = appearanceMix(v.accounts, v.now);
+  const named = (rows: Tally[], names: Map<string, string>) => rows.map((r) => ({ name: names.get(r.name) ?? r.name, n: r.n }));
+  const accents = new Map<string, string>(DESIGN_TOKENS.fruitAccents.map((a) => [a.id, a.name]));
+  const textures = new Map<string, string>(DESIGN_TOKENS.textures.map((t) => [t.id, t.name]));
+  const d = SETTINGS_REGISTRY.keys.textureIntensity.default;
+  const intensity = new Map([["default", `Default (${d})`], ["lower", `Below ${d}`], ["higher", `Above ${d}`]]);
+  const motion = new Map([["still", "Still"], ["slowDrift", "Slow drift"]]);
+  const other = new Map([["other", "Other value"]]);
+  const withOther = (m: Map<string, string>) => new Map([...m, ...other]);
+  return `<div class="tiles">${tile(mix.accounts, "active signed-in accounts")}</div>
+  <div class="cols">${tallyList("Accent color", named(mix.accentColor, withOther(accents)))}${tallyList("Texture", named(mix.canvasTexture, withOther(textures)))}${tallyList("Texture intensity, with a texture", named(mix.textureIntensity, withOther(intensity)))}${tallyList("Texture motion, with a texture", named(mix.textureMotion, withOther(motion)))}</div>
+  <p class="dim">Accounts without sign-in keep their settings on the device and are not counted. A setting never changed counts as its default.</p>`;
+}
+
 /// A titled card: the unit every page is built from.
 const card = (title: string, body: string, note = "", id = "") =>
   `<section class="card"${id ? ` id="${esc(id)}"` : ""}><header><h2>${esc(title)}</h2>${note ? `<p class="dim">${note}</p>` : ""}</header>${body}</section>`;
@@ -402,6 +419,7 @@ function productPage(v: AdminView): string {
   const o = overview(v.accounts, v.now);
   return card("Retention by week", retentionSection(v), "The accounts that started each week (Monday, UTC), as they are now.")
     + card("Clients and agents", clientsSection(v), "Devices and versions seen in the last 30 days.")
+    + card("Appearance", appearanceSection(v), "Accent color and texture of the signed-in accounts seen in the last 30 days.")
     + card("Usage", `<div class="tiles">${tile(o.openTasks, "open tasks")}${tile(o.closedTasks, "closed tasks")}${tile(o.files, `files (${size(o.fileBytes)})`)}${tile(o.agentChangesWeek, "agent changes, 7 days")}</div>`, "Counts only, every account.");
 }
 
