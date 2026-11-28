@@ -723,6 +723,9 @@ function validateAvatar(surfaces, tokens, caps) {
   assert(colors.length >= 5, "tokens.json: the avatar palette needs at least 5 fruit accents without multicolor");
   assert(colors.some((c) => c.id === ac.default), `tokens.json: avatarColors.default "${ac.default}" is not a fruit accent`);
   for (const c of colors) assert(/^[a-z]+$/.test(c.id), `tokens.json: avatar color id "${c.id}" is not a lowercase id`);
+  const tc = tokens.tagColors;
+  assert(tc && tc.source === "fruitAccents", "tokens.json: tagColors.source is fruitAccents (one palette, ADR 0019)");
+  for (const [from, to] of Object.entries(tc.legacy ?? {})) assert(colors.some((c) => c.id === to), `tokens.json: tagColors.legacy ${from} -> "${to}" is not a fruit accent`);
 }
 
 function validatePlaceNotes(surfaces, caps) {
@@ -1314,6 +1317,8 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  ]");
   lines.push(`  /// The fill of an account that never picked one, and of a member without an avatar.`);
   lines.push(`  static let avatarDefaultColorId = ${swiftStr(tokens.avatarColors.default)}`);
+  lines.push("  /// Tag colors stored before the fruit palette, read as the nearest fruit (`tokens.json` `tagColors.legacy`).");
+  lines.push(`  static let tagColorLegacy: [String: String] = [${Object.entries(tokens.tagColors.legacy).map(([k, v]) => `${swiftStr(k)}: ${swiftStr(v)}`).join(", ")}]`);
   lines.push("  static let fruitAccents: [RegistryFruitAccent] = [");
   for (const a of tokens.fruitAccents ?? []) {
     lines.push(`    RegistryFruitAccent(id: ${swiftStr(a.id)}, name: ${L(a.name, a, "name")}, origin: ${swiftStr(a.origin)}, lightHex: ${swiftStr(a.light)}, darkHex: ${swiftStr(a.dark)}, checkLightHex: ${swiftStr(a.checkLight)}, checkDarkHex: ${swiftStr(a.checkDark)}, multicolor: ${Boolean(a.multicolor)}),`);
@@ -2711,7 +2716,7 @@ function generateTS({ entities, rules, icons, tokens, caps, settings, dests, act
   lines.push(`export const DESTINATIONS = ${JSON.stringify(dests.destinations)} as const;`);
   lines.push(`export const GENERIC_EMPTY_STATE = ${JSON.stringify(dests.genericEmptyState)} as const;`);
   lines.push(`export const ICONS = ${JSON.stringify(icons.icons)} as const;`);
-  lines.push(`export const DESIGN_TOKENS = ${JSON.stringify({ accentPolicy: tokens.accentPolicy, fruitAccents: tokens.fruitAccents ?? [], textures: tokens.textures ?? [], selection: tokens.selection, colors: tokens.colors, multicolorGlyphs: tokens.multicolorGlyphs?.glyphs ?? {}, accentPalette: tokens.accentPalette, avatarColors: avatarColorList(tokens), avatarDefaultColor: tokens.avatarColors.default, radii: tokens.radii, spacing: tokens.spacing, desktopColumn: tokens.desktopColumn, textScale: tokens.textScale, motion: tokens.motion })} as const;`);
+  lines.push(`export const DESIGN_TOKENS = ${JSON.stringify({ accentPolicy: tokens.accentPolicy, fruitAccents: tokens.fruitAccents ?? [], textures: tokens.textures ?? [], selection: tokens.selection, colors: tokens.colors, multicolorGlyphs: tokens.multicolorGlyphs?.glyphs ?? {}, accentPalette: tokens.accentPalette, avatarColors: avatarColorList(tokens), avatarDefaultColor: tokens.avatarColors.default, tagColorLegacy: tokens.tagColors.legacy, radii: tokens.radii, spacing: tokens.spacing, desktopColumn: tokens.desktopColumn, textScale: tokens.textScale, motion: tokens.motion })} as const;`);
   // `docs` names site guides (ADR 0065): the site reads it from the registry; the clients do not.
   const capsForClients = Object.fromEntries(Object.entries(caps.capabilities).map(([id, { docs, ...rest }]) => [id, rest]));
   lines.push(`export const CAPABILITIES = ${JSON.stringify(capsForClients)} as const;`);

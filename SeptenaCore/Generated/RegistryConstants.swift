@@ -369,6 +369,8 @@ enum RegistryTokens {
   ]
   /// The fill of an account that never picked one, and of a member without an avatar.
   static let avatarDefaultColorId = "persimmon"
+  /// Tag colors stored before the fruit palette, read as the nearest fruit (`tokens.json` `tagColors.legacy`).
+  static let tagColorLegacy: [String: String] = ["blue": "haskap", "teal": "haskap", "amber": "persimmon", "green": "carambola", "red": "tamarillo", "purple": "acai", "pink": "pitaya"]
   static let fruitAccents: [RegistryFruitAccent] = [
     RegistryFruitAccent(id: "colorful", name: RegistryL10n.t("Colorful"), origin: "Default · Blue + semantic", lightHex: "#007AFF", darkHex: "#0A84FF", checkLightHex: "#FFFFFF", checkDarkHex: "#FFFFFF", multicolor: true),
     RegistryFruitAccent(id: "tamarillo", name: RegistryL10n.t("Tamarillo"), origin: "Andes · Crimson", lightHex: "#D6333F", darkHex: "#FF5C67", checkLightHex: "#FFFFFF", checkDarkHex: "#FFFFFF", multicolor: false),

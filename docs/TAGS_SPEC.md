@@ -20,7 +20,7 @@ Add lightweight **tags** to tasks for cross-cutting context (`@errands`, `@waiti
 1. **New `tag` entity (`tags` table) in `registry/entities.json`:**
    - `id`: stable ID (`tag-<uuid>` or normalized slug on import)
    - `name`: `text` (max 64, nullable: false; display name preserved as typed, case-insensitive uniqueness enforced on create/import so `"Errands"` and `"errands"` never duplicate!)
-   - `color`: `text` (max 32, nullable: true — optional semantic color token; default neutral pill)
+   - `color`: `text` (max 32, nullable: true). A fruit accent id, the app's one palette (`registry/tokens.json` `tagColors`, ADR 0019). Null draws the neutral pill. Names stored before the fruit palette (`blue`, `amber`, `green`, `red`, `purple`, `teal`, `pink`) read as the nearest fruit (`tagColors.legacy`).
    - `position`: `int` (nullable: true — manual display order)
    - `deletable: true`, `requiredOnInsert: ["name"]`.
 2. **New `tags` JSON array column on `task` in `registry/entities.json`:**
