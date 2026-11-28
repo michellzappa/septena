@@ -35,6 +35,7 @@ import {
   type DateBoardAttribute,
 } from "@/lib/dateBoard";
 import { registryText } from "@/lib/generated/registries";
+import { useEscapeToClose } from "@/lib/useEscapeToClose";
 
 /** The Lucide names that the date rows and pills use in `registry/icons.json`. */
 const LUCIDE: Record<string, LucideIcon> = {
@@ -93,6 +94,8 @@ export function DateBoardPopover(props: DateBoardPopoverProps) {
   const beyondStrip = value !== null && !days.includes(value);
   const [timeOpen, setTimeOpen] = useState(Boolean(props.startTime));
   const [calendarDay, setCalendarDay] = useState<string | null>(null);
+  // Escape closes the month calendar first, then the board.
+  useEscapeToClose(true, () => (calendarDay ? setCalendarDay(null) : onClose()));
 
   const rows = useMemo(
     () =>
@@ -175,12 +178,6 @@ export function DateBoardPopover(props: DateBoardPopoverProps) {
     // The app and the surface under the board bind the same keys, so no key
     // leaves the board.
     e.stopPropagation();
-    if (e.key === "Escape") {
-      e.preventDefault();
-      if (calendarDay) setCalendarDay(null);
-      else onClose();
-      return;
-    }
     // The time field, the duration pills and the month buttons keep their keys.
     if (e.target instanceof Element && e.target.closest("[data-date-board-control]")) return;
     const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];

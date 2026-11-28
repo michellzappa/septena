@@ -8,6 +8,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ExternalLink, X } from "lucide-react";
 import { HELP_URL, SURFACES_CATALOG, registryText } from "@/lib/generated/registries";
 import { ApiError, type SeptenaApiClient, type SupportDiagnostics, type SupportMessage } from "@/lib/api/client";
+import { useEscapeToClose } from "@/lib/useEscapeToClose";
 
 const SUPPORT = SURFACES_CATALOG.support;
 /** Matches the backend's limit (`MESSAGE_MAX_CHARS`). */
@@ -91,17 +92,7 @@ export function SupportModal({ open, language, api, onClose, onUnreadChange }: S
     };
   }, [api, onUnreadChange, open]);
 
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        onClose();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose, open]);
+  useEscapeToClose(open, onClose);
 
   const canSend =
     state.kind !== "sending" && text.trim().length > 0 && (!needsEmail || email.trim().length > 0);

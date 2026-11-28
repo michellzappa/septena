@@ -21,6 +21,7 @@ import {
   upsellMoment,
 } from "@/lib/plans";
 import { RegistryIcon } from "./RegistryIcon";
+import { useEscapeToClose } from "@/lib/useEscapeToClose";
 
 const TILE_COLOR: Record<string, string> = {
   "plans.devices": "var(--plan-devices)",
@@ -146,6 +147,7 @@ export function PlanSheet({
   useEffect(() => {
     if (open) setPicked(null);
   }, [open, upsellId, initialTier]);
+  useEscapeToClose(open && tiers.length > 0, onClose);
   if (!open || tiers.length === 0) return null;
   const chosen = picked ?? fallback;
   const tier = tiers.includes(chosen) ? chosen : tiers[0];
@@ -169,9 +171,6 @@ export function PlanSheet({
         aria-label={registryText(tierCard(tier)?.title ?? PLAN_UI.name, lang)}
         className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)] shadow-2xl"
         onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => {
-          if (e.key === "Escape") onClose();
-        }}
       >
         <div className="flex justify-end px-3 pt-3">
           <button

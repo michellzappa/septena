@@ -5,6 +5,7 @@ import { addDays } from "@/lib/dateBoard";
 import { registryText } from "@/lib/generated/registries";
 import type { TaskRow } from "@/lib/types";
 import { WAITING_ON_MAX, WAITING_SURFACE, waitingName } from "@/lib/waiting";
+import { useEscapeToClose } from "@/lib/useEscapeToClose";
 
 interface WaitingOnDialogProps {
   task: TaskRow;
@@ -23,6 +24,7 @@ interface WaitingOnDialogProps {
 export function WaitingOnDialog({ task, todayYMD, language, onClose, onSave }: WaitingOnDialogProps) {
   const text = (key: string) => registryText(key, language);
   const sheet = WAITING_SURFACE.sheet;
+  useEscapeToClose(true, onClose);
   const alreadyWaiting = Boolean(waitingName(task));
   const defaultDay = alreadyWaiting
     ? (task.scheduled ?? null)
@@ -53,9 +55,6 @@ export function WaitingOnDialog({ task, todayYMD, language, onClose, onSave }: W
         onSubmit={(e) => {
           e.preventDefault();
           void submit();
-        }}
-        onKeyDown={(e) => {
-          if (e.key === "Escape") onClose();
         }}
       >
         <div className="border-b border-[var(--border-subtle)] px-5 py-3.5">

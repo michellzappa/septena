@@ -19,6 +19,7 @@ import {
   type AvatarKind,
 } from "@/lib/avatar";
 import type { Avatar as AvatarModel, ProjectShareInfo, ShareMember } from "@/lib/types";
+import { useEscapeToClose } from "@/lib/useEscapeToClose";
 
 // The avatar (#857): initials in white on the palette color, one emoji on the
 // color, or a photo in a circle (initials on the color while it loads or
@@ -296,6 +297,7 @@ export function AvatarEditor({ api, controller, name, isDark, lang, onClose }: A
   const startKind: AvatarKind =
     state.pendingPhotoUrl || current?.kind === "photo" ? "photo" : current?.kind === "emoji" ? "emoji" : "initials";
   const [kind, setKind] = useState<AvatarKind>(startKind);
+  useEscapeToClose(true, onClose);
   const [color, setColor] = useState<string>(
     avatarColor(current?.color).id,
   );
@@ -440,9 +442,6 @@ export function AvatarEditor({ api, controller, name, isDark, lang, onClose }: A
         aria-label={registryTitle(lang)}
         className="w-full max-w-sm overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)] shadow-2xl"
         onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => {
-          if (e.key === "Escape") onClose();
-        }}
       >
         <div className="border-b border-[var(--border-subtle)] px-4 py-3 text-center text-sm font-semibold text-[var(--text-primary)]">
           {registryTitle(lang)}

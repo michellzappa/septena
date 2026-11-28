@@ -157,6 +157,7 @@ import {
   whenDay,
   type TaskRowItemProps,
 } from "./TaskRowItem";
+import { useEscapeToClose } from "@/lib/useEscapeToClose";
 
 interface EvaluatedTask {
   task: TaskRow;
@@ -1642,6 +1643,9 @@ export function SeptenaApp() {
     | { kind: "toggleToday"; tasks: TaskRow[]; bulkPutOnToday?: boolean }
     | null
   >(null);
+  // Escape closes the reschedule prompt and the phone sidebar drawer like any modal.
+  useEscapeToClose(pendingReschedule !== null, () => setPendingReschedule(null));
+  useEscapeToClose(mobileMenuOpen, () => setMobileMenuOpen(false));
 
   const applyTaskDay = useCallback(
     async (
