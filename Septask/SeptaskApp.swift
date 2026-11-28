@@ -171,7 +171,7 @@ private struct SeptaskMainWindow: View {
         guard let action else { return }
         switch action {
         case .newTask:
-          navigation.presentAddInfo()
+          navigation.startNewTaskOnToday()
         case .today:
           navigation.path = [.filter(.today)]
         }
