@@ -150,6 +150,7 @@ import { SignInScreen } from "./SignInScreen";
 import { TaskPageDrawer } from "./TaskPageDrawer";
 import { WaitingOnDialog } from "./WaitingOnDialog";
 import { MovePickerDialog } from "./MovePickerDialog";
+import { MemberAvatar, useAccountAvatar } from "./Avatar";
 import {
   TaskRowItem,
   openRepeatSelect,
@@ -326,6 +327,8 @@ export function SeptenaApp() {
   // at sign-in and again when Settings opens, for the row's count.
   const [betaOpen, setBetaOpen] = useState(false);
   const { beta, write: writeBeta } = useBeta(api, bootPhase === "signed_in", settingsOpen);
+  // The account avatar (#857): cached, refreshed after sign-in, edits flushed when online.
+  const accountAvatar = useAccountAvatar(api, bootPhase === "signed_in");
   // The dot on Settings, About, Contact Support: read when Settings opens.
   useEffect(() => {
     if (!settingsOpen) return;
@@ -727,6 +730,7 @@ export function SeptenaApp() {
   const handleSignOut = useCallback(async () => {
     undoStack.clear();
     await engine.signOutAndWipe();
+    accountAvatar.store.clear();
     setExpandedTaskId(null);
     setTaskPageId(null);
     setSettingsOpen(false);
@@ -740,11 +744,12 @@ export function SeptenaApp() {
       window.history.replaceState({}, "", "/");
     }
     setBootPhase("signed_out");
-  }, [engine, undoStack]);
+  }, [accountAvatar.store, engine, undoStack]);
 
   const handleDeleteAccount = useCallback(async () => {
     undoStack.clear();
     await engine.deleteAccountAndWipe();
+    accountAvatar.store.clear();
     setExpandedTaskId(null);
     setTaskPageId(null);
     setSettingsOpen(false);
@@ -758,7 +763,7 @@ export function SeptenaApp() {
       window.history.replaceState({}, "", "/");
     }
     setBootPhase("signed_out");
-  }, [engine, undoStack]);
+  }, [accountAvatar.store, engine, undoStack]);
 
   const nowIso = new Date().toISOString();
   const utcOffsetSeconds = localUtcOffsetSeconds();
@@ -3520,6 +3525,7 @@ export function SeptenaApp() {
       supportUnread={supportUnread}
       beta={beta}
       onOpenBeta={() => setBetaOpen(true)}
+      accountAvatar={accountAvatar}
     />
     </>
   );
@@ -4821,12 +4827,13 @@ export function SeptenaApp() {
                         key={member.id}
                         type="button"
                         onClick={() => setAssigneeFilter(active ? null : member.id)}
-                        className={`rounded-full px-2.5 py-0.5 transition-colors ${
+                        className={`inline-flex items-center gap-1.5 rounded-full py-0.5 pl-0.5 pr-2.5 transition-colors ${
                           active
                             ? "bg-[var(--bg-selected)] font-medium text-[var(--text-primary)]"
                             : "bg-[var(--bg-pill)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                         }`}
                       >
+                        <MemberAvatar api={api} share={share} member={member} isDark={isDark} size={18} />
                         {label}
                       </button>
                     );

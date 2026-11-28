@@ -29,7 +29,9 @@ import {
   type PushResponse,
   type SessionResponse,
   type WsTicketResponse,
+  type Avatar,
 } from "../types";
+import { normalizeAvatar } from "../avatar";
 
 // API client for api.septena.app (docs/WEB_CLIENT_SPEC.md §4–§5).
 // - Access token stays in memory only (never localStorage/sessionStorage).
@@ -112,6 +114,7 @@ export class SeptenaApiClient {
     this.accessToken = null;
     this.userId = null;
     this.accessExpiresAt = 0;
+    this.clearAvatarPhotos();
   }
 
   async restoreSession(): Promise<SessionResponse | null> {
@@ -751,6 +754,86 @@ export class SeptenaApiClient {
     this.clearInMemorySession();
   }
 
+  // The account and its avatar (#857, backend/src/api/avatar.ts).
+
+  /** GET /v1/account. */
+  async getAccount(): Promise<{ userId: string; avatar: Avatar }> {
+    const res = await this.authedFetch("/v1/account", { method: "GET" });
+    if (!res.ok) throw await apiError(res, "account_failed");
+    const body = (await res.json()) as { userId?: unknown; avatar?: unknown };
+    const avatar = normalizeAvatar(body.avatar);
+    if (typeof body.userId !== "string" || !avatar) throw new ApiError(502, "account_invalid");
+    return { userId: body.userId, avatar };
+  }
+
+  /**
+   * PATCH /v1/account/avatar: initials or one emoji. `applied: false` means a
+   * newer edit is on the server; the reply carries that avatar.
+   */
+  async patchAvatar(body: AvatarPatch): Promise<{ avatar: Avatar; applied: boolean }> {
+    const res = await this.authedFetch("/v1/account/avatar", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw await apiError(res, "avatar_failed");
+    return parseAvatarReply(await res.json());
+  }
+
+  /** PUT /v1/account/avatar: the cropped JPEG. 413: too large. 415: wrong type. */
+  async putAvatarPhoto(jpeg: Blob): Promise<{ avatar: Avatar; applied: boolean }> {
+    const res = await this.authedFetch("/v1/account/avatar", {
+      method: "PUT",
+      headers: { "Content-Type": "image/jpeg" },
+      body: await jpeg.arrayBuffer(),
+    });
+    if (!res.ok) throw await apiError(res, "avatar_photo_failed");
+    return parseAvatarReply(await res.json());
+  }
+
+  /** DELETE /v1/account/avatar: back to initials, the color and typed initials stay. */
+  async deleteAvatar(): Promise<Avatar> {
+    const res = await this.authedFetch("/v1/account/avatar", { method: "DELETE" });
+    if (!res.ok) throw await apiError(res, "avatar_delete_failed");
+    return parseAvatarReply(await res.json()).avatar;
+  }
+
+  private avatarPhotos = new Map<string, Promise<string>>();
+
+  /** The owner's photo as an object URL, cached by photo id. */
+  accountAvatarPhotoUrl(photoId: string): Promise<string> {
+    return this.avatarPhoto(`me:${photoId}`, `/v1/account/avatar/photo?v=${encodeURIComponent(photoId)}`);
+  }
+
+  /** A shared-project member's photo as an object URL, cached by photo id. */
+  memberAvatarPhotoUrl(shareId: string, memberId: string, photoId: string): Promise<string> {
+    return this.avatarPhoto(
+      `${shareId}/${memberId}:${photoId}`,
+      `/v1/shares/${encodeURIComponent(shareId)}/members/${encodeURIComponent(memberId)}/avatar?v=${encodeURIComponent(photoId)}`,
+    );
+  }
+
+  private avatarPhoto(key: string, path: string): Promise<string> {
+    const cached = this.avatarPhotos.get(key);
+    if (cached) return cached;
+    const load = (async () => {
+      const res = await this.authedFetch(path, { method: "GET" });
+      if (!res.ok) throw await apiError(res, "avatar_photo_failed");
+      return URL.createObjectURL(await res.blob());
+    })();
+    // A failed load is tried again on the next render that asks for it.
+    load.catch(() => this.avatarPhotos.delete(key));
+    this.avatarPhotos.set(key, load);
+    return load;
+  }
+
+  private clearAvatarPhotos(): void {
+    for (const p of this.avatarPhotos.values()) {
+      p.then((url) => URL.revokeObjectURL(url)).catch(() => {});
+    }
+    this.avatarPhotos.clear();
+  }
+
   async fetchSkillMarkdown(): Promise<string> {
     const res = await fetch(`${this.apiBase}/skill.md`, { method: "GET" });
     if (!res.ok) {
@@ -758,6 +841,24 @@ export class SeptenaApiClient {
     }
     return res.text();
   }
+}
+
+/** The PATCH body of `/v1/account/avatar` (backend zAvatarPatchBody). */
+export type AvatarPatch =
+  | { kind: "initials"; color?: string; initials?: string; updatedAt?: number }
+  | { kind: "emoji"; emoji: string; color?: string; initials?: string; updatedAt?: number };
+
+function parseAvatarReply(body: unknown): { avatar: Avatar; applied: boolean } {
+  const obj = (body ?? {}) as { avatar?: unknown; applied?: unknown };
+  const avatar = normalizeAvatar(obj.avatar);
+  if (!avatar) throw new ApiError(502, "avatar_invalid");
+  return { avatar, applied: obj.applied !== false };
+}
+
+async function apiError(res: Response, fallback: string): Promise<ApiError> {
+  const raw = await res.text().catch(() => "");
+  const err = parseErr(raw);
+  return new ApiError(res.status, err.error ?? fallback, err.message, raw);
 }
 
 function parseErr(raw: string): { error?: string; message?: string } {

@@ -455,6 +455,12 @@
       "settings.copy.smart_lists_editor.alwaysShown.label"
     ]
   },
+  "Amber": {
+    "text": "Amber",
+    "paths": [
+      "tokens.avatarColors.colors.amber.name"
+    ]
+  },
   "An agent below": {
     "text": "An agent below",
     "paths": [
@@ -585,6 +591,12 @@
       "settings.keys.aiMode.options.1.title"
     ]
   },
+  "Avatar": {
+    "text": "Avatar",
+    "paths": [
+      "surfaces.avatar.title"
+    ]
+  },
   "Açaí": {
     "text": "Açaí",
     "paths": [
@@ -643,6 +655,12 @@
       "surfaces.taskReferences.roles.blocked_by.label"
     ]
   },
+  "Blue": {
+    "text": "Blue",
+    "paths": [
+      "tokens.avatarColors.colors.blue.name"
+    ]
+  },
   "Bring in your tasks": {
     "text": "Bring in your tasks",
     "paths": [
@@ -694,6 +712,7 @@
     "text": "Cancel",
     "paths": [
       "surfaces.prompts.cancelTitle",
+      "surfaces.avatar.copy.cancel.label",
       "surfaces.accountSwitch.copy.cancel.label",
       "signIn.manage.cancel"
     ]
@@ -788,6 +807,12 @@
     "paths": [
       "surfaces.taskAttributes.checklist.label",
       "surfaces.checklistProjects.checklist"
+    ]
+  },
+  "Choose a Photo": {
+    "text": "Choose a Photo",
+    "paths": [
+      "surfaces.avatar.copy.choosePhoto.label"
     ]
   },
   "Choose a plan": {
@@ -885,6 +910,12 @@
     "text": "Code",
     "paths": [
       "signIn.email.codeLabel"
+    ]
+  },
+  "Color": {
+    "text": "Color",
+    "paths": [
+      "surfaces.avatar.copy.color.label"
     ]
   },
   "Colorful": {
@@ -1472,6 +1503,12 @@
       "plans.paywall.done"
     ]
   },
+  "Drag and zoom to fit the photo in the circle.": {
+    "text": "Drag and zoom to fit the photo in the circle.",
+    "paths": [
+      "surfaces.avatar.copy.cropHint.label"
+    ]
+  },
   "Duplicate": {
     "text": "Duplicate",
     "paths": [
@@ -1514,6 +1551,12 @@
       "plans.outcomes.everywhere.rows.beta.label"
     ]
   },
+  "Edit Avatar": {
+    "text": "Edit Avatar",
+    "paths": [
+      "surfaces.avatar.copy.edit.label"
+    ]
+  },
   "Edit Details…": {
     "text": "Edit Details…",
     "paths": [
@@ -1544,6 +1587,12 @@
     "text": "Email thread",
     "paths": [
       "surfaces.taskReferences.kinds.thread.label"
+    ]
+  },
+  "Emoji": {
+    "text": "Emoji",
+    "paths": [
+      "surfaces.avatar.copy.emoji.label"
     ]
   },
   "Empty Trash": {
@@ -1901,6 +1950,18 @@
       "actions.actions.task.gotItBack.title"
     ]
   },
+  "Graphite": {
+    "text": "Graphite",
+    "paths": [
+      "tokens.avatarColors.colors.graphite.name"
+    ]
+  },
+  "Green": {
+    "text": "Green",
+    "paths": [
+      "tokens.avatarColors.colors.green.name"
+    ]
+  },
   "Group Today by list": {
     "text": "Group Today by list",
     "paths": [
@@ -2134,10 +2195,22 @@
       "actions.actions.app.textSizeIncrease.title"
     ]
   },
+  "Indigo": {
+    "text": "Indigo",
+    "paths": [
+      "tokens.avatarColors.colors.indigo.name"
+    ]
+  },
   "Industrial": {
     "text": "Industrial",
     "paths": [
       "tokens.textures.fieldMatrix.tag"
+    ]
+  },
+  "Initials": {
+    "text": "Initials",
+    "paths": [
+      "surfaces.avatar.copy.initials.label"
     ]
   },
   "Invite Someone": {
@@ -3080,6 +3153,12 @@
       "surfaces.notices.items.getStarted.steps.addTask.platformDetails.0.detail"
     ]
   },
+  "Orange": {
+    "text": "Orange",
+    "paths": [
+      "tokens.avatarColors.colors.orange.name"
+    ]
+  },
   "Ordinal": {
     "text": "Ordinal",
     "paths": [
@@ -3172,6 +3251,12 @@
       "tokens.fruitAccents.persimmon.name"
     ]
   },
+  "Photo": {
+    "text": "Photo",
+    "paths": [
+      "surfaces.avatar.copy.photo.label"
+    ]
+  },
   "Pick another date": {
     "text": "Pick another date",
     "paths": [
@@ -3185,6 +3270,18 @@
     ],
     "paths": [
       "surfaces.taskDateBoard.rows.dateBoard.calendar.valueLabel"
+    ]
+  },
+  "Pick one emoji.": {
+    "text": "Pick one emoji.",
+    "paths": [
+      "surfaces.avatar.copy.emojiHint.label"
+    ]
+  },
+  "Pink": {
+    "text": "Pink",
+    "paths": [
+      "tokens.avatarColors.colors.pink.name"
     ]
   },
   "Pitaya": {
@@ -3407,6 +3504,12 @@
       "tokens.textures.none.name"
     ]
   },
+  "Purple": {
+    "text": "Purple",
+    "paths": [
+      "tokens.avatarColors.colors.purple.name"
+    ]
+  },
   "Questions": {
     "text": "Questions",
     "paths": [
@@ -3467,6 +3570,12 @@
       "plans.outcomes.nothing_lost.rows.deleted.label"
     ]
   },
+  "Red": {
+    "text": "Red",
+    "paths": [
+      "tokens.avatarColors.colors.red.name"
+    ]
+  },
   "Reference": {
     "text": "Reference",
     "paths": [
@@ -3516,6 +3625,12 @@
       "actions.actions.task.reference.remove.title",
       "surfaces.sharing.copy.remove.label",
       "signIn.manage.remove"
+    ]
+  },
+  "Remove Photo": {
+    "text": "Remove Photo",
+    "paths": [
+      "surfaces.avatar.copy.removePhoto.label"
     ]
   },
   "Remove from Today": {
@@ -3738,6 +3853,7 @@
       "actions.actions.task.detail.save.title",
       "actions.actions.settings.save.title",
       "surfaces.prompts.text.nameAgent.confirmTitle",
+      "surfaces.avatar.copy.save.label",
       "surfaces.waiting.sheet.confirmTitle",
       "surfaces.doing.stopNote.confirmTitle"
     ]
@@ -4622,6 +4738,12 @@
       "plans.promises.core_free.detail"
     ]
   },
+  "Teal": {
+    "text": "Teal",
+    "paths": [
+      "tokens.avatarColors.colors.teal.name"
+    ]
+  },
   "Terms of Use": {
     "text": "Terms of Use",
     "paths": [
@@ -4711,6 +4833,18 @@
     "text": "The other members lose this project. You keep it and its tasks.",
     "paths": [
       "surfaces.sharing.copy.stopDetail.label"
+    ]
+  },
+  "The photo did not upload. Try again.": {
+    "text": "The photo did not upload. Try again.",
+    "paths": [
+      "surfaces.avatar.copy.photoFailed.label"
+    ]
+  },
+  "The photo uploads when this device is online.": {
+    "text": "The photo uploads when this device is online.",
+    "paths": [
+      "surfaces.avatar.copy.photoPending.label"
     ]
   },
   "The project leaves your account. Everyone else keeps it.": {
@@ -4821,6 +4955,12 @@
     "text": "This invite no longer works. Ask for a new link.",
     "paths": [
       "surfaces.sharing.copy.invalid.label"
+    ]
+  },
+  "This photo is too big. Pick one under 5 MB.": {
+    "text": "This photo is too big. Pick one under 5 MB.",
+    "paths": [
+      "surfaces.avatar.copy.photoTooLarge.label"
     ]
   },
   "This project has no room for another member or invite.": {
@@ -5058,6 +5198,12 @@
       "surfaces.sharing.copy.invites.label"
     ]
   },
+  "Up to 3 letters": {
+    "text": "Up to 3 letters",
+    "paths": [
+      "surfaces.avatar.copy.initialsHint.label"
+    ]
+  },
   "Upcoming": {
     "text": "Upcoming",
     "paths": [
@@ -5068,6 +5214,12 @@
     "text": "Update Schedule",
     "paths": [
       "surfaces.prompts.items.rescheduleFixedRepeat.options.updateRule.title"
+    ]
+  },
+  "Use Photo": {
+    "text": "Use Photo",
+    "paths": [
+      "surfaces.avatar.copy.usePhoto.label"
     ]
   },
   "Use a device where Septena is already signed in.": {

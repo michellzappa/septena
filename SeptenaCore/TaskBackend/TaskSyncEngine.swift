@@ -221,6 +221,8 @@ final class TaskSyncEngine {
       return
     }
     SeptenaLog.info("[TaskSync] started since=\(since) pending=\(pendingOps)")
+    // An avatar edit made offline before the last quit (#857).
+    AvatarStore.shared.flushIfPending()
     Task { @MainActor in
       if !self.deviceNotSyncing {
         await self.runSync(reconcileFirst: true)
@@ -263,6 +265,7 @@ final class TaskSyncEngine {
       }
     }
     startPolling()
+    AvatarStore.shared.flushIfPending()
   }
 
   /// Applies fresh server plan limits from `PlanStatus.refresh()` (spec §6.3).
@@ -980,6 +983,8 @@ final class TaskSyncEngine {
     await SeptenaServices.shared.areasMutator.sweepDeletedContainerOrphans()
     lastSyncAt = Date()
     SeptenaServices.shared.runFadePassIfDue()
+    // A finished run means the network is back: send an avatar edit that waited (#857).
+    AvatarStore.shared.flushIfPending()
   }
 
   /// When this process last finished a push and a pull.
@@ -1652,11 +1657,13 @@ final class TaskSyncEngine {
       wipeLocalTaskData()
       SeptenaLog.info("[TaskSync] signed in as another account; local task data wiped")
     }
+    let changedAccount = lastUserID != userID
     lastUserID = userID
     signedIn = TaskBackendClient.hasSession
     lastError = nil
     // Today's upsell notices read the plan (spec §3.2).
     Task { @MainActor in await PlanStatus.shared.refresh() }
+    AvatarStore.shared.accountSignedIn(changedAccount: changedAccount)
     Self.onSignInHook?()
   }
 
@@ -1680,6 +1687,7 @@ final class TaskSyncEngine {
     localOnlyAttachmentReasons = [:]
     elsewhereAttachmentIDs = []
     Task { @MainActor in await PlanStatus.shared.refresh() }
+    AvatarStore.shared.clear()
     // The launch snapshot shows this account's Today (#82).
     TodaySnapshotStore.invalidate()
     TasksWidgetSnapshotStore.invalidate()
@@ -1737,6 +1745,7 @@ final class TaskSyncEngine {
     wipeLocalTaskData()
     lastUserID = nil
     signedIn = TaskBackendClient.hasSession
+    AvatarStore.shared.clear()
     SeptenaLog.info("[TaskSync] account deleted; local task data wiped")
   }
 

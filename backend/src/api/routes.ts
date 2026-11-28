@@ -62,6 +62,7 @@ import {
 import { MCP_READ_SCOPE, MCP_WRITE_SCOPE, createAgentKey, disconnectFamily, hasScope, isMcpAccessToken, verifyMcpAccess } from "../shadow/tokens.js";
 import { pollAgentSignup, startAgentSignup, zAgentSignupPollBody, zAgentSignupStartBody } from "../shadow/agentSignup.js";
 import { refreshAccounts } from "../admin/accounts.js";
+import { deleteAvatar, getAccount, getOwnAvatarPhoto, patchAvatar, putAvatarPhoto } from "./avatar.js";
 import { MAX_AGENT_WEBHOOKS, validateWebhookUrl } from "./agentWake.js";
 import {
   TRIAL_ROW_ID,
@@ -565,6 +566,7 @@ api.use("/account", async (c, next) => {
   }
   await next();
 }, requireUser);
+api.use("/account/*", requireUser);
 api.use("/devices/*", requireUser);
 api.use("/ical/settings", requireUser);
 api.use("/changes", requireUser, loadPlan("open", "changes"), requireSyncDevice);
@@ -1520,6 +1522,14 @@ api.delete("/agent/webhooks/:id", async (c) => {
   logEvent("agent_webhook_deleted", { webhookId: id.data });
   return c.body(null, 204);
 });
+
+// ---- the account and its avatar (#857, src/api/avatar.ts) ----
+
+api.get("/account", getAccount);
+api.patch("/account/avatar", patchAvatar);
+api.put("/account/avatar", putAvatarPhoto);
+api.delete("/account/avatar", deleteAvatar);
+api.get("/account/avatar/photo", getOwnAvatarPhoto);
 
 // ---- account deletion (§10) ----
 

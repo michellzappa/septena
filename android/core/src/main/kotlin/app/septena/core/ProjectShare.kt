@@ -3,8 +3,8 @@ package app.septena.core
 import app.septena.core.generated.RegistryEntityFields
 import app.septena.core.generated.RegistryEntityNames
 
-/** One person in a shared project. */
-data class ShareMember(val id: String, val name: String, val isOwner: Boolean)
+/** One person in a shared project. [avatar] is null when the server sent none: initials on the neutral fill. */
+data class ShareMember(val id: String, val name: String, val isOwner: Boolean, val avatar: Avatar? = null)
 
 /**
  * Who shares a project: the project row's server-owned `share` column
@@ -35,6 +35,7 @@ data class ProjectShare(
                         id = member["id"].stringValue() ?: return@mapNotNull null,
                         name = member["name"].stringValue().orEmpty(),
                         isOwner = member["role"].stringValue() == ROLE_OWNER,
+                        avatar = Avatar.from(member["avatar"]),
                     )
                 },
             )

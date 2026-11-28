@@ -706,24 +706,75 @@ enum KitGlyph {
   /// picked up the right ink soon after a switch, but the sidebar sets its row
   /// images only on a structure reload — its project rings kept the
   /// light-mode `secondaryLabelColor` (near-black) on the dark sidebar.
-  /// The members of a shared project as initials. AppKit twin of
-  /// `MemberAvatars`.
+  /// The members of a shared project as avatars (#857). AppKit twin of
+  /// `MemberAvatars`: a photo clipped to the circle, an emoji or white
+  /// initials on the palette color, else initials on the neutral fill. A
+  /// photo not loaded yet draws the initials and starts the load; the title
+  /// cell draws again on `AvatarStore.memberPhotosChanged`.
   static func members(_ share: ProjectShare, size: CGFloat = 24) -> NSImage {
-    var texts = share.members.prefix(MemberAvatars.limit).map(\.initials)
-    if share.members.count > MemberAvatars.limit { texts.append("+\(share.members.count - MemberAvatars.limit)") }
+    struct Chip {
+      var text: String
+      var isEmoji = false
+      var fill: NSColor?
+      var photo: CGImage?
+    }
+    let store = AvatarStore.shared
+    var chips: [Chip] = share.members.prefix(MemberAvatars.limit).map { member in
+      let avatar = member.avatar
+      let palette: RegistryAvatarColor? = avatar?.palette
+      var chip = Chip(text: member.initials, fill: palette.map { avatarFill($0) })
+      switch avatar?.kind {
+      case .emoji?:
+        chip.text = avatar?.emoji ?? chip.text
+        chip.isEmoji = true
+      case .photo?:
+        if let id = avatar?.photoId {
+          chip.photo = store.memberPhotos[id]
+          if chip.photo == nil {
+            Task { await store.loadMemberPhoto(shareID: share.id, member: member) }
+          }
+        }
+      default:
+        break
+      }
+      return chip
+    }
+    if share.members.count > MemberAvatars.limit {
+      chips.append(Chip(text: "+\(share.members.count - MemberAvatars.limit)"))
+    }
     let step = size + 4
-    return draw(size: NSSize(width: size + step * CGFloat(max(texts.count - 1, 0)), height: size)) { rect in
-      for (i, text) in texts.enumerated() {
+    return draw(size: NSSize(width: size + step * CGFloat(max(chips.count - 1, 0)), height: size)) { rect in
+      for (i, chip) in chips.enumerated() {
         let circle = NSRect(x: CGFloat(i) * step, y: rect.minY, width: size, height: size)
-        NSColor.secondaryLabelColor.withAlphaComponent(0.18).setFill()
-        NSBezierPath(ovalIn: circle).fill()
-        let label = NSAttributedString(string: text, attributes: [
-          .font: NSFont.systemFont(ofSize: size * 0.4, weight: .semibold),
-          .foregroundColor: SeptaskKitTheme.inkSecondary,
+        let path = NSBezierPath(ovalIn: circle)
+        (chip.fill ?? NSColor.secondaryLabelColor.withAlphaComponent(0.18)).setFill()
+        path.fill()
+        if let photo = chip.photo {
+          NSGraphicsContext.saveGraphicsState()
+          path.addClip()
+          NSImage(cgImage: photo, size: circle.size).draw(in: circle)
+          NSGraphicsContext.restoreGraphicsState()
+          continue
+        }
+        let label = NSAttributedString(string: chip.text, attributes: [
+          .font: chip.isEmoji
+            ? NSFont.systemFont(ofSize: size * 0.52)
+            : NSFont.systemFont(ofSize: size * 0.4, weight: .semibold),
+          .foregroundColor: chip.fill == nil ? SeptaskKitTheme.inkSecondary : NSColor.white,
         ])
         let bounds = label.size()
         label.draw(at: NSPoint(x: circle.midX - bounds.width / 2, y: circle.midY - bounds.height / 2))
       }
+    }
+  }
+
+  /// The palette color, light or dark by the drawing appearance.
+  private static func avatarFill(_ palette: RegistryAvatarColor) -> NSColor {
+    let light = RGBTriple.fromHex(palette.lightHex)
+    let dark = RGBTriple.fromHex(palette.darkHex)
+    return NSColor(name: nil) { appearance in
+      let c = appearance.bestMatch(from: [.darkAqua, .vibrantDark]) != nil ? dark : light
+      return NSColor(srgbRed: c.r, green: c.g, blue: c.b, alpha: 1)
     }
   }
 

@@ -8,10 +8,10 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 
 | Status | iPhone | iPad | Mac | Web | Android | Windows | linux | Watch |
 |---|---|---|---|---|---|---|---|---|
-| ships | 62 | 63 | 63 | 54 | 58 | 0 | 0 | 1 |
+| ships | 63 | 64 | 64 | 55 | 59 | 0 | 0 | 1 |
 | partial | 1 | 1 | 1 | 1 | 2 | 0 | 0 | 3 |
-| planned | 2 | 2 | 2 | 6 | 3 | 64 | 64 | 2 |
-| - | 4 | 3 | 3 | 8 | 6 | 5 | 5 | 63 |
+| planned | 2 | 2 | 2 | 6 | 3 | 65 | 65 | 2 |
+| - | 4 | 3 | 3 | 8 | 6 | 5 | 5 | 64 |
 
 **Agent** lists the MCP tools at `api.septena.app/mcp` that reach the feature; **none** means an agent cannot reach it.
 
@@ -68,6 +68,7 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 | `agents.stop-pause` | Stop one task, pause all agents | ships | ships | ships | ships | ships | planned | planned | - | `tasks_agent_events` |
 | `sync.backend` | Sync through api.septena.app | ships | ships | ships | ships | ships | planned | planned | planned | none |
 | `account.delete` | Delete account | ships | ships | ships | ships | ships | planned | planned | - | none |
+| `account.avatar` | Edit your avatar: a photo, an emoji, or initials with a color | ships | ships | ships | ships | ships | planned | planned | - | none |
 | `account.sign-in-apple` | Sign in with Apple (creates an account) | ships | ships | ships | planned | planned | planned | planned | - | none |
 | `account.sign-in-google` | Sign in with Google (creates an account) | planned | planned | planned | planned | planned | planned | planned | - | none |
 | `account.sign-in-microsoft` | Sign in with Microsoft (creates an account) | planned | planned | planned | planned | planned | planned | planned | - | none |

@@ -56,6 +56,7 @@ import {
   zVerb,
 } from "./tasksRest.js";
 import { zShareCreateBody, zShareId, zShareJoinBody, zSharePreviewBody } from "./shares.js";
+import { zAvatarPatchBody } from "./avatar.js";
 import { zHistoryQuery } from "./notesHistoryRest.js";
 import { isOptional, zodToJsonSchema, type JsonSchema } from "./zodJsonSchema.js";
 import { zBetaProgressBody, zBetaQuery } from "./beta.js";
@@ -176,6 +177,11 @@ export const ROUTES: RouteDoc[] = [
   { method: "GET", path: "/entitlement", tag: "account", auth: "app", summary: "The account's plan, limits, usage and device slot.", ok: { 200: "The entitlement." } },
   { method: "POST", path: "/entitlement/device", tag: "account", auth: "app", summary: "Move the sync slot to this device.", ok: { 200: "This device syncs." } },
   { method: "POST", path: "/entitlement/apple", tag: "account", auth: "app", summary: "Record a signed App Store transaction.", body: zEntitlementAppleBody, ok: { 200: "The entitlement it gives." } },
+  { method: "GET", path: "/account", tag: "account", auth: "app", summary: "The account id and its avatar.", ok: { 200: "The account." } },
+  { method: "PATCH", path: "/account/avatar", tag: "account", auth: "app", summary: "Set the avatar to initials or one emoji, with a color from the palette. A change older than the stored one changes nothing (`applied: false`).", body: zAvatarPatchBody, ok: { 200: "The avatar." } },
+  { method: "PUT", path: "/account/avatar", tag: "account", auth: "app", summary: "Set a photo as the avatar: a square JPEG, PNG or HEIC up to 5 MB. The photo before it is deleted.", binaryBody: true, ok: { 200: "The avatar." } },
+  { method: "DELETE", path: "/account/avatar", tag: "account", auth: "app", summary: "Go back to initials. The photo is deleted.", ok: { 200: "The avatar." } },
+  { method: "GET", path: "/account/avatar/photo", tag: "account", auth: "app", summary: "The account's own avatar photo.", stream: "bytes", ok: { 200: "The photo." } },
   { method: "DELETE", path: "/account", tag: "account", auth: "app", summary: "Delete the account and everything in it.", ok: { 204: "Deleted." } },
 
   // ---- support ----
@@ -191,6 +197,7 @@ export const ROUTES: RouteDoc[] = [
   { method: "GET", path: "/shares/:id", tag: "shares", auth: "app", summary: "One share, with its invites.", params: { id: zShareId }, ok: { 200: "The share." } },
   { method: "POST", path: "/shares/:id/invites", tag: "shares", auth: "app", summary: "Make an invite link.", params: { id: zShareId }, ok: { 201: "The invite and its link." } },
   { method: "DELETE", path: "/shares/:id/invites/:invite", tag: "shares", auth: "app", summary: "Revoke an invite.", params: { id: zShareId, invite: z.string() }, ok: { 204: "Revoked." } },
+  { method: "GET", path: "/shares/:id/members/:member/avatar", tag: "shares", auth: "app", summary: "The avatar photo of a member of the project. Only members read it.", params: { id: zShareId, member: z.string() }, stream: "bytes", ok: { 200: "The photo." } },
   { method: "DELETE", path: "/shares/:id/members/:member", tag: "shares", auth: "app", summary: "Remove a member, or leave.", params: { id: zShareId, member: z.string() }, ok: { 204: "Removed." } },
   { method: "DELETE", path: "/shares/:id", tag: "shares", auth: "app", summary: "Stop sharing a project.", params: { id: zShareId }, ok: { 204: "Closed." } },
 

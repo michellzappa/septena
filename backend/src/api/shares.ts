@@ -8,6 +8,9 @@ import { projectStoreFor } from "../store/ProjectStore.js";
 import { MEMBER_ID_RE, SHARE_ID_RE, newShareId } from "../store/shares.js";
 import { PAGE_CSS } from "../shadow/oauth.js";
 import { storeFor } from "./session.js";
+import { accountStoreFor } from "../store/AccountStore.js";
+import { publicAvatar } from "../store/avatar.js";
+import { avatarPhotoResponse } from "./avatar.js";
 
 // Shared projects (docs/PROJECT_SHARING_SPEC.md §5). Mounted at /v1/shares
 // behind requireUser, so only an app session reaches it, never an agent.
@@ -71,6 +74,7 @@ shares.post("/", async (c) => {
     return started === "not_found" ? notFound(c) : c.json({ error: started }, 409);
   }
   logEvent("share_created", { userId, shareId: id });
+  c.executionCtx.waitUntil(showAvatar(c, id));
   return c.json({ share: info }, 201);
 });
 
@@ -87,6 +91,7 @@ shares.post("/join", async (c) => {
   const result = await projectStoreFor(c.env, shareOf(input.token)).join(input.token, c.get("userId"), input.name);
   if (!result.ok) return result.reason === "full" ? c.json({ error: "share_full" }, 409) : notFound(c);
   logEvent("share_joined", { userId: c.get("userId"), shareId: result.shareId });
+  c.executionCtx.waitUntil(showAvatar(c, result.shareId));
   return c.json({ shareId: result.shareId, title: result.title });
 });
 
@@ -112,6 +117,15 @@ shares.delete("/:id/invites/:invite", async (c) => {
   return gone ? c.body(null, 204) : notFound(c);
 });
 
+/// A member's photo, for the other members of the project only (#857).
+shares.get("/:id/members/:member/avatar", async (c) => {
+  const id = shareId(c);
+  const member = c.req.param("member");
+  if (!id || !MEMBER_ID_RE.test(member)) return notFound(c);
+  const owner = await projectStoreFor(c.env, id).memberUserId(c.get("userId"), member);
+  return owner ? avatarPhotoResponse(c.env, owner) : notFound(c);
+});
+
 shares.delete("/:id/members/:member", async (c) => {
   const id = shareId(c);
   const member = c.req.param("member");
@@ -128,6 +142,18 @@ shares.delete("/:id", async (c) => {
 });
 
 const shareOf = (token: string) => TOKEN_RE.exec(token)![1];
+
+/// Shows the account's avatar in a project it just shared or joined (#857).
+async function showAvatar(c: Ctx, shareId: string): Promise<void> {
+  const accounts = accountStoreFor(c.env);
+  if (!accounts) return;
+  const userId = c.get("userId");
+  try {
+    await projectStoreFor(c.env, shareId).setMemberAvatar(userId, publicAvatar(await accounts.getAvatar(userId)));
+  } catch (e) {
+    logEvent("avatar_spread_failed", { userId, shareId, error: String(e) });
+  }
+}
 
 /// Where an invite link opens. It shows who invites and to what; it never
 /// accepts anything. An unknown, used, expired or revoked link gets one page.

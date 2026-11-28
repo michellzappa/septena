@@ -340,13 +340,15 @@ private fun SettingsRegistryRow(
                 else -> item.label ?: page?.title ?: return
             }
             if (item.surface == ACCOUNT_PROFILE_CARD) {
+                val name = values[RegistrySettingKeys.WELCOME_NAME].stringValue().orEmpty()
                 AccountProfileCard(
-                    name = values[RegistrySettingKeys.WELCOME_NAME].stringValue().orEmpty(),
+                    name = name,
                     signedIn = signedIn,
                     plans = surfaceEnv.plans,
                     syncState = surfaceEnv.syncState,
                     languageTag = languageTag,
                     onClick = { onPage(target) },
+                    avatar = { AccountAvatar(surfaceEnv.graph, name, 44.dp) },
                 )
                 return
             }
@@ -431,16 +433,32 @@ private fun SettingsRegistryRow(
                 "account_profile_editor" -> {
                     val key = item.ownsKeys.firstOrNull() ?: return
                     val definition = definitions[key] ?: return
-                    RegistrySettingControl(
-                        key = key,
-                        label = item.label ?: return,
-                        detail = item.detail,
-                        definition = definition,
-                        value = values[key] ?: definition.fields["default"] ?: JsonValue.Null,
-                        saveTitle = saveTitle,
-                        languageTag = languageTag,
-                        onValueChange = { onValueChange(key, it) },
-                    )
+                    val label = item.label ?: return
+                    // The avatar sits beside the name, as on iPhone; a tap opens Edit Avatar (#857).
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        EditableAccountAvatar(
+                            graph = surfaceEnv.graph,
+                            name = values[RegistrySettingKeys.WELCOME_NAME].stringValue().orEmpty(),
+                            signedIn = signedIn,
+                            languageTag = languageTag,
+                        )
+                        androidx.compose.foundation.layout.Box(modifier = Modifier.weight(1f)) {
+                            RegistrySettingControl(
+                                key = key,
+                                label = label,
+                                detail = item.detail,
+                                definition = definition,
+                                value = values[key] ?: definition.fields["default"] ?: JsonValue.Null,
+                                saveTitle = saveTitle,
+                                languageTag = languageTag,
+                                onValueChange = { onValueChange(key, it) },
+                            )
+                        }
+                    }
                 }
                 else -> if (item.surface != null && item.surface in SETTINGS_SURFACES) {
                     SettingsCustomSurface(item.surface, item.label, item.detail, surfaceEnv, languageTag)

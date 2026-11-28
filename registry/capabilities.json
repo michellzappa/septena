@@ -729,6 +729,18 @@
       "linux": "planned",
       "watchos": "not_applicable"
     },
+    "account.avatar": {
+      "title": "Edit your avatar: a photo, an emoji, or initials with a color",
+      "agent": "none",
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "ships",
+      "android": "ships",
+      "windows": "planned",
+      "linux": "planned",
+      "watchos": "not_applicable"
+    },
     "account.sign-in-apple": {
       "title": "Sign in with Apple (creates an account)",
       "agent": "none",

@@ -42,6 +42,7 @@ import app.septena.store.SqlDelightTaskStore
 import app.septena.store.db.SeptenaDatabase
 import app.septena.transport.SeptenaAccessClient
 import app.septena.transport.SeptenaAuthClient
+import app.septena.transport.SeptenaAvatarClient
 import app.septena.transport.SeptenaShareClient
 import app.septena.transport.SeptenaSupportClient
 import app.septena.transport.SeptenaTaskBackendClient
@@ -109,6 +110,8 @@ class AndroidAppGraph(application: Application) {
     private val transport = UrlConnectionSyncTransport(credentials, clientVersion)
     val access = SeptenaAccessClient(credentials, clientVersion)
     val shares = SeptenaShareClient(access)
+    /** The account's avatar and the members' photos (#857). */
+    val avatars = AvatarStore(application, SeptenaAvatarClient(credentials, clientVersion), appScope)
     /** The beta checklist (docs/BETA_ONBOARDING_SPEC.md §7): the Settings row, the Beta screen, the Today card. */
     internal val beta = app.septena.android.ui.BetaChecklistModel(app.septena.transport.SeptenaBetaClient(access), appScope)
     /** Contact Support (ADR 0054): the client and this device's support key. */
@@ -172,6 +175,8 @@ class AndroidAppGraph(application: Application) {
      * pass or the uploads changed.
      */
     private suspend fun afterSync(): Boolean {
+        // An avatar edit made offline goes up once the device syncs again (#857).
+        avatars.requestFlush()
         val uploads = attachments.afterSync()
         if (!credentials.signedIn.value) return uploads
         val changed = moveFadeSettingToAccount() || uploads
@@ -243,6 +248,15 @@ class AndroidAppGraph(application: Application) {
                 delay(1500)
                 runCatching { reminders.reconcile() }
                 runCatching { app.septena.android.widgets.SeptenaWidgetUpdater.refreshAll(application) }
+            }
+        }
+    }
+
+    init {
+        // The avatar cache belongs to one account: read it after sign-in, drop it on sign-out (#857).
+        appScope.launch {
+            credentials.userId.collect { userId ->
+                if (userId.isNullOrBlank()) avatars.signedOut() else avatars.signedIn(userId)
             }
         }
     }

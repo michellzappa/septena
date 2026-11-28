@@ -143,6 +143,7 @@ internal fun AccountProfileCard(
     syncState: SyncState,
     languageTag: String,
     onClick: () -> Unit,
+    avatar: (@Composable () -> Unit)? = null,
 ) {
     val title = name.trim().ifEmpty { settingsCopy(ACCOUNT_CARD, "yourProfile", languageTag) }
     val detail = if (signedIn) {
@@ -161,6 +162,7 @@ internal fun AccountProfileCard(
         settingsCopy(ACCOUNT_CARD, "signInToSync", languageTag)
     }
     ListItem(
+        leadingContent = avatar,
         headlineContent = { Text(title, style = MaterialTheme.typography.titleMedium) },
         supportingContent = { Text(detail) },
         trailingContent = { Text("›", color = MaterialTheme.colorScheme.onSurfaceVariant) },
