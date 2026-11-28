@@ -26,7 +26,6 @@ import {
   Undo2,
   Wifi,
   X,
-  FlaskConical,
 } from "lucide-react";
 import { SeptenaApiClient } from "@/lib/api/client";
 import {
@@ -138,7 +137,7 @@ import { FirstRunModal } from "./FirstRunModal";
 import { HeaderWash } from "./HeaderWash";
 import { KeyboardShortcutsModal, formatShortcutKeycaps } from "./KeyboardShortcutsModal";
 import { SupportModal, supportKey } from "./SupportModal";
-import { BetaModal, useBeta } from "./BetaModal";
+import { BetaCard, useBeta } from "./BetaCard";
 import { QuickAddModal, type QuickAddInitial } from "./QuickAddModal";
 import { QuickFindModal, type CommandBarItem } from "./QuickFindModal";
 import { RegistryIcon } from "./RegistryIcon";
@@ -321,12 +320,8 @@ export function SeptenaApp() {
   // Contact Support (ADR 0054): the modal and the unread replies' dot.
   const [supportOpen, setSupportOpen] = useState(false);
   const [supportUnread, setSupportUnread] = useState(0);
-  /** The message field's first line when Contact Support opens from a beta item. */
-  const [supportPrefill, setSupportPrefill] = useState<string | null>(null);
-  // The beta checklist (docs/BETA_ONBOARDING_SPEC.md §7): testers only. Read
-  // at sign-in and again when Settings opens, for the row's count.
-  const [betaOpen, setBetaOpen] = useState(false);
-  const { beta, write: writeBeta } = useBeta(api, bootPhase === "signed_in", settingsOpen);
+  // The beta Today card (docs/BETA_ONBOARDING_SPEC.md §7): testers only, read at sign-in.
+  const { beta, dismissCard: dismissBetaCard } = useBeta(api, bootPhase === "signed_in");
   // The account avatar (#857): cached, refreshed after sign-in, edits flushed when online.
   const accountAvatar = useAccountAvatar(api, bootPhase === "signed_in");
   // The dot on Settings, About, Contact Support: read when Settings opens.
@@ -519,6 +514,7 @@ export function SeptenaApp() {
     const notes = shareTitle && shareText && shareText !== shareTitle ? shareText : "";
 
     setQuickAddInitial({
+      addedVia: "share",
       title,
       notes,
       referenceUrl: extractedUrl || undefined,
@@ -2158,7 +2154,6 @@ export function SeptenaApp() {
         settingsOpen ||
         shortcutsOpen ||
         supportOpen ||
-        betaOpen ||
         sweepTasks !== null ||
         firstRunOpen;
       if (anyModalOpen) return;
@@ -2318,7 +2313,6 @@ export function SeptenaApp() {
     activeSelectedTasks,
     bootPhase,
     collapseInlineTask,
-    betaOpen,
     completeMany,
     destination,
     engine,
@@ -3518,13 +3512,8 @@ export function SeptenaApp() {
       onDeleteAccount={handleDeleteAccount}
       onShowWelcomeAgain={() => setFirstRunOpen(true)}
       onOpenShortcuts={() => setShortcutsOpen(true)}
-      onOpenSupport={() => {
-        setSupportPrefill(null);
-        setSupportOpen(true);
-      }}
+      onOpenSupport={() => setSupportOpen(true)}
       supportUnread={supportUnread}
-      beta={beta}
-      onOpenBeta={() => setBetaOpen(true)}
       accountAvatar={accountAvatar}
     />
     </>
@@ -4526,34 +4515,11 @@ export function SeptenaApp() {
             {/* The beta welcome card (docs/BETA_ONBOARDING_SPEC.md §7): once, at
                 the top of Today, until either button closes it for good. */}
             {destination.kind === "smart" && destination.id === "today" && beta && beta.cardDismissedAt == null && (
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/90 px-4 py-2.5 text-xs">
-                <div className="flex min-w-0 items-center gap-2.5">
-                  <FlaskConical className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
-                  <span className="text-[var(--text-secondary)]">
-                    <strong className="font-medium text-[var(--text-primary)]">{beta.copy.cardTitle}</strong>{" "}
-                    {beta.copy.cardBody}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      writeBeta({ dismissCard: true });
-                      setBetaOpen(true);
-                    }}
-                    className="rounded-md bg-[var(--bg-selected)] px-2.5 py-1 font-medium text-[var(--text-primary)]"
-                  >
-                    {beta.copy.cardOpen}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => writeBeta({ dismissCard: true })}
-                    className="text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-                  >
-                    {beta.copy.cardDismiss}
-                  </button>
-                </div>
-              </div>
+              <BetaCard
+                beta={beta}
+                onDismiss={dismissBetaCard}
+                onOpenProject={(projectId) => navigateTo({ kind: "project", id: projectId })}
+              />
             )}
 
             {/* Due Timed Reminder Banner */}
@@ -5456,6 +5422,7 @@ export function SeptenaApp() {
             deadline: input.deadline,
             area: input.area,
             project: input.project,
+            addedVia: quickAddInitial?.addedVia ?? "quick-add",
           });
           if (input.referenceUrl) {
             try {
@@ -5542,25 +5509,8 @@ export function SeptenaApp() {
         open={supportOpen}
         language={lang}
         api={api}
-        onClose={() => {
-          setSupportOpen(false);
-          setSupportPrefill(null);
-        }}
+        onClose={() => setSupportOpen(false)}
         onUnreadChange={setSupportUnread}
-        initialText={supportPrefill}
-      />
-
-      <BetaModal
-        open={betaOpen}
-        language={lang}
-        beta={beta}
-        onClose={() => setBetaOpen(false)}
-        onWrite={writeBeta}
-        onSendNote={(subject) => {
-          setBetaOpen(false);
-          setSupportPrefill(subject);
-          setSupportOpen(true);
-        }}
       />
 
       <KeyboardShortcutsModal

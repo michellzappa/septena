@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { ENTITY_ENUMS } from "./generated/registries.ts";
 
 // Boundary schemas and types for the Septena web client (WEB_CLIENT_SPEC.md).
 
@@ -224,6 +225,8 @@ export interface TaskRow {
   reminderDismissedAt?: string | null;
   source?: string | null;
   sourceClient?: string | null;
+  /** How the task was added (registry enum taskAddedVia). Set once at creation, never on edits. */
+  addedVia?: TaskAddedVia | null;
   acknowledgedAt?: string | null;
   touchedAt?: string | null;
   deferCount?: number | null;
@@ -247,6 +250,9 @@ export interface TaskRow {
   rev?: number;
   [key: string]: unknown;
 }
+
+/** How a task was added (ADR 0064 beta measurement), from registry/entities.json. */
+export type TaskAddedVia = (typeof ENTITY_ENUMS.taskAddedVia)[number];
 
 export interface NotesProposal {
   body: string;
@@ -541,20 +547,11 @@ export type ActiveDestination =
   | { kind: "area"; id: string }
   | { kind: "project"; id: string };
 
-// GET /v1/beta?platform=web (docs/BETA_ONBOARDING_SPEC.md §7). Every word on
-// the Beta screen and the Today card comes from `copy`; a non-tester gets
-// `{ member: false }` and the app shows nothing.
+// GET /v1/beta?platform=web (docs/BETA_ONBOARDING_SPEC.md §7, ADR 0064). The
+// checklist is a normal project the server seeds in the tester's list; the app
+// shows only the one-time Today card. Every word on it comes from `copy`; a
+// non-tester gets `{ member: false }` and the app shows nothing.
 export const zBetaCopy = z.object({
-  settingsRow: z.string(),
-  settingsSummary: z.string(),
-  title: z.string(),
-  deal: z.string(),
-  intro: z.string(),
-  tried: z.string(),
-  note: z.string(),
-  noteSubject: z.string(),
-  ack: z.string(),
-  ackDone: z.string(),
   cardTitle: z.string(),
   cardBody: z.string(),
   cardOpen: z.string(),
@@ -562,16 +559,13 @@ export const zBetaCopy = z.object({
 });
 export const zBetaMember = z.object({
   member: z.literal(true),
-  joinedAt: z.number().nullable().optional(),
-  copy: zBetaCopy,
-  items: z.array(z.object({ id: z.string(), title: z.string(), try: z.string() })),
-  tried: z.record(z.string(), z.number()),
-  ackAt: z.number().nullable(),
+  /** The seeded checklist project, or null when the server has none. */
+  projectId: z.string().nullable(),
   cardDismissedAt: z.number().nullable(),
-  feedbackURL: z.string().optional(),
+  copy: zBetaCopy,
 });
 export const zBetaState = z.discriminatedUnion("member", [z.object({ member: z.literal(false) }), zBetaMember]);
 export type BetaMember = z.infer<typeof zBetaMember>;
 export type BetaState = z.infer<typeof zBetaState>;
-/** POST /v1/beta/progress: exactly one of these. */
-export type BetaProgress = { item: string; tried: boolean } | { ack: true } | { dismissCard: true };
+/** POST /v1/beta/progress: the only write is closing the Today card. */
+export type BetaProgress = { dismissCard: true };

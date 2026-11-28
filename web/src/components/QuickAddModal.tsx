@@ -2,10 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Folder, Link2, Star, Sun, X } from "lucide-react";
-import type { AreaRow, ProjectRow } from "@/lib/types";
+import type { AreaRow, ProjectRow, TaskAddedVia } from "@/lib/types";
 import { DateBoardButton } from "./DateBoard";
 
 export interface QuickAddInitial {
+  /** How the sheet was reached, recorded on the new task (ADR 0064). Default "quick-add". */
+  addedVia?: Extract<TaskAddedVia, "quick-add" | "share">;
   title?: string;
   notes?: string;
   referenceUrl?: string;

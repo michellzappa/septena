@@ -49,6 +49,7 @@ import type {
   SyncedEntity,
   TagRow,
   TaskRefRow,
+  TaskAddedVia,
   TaskRow,
   TurnRow,
   WireTurn,
@@ -328,6 +329,8 @@ export class WebSyncEngine {
     project?: string | null;
     tags?: string[] | null;
     position?: number | null;
+    /** How the task was added (ADR 0064). Default "typed". Written once here, never on edits. */
+    addedVia?: TaskAddedVia | null;
   }): Promise<TaskRow> {
     await ensureCoreReady();
     const title = input.title.trim();
@@ -346,6 +349,7 @@ export class WebSyncEngine {
       touchedAt: now,
       source: "app",
       sourceClient: "web",
+      addedVia: input.addedVia === undefined ? "typed" : input.addedVia,
       today: Boolean(input.today),
       todaySetOn: input.today ? todayYMD : null,
       starred: Boolean(input.starred),
@@ -431,6 +435,8 @@ export class WebSyncEngine {
       touchedAt: now,
       source: "app",
       sourceClient: "web",
+      // The next occurrence keeps how its series was added: it is the same task, not a new add.
+      addedVia: task.addedVia ?? null,
       ...dateFields,
     };
 
@@ -992,6 +998,8 @@ export class WebSyncEngine {
       area: task.area ?? null,
       project: task.project ?? null,
       tags: task.tags ?? null,
+      // A restored task is the same task again: it keeps how it was first added.
+      addedVia: task.addedVia ?? null,
     });
   }
 
@@ -1273,6 +1281,8 @@ export class WebSyncEngine {
       touchedAt: now,
       source: "app",
       sourceClient: "web",
+      // A duplicate is a new task the user made in the app: the normal add path.
+      addedVia: "typed",
     };
     const row: TaskRow = { id, title: task.title, status: "open", ...fields };
     const queuedAt = Date.now();
@@ -1529,6 +1539,7 @@ export class WebSyncEngine {
         touchedAt: now,
         source: "app",
         sourceClient: "web",
+        addedVia: "import",
         recurrenceUnit: task.recurrenceUnit ?? null,
         recurrenceInterval: task.recurrenceInterval ?? null,
         recurrenceAfterCompletion: Boolean(task.recurrenceAfterCompletion),
