@@ -330,6 +330,14 @@
       "availability": { "selection": "single", "platforms": ["ios", "ipados", "android"] },
       "featureId": "places.projects"
     },
+    "project.move": {
+      "title": "Move…",
+      "shortTitle": "Move",
+      "icon": "action.move",
+      "role": "default",
+      "availability": { "selection": "single" },
+      "featureId": "places.projects"
+    },
     "project.useAsChecklist": {
       "title": "Use as Checklist",
       "icon": "action.checklist",
@@ -678,13 +686,7 @@
       { "kind": "action", "id": "project.moveUp" },
       { "kind": "action", "id": "project.moveDown" },
       { "kind": "divider" },
-      {
-        "kind": "submenu",
-        "id": "moveToArea",
-        "title": "Move to Area",
-        "icon": "action.move",
-        "items": [{ "kind": "slot", "slot": "moveToAreaDestinations" }]
-      },
+      { "kind": "action", "id": "project.move" },
       { "kind": "action", "id": "project.useAsChecklist" },
       { "kind": "action", "id": "project.share" },
       { "kind": "divider" },

@@ -333,7 +333,7 @@ fun AreasProjectsScreen(
                                 )
                                 if (destination is AreasProjectsDestination.Project) {
                                     PlaceMenuItem(
-                                        title = RegistryCatalog.submenuTitle("sidebar.project", "moveToArea", languageTag).orEmpty(),
+                                        title = actionTitle(RegistryActionIds.PROJECT_MOVE, languageTag),
                                         onClick = {
                                             menuOpen = false
                                             dialog = PlacesDialog.MoveToArea

@@ -141,12 +141,6 @@
     },
     {
       "file": "Septena/Shell/Sidebar/AreasProjectsView.swift",
-      "literal": "Move to Area",
-      "reason": "Placeholder, section title or label with no registry field yet.",
-      "issue": "#260"
-    },
-    {
-      "file": "Septena/Shell/Sidebar/AreasProjectsView.swift",
       "literal": "Project",
       "reason": "Placeholder, section title or label with no registry field yet.",
       "issue": "#260"

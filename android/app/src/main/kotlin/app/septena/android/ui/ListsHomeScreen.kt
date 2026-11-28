@@ -1559,7 +1559,7 @@ private fun CompactSidebarProjectRow(
                 )
                 DropdownMenuItem(
                     text = {
-                        Text(RegistryCatalog.submenuTitle("sidebar.project", "moveToArea", languageTag).orEmpty())
+                        Text(RegistryCatalog.actionTitle(RegistryActionIds.PROJECT_MOVE, languageTag = languageTag).orEmpty())
                     },
                     onClick = {
                         menuExpanded = false
@@ -1818,7 +1818,7 @@ internal fun MoveProjectToAreaDialog(
             .orEmpty()
     }
     val title = remember(languageTag) {
-        RegistryCatalog.submenuTitle("sidebar.project", "moveToArea", languageTag).orEmpty()
+        RegistryCatalog.actionTitle(RegistryActionIds.PROJECT_MOVE, "shortTitle", languageTag).orEmpty()
     }
 
     AlertDialog(

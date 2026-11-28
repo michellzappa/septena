@@ -141,6 +141,7 @@ import { BootSplash } from "./BootSplash";
 import { SignInScreen } from "./SignInScreen";
 import { TaskPageDrawer } from "./TaskPageDrawer";
 import { WaitingOnDialog } from "./WaitingOnDialog";
+import { MovePickerDialog } from "./MovePickerDialog";
 import {
   TaskRowItem,
   openRepeatSelect,
@@ -327,6 +328,8 @@ export function SeptenaApp() {
   /** The tasks of the open keep-or-let-go sheet, fixed when it opens. Null: closed. */
   const [sweepTasks, setSweepTasks] = useState<TaskRow[] | null>(null);
   const [waitingTaskId, setWaitingTaskId] = useState<string | null>(null);
+  /** Project ▸ Move… (`project.move`): the project whose area picker is open. */
+  const [movingProjectId, setMovingProjectId] = useState<string | null>(null);
   const [firstRunOpen, setFirstRunOpen] = useState(false);
   const [infoToast, setInfoToast] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
@@ -2292,6 +2295,7 @@ export function SeptenaApp() {
   ]);
 
   const lang = prefs.language;
+  const movingProject = movingProjectId ? (projectById.get(movingProjectId) ?? null) : null;
   const waitingTask = waitingTaskId
     ? (syncState.snapshot.tasks.find((t) => t.id === waitingTaskId && t.status === "open" && !t.deletedAt) ?? null)
     : null;
@@ -2502,105 +2506,19 @@ export function SeptenaApp() {
     }
   };
 
-  const openAreaContextMenu = (e: React.MouseEvent, area: AreaRow) => {
-    e.preventDefault();
-    setContextMenu({
-      x: e.clientX,
-      y: e.clientY,
-      items: [
-        {
-          kind: "item",
-          label: "New Project in Area",
-          onSelect: () => {
-            setDestination({ kind: "area", id: area.id });
-            setCreatingAreaId(area.id);
-            setCreatingInsertIndex(0);
-            setCreatingKind("project");
-            setNewContainerTitle("");
-          },
-        },
-        { kind: "divider" },
-        {
-          kind: "item",
-          label: "Rename",
-          onSelect: () => {
-            const next = window.prompt("Rename Area", area.title)?.trim();
-            if (next && next !== area.title) void engine.updateArea(area, { title: next });
-          },
-        },
-        {
-          kind: "item",
-          label: "Change Emoji…",
-          onSelect: () => {
-            const next = window.prompt("Area emoji (leave blank to clear)", area.emoji ?? "");
-            if (next !== null) void engine.updateArea(area, { emoji: next.trim() || null });
-          },
-        },
-        { kind: "divider" },
-        {
-          kind: "item",
-          label: "Delete Area",
-          destructive: true,
-          onSelect: () => {
-            if (window.confirm(`Delete “${area.title}”?`)) {
-              void engine.deleteArea(area);
-              if (destination.kind === "area" && destination.id === area.id) {
-                setDestination({ kind: "smart", id: "today" });
-              }
-            }
-          },
-        },
-      ],
-    });
-  };
-
-  const openProjectContextMenu = (e: React.MouseEvent, proj: ProjectRow) => {
-    e.preventDefault();
-    const currentAreaId = proj.area ?? null;
-    const moveAreaItems: ContextMenuState["items"] = [
-      {
-        kind: "item",
-        label: `${currentAreaId === null ? "✓ " : ""}Move to No Area`,
-        onSelect: () => {
-          if (currentAreaId !== null) void handleMoveProjectToArea(proj, null);
-        },
-      },
-      ...activeAreas.map((area) => ({
-        kind: "item" as const,
-        label: `${currentAreaId === area.id ? "✓ " : ""}Move to ${area.emoji ? `${area.emoji} ` : ""}${area.title}`,
-        onSelect: () => {
-          if (currentAreaId !== area.id) void handleMoveProjectToArea(proj, area.id);
-        },
-      })),
-    ];
-    const finishProject = (status: "done" | "cancelled") => {
-      void engine.updateProject(proj, { status, completedAt: new Date().toISOString() });
-      if (destination.kind === "project" && destination.id === proj.id) {
-        setDestination({ kind: "smart", id: "today" });
-      }
-    };
-    const handlers: Partial<Record<keyof typeof ACTIONS_CATALOG.actions, () => void>> = {
-      "project.rename": () => {
-        const next = window.prompt("Rename Project", proj.title)?.trim();
-        if (next && next !== proj.title) void engine.updateProject(proj, { title: next });
-      },
-      "project.markDone": () => finishProject("done"),
-      "project.cancel": () => finishProject("cancelled"),
-      "project.delete": () => {
-        if (window.confirm(`Delete “${proj.title}”?`)) {
-          void engine.deleteProject(proj);
-          if (destination.kind === "project" && destination.id === proj.id) {
-            setDestination({ kind: "smart", id: "today" });
-          }
-        }
-      },
-    };
+  /**
+   * Builds a sidebar context menu from the registry tree (`sidebar.area`,
+   * `sidebar.project`). An action renders only when it has a handler here, so
+   * actions the registry keeps for other platforms (Move Up / Move Down) drop out.
+   */
+  const registryMenuItems = (
+    menuId: "sidebar.area" | "sidebar.project",
+    handlers: Partial<Record<keyof typeof ACTIONS_CATALOG.actions, () => void>>,
+  ): ContextMenuEntry[] => {
     const items: ContextMenuEntry[] = [];
-    for (const entry of ACTIONS_CATALOG.contextMenus["sidebar.project"]) {
+    for (const entry of ACTIONS_CATALOG.contextMenus[menuId]) {
       if (entry.kind === "divider") {
         if (items.length && items.at(-1)?.kind !== "divider") items.push({ kind: "divider" });
-      } else if (entry.kind === "submenu" && entry.id === "moveToArea") {
-        items.push({ kind: "submenu", label: registryText(entry.title, lang), items: moveAreaItems });
       } else if (entry.kind === "action") {
         const onSelect = handlers[entry.id];
         if (!onSelect) continue;
@@ -2614,7 +2532,65 @@ export function SeptenaApp() {
       }
     }
     if (items.at(-1)?.kind === "divider") items.pop();
-    setContextMenu({ x: e.clientX, y: e.clientY, items });
+    return items;
+  };
+
+  const openAreaContextMenu = (e: React.MouseEvent, area: AreaRow) => {
+    e.preventDefault();
+    const handlers: Partial<Record<keyof typeof ACTIONS_CATALOG.actions, () => void>> = {
+      "area.newProject": () => {
+        setDestination({ kind: "area", id: area.id });
+        setCreatingAreaId(area.id);
+        setCreatingInsertIndex(0);
+        setCreatingKind("project");
+        setNewContainerTitle("");
+      },
+      "area.rename": () => {
+        const next = window.prompt("Rename Area", area.title)?.trim();
+        if (next && next !== area.title) void engine.updateArea(area, { title: next });
+      },
+      "area.changeEmoji": () => {
+        const next = window.prompt("Area emoji (leave blank to clear)", area.emoji ?? "");
+        if (next !== null) void engine.updateArea(area, { emoji: next.trim() || null });
+      },
+      "area.delete": () => {
+        if (window.confirm(`Delete “${area.title}”?`)) {
+          void engine.deleteArea(area);
+          if (destination.kind === "area" && destination.id === area.id) {
+            setDestination({ kind: "smart", id: "today" });
+          }
+        }
+      },
+    };
+    setContextMenu({ x: e.clientX, y: e.clientY, items: registryMenuItems("sidebar.area", handlers) });
+  };
+
+  const openProjectContextMenu = (e: React.MouseEvent, proj: ProjectRow) => {
+    e.preventDefault();
+    const finishProject = (status: "done" | "cancelled") => {
+      void engine.updateProject(proj, { status, completedAt: new Date().toISOString() });
+      if (destination.kind === "project" && destination.id === proj.id) {
+        setDestination({ kind: "smart", id: "today" });
+      }
+    };
+    const handlers: Partial<Record<keyof typeof ACTIONS_CATALOG.actions, () => void>> = {
+      "project.rename": () => {
+        const next = window.prompt("Rename Project", proj.title)?.trim();
+        if (next && next !== proj.title) void engine.updateProject(proj, { title: next });
+      },
+      "project.move": () => setMovingProjectId(proj.id),
+      "project.markDone": () => finishProject("done"),
+      "project.cancel": () => finishProject("cancelled"),
+      "project.delete": () => {
+        if (window.confirm(`Delete “${proj.title}”?`)) {
+          void engine.deleteProject(proj);
+          if (destination.kind === "project" && destination.id === proj.id) {
+            setDestination({ kind: "smart", id: "today" });
+          }
+        }
+      },
+    };
+    setContextMenu({ x: e.clientX, y: e.clientY, items: registryMenuItems("sidebar.project", handlers) });
   };
 
   const buildTaskRowProps = (item: EvaluatedTask, hideContainerLabel = false): TaskRowItemProps => {
@@ -5335,6 +5311,22 @@ export function SeptenaApp() {
           setTagFilterId(tid);
         }}
       />
+
+      {movingProject && (
+        <MovePickerDialog
+          key={movingProject.id}
+          title={registryText(ACTIONS_CATALOG.actions["project.move"].shortTitle, lang)}
+          subtitle={movingProject.title}
+          targets={[
+            { id: null, title: registryText("No Area", lang) },
+            ...activeAreas.map((a) => ({ id: a.id, title: a.title, emoji: a.emoji })),
+          ]}
+          currentId={movingProject.area ?? null}
+          searchPlaceholder={registryText("Search", lang)}
+          onPick={(areaId) => void handleMoveProjectToArea(movingProject, areaId)}
+          onClose={() => setMovingProjectId(null)}
+        />
+      )}
 
       {waitingTask && (
         <WaitingOnDialog
