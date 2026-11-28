@@ -444,16 +444,6 @@ internal fun JoinSharedProjectDialog(
     )
 }
 
-/** What an avatar shows: typed-in initials as they are, else the first letters (Swift `ProfileAvatar`). */
-private fun initials(name: String): String {
-    val words = name.trim().split(' ').filter(String::isNotEmpty)
-    if (words.size <= 1) {
-        val token = words.firstOrNull().orEmpty()
-        return (if (token.length <= 3) token else token.take(1)).uppercase()
-    }
-    return words.take(2).joinToString("") { it.take(1) }.uppercase()
-}
-
 /** The mark of a shared project in a list. TalkBack reads the members. */
 @Composable
 internal fun SharedProjectMark(share: ProjectShare, languageTag: String, tint: Color) {
@@ -485,7 +475,8 @@ internal fun ShareMembersRow(
                 onClick { onClick(); true }
             },
     ) {
-        shown.forEach { MemberCircle(initials(it.name)) }
+        // Each member's avatar (#857): initials, emoji or photo on their color; no avatar draws the neutral fill.
+        shown.forEach { MemberAvatar(share, it, MEMBER_AVATAR_SIZE) }
         if (more > 0) MemberCircle("+$more")
     }
 }
@@ -495,7 +486,7 @@ private fun MemberCircle(text: String) {
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
-            .size(28.dp)
+            .size(MEMBER_AVATAR_SIZE)
             .background(MaterialTheme.colorScheme.surfaceContainerHighest, CircleShape),
     ) {
         Text(
@@ -589,8 +580,10 @@ private fun NameField(value: String, label: String, enabled: Boolean, onChange: 
 private fun memberLabel(member: ShareMember, notes: List<String>): String =
     if (notes.isEmpty()) member.name else "${member.name} (${notes.joinToString(", ")})"
 
-/** How many initials a project's title shows before "+n". */
+/** How many avatars a project's title shows before "+n". */
 private const val MAX_AVATARS = 3
+
+private val MEMBER_AVATAR_SIZE = 28.dp
 
 /** The server's limit on a member's name. */
 private const val MAX_MEMBER_NAME = 80
