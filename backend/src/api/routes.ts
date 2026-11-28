@@ -100,7 +100,7 @@ import { notesHistoryRest } from "./notesHistoryRest.js";
 import { shares } from "./shares.js";
 import { projectStoreFor } from "../store/ProjectStore.js";
 import { tasksRest } from "./tasksRest.js";
-import { betaJoin, betaJoinPreflight } from "./beta.js";
+import { betaJoin, betaJoinPreflight, betaProgress, betaState, zBetaProgressBody, zBetaQuery } from "./beta.js";
 import { ERROR_FORMAT_HEADER, envelopeResponse } from "../errors.js";
 
 // Task backend API, mounted at /v1 (docs/SEPTASK_BACKEND.md in the app repo).
@@ -572,6 +572,8 @@ api.use("/notes/*", requireUser);
 api.use("/pair/*", requireUser);
 api.use("/auth/device", requireUser);
 api.use("/auth/identities", requireUser);
+api.use("/beta", requireUser);
+api.use("/beta/progress", requireUser);
 api.use("/auth/identities/*", requireUser);
 api.use("/auth/link/email/*", requireUser);
 api.use("/auth/link/apple", requireUser);
@@ -768,6 +770,21 @@ api.post("/auth/device", async (c) => {
 // ---- Sign-in methods management (ADR 0047 decision 6, #171, #643) ----
 // Only app sessions reach these routes; agents cannot list, add, or remove
 // sign-in methods.
+
+// The beta checklist (ADR 0064, registry/beta.json): only a tester's account
+// gets anything to draw.
+api.get("/beta", async (c) => {
+  const q = zBetaQuery.safeParse(c.req.query());
+  if (!q.success) return c.json({ error: "invalid_request", issues: q.error.issues.slice(0, 5) }, 400);
+  return c.json(await betaState(c.env, c.get("userId"), q.data.platform), 200, { "Cache-Control": "no-store" });
+});
+
+api.post("/beta/progress", async (c) => {
+  const body = await parse(c, zBetaProgressBody);
+  if (body instanceof Response) return body;
+  if (!(await betaProgress(c.env, c.get("userId"), body))) return c.json({ error: "not_a_tester" }, 404);
+  return c.body(null, 204);
+});
 
 api.get("/auth/identities", async (c) => {
   return c.json(await listUserIdentities(c.env, c.get("userId")), 200, { "Cache-Control": "no-store" });

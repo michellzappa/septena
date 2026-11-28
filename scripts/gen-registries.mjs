@@ -808,6 +808,23 @@ function validateImportSources(file, caps) {
   for (const id of Object.keys(caps.capabilities)) assert(!id.startsWith("import.") || listed.has(id), `import-sources.json: capability "${id}" has no source`);
 }
 
+// ---- beta.json (ADR 0064) ----
+function validateBeta(beta, caps) {
+  assert(beta.version === 1, "beta.json: version must be 1");
+  for (const [k, v] of Object.entries(beta.copy)) assert(typeof v === "string" && v.length > 0, `beta.json: copy.${k} missing`);
+  for (const k of ["settingsRow", "settingsSummary", "title", "deal", "intro", "tried", "note", "noteSubject", "ack", "ackDone", "cardTitle", "cardBody", "cardOpen", "cardDismiss"]) assert(beta.copy[k], `beta.json: copy.${k} missing`);
+  const ids = new Set();
+  for (const item of beta.items) {
+    assert(/^[a-z][a-z-]*$/.test(item.id) && !ids.has(item.id), `beta.json: bad or duplicate id "${item.id}"`);
+    ids.add(item.id);
+    assert(item.title && item.try, `beta.json: ${item.id} needs title and try`);
+    assert(Array.isArray(item.features) && item.features.length > 0, `beta.json: ${item.id} needs features`);
+    for (const f of item.features) assert(f in caps.capabilities, `beta.json: ${item.id} unknown feature "${f}"`);
+    assert(item.features.some((f) => caps.platforms.some((p) => caps.capabilities[f][p] === "ships")), `beta.json: ${item.id} ships on no platform`);
+  }
+  for (const [p, v] of stringsOf(beta, "beta")) assert(!/[–—]/.test(v), `beta.json: ${p} contains an em or en dash`);
+}
+
 function validatePlans(plans, icons, caps, importSources) {
   assert(plans.version === 1, "plans.json: version must be 1");
   assert(plans.featureId in caps.capabilities, `plans.json: unknown featureId "${plans.featureId}"`);
@@ -2526,7 +2543,7 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
 function generateTS({ entities, rules, icons, tokens, caps, settings, dests, actions, surfaces, plans }) {
   const lines = [];
   lines.push("// GENERATED FILE — DO NOT EDIT BY HAND.");
-  lines.push("// Sources: registry/{entities,rules,icons,tokens,capabilities,settings,destinations,actions,surfaces,plans}.json");
+  lines.push("// Sources: registry/{entities,rules,icons,tokens,capabilities,settings,destinations,actions,surfaces,plans,beta}.json");
   lines.push("// Regenerate: node scripts/gen-registries.mjs");
   lines.push("");
   lines.push("export const ENTITY_PATTERNS = {");
@@ -2586,6 +2603,8 @@ function generateTS({ entities, rules, icons, tokens, caps, settings, dests, act
   lines.push(`export const PLAN_UPSELLS = ${JSON.stringify(Object.fromEntries(plans.upsells.map((u) => [u.id, { title: u.title, detail: u.detail }])))} as const;`);
   lines.push("/** Sign-in methods, order per platform and screen copy (registry/sign-in.json, ADR 0047). Copy is English; localize with registryText(). GET /v1/auth/methods says which methods are on. */");
   lines.push(`export const SIGN_IN = ${JSON.stringify({ platforms: bundle.signIn.platforms, methods: bundle.signIn.methods.map(({ notes, ...m }) => m), order: bundle.signIn.order, copy: bundle.signIn.copy, email: bundle.signIn.email, errors: bundle.signIn.errors, existingAccount: bundle.signIn.existingAccount, manage: bundle.signIn.manage, legal: plans.legal })} as const;`);
+  lines.push("/** The beta checklist (registry/beta.json, ADR 0064). English. The backend serves it to testers; apps render what GET /v1/beta answers. */");
+  lines.push(`export const BETA_CHECKLIST = ${JSON.stringify({ copy: bundle.beta.copy, items: bundle.beta.items })} as const;`);
   lines.push("");
   lines.push("// Localized registry copy (ADR 0020). Keys are the English text.");
   lines.push(L10N.tsTables(BY_KEY, TRANSLATIONS));
@@ -3016,6 +3035,7 @@ const surfaces = readJSON("registry/surfaces.json");
 const plans = readJSON("registry/plans.json");
 const importSources = readJSON("registry/import-sources.json");
 const signIn = readJSON("registry/sign-in.json");
+const beta = readJSON("registry/beta.json");
 
 validateEntities(entities);
 validateRules(rules);
@@ -3036,6 +3056,7 @@ validateFirstRun(surfaces, icons, caps, settings);
 validateImportSources(importSources, caps);
 validatePlans(plans, icons, caps, importSources);
 validateSignIn(signIn, icons, caps, plans);
+validateBeta(beta, caps);
 validateConformance();
 validateCodeMap(readJSON("registry/code-map.json"), caps);
 validateSkills();
@@ -3070,7 +3091,7 @@ const conformance = Object.fromEntries(
     .map((name) => [name.replace(/\.json$/, ""), readJSON(`registry/conformance/${name}`)]),
 );
 const bundle = {
-  entities, rules, icons, tokens, caps, settings, dests, actions, surfaces, plans, importSources, signIn, conformance,
+  entities, rules, icons, tokens, caps, settings, dests, actions, surfaces, plans, importSources, signIn, conformance, beta,
   translations: { en: JSON.parse(L10N.englishFile(BY_KEY)), ...TRANSLATIONS },
 };
 /**

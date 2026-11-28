@@ -2,7 +2,7 @@ import type { Context } from "hono";
 import { z } from "zod";
 import type { Env } from "../env.js";
 import { escapeHtml, logEvent, sha256Base64Url } from "../util.js";
-import { DESIGN_TOKENS } from "../generated/registries.js";
+import { BETA_CHECKLIST, CAPABILITIES, DESIGN_TOKENS } from "../generated/registries.js";
 import { accountStoreFor } from "../store/AccountStore.js";
 import type { BetaTester } from "../store/betaInvites.js";
 import { grantRow } from "../entitlement/entitlement.js";
@@ -280,7 +280,7 @@ export function welcomeMail(email: string, linkUrl: string): Mail {
   return render("You’re in the Septena beta", [
     { p: "Thanks for testing Septena." },
     { p: `Apple sends its own mail from TestFlight. Open it on your phone or tablet to install. On a Mac, [download the app here](${MAC}).` },
-    { p: "What I’d like you to try this week:" },
+    { p: "Once you sign in with this address, the app shows your beta checklist in Settings, under Beta. Start with these three:" },
     { ol: [
       "Move a real piece of your list in. Give some tasks a day, and finish a few.",
       `[Connect Claude or another agent](${AGENTS}). Give it one task you can check, answer its question in the app, then Accept or Send back its work in Review.`,
@@ -308,4 +308,55 @@ export function launchMail(expiresAt: number, unclaimed: boolean): Mail {
     ...(unclaimed ? [{ p: "It isn’t on an account yet. Sign in to Septena, then open the claim link in my first mail, “You’re in the Septena beta”." }] : []),
     { p: "Michell" },
   ]);
+}
+
+// ---- the checklist in the app (registry/beta.json) ----
+
+export const BETA_PLATFORMS = ["ios", "ipados", "macos", "web", "android", "windows", "linux"] as const;
+type BetaPlatform = (typeof BETA_PLATFORMS)[number];
+const ITEM_IDS = BETA_CHECKLIST.items.map((i) => i.id) as [string, ...string[]];
+
+export const zBetaQuery = z.object({ platform: z.enum(BETA_PLATFORMS) }).strict();
+
+/// One change from the checklist screen: an item ticked or unticked, the
+/// weekly "I used it for real", or the welcome card closed for good.
+export const zBetaProgressBody = z.union([
+  z.object({ item: z.enum(ITEM_IDS), tried: z.boolean() }).strict(),
+  z.object({ ack: z.literal(true) }).strict(),
+  z.object({ dismissCard: z.literal(true) }).strict(),
+]);
+
+/// The items whose features ship on this platform.
+export function betaItemsFor(platform: BetaPlatform) {
+  return BETA_CHECKLIST.items.filter((i) =>
+    i.features.some((f) => (CAPABILITIES as Record<string, Record<string, unknown>>)[f]?.[platform] === "ships"));
+}
+
+/// GET /v1/beta?platform=…: `{ member: false }` for every account that is not
+/// a tester's, so the app shows nothing. A tester gets the copy, the items
+/// for this platform and what they ticked.
+export async function betaState(env: Env, userId: string, platform: BetaPlatform) {
+  const state = await accountStoreFor(env)?.betaForUser(userId);
+  if (!state) return { member: false as const };
+  const items = betaItemsFor(platform);
+  const tried = Object.fromEntries(items.filter((i) => state.progress[i.id]).map((i) => [i.id, state.progress[i.id]]));
+  return {
+    member: true as const,
+    joinedAt: state.joinedAt,
+    copy: BETA_CHECKLIST.copy,
+    items: items.map(({ id, title, try: tryText }) => ({ id, title, try: tryText })),
+    tried,
+    ackAt: state.progress._ack ?? null,
+    cardDismissedAt: state.progress._card ?? null,
+    feedbackURL: FEEDBACK,
+  };
+}
+
+/// POST /v1/beta/progress. False when the account is not a tester's.
+export async function betaProgress(env: Env, userId: string, body: z.infer<typeof zBetaProgressBody>): Promise<boolean> {
+  const accounts = accountStoreFor(env);
+  if (!accounts) return false;
+  if ("item" in body) return accounts.betaSetProgress(userId, body.item, body.tried);
+  if ("ack" in body) return accounts.betaSetProgress(userId, "_ack", true);
+  return accounts.betaSetProgress(userId, "_card", true);
 }

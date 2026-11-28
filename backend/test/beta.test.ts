@@ -6,7 +6,7 @@ installWorkerTestHooks();
 
 // The beta by invite code (ADR 0064, docs/BETA_ONBOARDING_SPEC.md).
 
-const { betaJoin, grantBetaAtSignIn, setBetaLaunch, sweepBeta, afterJoin } = await import("../src/api/beta.ts");
+const { betaJoin, grantBetaAtSignIn, setBetaLaunch, sweepBeta, afterJoin, betaState, betaProgress, betaItemsFor } = await import("../src/api/beta.ts");
 const { claimPlusLink, betaGrantEnd } = await import("../src/api/plusLinks.ts");
 const { normalizeBetaCode } = await import("../src/store/betaInvites.ts");
 const { Hono } = await import("hono");
@@ -224,6 +224,42 @@ describe("The Pro year follows the email", () => {
     await sweepBeta(h.env, Date.now() + 5 * DAY);
     await sweepBeta(h.env, Date.now() + 6 * DAY);
     assert.equal(h.mails.filter((m) => m.subject === "How is Septena so far?").length, 1);
+  });
+});
+
+describe("The checklist in the app", () => {
+  it("shows nothing to an account that is not a tester's, and the items to one that is", async () => {
+    const h = await harness();
+    h.accounts.createBetaCode({ code: "FIRSTWAVE", label: "Friends", maxUses: 5, endsAt: null });
+    fakeApple();
+    await h.join({ email: "ana@example.com", code: "FIRSTWAVE" });
+    assert.deepEqual(await betaState(h.env, userId(1), "ios"), { member: false });
+    assert.equal(await betaProgress(h.env, userId(1), { item: "do", tried: true }), false, "a non-tester cannot write");
+    await grantBetaAtSignIn(h.env, userId(1), "ana@example.com", true);
+    const s = await betaState(h.env, userId(1), "ios");
+    assert.ok(s.member);
+    assert.equal(s.items.length, 10);
+    assert.equal(s.copy.title, "Beta");
+    assert.deepEqual(s.tried, {});
+    assert.equal(s.cardDismissedAt, null);
+
+    assert.equal(await betaProgress(h.env, userId(1), { item: "do", tried: true }), true);
+    await betaProgress(h.env, userId(1), { ack: true });
+    await betaProgress(h.env, userId(1), { dismissCard: true });
+    const after = await betaState(h.env, userId(1), "ios");
+    assert.ok(after.member && after.tried.do && after.ackAt && after.cardDismissedAt);
+    await betaProgress(h.env, userId(1), { item: "do", tried: false });
+    const untick = await betaState(h.env, userId(1), "ios");
+    assert.ok(untick.member && !untick.tried.do);
+    assert.equal(h.accounts.listBetaCodes().progress._ack, 1);
+  });
+
+  it("lists only what ships on the platform", () => {
+    const web = betaItemsFor("web").map((i) => i.id);
+    assert.ok(!web.includes("do"), "Do is not built on the web");
+    assert.ok(!web.includes("siri"));
+    assert.ok(web.includes("connect-agent"));
+    assert.ok(betaItemsFor("macos").map((i) => i.id).includes("siri"));
   });
 });
 

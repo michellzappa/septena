@@ -74,6 +74,11 @@ export class BetaInvites {
       );
       CREATE INDEX IF NOT EXISTS beta_testers_link ON beta_testers(planLinkId);
       CREATE TABLE IF NOT EXISTS beta_settings (key TEXT PRIMARY KEY, value INTEGER);
+      CREATE TABLE IF NOT EXISTS beta_progress (
+        userId TEXT NOT NULL, key TEXT NOT NULL, at INTEGER NOT NULL,
+        PRIMARY KEY (userId, key)
+      );
+      CREATE INDEX IF NOT EXISTS beta_testers_user ON beta_testers(grantedUserId);
     `);
   }
 
@@ -202,8 +207,33 @@ export class BetaInvites {
     this.sql.exec("INSERT INTO beta_settings (key, value) VALUES ('launchAt', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value", at);
   }
 
-  /// Account deletion: the grant goes with the account, the tester stays.
+  /// The tester whose Pro is on this account: what makes an account a beta
+  /// account in the app.
+  testerForUser(userId: string): BetaTester | null {
+    const r = this.sql.exec(`SELECT ${TESTER_COLS} FROM beta_testers WHERE grantedUserId = ?`, userId).toArray()[0];
+    return r ? { ...r } as unknown as BetaTester : null;
+  }
+
+  /// The checklist state of one account: item ids, `_ack` (the weekly "I used
+  /// it for real") and `_card` (the welcome card was closed), each with when.
+  progress(userId: string): Record<string, number> {
+    return Object.fromEntries(this.sql.exec<{ key: string; at: number }>("SELECT key, at FROM beta_progress WHERE userId = ?", userId).toArray().map((r) => [r.key, r.at]));
+  }
+
+  setProgress(userId: string, key: string, on: boolean, now: number): void {
+    if (on) this.sql.exec("INSERT INTO beta_progress (userId, key, at) VALUES (?, ?, ?) ON CONFLICT(userId, key) DO UPDATE SET at = excluded.at", userId, key, now);
+    else this.sql.exec("DELETE FROM beta_progress WHERE userId = ? AND key = ?", userId, key);
+  }
+
+  /// Per key: how many accounts set it (the admin page).
+  progressCounts(): Record<string, number> {
+    return Object.fromEntries(this.sql.exec<{ key: string; n: number }>("SELECT key, COUNT(*) AS n FROM beta_progress GROUP BY key").toArray().map((r) => [r.key, r.n]));
+  }
+
+  /// Account deletion: the grant and the checklist go with the account, the
+  /// tester stays.
   forgetUser(userId: string): void {
     this.sql.exec("UPDATE beta_testers SET grantedUserId = NULL, grantedAt = NULL WHERE grantedUserId = ?", userId);
+    this.sql.exec("DELETE FROM beta_progress WHERE userId = ?", userId);
   }
 }

@@ -537,8 +537,8 @@ export class AccountStore extends DurableObject<Env> {
     return this.beta.createCode(input, now);
   }
 
-  listBetaCodes(): { codes: BetaCode[]; counts: Record<string, { joined: number; granted: number }>; launchAt: number | null } {
-    return { codes: this.beta.listCodes(), counts: Object.fromEntries(this.beta.codeCounts()), launchAt: this.beta.launchAt() };
+  listBetaCodes(): { codes: BetaCode[]; counts: Record<string, { joined: number; granted: number }>; launchAt: number | null; progress: Record<string, number> } {
+    return { codes: this.beta.listCodes(), counts: Object.fromEntries(this.beta.codeCounts()), launchAt: this.beta.launchAt(), progress: this.beta.progressCounts() };
   }
 
   closeBetaCode(id: string, now = Date.now()): boolean {
@@ -577,6 +577,23 @@ export class AccountStore extends DurableObject<Env> {
 
   betaTakeCheckinsDue(joinedBefore: number, now = Date.now()): BetaTester[] {
     return this.ctx.storage.transactionSync(() => this.beta.takeCheckinsDue(joinedBefore, now));
+  }
+
+  /// The beta state of one account, or null when it is not a tester's.
+  betaForUser(userId: string): { joinedAt: number; progress: Record<string, number> } | null {
+    const t = this.beta.testerForUser(userId);
+    return t ? { joinedAt: t.joinedAt, progress: this.beta.progress(userId) } : null;
+  }
+
+  /// False when the account is not a tester's.
+  betaSetProgress(userId: string, key: string, on: boolean, now = Date.now()): boolean {
+    if (!this.beta.testerForUser(userId)) return false;
+    this.beta.setProgress(userId, key, on, now);
+    return true;
+  }
+
+  betaProgressCounts(): Record<string, number> {
+    return this.beta.progressCounts();
   }
 
   betaInvited(): BetaTester[] {
