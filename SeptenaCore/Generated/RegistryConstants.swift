@@ -1071,7 +1071,6 @@ enum RegistryActionID: String, CaseIterable, Hashable, Sendable {
   case projectRename = "project.rename"
   case projectMoveUp = "project.moveUp"
   case projectMoveDown = "project.moveDown"
-  case projectUseAsChecklist = "project.useAsChecklist"
   case projectMarkDone = "project.markDone"
   case projectCancel = "project.cancel"
   case projectDelete = "project.delete"
@@ -1248,7 +1247,6 @@ enum RegistryActions {
     .projectRename: RegistryL10n.t("Rename"),
     .projectMoveUp: RegistryL10n.t("Move Up"),
     .projectMoveDown: RegistryL10n.t("Move Down"),
-    .projectUseAsChecklist: RegistryL10n.t("Use as Checklist"),
     .projectMarkDone: RegistryL10n.t("Mark Done"),
     .projectCancel: RegistryL10n.t("Cancel Project"),
     .projectDelete: RegistryL10n.t("Delete Project"),
@@ -1349,7 +1347,6 @@ enum RegistryActions {
     .projectRename: "pencil",
     .projectMoveUp: "chevron.up",
     .projectMoveDown: "chevron.down",
-    .projectUseAsChecklist: "checklist",
     .projectMarkDone: "checkmark.circle",
     .projectCancel: "xmark.circle",
     .projectDelete: "trash",
@@ -1541,7 +1538,6 @@ enum RegistryActions {
     .projectRename: RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "places.projects"),
     .projectMoveUp: RegistryActionAvailability(selection: "single", platforms: ["ios", "ipados", "android"], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "places.projects"),
     .projectMoveDown: RegistryActionAvailability(selection: "single", platforms: ["ios", "ipados", "android"], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "places.projects"),
-    .projectUseAsChecklist: RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "places.projects"),
     .projectMarkDone: RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "places.projects"),
     .projectCancel: RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "places.projects"),
     .projectDelete: RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "places.projects"),
@@ -1642,12 +1638,11 @@ enum RegistryActions {
       RegistryMenuItem(kind: "action", id: "project.moveDown", actionId: .projectMoveDown, title: RegistryL10n.t("Move Down"), sfSymbol: "chevron.down", items: []),
       RegistryMenuItem(kind: "divider", id: "divider.3", actionId: nil, title: nil, sfSymbol: nil, items: []),
       RegistryMenuItem(kind: "submenu", id: "moveToArea", actionId: nil, title: RegistryL10n.t("Move to Area"), sfSymbol: "folder", items: [RegistryMenuItem(kind: "slot", id: "moveToAreaDestinations", actionId: nil, title: nil, sfSymbol: nil, items: [])]),
-      RegistryMenuItem(kind: "action", id: "project.useAsChecklist", actionId: .projectUseAsChecklist, title: RegistryL10n.t("Use as Checklist"), sfSymbol: "checklist", items: []),
       RegistryMenuItem(kind: "action", id: "project.share", actionId: .projectShare, title: RegistryL10n.t("Share Project…"), sfSymbol: "person.crop.circle.badge.plus", items: []),
-      RegistryMenuItem(kind: "divider", id: "divider.7", actionId: nil, title: nil, sfSymbol: nil, items: []),
+      RegistryMenuItem(kind: "divider", id: "divider.6", actionId: nil, title: nil, sfSymbol: nil, items: []),
       RegistryMenuItem(kind: "action", id: "project.markDone", actionId: .projectMarkDone, title: RegistryL10n.t("Mark Done"), sfSymbol: "checkmark.circle", items: []),
       RegistryMenuItem(kind: "action", id: "project.cancel", actionId: .projectCancel, title: RegistryL10n.t("Cancel Project"), sfSymbol: "xmark.circle", items: []),
-      RegistryMenuItem(kind: "divider", id: "divider.10", actionId: nil, title: nil, sfSymbol: nil, items: []),
+      RegistryMenuItem(kind: "divider", id: "divider.9", actionId: nil, title: nil, sfSymbol: nil, items: []),
       RegistryMenuItem(kind: "action", id: "project.delete", actionId: .projectDelete, title: RegistryL10n.t("Delete Project"), sfSymbol: "trash", items: []),
     ],
     .sidebarEmpty: [
@@ -2090,12 +2085,9 @@ enum RegistrySurfaces {
   static let checklistAddItem: String = RegistryL10n.t("Add item")
   static let checklistOnList: String = RegistryL10n.t("On list")
   static let checklistChecked: String = RegistryL10n.t("Checked")
-  static let checklistProjectType: String = RegistryL10n.t("Project type")
   static let checklistMoveToGroup: String = RegistryL10n.t("Move to group")
   static let checklistUngrouped: String = RegistryL10n.t("Ungrouped")
   static func checklistAddItemToGroup(group: String) -> String { RegistryL10n.format("Add item to %@", english: "Add item to %@", args: [group]) }
-  static let standardProjectTitle: String = RegistryL10n.t("Project")
-  static let checklistProjectTitle: String = RegistryL10n.t("Checklist")
   /// Sort By copy (`surfaces.json` `listSort`, docs/LIST_SORT_SPEC.md).
   static let listSortMenuTitle: String = RegistryL10n.t("Sort By")
   static let listSortSymbol: String = "arrow.up.arrow.down"

@@ -770,8 +770,7 @@
   "Checklist": {
     "text": "Checklist",
     "paths": [
-      "surfaces.taskAttributes.checklist.label",
-      "surfaces.checklistProjects.checklist"
+      "surfaces.taskAttributes.checklist.label"
     ]
   },
   "Choose a plan": {
@@ -3318,8 +3317,7 @@
   "Project": {
     "text": "Project",
     "paths": [
-      "surfaces.prompts.items.deleteProject.untitledName",
-      "surfaces.checklistProjects.project"
+      "surfaces.prompts.items.deleteProject.untitledName"
     ]
   },
   "Project name": {
@@ -3327,12 +3325,6 @@
     "paths": [
       "surfaces.prompts.text.newProject.placeholder",
       "surfaces.prompts.text.renameProject.placeholder"
-    ]
-  },
-  "Project type": {
-    "text": "Project type",
-    "paths": [
-      "surfaces.checklistProjects.projectType"
     ]
   },
   "Projects": {
@@ -5000,12 +4992,6 @@
     "text": "Use a different email",
     "paths": [
       "signIn.email.differentEmail"
-    ]
-  },
-  "Use as Checklist": {
-    "text": "Use as Checklist",
-    "paths": [
-      "actions.actions.project.useAsChecklist.title"
     ]
   },
   "Use default": {

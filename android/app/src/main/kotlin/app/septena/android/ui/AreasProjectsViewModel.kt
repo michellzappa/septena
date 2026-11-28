@@ -281,17 +281,6 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         }
     }
 
-    fun useAsChecklist() {
-        val project = destination.value as? AreasProjectsDestination.Project ?: return
-        mutate {
-            graph.registryEntityMutator.update(
-                RegistryEntityNames.PROJECT,
-                project.id,
-                mapOf(RegistryEntityFields.Project.CHECKLIST_MODE to JsonValue.StringValue(RegistryEntityEnums.ChecklistMode.PLAIN)),
-            ) != null
-        }
-    }
-
     fun addChecklistItem(title: String, heading: String?) {
         val project = destination.value as? AreasProjectsDestination.Project ?: return
         val name = title.trim()

@@ -350,8 +350,8 @@ struct AreaDetailView: View {
     }
     #endif
     .sheet(isPresented: $showingNewProject) {
-      NewProjectSheet(areas: areas, initialAreaId: area.id) { title, areaId, mode in
-        createProjectInArea(title: title, areaId: areaId, mode: mode)
+      NewProjectSheet(areas: areas, initialAreaId: area.id) { title, areaId in
+        createProjectInArea(title: title, areaId: areaId)
       }
       .presentationDetents([.medium])
       .septenaSheetChrome()
@@ -405,13 +405,13 @@ struct AreaDetailView: View {
     }
   }
 
-  private func createProjectInArea(title: String, areaId: String?, mode: ProjectChecklistMode?) {
+  private func createProjectInArea(title: String, areaId: String?) {
     let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty else { return }
     Haptics.commit()
     Task {
       do {
-        let project = try await projectsMutator.create(title: trimmed, area: areaId, checklistMode: mode)
+        let project = try await projectsMutator.create(title: trimmed, area: areaId)
         // Recorded at the gesture, after the create lands: undo removes it.
         TaskUndo.recordProjectCreate(project, projects: projectsMutator)
         await load()
@@ -898,11 +898,6 @@ struct ProjectDetailView: View {
         nav.shouldCreateHeading = true
       } label: {
         Label(RegistryActions.title(.sectionNew), systemImage: "rectangle.split.1x2")
-      }
-      if project.checklistMode == nil {
-        Button(RegistryActions.title(.projectUseAsChecklist)) {
-          Task { try await projectsMutator.useAsChecklist(id: project.id) }
-        }
       }
       // Sort By for this project's tasks (docs/LIST_SORT_SPEC.md §6).
       ListSortMenu(filter: .project(project.id))

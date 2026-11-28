@@ -332,12 +332,6 @@ fun AreasProjectsScreen(
                                     },
                                 )
                                 if (destination is AreasProjectsDestination.Project) {
-                                    if (!state.isChecklist) {
-                                        PlaceMenuItem(title = actionTitle(RegistryActionIds.PROJECT_USE_AS_CHECKLIST, languageTag), onClick = {
-                                            menuOpen = false
-                                            viewModel.useAsChecklist()
-                                        })
-                                    }
                                     PlaceMenuItem(
                                         title = RegistryCatalog.submenuTitle("sidebar.project", "moveToArea", languageTag).orEmpty(),
                                         onClick = {

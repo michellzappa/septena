@@ -675,8 +675,8 @@ fun TaskHomeScreen(
                                     selectHomeLocation(created)
                                 }
                             },
-                            onCreateProject = { title, areaId, insertIndex, checklistMode ->
-                                homeViewModel.createProject(title, areaId = areaId, insertIndex = insertIndex, checklistMode = checklistMode) { created ->
+                            onCreateProject = { title, areaId, insertIndex ->
+                                homeViewModel.createProject(title, areaId = areaId, insertIndex = insertIndex) { created ->
                                     selectHomeLocation(created)
                                 }
                             },
@@ -794,8 +794,8 @@ fun TaskHomeScreen(
                             selectHomeLocation(created)
                         }
                     },
-                    onCreateProject = { title, areaId, insertIndex, checklistMode ->
-                        homeViewModel.createProject(title, areaId = areaId, insertIndex = insertIndex, checklistMode = checklistMode) { created ->
+                    onCreateProject = { title, areaId, insertIndex ->
+                        homeViewModel.createProject(title, areaId = areaId, insertIndex = insertIndex) { created ->
                             selectHomeLocation(created)
                         }
                     },

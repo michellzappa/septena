@@ -1682,10 +1682,7 @@
     "checked": "Checked",
     "chooseGroup": "Choose group",
     "moveToGroup": "Move to group",
-    "ungrouped": "Ungrouped",
-    "projectType": "Project type",
-    "project": "Project",
-    "checklist": "Checklist"
+    "ungrouped": "Ungrouped"
   },
   "listSort": {
     "id": "listSort",

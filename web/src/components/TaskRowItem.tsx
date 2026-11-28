@@ -334,7 +334,7 @@ export function TaskDetailEditor({
     }
   }, [historyRows, isPageMode, props, showHistory]);
 
-  const isDone = task.status === "done";
+  const isDone = task.status === "done" || task.status === "checklistChecked";
   const isCancelled = task.status === "cancelled";
   const isToday = membership.isOnToday;
   const taskTagIds = Array.isArray(task.tags) ? task.tags : [];
@@ -1201,7 +1201,7 @@ export function TaskRowItem(props: TaskRowItemProps) {
     convoState,
   } = props;
 
-  const isDone = task.status === "done";
+  const isDone = task.status === "done" || task.status === "checklistChecked";
   const [justChecked, setJustChecked] = useState(false);
   const prevIsDoneRef = useRef(isDone);
 
