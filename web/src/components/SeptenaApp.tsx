@@ -45,6 +45,12 @@ import {
 } from "@/lib/core";
 import { evaluateConversation, groupTurnsByTask } from "@/lib/conversation";
 import { historyStepForKey, isMacPlatform } from "@/lib/historyKeys";
+import {
+  CHECKLIST_CHECKED,
+  checklistLayout,
+  isChecklistProject,
+  suggestedChecklistHeading,
+} from "@/lib/projectChecklist";
 import { addDays, attributeLabel, todayLabel, tomorrowLabel, type DateBoardAttribute } from "@/lib/dateBoard";
 import {
   SIDEBAR_DESTINATIONS,
@@ -283,6 +289,9 @@ export function SeptenaApp() {
   const [tagFilterId, setTagFilterId] = useState<string | null>(null);
   const [assigneeFilter, setAssigneeFilter] = useState<string | null>(null);
   const [composerTitle, setComposerTitle] = useState("");
+  // The Checked group of a Checklist project is expanded by default (#860).
+  const [checkedCollapsedIds, setCheckedCollapsedIds] = useState<Set<string>>(() => new Set());
+  const [creatingChecklistMode, setCreatingChecklistMode] = useState<"plain" | null>(null);
   // New Task in Section (registry section.newTask): an inline composer under one heading.
   // A task is created only on submit with a title, so there is no empty draft row to purge.
   const [sectionComposer, setSectionComposer] = useState<{ headingId: string; title: string } | null>(null);
@@ -1249,10 +1258,29 @@ export function SeptenaApp() {
 
   // Existing checklists keep their saved checked rows in the normal project view.
   const savedCheckedItems = useMemo(() => {
-    if (destination.kind !== "project" || !projectById.get(destination.id)?.checklistMode) return [];
+    if (destination.kind !== "project" || !isChecklistProject(projectById.get(destination.id))) return [];
     return evaluatedTasks.filter(({ task }) =>
-      task.project === destination.id && !task.deletedAt && task.status === "checklistChecked");
+      task.project === destination.id && !task.deletedAt && task.status === CHECKLIST_CHECKED);
   }, [destination, evaluatedTasks, projectById]);
+
+  // A Checklist is the standard project list plus the core layout: which
+  // headings have active rows, and the add-field matches for the typed text.
+  const checklistProjectId =
+    destination.kind === "project" && isChecklistProject(projectById.get(destination.id)) ? destination.id : null;
+  const checklistView = useMemo(() => {
+    if (!checklistProjectId) return null;
+    const rows = syncState.snapshot.tasks
+      .filter((t) => t.project === checklistProjectId && !t.deletedAt)
+      .sort((a, b) => (a.position ?? Number.MAX_SAFE_INTEGER) - (b.position ?? Number.MAX_SAFE_INTEGER));
+    const layout = checklistLayout(rows, composerTitle);
+    if (!layout) return null;
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    return {
+      layout,
+      byId,
+      activeHeadingIds: new Set(layout.groups.map((group) => group.id)),
+    };
+  }, [checklistProjectId, composerTitle, syncState.snapshot.tasks]);
   const selectableTasks = useMemo(() => visibleTasks.concat(savedCheckedItems), [visibleTasks, savedCheckedItems]);
 
   // Today's logged block: tasks completed or cancelled TODAY (local calendar
@@ -1419,7 +1447,7 @@ export function SeptenaApp() {
     async (task: TaskRow) => {
       const wasChecked = task.status === "checklistChecked";
       const wasDone = task.status === "done" || wasChecked;
-      const isChecklist = Boolean(task.project && projectById.get(task.project)?.checklistMode);
+      const isChecklist = isChecklistProject(task.project ? projectById.get(task.project) : null);
       const inLogbook = destination.kind === "smart" && destination.id === "logbook";
       if (!isChecklist) {
         if (wasDone) {
@@ -1453,13 +1481,16 @@ export function SeptenaApp() {
       const inLogbook = destination.kind === "smart" && destination.id === "logbook";
       if (!inLogbook) {
         for (const t of tasks) {
-          if (t.status === "open") settle.start(t.id, { reviewGroup: reviewGroupForSettle(t) });
+          // A Checklist row moves to Checked at once, as in toggleDone.
+          if (t.status === "open" && !isChecklistProject(t.project ? projectById.get(t.project) : null)) {
+            settle.start(t.id, { reviewGroup: reviewGroupForSettle(t) });
+          }
         }
       }
       const receipt = await engine.completeTasks(tasks);
       recordCompletion(`Completed ${receipt.before.length} tasks`, receipt, () => engine.completeTasks(tasks), true);
     },
-    [destination, engine, recordCompletion, reviewGroupForSettle, settle],
+    [destination, engine, projectById, recordCompletion, reviewGroupForSettle, settle],
   );
 
   const sendBackReview = useCallback(
@@ -2433,8 +2464,24 @@ export function SeptenaApp() {
       opts.project = destination.id;
       const proj = projectById.get(destination.id);
       if (proj?.area) opts.area = proj.area;
+      if (isChecklistProject(proj)) {
+        // No heading is open here, so a known grocery joins its group's one
+        // stable heading (core checklistHeading). Unknown items stay ungrouped.
+        const projectRows = syncState.snapshot.tasks.filter((t) => t.project === destination.id);
+        const placement = suggestedChecklistHeading(destination.id, title, projectRows, lang);
+        if (placement.create) {
+          await engine.createTask({ id: placement.create.id, title: placement.create.title, kind: "heading", project: destination.id });
+        }
+        opts.heading = placement.heading;
+      }
     }
     await createTaskWithUndo(opts);
+  };
+
+  // An add-field suggestion for a checked row: reopen the same row in its saved group.
+  const reopenChecklistMatch = async (task: TaskRow) => {
+    setComposerTitle("");
+    await toggleDone(task);
   };
 
   const activeAreaId = useMemo(() => {
@@ -2480,9 +2527,11 @@ export function SeptenaApp() {
     const kind = creatingKind;
     const targetAreaId = creatingAreaId;
     const insertIndex = creatingInsertIndex;
+    const checklistMode = creatingChecklistMode;
     setCreatingKind(null);
     setCreatingAreaId(null);
     setCreatingInsertIndex(null);
+    setCreatingChecklistMode(null);
     if (kind === "area") {
       const area = await engine.createArea(title);
       if (insertIndex !== null) {
@@ -2492,7 +2541,7 @@ export function SeptenaApp() {
       }
       setDestination({ kind: "area", id: area.id });
     } else if (kind === "project") {
-      const proj = await engine.createProject(title, targetAreaId);
+      const proj = await engine.createProject(title, targetAreaId, checklistMode);
       if (insertIndex !== null) {
         const siblings = activeProjects.filter(
           (p) => (p.area ?? null) === (targetAreaId ?? null) && p.id !== proj.id,
@@ -2579,6 +2628,10 @@ export function SeptenaApp() {
         if (next && next !== proj.title) void engine.updateProject(proj, { title: next });
       },
       "project.move": () => setMovingProjectId(proj.id),
+      // Conversion sets checklistMode only: id, name, area, position, headings and rows stay.
+      "project.useAsChecklist": isChecklistProject(proj)
+        ? undefined
+        : () => void engine.updateProject(proj, { checklistMode: "plain" }),
       "project.markDone": () => finishProject("done"),
       "project.cancel": () => finishProject("cancelled"),
       "project.delete": () => {
@@ -4045,6 +4098,7 @@ export function SeptenaApp() {
                 onKeyDown={(e) => {
                   if (e.key === "Escape") {
                     setCreatingKind(null);
+                    setCreatingChecklistMode(null);
                     setCreatingAreaId(null);
                     setCreatingInsertIndex(null);
                     setNewContainerTitle("");
@@ -4053,6 +4107,17 @@ export function SeptenaApp() {
                 placeholder={creatingKind === "area" ? "New area name…" : "New project name…"}
                 className="w-full rounded-lg border border-[var(--accent)] bg-[var(--bg-elevated)] px-2.5 py-1 text-xs text-[var(--text-primary)] outline-none"
               />
+              {creatingKind === "project" && (
+                <select
+                  aria-label={registryText(SURFACES_CATALOG.checklistProjects.projectType, lang)}
+                  value={creatingChecklistMode ?? ""}
+                  onChange={(e) => setCreatingChecklistMode(e.target.value === "plain" ? "plain" : null)}
+                  className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-elevated)] px-2 py-1 text-[11px] text-[var(--text-secondary)] outline-none"
+                >
+                  <option value="">{registryText(SURFACES_CATALOG.checklistProjects.project, lang)}</option>
+                  <option value="plain">{registryText(SURFACES_CATALOG.checklistProjects.checklist, lang)}</option>
+                </select>
+              )}
               {creatingKind === "project" && activeAreas.length > 0 && (
                 <select
                   aria-label="Area"
@@ -4766,8 +4831,9 @@ export function SeptenaApp() {
                 "tomorrow"); a "today" list sends N and New Task to Today instead. */}
             {newTaskTarget !== "today" && (
               <form
+                id="quick-add-composer"
                 onSubmit={(e) => void handleQuickAddInline(e)}
-                className={`mb-5 flex items-center gap-2.5 rounded-[14px] border border-[var(--border-subtle)]/75 px-3 py-2.5 focus-within:border-[var(--accent)] ${
+                className={`${checklistView && composerTitle.trim() ? "mb-2" : "mb-5"} flex items-center gap-2.5 rounded-[14px] border border-[var(--border-subtle)]/75 px-3 py-2.5 focus-within:border-[var(--accent)] ${
                   canvasTexture !== "none"
                     ? "bg-[var(--bg-card-glass)] backdrop-blur-md"
                     : "bg-[var(--bg-card)]"
@@ -4784,7 +4850,7 @@ export function SeptenaApp() {
                   placeholder={`New task in ${pageMeta.title}… (press N)`}
                   className="min-w-0 flex-1 bg-transparent text-[15px] text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)]"
                 />
-                {composerTitle.trim() && (
+                {composerTitle.trim() && !checklistView && (
                   <button
                     type="submit"
                     className="rounded-lg bg-[var(--accent)] px-2.5 py-1 text-xs font-medium hover:opacity-90"
@@ -4794,6 +4860,43 @@ export function SeptenaApp() {
                   </button>
                 )}
               </form>
+            )}
+
+            {/* Checklist add-field suggestions (#860): a checked match reopens that row,
+                an active match is On list, and the last choice adds the typed text. */}
+            {newTaskTarget !== "today" && checklistView && composerTitle.trim() && (
+              <div role="listbox" aria-label={registryText(SURFACES_CATALOG.checklistProjects.addItem, lang)} className={`mb-5 ${taskCardClass}`}>
+                {checklistView.layout.matches.flatMap((id) => {
+                  const row = checklistView.byId.get(id);
+                  if (!row) return [];
+                  const checked = row.status === CHECKLIST_CHECKED;
+                  const group = row.heading ? checklistView.byId.get(row.heading)?.title : undefined;
+                  const detail = checked ? group : registryText(SURFACES_CATALOG.checklistProjects.onList, lang);
+                  return [
+                    <button
+                      key={id}
+                      type="button"
+                      role="option"
+                      aria-selected={false}
+                      disabled={!checked}
+                      onClick={() => void reopenChecklistMatch(row)}
+                      className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-[15px] text-[var(--text-primary)] enabled:hover:bg-[var(--bg-selected)] disabled:text-[var(--text-secondary)]"
+                    >
+                      <span className="truncate">{row.title}</span>
+                      {detail && <span className="shrink-0 text-[13px] text-[var(--text-muted)]">· {detail}</span>}
+                    </button>,
+                  ];
+                })}
+                <button
+                  type="submit"
+                  form="quick-add-composer"
+                  role="option"
+                  aria-selected={false}
+                  className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-[15px] font-medium text-[var(--accent)] hover:bg-[var(--bg-selected)]"
+                >
+                  {registryText(SURFACES_CATALOG.checklistProjects.addTyped, lang, { title: composerTitle.trim() })}
+                </button>
+              </div>
             )}
 
             {/* Task Lists — iOS grouped rounded cards on soft gray canvas */}
@@ -4966,6 +5069,10 @@ export function SeptenaApp() {
                 )}
                 {projectHeadings.map((h) => {
                   const under = visibleTasks.filter((i) => i.task.heading === h.id);
+                  // A Checklist hides a heading with no active rows; the heading row stays.
+                  if (checklistView && !checklistView.activeHeadingIds.has(h.id) && sectionComposer?.headingId !== h.id) {
+                    return null;
+                  }
                   return (
                     <section key={h.id}>
                       {renderSectionHeader({
@@ -5075,12 +5182,30 @@ export function SeptenaApp() {
               <div className={taskCardClass}>{visibleTasks.map((i) => renderTaskRow(i))}</div>
             )}
 
-            {savedCheckedItems.length > 0 && (
-              <section className="pt-5">
-                {renderSectionHeader({ title: registryText(SURFACES_CATALOG.checklistProjects.checked, lang) })}
-                <div className={taskCardClass}>{savedCheckedItems.map((item) => renderTaskRow(item))}</div>
-              </section>
-            )}
+            {savedCheckedItems.length > 0 && destination.kind === "project" && (() => {
+              const expanded = !checkedCollapsedIds.has(destination.id);
+              return (
+                <section className="pt-5">
+                  {renderSectionHeader({
+                    title: registryText(SURFACES_CATALOG.checklistProjects.checked, lang),
+                    count: expanded ? undefined : savedCheckedItems.length,
+                    collapse: {
+                      expanded,
+                      onToggle: () =>
+                        setCheckedCollapsedIds((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(destination.id)) next.delete(destination.id);
+                          else next.add(destination.id);
+                          return next;
+                        }),
+                    },
+                  })}
+                  {expanded && (
+                    <div className={taskCardClass}>{savedCheckedItems.map((item) => renderTaskRow(item))}</div>
+                  )}
+                </section>
+              );
+            })()}
 
             {/* Project / Area collapsible logged items footer (1:1 with iOS/Mac) */}
             {(destination.kind === "area" || destination.kind === "project") &&
