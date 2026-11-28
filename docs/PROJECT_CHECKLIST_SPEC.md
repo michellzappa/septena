@@ -27,7 +27,7 @@ A project Checklist uses project rows. [Task checklist steps](CHECKLISTS_SPEC.md
 
 Clients call these functions through the core. They never re-implement them. Vectors: `registry/conformance/project-checklist.json`.
 
-- **`projectChecklist({ rows, query, groceries })`** returns `ungrouped`, `groups` (active rows per heading, empty headings left out), `checked`, `matches` (exact title first, then title prefix or word prefix, case- and accent-insensitive, deleted rows left out) and `suggestedGroup` (a group key such as `dairy`, or null).
+- **`projectChecklist({ rows, query, groceries })`** returns `ungrouped`, `groups` (active rows per heading; a heading whose rows are all checked is left out, and a heading with no rows at all stays so a new section shows at once), `checked`, `matches` (exact title first, then title prefix or word prefix, case- and accent-insensitive, deleted rows left out) and `suggestedGroup` (a group key such as `dairy`, or null).
 - **`checklistCheckPatch({ checked })`.** Checking sets `checklistChecked` and clears every date, Today and reminder field. Reopening sets `open` only, so the row stays undated. There is no completion stamp: no Logbook entry, no project progress, no repeat.
 - **`checklistHeading({ projectId, group, title, rows })`** returns `{ heading, create }` for a suggested group. The host passes the project's rows with deleted rows included, and the group's localized title from the registry. The stable heading id is `occurrenceId("checklist:<projectId>", <group>)`, so two offline devices that add bananas create one Produce heading.
   1. A live heading with the stable id, else a live heading with the same title (case- and accent-insensitive): `create: false`, reuse it.
@@ -55,7 +55,7 @@ Clients call these functions through the core. They never re-implement them. Vec
 
 - **Web, iOS, iPadOS, macOS, Android:** the full host contract above.
 - **watchOS:** the watch reads its lists from the backend REST API, which returns open rows only. It checks through `POST /v1/tasks/:id/complete`, where the backend applies `checklistCheckPatch` to a Checklist row. A checked row never shows as open, and checking uses the checklist check. The watch has no project add field.
-- **Windows:** check, reopen, the Checked group, hidden empty headings and suggested-group placement. Add-field suggestions, New Project → Checklist and Use as Checklist wait for the Windows places UI (#896).
+- **Windows:** check, reopen, the Checked group and suggested-group placement. The Windows list draws no header for any section without open rows, so a new empty section does not show there yet (#896). Add-field suggestions, New Project → Checklist and Use as Checklist wait for the Windows places UI (#896).
 
 ## Create and convert
 
