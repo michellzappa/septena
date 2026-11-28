@@ -6,6 +6,26 @@ three-scaffold drift described under "Today" below. When this conflicts with
 code, the code is wrong (fix the code) — except where a line is marked
 **(target)**, which is not built yet.
 
+## Phone top bar: the registry decides (2026-11-28)
+
+On a phone (compact width) the top bar is data: `registry/surfaces.json`
+`topBar` names the buttons of each screen, in order, as groups, and when
+each one shows. Every shell and the website's drawn screens read it, so the
+phone top bar is the same everywhere:
+
+| Screen | Leading | Trailing |
+|---|---|---|
+| Lists home (the stack root) | Settings | More · Search |
+| A list, an area or a project (pushed) | Back | More, Star · Search |
+
+More holds the page's actions (Sort By, New Project…) and hides when there
+are none. Star shows only while the list holds an open starred task. Search
+is always a capsule of its own. There is no "+" in the phone top bar: the
+Magic Plus orb creates. The three-slot model below still describes wide
+layouts; where it disagrees with the registry on a phone, the registry wins.
+Readers: `SeptenaPage.swift` (`topBarShows`, `topBarTrailing`),
+`android/core/.../TopBar.kt`, the site's `components/task-ui/task-screen.tsx`. The web app's narrow header follows in #883.
+
 ## First principles
 
 1. **One page skeleton, everywhere.** Today, Next, Tasks, Coach, and every

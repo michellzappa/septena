@@ -14,9 +14,10 @@ name: Septena iOS TestFlight
 # without it Xcode tries cloud signing, which the API key is refused
 # ("Cloud signing permission error", 2026-11-23).
 #
-# Build number = git commit count (scripts/stamp-version.sh), so every push to
-# main gets a new, higher build number. MARKETING_VERSION stays the
-# hand-chosen value in project.yml.
+# Build number = git commit count (scripts/stamp-version.sh). MARKETING_VERSION
+# stays the hand-chosen value in project.yml. CI still builds every main push;
+# external TestFlight promotion is manual on the Tuesday/Friday cadence in
+# docs/TESTFLIGHT_RELEASES.md, with a manual hotfix path.
 #
 # Watch: project.yml has the SeptaskWatch embed commented out
 # (WATCH_EMBED_DISABLED), so these builds ship WITHOUT the watch app.
@@ -30,11 +31,13 @@ name: Septena iOS TestFlight
 #   IOS_SIGNING_P12_PASSWORD
 # Until the secrets exist, the job skips with a notice instead of failing.
 #
-# Distribution: after the upload, the `distribute` job (Linux, so the wait for
-# Apple's processing does not use macOS minutes) adds the build to the
-# external group "Public beta", which owns the public link, and sends it to
-# beta review (scripts/testflight-distribute.mjs). Apple holds one build in
-# review at a time; a refused submission is a notice, not a failure.
+# Distribution: a regular TestFlight build is started manually from main after
+# its exact SHA passes CI. The preflight skips an ungreen or already-uploaded
+# build. After upload, the distribute job (Linux, so the wait for Apple's
+# processing does not use macOS minutes) adds it to the external group "Public
+# beta" and sends it to beta review (scripts/testflight-distribute.mjs). Apple
+# holds one build in review at a time; a refused submission is a notice, not a
+# failure.
 #
 # Device builds (docs/DEVICE_BUILDS.md): a push to device/<name>, or a manual
 # run with `branch`, builds that branch for the internal group "Device builds"
@@ -45,14 +48,6 @@ name: Septena iOS TestFlight
 # branch's own build scripts.
 
 on:
-  push:
-    branches: [main]
-    paths-ignore:
-      - "docs/**"
-      - "backend/**"
-      - "tools/**"
-      - "appstore/**"
-      - "**/*.md"
   workflow_dispatch:
     inputs:
       branch:
@@ -64,15 +59,14 @@ on:
     branches: ["device/**"]
     types: [completed]
 
-# Several sessions push to main within minutes of each other. Cancelling the
-# running upload on each push meant no run ever finished. A running upload now
-# finishes; GitHub keeps only the newest pending run behind it.
-# A device build gives way to the next push of the same branch.
+# Manual main promotions do not cancel one another. Device builds give way to
+# the next push of the same branch.
 concurrency:
   group: ${{ (github.event_name == 'workflow_run' && format('testflight-device-{0}', github.event.workflow_run.head_branch)) || (inputs.branch && format('testflight-device-{0}', inputs.branch)) || 'testflight-ios' }}
   cancel-in-progress: ${{ github.event_name == 'workflow_run' || (inputs.branch || '') != '' }}
 
 permissions:
+  actions: read
   contents: read
 
 env:
@@ -93,8 +87,9 @@ jobs:
     environment: ${{ (github.event_name == 'workflow_run' || (inputs.branch || '') != '') && 'apple-device' || 'apple-release' }}
     outputs:
       marketing_version: ${{ steps.stamp.outputs.marketing_version }}
-      ready: ${{ steps.gate.outputs.ready }}
+      ready: ${{ steps.preflight.outputs.ready || 'false' }}
       build_number: ${{ steps.stamp.outputs.build_number }}
+      source_sha: ${{ steps.stamp.outputs.source_sha }}
     steps:
       - name: Check signing secrets
         id: gate
@@ -109,10 +104,20 @@ jobs:
             echo "ready=false" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Require main for a regular beta promotion
+        if: github.event_name == 'workflow_dispatch' && (inputs.branch || '') == ''
+        env:
+          DISPATCH_REF: ${{ github.ref }}
+        run: |
+          if [[ "$DISPATCH_REF" != "refs/heads/main" ]]; then
+            echo "::error::Regular TestFlight promotions must be dispatched from main. Use the branch input only for an internal device build."
+            exit 1
+          fi
+
       - uses: actions/checkout@v4
         if: steps.gate.outputs.ready == 'true'
         with:
-          ref: ${{ (github.event_name == 'workflow_run' && github.event.workflow_run.head_sha) || inputs.branch || github.sha }}
+          ref: ${{ (github.event_name == 'workflow_run' && github.event.workflow_run.head_sha) || inputs.branch || 'refs/heads/main' }}
           fetch-depth: 0  # stamp-version.sh needs the full commit count
           persist-credentials: false
 
@@ -138,10 +143,28 @@ jobs:
             VERSION="${VERSION%%.*}.999.$(( GITHUB_RUN_NUMBER * 10 + GITHUB_RUN_ATTEMPT ))"
           fi
           echo "marketing_version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "source_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           xcodegen generate
 
-      - name: Import signing identities and API key
+      - name: Check CI and duplicate upload
+        id: preflight
         if: steps.gate.outputs.ready == 'true'
+        env:
+          DEVICE_BUILD: ${{ env.DEVICE_BUILD }}
+          SOURCE_SHA: ${{ steps.stamp.outputs.source_sha }}
+          BUILD_NUMBER: ${{ steps.stamp.outputs.build_number }}
+          MARKETING_VERSION: ${{ steps.stamp.outputs.marketing_version }}
+          TESTFLIGHT_GROUP: ${{ env.DEVICE_BUILD == 'true' && 'Device builds' || 'Public beta' }}
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+          ASC_APP_ID: "6836809027"
+        run: node scripts/testflight-preflight.mjs
+
+      - name: Import signing identities and API key
+        if: steps.preflight.outputs.ready == 'true'
         env:
           IOS_SIGNING_P12: ${{ secrets.IOS_SIGNING_P12 }}
           IOS_SIGNING_P12_PASSWORD: ${{ secrets.IOS_SIGNING_P12_PASSWORD }}
@@ -169,7 +192,7 @@ jobs:
           echo "ASC_KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
 
       - name: Archive
-        if: steps.gate.outputs.ready == 'true'
+        if: steps.preflight.outputs.ready == 'true'
         env:
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
@@ -188,7 +211,7 @@ jobs:
             MARKETING_VERSION="$MARKETING"
 
       - name: Export and upload to App Store Connect
-        if: steps.gate.outputs.ready == 'true'
+        if: steps.preflight.outputs.ready == 'true'
         env:
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
@@ -219,7 +242,7 @@ jobs:
             -authenticationKeyIssuerID "$APPLE_API_ISSUER_ID"
 
       - name: Clean up keychain and key
-        if: always() && steps.gate.outputs.ready == 'true'
+        if: always() && steps.preflight.outputs.ready == 'true'
         run: |
           security delete-keychain "$RUNNER_TEMP/septena-ios.keychain-db" || true
           rm -f "$ASC_KEY_PATH"
@@ -244,6 +267,7 @@ jobs:
           node-version: 22
 
       - name: Distribute build ${{ needs.upload.outputs.build_number }}
+        id: distribute_build
         env:
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
@@ -254,3 +278,20 @@ jobs:
           TESTFLIGHT_GROUP: ${{ env.DEVICE_BUILD == 'true' && 'Device builds' || 'Public beta' }}
           DEVICE_NOTE: ${{ env.DEVICE_BUILD == 'true' && (github.event.workflow_run.head_branch || inputs.branch) || '' }}
         run: node scripts/testflight-distribute.mjs
+
+      - name: Record promotion
+        if: always()
+        env:
+          SOURCE_SHA: ${{ needs.upload.outputs.source_sha }}
+          MARKETING_VERSION: ${{ needs.upload.outputs.marketing_version }}
+          BUILD_NUMBER: ${{ needs.upload.outputs.build_number }}
+          TESTFLIGHT_GROUP: ${{ env.DEVICE_BUILD == 'true' && 'Device builds' || 'Public beta' }}
+          DISTRIBUTE_OUTCOME: ${{ steps.distribute_build.outcome }}
+        run: |
+          {
+            echo "## TestFlight promotion"
+            echo "- Source: \`$SOURCE_SHA\`"
+            echo "- Version/build: $MARKETING_VERSION ($BUILD_NUMBER)"
+            echo "- Group: $TESTFLIGHT_GROUP"
+            echo "- Distribution step: $DISTRIBUTE_OUTCOME"
+          } >> "$GITHUB_STEP_SUMMARY"

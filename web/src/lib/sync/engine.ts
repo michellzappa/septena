@@ -555,13 +555,14 @@ export class WebSyncEngine {
     const ops: OutboxOp[] = [];
     tasks.forEach((row, idx) => {
       const task = this.liveTask(row.id) ?? row;
+      if (task.status === "checklistChecked") return;
       const writes = this.completionWrites(task, now, queuedAt + idx * 10);
       mutations.push(...writes.mutations);
       ops.push(...writes.ops);
       receipt.before.push({ task, convo: writes.reviewed, checklistPatch: writes.checklistPatch });
       if (writes.spawnedTaskId) receipt.spawnedTaskIds.push(writes.spawnedTaskId);
     });
-    await this.commit(mutations, ops);
+    if (mutations.length) await this.commit(mutations, ops);
     return receipt;
   }
 

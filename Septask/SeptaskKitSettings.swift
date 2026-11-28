@@ -7,7 +7,7 @@ import SwiftUI
 // surfaces — so porting them to AppKit would be pure drift; hosting keeps the
 // single implementation. The environment chain mirrors the SwiftUI Settings
 // scene in SeptaskApp exactly (same injector), because a hosted shared view
-// reading a missing @Environment crashes at launch — the documented Septask
+// reading a missing @Environment crashes at launch — the documented Septena
 // P1 trap.
 @MainActor
 enum SeptaskKitSettingsWindow {

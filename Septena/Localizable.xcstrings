@@ -4086,6 +4086,10 @@
         }
       }
     },
+    "A change couldn’t be saved" : {
+      "comment" : "Generated from registry surfaces.prompts.items.changeNotSaved.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "A free account connects one agent. Plus connects three. Pro has no limit." : {
       "comment" : "Generated from registry plans.upsells.agents_full.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
@@ -4709,6 +4713,10 @@
           }
         }
       }
+    },
+    "Add “%@”" : {
+      "comment" : "Generated from registry surfaces.checklistProjects.addTyped. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Add %@" : {
       "comment" : "Generated from registry signIn.manage.addProvider. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -7959,6 +7967,10 @@
           }
         }
       }
+    },
+    "Bakery" : {
+      "comment" : "Generated from registry surfaces.checklistProjects.groups.bakery. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Balanced" : {
       "comment" : "Generated from registry settings.keys.pccReasoning.options.1.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -12360,6 +12372,10 @@
     },
     "Daily digest" : {
       "comment" : "Generated from registry settings.keys.agentCommentNotifications.options.2.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Dairy" : {
+      "comment" : "Generated from registry surfaces.checklistProjects.groups.dairy. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
     "Dark" : {
@@ -17209,6 +17225,48 @@
         }
       }
     },
+    "Forward" : {
+      "comment" : "Generated from registry actions.actions.app.goForward.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vorwärts"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adelante"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avancer"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avanti"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vooruit"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avançar"
+          }
+        }
+      }
+    },
     "Found %@ areas, %@ projects, and %@ tasks." : {
       "comment" : "Generated from registry settings.copy.import_export.importSummary.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -17456,6 +17514,10 @@
           }
         }
       }
+    },
+    "Frozen" : {
+      "comment" : "Generated from registry surfaces.checklistProjects.groups.frozen. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Full Septena tasks, areas, projects, and checklists (importable)" : {
       "comment" : "Generated from registry settings.copy.import_export.exportJsonDetail.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -20581,6 +20643,48 @@
         }
       }
     },
+    "It can wait. The rest is in your Logbook." : {
+      "comment" : "Generated from registry surfaces.fadeSweep.letGoTitle. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das kann warten. Der Rest ist in deinem Protokoll."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Puede esperar. El resto está en tu Registro."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ça peut attendre. Le reste est dans votre Journal."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Può aspettare. Il resto è nel tuo Registro."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Het kan wachten. De rest staat in je Logboek."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Isso pode esperar. O resto está no seu Registro."
+          }
+        }
+      }
+    },
     "It lands in your Inbox until you schedule or file it" : {
       "comment" : "Generated from registry surfaces.notices.items.getStarted.steps.addTask.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -21745,6 +21849,48 @@
         }
       }
     },
+    "Loading Septena" : {
+      "comment" : "Generated from registry signIn.copy.loading. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Septena wird geladen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cargando Septena"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chargement de Septena"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Caricamento di Septena"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Septena wordt geladen"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Carregando o Septena"
+          }
+        }
+      }
+    },
     "Loading…" : {
       "localizations" : {
         "pt-BR" : {
@@ -22387,6 +22533,10 @@
           }
         }
       }
+    },
+    "Meat & Seafood" : {
+      "comment" : "Generated from registry surfaces.checklistProjects.groups.meatSeafood. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Medium" : {
       "extractionState" : "manual",
@@ -27459,6 +27609,10 @@
         }
       }
     },
+    "One edit was rolled back and is not stored. Anything you typed just now may need retyping. Later changes still save normally." : {
+      "comment" : "Generated from registry surfaces.prompts.items.changeNotSaved.message. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Only approve a code you started yourself. Septena never asks for a code by email, text or phone call." : {
       "comment" : "Generated from registry settings.copy.sign_in_approval.safetyFooter.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -28242,6 +28396,10 @@
           }
         }
       }
+    },
+    "Pantry" : {
+      "comment" : "Generated from registry surfaces.checklistProjects.groups.pantry. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Parameters" : {
       "localizations" : {
@@ -29800,6 +29958,10 @@
           }
         }
       }
+    },
+    "Produce" : {
+      "comment" : "Generated from registry surfaces.checklistProjects.groups.produce. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Project" : {
       "localizations" : {
@@ -41014,6 +41176,48 @@
         }
       }
     },
+    "Today can stay empty. Add a task when you want one." : {
+      "comment" : "Generated from registry destinations.destinations.today.emptyState.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Heute darf leer bleiben. Füge eine Aufgabe hinzu, wenn du eine möchtest."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hoy puede quedarse vacío. Añade una tarea cuando quieras."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aujourd’hui peut rester vide. Ajoutez une tâche quand vous le souhaitez."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Oggi può restare vuoto. Aggiungi un’attività quando vuoi."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vandaag mag leeg blijven. Voeg een taak toe wanneer je wilt."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hoje pode ficar vazio. Adicione uma tarefa quando quiser."
+          }
+        }
+      }
+    },
     "Today shows what to do now. Anything you skipped stays on the Get started list." : {
       "comment" : "Generated from registry surfaces.firstRun.steps.done.body. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -42227,7 +42431,7 @@
       "extractionState" : "manual"
     },
     "Use as Checklist" : {
-      "comment" : "Generated from registry surfaces.checklistProjects.useAsChecklist. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry actions.actions.project.useAsChecklist.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
     "Use default" : {

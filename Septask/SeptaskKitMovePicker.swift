@@ -31,6 +31,9 @@ final class SeptaskKitMovePicker {
   /// Marks the checkmark row — nil for a bulk move (no single "current" to
   /// mark, matching `MovePickerSheet.showCurrentSelection`).
   private var currentDestination: KitMoveMenu.Destination?
+  /// Project ▸ Move… (`project.move`): only No Area and the areas, because a
+  /// project files under an area, never under another project.
+  private var areasOnly = false
 
   private lazy var surface: KitFilterSurface = {
     let surface = KitFilterSurface(
@@ -56,9 +59,12 @@ final class SeptaskKitMovePicker {
   /// `current` marks the checkmark row; `title` becomes the field's
   /// placeholder ("Move" vs "Move N Tasks", matching `MovePickerSheet`'s
   /// navigation title exactly). `anchor` decides the tier: pass the row's rect
-  /// when exactly one row is moving, `.window` otherwise.
-  func show(current: KitMoveMenu.Destination?, title: String, anchor: KitSurfaceAnchor) {
+  /// when exactly one row is moving, `.window` otherwise. `areasOnly` limits
+  /// the list to No Area and the areas (Project ▸ Move…).
+  func show(current: KitMoveMenu.Destination?, title: String, anchor: KitSurfaceAnchor,
+            areasOnly: Bool = false) {
     currentDestination = current
+    self.areasOnly = areasOnly
     reloadProgress()
     // `show` clears the query, which reloads the rows through `onQueryChanged`.
     surface.show(anchor: anchor, placeholder: title)
@@ -73,7 +79,10 @@ final class SeptaskKitMovePicker {
   private func reloadRows() {
     let query = surface.query.lowercased()
     let snapshot = StructureCache.snapshot(in: context)
-    allRows = KitMoveMenu.pickerDestinations(areas: snapshot.areas, projects: snapshot.projects)
+    let entries = areasOnly
+      ? KitMoveMenu.areaDestinations(areas: snapshot.areas)
+      : KitMoveMenu.pickerDestinations(areas: snapshot.areas, projects: snapshot.projects)
+    allRows = entries
       .map { entry in
         Row(title: entry.title, destination: entry.target, emoji: entry.emoji,
             indent: entry.indent, projectId: entry.projectId)

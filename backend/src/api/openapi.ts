@@ -58,6 +58,7 @@ import {
 import { zShareCreateBody, zShareId, zShareJoinBody, zSharePreviewBody } from "./shares.js";
 import { zHistoryQuery } from "./notesHistoryRest.js";
 import { isOptional, zodToJsonSchema, type JsonSchema } from "./zodJsonSchema.js";
+import { zBetaProgressBody, zBetaQuery } from "./beta.js";
 
 type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
@@ -139,6 +140,8 @@ export const ROUTES: RouteDoc[] = [
   { method: "POST", path: "/auth/google/native", tag: "auth", auth: "none", summary: "Sign in with a Google identity token from the device's own account picker.", body: zGoogleNativeBody, ok: { 200: "A session." } },
   { method: "POST", path: "/auth/oidc/redeem", tag: "auth", auth: "none", summary: "Swap the one-use code from a web sign-in redirect for a session.", body: zOidcRedeemBody, ok: { 200: "A session." } },
   { method: "POST", path: "/auth/link/complete", tag: "auth", auth: "none", summary: "Finish adding a sign-in method to an existing account with the emailed code.", body: zLinkCompleteBody, ok: { 200: "A session." } },
+  { method: "GET", path: "/beta", tag: "account", auth: "app", summary: "The beta checklist for this platform. `member: false` for an account that is not a beta tester's.", query: zBetaQuery, ok: { 200: "The checklist, or member false." } },
+  { method: "POST", path: "/beta/progress", tag: "account", auth: "app", summary: "Tick or untick a checklist item, say you used Septena this week, or close the welcome card.", body: zBetaProgressBody, ok: { 204: "Saved.", 404: "The account is not a beta tester's." } },
   { method: "GET", path: "/auth/identities", tag: "auth", auth: "app", summary: "The sign-in methods on the account.", ok: { 200: "The methods." } },
   { method: "DELETE", path: "/auth/identities/:id", tag: "auth", auth: "app", summary: "Remove a sign-in method.", params: { id: z.string() }, ok: { 204: "Removed." } },
   { method: "POST", path: "/auth/link/email/start", tag: "auth", auth: "app", summary: "Send a code to add an email sign-in.", body: zEmailStartBody, ok: { 202: "The code is sent." } },
@@ -199,8 +202,10 @@ export const ROUTES: RouteDoc[] = [
 ];
 
 /// /v1 routes that are not part of the contract, and why.
-export const INTERNAL_ROUTES: Array<{ method: Method; path: string; why: string }> = [
+export const INTERNAL_ROUTES: Array<{ method: Method | "OPTIONS"; path: string; why: string }> = [
   { method: "POST", path: "/webhooks/apple", why: "Called by the App Store only." },
+  { method: "POST", path: "/beta/join", why: "Called by septena.app/beta only (ADR 0064)." },
+  { method: "OPTIONS", path: "/beta/join", why: "The CORS preflight for septena.app/beta." },
   { method: "POST", path: "/support/replies", why: "Called by the support workspace only (signed)." },
   { method: "GET", path: "/auth/oidc/:provider/start", why: "A browser redirect in the web sign-in flow, not an API call." },
   { method: "GET", path: "/auth/oidc/:provider/callback", why: "The provider's redirect back, not an API call." },

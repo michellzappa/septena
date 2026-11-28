@@ -56,8 +56,12 @@ translated one.
 - One source feeds the site, the App Store panels, the 3D device render and
   the native demo seed. The last two still hold their own copies until they
   read the cast.
-- `studio.json` is the first sample world as a `legacy` person, exempt from the
-  content rules. It leaves when the site is cast.
+- `studio.json` was the first sample world as a `legacy` person, exempt from
+  the content rules. It left when the site was cast (2026-11-28, septena/site#21).
+- Each person wears an accent and texture pair of their own (mz, 2026-11-28):
+  their screens look like their own app. Ten people share nine accents, so one
+  accent repeats, with another texture and appearance. The registry gate
+  refuses a repeated pair.
 - A still is captured only for the person cast in it. Every other combination
   renders live.
 - `/house/language` (Starlings) owns who the examples show; it follows this ADR.

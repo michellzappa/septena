@@ -58,6 +58,11 @@ ACCESS_AUD = "5154cf50dab7e60f4e49494cd5cafab0e5cd1ebec1f44fdf99fcc0445236a83a"
 # of Use and the privacy copy shipped (#564). "false" hides email on every
 # client (GET /v1/auth/methods) and refuses the email routes with 503.
 EMAIL_SIGNIN = "true"
+# The beta by invite code (ADR 0064). The app and its external TestFlight
+# group ("Public beta"). The key is three secrets: ASC_KEY_P8, ASC_KEY_ID,
+# ASC_ISSUER_ID (scripts/setup-beta-secrets.sh).
+ASC_APP_ID = "6836809027"
+ASC_BETA_GROUP_ID = "d2c1fcf6-eee2-40e8-934c-a1d5b2b873b5"
 
 # Account summaries for the admin page (src/admin/accounts.ts).
 [triggers]

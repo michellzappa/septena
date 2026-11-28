@@ -44,7 +44,7 @@
       "newTaskTarget": "here",
       "dropBehavior": "setToday",
       "featureId": "lists.today",
-      "emptyState": { "title": "Nothing on Today", "detail": "Add a task or move one here when you want to work on it today." }
+      "emptyState": { "title": "Nothing on Today", "detail": "Today can stay empty. Add a task when you want one." }
     },
     {
       "id": "review",

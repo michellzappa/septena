@@ -1,8 +1,8 @@
 import XCTest
 
-/// Septask owns the same task surface, so it receives the same executable
-/// keyboard contract as the full app. This catches target-membership drift in
-/// shared task UI code.
+/// Septena owns the same task surface, so it receives the same executable
+/// keyboard contract as the full app (Septena Life). This catches
+/// target-membership drift in shared task UI code.
 final class TaskKeyboardContractTests: XCTestCase {
   override func setUpWithError() throws { continueAfterFailure = false }
 

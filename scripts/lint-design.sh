@@ -177,7 +177,7 @@ if [ -n "$android_text_back" ]; then
 fi
 
 # ── AppKit transient surfaces (docs/SEPTASK_APPKIT_SURFACES.md) ─────────────
-# Every popover, floating panel and filter list in the Septask AppKit shell is
+# Every popover, floating panel and filter list in the Septena AppKit shell is
 # built in Septask/SeptaskKitSurface.swift, so material, corner radius, field
 # face and row height have one source of truth. They did not before: the shell
 # carried two corner radii, three placements for the same scope of edit, a

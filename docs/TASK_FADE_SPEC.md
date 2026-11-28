@@ -165,6 +165,9 @@ themselves are the Faded group of Review (`docs/REVIEW_SPEC.md`).
 - One button at the bottom: **Let the rest go**. It sets status `cancelled`,
   `dropReason = "faded"`, `completedAt = now` on every row not kept. This is
   one undo entry.
+- After **Let the rest go**, the sheet stays open on one line,
+  `fadeSweep.letGoTitle` ("It can wait. The rest is in your Logbook.", #711),
+  and a **Done** button that closes it.
 - If the user ignores the sweep, nothing is dropped. Faded tasks stay in the
   pile until a sweep passes. AI and timers never drop a task.
 
@@ -216,7 +219,7 @@ Reasons:
 
 The rule lives in one place in `SeptenaCore` (with the `isOnToday` union,
 see #77) and has one mirror in `backend/` for the MCP connector's Today read.
-Every other surface (Today, Next, widgets, the watch, Septask) calls it.
+Every other surface (Today, Next, widgets, the watch, Septena) calls it.
 
 **Cleanup.** A stale pin keeps `today == true` in storage. Clean slate may
 clear it lazily on the next user write to that task, through the mutator.
@@ -256,8 +259,8 @@ defer. The user pins it again to bring it back.
 | Values | `"ask"`, `"cleanSlate"` |
 | Default | `null` reads as `"ask"` |
 | Sync | Per account, through the `settings` table, so every device shows the same Today |
-| Septena | Settings ▸ Tasks, "At the start of each day" |
-| Septask | Settings ▸ General, "At the start of each day" |
+| Septena Life | Settings ▸ Tasks, "At the start of each day" |
+| Septena | Settings ▸ General, "At the start of each day" |
 | Labels | "Ask me about unfinished tasks" (`ask`), "Start with an empty Today" (`cleanSlate`) *(default copy, goes through the humanizer before it ships)* |
 
 Device-only storage is wrong for this key: two devices with different modes
@@ -332,14 +335,14 @@ All are suggestions the user taps. All run on-device first.
   reason ("untouched since June, no date, no project"). No AI is needed for
   this: it comes from the fields.
 
-### 9.1 Readiness-ordered Next (Septena only)
+### 9.1 Readiness-ordered Next (Septena Life only)
 
-Septena reads the day's readiness (Oura readiness, else HealthKit sleep). On
+Septena Life reads the day's readiness (Oura readiness, else HealthKit sleep). On
 a low day, Next lists `light` tasks before `heavy` ones. On a high day,
 the first `heavy` task leads. Unknown effort keeps manual order. The user's
 manual order breaks ties.
 
-This lives in the Next feed builder behind the runtime profile. Septask runs
+This lives in the Next feed builder behind the runtime profile. Septena runs
 `RuntimeProfile.tasksOnly` with no provider stores, so it keeps manual order.
 Do not copy the feed file into `Septask/`.
 
@@ -378,7 +381,7 @@ a year).
 | P2 | §4 fade pass + Faded pile, §5 sweep. | P1 |
 | R0 | §6.2 rule in `SeptenaCore` + `backend/` mirror, §6.5 `todayRollover` setting key, legacy-pin handling. Reads only; no UI change. Collapses the `isOnToday` copies (#77). | P1 |
 | R1 | §6.3 Ask: carry-over rows in the band, Today / Not today pair, §6.6 one-time notice. Replaces P3. | R0 |
-| R2 | §6.4 Clean slate, §6.5 setting UI in Septena and Septask, §6.7 MCP Today read on both servers. | R0 |
+| R2 | §6.4 Clean slate, §6.5 setting UI in Septena Life and Septena, §6.7 MCP Today read on both servers. | R0 |
 | P4 | §7 stuck question. | P1 |
 | P5 | §8 done-first view. | P2 |
 | P6 | §9 capture cleanup + effort, §9.1 readiness Next. | P1 |
@@ -387,8 +390,8 @@ a year).
 P1 must land on the backend schema first if the cutover (M1) has happened,
 else on the local model with the backend fields specified for the cutover.
 
-Each phase touches shared task code: build all four schemes (`CLAUDE.md`,
-"Septask"). Any new MCP field lands in `backend/`, the one MCP
+Each phase touches shared task code: build all four schemes (`AGENTS.md`,
+"The Septask targets"). Any new MCP field lands in `backend/`, the one MCP
 server (the in-app server was removed on 2026-11-21).
 
 ## 11. Open questions for mz

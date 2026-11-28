@@ -5,7 +5,8 @@ Draft installable packages for AI coding/CLI agents pointing at the Septena task
 The Claude Code plugin is published. This repo is its marketplace (`.claude-plugin/marketplace.json` at the repo root):
 
 ```
-/plugin install septena --marketplace michellzappa/septena
+/plugin marketplace add septena/septena
+/plugin install septena@septena
 ```
 
 The Gemini CLI extension and `llms.txt` are still drafts.

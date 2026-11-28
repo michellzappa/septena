@@ -15,7 +15,8 @@ branch="wt/$name"
 main=$(git worktree list --porcelain | awk '/^worktree /{w=$2} /^branch refs\/heads\/main$/{print w; exit}')
 [ -n "$main" ] || { echo "wt-new: no worktree is on 'main'"; exit 1; }
 
-path="$(dirname "$main")/septena-$name"
+path="$(dirname "$main")/worktrees/$name"
+mkdir -p "$(dirname "$path")"
 [ -e "$path" ] && { echo "wt-new: $path already exists"; exit 1; }
 git -C "$main" show-ref --verify --quiet "refs/heads/$branch" \
   && { echo "wt-new: branch $branch already exists"; exit 1; }

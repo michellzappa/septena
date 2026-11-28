@@ -1,7 +1,7 @@
 # Roadmap
 
 The order of work, by track and milestone. Each phase links its spec. Each
-milestone has a matching GitHub milestone on `michellzappa/septena`; each phase
+milestone has a matching GitHub milestone on `septena/septena`; each phase
 is one issue there. Update this file when the order changes. Rules:
 `docs/README.md`.
 
@@ -155,7 +155,7 @@ accepts the result with no device awake in between.
 
 GitHub milestone: `"AS Agent surface"`. Spec: `docs/AGENT_SURFACE_SPEC.md`.
 Contract phases (AS3 to AS7) are issues on this repo. Site phases are issues
-on `michellzappa/septena-site`; the spec lists both. Order: AS1 first, AS3
+on `septena/site`; the spec lists both. Order: AS1 first, AS3
 before AS5, AS7 before AS12.
 
 Exit: every public page answers as Markdown, the agent spec with schema and

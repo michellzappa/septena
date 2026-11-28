@@ -81,7 +81,7 @@ in the Play Console web UI (which permanently locks `app.septena.android`):
    `Septena-<version>.aab` (plus `mapping-<version>.txt`) to Play Console's
    **Internal testing** track.
 3. Fill in store listing copy, Data Safety, permissions, and graphics from
-   [PLAYSTORE.md](PLAYSTORE.md) and `appstore/playstore/`.
+   `docs/PLAYSTORE.md` and `appstore/playstore/` in the private `septena/studio` repo.
 4. To enable automated CI uploads for every subsequent release:
    - Create a service account in Google Cloud Console with a JSON key.
    - Enable the **Google Play Android Developer API** in that Cloud project.
@@ -139,7 +139,7 @@ Run workflow** and select:
   `https://septena.app/android/download` to the latest `android-v*` release's
   `Septena.apk` asset (or read `android-release.json`), keeping
   `https://septena.app/mac/appcast.xml` pinned to `/releases/latest`.
-- **Obtainium:** users can track `https://github.com/michellzappa/septena` with
+- **Obtainium:** users can track `https://github.com/septena/septena` with
   release filter `^android-v` and APK regex `^Septena-.*\.apk$`.
 
 ---

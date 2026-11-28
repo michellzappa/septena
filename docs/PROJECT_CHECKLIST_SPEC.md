@@ -1,42 +1,64 @@
 # Checklist projects
 
-**Status** · Product proposal
+**Status** · Accepted (#860, 2026-11-28)
 
 A Checklist is a project you can use repeatedly. Checking an item removes it from the active list and keeps it available for next time. The project keeps its place in the sidebar when everything is checked. Groceries, packing, and restocking are the first use cases.
 
 A project Checklist uses project rows. [Task checklist steps](CHECKLISTS_SPEC.md) are the smaller steps inside one task. [Recurrence behavior](RECURRENCE_BEHAVIOR_SPEC.md) covers items that come back on a schedule.
 
-## Project and item behavior
+## The rule
 
-- Offer **Checklist** when creating a project and **Use as Checklist** in an existing project’s menu. Conversion keeps the project’s name, area, position, and open tasks. Historical completions remain in the Logbook.
-- Show active items first, with **Add item** close at hand. Show one **Checked** group below, expanded by default. A fully checked project opens directly to a list of items the user can bring back.
-- Check to move a row to **Checked**. Uncheck to bring the same row back to its saved group and position. Checking does not generate a Logbook completion or advance project progress. Toggle, move, and delete are distinct actions.
-- A checklist item appears in Today when the user schedules it there. Checking clears that occurrence’s schedule. When the user brings the row back, it starts undated. Undo restores the preceding state, including the date if checking cleared it.
-- Checking and reopening work offline, sync across devices, and use the shared Undo stack for local gestures. Retain the row’s identity through both actions.
+**A Checklist is a regular project with three differences:** the check action, the **Checked** group, and add-field suggestions. Everything else (rows, editing, selection, keyboard, context menus, drag, Undo, headings, Delete) is the standard project path, unchanged. No platform has a Checklist-specific list screen, row component, add field, group picker or Delete button.
 
-## Add and prefill
+## Decisions
 
-Search the current project as the user types in **Add item**. A matching checked row shows its full name and group, such as **Greek yogurt · Dairy** for `yo`. Choosing it reopens that row. An active match shows **On list**. Keep an explicit **Add “…”** choice for a genuinely new item, with the typed text intact.
+1. **One Checklist type.** New Checklists write `checklistMode: "plain"`. A client reads `groceries` as a Checklist too. Stored values are never rewritten, and the `groceries` enum value stays: older clients still send it.
+2. **Grocery grouping applies to every Checklist.** Hosts always pass `groceries: true` to `projectChecklist` for a Checklist project. Unknown items stay ungrouped, so a packing list is not affected.
+3. **Checked is a view, not a heading.** The host builds the **Checked** group from `status == checklistChecked`. No client creates a heading row named Checked, and checking never changes a row's `heading`.
+4. **No project subtype, no second renderer, no calendar-repeat changes.**
 
-Reuse the name, group, and position. Scheduling and quantity entered for a particular trip should not prefill the next one. Typing alone leaves the list unchanged. Match case-insensitively and rank exact matches ahead of prefixes.
+## Data
 
-## Groups and Groceries
+- Project field `checklistMode` (`registry/entities.json`): `plain | groceries`, nullable. Null means a regular project.
+- Task status `checklistChecked`. A checked row keeps its `id`, `heading` and `position`. Only `status` and the date fields change.
+- Sync, export and backup carry both. The sync shape and enum values do not change for this feature.
 
-- **Checklist groups are optional and local to one project.** Packing can have Clothes, Toiletries, and Electronics. A short list can stay flat. Adding within a group assigns it directly. Moving an item changes its saved group. Keep group order stable and show headings in the active list only when they have active items.
-- **Groceries is a Checklist preset.** It seeds category headings such as Produce, Dairy, Pantry, and Frozen. For a new item entered from the main Add item field, use a small offline vocabulary to assign a clear match. Leave unknown or ambiguous items ungrouped. Use the same categorization data across clients and sync the assigned group.
-- **Explicit placement wins.** The group the user adds into, or moves an item to, takes priority over a grocery suggestion. If they move oat milk to Pantry, it returns to Pantry on every re-add. Show the saved group in autocomplete and provide a **Move to group** action on the row.
-- Keep checked items together under **Checked**, with their saved group available when useful. Checking the last item in an aisle collapses that aisle out of the active list without discarding its group.
+## Shared core (`core/crates/septena-core/src/project_checklist.rs`)
 
-## First release
+Clients call these functions through the core. They never re-implement them. Vectors: `registry/conformance/project-checklist.json`.
 
-The first release includes reusable rows, autocomplete, optional project groups, and the Groceries preset. Bulk reset and automatic categorization for other kinds of checklists can follow when repeated use warrants them.
+- **`projectChecklist({ rows, query, groceries })`** returns `ungrouped`, `groups` (active rows per heading, empty headings left out), `checked`, `matches` (exact title first, then title prefix or word prefix, case- and accent-insensitive, deleted rows left out) and `suggestedGroup` (a group key such as `dairy`, or null).
+- **`checklistCheckPatch({ checked })`.** Checking sets `checklistChecked` and clears every date, Today and reminder field. Reopening sets `open` only, so the row stays undated. There is no completion stamp: no Logbook entry, no project progress, no repeat.
+- **`checklistHeading({ projectId, group, title, rows })`** returns `{ heading, create }` for a suggested group. The host passes the project's rows with deleted rows included, and the group's localized title from the registry. The stable heading id is `occurrenceId("checklist:<projectId>", <group>)`, so two offline devices that add bananas create one Produce heading.
+  1. A live heading with the stable id, else a live heading with the same title (case- and accent-insensitive): `create: false`, reuse it.
+  2. A deleted heading with the stable id or the same title: `heading: null`. The user removed that group, so the row stays ungrouped.
+  3. Otherwise `create: true`: create a heading row with the returned id and the title.
+- The grocery vocabulary lives in the core. Its group keys equal the registry's `checklistProjects.groups` keys (a core test checks this through `registry::checklist_groups::KEYS`).
 
-Use the same row and undo behavior across Apple, Android, and Web. Preserve the project mode, row state, and group assignments through sync and export.
+## Registry copy
 
-## Acceptance checks
+`registry/surfaces.json` `checklistProjects` holds the copy, with keys in `registry/l10n`: **Checklist** (`checklist`), **Project** (`project`), **Project type** (`projectType`), **Checked**, **On list**, **Add item**, **Add "…"** (`addTyped`, placeholder `title`), and the group titles per key (`groups`: Produce, Dairy, Bakery, Meat & Seafood, Pantry, Frozen). **Use as Checklist** is the `project.useAsChecklist` action in `registry/actions.json`, in the `sidebar.project` menu. Clients never hard-code these words.
 
-- Finish the first shop. The project stays in the sidebar and all bought items are visible under **Checked**. A week later, type `yo`, reopen the same Greek yogurt row in Dairy, and shop from a list containing only the rows you selected or added.
-- An active match is marked **On list**. A truly new item can still be added from the same input.
-- A first-time grocery such as bananas lands in Produce. An unknown item stays ungrouped. Move oat milk to Pantry, check it, and reopen it from another device. It returns to Pantry.
-- A scheduled item checked from Today disappears from Today. Reopening it from the project leaves it undated. Undoing the original check restores the original date.
-- Convert a normal project with open items and historical completions. Its open items become unchecked, and the historical completions stay in the Logbook.
+## Host contract
+
+- **Check action.** On every surface where a project row can be checked (project list, Today, search, quick views), the check control on a row whose project has a non-null `checklistMode` applies `checklistCheckPatch`, not task completion.
+- **Undo of a check.** Before the client applies the check patch, it snapshots the row's values for every key in the patch. Undo writes the snapshot back, so the date returns. Record the entry on the platform's shared Undo stack at the user gesture, never a custom toast or a mutator-level record.
+- **Checked group.** After the active rows, the client shows one **Checked** group built from `checked`, expanded by default, with the platform's existing collapsible group. A fully checked project stays in the sidebar and opens to the Checked group.
+- **Add field.** The standard add field at the bottom of the project. While the user types, show suggestions from `matches`:
+  - A checked match shows its title and saved group, for example **Greek yogurt · Dairy**. Choosing it reopens that row.
+  - An active match shows **On list** and does nothing.
+  - The last choice is always **Add "…"** with the exact typed text.
+  - Typing alone never changes the list.
+- **Placement of a new item.** The heading the user adds from wins. With none, the client takes `suggestedGroup`, looks up its title in the registry, and calls `checklistHeading`. Otherwise the item stays ungrouped.
+
+## Create and convert
+
+Offer **Checklist** in the new-project flow. Show **Use as Checklist** in the existing project menu. Conversion sets `checklistMode` only. It keeps the project id, name, area, sidebar position, headings and open rows. Done tasks stay done and stay in the Logbook. There is no "convert back" yet.
+
+## Acceptance checks (per platform)
+
+- Convert a populated project. Compare it with a regular project: the add field, row layout, menus, editing, keyboard and drag are the same. Delete is in the normal row menu for active and checked rows.
+- Add Greek yogurt to Dairy and check it. Check every other item. The project stays in the sidebar and opens to Checked. Type `yo`: the suggestion reads **Greek yogurt · Dairy**, and choosing it puts the same row back in Dairy. Type the name of an active item: it shows **On list**, and **Add "…"** still adds a new row.
+- Add bananas with no heading open: the row lands in Produce, and the client creates Produce once. Add the same item on a second offline device and sync: there is one Produce heading. Add `zorbo`: it stays ungrouped. Move oat milk to Pantry, check it, and reopen it on another device: it is in Pantry.
+- Check a scheduled row from Today: it leaves Today. Undo it: the date returns. Check it again, then reopen it from the project: it is undated and has no Logbook entry.
+- Open a legacy `groceries` project: it behaves as a Checklist and its data is unchanged.

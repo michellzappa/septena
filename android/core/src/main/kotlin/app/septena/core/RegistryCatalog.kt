@@ -226,6 +226,9 @@ object RegistryCatalog {
     fun actionTitle(id: String, field: String = "title", languageTag: String = "en"): String? =
         action(id)?.stringAt(field)?.let { localizedString(it, languageTag) ?: it }
 
+    /** The key of an action's registry shortcut (`shortcut.key`, e.g. "[" for app.goBack). */
+    fun actionShortcutKey(id: String): String? = action(id)?.objectAt("shortcut")?.stringAt("key")
+
     fun actionAddTitle(id: String, languageTag: String = "en"): String? =
         actionTitle(id, field = ACTION_ADD_TITLE_FIELD, languageTag = languageTag)
 
@@ -347,6 +350,11 @@ object RegistryCatalog {
 
     /** The task attribute that an action opens (actions.json `opensAttribute`), or null. */
     fun actionOpensAttribute(actionId: String): String? = action(actionId)?.stringAt("opensAttribute")
+
+    /** The heading title for a core grocery group key (surfaces.json `checklistProjects.groups`), or null. */
+    fun checklistGroupTitle(key: String, languageTag: String = "en"): String? =
+        surface("checklistProjects")?.objectAt("groups")?.stringAt(key)
+            ?.let { localizedString(it, languageTag) ?: it }
 
     fun localizedString(key: String, languageTag: String = "en"): String? {
         val translations = document("localizations")

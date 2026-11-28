@@ -48,7 +48,7 @@ enum SomedayStatusMigrator {
 
 // MARK: - Peek-ack proposal recovery
 
-/// One-shot: restore MCP proposals that Septask peek/select accidentally
+/// One-shot: restore MCP proposals that Septena peek/select accidentally
 /// acknowledged (cleared the glow and, under the old band predicate, yanked
 /// them out of Inbox into Anytime). Birth-acked committed creates
 /// (`acknowledgedAt ≈ createdAt`) are left alone — those were intentional.

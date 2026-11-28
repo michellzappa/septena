@@ -3,7 +3,7 @@
 **Status:** shipped — historical (2026-11-22, #160 and #161).
 **Decisions:** [ADR 0002](adr/0002-own-backend-replaces-icloud.md), [ADR 0007](adr/0007-septena-is-the-task-app.md), [ADR 0015](adr/0015-shared-registries-for-cross-platform-clients.md).
 **Builds on:** `SeptenaCore/TasksWidgetBuilder.swift`, `SeptenaCore/TasksWidgetSnapshotStore.swift`, `SeptenaCore/TasksWidgetWire.swift`, `SeptenaCore/SeptenaAppGroup.swift`, `SeptenaCore/Outbox.swift`, `project.yml`.
-**Tracking issue:** [#129](https://github.com/michellzappa/septena/issues/129).
+**Tracking issue:** [#129](https://github.com/septena/septena/issues/129).
 **Owner of decisions:** mz. Defaults chosen by the author are marked *(default)*.
 
 ## 1. Goal
@@ -14,7 +14,7 @@ Bring calm, interactive Home Screen, Lock Screen, and macOS Desktop/Notification
 
 ## 2. Data transport (no CloudKit)
 
-- Reuse `TasksWidgetSnapshotStore` + `TasksWidgetWire` inside Septask's App Group container (verify group ID in `Septask.entitlements` / `SeptaskMac.entitlements` — do not share Septena Life's container where bundle boundaries differ).
+- Reuse `TasksWidgetSnapshotStore` + `TasksWidgetWire` inside Septena's App Group container (verify group ID in `Septask.entitlements` / `SeptaskMac.entitlements` — do not share Septena Life's container where bundle boundaries differ).
 - Publish a fresh JSON snapshot whenever:
   1. Any `TaskMutator` write commits locally.
   2. `TaskSyncClient` applies a backend pull.

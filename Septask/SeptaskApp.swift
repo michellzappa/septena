@@ -2,11 +2,11 @@ import SwiftUI
 import SwiftData
 import Combine
 
-/// Septask — the focused task app over Septena's task data (docs/SEPTASK.md).
+/// Septena — the focused task app over the shared task data (docs/SEPTASK.md).
 ///
 /// The task data/services are shared process-wide. Navigation is deliberately
 /// *not*: every restored window owns its own route, presented sheet, and sidebar
-/// state so opening a second Septask window never steers the first one.
+/// state so opening a second Septena window never steers the first one.
 @main
 struct SeptaskApp: App {
   @State private var theme = SectionTheme()
@@ -164,14 +164,14 @@ private struct SeptaskMainWindow: View {
       #endif
       .tint(appearance.accentSwiftUIColor)
       .preferredColorScheme(appearance.preferredColorScheme)
-      // No CloudKit batch listener: Septask's settings arrive with the task
+      // No CloudKit batch listener: Septena's settings arrive with the task
       // backend pull, and `SettingsStore` reloads itself on
-      // `.septaskSettingsPulled`. Septask has no section colors to repaint.
+      // `.septaskSettingsPulled`. Septena has no section colors to repaint.
       .onChange(of: navigation.pendingShortcut) { _, action in
         guard let action else { return }
         switch action {
         case .newTask:
-          navigation.presentAddInfo()
+          navigation.startNewTaskOnToday()
         case .today:
           navigation.path = [.filter(.today)]
         }
@@ -186,14 +186,14 @@ private struct SeptaskMainWindow: View {
       .septenaSharedEnvironment(navigation: navigation, theme: theme,
                                 settings: settingsStore, dayClock: dayClock,
                                 logCommit: logCommit, services: services)
-      // Septask-only chrome.
+      // Septena-only chrome.
       .environment(iPadChrome)
       .modelContainer(localStore.container)
       .septenaTextSize()
       // Ungated on iPad on purpose (unlike the task-list publishers, which are
       // `#if os(macOS)`): the iPad `.focusedSceneValue` crash came from publishing
       // inside a NavigationSplitView *detail* column. This is at the WindowGroup
-      // content root, above the split view, so it's safe — and iPad Septask needs
+      // content root, above the split view, so it's safe — and iPad Septena needs
       // these window-level actions (⌘N etc.) in the shortcut HUD.
       .focusedSceneValue(\.septaskNavigationActions, navigationActions)
       .task {
@@ -217,8 +217,8 @@ private struct SeptaskMainWindow: View {
         // Shared with the macOS AppKit root — see `SeptaskLaunch`. Idempotent,
         // so it's harmless when that root already ran it.
         await SeptaskLaunch.run(settings: settingsStore)
-        // No watch snapshot: it was a CloudKit record, and Septask is
-        // CloudKit-free (docs/SEPTASK_BACKEND.md §9). The Septask watch needs
+        // No watch snapshot: it was a CloudKit record, and Septena is
+        // CloudKit-free (docs/SEPTASK_BACKEND.md §9). The Septena watch needs
         // a new transport before its embed is restored (project.yml).
         #if DEBUG
         if DemoSeedMode.isOn {
@@ -259,7 +259,24 @@ private struct SeptaskMainWindow: View {
       showQuickFind: { navigation.showQuickFind = true },
       showQuickAdd: { navigation.presentAddInfo() },
       showSettings: { navigation.showSettings = true },
-      showKeyboardShortcuts: { navigation.showKeyboardShortcuts = true }
+      showKeyboardShortcuts: { navigation.showKeyboardShortcuts = true },
+      canGoBack: navigation.canGoBack,
+      canGoForward: navigation.canGoForward,
+      goBack: { navigation.goBack(exists: routeExists) },
+      goForward: { navigation.goForward(exists: routeExists) }
     )
+  }
+
+  /// Back / Forward skip an area or project that was deleted since the visit.
+  private func routeExists(_ route: Route) -> Bool {
+    let structure = StructureCache.snapshot(in: localStore.container.mainContext)
+    switch route {
+    case .area(let id), .filter(.area(let id)):
+      return structure.areas.contains { $0.id == id }
+    case .project(let id), .filter(.project(let id)):
+      return structure.projects.contains { $0.id == id }
+    case .filter, .next:
+      return true
+    }
   }
 }

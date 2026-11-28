@@ -6,7 +6,7 @@ import Foundation
 ///
 /// Declared once because three surfaces have to agree on it and each used to
 /// spell it out for itself:
-///   • Septask's AppKit list — `groupedByList` emits headers in this order,
+///   • Septena's AppKit list — `groupedByList` emits headers in this order,
 ///     and flat Today now runs its "Lists" block through this;
 ///   • SwiftUI's `groupedOpenItems` / `ungroupedOpenItems`;
 ///   • `TaskListView.orderedFromGroupedOpen`, which arrow-key traversal reads

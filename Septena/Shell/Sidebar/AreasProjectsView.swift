@@ -172,6 +172,7 @@ struct AreaDetailView: View {
   @Environment(DayClock.self) private var clock
   @Environment(NavigationState.self) private var nav
   @Environment(\.usesPushNavigation) private var usesPushNavigation
+  @Environment(\.scenePhase) private var scenePhase
   @Environment(AreasMutator.self) private var areasMutator
   @Environment(ProjectsMutator.self) private var projectsMutator
   @Environment(TaskMutator.self) private var taskMutator
@@ -238,7 +239,9 @@ struct AreaDetailView: View {
     TaskListView(
       filter: .area(area.id),
       embedded: true,
-      excludeProjectedTasks: true
+      excludeProjectedTasks: true,
+      embeddedNavRowIDs: navRowIDs,
+      onActivateNavRow: activateNavRow
     ) {
       VStack(alignment: .leading, spacing: 0) {
         VStack(alignment: .leading, spacing: 10) {
@@ -307,40 +310,53 @@ struct AreaDetailView: View {
         ForEach(Array(areaProjects.enumerated()), id: \.element.id) { idx, project in
           // The card wears the selection fill from touch-down, like a
           // sidebar row (`NavigationPressStyle`, SelectionLanguage.swift).
-          NavigationPressReader { pressed in
-            Button { openProject(project) } label: {
-              projectRow(project)
+          // ↑/↓ reach the row and Return opens it, as on a task row (#850);
+          // the keyboard selection wears the same card fill as a press.
+          SelectableNavRowReader(id: Self.navRowID(project: project.id)) { selected in
+            NavigationPressReader { pressed in
+              Button { openProject(project) } label: {
+                projectRow(project)
+              }
+              .buttonStyle(NavigationPressStyle(hoverCornerRadius: Theme.cornerRadiusSmall))
+              .modifier(TaskMoveDrop(perform: { ids in
+                handleProjectDrop(ids: ids, project: project)
+              }))
+              .taskCardChrome(TaskCardPosition(index: idx, count: cardCount),
+                              isSelected: pressed || selected)
             }
-            .buttonStyle(NavigationPressStyle(hoverCornerRadius: Theme.cornerRadiusSmall))
-            .modifier(TaskMoveDrop(perform: { ids in
-              handleProjectDrop(ids: ids, project: project)
-            }))
-            .taskCardChrome(TaskCardPosition(index: idx, count: cardCount),
-                            isSelected: pressed)
           }
         }
-        NavigationPressReader { pressed in
-          Button {
-            notesFocused = false
-            Haptics.press()
-            showingNewProject = true
-          } label: {
-            newProjectRow
+        SelectableNavRowReader(id: Self.newProjectNavRowID) { selected in
+          NavigationPressReader { pressed in
+            Button {
+              startNewProject()
+            } label: {
+              newProjectRow
+            }
+            .buttonStyle(NavigationPressStyle(hoverCornerRadius: Theme.cornerRadiusSmall))
+            .taskCardChrome(TaskCardPosition(index: areaProjects.count, count: cardCount),
+                            isSelected: pressed || selected)
           }
-          .buttonStyle(NavigationPressStyle(hoverCornerRadius: Theme.cornerRadiusSmall))
-          .taskCardChrome(TaskCardPosition(index: areaProjects.count, count: cardCount),
-                          isSelected: pressed)
         }
       }
     }
     .septenaToastOverlay(store: toastStore)
     .septenaInlineTitle()
+    // A blur is not the only way out of the notes field. Leaving the page
+    // (Back, a swipe, a sidebar tap) or the app can end the field with no
+    // blur, and the draft then never reached the store (#617).
+    .onDisappear { commitNotes() }
+    .onChange(of: scenePhase) { _, phase in
+      if phase != .active { commitNotes() }
+    }
     #if os(iOS)
     .toolbar {
       ToolbarItem(placement: usesPushNavigation ? .primaryAction : .topBarTrailing) {
         areaOverflowMenu
       }
       if !usesPushNavigation {
+        // Search is a capsule of its own (registry/surfaces.json `topBar`).
+        ToolbarSpacer(.fixed, placement: .topBarTrailing)
         ToolbarItem(placement: .topBarTrailing) { QuickFindToolbarButton() }
       }
     }
@@ -350,8 +366,8 @@ struct AreaDetailView: View {
     }
     #endif
     .sheet(isPresented: $showingNewProject) {
-      NewProjectSheet(areas: areas, initialAreaId: area.id) { title, areaId, mode in
-        createProjectInArea(title: title, areaId: areaId, mode: mode)
+      NewProjectSheet(areas: areas, initialAreaId: area.id) { title, areaId in
+        createProjectInArea(title: title, areaId: areaId)
       }
       .presentationDetents([.medium])
       .septenaSheetChrome()
@@ -405,13 +421,13 @@ struct AreaDetailView: View {
     }
   }
 
-  private func createProjectInArea(title: String, areaId: String?, mode: ProjectChecklistMode?) {
+  private func createProjectInArea(title: String, areaId: String?) {
     let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty else { return }
     Haptics.commit()
     Task {
       do {
-        let project = try await projectsMutator.create(title: trimmed, area: areaId, checklistMode: mode)
+        let project = try await projectsMutator.create(title: trimmed, area: areaId)
         // Recorded at the gesture, after the create lands: undo removes it.
         TaskUndo.recordProjectCreate(project, projects: projectsMutator)
         await load()
@@ -423,6 +439,35 @@ struct AreaDetailView: View {
 
   private var projectsInArea: [Project] {
     projects.filter { $0.area == area.id && $0.status == .active }
+  }
+
+  // MARK: Keyboard rows (#850)
+
+  private static let newProjectNavRowID = SelectableNavRow.id("new-project")
+
+  private static func navRowID(project id: String) -> String {
+    SelectableNavRow.id("project." + id)
+  }
+
+  /// The project card's rows in screen order: each project, then "New
+  /// Project". They lead the area list's ↑/↓ order.
+  private var navRowIDs: [String] {
+    projectsInArea.map { Self.navRowID(project: $0.id) } + [Self.newProjectNavRowID]
+  }
+
+  /// Return on a project card row does what its click does.
+  private func activateNavRow(_ id: String) {
+    if id == Self.newProjectNavRowID {
+      startNewProject()
+    } else if let project = projectsInArea.first(where: { Self.navRowID(project: $0.id) == id }) {
+      openProject(project)
+    }
+  }
+
+  private func startNewProject() {
+    notesFocused = false
+    Haptics.press()
+    showingNewProject = true
   }
 
   /// A project lives *inside* this area, so on the iPhone push stack append it
@@ -585,11 +630,12 @@ struct AreaDetailView: View {
 
   private func commitNotes() {
     guard draftNotes != originalNotes else { return }
-    originalNotes = draftNotes
+    let value = draftNotes
+    originalNotes = value
     Task {
       do {
         try await areasMutator.setContext(id: area.id,
-                                          context: draftNotes.isEmpty ? nil : draftNotes)
+                                          context: value.isEmpty ? nil : value)
       } catch {
         errorMessage = error.localizedDescription
       }
@@ -677,6 +723,7 @@ struct ProjectDetailView: View {
   @Environment(\.dismiss) private var dismiss
   @Environment(\.modelContext) private var modelContext
   @Environment(\.usesPushNavigation) private var usesPushNavigation
+  @Environment(\.scenePhase) private var scenePhase
 
   @State private var draftName: String
   @State private var draftNotes: String
@@ -803,9 +850,17 @@ struct ProjectDetailView: View {
       }
     }
     .septenaInlineTitle()
+    // A blur is not the only way out of the notes field. Leaving the page
+    // (Back, a swipe, a sidebar tap) or the app can end the field with no
+    // blur, and the draft then never reached the store (#617).
+    .onDisappear { commitNotes() }
+    .onChange(of: scenePhase) { _, phase in
+      if phase != .active { commitNotes() }
+    }
     .toolbar { projectDetailToolbar }
     .sheet(isPresented: $showingMoveToArea) {
-      AreaPickerSheet(areas: areas, currentAreaId: project.area) { newAreaId in
+      MovePickerSheet(areas: areas, projects: [], currentAreaId: project.area,
+                      noneTitle: String(localized: "No Area")) { newAreaId, _ in
         moveToArea(newAreaId)
       }
       .presentationDetents([.medium, .large])
@@ -883,6 +938,8 @@ struct ProjectDetailView: View {
     #if os(iOS)
     if !usesPushNavigation {
       ToolbarItem(placement: .topBarTrailing) { projectOverflowMenu }
+      // Search is a capsule of its own (registry/surfaces.json `topBar`).
+      ToolbarSpacer(.fixed, placement: .topBarTrailing)
       ToolbarItem(placement: .topBarTrailing) { QuickFindToolbarButton() }
     } else {
       ToolbarItem(placement: .primaryAction) { projectOverflowMenu }
@@ -899,21 +956,13 @@ struct ProjectDetailView: View {
       } label: {
         Label(RegistryActions.title(.sectionNew), systemImage: "rectangle.split.1x2")
       }
-      if project.checklistMode == nil {
-        Button(RegistrySurfaces.checklistUseAsChecklist) {
-          Task { try await projectsMutator.useAsChecklist(id: project.id) }
-        }
-        Button(RegistrySurfaces.checklistUseForGroceries) {
-          Task { try await projectsMutator.useAsChecklist(id: project.id, mode: .groceries) }
-        }
-      }
       // Sort By for this project's tasks (docs/LIST_SORT_SPEC.md §6).
       ListSortMenu(filter: .project(project.id))
       Divider()
       Button {
         showingMoveToArea = true
       } label: {
-        Label("Move to Area…", systemImage: "folder")
+        Label(RegistryActions.title(.projectMove), systemImage: RegistryIcons.sfSymbol(for: "action.move"))
       }
       Button {
         SeptaskSharing.present(projectID: project.id)
@@ -1020,11 +1069,13 @@ struct ProjectDetailView: View {
   }
 
   private func commitNotes() {
-    guard draftNotes != originalNotes else { return }
+    // A template nobody typed into is not notes (the blur clears it too).
+    let value = ContainerNotes.isUntouchedTemplate(draftNotes) ? "" : draftNotes
+    guard value != originalNotes else { return }
     let from = originalNotes
-    originalNotes = draftNotes
+    originalNotes = value
     Task {
-      do { try await projectsMutator.setNotes(id: project.id, notes: draftNotes, from: from) }
+      do { try await projectsMutator.setNotes(id: project.id, notes: value, from: from) }
       catch { errorMessage = error.localizedDescription }
     }
   }
@@ -1128,76 +1179,5 @@ struct ProjectDetailView: View {
         errorMessage = error.localizedDescription
       }
     }
-  }
-}
-
-
-// MARK: - Area picker (used by Project "Move to Area…")
-
-struct AreaPickerSheet: View {
-  let areas: [Area]
-  let currentAreaId: String?
-  let onPick: (String?) -> Void
-  @Environment(\.dismiss) private var dismiss
-
-  var body: some View {
-    NavigationStack {
-      List {
-        Button {
-          if currentAreaId != nil { onPick(nil) }
-          dismiss()
-        } label: {
-          row(label: "No Area", icon: "tray", selected: currentAreaId == nil)
-        }
-        .buttonStyle(PlainHoverRowButtonStyle())
-        .listRowBackground(SelectableListRowBackground(isSelected: currentAreaId == nil))
-
-        ForEach(areas) { area in
-          let isCurrent = currentAreaId == area.id
-          Button {
-            if !isCurrent { onPick(area.id) }
-            dismiss()
-          } label: {
-            row(label: area.title, icon: "square.stack.3d.up.fill",
-                emoji: area.emoji, selected: isCurrent)
-          }
-          .buttonStyle(PlainHoverRowButtonStyle())
-          .listRowBackground(SelectableListRowBackground(isSelected: isCurrent))
-        }
-      }
-      .navigationTitle("Move to Area")
-      .septenaInlineTitle()
-      .toolbar {
-        ToolbarItem(placement: .cancellationAction) {
-          DrawerCloseButton { dismiss() }
-        }
-      }
-    }
-    .macSheetFrame(width: 460, height: 480)
-  }
-
-  @ViewBuilder
-  private func row(label: String, icon: String, emoji: String? = nil, selected: Bool) -> some View {
-    HStack(spacing: 12) {
-      if icon == "square.stack.3d.up.fill" {
-        AreaIcon(diameter: 15, lineWidth: 1.1, emoji: emoji)
-          .frame(width: 22)
-      } else {
-        Image(systemName: icon)
-          .scaledFont(size: 15)
-          .foregroundStyle(Theme.iconMuted)
-          .frame(width: 22)
-      }
-      Text(label)
-        .fontWeight(selected ? .semibold : .regular)
-        .foregroundStyle(Theme.inkPrimary)
-      Spacer()
-      if selected {
-        Image(systemName: "checkmark")
-          .scaledFont(size: 13, weight: .semibold)
-          .foregroundStyle(AppearancePreferences.shared.accentSwiftUIColor)
-      }
-    }
-    .contentShape(Rectangle())
   }
 }

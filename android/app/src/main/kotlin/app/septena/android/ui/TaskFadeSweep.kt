@@ -30,6 +30,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -267,6 +268,7 @@ internal fun FadeSweepBannerCard(
     onReview: () -> Unit,
     onDismiss: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
+    title: String? = null,
 ) {
     TaskCardSlice(
         position = TaskCardPosition.Solo,
@@ -281,6 +283,15 @@ internal fun FadeSweepBannerCard(
                 .padding(horizontal = TaskCardMetrics.ContentInset, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
+            title?.takeIf(String::isNotBlank)?.let {
+                Text(
+                    text = it,
+                    fontSize = 14.5.sp,
+                    lineHeight = 20.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
             Text(
                 text = message,
                 fontSize = 14.5.sp,
@@ -314,7 +325,8 @@ internal fun FadeSweepBannerCard(
  * Weekly Sweep sheet mirroring Apple `TaskFadeSweepSheet.swift`:
  * shows faded tasks with one tap ("Keep") per item and one bottom button
  * ("Let the rest go") that cancels remaining tasks with `dropReason = "faded"`
- * as a single undo entry. Dismissing drops nothing.
+ * as a single undo entry. Dismissing drops nothing. After Let the rest go
+ * the sheet stays open on one permission line (#711) until the user taps Done.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -332,6 +344,7 @@ internal fun TaskFadeSweepSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val remaining = remember(items) { mutableStateListOf<FadeSweepItem>().apply { addAll(items) } }
     var keptCount by remember(items) { mutableIntStateOf(0) }
+    var letGoCount by remember(items) { mutableIntStateOf(0) }
     fun copy(field: String) = fadeSweepText(field, languageTag)
 
     ModalBottomSheet(
@@ -373,10 +386,17 @@ internal fun TaskFadeSweepSheet(
                         size = 32.dp,
                     )
                     Text(
-                        text = copy(if (keptCount > 0) "keptAllTitle" else "emptyTitle"),
+                        text = copy(
+                            when {
+                                letGoCount > 0 -> "letGoTitle"
+                                keptCount > 0 -> "keptAllTitle"
+                                else -> "emptyTitle"
+                            },
+                        ),
                         style = MaterialTheme.typography.titleMedium,
+                        textAlign = TextAlign.Center,
                     )
-                    if (keptCount > 0) {
+                    if (keptCount > 0 && letGoCount == 0) {
                         Text(
                             text = copy("keptAllDetail"),
                             style = MaterialTheme.typography.bodySmall,
@@ -469,9 +489,11 @@ internal fun TaskFadeSweepSheet(
                     )
                     Button(
                         onClick = {
-                            onLetRestGo(remaining.map(FadeSweepItem::id))
+                            val ids = remaining.map(FadeSweepItem::id)
+                            onLetRestGo(ids)
                             onMarkCompleted()
-                            onDismiss()
+                            letGoCount = ids.size
+                            remaining.clear()
                         },
                     ) {
                         Text(copy("letRestGoTitle"))

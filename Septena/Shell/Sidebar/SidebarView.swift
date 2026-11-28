@@ -119,6 +119,8 @@ struct SidebarRootView: View {
   /// Right-click → Change Emoji. The picker the area page's icon opens.
   @State private var emojiAreaTarget: Area?
   @State private var emojiDraft = ""
+  /// Right-click → Move… (`project.move`): the task Move sheet, areas only.
+  @State private var moveProjectTarget: Project?
 
   /// Right-click → Delete (confirm before mutating).
   @State private var deleteProjectTarget: Project?
@@ -133,17 +135,29 @@ struct SidebarRootView: View {
   var body: some View {
     #if os(macOS)
     sidebarMac.modifier(rightClickAlerts).sheet(item: $emojiAreaTarget, content: areaEmojiSheet)
+      .sheet(item: $moveProjectTarget, content: projectMoveSheet)
     #else
     if usesPushNavigation {
       sidebarSplit.modifier(rightClickAlerts).sheet(item: $emojiAreaTarget, content: areaEmojiSheet)
+      .sheet(item: $moveProjectTarget, content: projectMoveSheet)
     } else {
       sidebarPhone.modifier(rightClickAlerts).sheet(item: $emojiAreaTarget, content: areaEmojiSheet)
+      .sheet(item: $moveProjectTarget, content: projectMoveSheet)
     }
     #endif
   }
 
   private func areaEmojiSheet(_ area: Area) -> some View {
     EmojiPickerContent(emoji: $emojiDraft) { setAreaEmoji(area, $0) }
+  }
+
+  private func projectMoveSheet(_ project: Project) -> some View {
+    MovePickerSheet(areas: areas, projects: [], currentAreaId: project.area,
+                    noneTitle: String(localized: "No Area")) { areaId, _ in
+      moveProject(project, to: areaId)
+    }
+    .presentationDetents([.medium, .large])
+    .septenaSheetChrome()
   }
 
   private func setAreaEmoji(_ area: Area, _ value: String) {
@@ -760,7 +774,7 @@ struct SidebarRootView: View {
         nav.path = [.filter(.today)]
         nav.requestNewTask()
       },
-      onCreateProject: { title, areaId, mode in createProject(title: title, areaId: areaId, mode: mode) },
+      onCreateProject: { title, areaId in createProject(title: title, areaId: areaId) },
       onCreateArea: { createArea() },
       reload: { Task { await load() } }
     )
@@ -768,12 +782,12 @@ struct SidebarRootView: View {
 
   // MARK: - Create handlers
 
-  private func createProject(title: String, areaId: String?, mode: ProjectChecklistMode?) {
+  private func createProject(title: String, areaId: String?) {
     let t = title.trimmingCharacters(in: .whitespaces)
     guard !t.isEmpty else { return }
     Task {
       do {
-        _ = try await projectsMutator.create(title: t, area: areaId, checklistMode: mode)
+        _ = try await projectsMutator.create(title: t, area: areaId)
         await load()
       } catch {
         errorMessage = error.localizedDescription
@@ -1366,34 +1380,13 @@ struct SidebarRootView: View {
           })
         case .projectMarkDone: return .init { setProjectStatus(project, to: .done) }
         case .projectCancel: return .init { setProjectStatus(project, to: .cancelled) }
+        case .projectMove: return .init { moveProjectTarget = project }
         case .projectShare: return .init { SeptaskSharing.present(projectID: project.id) }
         // A shared project ends from its Share screen.
         case .projectDelete: return project.share == nil ? .init { deleteProjectTarget = project } : nil
         default: return nil
         }
-      },
-      slot: { id in
-        guard id == "moveToAreaDestinations" else { return [] }
-        return projectAreaDestinations(project)
       }))
-  }
-
-  /// Move to Area ▸ — No Area, then every area; the current parent is
-  /// checked and inert. Same slot the AppKit sidebar fills.
-  private func projectAreaDestinations(_ project: Project) -> [RegistryMenuNode] {
-    var nodes: [RegistryMenuNode] = [
-      RegistryMenuEntry.slot(id: "area.none", title: String(localized: "No Area"),
-                             sfSymbol: "tray", isOn: project.area == nil,
-                             perform: project.area == nil ? nil : { moveProject(project, to: nil) }),
-    ]
-    if !areas.isEmpty { nodes.append(.divider(id: "areas.divider")) }
-    for area in areas {
-      nodes.append(RegistryMenuEntry.slot(
-        id: "area.\(area.id)", title: area.title,
-        listIcon: .area(emoji: area.emoji), isOn: project.area == area.id,
-        perform: project.area == area.id ? nil : { moveProject(project, to: area.id) }))
-    }
-    return nodes
   }
 
   /// Registry `sidebar.area`, the same menu the AppKit sidebar renders.
@@ -1764,7 +1757,7 @@ private struct SidebarBehaviorModifier: ViewModifier {
   let areas: [Area]
   let activeAreaId: String?
   let onNewTodo: () -> Void
-  let onCreateProject: (String, String?, ProjectChecklistMode?) -> Void
+  let onCreateProject: (String, String?) -> Void
   let onCreateArea: () -> Void
   let reload: () -> Void
 
@@ -2071,15 +2064,14 @@ struct NewProjectSheet: View {
   /// Pre-selected area when invoked from an area's context menu, an open Area
   /// page, or a Project inside an Area.
   var initialAreaId: String? = nil
-  let onCreate: (String, String?, ProjectChecklistMode?) -> Void
+  let onCreate: (String, String?) -> Void
 
   @Environment(\.dismiss) private var dismiss
   @State private var title = ""
-  @State private var mode: ProjectChecklistMode?
   @State private var selectedAreaId: String?
   @FocusState private var titleFocused: Bool
 
-  init(areas: [Area], initialAreaId: String? = nil, onCreate: @escaping (String, String?, ProjectChecklistMode?) -> Void) {
+  init(areas: [Area], initialAreaId: String? = nil, onCreate: @escaping (String, String?) -> Void) {
     self.areas = areas
     self.initialAreaId = initialAreaId
     self.onCreate = onCreate
@@ -2092,7 +2084,7 @@ struct NewProjectSheet: View {
 
   private func submit() {
     guard canCreate else { return }
-    onCreate(title, selectedAreaId, mode)
+    onCreate(title, selectedAreaId)
     dismiss()
   }
 
@@ -2104,11 +2096,6 @@ struct NewProjectSheet: View {
             .focused($titleFocused)
             .submitLabel(.done)
             .onSubmit { submit() }
-        }
-        Picker(RegistrySurfaces.checklistProjectType, selection: $mode) {
-          Text(RegistrySurfaces.standardProjectTitle).tag(nil as ProjectChecklistMode?)
-          Text(RegistrySurfaces.checklistProjectTitle).tag(ProjectChecklistMode?.some(.plain))
-          Text(RegistrySurfaces.groceriesProjectTitle).tag(ProjectChecklistMode?.some(.groceries))
         }
         Section("Area") {
           Button { selectedAreaId = nil } label: {
@@ -2265,7 +2252,7 @@ private struct SidebarSheets: ViewModifier {
   let areas: [Area]
   let activeAreaId: String?
   let onNewTodo: () -> Void
-  let onCreateProject: (String, String?, ProjectChecklistMode?) -> Void
+  let onCreateProject: (String, String?) -> Void
   let onCreateArea: () -> Void
 
   func body(content: Content) -> some View {

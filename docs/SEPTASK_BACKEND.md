@@ -1,11 +1,11 @@
-# Septask backend — spec
+# Septena backend — spec
 
 **Status (2026-11-19):** live at `api.septena.app` (Cloudflare account
-Centaur-Labs). **Phase 4 done: Septask is backend-only and CloudKit-free**
+Centaur-Labs). **Phase 4 done: Septena is backend-only and CloudKit-free**
 (§9):
-tasks, areas, projects, attachments, conversations, turns and Septask's
-synced settings all sync through it. Septena still uses CloudKit for its own
-data and freezes the CloudKit task types on a device where Septask runs.
+tasks, areas, projects, attachments, conversations, turns and Septena's
+synced settings all sync through it. Septena Life still uses CloudKit for its own
+data and freezes the CloudKit task types on a device where Septena runs.
 **Owner of decisions:** mz. All open questions answered 2026-11-18 (§12).
 
 ## 1. Decisions already made (2026-11-18)
@@ -13,18 +13,19 @@ data and freezes the CloudKit task types on a device where Septask runs.
 | Question | Decision |
 |---|---|
 | Where task data lives | Own backend. Cloudflare is the source of truth. SwiftData stays as the local cache. |
-| Who Septask is for | mz first. Keep an App Store release possible. |
-| Septena (life OS) | Stays. Septena and Septask share one task core. |
+| Who Septena is for | mz first. Keep an App Store release possible. |
+| Septena Life (life OS) | Stays. Septena Life and Septena share one task core. |
 | Claude surfaces that must work | Claude.ai / mobile connector, Claude Code / Desktop, scheduled agents while every device sleeps. |
 
-**2026-11-19: Septask becomes a fully separate product** and will probably
-be renamed. Backend features (Sign in with Apple, the import, sync) land in
-Septask first. **Septena drops tasks** (decided 2026-11-19): the task app
-owns them, and Septena's Tasks section is removed after the cutover. The
-import runs from Septask (Settings ▸ About ▸ Advanced). Open: the new name.
+**2026-11-19: the task app (then the working name Septask) becomes a fully
+separate product.** ADR 0007 later named it Septena. Backend features (Sign in
+with Apple, the import, sync) land in the task app first. **Septena Life drops
+tasks** (decided 2026-11-19): the task app owns them, and Septena Life's Tasks
+section is removed after the cutover. The import runs from Septena (Settings ▸
+About ▸ Advanced).
 
 Earlier default chosen by the agent (overrule if wrong): **tasks move to the backend
-for BOTH apps.** Septena's other sections (checklists, intake, body, goals,
+for BOTH apps.** Septena Life's other sections (checklists, intake, body, goals,
 wearables, settings) stay on CloudKit. One task store, not two.
 
 ## 2. Why
@@ -166,8 +167,8 @@ Why key/value rows and not one row of columns: conflicts stay per key (two
 devices changing two settings both win), and a new setting is one schema line
 with no table change. A pull carries setting rows only when the client asks
 with `settings=1`, because builds before 2026-11-19 decode entities strictly.
-The app keeps these values in a blob in Septask's own defaults, NOT in the
-shared `SettingsEntity` row, which Septena still syncs through CloudKit
+The app keeps these values in a blob in Septena's own defaults, NOT in the
+shared `SettingsEntity` row, which Septena Life still syncs through CloudKit
 (`SeptenaCore/TaskBackend/TaskSyncSettings.swift`). First run: the blob is
 seeded from that row, and a seeded value is pushed only for a key the first
 pull did not bring, so a value another device pushed wins. Device-only
@@ -272,21 +273,21 @@ the pulled server state overwrites local fields that have no pending op.
   gesture, never in the mutator or the sync apply path.
 - **Sign-in:** Sign in with Apple, once per install. The Worker returns a
   long-lived refresh token (Keychain, shared through the app group so
-  extensions can read it) and a short access token. **Septena asks for Sign
-  in with Apple at first launch**, for every user, same as Septask.
+  extensions can read it) and a short access token. **Septena Life asks for Sign
+  in with Apple at first launch**, for every user, same as Septena.
 - **In-app MCP server** (`SeptenaCore/MCP/`) keeps working: it reads the
   local cache and writes through the mutators, so its writes sync like any
   app write.
 - **Cutover flag:** a `taskStore` setting with values `cloudkit` / `backend`.
   Both paths exist in the code until the cleanup phase.
-- **Status (2026-11-19): Septask is CloudKit-free.** Septask never starts
+- **Status (2026-11-19): Septena is CloudKit-free.** Septena never starts
   `CKEngine` (no zone fetch, no push registration, no `CKContainer`), has no
-  iCloud or push entitlement, and has no iCloud/backend switch. In Septask
-  `TaskStoreMode.current` is always `backend`; Septask writes `backend` into
-  the shared `septena.taskStore.mode` key at every launch so Septena keeps its
-  freeze. Signed out, Septask edits the local store and queues every change
+  iCloud or push entitlement, and has no iCloud/backend switch. In Septena
+  `TaskStoreMode.current` is always `backend`; Septena writes `backend` into
+  the shared `septena.taskStore.mode` key at every launch so Septena Life keeps its
+  freeze. Signed out, Septena edits the local store and queues every change
   in the outbox; the welcome, Today and Settings ▸ Account ask for Sign in
-  with Apple. The `.tasks` section color is no longer read in Septask (it
+  with Apple. The `.tasks` section color is no longer read in Septena (it
   uses the platform accent).
 
 ## 8. MCP gateway
@@ -311,7 +312,7 @@ the pulled server state overwrites local fields that have no pending op.
   connector that served `https://api.septena.app/mcp` from the same Worker
   (`src/shadow/` in the gateway). Its OAuth uses **app pairing** instead of
   web Sign in with Apple (no Services ID needed): the authorize page shows an
-  8-character code, and Septask ▸ Settings ▸ About ▸ Advanced ▸ Task backend ▸
+  8-character code, and Septena ▸ Settings ▸ About ▸ Advanced ▸ Task backend ▸
   "Connect Claude (preview)" approves it through `POST /v1/pair/approve` with
   the app's own session. Today is ordered by `todayPosition`, then
   `position`. **Read-write since 2026-11-19:** it serves every task tool of the live connector,
@@ -333,26 +334,26 @@ Each phase ends in a working app. Rollback is the cutover flag.
 
 **Status (2026-11-19):** phases 0 and 1 are live (2,035 rows imported).
 Phase 2 is built and awaits deploy: the read-only connector at
-`api.septena.app/mcp`, authorized by pairing a code with the Septask Mac app
+`api.septena.app/mcp`, authorized by pairing a code with the Septena Mac app
 (§8).
 
 **Rollback after phase 3:** a one-shot "Copy tasks back to iCloud" writer
 must exist **before** cutover, because rows created on the backend after
 cutover are not in CloudKit.
 
-**Phase 4 status (2026-11-19), Septask:** done for Septask. The rollback
+**Phase 4 status (2026-11-19), Septena:** done for Septena. The rollback
 ("Move tasks back to iCloud", `TaskStoreRollback`) and the import ("Copy tasks
 to backend", `TaskBackendImporter`, with its CloudKit-pending checks) are
-removed from Septask's compile, as are `CloudKitRecordRegistry`,
+removed from Septena's compile, as are `CloudKitRecordRegistry`,
 `SchemaSeedRegistrar` and the CloudKit watch snapshot publisher (project.yml
 excludes). No re-upload action replaces the import: the sync engine's
 reconcile already sends every local row the backend does not hold. There is
-no way back to iCloud from Septask any more. The CloudKit task records stay as
-a frozen backup. Septena still compiles the CloudKit task path for its own
-records; the files above remain in Septena until Septena drops tasks.
+no way back to iCloud from Septena any more. The CloudKit task records stay as
+a frozen backup. Septena Life still compiles the CloudKit task path for its own
+records; the files above remain in Septena Life until Septena Life drops tasks.
 
 **Phase 4 done (2026-11-19, #42).** No CloudKit task record mapping compiles
-into either Septask target. `CloudKit/TaskRecord.swift`, `AreaRecord.swift`,
+into either task-app target. `CloudKit/TaskRecord.swift`, `AreaRecord.swift`,
 `ProjectRecord.swift`, `TaskAttachmentRecord.swift` (CKRecord encode/decode)
 and `CloudKit/Migration.swift` (the CloudKit `TasksMigrator` and its
 snapshots) are excluded from `Septask` and `SeptaskMac`. Their shared halves
@@ -361,9 +362,9 @@ moved to their own files, which both apps compile: `TaskRecordNames.swift`
 `TaskStoreMode`'s freeze and the sync engine's ledger),
 `TaskAttachments.swift` (`TaskAttachmentEntity`, `TaskAttachmentFiles`,
 `TaskAttachmentStore`) and `LaunchMigrators.swift` (`EventTimestamp` and the
-launch migrators). `CKEngine` still compiles in Septask because the mutators
+launch migrators). `CKEngine` still compiles in Septena because the mutators
 take it; it never starts there. `TaskStoreMode` and the frozen-record-types
-logic stay for Septena, which reads the device-wide mode so it never writes
+logic stay for Septena Life, which reads the device-wide mode so it never writes
 tasks through CloudKit.
 
 ## 10. Privacy and security
@@ -433,11 +434,11 @@ tasks through CloudKit.
 
 ## 11. Repo split (after cutover)
 
-- A new `septask` repo holds the Septask app targets and the backend Worker.
+- A new `septask` repo holds the Septena app targets and the backend Worker.
 - The shared task core (models, mutators, `TaskSyncClient`, task UI under
   `Shell/Tasks`) becomes an SPM package that both repos consume.
-- Septena pins a version of that package. Shared-code changes then need a
-  version bump in Septena; this replaces today's "build all four schemes"
+- Septena Life pins a version of that package. Shared-code changes then need a
+  version bump in Septena Life; this replaces today's "build all four schemes"
   rule.
 - The split happens after cutover so that the migration happens in one repo.
 
@@ -446,12 +447,12 @@ tasks through CloudKit.
 | Question | Decision |
 |---|---|
 | Domain | Stay on `septena.app`: keep `mcp.septena.app`, add `api.septena.app`. The live connector does not change. |
-| Sign-in in Septena | Septena asks for Sign in with Apple at first launch, for every user. |
+| Sign-in in Septena Life | Septena Life asks for Sign in with Apple at first launch, for every user. |
 | Attachment limits | 25 MB per file, 2 GB per user (§10). |
 | Delete vs. late update | A deleted task stays deleted; the late edit is dropped and logged (§6.4). |
 | Area / project delete (2026-11-20) | Its tasks go to Recently Deleted, never to the Inbox; the deleting client cascades, the server does not (§6.4). One undo step restores everything. |
 | Manual order (2026-11-19) | Today has its own order (`todayPosition`), separate from the home list's `position`, as in Things. The backend column is live; the apps adopt it at cutover. |
 | Things-grade pass | Separate work. Needs mz's list of pains. Not part of this spec. |
 | Linked projects (2026-11-19) | GitHub Issues and Starlings tasks as project sources, run server-side after cutover. Spec: `docs/LINKED_PROJECTS_SPEC.md`. |
-| Septask and CloudKit (2026-11-19) | Septask is CloudKit-free: no engine, no entitlement, no iCloud switch. Settings it syncs move to the backend `setting` entity. Rollback to iCloud is removed. |
-| Task-related settings (2026-11-19) | Answers §3's open question. Task view preferences (`todayGroupByList` and the like) are device-local defaults and stay local. The account-wide settings Septask used (name, usage-data level, hidden calendars, rolled-in dismissal, home time zone) synced through the CloudKit `Settings` record; for Septask they now sync as backend `setting` rows (§5.2). |
+| Septena and CloudKit (2026-11-19) | Septena is CloudKit-free: no engine, no entitlement, no iCloud switch. Settings it syncs move to the backend `setting` entity. Rollback to iCloud is removed. |
+| Task-related settings (2026-11-19) | Answers §3's open question. Task view preferences (`todayGroupByList` and the like) are device-local defaults and stay local. The account-wide settings Septena used (name, usage-data level, hidden calendars, rolled-in dismissal, home time zone) synced through the CloudKit `Settings` record; for Septena they now sync as backend `setting` rows (§5.2). |

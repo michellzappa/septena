@@ -68,6 +68,19 @@ extension NavigationState {
       self.shouldStartCreating = false
     }
   }
+
+  /// Open Today and start the standard inline new task there, the same draft
+  /// the + button and Magic Plus open. The Quick Add home-screen action and
+  /// the widget's + use it. While the Do screen covers the lists there is no
+  /// list to create in, so the quick-add sheet opens instead.
+  func startNewTaskOnToday() {
+    if DoFlow.isAvailable, DoStore.shared.isFullHere, DoStore.shared.current != nil {
+      presentAddInfo()
+      return
+    }
+    go(to: .filter(.today))
+    requestNewTask()
+  }
 }
 
 /// Prominent "+" for creating a task — shared between the local nav toolbar
@@ -186,7 +199,7 @@ struct TaskListStandaloneChrome: ViewModifier {
   func body(content: Content) -> some View {
     #if os(iOS)
     if usesPushNavigation {
-      // Septask has no floating window-level overlay bar (unlike Septena's
+      // Septena has no floating window-level overlay bar (unlike Septena Life's
       // `RootTabView.iPadTabless`), so on iPad / unfolded iPhone Duo the
       // standalone detail column owns its own trailing action (New Task).
       // "Group Today by List" is a global setting: it lives in Settings, not

@@ -88,16 +88,6 @@
       "reasonId": "predates-rule"
     },
     {
-      "file": "Septena/Shell/Sidebar/AreasProjectsView.swift",
-      "literal": "Move to Area…",
-      "reasonId": "predates-rule"
-    },
-    {
-      "file": "Septena/Shell/Sidebar/AreasProjectsView.swift",
-      "literal": "Move to Area",
-      "reasonId": "predates-rule"
-    },
-    {
       "file": "Septena/Shell/Sidebar/SidebarView.swift",
       "literal": "Customize Lists…",
       "reasonId": "predates-rule"

@@ -102,7 +102,7 @@ private struct IconStyleTileButton: View {
   }
 }
 
-// MARK: - Native Vector Preview (Matches `tools/logo-builder/dial-svg.mjs`)
+// MARK: - Native Vector Preview (Matches `scripts/dial-svg.mjs`)
 
 /// Crisp vector SwiftUI rendering of the canonical Septena Upright Compass icon,
 /// shared by the Settings picker and any in-app icon preview without shipping

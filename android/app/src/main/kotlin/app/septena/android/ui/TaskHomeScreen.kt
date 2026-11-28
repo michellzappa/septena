@@ -72,6 +72,7 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
@@ -91,6 +92,7 @@ import app.septena.android.AndroidAppGraph
 import app.septena.android.calendar.AndroidCalendarReader
 import app.septena.android.doing.DoCopy
 import app.septena.android.widgets.WidgetLaunchAction
+import app.septena.core.TopBar
 import app.septena.core.JsonValue
 import app.septena.core.generated.RegistrySettingKeys
 import app.septena.core.stringValue
@@ -182,6 +184,10 @@ fun TaskHomeScreen(
     LaunchedEffect(state.selectedIds) {
         if (state.selectedIds.isNotEmpty()) expandedTaskId = null
     }
+    // Set when a new task must open on Today once Today has loaded: Magic Plus
+    // from a list whose `newTaskTarget` is today, and the Quick Add shortcut,
+    // tile and widget +.
+    var pendingTodayNewTask by remember { mutableStateOf(false) }
     LaunchedEffect(launchAction) {
         when (launchAction) {
             null -> Unit
@@ -212,7 +218,15 @@ fun TaskHomeScreen(
                 openedTaskAttribute = null
                 expandedTaskId = null
                 showingListsHome = false
-                homeQuickAddDraft = QuickAddDraft(today = launchAction.today)
+                // The standard inline new task on Today, the same draft Magic
+                // Plus opens (not the Quick Add sheet). The Do screen has no
+                // list behind it, so it keeps the sheet.
+                if (doing.current?.takeIf { doing.isFullHere } != null) {
+                    homeQuickAddDraft = QuickAddDraft(today = launchAction.today)
+                } else {
+                    pendingTodayNewTask = true
+                    selectHomeLocation(TaskHomeLocation.SmartList(RegistryDestinationIds.TODAY))
+                }
                 onConsumeLaunchAction()
             }
             is WidgetLaunchAction.JoinShare -> {
@@ -251,7 +265,6 @@ fun TaskHomeScreen(
     // Magic Plus tap / app.newTask from this list (`newTaskTarget` in destinations.json,
     // Apple `triggerInlineNewTask`): a draft here, a draft here on tomorrow, or a jump
     // to Today, where the draft opens once Today has loaded.
-    var pendingTodayNewTask by remember { mutableStateOf(false) }
     val newTaskFromHere: () -> Unit = {
         val destId = (state.location as? TaskHomeLocation.SmartList)?.destinationId
         val target = destId?.let(RegistryCatalog::destinationNewTaskTarget) ?: RegistryCatalog.NEW_TASK_HERE
@@ -552,6 +565,20 @@ fun TaskHomeScreen(
     val smartListNavOrder = remember(state.topSmartLists, state.bottomSmartLists) {
         (state.topSmartLists + state.bottomSmartLists).map { it.location }
     }
+    // app.goBack / app.goForward (#849): the keys come from the registry shortcut.
+    val goBackKey = remember { registryShortcutKey(RegistryActionIds.APP_GO_BACK) }
+    val goForwardKey = remember { registryShortcutKey(RegistryActionIds.APP_GO_FORWARD) }
+    val stepHistory: (TaskHomeLocation?) -> Boolean = { target ->
+        if (target != null) {
+            settingsOpen = false
+            quickFindOpen = false
+            openedTaskId = null
+            expandedTaskId = null
+            selectHomeLocation(target)
+        }
+        // Consumed at either end too, so the key never types into a field.
+        true
+    }
     val hardwareShortcutModifier = Modifier.onPreviewKeyEvent { event ->
         if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
         val primary = event.isCtrlPressed || event.isMetaPressed
@@ -591,6 +618,8 @@ fun TaskHomeScreen(
                 }
                 true
             }
+            primary && !event.isShiftPressed && event.key == goBackKey -> stepHistory(homeViewModel.historyBack())
+            primary && !event.isShiftPressed && event.key == goForwardKey -> stepHistory(homeViewModel.historyForward())
             primary && event.key in KEYBOARD_LIST_INDEX -> {
                 val index = KEYBOARD_LIST_INDEX.getValue(event.key)
                 val target = smartListNavOrder.getOrNull(index) ?: return@onPreviewKeyEvent false
@@ -664,8 +693,8 @@ fun TaskHomeScreen(
                                     selectHomeLocation(created)
                                 }
                             },
-                            onCreateProject = { title, areaId, insertIndex, checklistMode ->
-                                homeViewModel.createProject(title, areaId = areaId, insertIndex = insertIndex, checklistMode = checklistMode) { created ->
+                            onCreateProject = { title, areaId, insertIndex ->
+                                homeViewModel.createProject(title, areaId = areaId, insertIndex = insertIndex) { created ->
                                     selectHomeLocation(created)
                                 }
                             },
@@ -783,8 +812,8 @@ fun TaskHomeScreen(
                             selectHomeLocation(created)
                         }
                     },
-                    onCreateProject = { title, areaId, insertIndex, checklistMode ->
-                        homeViewModel.createProject(title, areaId = areaId, insertIndex = insertIndex, checklistMode = checklistMode) { created ->
+                    onCreateProject = { title, areaId, insertIndex ->
+                        homeViewModel.createProject(title, areaId = areaId, insertIndex = insertIndex) { created ->
                             selectHomeLocation(created)
                         }
                     },
@@ -1208,6 +1237,11 @@ private fun TaskHomeScaffold(
     val appearance = LocalAppearance.current
     val selecting = state.selectedIds.isNotEmpty()
     val destinationId = (state.location as? TaskHomeLocation.SmartList)?.destinationId
+    val betaSignedIn by graph.credentials.signedIn.collectAsStateWithLifecycle()
+    // The beta card (docs/BETA_ONBOARDING_SPEC.md §7) reads the checklist each time Today opens.
+    LaunchedEffect(destinationId == RegistryDestinationIds.TODAY, betaSignedIn) {
+        if (destinationId == RegistryDestinationIds.TODAY) graph.beta.refresh(betaSignedIn)
+    }
     val showStarFilterButton = destinationId != RegistryDestinationIds.STARRED &&
         destinationId != RegistryDestinationIds.RECENTLY_DELETED &&
         !(destinationId == RegistryDestinationIds.LOGBOOK && logbookShowingDeleted)
@@ -1426,6 +1460,15 @@ private fun TaskHomeScaffold(
                 ),
             )
         }
+        if (destinationId == RegistryDestinationIds.TODAY) {
+            BetaTodayCard(
+                graph = graph,
+                languageTag = languageTag,
+                isDark = isDark,
+                hasActiveTexture = appearance.hasActiveTexture,
+                modifier = Modifier.padding(bottom = 10.dp),
+            )
+        }
         val noticedDo = doing.current?.takeIf { doing.showsNotice }
         val needsYou = doing.endedSince?.let { since -> state.agentRequestTimes.count { !it.isBefore(since) } } ?: 0
         if (noticedDo != null) {
@@ -1622,38 +1665,45 @@ private fun TaskHomeScaffold(
                         } else {
                             {}
                         },
-                        // Home top nav is Star + Search (matching iOS; Settings lives in sidebar & title nav menu).
+                        // The phone top bar from the registry (surfaces.json `topBar`, screen
+                        // `list`): More (Sort By) · Star · Search, in that order on every platform.
                         actions = {
-                            if (showStarFilterButton) {
-                                IconButton(
-                                    onClick = onToggleStarFilter,
-                                    modifier = Modifier.semantics { contentDescription = starredFilterTitle },
-                                ) {
-                                    StarGlyph(
-                                        filled = state.starredOnly,
-                                        tint = if (state.starredOnly) {
-                                            MaterialTheme.colorScheme.secondary
-                                        } else {
-                                            MaterialTheme.colorScheme.onSurface
-                                        },
-                                        size = 21.dp,
-                                    )
+                            TopBar.order(TopBar.Screen.LIST, "trailing").forEach { button ->
+                                when (button) {
+                                    TopBar.Button.MORE -> state.listSort?.let { currentSort ->
+                                        ListSortMenuButton(
+                                            copy = listSortCopy,
+                                            current = currentSort,
+                                            expanded = sortMenuOpen,
+                                            onExpandedChange = { sortMenuOpen = it },
+                                            onPick = homeViewModel::setListSort,
+                                        )
+                                    }
+                                    // Star shows while the list holds an open starred task, or while
+                                    // its filter is on (so it can be turned off again).
+                                    TopBar.Button.STAR -> if (showStarFilterButton && (state.hasOpenStarred || state.starredOnly)) {
+                                        IconButton(
+                                            onClick = onToggleStarFilter,
+                                            modifier = Modifier.semantics { contentDescription = starredFilterTitle },
+                                        ) {
+                                            StarGlyph(
+                                                filled = state.starredOnly,
+                                                tint = if (state.starredOnly) {
+                                                    MaterialTheme.colorScheme.secondary
+                                                } else {
+                                                    MaterialTheme.colorScheme.onSurface
+                                                },
+                                                size = 21.dp,
+                                            )
+                                        }
+                                    }
+                                    TopBar.Button.SEARCH -> IconButton(
+                                        onClick = onQuickFind,
+                                        modifier = Modifier.semantics { contentDescription = quickFindTitle },
+                                    ) {
+                                        SearchGlyph(tint = MaterialTheme.colorScheme.onSurface)
+                                    }
                                 }
-                            }
-                            state.listSort?.let { currentSort ->
-                                ListSortMenuButton(
-                                    copy = listSortCopy,
-                                    current = currentSort,
-                                    expanded = sortMenuOpen,
-                                    onExpandedChange = { sortMenuOpen = it },
-                                    onPick = homeViewModel::setListSort,
-                                )
-                            }
-                            IconButton(
-                                onClick = onQuickFind,
-                                modifier = Modifier.semantics { contentDescription = quickFindTitle },
-                            ) {
-                                SearchGlyph(tint = MaterialTheme.colorScheme.onSurface)
                             }
                         },
                     )
@@ -2030,7 +2080,8 @@ private fun ListSortMenuButton(
             onClick = { onExpandedChange(true) },
             modifier = Modifier.semantics { contentDescription = copy.menuTitle },
         ) {
-            SortGlyph(tint = MaterialTheme.colorScheme.onSurface)
+            // Sort By lives inside More (registry `topBar`): the button is the `action.more` glyph.
+            MoreGlyph(tint = MaterialTheme.colorScheme.onSurface)
         }
         val isDark = LocalSeptenaDarkTheme.current
         DropdownMenu(
@@ -2071,22 +2122,13 @@ private fun ListSortMenuButton(
     }
 }
 
-/** The `action.sort` glyph of registry/icons.json (Material `swap_vert`): an up and a down arrow. */
+/** The `action.more` glyph of registry/icons.json (Material `more_horiz`): three dots in a row. */
 @Composable
-private fun SortGlyph(tint: Color) {
+private fun MoreGlyph(tint: Color) {
     Canvas(modifier = Modifier.size(21.dp)) {
-        val stroke = 1.9.dp.toPx()
-        val head = size.width * 0.16f
-        val upX = size.width * 0.34f
-        val downX = size.width * 0.66f
-        val top = size.height * 0.18f
-        val bottom = size.height * 0.82f
-        drawLine(tint, Offset(upX, top), Offset(upX, bottom), strokeWidth = stroke, cap = StrokeCap.Round)
-        drawLine(tint, Offset(upX, top), Offset(upX - head, top + head), strokeWidth = stroke, cap = StrokeCap.Round)
-        drawLine(tint, Offset(upX, top), Offset(upX + head, top + head), strokeWidth = stroke, cap = StrokeCap.Round)
-        drawLine(tint, Offset(downX, top), Offset(downX, bottom), strokeWidth = stroke, cap = StrokeCap.Round)
-        drawLine(tint, Offset(downX, bottom), Offset(downX - head, bottom - head), strokeWidth = stroke, cap = StrokeCap.Round)
-        drawLine(tint, Offset(downX, bottom), Offset(downX + head, bottom - head), strokeWidth = stroke, cap = StrokeCap.Round)
+        val radius = 1.8.dp.toPx()
+        val y = size.height / 2f
+        listOf(0.22f, 0.5f, 0.78f).forEach { x -> drawCircle(tint, radius = radius, center = Offset(size.width * x, y)) }
     }
 }
 
@@ -2222,6 +2264,14 @@ private fun actionMenuIcon(actionId: String): TaskMenuActionIcon = when (actionI
     RegistryActionIds.TASK_GOT_IT_BACK -> TaskMenuActionIcon.Restore
     else -> TaskMenuActionIcon.None
 }
+
+/** A registry shortcut key as a Compose [Key]; null for a key this screen does not bind. */
+private fun registryShortcutKey(actionId: String): Key? =
+    when (RegistryCatalog.actionShortcutKey(actionId)) {
+        "[" -> Key.LeftBracket
+        "]" -> Key.RightBracket
+        else -> null
+    }
 
 private val KEYBOARD_LIST_INDEX: Map<Key, Int> = mapOf(
     Key.One to 0,

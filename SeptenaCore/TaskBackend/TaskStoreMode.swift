@@ -5,17 +5,17 @@ import Foundation
 // CKEngine as before. `backend`: they sync through `TaskSyncEngine` to
 // api.septena.app, and CloudKit freezes those four record types.
 //
-// Septask is backend-only since 2026-11-19 (phase 4): in Septask `current` is
-// always `.backend`, and Septask never starts CloudKit at all.
+// Septena is backend-only since 2026-11-19 (phase 4): in Septena `current` is
+// always `.backend`, and Septena never starts CloudKit at all.
 //
 // The STORED value is device-wide, in the shared app-group defaults, and is
-// now only for Septena. Septena and Septask open the same SwiftData store
-// (`MacStoreLocation` on the Mac, the app-group container on iOS). If Septena
-// kept applying CloudKit task records into that store while Septask syncs
+// now only for Septena Life. Septena Life and Septena open the same SwiftData store
+// (`MacStoreLocation` on the Mac, the app-group container on iOS). If Septena Life
+// kept applying CloudKit task records into that store while Septena syncs
 // with the backend, a device still on CloudKit could overwrite backend state
-// through Septena's process. So Septena READS the flag and honors the freeze,
-// and Septask writes `backend` at every launch (`markDeviceBackend`). The old
-// key and value stay, rather than a new flag, so Septena builds already on
+// through Septena Life's process. So Septena Life READS the flag and honors the freeze,
+// and Septena writes `backend` at every launch (`markDeviceBackend`). The old
+// key and value stay, rather than a new flag, so Septena Life builds already on
 // devices keep honoring it with no change.
 
 enum TaskStoreMode: String, Sendable {
@@ -27,7 +27,7 @@ enum TaskStoreMode: String, Sendable {
   }
 
   /// Tells Septena on this device that the backend owns tasks, so it freezes
-  /// the CloudKit task types. Idempotent; called at every Septask launch.
+  /// the CloudKit task types. Idempotent; called at every Septena launch.
   static func markDeviceBackend() {
     let defaults = SeptenaAppGroup.defaults
     guard defaults.string(forKey: SettingsKey.taskStoreMode) != TaskStoreMode.backend.rawValue else { return }

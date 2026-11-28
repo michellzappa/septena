@@ -110,6 +110,7 @@ enum RegistryRules {
   static let deleteGraceSeconds: Int = 120
   static let doStaleHours: Int = 4
   static let doLapseHours: Int = 24
+  static let navigationHistoryLimit: Int = 50
 }
 
 /// Semantic icon ID → SF Symbol lookup (`registry/icons.json`).
@@ -186,7 +187,10 @@ enum RegistryIcons {
     "action.move_up": "chevron.up",
     "action.move_down": "chevron.down",
     "action.add": "plus",
+    "action.go_back": "chevron.backward",
+    "action.go_forward": "chevron.forward",
     "action.search": "magnifyingglass",
+    "action.settings": "gearshape",
     "action.sidebar": "sidebar.leading",
     "action.notes": "text.alignleft",
     "action.discuss": "bubble.left.and.bubble.right",
@@ -313,7 +317,7 @@ enum RegistryTokens {
     static let unemphasizedAlphaLight: Double = 0.1
     static let unemphasizedAlphaDark: Double = 0.14
     static let chipSelectedFillOpacity: Double = 0.22
-    static let pointerHoverOpacity: Double = 0.012
+    static let pointerHoverOpacity: Double = 0.05
   }
   enum Radii {
     static let card: Double = 22
@@ -957,7 +961,7 @@ enum RegistryDestinations {
 
   static let all: [RegistryDestination] = [
     RegistryDestination(id: .inbox, navigationKey: "triage", serverView: "triage", title: RegistryL10n.t("Inbox"), iconId: "list.inbox", sfSymbol: "tray.full", sidebarSection: "top", visibility: "todayBand", canHide: false, canMoveSection: false, supportsManualOrder: false, newTaskTarget: "here", emptyTitle: RegistryL10n.t("Inbox is empty"), emptyDetail: RegistryL10n.t("New tasks wait at the top of Today until you schedule or file them."), featureId: "lists.inbox"),
-    RegistryDestination(id: .today, navigationKey: "today", serverView: "today", title: RegistryL10n.t("Today"), iconId: "list.today", sfSymbol: "sun.max.fill", sidebarSection: "top", visibility: "always", canHide: false, canMoveSection: false, supportsManualOrder: true, newTaskTarget: "here", emptyTitle: RegistryL10n.t("Nothing on Today"), emptyDetail: RegistryL10n.t("Add a task or move one here when you want to work on it today."), featureId: "lists.today"),
+    RegistryDestination(id: .today, navigationKey: "today", serverView: "today", title: RegistryL10n.t("Today"), iconId: "list.today", sfSymbol: "sun.max.fill", sidebarSection: "top", visibility: "always", canHide: false, canMoveSection: false, supportsManualOrder: true, newTaskTarget: "here", emptyTitle: RegistryL10n.t("Nothing on Today"), emptyDetail: RegistryL10n.t("Today can stay empty. Add a task when you want one."), featureId: "lists.today"),
     RegistryDestination(id: .review, navigationKey: "review", serverView: "all", title: RegistryL10n.t("Review"), iconId: "list.review", sfSymbol: "eye", sidebarSection: "top", visibility: "whenNonEmpty", canHide: true, canMoveSection: false, supportsManualOrder: false, newTaskTarget: "today", emptyTitle: RegistryL10n.t("Nothing to review"), emptyDetail: RegistryL10n.t("Your agent's questions, finished work and tasks in progress show up here, and so do tasks you are waiting on. Faded tasks do too."), featureId: "lists.review"),
     RegistryDestination(id: .agent, navigationKey: "agent", serverView: "all", title: RegistryL10n.t("Agent"), iconId: "list.agent", sfSymbol: "person.2.badge.gearshape", sidebarSection: "top", visibility: "reviewGroup", canHide: false, canMoveSection: false, supportsManualOrder: false, newTaskTarget: "today", emptyTitle: RegistryL10n.t("No agent work"), emptyDetail: RegistryL10n.t("Tasks you assign to Claude show up in Review, grouped by where the work stands."), featureId: "lists.agent"),
     RegistryDestination(id: .upcoming, navigationKey: "upcoming", serverView: "upcoming", title: RegistryL10n.t("Upcoming"), iconId: "list.upcoming", sfSymbol: "calendar", sidebarSection: "top", visibility: "always", canHide: true, canMoveSection: false, supportsManualOrder: false, newTaskTarget: "tomorrow", emptyTitle: RegistryL10n.t("Nothing upcoming"), emptyDetail: RegistryL10n.t("Tasks with a future When or Deadline date appear here."), featureId: "lists.upcoming"),
@@ -1071,6 +1075,8 @@ enum RegistryActionID: String, CaseIterable, Hashable, Sendable {
   case projectRename = "project.rename"
   case projectMoveUp = "project.moveUp"
   case projectMoveDown = "project.moveDown"
+  case projectMove = "project.move"
+  case projectUseAsChecklist = "project.useAsChecklist"
   case projectMarkDone = "project.markDone"
   case projectCancel = "project.cancel"
   case projectDelete = "project.delete"
@@ -1091,6 +1097,8 @@ enum RegistryActionID: String, CaseIterable, Hashable, Sendable {
   case appShareCaptureAdd = "app.shareCapture.add"
   case appQuickEntry = "app.quickEntry"
   case appQuickFind = "app.quickFind"
+  case appGoBack = "app.goBack"
+  case appGoForward = "app.goForward"
   case appPauseAgents = "app.pauseAgents"
   case taskConversationStop = "task.conversation.stop"
   case taskConversationOther = "task.conversation.other"
@@ -1247,6 +1255,8 @@ enum RegistryActions {
     .projectRename: RegistryL10n.t("Rename"),
     .projectMoveUp: RegistryL10n.t("Move Up"),
     .projectMoveDown: RegistryL10n.t("Move Down"),
+    .projectMove: RegistryL10n.t("Move…"),
+    .projectUseAsChecklist: RegistryL10n.t("Use as Checklist"),
     .projectMarkDone: RegistryL10n.t("Mark Done"),
     .projectCancel: RegistryL10n.t("Cancel Project"),
     .projectDelete: RegistryL10n.t("Delete Project"),
@@ -1267,6 +1277,8 @@ enum RegistryActions {
     .appShareCaptureAdd: RegistryL10n.t("Add"),
     .appQuickEntry: RegistryL10n.t("Quick Entry"),
     .appQuickFind: RegistryL10n.t("Quick Find…"),
+    .appGoBack: RegistryL10n.t("Back"),
+    .appGoForward: RegistryL10n.t("Forward"),
     .appPauseAgents: RegistryL10n.t("Pause all agents"),
     .taskConversationStop: RegistryL10n.t("Stop"),
     .taskConversationOther: RegistryL10n.t("Other…"),
@@ -1347,6 +1359,8 @@ enum RegistryActions {
     .projectRename: "pencil",
     .projectMoveUp: "chevron.up",
     .projectMoveDown: "chevron.down",
+    .projectMove: "folder",
+    .projectUseAsChecklist: "checklist",
     .projectMarkDone: "checkmark.circle",
     .projectCancel: "xmark.circle",
     .projectDelete: "trash",
@@ -1367,6 +1381,8 @@ enum RegistryActions {
     .appShareCaptureAdd: "plus",
     .appQuickEntry: "plus",
     .appQuickFind: "magnifyingglass",
+    .appGoBack: "chevron.backward",
+    .appGoForward: "chevron.forward",
     .appPauseAgents: "cpu",
     .taskConversationStop: "xmark.circle",
     .taskConversationOther: "info.circle",
@@ -1405,6 +1421,7 @@ enum RegistryActions {
     .taskMove: ["pluralTitle": RegistryL10n.t("Move Tasks"), "shortTitle": RegistryL10n.t("Move")],
     .taskPauseResumeRepeat: ["activeTitle": RegistryL10n.t("Resume Repeat")],
     .taskDelete: ["pluralTitle": RegistryL10n.t("Delete Tasks")],
+    .projectMove: ["shortTitle": RegistryL10n.t("Move")],
     .noticeToggleStep: ["activeTitle": RegistryL10n.t("Mark as Not Done")],
     .appQuickAdd: ["addTitle": RegistryL10n.t("Add")],
     .appQuickFind: ["desktopTitle": RegistryL10n.t("Command Bar…")],
@@ -1440,6 +1457,8 @@ enum RegistryActions {
     .appQuickAdd: RegistryShortcut(key: "i", modifiers: ["primary"], keycaps: ["⌘", "I"], excludePlatforms: []),
     .appQuickEntry: RegistryShortcut(key: "space", modifiers: ["ctrl", "alt"], keycaps: ["⌃", "⌥", "space"], excludePlatforms: []),
     .appQuickFind: RegistryShortcut(key: "k", modifiers: ["primary"], keycaps: ["⌘", "K"], excludePlatforms: [], alternates: [RegistryShortcut(key: "f", modifiers: ["primary", "shift"], keycaps: ["⇧", "⌘", "F"], excludePlatforms: [])]),
+    .appGoBack: RegistryShortcut(key: "[", modifiers: ["primary"], keycaps: ["⌘", "["], excludePlatforms: []),
+    .appGoForward: RegistryShortcut(key: "]", modifiers: ["primary"], keycaps: ["⌘", "]"], excludePlatforms: []),
     .appToggleSidebar: RegistryShortcut(key: "s", modifiers: ["ctrl", "primary"], keycaps: ["⌃", "⌘", "S"], excludePlatforms: ["ios", "ipados"]),
     .appSettings: RegistryShortcut(key: ",", modifiers: ["primary"], keycaps: ["⌘", ","], excludePlatforms: []),
     .appKeyboardShortcuts: RegistryShortcut(key: "/", modifiers: ["primary", "shift"], keycaps: ["⇧", "⌘", "/"], excludePlatforms: []),
@@ -1538,6 +1557,8 @@ enum RegistryActions {
     .projectRename: RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "places.projects"),
     .projectMoveUp: RegistryActionAvailability(selection: "single", platforms: ["ios", "ipados", "android"], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "places.projects"),
     .projectMoveDown: RegistryActionAvailability(selection: "single", platforms: ["ios", "ipados", "android"], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "places.projects"),
+    .projectMove: RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "places.projects"),
+    .projectUseAsChecklist: RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "places.projects"),
     .projectMarkDone: RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "places.projects"),
     .projectCancel: RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "places.projects"),
     .projectDelete: RegistryActionAvailability(selection: "single", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "places.projects"),
@@ -1558,6 +1579,8 @@ enum RegistryActions {
     .appShareCaptureAdd: RegistryActionAvailability(selection: "none", platforms: ["android"], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "capture.share-target"),
     .appQuickEntry: RegistryActionAvailability(selection: "none", platforms: ["macos", "windows", "linux"], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "capture.quick-entry"),
     .appQuickFind: RegistryActionAvailability(selection: "none", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "find.quick-find"),
+    .appGoBack: RegistryActionAvailability(selection: "none", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "mac.keyboard"),
+    .appGoForward: RegistryActionAvailability(selection: "none", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "mac.keyboard"),
     .appPauseAgents: RegistryActionAvailability(selection: "none", platforms: ["android"], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "agents.stop-pause"),
     .taskConversationStop: RegistryActionAvailability(selection: "single", platforms: ["android"], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "agents.stop-pause"),
     .taskConversationOther: RegistryActionAvailability(selection: "single", platforms: ["android"], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "ai.discuss"),
@@ -1637,12 +1660,13 @@ enum RegistryActions {
       RegistryMenuItem(kind: "action", id: "project.moveUp", actionId: .projectMoveUp, title: RegistryL10n.t("Move Up"), sfSymbol: "chevron.up", items: []),
       RegistryMenuItem(kind: "action", id: "project.moveDown", actionId: .projectMoveDown, title: RegistryL10n.t("Move Down"), sfSymbol: "chevron.down", items: []),
       RegistryMenuItem(kind: "divider", id: "divider.3", actionId: nil, title: nil, sfSymbol: nil, items: []),
-      RegistryMenuItem(kind: "submenu", id: "moveToArea", actionId: nil, title: RegistryL10n.t("Move to Area"), sfSymbol: "folder", items: [RegistryMenuItem(kind: "slot", id: "moveToAreaDestinations", actionId: nil, title: nil, sfSymbol: nil, items: [])]),
+      RegistryMenuItem(kind: "action", id: "project.move", actionId: .projectMove, title: RegistryL10n.t("Move…"), sfSymbol: "folder", items: []),
+      RegistryMenuItem(kind: "action", id: "project.useAsChecklist", actionId: .projectUseAsChecklist, title: RegistryL10n.t("Use as Checklist"), sfSymbol: "checklist", items: []),
       RegistryMenuItem(kind: "action", id: "project.share", actionId: .projectShare, title: RegistryL10n.t("Share Project…"), sfSymbol: "person.crop.circle.badge.plus", items: []),
-      RegistryMenuItem(kind: "divider", id: "divider.6", actionId: nil, title: nil, sfSymbol: nil, items: []),
+      RegistryMenuItem(kind: "divider", id: "divider.7", actionId: nil, title: nil, sfSymbol: nil, items: []),
       RegistryMenuItem(kind: "action", id: "project.markDone", actionId: .projectMarkDone, title: RegistryL10n.t("Mark Done"), sfSymbol: "checkmark.circle", items: []),
       RegistryMenuItem(kind: "action", id: "project.cancel", actionId: .projectCancel, title: RegistryL10n.t("Cancel Project"), sfSymbol: "xmark.circle", items: []),
-      RegistryMenuItem(kind: "divider", id: "divider.9", actionId: nil, title: nil, sfSymbol: nil, items: []),
+      RegistryMenuItem(kind: "divider", id: "divider.10", actionId: nil, title: nil, sfSymbol: nil, items: []),
       RegistryMenuItem(kind: "action", id: "project.delete", actionId: .projectDelete, title: RegistryL10n.t("Delete Project"), sfSymbol: "trash", items: []),
     ],
     .sidebarEmpty: [
@@ -1688,10 +1712,13 @@ enum RegistryActions {
       RegistryMenuItem(kind: "submenu", id: "textSize", actionId: nil, title: RegistryL10n.t("Text Size"), sfSymbol: "textformat.size", items: [RegistryMenuItem(kind: "slot", id: "textSizeSteps", actionId: nil, title: nil, sfSymbol: nil, items: []), RegistryMenuItem(kind: "divider", id: "divider.1", actionId: nil, title: nil, sfSymbol: nil, items: []), RegistryMenuItem(kind: "action", id: "app.textSizeIncrease", actionId: .appTextSizeIncrease, title: RegistryL10n.t("Increase Text Size"), sfSymbol: "textformat.size", items: []), RegistryMenuItem(kind: "action", id: "app.textSizeDecrease", actionId: .appTextSizeDecrease, title: RegistryL10n.t("Decrease Text Size"), sfSymbol: "textformat.size", items: []), RegistryMenuItem(kind: "action", id: "app.textSizeReset", actionId: .appTextSizeReset, title: RegistryL10n.t("Reset Text Size"), sfSymbol: "textformat.size", items: [])]),
     ]),
     RegistryMenu(id: .go, title: RegistryL10n.t("Go"), system: nil, items: [
+      RegistryMenuItem(kind: "action", id: "app.goBack", actionId: .appGoBack, title: RegistryL10n.t("Back"), sfSymbol: "chevron.backward", items: []),
+      RegistryMenuItem(kind: "action", id: "app.goForward", actionId: .appGoForward, title: RegistryL10n.t("Forward"), sfSymbol: "chevron.forward", items: []),
+      RegistryMenuItem(kind: "divider", id: "divider.2", actionId: nil, title: nil, sfSymbol: nil, items: []),
       RegistryMenuItem(kind: "slot", id: "smartLists", actionId: nil, title: nil, sfSymbol: nil, items: []),
-      RegistryMenuItem(kind: "divider", id: "divider.1", actionId: nil, title: nil, sfSymbol: nil, items: []),
+      RegistryMenuItem(kind: "divider", id: "divider.4", actionId: nil, title: nil, sfSymbol: nil, items: []),
       RegistryMenuItem(kind: "action", id: "app.quickFind", actionId: .appQuickFind, title: RegistryL10n.t("Quick Find…"), sfSymbol: "magnifyingglass", items: []),
-      RegistryMenuItem(kind: "divider", id: "divider.3", actionId: nil, title: nil, sfSymbol: nil, items: []),
+      RegistryMenuItem(kind: "divider", id: "divider.6", actionId: nil, title: nil, sfSymbol: nil, items: []),
       RegistryMenuItem(kind: "action", id: "app.septenaWindow", actionId: .appSeptenaWindow, title: RegistryL10n.t("Septena Window"), sfSymbol: "macwindow", items: []),
       RegistryMenuItem(kind: "action", id: "app.classicWindow", actionId: .appClassicWindow, title: RegistryL10n.t("Classic Window"), sfSymbol: "macwindow", items: []),
       RegistryMenuItem(kind: "action", id: "app.quickEntry", actionId: .appQuickEntry, title: RegistryL10n.t("Quick Entry"), sfSymbol: "plus", items: []),
@@ -1738,6 +1765,8 @@ enum RegistryActions {
     RegistryShortcutEntry(id: "app.quickAdd", actionId: .appQuickAdd, label: RegistryL10n.t("Quick Add…"), keycaps: ["⌘", "I"], excludePlatforms: []),
     RegistryShortcutEntry(id: "app.quickFind", actionId: .appQuickFind, label: RegistryL10n.t("Quick Find…"), keycaps: ["⌘", "K"], excludePlatforms: []),
     RegistryShortcutEntry(id: "app.quickFind.alt0", actionId: .appQuickFind, label: RegistryL10n.t("Quick Find…"), keycaps: ["⇧", "⌘", "F"], excludePlatforms: []),
+    RegistryShortcutEntry(id: "app.goBack", actionId: .appGoBack, label: RegistryL10n.t("Back"), keycaps: ["⌘", "["], excludePlatforms: []),
+    RegistryShortcutEntry(id: "app.goForward", actionId: .appGoForward, label: RegistryL10n.t("Forward"), keycaps: ["⌘", "]"], excludePlatforms: []),
     RegistryShortcutEntry(id: "app.toggleSidebar", actionId: .appToggleSidebar, label: RegistryL10n.t("Show / Hide Sidebar"), keycaps: ["⌃", "⌘", "S"], excludePlatforms: ["ios", "ipados"]),
     RegistryShortcutEntry(id: "app.settings", actionId: .appSettings, label: RegistryL10n.t("Settings…"), keycaps: ["⌘", ","], excludePlatforms: []),
     RegistryShortcutEntry(id: "app.keyboardShortcuts", actionId: .appKeyboardShortcuts, label: RegistryL10n.t("Keyboard Shortcuts"), keycaps: ["⇧", "⌘", "/"], excludePlatforms: []),
@@ -1838,6 +1867,7 @@ enum RegistryPromptID: String, CaseIterable, Hashable, Sendable {
   case clearLogged = "clearLogged"
   case rescheduleFixedRepeat = "rescheduleFixedRepeat"
   case disconnectAgent = "disconnectAgent"
+  case changeNotSaved = "changeNotSaved"
   case agentKeyCreated = "agentKeyCreated"
   case agentReplaces = "agentReplaces"
   case scanSignInCode = "scanSignInCode"
@@ -1895,6 +1925,7 @@ enum RegistryPrompts {
   static let fixed: [RegistryPromptID: RegistryPromptCopy] = [
     .deleteSection: RegistryPromptCopy(id: .deleteSection, title: RegistryL10n.t("Delete this section?"), message: RegistryL10n.t("Its tasks stay in the project."), confirmTitle: RegistryL10n.t("Delete Section"), options: []),
     .rescheduleFixedRepeat: RegistryPromptCopy(id: .rescheduleFixedRepeat, title: RegistryL10n.t("Reschedule repeating task?"), message: RegistryL10n.t("Move only this task, or update the repeating schedule to the new date?"), confirmTitle: nil, options: [RegistryPromptOption(id: .exception, title: RegistryL10n.t("Only This Task")), RegistryPromptOption(id: .updateRule, title: RegistryL10n.t("Update Schedule"))]),
+    .changeNotSaved: RegistryPromptCopy(id: .changeNotSaved, title: RegistryL10n.t("A change couldn’t be saved"), message: RegistryL10n.t("One edit was rolled back and is not stored. Anything you typed just now may need retyping. Later changes still save normally."), confirmTitle: RegistryL10n.t("OK"), options: []),
     .agentKeyCreated: RegistryPromptCopy(id: .agentKeyCreated, title: RegistryL10n.t("Your agent key"), message: RegistryL10n.t("Septena shows this key only once. Paste it into your script or agent. To stop the agent, disconnect it in this list."), confirmTitle: RegistryL10n.t("Copy Key"), options: []),
     .agentReplaces: RegistryPromptCopy(id: .agentReplaces, title: RegistryL10n.t("Replaces"), message: RegistryL10n.t("If this agent takes the place of one you connected before, pick it. That agent stops working."), confirmTitle: nil, options: [RegistryPromptOption(id: .none, title: RegistryL10n.t("Nothing, a new agent")), RegistryPromptOption(id: .agent, title: RegistryL10n.t("An agent below"))]),
     .scanSignInCode: RegistryPromptCopy(id: .scanSignInCode, title: RegistryL10n.t("Scan a sign-in code"), message: RegistryL10n.t("Point the camera at the QR code on the other screen."), confirmTitle: RegistryL10n.t("Scan Code"), options: []),
@@ -2059,6 +2090,9 @@ enum RegistrySurfaces {
   static func dateBoardRows(for attribute: RegistryDateBoardAttribute, on platform: String) -> [RegistryDateBoardRow] {
     dateBoardRows.filter { $0.applies(to: attribute, on: platform) }
   }
+  /// The date board opens with the start cell focused (`taskDateBoard.openFocus`).
+  /// False: no cell is focused until the first arrow key or the pointer.
+  static let dateBoardFocusesOnOpen: Bool = false
   static let taskDateBoardOverdueLabel: String = RegistryL10n.t("Overdue")
   /// The calendar row when the task has a date past the day strip.
   static func dateBoardCalendarLabel(date: String) -> String { RegistryL10n.format("Pick another date (%@)", english: "Pick another date (%@)", args: [date]) }
@@ -2076,24 +2110,37 @@ enum RegistrySurfaces {
   static let agentPromptAcceptedLabel: String = RegistryL10n.t("Accepted")
   /// The weekly fade sweep's title (`surfaces.json` `fadeSweep`).
   static let fadeSweepTitle: String = RegistryL10n.t("Faded Tasks")
+  /// The sweep's closing line after Let the rest go (#711, a permission line).
+  static let fadeSweepLetGoTitle: String = RegistryL10n.t("It can wait. The rest is in your Logbook.")
   /// Quick Find copy (`surfaces.json` `quickFind`).
   static let quickFindPlaceholder: String = RegistryL10n.t("Search tasks, projects, areas…")
   static let quickFindCommandPlaceholder: String = RegistryL10n.t("Search or run a command…")
   static let quickFindEmptyTitle: String = RegistryL10n.t("Search Tasks")
   static let quickFindEmptyDetail: String = RegistryL10n.t("Find any task, project, or area.")
   static let quickFindCompletedLabel: String = RegistryL10n.t("Completed")
-  static let checklistUseAsChecklist: String = RegistryL10n.t("Use as Checklist")
-  static let checklistUseForGroceries: String = RegistryL10n.t("Use for Groceries")
   static let checklistAddItem: String = RegistryL10n.t("Add item")
   static let checklistOnList: String = RegistryL10n.t("On list")
   static let checklistChecked: String = RegistryL10n.t("Checked")
-  static let checklistProjectType: String = RegistryL10n.t("Project type")
   static let checklistMoveToGroup: String = RegistryL10n.t("Move to group")
   static let checklistUngrouped: String = RegistryL10n.t("Ungrouped")
   static func checklistAddItemToGroup(group: String) -> String { RegistryL10n.format("Add item to %@", english: "Add item to %@", args: [group]) }
+  /// The last add-field suggestion: Add "<typed text>" (docs/PROJECT_CHECKLIST_SPEC.md).
+  static func checklistAddTyped(title: String) -> String { RegistryL10n.format("Add “%@”", english: "Add “%@”", args: [title]) }
+  static let checklistProjectType: String = RegistryL10n.t("Project type")
   static let standardProjectTitle: String = RegistryL10n.t("Project")
   static let checklistProjectTitle: String = RegistryL10n.t("Checklist")
-  static let groceriesProjectTitle: String = RegistryL10n.t("Groceries")
+  /// The heading title for a core grocery group key (`checklistProjects.groups`), nil for an unknown key.
+  static func checklistGroupTitle(_ key: String) -> String? {
+    switch key {
+    case "produce": return RegistryL10n.t("Produce")
+    case "dairy": return RegistryL10n.t("Dairy")
+    case "bakery": return RegistryL10n.t("Bakery")
+    case "meatSeafood": return RegistryL10n.t("Meat & Seafood")
+    case "pantry": return RegistryL10n.t("Pantry")
+    case "frozen": return RegistryL10n.t("Frozen")
+    default: return nil
+    }
+  }
   /// Sort By copy (`surfaces.json` `listSort`, docs/LIST_SORT_SPEC.md).
   static let listSortMenuTitle: String = RegistryL10n.t("Sort By")
   static let listSortSymbol: String = "arrow.up.arrow.down"
@@ -2257,6 +2304,28 @@ enum RegistryPlaceNotes {
   static let previewLines = 3
   static let showMoreTitle: String = RegistryL10n.t("Show more")
   static let showLessTitle: String = RegistryL10n.t("Show less")
+}
+
+/// A button of the phone top bar (`registry/surfaces.json` `topBar`).
+enum RegistryTopBarItem: String {
+  case settings, back, more, star, search
+}
+
+/// The phone top bar: the buttons each screen shows, in order, as groups (`registry/surfaces.json` `topBar`).
+enum RegistryTopBar {
+  enum Screen { case listsHome, list }
+  static func leading(_ screen: Screen) -> [[RegistryTopBarItem]] {
+    switch screen {
+    case .listsHome: return [[.settings]]
+    case .list: return [[.back]]
+    }
+  }
+  static func trailing(_ screen: Screen) -> [[RegistryTopBarItem]] {
+    switch screen {
+    case .listsHome: return [[.more], [.search]]
+    case .list: return [[.more, .star], [.search]]
+    }
+  }
 }
 
 /// Shared projects (`registry/surfaces.json` `sharing`).
@@ -2712,6 +2781,7 @@ enum RegistrySignIn {
     static func terms(terms: String, privacy: String) -> String { RegistryL10n.format("By continuing, you agree to the %@ and the %@.", english: "By continuing, you agree to the %@ and the %@.", args: [terms, privacy]) }
     static var termsLabel: String { RegistryL10n.t("Terms of Use") }
     static var privacyLabel: String { RegistryL10n.t("Privacy Policy") }
+    static var loading: String { RegistryL10n.t("Loading Septena") }
   }
   enum Email {
     static var emailLabel: String { RegistryL10n.t("Email") }

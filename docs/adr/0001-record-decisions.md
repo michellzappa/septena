@@ -21,7 +21,7 @@ Planning uses four records, each with one job (`docs/README.md`):
 - **Spec** for how one feature works, with phases. Frozen as historical when it
   ships.
 - **Roadmap** (`docs/ROADMAP.md`) for the order of tracks and milestones.
-- **GitHub issues and milestones** on `michellzappa/septena` for units of work.
+- **GitHub issues and milestones** on `septena/septena` for units of work.
   Every issue links its spec. Every milestone maps to one roadmap phase.
 
 Existing docs stay where they are. The index gives each one a status. New work

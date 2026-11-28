@@ -6,7 +6,7 @@ import AppKit
 import UIKit
 #endif
 
-// Sign-in for the task backend, in one place. Septask is backend-only
+// Sign-in for the task backend, in one place. Septena is backend-only
 // (docs/SEPTASK_BACKEND.md §9, phase 4): signed out, it keeps working on the
 // local store and queues every edit in the sync outbox, and it asks to sign in
 // on the welcome, on Today, and in Settings ▸ Account. All three ask through

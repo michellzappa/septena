@@ -32,12 +32,12 @@ const FIELDS = {
     "title", "primaryTitle", "detail", "message", "confirmTitle", "cancelTitle", "dismissTitle", "format",
     "emptyTitleFormat", "singularFormat", "body", "footnote", "returningTitle", "returningBody",
     "label", "countLabel", "workingLabel", "valueLabel", "instructions", "setup", "first", "placeholder", "commandPlaceholder", "untitledName", "selfLabel",
-    "askKicker", "reviewKicker", "reviewFallback", "acceptedLabel", "menuTitle", "sortedBy",
+    "askKicker", "reviewKicker", "reviewFallback", "acceptedLabel", "menuTitle", "sortedBy", "letGoTitle",
     "historyStarred", "historyUnstarred",
   ]),
   importSources: new Set(["detail"]),
   signIn: new Set([
-    "title", "heading", "subheading", "terms", "termsLabel", "privacyLabel", "emailLabel", "emailPlaceholder", "sendCode",
+    "title", "heading", "subheading", "terms", "termsLabel", "privacyLabel", "loading", "emailLabel", "emailPlaceholder", "sendCode",
     "codeSent", "codeLabel", "signIn", "resend", "differentEmail", "invalidEmail", "wrongCode", "tooManyTries",
     "codeExpired", "rateLimited", "network", "detail", "button", "manualDetail",
     "footer", "remove", "cancel", "addProvider", "addEmail", "addAppleDetail", "alreadyLinked",
@@ -82,7 +82,7 @@ function collectFile(fileId, json) {
     for (const [k, v] of Object.entries(node)) {
       const here = `${p}.${k}`;
       if (k === "description" || k === "l10nKeys") continue;
-      const checklistCopy = p === "surfaces.checklistProjects" && k !== "id";
+      const checklistCopy = (p === "surfaces.checklistProjects" || p === "surfaces.checklistProjects.groups") && k !== "id";
       if ((fields.has(k) || checklistCopy) && !SKIP_PATHS.some((re) => re.test(here))) {
         const key = node.l10nKeys?.[k];
         if (typeof v === "string") {

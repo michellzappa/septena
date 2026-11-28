@@ -23,7 +23,7 @@ import { AGENT_NAME_MAX, MCP_CLIENT_PREFIX, MCP_GRANT_SCOPE, MCP_SCOPES, issueMc
 // PAIRING instead of a web login:
 //   1. Claude registers (DCR) and opens /oauth/authorize here.
 //   2. The page shows a short code and refreshes itself.
-//   3. The user enters the code in Septask; the app calls
+//   3. The user enters the code in Septena; the app calls
 //      POST /v1/pair/approve with its own bearer token, which binds its user id
 //      to the pending authorization (PairingStore).
 //   4. The page's next refresh sees the approval and redirects back to Claude
@@ -355,7 +355,7 @@ export async function pairReviewer(c: Context<{ Bindings: Env }>) {
 //
 // A new device (the Android client first) has no Apple identity. It calls
 // POST /v1/auth/device/start, shows the 8-character code, and the user enters
-// it where Septask already takes connector codes (POST /v1/pair/approve, which
+// it where Septena already takes connector codes (POST /v1/pair/approve, which
 // handles both purposes). The device polls POST /v1/auth/device/poll with the
 // secret only it holds; after approval the poll returns an app session for the
 // approving user. The purpose check in PairingStore keeps the two flows apart.

@@ -1,5 +1,5 @@
 // GENERATED FILE — DO NOT EDIT BY HAND.
-// Sources: registry/entities.json, registry/rules.json, registry/destinations.json
+// Sources: registry/entities.json, registry/rules.json, registry/destinations.json, registry/surfaces.json
 // Regenerate: node scripts/gen-registries.mjs
 #![allow(dead_code)]
 
@@ -22,6 +22,7 @@ pub mod rules {
     pub const DELETE_GRACE_SECONDS: i64 = 120;
     pub const DO_STALE_HOURS: i64 = 4;
     pub const DO_LAPSE_HOURS: i64 = 24;
+    pub const NAVIGATION_HISTORY_LIMIT: i64 = 50;
 }
 
 /// Wire limits (`registry/entities.json` `limits`).
@@ -256,4 +257,9 @@ pub mod destination_ids {
     pub const STARRED: &str = "starred";
     pub const FADED: &str = "faded";
     pub const RECENTLY_DELETED: &str = "recentlyDeleted";
+}
+
+/// Checklist group keys (`registry/surfaces.json` `checklistProjects.groups`).
+pub mod checklist_groups {
+    pub const KEYS: &[&str] = &["produce", "dairy", "bakery", "meatSeafood", "pantry", "frozen"];
 }

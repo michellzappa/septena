@@ -89,6 +89,7 @@ internal fun buildTaskListItem(
     showsOwnAssignee: Boolean = false,
     languageTag: String = Locale.getDefault().toLanguageTag(),
     zoneId: ZoneId = ZoneId.systemDefault(),
+    subtitleTargetKey: String? = null,
 ): TaskListItem {
     val isOpen = snapshot.status == RegistryEntityEnums.TaskStatus.OPEN
     val isDeleted = snapshot.deletedAt != null
@@ -213,6 +214,7 @@ internal fun buildTaskListItem(
         isWaiting = isWaiting,
         waitingText = waitingText,
         subtitle = subtitle,
+        subtitleTargetKey = subtitleTargetKey,
         isCompleted = snapshot.status == RegistryEntityEnums.TaskStatus.DONE,
         isOnToday = membership.isOnToday,
         isStarred = snapshot.starred,

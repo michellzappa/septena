@@ -332,18 +332,8 @@ fun AreasProjectsScreen(
                                     },
                                 )
                                 if (destination is AreasProjectsDestination.Project) {
-                                    if (state.checklistMode == null) {
-                                        PlaceMenuItem(title = checklistCopy("useAsChecklist", languageTag), onClick = {
-                                            menuOpen = false
-                                            viewModel.useAsChecklist(RegistryEntityEnums.ChecklistMode.PLAIN)
-                                        })
-                                        PlaceMenuItem(title = checklistCopy("useForGroceries", languageTag), onClick = {
-                                            menuOpen = false
-                                            viewModel.useAsChecklist(RegistryEntityEnums.ChecklistMode.GROCERIES)
-                                        })
-                                    }
                                     PlaceMenuItem(
-                                        title = RegistryCatalog.submenuTitle("sidebar.project", "moveToArea", languageTag).orEmpty(),
+                                        title = actionTitle(RegistryActionIds.PROJECT_MOVE, languageTag),
                                         onClick = {
                                             menuOpen = false
                                             dialog = PlacesDialog.MoveToArea
@@ -614,11 +604,10 @@ fun AreasProjectsScreen(
                     }
                 }
 
-                if (destination is AreasProjectsDestination.Project && state.checklistMode != null) {
+                if (destination is AreasProjectsDestination.Project && state.isChecklist) {
                     item(key = "project-checklist") {
                         ProjectChecklistContent(
                             rows = state.checklistRows,
-                            groceries = state.checklistMode == RegistryEntityEnums.ChecklistMode.GROCERIES,
                             add = viewModel::addChecklistItem,
                             toggle = viewModel::toggleChecklistItem,
                             move = viewModel::moveChecklistItem,
@@ -1296,7 +1285,6 @@ private fun AreasProjectsDestination.renamePrompt(): String = when (this) {
 @Composable
 private fun ProjectChecklistContent(
     rows: List<SyncRecord>,
-    groceries: Boolean,
     add: (String, String?) -> Unit,
     toggle: (String) -> Unit,
     move: (String, String?) -> Unit,
@@ -1311,7 +1299,7 @@ private fun ProjectChecklistContent(
     val headings = remember(rows) {
         rows.filter { it.fields[RegistryEntityFields.Task.KIND].stringValue() == RegistryEntityEnums.TaskKind.HEADING }
     }
-    val layout = remember(rows, title, groceries) { ProjectChecklistRules.layout(rows, title, groceries) }
+    val layout = remember(rows, title) { ProjectChecklistRules.layout(rows, title) }
     fun name(row: SyncRecord?): String = row?.fields?.get(RegistryEntityFields.Task.TITLE).stringValue().orEmpty()
     fun checked(row: SyncRecord): Boolean =
         row.fields[RegistryEntityFields.Task.STATUS].stringValue() == RegistryEntityEnums.TaskStatus.CHECKLIST_CHECKED

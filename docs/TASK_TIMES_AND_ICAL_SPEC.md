@@ -3,7 +3,7 @@
 **Status:** proposal (2026-11-21). Defaults in §8 stand unless mz overrules.
 **Decisions:** [ADR 0002](adr/0002-own-backend-replaces-icloud.md), [ADR 0007](adr/0007-septena-is-the-task-app.md), [ADR 0011](adr/0011-self-hostable-backend.md), [ADR 0015](adr/0015-shared-registries-for-cross-platform-clients.md).
 **Builds on:** `registry/entities.json`, `docs/TIMED_REMINDERS_SPEC.md` (#97), `docs/RECURRENCE_V2_SPEC.md` (#126), `backend/src/`, `Septask/SeptaskKitDatePopover.swift`, `Septena/Shell/Tasks/CalendarEventRow.swift`.
-**Tracking issue:** [#128](https://github.com/michellzappa/septena/issues/128).
+**Tracking issue:** [#128](https://github.com/septena/septena/issues/128).
 **Owner of decisions:** mz. Defaults chosen by the author are marked *(default)*.
 
 ## 1. Goal
@@ -72,7 +72,7 @@ account synced to the phone (Google, Exchange, Samsung). The client asks for
 windows as `CalendarBridge` (rest of today, next 30 days). Hidden calendars
 use the same synced `calendarHiddenTitles` setting, matched by title. A
 `ContentObserver` on the calendar URI replaces `.EKEventStoreChanged`.
-No backend work. Already listed in `docs/SEPTASK_ANDROID_PLAN.md`
+No backend work. Already listed in `docs/ANDROID_BRIDGE_PLAN.md`
 ("Today calendar strip", late).
 
 ### 5.2 Web and Windows: backend calendar sources

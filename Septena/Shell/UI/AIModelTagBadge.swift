@@ -3,7 +3,7 @@ import SwiftUI
 // The small "which model answered" caption shown next to AI outputs during the
 // iOS-27 beta. Reads `AIModelTag.isVisible` itself, so callers can drop it in
 // unconditionally — it renders nothing when the beta toggle is off. Shared UI
-// (compiles into Septena and Septask via Shell/UI).
+// (compiles into Septena Life and Septena via Shell/UI).
 
 struct AIModelTagBadge: View {
   let tag: AIModelTag

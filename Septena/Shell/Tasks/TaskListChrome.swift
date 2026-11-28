@@ -196,11 +196,11 @@ private struct TaskCardChrome: ViewModifier {
             shape.strokeBorder(Theme.border, lineWidth: 0.5)
           }
           #endif
-          #if os(macOS)
+          // Pointer hover on Mac and on iPad (trackpad, mouse, Pencil
+          // hover). `onHover` never fires for touch, so iPhone is unaffected.
           if hovered && !isSelected && !isEditing {
             shape.fill(Color.primary.opacity(Theme.pointerHoverOpacity))
           }
-          #endif
           if (position == .top || position == .middle) && !isSelected && !isEditing {
             Rectangle().fill(Theme.border).frame(height: 0.5)
           }
@@ -228,9 +228,7 @@ private struct TaskCardChrome: ViewModifier {
       // shifts. Without it every leaf animates its own position, and the
       // titles drift away from their rows.
       .geometryGroup()
-      #if os(macOS)
       .onHover { hovered = $0 }
-      #endif
   }
 }
 

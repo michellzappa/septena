@@ -6,6 +6,7 @@ import app.septena.android.AndroidAppGraph
 import app.septena.core.JsonValue
 import app.septena.core.ListSortPreferences
 import app.septena.core.ListSortRules
+import app.septena.core.NavigationHistory
 import app.septena.core.ProjectShare
 import app.septena.core.RegistryActionContext
 import app.septena.core.RegistryActionResolver
@@ -93,6 +94,8 @@ data class TaskHomeUiState(
     val agentRequestTimes: List<java.time.Instant> = emptyList(),
     /** Top-nav Star filter toggle: shows only starred tasks in the current list. */
     val starredOnly: Boolean = false,
+    /** The list holds an open starred task: the top bar's Star shows (registry `topBar` `openStarred`). */
+    val hasOpenStarred: Boolean = false,
     /** Task ids picked by a long-press; non-empty means the list is in selection mode. */
     val selectedIds: Set<String> = emptySet(),
     /** All currently faded open tasks ready for the Faded sweep sheet. */
@@ -165,6 +168,8 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
     private val location = MutableStateFlow<TaskHomeLocation>(
         TaskHomeLocation.SmartList(RegistryDestinationIds.TODAY),
     )
+    /** Back / Forward through the lists this window showed (#849), by [historyKey]. */
+    private val history = NavigationHistory<String>().apply { visit(historyKey(location.value)) }
     private val starredOnly = MutableStateFlow(false)
     private val selectedIds = MutableStateFlow<Set<String>>(emptySet())
     private val errorMessage = MutableStateFlow<String?>(null)
@@ -223,6 +228,7 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             reviewCount = home.reviewCount,
             agentRequestTimes = home.agentRequestTimes,
             starredOnly = applyStar,
+            hasOpenStarred = (home.inboxTasks + home.tasks + home.fadedTasks).any { it.isStarred && !it.isCompleted },
             selectedIds = selected,
             fadedSweepItems = home.fadedSweepItems,
             weeklySweepItems = home.weeklySweepItems,
@@ -247,7 +253,34 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         val opensFaded = location == TaskHomeLocation.SmartList(RegistryDestinationIds.FADED)
         val opensAgent = location == TaskHomeLocation.SmartList(RegistryDestinationIds.AGENT)
         if (opensFaded) graph.fadeSweepStore.setFadedGroupExpanded(true)
-        this.location.value = if (opensFaded || opensAgent) TaskHomeLocation.SmartList(RegistryDestinationIds.REVIEW) else location
+        val shown = if (opensFaded || opensAgent) TaskHomeLocation.SmartList(RegistryDestinationIds.REVIEW) else location
+        this.location.value = shown
+        // A step Back or Forward lands here too; the history ignores a visit
+        // to the destination it already holds.
+        history.visit(historyKey(shown))
+    }
+
+    /**
+     * Steps Back (Ctrl or Cmd with [) and returns the list to show, or null at the end. A deleted
+     * area or project is skipped. The caller shows it through the same path as a tap.
+     */
+    fun historyBack(): TaskHomeLocation? =
+        history.goBack { historyLocation(it) != null }?.let(::historyLocation)
+
+    /** Steps Forward (Ctrl or Cmd with ]); see [historyBack]. */
+    fun historyForward(): TaskHomeLocation? =
+        history.goForward { historyLocation(it) != null }?.let(::historyLocation)
+
+    /** The live location for a history key, with its current title; null when it was deleted. */
+    private fun historyLocation(key: String): TaskHomeLocation? {
+        val (kind, id) = key.split(":", limit = 2).takeIf { it.size == 2 } ?: return null
+        val current = state.value
+        return when (kind) {
+            "smart" -> TaskHomeLocation.SmartList(id)
+            "area" -> current.areas.firstOrNull { (it.location as? TaskHomeLocation.Area)?.id == id }?.location
+            "project" -> current.projects.firstOrNull { (it.location as? TaskHomeLocation.Project)?.id == id }?.location
+            else -> null
+        }
     }
 
     fun toggleFadedGroup() {
@@ -396,7 +429,6 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         title: String,
         areaId: String? = null,
         insertIndex: Int? = null,
-        checklistMode: String? = null,
         onCreated: (TaskHomeLocation.Project) -> Unit = {},
     ) {
         val trimmed = title.trim()
@@ -421,7 +453,6 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                     val fields = buildMap<String, JsonValue> {
                         put(RegistryEntityFields.Project.TITLE, JsonValue.StringValue(trimmed))
                         put(RegistryEntityFields.Project.STATUS, JsonValue.StringValue(RegistryEntityEnums.ProjectStatus.ACTIVE))
-                        checklistMode?.let { put(RegistryEntityFields.Project.CHECKLIST_MODE, JsonValue.StringValue(it)) }
                         put(RegistryEntityFields.Project.POSITION, JsonValue.IntegerValue(appendPos))
                         areaId?.let { put(RegistryEntityFields.Project.AREA, JsonValue.StringValue(it)) }
                     }
@@ -1729,11 +1760,18 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             is TaskHomeLocation.Area -> projectTitle
             is TaskHomeLocation.Project -> null
         }
+        // The same key a group header opens, so a tap on the subtitle opens that list.
+        val subtitleTargetKey = when {
+            subtitle == null -> null
+            projectTitle != null -> snapshot.project?.let { "project:$it" }
+            else -> snapshot.area?.let { "area:$it" }
+        }
         return buildTaskListItem(
             record = record,
             snapshot = snapshot,
             membership = membership,
             subtitle = subtitle,
+            subtitleTargetKey = subtitleTargetKey,
             catalog = catalog,
             today = today,
             now = now,
@@ -1896,4 +1934,11 @@ private fun JsonValue?.numberValue(): Double? = when (this) {
     is JsonValue.IntegerValue -> value.toDouble()
     is JsonValue.DecimalValue -> value
     else -> null
+}
+
+/** Stable history key: a renamed area or project stays the same entry. */
+private fun historyKey(location: TaskHomeLocation): String = when (location) {
+    is TaskHomeLocation.SmartList -> "smart:${location.destinationId}"
+    is TaskHomeLocation.Area -> "area:${location.id}"
+    is TaskHomeLocation.Project -> "project:${location.id}"
 }

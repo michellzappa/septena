@@ -39,9 +39,9 @@ final class CKEngine {
   /// devices must report the same one or they're hitting different
   /// private databases entirely.
   ///
-  /// Created on first use, not in `init`: Septask builds this object (the
+  /// Created on first use, not in `init`: Septena builds this object (the
   /// mutators take it) but has no iCloud entitlement, and `CKContainer`
-  /// raises an exception for a container the app is not entitled to. Septask
+  /// raises an exception for a container the app is not entitled to. Septena
   /// never starts the engine, so it never reaches this.
   var container: CKContainer {
     if let containerCache { return containerCache }
@@ -137,7 +137,7 @@ init() {
   /// account status; we don't want to pay that cost until we're ready
   /// to actually sync).
 func start() {
-    // Septask is CloudKit-free (docs/SEPTASK_BACKEND.md §9, phase 4): no
+    // Septena is CloudKit-free (docs/SEPTASK_BACKEND.md §9, phase 4): no
     // engine, no zone fetch, no push registration.
     SeptenaLog.info("[CKEngine] start skipped: Septask does not use CloudKit")
     return
@@ -283,8 +283,8 @@ func noteTagDeletion(id: String) { _ = routeToTaskBackend(.tag, id) }
   private var blocksTaskApplies: Bool { TaskStoreMode.current == .backend }
 
   /// The swap point. In backend mode, hands the change to `TaskSyncEngine`
-  /// (Septask) or drops it (Septena, which never syncs tasks to the backend;
-  /// Septask's reconcile picks the row up from the shared store) and returns
+  /// (Septena) or drops it (Septena Life, which never syncs tasks to the backend;
+  /// Septena's reconcile picks the row up from the shared store) and returns
   /// true. In CloudKit mode returns false and the caller queues as before.
   private func routeToTaskBackend(_ entity: BackendEntity, _ id: String) -> Bool {
     guard TaskStoreMode.current == .backend else { return false }

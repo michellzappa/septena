@@ -1,6 +1,6 @@
 // The task app's changelog: one file per user-visible change in
 // changelog/updates/ (changelog/README.md). septena.app/changelog renders the
-// JSON this prints (../septena-site/scripts/sync-changelog.mjs).
+// JSON this prints (../site/scripts/sync-changelog.mjs).
 //
 // Usage: node tools/changelog.mjs           prints the updates, newest first
 //        node tools/changelog.mjs --check   checks every update file (exit 1 on a problem)

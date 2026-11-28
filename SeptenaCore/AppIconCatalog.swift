@@ -10,7 +10,7 @@ import CoreGraphics
 /// for Septena (`Septask/Assets.xcassets/AppIcon*.appiconset` on iOS, live
 /// CoreGraphics Dock + bundle icon on macOS).
 ///
-/// Generated from `tools/logo-builder/dial-svg.mjs` via `scripts/generate-app-icons.mjs`.
+/// Generated from `scripts/dial-svg.mjs` via `scripts/generate-app-icons.mjs`.
 /// Every `.appiconset` ships both Light OS and Dark OS (`luminosity: dark`)
 /// 1024px artwork, so iOS handles Light/Dark Home Screen switching automatically;
 /// macOS renders the identical geometry live into `NSApp.applicationIconImage`.
@@ -82,7 +82,7 @@ enum AppIconColor: String, CaseIterable, Sendable, Identifiable {
 
   var isMono: Bool { self == .mono }
 
-  /// Canonical palette tokens matching `tools/logo-builder/dial-svg.mjs`.
+  /// Canonical palette tokens matching `scripts/dial-svg.mjs`.
   var baseHex: String {
     switch self {
     case .persimmon: return "#E05212"

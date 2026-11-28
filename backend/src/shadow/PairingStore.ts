@@ -5,7 +5,7 @@ import type { Env } from "../env.js";
 // read-only MCP preview on api.septena.app (see src/shadow/oauth.ts).
 //
 // The browser's authorize page holds a pending authorization and shows a
-// short code. The user enters that code in Septask, which calls
+// short code. The user enters that code in Septena, which calls
 // POST /v1/pair/approve with its own bearer token; that binds the user id to
 // the pending authorization. The page polls until it sees the approval, then
 // finishes the OAuth redirect. A Durable Object gives the poll and the approve

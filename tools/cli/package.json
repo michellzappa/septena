@@ -8,5 +8,5 @@
   "files": ["bin"],
   "engines": { "node": ">=20" },
   "scripts": { "test": "node --test test/*.test.mjs" },
-  "repository": { "type": "git", "url": "https://github.com/michellzappa/septena.git", "directory": "tools/cli" }
+  "repository": { "type": "git", "url": "https://github.com/septena/septena.git", "directory": "tools/cli" }
 }

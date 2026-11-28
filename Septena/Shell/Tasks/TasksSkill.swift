@@ -1,5 +1,5 @@
 // The tasks MCP skill brief — relocated from TasksPlugin so both shells can
-// surface it (Septena's Skills pane via the plugin; Septask's task-only
+// surface it (Septena Life's Skills pane via the plugin; Septena's task-only
 // skills pane directly — docs/SEPTASK.md). Keep in sync with the gateway's
 // skill.md, which is generated from SectionRegistry.fullSkillMarkdown().
 

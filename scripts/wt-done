@@ -35,7 +35,7 @@ gate="${WT_GATE:-SeptaskMac}"
 main=$(git worktree list --porcelain | awk '/^worktree /{w=$2} /^branch refs\/heads\/main$/{print w; exit}')
 [ -n "$main" ] || { echo "wt-done: no worktree is on 'main'"; exit 1; }
 
-path="$(dirname "$main")/septena-$name"
+path="$(dirname "$main")/worktrees/$name"
 [ -d "$path" ] || { echo "wt-done: no worktree at $path"; exit 1; }
 
 # Chunking commits is the agent's/cron's job — wt-done only integrates committed work.

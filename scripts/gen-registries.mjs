@@ -111,6 +111,7 @@ function validateRules(rules) {
     "deleteGraceSeconds",
     "doStaleHours",
     "doLapseHours",
+    "navigationHistoryLimit",
   ];
   for (const k of required) {
     assert(typeof rules[k] === "number" && Number.isFinite(rules[k]) && rules[k] > 0, `rules.json: ${k} must be positive number`);
@@ -163,6 +164,8 @@ function validateTokens(tokens) {
       assert(/^#[0-9a-fA-F]{6}$/.test(tokens.colors?.[role] ?? ""), `tokens.json: multicolorGlyphs "${icon}" role "${role}" must name a hex in colors`);
     }
   }
+  const hover = tokens.selection?.pointerHoverOpacity;
+  assert(typeof hover === "number" && hover > 0 && hover < 0.2, "tokens.json: selection.pointerHoverOpacity must be a number in (0, 0.2)");
   assert(Array.isArray(tokens.textScale?.steps) && tokens.textScale.steps.length === 5, "tokens.json: textScale must have 5 steps");
   const cm = tokens.motion?.completion;
   assert(cm && typeof cm === "object", "tokens.json: missing motion.completion");
@@ -651,6 +654,32 @@ function validateSurfaces(surfaces, icons, caps, plans) {
 }
 
 // Project and area notes on the page (docs/PROJECT_NOTES_SPEC.md §6).
+// The phone top bar (surfaces.json `topBar`): which buttons each screen shows, in order.
+const TOP_BAR_WHEN = new Set(["always", "pageActions", "openStarred"]);
+const TOP_BAR_SCREENS = ["listsHome", "list"];
+function validateTopBar(surfaces, icons, caps) {
+  const t = surfaces.topBar;
+  assert(t && t.id === "topBar" && t.featureId in caps.capabilities, "surfaces.json: topBar needs id topBar and a known featureId");
+  const items = new Map();
+  for (const item of t.items) {
+    assert(!items.has(item.button), `surfaces.json: topBar duplicate item ${item.button}`);
+    assert(item.icon in icons.icons, `surfaces.json: topBar item ${item.button} unknown icon "${item.icon}"`);
+    assert(TOP_BAR_WHEN.has(item.when), `surfaces.json: topBar item ${item.button} unknown when "${item.when}"`);
+    items.set(item.button, item);
+  }
+  assert(t.screens.map((screen) => screen.screen).join() === TOP_BAR_SCREENS.join(), `surfaces.json: topBar screens must be ${TOP_BAR_SCREENS.join(", ")}`);
+  for (const screen of t.screens) {
+    const placed = [...screen.leading, ...screen.trailing].flat();
+    for (const id of placed) assert(items.has(id), `surfaces.json: topBar ${screen.screen} unknown item "${id}"`);
+    assert(new Set(placed).size === placed.length, `surfaces.json: topBar ${screen.screen} places an item twice`);
+    assert([...screen.leading, ...screen.trailing].every((group) => Array.isArray(group) && group.length > 0), `surfaces.json: topBar ${screen.screen} has an empty group`);
+    const search = screen.trailing.find((group) => group.includes("search"));
+    assert(search && search.length === 1, `surfaces.json: topBar ${screen.screen}: Search is a trailing group of its own`);
+    // The Apple shell draws at most two trailing capsules (SeptenaPage.swift).
+    assert(screen.trailing.length <= 2 && screen.leading.length === 1, `surfaces.json: topBar ${screen.screen}: one leading group and at most two trailing groups`);
+  }
+}
+
 function validatePlaceNotes(surfaces, caps) {
   const t = surfaces.placeNotes;
   assert(t && t.featureId in caps.capabilities, "surfaces.json: placeNotes needs a known featureId");
@@ -713,6 +742,7 @@ function checkTaskDateBoard({ surfaces, icons, caps, actions }) {
   const groups = surfaces.taskDateBoard?.groups ?? [];
   assert(groups.length === DATE_BOARD_GROUPS.length && groups.every((g, i) => g === DATE_BOARD_GROUPS[i]), `surfaces.json: taskDateBoard.groups must be ${JSON.stringify(DATE_BOARD_GROUPS)}`);
   assert(typeof surfaces.taskDateBoard?.tomorrow?.label === "string", "surfaces.json: taskDateBoard.tomorrow.label is missing");
+  assert(DATE_BOARD_OPEN_FOCUS.has(surfaces.taskDateBoard?.openFocus), `surfaces.json: taskDateBoard.openFocus must be one of ${JSON.stringify([...DATE_BOARD_OPEN_FOCUS])}`);
   let lastGroup = 0;
   for (const r of rows) {
     const g = groups.indexOf(r.group);
@@ -737,6 +767,12 @@ function checkTaskDateBoard({ surfaces, icons, caps, actions }) {
 }
 const DATE_BOARD_ROW_KINDS = new Set(["calendar", "time", "repeatRule", "clear"]);
 const DATE_BOARD_GROUPS = ["pick", "refine", "remove"];
+// Which cell holds keyboard focus when the board opens (#847). "none": no
+// cell; the first arrow key focuses the cell that holds the task's value
+// (the day, or Pick another date for a date past the strip), else Today.
+// "currentValue": that cell from the start. The task's value keeps its
+// current-value ground either way.
+const DATE_BOARD_OPEN_FOCUS = new Set(["none", "currentValue"]);
 const DATE_BOARD_ATTRIBUTES = new Set(["when", "deadline"]);
 
 // One picker per attribute (ADR 0029): every popover attribute is opened by
@@ -796,6 +832,23 @@ function validateImportSources(file, caps) {
   }
   const listed = new Set(file.sources.map((s) => s.featureId).filter(Boolean));
   for (const id of Object.keys(caps.capabilities)) assert(!id.startsWith("import.") || listed.has(id), `import-sources.json: capability "${id}" has no source`);
+}
+
+// ---- beta.json (ADR 0064) ----
+function validateBeta(beta, caps) {
+  assert(beta.version === 1, "beta.json: version must be 1");
+  for (const [k, v] of Object.entries(beta.copy)) assert(typeof v === "string" && v.length > 0, `beta.json: copy.${k} missing`);
+  for (const k of ["settingsRow", "settingsSummary", "title", "deal", "intro", "tried", "note", "noteSubject", "ack", "ackDone", "cardTitle", "cardBody", "cardOpen", "cardDismiss"]) assert(beta.copy[k], `beta.json: copy.${k} missing`);
+  const ids = new Set();
+  for (const item of beta.items) {
+    assert(/^[a-z][a-z-]*$/.test(item.id) && !ids.has(item.id), `beta.json: bad or duplicate id "${item.id}"`);
+    ids.add(item.id);
+    assert(item.title && item.try, `beta.json: ${item.id} needs title and try`);
+    assert(Array.isArray(item.features) && item.features.length > 0, `beta.json: ${item.id} needs features`);
+    for (const f of item.features) assert(f in caps.capabilities, `beta.json: ${item.id} unknown feature "${f}"`);
+    assert(item.features.some((f) => caps.platforms.some((p) => caps.capabilities[f][p] === "ships")), `beta.json: ${item.id} ships on no platform`);
+  }
+  for (const [p, v] of stringsOf(beta, "beta")) assert(!/[–—]/.test(v), `beta.json: ${p} contains an em or en dash`);
 }
 
 function validatePlans(plans, icons, caps, importSources) {
@@ -984,7 +1037,7 @@ function validateSignIn(signIn, icons, caps, plans) {
 // No bindings: septena.app renders it. Every path must exist in this repo, so
 // a rename here fails before the site's own check does.
 function validateCodeMap(map, caps) {
-  assert(map.repo === "michellzappa/septena" && map.branch === "main", "code-map.json: repo must be michellzappa/septena on main");
+  assert(map.repo === "septena/septena" && map.branch === "main", "code-map.json: repo must be septena/septena on main");
   assert(Array.isArray(map.entries) && map.entries.length > 0, "code-map.json: entries must be a non-empty array");
   const ids = new Set();
   for (const e of map.entries) {
@@ -1917,6 +1970,9 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  static func dateBoardRows(for attribute: RegistryDateBoardAttribute, on platform: String) -> [RegistryDateBoardRow] {");
   lines.push("    dateBoardRows.filter { $0.applies(to: attribute, on: platform) }");
   lines.push("  }");
+  lines.push("  /// The date board opens with the start cell focused (`taskDateBoard.openFocus`).");
+  lines.push("  /// False: no cell is focused until the first arrow key or the pointer.");
+  lines.push(`  static let dateBoardFocusesOnOpen: Bool = ${surfaces.taskDateBoard.openFocus === "currentValue"}`);
   lines.push(`  static let taskDateBoardOverdueLabel: String = ${L(surfaces.taskDateBoard.overdue.label, surfaces.taskDateBoard.overdue, "label")}`);
   const cal = surfaces.taskDateBoard.rows.find((r) => r.kind === "calendar");
   lines.push("  /// The calendar row when the task has a date past the day strip.");
@@ -1937,6 +1993,8 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   }
   lines.push("  /// The weekly fade sweep's title (`surfaces.json` `fadeSweep`).");
   lines.push(`  static let fadeSweepTitle: String = ${L(surfaces.fadeSweep.title, surfaces.fadeSweep, "title")}`);
+  lines.push("  /// The sweep's closing line after Let the rest go (#711, a permission line).");
+  lines.push(`  static let fadeSweepLetGoTitle: String = ${L(surfaces.fadeSweep.letGoTitle, surfaces.fadeSweep, "letGoTitle")}`);
   const qf = surfaces.quickFind;
   lines.push("  /// Quick Find copy (`surfaces.json` `quickFind`).");
   lines.push(`  static let quickFindPlaceholder: String = ${L(qf.placeholder, qf, "placeholder")}`);
@@ -1945,14 +2003,25 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push(`  static let quickFindEmptyDetail: String = ${L(qf.emptyState.detail, qf.emptyState, "detail")}`);
   lines.push(`  static let quickFindCompletedLabel: String = ${L(qf.completed.label, qf.completed, "label")}`);
   const checklist = surfaces.checklistProjects;
-  for (const field of ["useAsChecklist", "useForGroceries", "addItem", "onList", "checked", "projectType", "moveToGroup", "ungrouped"]) {
+  for (const field of ["addItem", "onList", "checked", "moveToGroup", "ungrouped"]) {
     const swiftName = "checklist" + field[0].toUpperCase() + field.slice(1);
     lines.push(`  static let ${swiftName}: String = ${L(checklist[field], checklist, field)}`);
   }
   lines.push(tmplFn("checklistAddItemToGroup", tmplKey(checklist.addItemToGroup, checklist, "addItemToGroup")));
+  lines.push("  /// The last add-field suggestion: Add \"<typed text>\" (docs/PROJECT_CHECKLIST_SPEC.md).");
+  lines.push(tmplFn("checklistAddTyped", tmplKey(checklist.addTyped, checklist, "addTyped")));
+  lines.push(`  static let checklistProjectType: String = ${L(checklist.projectType, checklist, "projectType")}`);
   lines.push(`  static let standardProjectTitle: String = ${L(checklist.project, checklist, "project")}`);
   lines.push(`  static let checklistProjectTitle: String = ${L(checklist.checklist, checklist, "checklist")}`);
-  lines.push(`  static let groceriesProjectTitle: String = ${L(checklist.groceries, checklist, "groceries")}`);
+  lines.push("  /// The heading title for a core grocery group key (`checklistProjects.groups`), nil for an unknown key.");
+  lines.push("  static func checklistGroupTitle(_ key: String) -> String? {");
+  lines.push("    switch key {");
+  for (const [key, title] of Object.entries(checklist.groups)) {
+    lines.push(`    case ${swiftStr(key)}: return ${L(title, checklist.groups, key)}`);
+  }
+  lines.push("    default: return nil");
+  lines.push("    }");
+  lines.push("  }");
   const ls = surfaces.listSort;
   lines.push("  /// Sort By copy (`surfaces.json` `listSort`, docs/LIST_SORT_SPEC.md).");
   lines.push(`  static let listSortMenuTitle: String = ${L(ls.menuTitle, ls, "menuTitle")}`);
@@ -2109,6 +2178,27 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push(`  static let previewLines = ${placeNotes.previewLines}`);
   for (const key of ["showMore", "showLess"]) {
     lines.push(`  static let ${key}Title: String = ${L(placeNotes[key].title, placeNotes[key], "title")}`);
+  }
+  lines.push("}");
+  lines.push("");
+
+  // 8a. The phone top bar (surfaces.json `topBar`)
+  const topBar = surfaces.topBar;
+  lines.push("/// A button of the phone top bar (`registry/surfaces.json` `topBar`).");
+  lines.push("enum RegistryTopBarItem: String {");
+  lines.push(`  case ${topBar.items.map((item) => item.button).join(", ")}`);
+  lines.push("}");
+  lines.push("");
+  lines.push("/// The phone top bar: the buttons each screen shows, in order, as groups (`registry/surfaces.json` `topBar`).");
+  lines.push("enum RegistryTopBar {");
+  lines.push("  enum Screen { case " + topBar.screens.map((screen) => screen.screen).join(", ") + " }");
+  const groups = (list) => `[${list.map((group) => `[${group.map((id) => `.${id}`).join(", ")}]`).join(", ")}]`;
+  for (const side of ["leading", "trailing"]) {
+    lines.push(`  static func ${side}(_ screen: Screen) -> [[RegistryTopBarItem]] {`);
+    lines.push("    switch screen {");
+    for (const screen of topBar.screens) lines.push(`    case .${screen.screen}: return ${groups(screen[side])}`);
+    lines.push("    }");
+    lines.push("  }");
   }
   lines.push("}");
   lines.push("");
@@ -2500,7 +2590,7 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
 function generateTS({ entities, rules, icons, tokens, caps, settings, dests, actions, surfaces, plans }) {
   const lines = [];
   lines.push("// GENERATED FILE — DO NOT EDIT BY HAND.");
-  lines.push("// Sources: registry/{entities,rules,icons,tokens,capabilities,settings,destinations,actions,surfaces,plans}.json");
+  lines.push("// Sources: registry/{entities,rules,icons,tokens,capabilities,settings,destinations,actions,surfaces,plans,beta}.json");
   lines.push("// Regenerate: node scripts/gen-registries.mjs");
   lines.push("");
   lines.push("export const ENTITY_PATTERNS = {");
@@ -2544,7 +2634,7 @@ function generateTS({ entities, rules, icons, tokens, caps, settings, dests, act
   lines.push(`export const DESIGN_TOKENS = ${JSON.stringify({ accentPolicy: tokens.accentPolicy, fruitAccents: tokens.fruitAccents ?? [], textures: tokens.textures ?? [], selection: tokens.selection, colors: tokens.colors, multicolorGlyphs: tokens.multicolorGlyphs?.glyphs ?? {}, accentPalette: tokens.accentPalette, radii: tokens.radii, spacing: tokens.spacing, desktopColumn: tokens.desktopColumn, textScale: tokens.textScale, motion: tokens.motion })} as const;`);
   lines.push(`export const CAPABILITIES = ${JSON.stringify(caps.capabilities)} as const;`);
   lines.push(`export const ACTIONS_CATALOG = ${JSON.stringify({ actions: actions.actions, contextMenus: actions.contextMenus, menuBar: actions.menuBar, shortcutsSheet: actions.shortcutsSheet })} as const;`);
-  lines.push(`export const SURFACES_CATALOG = ${JSON.stringify({ notices: surfaces.notices, prompts: surfaces.prompts, toasts: surfaces.toasts, taskAttributes: surfaces.taskAttributes, taskDateBoard: surfaces.taskDateBoard, taskPage: surfaces.taskPage, waiting: surfaces.waiting, sharing: surfaces.sharing, accountSwitch: surfaces.accountSwitch, deviceSignIn: surfaces.deviceSignIn, quickFind: surfaces.quickFind, checklistProjects: surfaces.checklistProjects, listSort: surfaces.listSort, support: surfaces.support })} as const;`);
+  lines.push(`export const SURFACES_CATALOG = ${JSON.stringify({ notices: surfaces.notices, prompts: surfaces.prompts, toasts: surfaces.toasts, taskAttributes: surfaces.taskAttributes, taskDateBoard: surfaces.taskDateBoard, taskPage: surfaces.taskPage, waiting: surfaces.waiting, sharing: surfaces.sharing, accountSwitch: surfaces.accountSwitch, deviceSignIn: surfaces.deviceSignIn, quickFind: surfaces.quickFind, checklistProjects: surfaces.checklistProjects, listSort: surfaces.listSort, topBar: surfaces.topBar, support: surfaces.support, fadeSweep: surfaces.fadeSweep })} as const;`);
   lines.push(`export const FIRST_RUN = ${JSON.stringify(surfaces.firstRun)} as const;`);
   lines.push("/** Plan limits (registry/plans.json). The server's plan table: every gate reads these, never a plan name. */");
   lines.push(`export const PLAN_LIMITS = ${JSON.stringify(plans.limits)} as const;`);
@@ -2560,6 +2650,8 @@ function generateTS({ entities, rules, icons, tokens, caps, settings, dests, act
   lines.push(`export const PLAN_UPSELLS = ${JSON.stringify(Object.fromEntries(plans.upsells.map((u) => [u.id, { title: u.title, detail: u.detail }])))} as const;`);
   lines.push("/** Sign-in methods, order per platform and screen copy (registry/sign-in.json, ADR 0047). Copy is English; localize with registryText(). GET /v1/auth/methods says which methods are on. */");
   lines.push(`export const SIGN_IN = ${JSON.stringify({ platforms: bundle.signIn.platforms, methods: bundle.signIn.methods.map(({ notes, ...m }) => m), order: bundle.signIn.order, copy: bundle.signIn.copy, email: bundle.signIn.email, errors: bundle.signIn.errors, existingAccount: bundle.signIn.existingAccount, manage: bundle.signIn.manage, legal: plans.legal })} as const;`);
+  lines.push("/** The beta checklist (registry/beta.json, ADR 0064). English. The backend serves it to testers; apps render what GET /v1/beta answers. */");
+  lines.push(`export const BETA_CHECKLIST = ${JSON.stringify({ copy: bundle.beta.copy, items: bundle.beta.items })} as const;`);
   lines.push("");
   lines.push("// Localized registry copy (ADR 0020). Keys are the English text.");
   lines.push(L10N.tsTables(BY_KEY, TRANSLATIONS));
@@ -2722,6 +2814,11 @@ function generateKotlinCore(bundle) {
   }
   lines.push("}");
   lines.push("");
+  lines.push("/** Pointer hover wash: primary ink at this opacity (`registry/tokens.json` `selection.pointerHoverOpacity`, #851). */");
+  lines.push("object RegistryPointerHover {");
+  lines.push(`    const val OPACITY: Float = ${Number(tokens.selection.pointerHoverOpacity)}f`);
+  lines.push("}");
+  lines.push("");
   lines.push("/** Standard task-completion settle and checkbox motion (`registry/tokens.json` `motion.completion`). */");
   lines.push("object RegistryCompletionMotion {");
   lines.push(`    const val SETTLE_DELAY_MS: Long = ${tokens.motion.completion.settleDelayMs}L`);
@@ -2872,10 +2969,10 @@ const rustModName = (s) => rustConstName(s).toLowerCase();
 const rustStr = (s) => JSON.stringify(s);
 
 function generateRustCore(bundle) {
-  const { entities, rules, dests } = bundle;
+  const { entities, rules, dests, surfaces } = bundle;
   const lines = [
     "// GENERATED FILE — DO NOT EDIT BY HAND.",
-    "// Sources: registry/entities.json, registry/rules.json, registry/destinations.json",
+    "// Sources: registry/entities.json, registry/rules.json, registry/destinations.json, registry/surfaces.json",
     "// Regenerate: node scripts/gen-registries.mjs",
     "#![allow(dead_code)]",
     "",
@@ -2940,6 +3037,20 @@ function generateRustCore(bundle) {
   }
   lines.push("}");
   lines.push("");
+  // The core's grocery vocabulary returns these keys; hosts look up the
+  // heading title by key. A core test checks that both lists match.
+  const groupKeys = Object.keys(surfaces.checklistProjects.groups);
+  const groupArray = `[${groupKeys.map(rustStr).join(", ")}]`;
+  lines.push("/// Checklist group keys (`registry/surfaces.json` `checklistProjects.groups`).");
+  lines.push("pub mod checklist_groups {");
+  if (groupArray.length <= 72) lines.push(`    pub const KEYS: &[&str] = &${groupArray};`);
+  else {
+    lines.push("    pub const KEYS: &[&str] = &[");
+    for (const key of groupKeys) lines.push(`        ${rustStr(key)},`);
+    lines.push("    ];");
+  }
+  lines.push("}");
+  lines.push("");
   return lines.join("\n");
 }
 
@@ -2971,6 +3082,7 @@ const surfaces = readJSON("registry/surfaces.json");
 const plans = readJSON("registry/plans.json");
 const importSources = readJSON("registry/import-sources.json");
 const signIn = readJSON("registry/sign-in.json");
+const beta = readJSON("registry/beta.json");
 
 validateEntities(entities);
 validateRules(rules);
@@ -2984,6 +3096,7 @@ validateSurfaces(surfaces, icons, caps, plans);
 validateTaskReferences(surfaces, icons, caps, entities);
 validateWaiting(surfaces, caps);
 validatePlaceNotes(surfaces, caps);
+validateTopBar(surfaces, icons, caps);
 validateDoing(surfaces, caps, entities);
 checkOpensAttribute({ actions, surfaces });
 checkTaskDateBoard({ surfaces, icons, caps, actions });
@@ -2991,6 +3104,7 @@ validateFirstRun(surfaces, icons, caps, settings);
 validateImportSources(importSources, caps);
 validatePlans(plans, icons, caps, importSources);
 validateSignIn(signIn, icons, caps, plans);
+validateBeta(beta, caps);
 validateConformance();
 validateCodeMap(readJSON("registry/code-map.json"), caps);
 validateSkills();
@@ -3025,7 +3139,7 @@ const conformance = Object.fromEntries(
     .map((name) => [name.replace(/\.json$/, ""), readJSON(`registry/conformance/${name}`)]),
 );
 const bundle = {
-  entities, rules, icons, tokens, caps, settings, dests, actions, surfaces, plans, importSources, signIn, conformance,
+  entities, rules, icons, tokens, caps, settings, dests, actions, surfaces, plans, importSources, signIn, conformance, beta,
   translations: { en: JSON.parse(L10N.englishFile(BY_KEY)), ...TRANSLATIONS },
 };
 /**

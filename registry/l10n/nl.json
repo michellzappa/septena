@@ -32,7 +32,6 @@
   "Add Reference": "Verwijzing toevoegen",
   "Add Reference…": "Verwijzing toevoegen…",
   "Add Reminder…": "Herinnering toevoegen…",
-  "Add a task or move one here when you want to work on it today.": "Voeg een taak toe of verplaats er een hierheen als je die vandaag wilt doen.",
   "Add and Do": "Toevoegen en doen",
   "Add as a custom MCP server in any MCP client": "Voeg toe als aangepaste MCP-server in elke MCP-client",
   "Add the MCP server URL to any MCP client, or paste the setup prompt into your agent. When your browser shows an 8-character code, enter it above. Only enter a code from a window you opened yourself.": "Voeg de MCP-server-URL toe aan een MCP-client of plak de instelprompt in je agent. Als je browser een code van 8 tekens toont, vul die dan hierboven in. Vul alleen een code in uit een venster dat je zelf hebt geopend.",
@@ -238,6 +237,7 @@
   "Finished work": "Afgerond werk",
   "Follow-up to": "Vervolg op",
   "For people who hand a lot of work to agents.": "Voor wie veel werk aan agents overlaat.",
+  "Forward": "Vooruit",
   "Found {areas} areas, {projects} projects, and {tasks} tasks.": "{areas} gebieden, {projects} projecten en {tasks} taken gevonden.",
   "Free": "Gratis",
   "Free account": "Gratis account",
@@ -316,6 +316,7 @@
   "Links in this task": "Links in deze taak",
   "List": "Lijst",
   "Lists": "Lijsten",
+  "Loading Septena": "Septena wordt geladen",
   "Logbook": "Logboek",
   "Logbook is empty": "Het logboek is leeg",
   "Look up": "Opzoeken",
@@ -344,7 +345,6 @@
   "Move down": "Omlaag verplaatsen",
   "Move from another app": "Overzetten uit een andere app",
   "Move only this task, or update the repeating schedule to the new date?": "Alleen deze taak verplaatsen, of het herhaalpatroon aanpassen aan de nieuwe datum?",
-  "Move to Area": "Naar een gebied verplaatsen",
   "Move to Suggested List": "Naar de voorgestelde lijst verplaatsen",
   "Move to Today": "Naar Vandaag verplaatsen",
   "Move to a new device": "Naar een nieuw apparaat verplaatsen",
@@ -844,5 +844,7 @@
   "€5 a month. You save €24 against paying monthly.": "€5 per maand. Je bespaart €24 ten opzichte van maandelijks betalen.",
   "€60 a year": "€60 per jaar",
   "€60 a year or €7 a month": "€60 per jaar of €7 per maand",
-  "€7 a month": "€7 per maand"
+  "€7 a month": "€7 per maand",
+  "It can wait. The rest is in your Logbook.": "Het kan wachten. De rest staat in je Logboek.",
+  "Today can stay empty. Add a task when you want one.": "Vandaag mag leeg blijven. Voeg een taak toe wanneer je wilt."
 }

@@ -2,7 +2,7 @@
 
 Status: building (2026-11-24; CD0, CD1 and CD3 built). Rests on ADR 0034 and ADR 0035 (both accepted 2026-11-25). CD2 and CD4 are for later.
 This spec is the backend contract. The desk orb's firmware and its own roadmap
-are in `michellzappa/tinyseptena` (private).
+are in `septena/orb` (private).
 
 ## What exists
 

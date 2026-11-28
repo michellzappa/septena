@@ -3,6 +3,7 @@ import { logEvent } from "../util.js";
 import { accountStoreFor, type AccountIndexRow } from "../store/AccountStore.js";
 import { deviceVersion, isActivated, lastSeen, marketingVersion, overview, planView, platformName } from "./accounts.js";
 import { signupTotals } from "./signups.js";
+import { SETTINGS_REGISTRY } from "../generated/registries.js";
 
 // Growth for the admin page (ADR 0059). Two kinds of history:
 // - Series that the data can rebuild (accounts and signups by the day they
@@ -16,14 +17,17 @@ export const SERIES_DAYS = 30;
 
 export const dayKey = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 
-export type Snapshot = ReturnType<typeof overview> & { signups: number; signupsWeek: number };
+export type Snapshot = ReturnType<typeof overview> & { signups: number; signupsWeek: number } & Record<string, number>;
 
 /// Writes today's snapshot. Runs from the hourly cron after the sweep.
 export async function recordMetrics(env: Env, now = Date.now()): Promise<void> {
   const accounts = accountStoreFor(env);
   if (!accounts) return;
   const [rows, signups] = await Promise.all([accounts.listAccounts(), signupTotals(env, now)]);
-  const snapshot: Snapshot = { ...overview(rows, now), signups: signups?.total ?? 0, signupsWeek: signups?.week ?? 0 };
+  const snapshot: Snapshot = {
+    ...overview(rows, now), signups: signups?.total ?? 0, signupsWeek: signups?.week ?? 0,
+    ...appearanceSnapshot(appearanceMix(rows, now)),
+  };
   await accounts.saveMetricDay(dayKey(now), snapshot);
   logEvent("admin_metrics", { day: dayKey(now), accounts: snapshot.accounts });
 }
@@ -159,4 +163,50 @@ export function agentMix(rows: AccountIndexRow[]): Tally[] {
 /// Sign-in providers per account.
 export function providerMix(rows: AccountIndexRow[]): Tally[] {
   return tally(rows.flatMap((r) => (r.providers.length ? r.providers : ["not seen yet"])));
+}
+
+// ---- appearance (#859) ----
+
+export interface AppearanceMix {
+  /// Active signed-in accounts with an appearance in their summary.
+  accounts: number;
+  accentColor: Tally[];
+  canvasTexture: Tally[];
+  /// Intensity and motion count only the accounts with a texture on.
+  textureIntensity: Tally[];
+  textureMotion: Tally[];
+}
+
+/// The intensity bucket: the registry default, below it, above it, or "other".
+export function intensityBucket(v: number | "other"): string {
+  const d = SETTINGS_REGISTRY.keys.textureIntensity.default;
+  if (v === "other") return "other";
+  return v === d ? "default" : v < d ? "lower" : "higher";
+}
+
+/// The appearance choices of the accounts seen in the last 30 days. An
+/// account with no appearance in its summary (not signed in, or a summary
+/// from before #859) is not counted. Counts only (ADR 0043).
+export function appearanceMix(rows: AccountIndexRow[], now = Date.now()): AppearanceMix {
+  const looks = rows
+    .filter((r) => now - (lastSeen(r.summary) ?? 0) < 30 * DAY_MS)
+    .flatMap((r) => (r.summary?.appearance ? [r.summary.appearance] : []));
+  const textured = looks.filter((a) => a.canvasTexture !== "none");
+  return {
+    accounts: looks.length,
+    accentColor: tally(looks.map((a) => a.accentColor)),
+    canvasTexture: tally(looks.map((a) => a.canvasTexture)),
+    textureIntensity: tally(textured.map((a) => intensityBucket(a.textureIntensity))),
+    textureMotion: tally(textured.map((a) => a.textureMotion)),
+  };
+}
+
+/// The mix as flat snapshot fields: `appearance.accounts` and
+/// `appearance.<setting>.<value>`.
+export function appearanceSnapshot(mix: AppearanceMix): Record<string, number> {
+  const out: Record<string, number> = { "appearance.accounts": mix.accounts };
+  for (const key of ["accentColor", "canvasTexture", "textureIntensity", "textureMotion"] as const) {
+    for (const t of mix[key]) out[`appearance.${key}.${t.name}`] = t.n;
+  }
+  return out;
 }

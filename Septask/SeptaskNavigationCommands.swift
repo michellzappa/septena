@@ -3,7 +3,7 @@ import SwiftUI
 import AppKit
 #endif
 
-/// Window-scoped commands published by the active Septask scene. App services
+/// Window-scoped commands published by the active Septena scene. App services
 /// stay shared, but route selection, presentation, and sidebar visibility must
 /// belong to the window the person is actually using.
 struct SeptaskNavigationActions {
@@ -17,6 +17,11 @@ struct SeptaskNavigationActions {
   var showQuickAdd: () -> Void
   var showSettings: () -> Void
   var showKeyboardShortcuts: () -> Void
+  /// Back / Forward through the lists this window showed (#849).
+  var canGoBack: Bool
+  var canGoForward: Bool
+  var goBack: () -> Void
+  var goForward: () -> Void
 }
 
 private struct SeptaskNavigationActionsKey: FocusedValueKey {
@@ -270,6 +275,10 @@ struct SeptaskCommandMenus: Commands {
   /// Mirror of the AppKit shell's sidebar collapse, for the same reason.
   @AppStorage(SeptaskKitStateKey.sidebarHidden)
   private var kitSidebarHidden = false
+  /// Mirrors of the AppKit shell's Back / Forward history, so Go ▸ Back and
+  /// Go ▸ Forward turn off at either end.
+  @AppStorage(SeptaskKitStateKey.canGoBack) private var kitCanGoBack = false
+  @AppStorage(SeptaskKitStateKey.canGoForward) private var kitCanGoForward = false
 
   private var sidebarCountsHidden: Bool {
     UserDefaults.standard.object(forKey: SettingsKey.septaskSidebarCounts) == nil
@@ -315,6 +324,33 @@ struct SeptaskCommandMenus: Commands {
       SeptaskKitCommands.go(filter)
       #endif
     }
+  }
+
+  /// Go ▸ Back (⌘[): the previous list in the window in front. Off when
+  /// there is nothing to go back to.
+  private var goBackAction: (() -> Void)? {
+    if let actions { return actions.canGoBack ? actions.goBack : nil }
+    #if os(macOS)
+    return kitCanGoBack && SeptaskKitCommands.canNavigate ? { SeptaskKitCommands.goBack() } : nil
+    #else
+    return nil
+    #endif
+  }
+
+  /// Go ▸ Forward (⌘]): the list Back left.
+  private var goForwardAction: (() -> Void)? {
+    if let actions { return actions.canGoForward ? actions.goForward : nil }
+    #if os(macOS)
+    return kitCanGoForward && SeptaskKitCommands.canNavigate ? { SeptaskKitCommands.goForward() } : nil
+    #else
+    return nil
+    #endif
+  }
+
+  private func historyButton(_ id: RegistryActionID, perform: (() -> Void)?) -> some View {
+    Button(RegistryActions.title(id)) { perform?() }
+      .keyboardShortcut(RegistryActions.shortcut(for: id)?.keyboardShortcut)
+      .disabled(perform == nil)
   }
 
   private func showQuickFind() {
@@ -490,6 +526,12 @@ struct SeptaskCommandMenus: Commands {
 
   var body: some Commands {
     CommandMenu(Self.goMenu.title) {
+      // Back and Forward head the registry's Go menu, as in Finder and Safari.
+      historyButton(.appGoBack, perform: goBackAction)
+      historyButton(.appGoForward, perform: goForwardAction)
+
+      Divider()
+
       SmartListCommands(canNavigate: canNavigate, go: go)
 
       Divider()

@@ -120,7 +120,7 @@ public struct SeptaskDiagnosticsPulse: Decodable, Sendable {
     }
 }
 
-/// Coordinates the optional weekly diagnostics report used by Septask.
+/// Coordinates the optional weekly diagnostics report used by Septena.
 @MainActor
 public final class SeptaskDiagnosticsCoordinator {
     public static let shared = SeptaskDiagnosticsCoordinator()
@@ -265,7 +265,7 @@ public final class SeptaskDiagnosticsCoordinator {
         )
     }
 
-    /// Septask has no hosted-gateway connection: Claude pairs with the task
+    /// Septena has no hosted-gateway connection: Claude pairs with the task
     /// backend, and that pairing lives server-side, so the app reports false.
     private static var claudeConnected: Bool {
         false

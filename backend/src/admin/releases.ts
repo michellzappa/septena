@@ -9,7 +9,7 @@ import { logEvent } from "../util.js";
 // not. Cached in KV for an hour; the last good answer is kept without expiry
 // and shown when GitHub does not answer.
 
-const URL_RELEASES = "https://api.github.com/repos/michellzappa/septena/releases?per_page=30";
+const URL_RELEASES = "https://api.github.com/repos/septena/septena/releases?per_page=30";
 const CACHE_KEY = "admin:mac-releases:v1";
 const CACHE_SECONDS = 3600;
 const LAST_GOOD_KEY = "admin:mac-releases:last-good";

@@ -12,7 +12,7 @@ This spec defines the contract between Septena and an agent: the records, their 
 - `https://septena.app/spec/conformance/run.mjs`: a runner for the vectors, with no dependencies.
 - `https://api.septena.app/openapi.json`: the OpenAPI 3.1 document for the `/v1` HTTP API.
 
-The source is `docs/agent-spec/` in the public app repository, `github.com/michellzappa/septena`. The tables in this document, the schema and the OpenAPI document are generated from the code and the registry. CI fails when one of them is out of date.
+The source is `docs/agent-spec/` in the public app repository, `github.com/septena/septena`. The tables in this document, the schema and the OpenAPI document are generated from the code and the registry. CI fails when one of them is out of date.
 
 ## Where an agent connects
 
@@ -394,8 +394,8 @@ The conformance vectors are the cases every Septena implementation passes: the a
 | [`convo-derived.json`](https://septena.app/spec/conformance/convo-derived.json) | `cases` (10), `conversationState` (11) |
 | [`do-session.json`](https://septena.app/spec/conformance/do-session.json) | `resolve` (16), `endWins` (4) |
 | [`list-sort.json`](https://septena.app/spec/conformance/list-sort.json) | `cases` (15) |
-| [`project-checklist.json`](https://septena.app/spec/conformance/project-checklist.json) | `layout` (3), `check` (2) |
-| [`recurrence.json`](https://septena.app/spec/conformance/recurrence.json) | `nextScheduledDate` (36), `occurrenceID` (3), `checklistOccurrenceID` (3) |
+| [`project-checklist.json`](https://septena.app/spec/conformance/project-checklist.json) | `layout` (3), `check` (2), `heading` (10) |
+| [`recurrence.json`](https://septena.app/spec/conformance/recurrence.json) | `missedWindows` (7), `nextScheduledDate` (36), `occurrenceID` (3), `checklistOccurrenceID` (3) |
 | [`refs.json`](https://septena.app/spec/conformance/refs.json) | `parseRef` (110), `normalizeRefKey` (63), `findIssueRefs` (10), `emailRefKeys` (12), `taskRefId` (3) |
 | [`reminders.json`](https://septena.app/spec/conformance/reminders.json) | `shiftReminderForRecurrence` (6), `shiftReminderOnReschedule` (5), `shouldArmReminder` (8) |
 | [`sync-engine.json`](https://septena.app/spec/conformance/sync-engine.json) | `pullPage` (7), `pullRow` (13), `pushResponse` (7), `rejectionReason` (7) |

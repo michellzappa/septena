@@ -3,7 +3,6 @@ import SwiftUI
 /// Shared Add Item field for the iOS project page and the Mac project popover.
 struct ProjectChecklistAddView: View {
   let rows: [SeptenaTask]
-  let mode: ProjectChecklistMode
   let initialHeading: String?
   let add: (String, String?) -> Void
   let reopen: (String) -> Void
@@ -14,7 +13,7 @@ struct ProjectChecklistAddView: View {
   var body: some View {
     let headings = Dictionary(uniqueKeysWithValues: rows.filter(\.isHeading).map { ($0.id, $0.title) })
     let byID = Dictionary(uniqueKeysWithValues: rows.map { ($0.id, $0) })
-    let matches = ProjectChecklist.layout(rows: rows, query: title, mode: mode)?.matches ?? []
+    let matches = ProjectChecklist.layout(rows: rows, query: title)?.matches ?? []
     VStack(alignment: .leading, spacing: 8) {
       HStack {
         TextField(RegistrySurfaces.checklistAddItem, text: $title)

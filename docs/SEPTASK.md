@@ -1,48 +1,54 @@
-# Septask - separate Tasks app plan
+# Septena task app: plan and build notes
 
-**Status:** P0–P4 landed, plus the app icon. Septask ships on iOS/iPad +
+**Status:** P0–P4 landed, plus the app icon. Septena ships on iOS/iPad +
 native macOS with the real task UI, its own welcome and Settings, the
 same-device Darwin nudge, and its own icon (the Compass,
 `docs/APP_ICON_DECISIONS.md`). Remaining before shipping: localization
 of new strings, on-device signed convergence test, App Store packaging.
 Web project links (P5) follow the native-sharing work per
-`docs/NATIVE_PROJECT_SHARING_SPEC.md`. Internal codename: **Septask**.
+`docs/NATIVE_PROJECT_SHARING_SPEC.md`. The code targets keep the working name
+`Septask` until phase 3 of #856 renames them.
+
+**Names:** this doc was written when the task app had the working name
+Septask and "Septena" meant the life OS. It now uses the current names (ADR
+0007): Septena is the task app, Septena Life is the life OS (moved out in ADR
+0017). The Naming section below keeps the old names as history.
 
 **macOS is moving to AppKit** for the task surfaces — see "AppKit shell on
 macOS" below before touching `SeptaskMac`.
 
 ## CloudKit-free (2026-11-19)
 
-**Septask uses no CloudKit at all.** Everything it shows comes from the task
+**Septena uses no CloudKit at all.** Everything it shows comes from the task
 backend (`api.septena.app`, docs/SEPTASK_BACKEND.md). This supersedes §5
 "Data Model And Parallel Running" and the CloudKit parts of §6 below, which
 stay as history.
 
 - **Sync:** tasks, areas, projects, attachments, conversations, turns and the
   synced settings go through `TaskSyncEngine`. `TaskStoreMode.current` is
-  always `.backend` in Septask. `CKEngine` still compiles (the mutators take
-  it), but in Septask its `start()` is a no-op, it creates no `CKContainer`,
+  always `.backend` in Septena. `CKEngine` still compiles (the mutators take
+  it), but in Septena its `start()` is a no-op, it creates no `CKContainer`,
   queries no account status, fetches no zone and registers for no push.
-- **Septena on the same device:** Septask writes `backend` into the shared
-  `septena.taskStore.mode` key at every launch, so Septena keeps freezing the
+- **Septena Life on the same device:** Septena writes `backend` into the shared
+  `septena.taskStore.mode` key at every launch, so Septena Life keeps freezing the
   CloudKit task types (it reads that key, unchanged).
-- **Signed out:** Septask works on the local store and queues every edit in
+- **Signed out:** Septena works on the local store and queues every edit in
   the sync outbox. It asks for Sign in with Apple on the welcome, at the top
   of Today (SwiftUI `SeptaskSignInNotice` on `TaskListNotice`, AppKit `KitNoticeCell`) and
   in Settings ▸ Account. One flow: `Septask/SeptaskSignIn.swift`.
 - **Settings:** the account-wide ones (name, usage-data level, hidden
   calendars, rolled-in dismissal, home time zone) sync as the backend's
-  `setting` entity. In Septask, `SettingsMirror.loadSettings` / `upsert` read
-  and write a blob in Septask's own defaults, never the shared
-  `SettingsEntity` row (Septena still syncs that through CloudKit). Supporter
-  status no longer syncs into Septask.
-- **Colors:** Septask has no section colors. `SectionTheme.color(for:)`
-  returns the platform accent in Septask; the Tasks section color is
-  Septena's only.
+  `setting` entity. In Septena, `SettingsMirror.loadSettings` / `upsert` read
+  and write a blob in Septena's own defaults, never the shared
+  `SettingsEntity` row (Septena Life still syncs that through CloudKit). Supporter
+  status no longer syncs into Septena.
+- **Colors:** Septena has no section colors. `SectionTheme.color(for:)`
+  returns the platform accent in Septena; the Tasks section color is
+  Septena Life's only.
 - **Entitlements:** iCloud containers, CloudKit, the container environment
-  and `aps-environment` are gone from both Septask entitlements files. App
+  and `aps-environment` are gone from both task-app entitlements files. App
   group (iOS) and Sign in with Apple stay. No `UIBackgroundModes`.
-- **Not compiled in Septask:** `TaskBackendImporter`, `TaskStoreRollback`,
+- **Not compiled in Septena:** `TaskBackendImporter`, `TaskStoreRollback`,
   `CloudKitRecordRegistry`, `SchemaSeedRegistrar`,
   `TasksWatchSnapshotPublisher` (project.yml excludes).
 - **Watch:** (2026-11-22) the watch is a thin client of the backend
@@ -89,7 +95,7 @@ first-run welcome gate, which the AppKit shell does NOT show.
 - `SeptaskKitSettings.swift` — hosts the SwiftUI settings view.
 
 **What's still missing** versus the SwiftUI surface is tracked as a prioritized
-checklist in `docs/SEPTASK_APPKIT_PARITY.md` — read that before picking up
+checklist in `docs/APPKIT_PARITY.md` — read that before picking up
 shell work, and keep it current as items land.
 
 **Rules for working on it:**
@@ -150,7 +156,7 @@ shell work, and keep it current as items land.
 
 **Hazards proven the hard way.** Each of these cost a session or more, and
 none is guessable from the API. They were harvested out of
-`docs/SEPTASK_APPKIT_PARITY.md`'s session log when that file was cut back to a
+`docs/APPKIT_PARITY.md`'s session log when that file was cut back to a
 gap list; git holds the full narrative.
 
 - **Every click target in a table/outline cell is a real `NSButton`.** No
@@ -211,7 +217,7 @@ gap list; git holds the full narrative.
 ## Icon Notes
 
 The icon is generated, not designed by hand: regenerate rather than retouch.
-`tools/logo-builder/dial-svg.mjs` holds the geometry and
+`scripts/dial-svg.mjs` holds the geometry and
 `scripts/generate-app-icons.mjs` writes every icon set. Decisions:
 `docs/APP_ICON_DECISIONS.md`.
 
@@ -237,8 +243,8 @@ The icon is generated, not designed by hand: regenerate rather than retouch.
   the SettingsView AI deep link — are `#if !SEPTASK`-gated inside it).
   Update (2026-11): the rows are now one whole page, `TaskSettingsPane`
   (same file), shown as a top-level Settings ▸ Tasks pane in both apps.
-  Each app passes a `TaskSettingsLink` → its own navigation value. Septena
-  no longer shows task settings under Sections ▸ Tasks, and Septask's root
+  Each app passes a `TaskSettingsLink` → its own navigation value. Septena Life
+  no longer shows task settings under Sections ▸ Tasks, and Septena's root
   has no Sections row.
   Update (2026-11-21, #217): `TaskSettingsPane` had no caller and is
   deleted. Settings renders from `registry/settings.json` in
@@ -247,12 +253,12 @@ The icon is generated, not designed by hand: regenerate rather than retouch.
   (`Shell/UI/PaletteSwatch.swift`), `ClaudeGatewayDetail` (+ its private
   timer — extract private helpers together), and `SkillCopy`
   (`Shell/UI/SkillCopy.swift`).
-- **Septask-local shell** (`Septask/`): `SeptaskSettingsView` (composition
+- **Septena-local shell** (`Septask/`): `SeptaskSettingsView` (composition
   only) and `SeptaskWelcome` (gate + view, completion under
   `septask.welcome.completed`).
 - **Accent is the shared `SectionEntity.color`** via
   `SettingsMirror.setSectionColor("tasks")` + `theme.setColor` — changing it
-  in Septask recolors Septena's Tasks surfaces, by design.
+  in Septena recolors Septena Life's Tasks surfaces, by design.
 - **Smoke-test trap**: building with `CODE_SIGNING_ALLOWED=NO` strips the
   ad-hoc entitlements simulator builds normally embed, and `CKContainer`
   init then traps at launch. Simulator smoke tests must build through
@@ -304,7 +310,7 @@ zero task files copied:
 - **Runtime seam the compiler can't catch:** any `@Environment(X.self)` read
   in an included view crashes at launch if the shell doesn't inject it —
   `IPadChromeModel` (read by SeptenaPage's nav-depth reporter) did exactly
-  that. Septask's composition root must inject: NavigationState,
+  that. Septena's composition root must inject: NavigationState,
   SectionTheme, TaskMutator, AreasMutator, ProjectsMutator, ChecklistMutator
   (the removed Next page's trio rows read it; still injected), CKEngine, DayClock, LogCommitCenter,
   IPadChromeModel, and the model container. When new surfaces land, re-audit
@@ -324,15 +330,15 @@ binds in `start()`), not structural (no UIKit/shell types in the runtime).
   Oura/Withings/Readwise stores; `absorbRemoteChanges()` skips the life-domain
   migrators but keeps the task ones (project-graph heal, someday-status).
 - **"Task-only sync" is impossible at the fetch layer.** `CKSyncEngine`
-  fetches per-zone and everything lives in `septena-v1`, so Septask downloads
-  all record types regardless. Decision: **apply everything** into Septask's
-  mirror (invisible without UI, zero divergence from Septena's sync path)
+  fetches per-zone and everything lives in `septena-v1`, so Septena downloads
+  all record types regardless. Decision: **apply everything** into Septena's
+  mirror (invisible without UI, zero divergence from Septena Life's sync path)
   rather than skip-on-apply. This is the §5 "deliberate tradeoff" — forced by
   CloudKit zone mechanics, not by code quality.
 - **Two known upward seams in SeptenaCore.** `NextFeed.swift` references
   `NextSuggestionsModel` (defined in `Shell/Dashboard`) — originally both it
   and its one core dependent `WatchSnapshotPublisher.swift` were excluded from
-  the Septask target. The Next page (2026-08-13) un-excluded `NextFeed.swift`;
+  the `Septask` target. The Next page (2026-08-13) un-excluded `NextFeed.swift`;
   its removal (2026-11-19, see "Next page" below) excluded it again, so both
   `NextFeed.swift` and `WatchSnapshotPublisher.swift` stay out, with the `#if
   !SEPTASK` gate at the publisher's single call site.
@@ -347,27 +353,27 @@ binds in `start()`), not structural (no UIKit/shell types in the runtime).
   all resolved by source inclusion (same file, both targets), never by copy.
 - **Sequencing vs. native sharing:** `docs/NATIVE_PROJECT_SHARING_SPEC.md`
   Phase 0 (dev spike) may start any time, but its Phases 1–2 (identity
-  namespace + shared-DB engine) wait until Septask P2 lands, so CKEngine is
-  rewritten once, in one place, and Septask inherits it.
+  namespace + shared-DB engine) wait until Septena P2 lands, so CKEngine is
+  rewritten once, in one place, and Septena inherits it.
 
-Septask is a second Apple-platform app over Septena's task system: same repo,
+Septena is a second Apple-platform app over Septena Life's task system: same repo,
 same task logic, same private CloudKit task data, different composition root.
-It is not a fork, not an import/export sidecar, and not "Septena Lite." It is a
+It is not a fork, not an import/export sidecar, and not a "lite" Septena Life. It is a
 focused, Things-grade task app for people who want private data ownership and AI
 control without opening the full life-OS shell.
 
 The most important implementation constraint:
 
-> Septena and Septask must run side by side on the same device as first-class
+> Septena Life and Septena must run side by side on the same device as first-class
 > clients over the same task data.
 
 ---
 
 ## 1. Product Thesis
 
-Tasks is Septena's most legible surface. "A private, local-first task manager an
+Tasks is Septena Life's most legible surface. "A private, local-first task manager an
 AI can drive" is understandable immediately; "a life operating system that
-correlates your domains" is not. Septask opens the door to users who would never
+correlates your domains" is not. Septena opens the door to users who would never
 start with the whole app, especially Things users who want AI and stronger data
 ownership.
 
@@ -380,7 +386,7 @@ The target is:
   positioning can be decided later.
 - **Polished:** judged against Things on feel, density, keyboard flow, import,
   and calm task management.
-- **AI-native:** not "AI someday." Septena already has the spine: MCP task
+- **AI-native:** not "AI someday." Septena Life already has the spine: MCP task
   tools, task conversations, an AI policy dial, on-device reasoning, and
   Claude handoff.
 
@@ -405,7 +411,7 @@ long as bundle IDs and display names are explicit.
 
 - **Second target, one codebase.** Ship another app target from this repo. Never
   clone the repo or duplicate task logic.
-- **Same task data.** Septena and Septask read/write the same CloudKit task,
+- **Same task data.** Septena Life and Septena read/write the same CloudKit task,
   area, project, and task-conversation records.
 - **Separate local mirrors.** Each app has its own SwiftData SQLite mirror. Do
   not put the SwiftData store in the App Group and let two processes write it.
@@ -413,9 +419,9 @@ long as bundle IDs and display names are explicit.
 - **Same write boundary.** Both apps mutate through `TaskMutator`,
   `AreasMutator`, `ProjectsMutator`, and the same conversation mutator methods.
 - **Tasks are always available.** If the user hides the Tasks section in
-  Septena, Septask still works. Hiding a section in the full app hides surfaces,
+  Septena Life, Septena still works. Hiding a section in the full app hides surfaces,
   not data or external clients.
-- **Task-only user surface.** Septask v1 has no Week, Goals, Health,
+- **Task-only user surface.** Septena v1 has no Week, Goals, Health,
   training, nutrition, section picker, full section registry, or life-OS
   dashboard. (Amended 2026-07-11 / 2026-08-13 to add a Next page; amended
   again 2026-11-19: the Next page was removed, so the rule holds without
@@ -460,7 +466,7 @@ extract the task-specific primitives rather than copying it.
 
 ### AI / MCP
 
-Do not re-invent this. Septask should surface the existing task AI story.
+Do not re-invent this. Septena should surface the existing task AI story.
 
 - `Septena/Shell/Tasks/ConversationEngine.swift`
 - `Septena/Shell/Tasks/ConversationCard.swift`
@@ -484,7 +490,7 @@ that coherently inside a focused task app.
 - `Septena/Shell/Sections/Plugins/SectionOnboarding.swift` for reusable section
   onboarding chrome.
 - `TasksPlugin.onboarding` for the reusable task explainer, but **not** as a
-  mandatory first-run step in Septask.
+  mandatory first-run step in Septena.
 
 ---
 
@@ -528,7 +534,7 @@ reaches into Week/Next/Goals/Sections, resolve it by:
 
 1. **Relocate:** move a real shared primitive into `Shell/UI` or a task-shared
    file.
-2. **Cut:** remove a cross-domain dependency from Septask's path.
+2. **Cut:** remove a cross-domain dependency from Septena's path.
 3. **Stub:** provide a thin shell alternative for full-app-only chrome.
 
 Do not solve seam failures by copying task files into `Septask/`.
@@ -537,7 +543,7 @@ Do not solve seam failures by copying task files into `Septask/`.
 
 ## 5. Data Model And Parallel Running
 
-> **Superseded 2026-11-19:** Septask is CloudKit-free; see "CloudKit-free"
+> **Superseded 2026-11-19:** Septena is CloudKit-free; see "CloudKit-free"
 > at the top. Kept as history.
 
 Both apps should be able to run at once on the same device.
@@ -545,13 +551,13 @@ Both apps should be able to run at once on the same device.
 Correct shape:
 
 ```text
-Septena SwiftData mirror  <->  private CloudKit task records  <->  Septask SwiftData mirror
+Septena Life SwiftData mirror  <->  private CloudKit task records  <->  Septena SwiftData mirror
 ```
 
 Wrong shape:
 
 ```text
-Septena process  <->  shared App Group SQLite  <->  Septask process
+Septena Life process  <->  shared App Group SQLite  <->  Septena process
 ```
 
 Why: two app processes writing the same SwiftData/Core Data SQLite store is a
@@ -575,7 +581,7 @@ Implementation notes:
 
 ### Task-Only Sync
 
-Product intent: Septask syncs only task-domain data:
+Product intent: Septena syncs only task-domain data:
 
 - tasks
 - areas
@@ -596,7 +602,7 @@ not the desired architecture.
 
 ### Welcome
 
-Septask gets its own proprietary welcome screen:
+Septena gets its own proprietary welcome screen:
 
 - same design language as `WelcomeView`
 - different copy
@@ -604,14 +610,14 @@ Septask gets its own proprietary welcome screen:
 - no life-OS framing
 - no mandatory `TasksPlugin.onboarding` after welcome
 
-If an existing Septena user installs Septask, show the Septask app welcome once
+If an existing Septena Life user installs Septena, show the Septena app welcome once
 for that app, then land in tasks. The task content onboarding should be available
 from Settings/help but should not block first run.
 
 ### Settings
 
-Septask needs a dedicated Settings surface. It should share code smartly, not
-mount Septena's whole Settings app.
+Septena needs a dedicated Settings surface. It should share code smartly, not
+mount Septena Life's whole Settings app.
 
 Extract/reuse:
 
@@ -622,11 +628,11 @@ Extract/reuse:
 - accent picker for the shared `"tasks"` section color
 - task privacy/export/about copy where reusable
 
-Keep Septask-specific:
+Keep Septena-specific:
 
 - app welcome reset
 - app icon/name/about
-- view preferences that should be local to Septask
+- view preferences that should be local to Septena
 - web project sharing/link management
 - task-only privacy explainer copy
 
@@ -649,18 +655,18 @@ Settings split rule:
 
 ### Accent
 
-> **Superseded 2026-11-19:** Septask uses the platform accent and reads no
+> **Superseded 2026-11-19:** Septena uses the platform accent and reads no
 > section color. The text below is history.
 
 The task accent is shared.
 
 Use `SettingsMirror.setSectionColor("tasks", hex: ...)`. This writes the same
-`SectionEntity.color` that Septena uses for its Tasks tile/surfaces. Changing it
-in Septask recolors Tasks in Septena too; this is desired.
+`SectionEntity.color` that Septena Life uses for its Tasks tile/surfaces. Changing it
+in Septena recolors Tasks in Septena Life too; this is desired.
 
 ### AI
 
-Septask v1 should include the current task AI/MCP story:
+Septena v1 should include the current task AI/MCP story:
 
 - AI policy dial
 - task conversations in the composer
@@ -678,7 +684,7 @@ Do not modify the user's Things data.
 
 ### App Store / Site
 
-Septask should have its own icon, App Store page, and explainer on
+Septena should have its own icon, App Store page, and explainer on
 `www.septena.app`. Pricing is intentionally undecided. Assume free for planning.
 
 ---
@@ -705,14 +711,14 @@ Recommended model:
 - The helper must never receive broad account authority when a scoped share will
   do.
 
-This does not need to block the native Septask target. Plan the data shape early
+This does not need to block the native task-app target. Plan the data shape early
 so project detail/settings have a stable place for share controls later.
 
 ---
 
 ## 8. Phased Workflow
 
-Each phase must leave the full Septena app green and behaviorally unchanged.
+Each phase must leave the full Septena Life app green and behaviorally unchanged.
 Build through `scripts/build.sh` per `CLAUDE.md`; do not run concurrent builds.
 No branches unless the user explicitly asks.
 
@@ -724,7 +730,7 @@ Goal: prove "two apps, same task data" before polishing UI.
 - Start the lightest viable runtime.
 - Render a raw task list from the local mirror.
 - Create/complete a task through the existing mutator.
-- Install next to Septena on one device.
+- Install next to Septena Life on one device.
 - Confirm both apps converge through CloudKit.
 - Measure whether task-only runtime/sync extraction is clean or invasive.
 
@@ -740,9 +746,9 @@ extraction.
   - `TasksPlugin.destinationView` usage
   - `SectionDrawer` mounting path
 - Move real shared UI primitives to `Shell/UI`.
-- Keep Septena behavior identical.
+- Keep Septena Life behavior identical.
 
-### P2 - Thin Septask Shell
+### P2 - Thin Septena Shell
 
 - App entry / scene.
 - iPhone/iPad/Mac task navigation.
@@ -758,11 +764,11 @@ extraction.
 - No `LogCommitCenter` unless needed; task code is nil-safe.
 - No Week/Next/Goals/section registry.
 
-### P3 - Septask Welcome And Settings
+### P3 - Septena Welcome And Settings
 
-- Build Septask welcome in Septena's welcome design language.
-- Mark Septask welcome completion separately from Septena's life-OS welcome.
-- Build dedicated Septask Settings.
+- Build Septena welcome in Septena Life's welcome design language.
+- Mark Septena welcome completion separately from Septena Life's life-OS welcome.
+- Build dedicated Septena Settings.
 - Extract task settings from `TasksDetailContent` into a reusable task settings
   pane/component.
 - Add Things import and AI/MCP entries.
@@ -770,7 +776,7 @@ extraction.
 
 ### P4 - Cross-App Polish
 
-- Darwin notification nudge between Septena and Septask.
+- Darwin notification nudge between Septena Life and Septena.
 - Foreground refresh checks.
 - Badge behavior decision.
 - Widget/watch snapshot decision (v1 should not ship Watch).
@@ -793,8 +799,8 @@ extraction.
 
 - app entry
 - scene/navigation chrome
-- Septask welcome
-- Septask settings shell
+- Septena welcome
+- Septena settings shell
 - app assets
 - target-specific wrappers/adapters
 
@@ -836,7 +842,7 @@ shared supporting folder so both apps improve together.
 
 **Removed 2026-11-19.** Septask is becoming a standalone task app: Septena
 (the life-OS app) drops tasks, and Septask may be renamed. The Next page
-showed Septena's suggestions plus the chores / habits / supplements trio,
+showed Septena Life's suggestions plus the chores / habits / supplements trio,
 which is life-OS content, not tasks. Today covers "what's next" for tasks.
 What changed:
 
@@ -847,19 +853,19 @@ What changed:
   no sidebar row, so the window falls back to Today.
 - SwiftUI (iPhone / iPad / classic Mac window): `TaskDestinations.sidebarRoutes`
   no longer inserts `.next` under `SEPTASK`; the iPad sidebar badge is gone;
-  `ContentView` maps a stray `.next` route to the Today list in Septask.
+  `ContentView` maps a stray `.next` route to the Today list in Septena.
   `SeptaskRootView` dropped the mood check-in and new-meal sheets.
-- project.yml (both Septask targets, lockstep): removed the two
+- project.yml (both task-app targets, lockstep): removed the two
   `Shell/Dashboard` Next files and the Mood / Nutrition files, and excluded
   `SeptenaCore/NextFeed.swift` again.
 - Not changed: `SeptenaServices.start()` still binds `checklistMutator`,
   `intakeMutator` and `nutritionMutator` in both profiles. Moving them under
-  the life-OS gate is a separate decision. Septena's own Next is untouched.
+  the life-OS gate is a separate decision. Septena Life's own Next is untouched.
   SeptaskWatch never showed Next (tasks only).
 
 The history below describes the page as it was.
 
-Septask hosted the Next feed — suggestions plus the chores / habits /
+Septena hosted the Next feed — suggestions plus the chores / habits /
 supplements trio — as a **first-class page**, not a fold under Today.
 iPhone: a tab between Today and Upcoming (`SeptaskRootView`). iPad: a
 sidebar row after Today (`TaskDestinations.sidebarRoutes` → `ContentView`
@@ -872,15 +878,15 @@ The Today fold (`SeptaskNextFold`) and its Settings ▸ Home ▸ "Next in Today"
 toggle were removed so every platform agrees: Next is beside Today, not
 under it.
 
-- **Composition, not copies.** The page renders the SAME models/rows Septena's
+- **Composition, not copies.** The page renders the SAME models/rows Septena Life's
   Next tab uses (`NextItemsModel`, `NextSuggestionsModel`,
   `HabitRow`/`SupplementRow`/`ChoreRow`, `NextSuggestionRow`). Rows wear the
   Tasks surface's `taskCardChrome` instead of List cells. No List selection /
   keyboard cursor across Next rows.
-- **Deliberate cuts from Septena's Next page:** no "Tasks Today" block (the
+- **Deliberate cuts from Septena Life's Next page:** no "Tasks Today" block (the
   Today list IS it); no "Done Today" log (too recursive on a surface that's
   already the task log — forward glance only); no training suggestion
-  (its destination is the live-session surface Septask doesn't compile).
+  (its destination is the live-session surface Septena doesn't compile).
   Sub-block titles (Suggested / Chores / Habits / Supplements) render a step
   smaller + gray so they don't compete with task section headers.
 - **Runtime loosening (deliberate).** `SeptenaServices.start()` now binds
@@ -889,13 +895,13 @@ under it.
   meal; mood needs no engine binding). Gut / goal / coach / activity /
   symptoms / medications / grocery / training mutators and the provider stores
   stay full-profile-only.
-- **Included files** (project.yml, both Septask targets, lockstep): the three
+- **Included files** (project.yml, both task-app targets, lockstep): the three
   `Shell/Dashboard` Next files + `MirrorReader.swift`, `NextFeed.swift`
   (un-excluded), and from `Septena/Sections/`: Mood catalog + commit animation
   + check-in page (`AddMoodPage`), and Nutrition edit/new sheets +
   `NutritionCommit.swift` + MealPhoto analyzer/draft/camera. (`MealPhotoThumbnail`
   lives in `EditNutritionEntrySheet.swift`, so the new-meal sheet pulls that
-  file in even though the page no longer edits meals.) Septask iOS also gained
+  file in even though the page no longer edits meals.) Septena iOS also gained
   the `FoundationModels.framework` dependency (meal-photo analyzer).
 - **Extraction made for this:** `NutritionPlugin.commitMeal` moved to
   `NutritionCommit` (Sections/Nutrition) so the meal sheets compile without

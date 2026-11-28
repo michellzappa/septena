@@ -70,12 +70,12 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import app.septena.core.TopBar
 import app.septena.core.JsonValue
 import app.septena.core.RegistryActionContext
 import app.septena.core.RegistryActionResolver
 import app.septena.core.RegistryCatalog
 import app.septena.core.generated.RegistryActionIds
-import app.septena.core.generated.RegistryEntityEnums
 import app.septena.core.generated.RegistryDestinationIds
 import app.septena.core.generated.RegistryPlatformIds
 import app.septena.core.generated.RegistryPromptIds
@@ -129,7 +129,7 @@ internal fun ListsHomePage(
     onQuickFind: () -> Unit,
     onOpenSettings: () -> Unit,
     onCreateArea: (String, Int?) -> Unit,
-    onCreateProject: (String, String?, Int?, String?) -> Unit,
+    onCreateProject: (String, String?, Int?) -> Unit,
     onMoveProjectToArea: (String, String?) -> Unit = { _, _ -> },
     onRenameArea: (String, String) -> Unit = { _, _ -> },
     onRenameProject: (String, String) -> Unit = { _, _ -> },
@@ -183,22 +183,31 @@ internal fun ListsHomePage(
                             scrolledContainerColor = Color.Transparent,
                         ),
                         title = {},
-                        actions = {
-                            IconButton(
-                                onClick = onQuickFind,
-                                modifier = Modifier.semantics { contentDescription = quickFindTitle },
-                            ) {
-                                SearchGlyph(tint = MaterialTheme.colorScheme.onSurface)
+                        // The phone top bar from the registry (surfaces.json `topBar`, screen
+                        // `listsHome`): Settings leading, Search trailing, as on every platform.
+                        navigationIcon = {
+                            if (TopBar.order(TopBar.Screen.LISTS_HOME, "leading").contains(TopBar.Button.SETTINGS)) {
+                                IconButton(
+                                    onClick = onOpenSettings,
+                                    modifier = Modifier.semantics { contentDescription = settingsTitle },
+                                ) {
+                                    SeptenaGlyph(
+                                        kind = SeptenaIconKind.Settings,
+                                        tint = MaterialTheme.colorScheme.onSurface,
+                                        size = 21.dp,
+                                    )
+                                }
                             }
-                            IconButton(
-                                onClick = onOpenSettings,
-                                modifier = Modifier.semantics { contentDescription = settingsTitle },
-                            ) {
-                                SeptenaGlyph(
-                                    kind = SeptenaIconKind.Settings,
-                                    tint = MaterialTheme.colorScheme.onSurface,
-                                    size = 21.dp,
-                                )
+                        },
+                        actions = {
+                            // More has no rows here yet: this screen's actions sit in its content.
+                            if (TopBar.order(TopBar.Screen.LISTS_HOME, "trailing").contains(TopBar.Button.SEARCH)) {
+                                IconButton(
+                                    onClick = onQuickFind,
+                                    modifier = Modifier.semantics { contentDescription = quickFindTitle },
+                                ) {
+                                    SearchGlyph(tint = MaterialTheme.colorScheme.onSurface)
+                                }
                             }
                         },
                     )
@@ -235,7 +244,7 @@ internal fun ListsHomePage(
                             magicDraft = null
                             when (draft) {
                                 is HomeMagicDraft.Area -> onCreateArea(name, draft.index)
-                                is HomeMagicDraft.Project -> onCreateProject(name, draft.areaId, draft.index, null)
+                                is HomeMagicDraft.Project -> onCreateProject(name, draft.areaId, draft.index)
                             }
                         },
                         onCancelMagicDraft = { magicDraft = null },
@@ -331,9 +340,9 @@ internal fun ListsHomePage(
             initialAreaId = newProjectInitialAreaId,
             languageTag = languageTag,
             onDismiss = { newProjectDialogOpen = false },
-            onConfirm = { name, areaId, checklistMode ->
+            onConfirm = { name, areaId ->
                 newProjectDialogOpen = false
-                onCreateProject(name, areaId, null, checklistMode)
+                onCreateProject(name, areaId, null)
             },
         )
     }
@@ -355,7 +364,7 @@ internal fun TabletSidebarPane(
     onSetAreaEmoji: (String, String?) -> Unit,
     onOpenSettings: () -> Unit,
     onCreateArea: (String, Int?) -> Unit,
-    onCreateProject: (String, String?, Int?, String?) -> Unit,
+    onCreateProject: (String, String?, Int?) -> Unit,
     onMoveProjectToArea: (String, String?) -> Unit,
     onRenameArea: (String, String) -> Unit,
     onRenameProject: (String, String) -> Unit,
@@ -410,7 +419,7 @@ internal fun TabletSidebarPane(
                     magicDraft = null
                     when (draft) {
                         is HomeMagicDraft.Area -> onCreateArea(name, draft.index)
-                        is HomeMagicDraft.Project -> onCreateProject(name, draft.areaId, draft.index, null)
+                        is HomeMagicDraft.Project -> onCreateProject(name, draft.areaId, draft.index)
                     }
                 },
                 onCancelMagicDraft = { magicDraft = null },
@@ -504,9 +513,9 @@ internal fun TabletSidebarPane(
             initialAreaId = newProjectInitialAreaId,
             languageTag = languageTag,
             onDismiss = { newProjectDialogOpen = false },
-            onConfirm = { name, areaId, checklistMode ->
+            onConfirm = { name, areaId ->
                 newProjectDialogOpen = false
-                onCreateProject(name, areaId, null, checklistMode)
+                onCreateProject(name, areaId, null)
             },
         )
     }
@@ -1560,7 +1569,7 @@ private fun CompactSidebarProjectRow(
                 )
                 DropdownMenuItem(
                     text = {
-                        Text(RegistryCatalog.submenuTitle("sidebar.project", "moveToArea", languageTag).orEmpty())
+                        Text(RegistryCatalog.actionTitle(RegistryActionIds.PROJECT_MOVE, languageTag = languageTag).orEmpty())
                     },
                     onClick = {
                         menuExpanded = false
@@ -1734,7 +1743,7 @@ private fun NewProjectDialog(
     initialAreaId: String?,
     languageTag: String,
     onDismiss: () -> Unit,
-    onConfirm: (String, String?, String?) -> Unit,
+    onConfirm: (String, String?) -> Unit,
 ) {
     val promptId = RegistryPromptIds.NEW_PROJECT
     val promptFields = remember { RegistryCatalog.surface(promptId)?.fields.orEmpty() }
@@ -1747,10 +1756,6 @@ private fun NewProjectDialog(
 
     var name by remember { mutableStateOf("") }
     var selectedAreaId by remember(initialAreaId) { mutableStateOf(initialAreaId) }
-    var checklistMode by remember { mutableStateOf<String?>(null) }
-    var typeMenuOpen by remember { mutableStateOf(false) }
-    val modes = listOf(null to "project", RegistryEntityEnums.ChecklistMode.PLAIN to "checklist",
-        RegistryEntityEnums.ChecklistMode.GROCERIES to "groceries")
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
@@ -1768,24 +1773,9 @@ private fun NewProjectDialog(
                     label = { Text(placeholder) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(onDone = { if (name.isNotBlank()) onConfirm(name, selectedAreaId, checklistMode) }),
+                    keyboardActions = KeyboardActions(onDone = { if (name.isNotBlank()) onConfirm(name, selectedAreaId) }),
                     modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
                 )
-                Box {
-                    val key = modes.first { it.first == checklistMode }.second
-                    TextButton(onClick = { typeMenuOpen = true }) { Text(checklistCopy(key, languageTag)) }
-                    DropdownMenu(expanded = typeMenuOpen, onDismissRequest = { typeMenuOpen = false }) {
-                        for ((mode, label) in modes) {
-                            DropdownMenuItem(
-                                text = { Text(checklistCopy(label, languageTag)) },
-                                onClick = {
-                                    checklistMode = mode
-                                    typeMenuOpen = false
-                                },
-                            )
-                        }
-                    }
-                }
                 if (areas.isNotEmpty()) {
                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         AreaPickerOptionRow(
@@ -1809,7 +1799,7 @@ private fun NewProjectDialog(
             }
         },
         confirmButton = {
-            TextButton(enabled = name.isNotBlank(), onClick = { onConfirm(name, selectedAreaId, checklistMode) }) {
+            TextButton(enabled = name.isNotBlank(), onClick = { onConfirm(name, selectedAreaId) }) {
                 Text(confirmTitle)
             }
         },
@@ -1838,7 +1828,7 @@ internal fun MoveProjectToAreaDialog(
             .orEmpty()
     }
     val title = remember(languageTag) {
-        RegistryCatalog.submenuTitle("sidebar.project", "moveToArea", languageTag).orEmpty()
+        RegistryCatalog.actionTitle(RegistryActionIds.PROJECT_MOVE, "shortTitle", languageTag).orEmpty()
     }
 
     AlertDialog(

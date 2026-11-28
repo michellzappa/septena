@@ -66,10 +66,18 @@ final class KitHeaderWashView: NSView {
     }
   }
 
+  /// Window focus, occlusion and app activation also land here, often while
+  /// nothing the texture shows has changed. A still texture redraws only when
+  /// its inputs change: a redraw on every notification re-ran the full
+  /// procedural render on the main thread and the header flashed.
   func reloadConfig() {
-    isHidden = !AppearancePreferences.shared.hasActiveTexture
+    let hidden = !AppearancePreferences.shared.hasActiveTexture
+    let shownChanged = hidden != isHidden
+    isHidden = hidden
     updateMotionTimer()
-    needsDisplay = true
+    if shownChanged || driftTimer != nil || currentParams() != lastDrawnParams {
+      needsDisplay = true
+    }
   }
 
   override func viewDidMoveToWindow() {
@@ -84,13 +92,13 @@ final class KitHeaderWashView: NSView {
     needsDisplay = true
   }
 
-  override func draw(_ dirtyRect: NSRect) {
-    let prefs = AppearancePreferences.shared
-    guard prefs.hasActiveTexture, bounds.width > 1, bounds.height > 1 else { return }
-    guard let cg = NSGraphicsContext.current?.cgContext else { return }
+  /// The inputs of the last draw: `reloadConfig` compares against them.
+  private var lastDrawnParams: HeaderWashParams?
 
+  private func currentParams() -> HeaderWashParams {
+    let prefs = AppearancePreferences.shared
     let isDark = effectiveAppearance.bestMatch(from: [.darkAqua, .vibrantDark]) != nil
-    let params = HeaderWashParams(
+    return HeaderWashParams(
       style: prefs.canvasTexture,
       isDark: isDark,
       accent: prefs.accentRGB(isDark: isDark),
@@ -101,6 +109,24 @@ final class KitHeaderWashView: NSView {
       mini: false,
       increaseContrast: NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast
     )
+  }
+
+  override func draw(_ dirtyRect: NSRect) {
+    guard AppearancePreferences.shared.hasActiveTexture, bounds.width > 1, bounds.height > 1 else { return }
+    let params = currentParams()
+    lastDrawnParams = params
+    // Still texture: blit the cached bitmap the SwiftUI lists use, so a
+    // redraw never re-runs the procedural render. Drift draws live.
+    if driftTimer == nil {
+      let scale = min(window?.backingScaleFactor ?? 2, 2)
+      if let cgImage = HeaderWashBitmapCache.image(for: params, size: bounds.size, scale: scale) {
+        NSImage(cgImage: cgImage, size: bounds.size).draw(
+          in: bounds, from: .zero, operation: .sourceOver, fraction: 1,
+          respectFlipped: true, hints: nil)
+        return
+      }
+    }
+    guard let cg = NSGraphicsContext.current?.cgContext else { return }
     HeaderWashEngine.draw(in: cg, size: bounds.size, params: params)
   }
 

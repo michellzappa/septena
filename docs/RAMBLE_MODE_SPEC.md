@@ -1,9 +1,9 @@
 # Ramble mode — voice capture and task context
 
 **Status:** proposal (2026-11-24). Defaults in §9 stand unless mz overrules.
-**Decisions:** [ADR 0007](adr/0007-septena-is-the-task-app.md), [ADR 0015](adr/0015-shared-registries-for-cross-platform-clients.md), [ADR 0020](adr/0020-registry-owns-copy-and-translations.md), [ADR 0028](adr/0028-registry-owns-vocabulary-platforms-own-interaction.md), [ADR 0029](adr/0029-one-task-page-two-depths.md), [ADR 0035](adr/0035-companion-voice-is-push-to-talk-and-confirmed.md) (proposed — shared confirm contract; companion voice is [#426](https://github.com/michellzappa/septena/issues/426)). Does **not** depend on [ADR 0009](adr/0009-trustable-private-ai.md) (proposed): phone and Mac Ramble stays strictly on-device by default.
+**Decisions:** [ADR 0007](adr/0007-septena-is-the-task-app.md), [ADR 0015](adr/0015-shared-registries-for-cross-platform-clients.md), [ADR 0020](adr/0020-registry-owns-copy-and-translations.md), [ADR 0028](adr/0028-registry-owns-vocabulary-platforms-own-interaction.md), [ADR 0029](adr/0029-one-task-page-two-depths.md), [ADR 0035](adr/0035-companion-voice-is-push-to-talk-and-confirmed.md) (proposed — shared confirm contract; companion voice is [#426](https://github.com/septena/septena/issues/426)). Does **not** depend on [ADR 0009](adr/0009-trustable-private-ai.md) (proposed): phone and Mac Ramble stays strictly on-device by default.
 **Builds on:** `Septena/Shell/Intelligence/OnDeviceAI.swift`, `SeptenaCore/AIPolicy.swift`, `Septena/Shell/Tasks/TaskComposer.swift`, `Septena/Shell/Tasks/TaskDraft.swift`, `Septena/Shell/Tasks/AddTaskPage.swift`, `Septask/SeptaskKitQuickEntry.swift`, `Septask/SeptaskKitInspector.swift`, `SeptenaCore/Outbox.swift` (`TaskMutator`), `SeptenaCore/TaskUndo.swift`, `docs/INLINE_CAPTURE_PARSING_SPEC.md` (#133), `docs/COMPANION_DEVICES_SPEC.md`, `docs/TASK_PAGE_SPEC.md` (#300), `docs/HAPTICS_SPEC.md`.
-**Tracking issue:** [#211](https://github.com/michellzappa/septena/issues/211).
+**Tracking issue:** [#211](https://github.com/septena/septena/issues/211).
 **Owner of decisions:** mz. Defaults chosen by the author are marked *(default)*.
 
 ---

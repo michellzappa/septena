@@ -1,6 +1,6 @@
 // Connected-apps detail panes shared by both shells (docs/SEPTASK.md):
 // Reminders inbox import and calendar visibility. Extracted from
-// IntegrationsSettingsPane.swift so Septask's Settings can offer the same
+// IntegrationsSettingsPane.swift so Septena's Settings can offer the same
 // management UI without compiling the full Integrations surface — the
 // bridges themselves (RemindersBridge, CalendarBridge) live in SeptenaCore.
 

@@ -21,13 +21,13 @@ struct AddTaskPage: View {
   @Environment(\.modelContext) private var modelContext
   @Environment(\.dismiss) private var dismiss
   @Bindable var router: AddInfoRouter
-  /// True when this page is the whole quick-add (Septask's sheet): it then
+  /// True when this page is the whole quick-add (Septena's sheet): it then
   /// owns its own focused title field and Cancel / Add toolbar. False under
   /// Septena's `AddInfoSheet`, which feeds `router.query` from its `.searchable`
   /// bar and owns the chrome.
   var hostsTitleField: Bool = false
   /// File every capture to the Inbox instead of deriving a list from the
-  /// current route (Septask's quick add is a pure Inbox capture).
+  /// current route (Septena's quick add is a pure Inbox capture).
   var forcesInbox: Bool = false
   @State private var todays: [SeptenaTask] = []
   @State private var working = false

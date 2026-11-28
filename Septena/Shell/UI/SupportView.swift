@@ -11,6 +11,14 @@ struct SupportView: View {
   /// The Mac window scene's id.
   static let windowID = "septask-support"
 
+  /// The message's first line when the form opens with an empty field (the
+  /// beta checklist's "Beta: <item>").
+  private let prefill: String?
+
+  init(prefill: String? = nil) {
+    self.prefill = prefill
+  }
+
   @State private var center = SupportCenter.shared
   @State private var text = ""
   @State private var email = ""
@@ -101,6 +109,7 @@ struct SupportView: View {
     .navigationBarTitleDisplayMode(.inline)
     #endif
     .task {
+      if let prefill, text.isEmpty { text = prefill + "\n\n" }
       await center.refresh()
       await center.markRead()
     }

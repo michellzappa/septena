@@ -35,7 +35,7 @@ enum PageChromeMetrics {
   /// floating chrome bar (gear/switcher/+). Matches the bar's rendered height
   /// (≈60pt circles + 8pt top padding) with a little breathing room.
   ///
-  /// Septask draws no floating chrome bar (its split-view sidebar is the
+  /// Septena draws no floating chrome bar (its split-view sidebar is the
   /// switcher — see `SeptaskRootView`), so there is nothing to clear: every
   /// task surface reserves 0 and content rests at the normal page top instead
   /// of ~62pt lower. The constant is gated at the source so all surfaces
@@ -255,7 +255,7 @@ private struct PageChromeModifier: ViewModifier {
   let id: String
   let title: String
   let localActions: () -> AnyView?
-  /// One page-local toolbar button beside Search on iPhone Septask (the
+  /// One page-local toolbar button beside Search on iPhone Septena (the
   /// Tasks Starred filter). nil → nothing.
   let accessory: () -> AnyView?
   let add: PageAdd?
@@ -297,8 +297,8 @@ private struct PageChromeModifier: ViewModifier {
     // instead of the window overlay. `usesPushNavigation` is true on iPad
     // regular regardless of column width.
     if usesPushNavigation {
-      // Septask never renders the floating iPad overlay bar — that lives only in
-      // Septena's `RootTabView.iPadTabless`. Routing chrome there would strand the
+      // Septena never renders the floating iPad overlay bar — that lives only in
+      // Septena Life's `RootTabView.iPadTabless`. Routing chrome there would strand the
       // gear/"+" off-screen AND leave an empty, background-hidden nav bar with no
       // scroll-edge "pocket", so content hard-cuts at the top instead of the iOS 26
       // soft fade. Put the chrome in the real (translucent) navigation bar like
@@ -324,25 +324,26 @@ private struct PageChromeModifier: ViewModifier {
   private var chromeToolbar: some ToolbarContent {
     #if os(iOS)
     if !usesPushNavigation {
-      // iPhone (compact) Septena: top-left is Settings only on root pages
-      // (pushed destinations keep the native Back button unobstructed);
-      // top-right shows page-local actions ("···", only when present) + Search.
-      // New Task (+) lives in the bottom tab bar.
-      if (showsGlobal || id == "tasks") && !isInPushedDetail {
+      // iPhone (compact): the phone top bar from the registry
+      // (`registry/surfaces.json` `topBar`), the same on every platform.
+      // The lists home shows Settings at the leading edge; a pushed list shows
+      // the native Back there (pushed destinations keep it unobstructed).
+      // Trailing: each registry group is one glass capsule, with a fixed
+      // spacer between groups. New Task lives in the Magic Plus orb.
+      if topBarShows(.settings) {
         ToolbarItem(placement: .topBarLeading) { SettingsToolbarButton() }
       }
-      if let actions = localActions() {
-        ToolbarItem(placement: .topBarTrailing) {
-          OverflowMenu { actions }
+      if !topBarTrailing.isEmpty {
+        ToolbarItemGroup(placement: .topBarTrailing) {
+          ForEach(topBarTrailing[0], id: \.self) { topBarButton($0) }
         }
       }
-      if let accessory = accessory() {
-        ToolbarItem(placement: .topBarTrailing) { accessory }
-        // A fixed spacer splits the shared glass pill: the accessory (Star)
-        // and Search read as two separate circles, not one joined control.
+      if topBarTrailing.count > 1 {
         ToolbarSpacer(.fixed, placement: .topBarTrailing)
+        ToolbarItemGroup(placement: .topBarTrailing) {
+          ForEach(topBarTrailing[1], id: \.self) { topBarButton($0) }
+        }
       }
-      ToolbarItem(placement: .topBarTrailing) { QuickFindToolbarButton() }
     } else {
       if showsGlobal || id == "tasks" {
         ToolbarItem(placement: .topBarLeading) { iosLeadingChrome }
@@ -374,6 +375,45 @@ private struct PageChromeModifier: ViewModifier {
     }
     #endif
   }
+
+  #if os(iOS)
+  /// The registry screen this page is: the lists home, or a list pushed over it.
+  private var topBarScreen: RegistryTopBar.Screen { isInPushedDetail ? .list : .listsHome }
+
+  /// Whether a top-bar button shows on this page (its registry `when`).
+  private func topBarShows(_ item: RegistryTopBarItem) -> Bool {
+    let placed = (RegistryTopBar.leading(topBarScreen) + RegistryTopBar.trailing(topBarScreen)).joined().contains(item)
+    guard placed else { return false }
+    switch item {
+    case .settings: return showsGlobal || id == "tasks"
+    case .back: return false // the navigation stack draws Back itself
+    case .more: return localActions() != nil
+    case .star: return accessory() != nil
+    case .search: return true
+    }
+  }
+
+  /// The trailing groups that have a button to show, in registry order.
+  private var topBarTrailing: [[RegistryTopBarItem]] {
+    RegistryTopBar.trailing(topBarScreen).map { $0.filter(topBarShows) }.filter { !$0.isEmpty }
+  }
+
+  @ViewBuilder
+  private func topBarButton(_ item: RegistryTopBarItem) -> some View {
+    switch item {
+    case .more:
+      if let actions = localActions() { OverflowMenu { actions } }
+    case .star:
+      if let accessory = accessory() { accessory }
+    case .search:
+      QuickFindToolbarButton()
+    case .settings:
+      SettingsToolbarButton()
+    case .back:
+      EmptyView()
+    }
+  }
+  #endif
 
   /// The leading "···" menu: the page's own actions, then Settings (always last).
   private var overflowMenu: some View {

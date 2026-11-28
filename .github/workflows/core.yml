@@ -239,7 +239,8 @@ jobs:
           export ANDROID_NDK_HOME="$ANDROID_NDK_LATEST_HOME"
           # 16 KB ELF LOAD segment alignment on 64-bit Android ABIs (Google Play requirement for targetSdk >= 35).
           export CARGO_TARGET_AARCH64_LINUX_ANDROID_RUSTFLAGS="${CARGO_TARGET_AARCH64_LINUX_ANDROID_RUSTFLAGS:-} -C link-arg=-Wl,-z,max-page-size=16384"
-          export CARGO_TARGET_X86_64_LINUX_ANDROID_RUSTFLAGS="${CARGO_TARGET_X86_64_LINUX_ANDROID_RUSTFLAGS:-} -C link-arg=-Wl,-z,max-page-size=16384"
+          # The app requires API 29. Android packed relocations are supported from API 23.
+          export CARGO_TARGET_X86_64_LINUX_ANDROID_RUSTFLAGS="${CARGO_TARGET_X86_64_LINUX_ANDROID_RUSTFLAGS:-} -C link-arg=-Wl,-z,max-page-size=16384 -C link-arg=-Wl,--pack-dyn-relocs=android"
           cargo ndk -t arm64-v8a -t armeabi-v7a -t x86_64 build $LOCKED -p septena-core --profile "$PROFILE"
       - name: Slice sizes
         working-directory: core
@@ -265,13 +266,18 @@ jobs:
           if-no-files-found: error
 
   jvm:
-    name: core-jvm-${{ matrix.os }}
+    name: core-jvm-${{ matrix.dist }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        # dist names the uploaded artifact (core-dist-jvm-<dist>); core-release.yml reads them.
+        # ubuntu-24.04-arm is the native ARM64 Linux slice (aarch64-unknown-linux-gnu, #804).
+        include:
+          - { os: ubuntu-latest, dist: ubuntu-latest }
+          - { os: windows-latest, dist: windows-latest }
+          - { os: ubuntu-24.04-arm, dist: ubuntu-arm64 }
     defaults:
       run:
         shell: bash
@@ -299,7 +305,7 @@ jobs:
             Linux) strip --strip-unneeded "$RUNNER_TEMP/natives/$(basename "$lib")" ;;
           esac
           size=$(wc -c < "$RUNNER_TEMP/natives/$(basename "$lib")" | tr -d ' ')
-          echo "### core-jvm ($RUNNER_OS)" >> "$GITHUB_STEP_SUMMARY"
+          echo "### core-jvm ($RUNNER_OS $RUNNER_ARCH)" >> "$GITHUB_STEP_SUMMARY"
           echo "- $(basename "$lib"): $size bytes" >> "$GITHUB_STEP_SUMMARY"
           dir="$PWD/target/$PROFILE"
           if command -v cygpath > /dev/null; then dir="$(cygpath -w "$dir")"; fi
@@ -307,7 +313,7 @@ jobs:
           if [ "$size" -gt "$BUDGET_NATIVE" ]; then echo "::error::$(basename "$lib") is $size bytes, over $BUDGET_NATIVE"; exit 1; fi
       - uses: actions/upload-artifact@v4
         with:
-          name: core-dist-jvm-${{ matrix.os }}
+          name: core-dist-jvm-${{ matrix.dist }}
           path: ${{ runner.temp }}/natives
           if-no-files-found: error
       - uses: actions/setup-java@v4

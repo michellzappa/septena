@@ -850,6 +850,9 @@ struct MovePickerSheet: View {
   var currentProjectId: String? = nil
   /// The Inbox row is not useful when every selected task is already there.
   var hidesInboxTarget: Bool = false
+  /// Title of the first row (no area, no project). Project ▸ Move… passes
+  /// "No Area" and no projects, so the sheet lists only the areas.
+  var noneTitle: String? = nil
   /// When moving multiple tasks, hides the single-row highlight and retitles the sheet.
   var bulkCount: Int = 1
   let onPick: (_ areaId: String?, _ projectId: String?) -> Void
@@ -897,8 +900,8 @@ struct MovePickerSheet: View {
   private var rows: some View {
         VStack(alignment: .leading, spacing: 4) {
           // Inbox first — drop both area and project.
-          if !hidesInboxTarget && matches(TaskFilter.triage.title) {
-            row(.inbox, title: TaskFilter.triage.title,
+          if !hidesInboxTarget && matches(noneTitle ?? TaskFilter.triage.title) {
+            row(.inbox, title: noneTitle ?? TaskFilter.triage.title,
                 selected: showCurrentSelection && currentAreaId == nil && currentProjectId == nil) {
               onPick(nil, nil); close()
             }

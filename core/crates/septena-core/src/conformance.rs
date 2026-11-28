@@ -63,7 +63,11 @@ pub fn run_conformance(fixture: String, json: String) -> Result<ConformanceRepor
             }
         }
         "project-checklist" => {
-            for (section, function) in [("layout", "projectChecklist"), ("check", "checklistCheckPatch")] {
+            for (section, function) in [
+                ("layout", "projectChecklist"),
+                ("check", "checklistCheckPatch"),
+                ("heading", "checklistHeading"),
+            ] {
                 for case in cases(&doc, section) {
                     run.check(section, case, function, case["input"].clone(), false);
                 }
@@ -92,6 +96,9 @@ pub fn run_conformance(fixture: String, json: String) -> Result<ConformanceRepor
             }
         }
         "recurrence" => {
+            for case in cases(&doc, "missedWindows") {
+                run.check("missedWindows", case, "recurrenceWindow", case["input"].clone(), false);
+            }
             for case in cases(&doc, "nextScheduledDate") {
                 run.check(
                     "nextScheduledDate",

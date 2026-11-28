@@ -24,7 +24,7 @@ created the process.
 | `start.bindMutators` | interval | `SeptenaServices.bindWriteBoundary()` | Mutator binding, the write boundary; runs before the first frame |
 | `launch.servicesStart` | interval | `SeptenaServices.start()` | The whole services start, first caller only |
 | `start.backfillSectionOnboarding` | interval | `start()` | Legacy section backfill |
-| `start.seedSyncedSettings` | interval | `start()` (Septask) | Synced settings seed |
+| `start.seedSyncedSettings` | interval | `start()` (Septena) | Synced settings seed |
 | `start.taskSyncStart` | interval | `start()` | `TaskSyncEngine.start()` (store open, first sync scheduled) |
 | `start.ckEngineStart` | interval | `start()` (Septena Life only) | CKEngine start |
 | `launch.deferredWork` | interval | `SeptaskLaunch.run` | Capture import, legacy cleanup, diagnostics, badge |
@@ -73,7 +73,7 @@ draft sweep apply on both platforms.
 
 ## Launch screen
 
-The iOS launch screen (`UILaunchScreen` in `project.yml`, Septask target)
+The iOS launch screen (`UILaunchScreen` in `project.yml`, `Septask` target)
 is blank: only the system background, `LaunchBackground` in
 `Septask/Assets.xcassets` (white / black). It shows no glyph, so the first
 frame replaces an empty screen, not a logo. Decided 2026-11-23; the glyph

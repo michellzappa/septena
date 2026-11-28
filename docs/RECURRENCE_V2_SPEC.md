@@ -3,7 +3,7 @@
 **Status:** proposal (2026-11-21). Defaults in §9 stand unless mz overrules.
 **Decisions:** [ADR 0002](adr/0002-own-backend-replaces-icloud.md), [ADR 0007](adr/0007-septena-is-the-task-app.md), [ADR 0015](adr/0015-shared-registries-for-cross-platform-clients.md).
 **Builds on:** `registry/entities.json`, `registry/conformance/recurrence.json`, `backend/src/recurrence.ts`, `SeptenaCore/DateParser.swift` (`RecurrenceDateCalculator`), `SeptenaCore/Models.swift` (`Recurrence`), `SeptenaCore/Persistence.swift`, `Septask/SeptaskKitDatePopover.swift`, `Septena/Shell/Tasks/TaskPickerSheets.swift`.
-**Tracking issue:** [#126](https://github.com/michellzappa/septena/issues/126).
+**Tracking issue:** [#126](https://github.com/septena/septena/issues/126).
 **Owner of decisions:** mz. Defaults chosen by the author are marked *(default)*.
 
 ## 1. Goal

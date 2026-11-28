@@ -1,7 +1,7 @@
 # Android client spec
 
 **Status:** accepted (2026-11-21), defaults accepted by mz. Replaces the architecture of
-`docs/SEPTASK_ANDROID_PLAN.md`, which assumed CloudKit. Issue #20, milestone
+`docs/ANDROID_BRIDGE_PLAN.md`, which assumed CloudKit. Issue #20, milestone
 M4.
 
 **Rests on:** ADR 0002 (own backend), ADR 0008 (agent loop rules live in the

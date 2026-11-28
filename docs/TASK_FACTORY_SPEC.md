@@ -12,9 +12,9 @@ software-factory playbook for Starlings and Bipe).
 
 ## 1. Goal
 
-mz writes a note in Septask and assigns it to Claude. An agent does the work
+mz writes a note in Septena and assigns it to Claude. An agent does the work
 while mz does something else, asks mz short questions in the app when it
-needs input, and hands back a result mz can check. Septask is the intake and the
+needs input, and hands back a result mz can check. Septena is the intake and the
 inbox for agent work, on every device.
 
 ## 2. What exists and what is missing
@@ -202,7 +202,7 @@ Hard rules, independent of profile:
   an issue in someone else's repo, invite a person) always end in an approval
   card or a handoff. The agent drafts; mz taps.
 - **Money:** never. Always a handoff.
-- **Deletion of anything outside Septask:** never without an approval card.
+- **Deletion of anything outside Septena:** never without an approval card.
 - The approval card is a normal turn: `step = decide`, options
   `["Approve", "Change…", "Stop"]`. The agent executes only after a user turn
   with `chosen = "Approve"` that answers that card's `seq`.
@@ -250,7 +250,7 @@ URL, mail or phone.
 ### 7.4 Relation to `factory-day`
 
 The `factory-day` skill keeps running the Starlings and Bipe factories. Its
-"queue a question" step can target Septask instead of Starlings
+"queue a question" step can target Septena instead of Starlings
 `ask_decision` *(default for mz's personal projects; Starlings stays the
 queue for team work)*. Then all of mz's agent questions are in one app.
 
@@ -313,7 +313,7 @@ links (issue, PR, commit).
   scope (backend spec §8), and GitHub access only through the repo links of
   its profile.
 - **Kill switch:** one setting, "Pause all agents", stops claims and agent writes at once.
-  Built: synced setting `agentsPaused`, toggle in Septask ▸ Settings ▸
+  Built: synced setting `agentsPaused`, toggle in Septena ▸ Settings ▸
   Connections & AI. Per task: **Stop** / **Resume** in the conversation.
 
 ## 11. Phases
@@ -325,7 +325,7 @@ links (issue, PR, commit).
 | F1b | APNs push notifications when a provider turn with options commits + up to 3 option actions on iOS and watch (requires mz's APNs `.p8` key in Cloudflare). | A question arrives as a notification on iPhone/watch; mz taps an option from the lock screen and the turn commits. |
 | F2 | Work profiles and approval cards. `errand` workflow. Kill switch. | An outward action waits for Approve; nothing outward happens without it. |
 | F3 | `code` workflow on the project's `githubRepo`. Run log and inspector list. | A note becomes an issue, a PR and a merge on this repo; mz tests from the `needs_verify` list. |
-| F4 | `factory-day` questions route to Septask; daily digest from the run log; cloud-routine host. | One morning report and one question inbox for all of mz's personal factories. |
+| F4 | `factory-day` questions route to Septena; daily digest from the run log; cloud-routine host. | One morning report and one question inbox for all of mz's personal factories. |
 
 ## 12. Open questions for mz
 
@@ -337,7 +337,7 @@ links (issue, PR, commit).
 | Profile scope | Decided (default, 2026-11-21): Project, with area as fallback. |
 | Auto-intake without assigning | Decided (default, 2026-11-21): Off in v1. |
 | Notification actions | Decided (default, 2026-11-21): Up to 3 options as actions. |
-| Where `factory-day` asks for personal projects | Decided (default, 2026-11-21): Septask. Starlings stays for team work. |
+| Where `factory-day` asks for personal projects | Decided (default, 2026-11-21): Septena. Starlings stays for team work. |
 | Agent merges on `ship` | Decided (default, 2026-11-21): Yes, per your global merge rule. |
 | F1 runner scope & wake transport | Decided (2026-11-21): Multi-user transport on `api.septena.app` (signed outbound webhook URL + SSE/WebSocket stream for NAT'd Macs); `mz-mini` is the first runner. |
 | Background runner in onboarding | Decided (2026-11-21): Keep onboarding (`#103`) interactive-only; put "Always-on / Background agent" in Settings ▸ Agents later. |

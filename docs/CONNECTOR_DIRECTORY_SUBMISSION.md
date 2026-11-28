@@ -83,7 +83,7 @@ Complete these checks before clicking Submit in either portal:
 - **Support URL**: `https://septena.app/support`
 - **Support Contact**: `https://septena.app/support`
 - **Developer / Publisher Name**: `Michell Zappa` (or `Septena`)
-- **Open-Source Repository (MIT)**: `https://github.com/michellzappa/septena`
+- **Open-Source Repository (MIT)**: `https://github.com/septena/septena`
 
 ### Data handling and compliance notes (for portal questionnaire)
 
@@ -299,7 +299,7 @@ Use these prompts in portal submission fields and reviewer walkthroughs to exerc
    > "Search my Septena tasks for 'website' and show me the project brief for the matching project."
    *Expected tools:* `tasks_search`, `tasks_project_get` (or `tasks_get(include_notes: true)`). No writes.
 3. **Reference lookup:**
-   > "Do I already have a Septena task linked to `https://github.com/michellzappa/septena/issues/85`?"
+   > "Do I already have a Septena task linked to `https://github.com/septena/septena/issues/85`?"
    *Expected tool:* `tasks_find_by_ref`. No writes.
 
 ### Non-destructive write checks

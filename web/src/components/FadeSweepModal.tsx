@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { CheckCircle2 } from "lucide-react";
-import { ACTIONS_CATALOG, DOMAIN_RULES, registryText } from "@/lib/generated/registries";
+import { ACTIONS_CATALOG, DOMAIN_RULES, SURFACES_CATALOG, registryText } from "@/lib/generated/registries";
 import type { AreaRow, ProjectRow, TaskRow } from "@/lib/types";
 
 interface FadeSweepModalProps {
@@ -38,6 +38,8 @@ export function FadeSweepModal({
 }: FadeSweepModalProps) {
   const [remaining, setRemaining] = useState<TaskRow[]>(tasks);
   const [keptCount, setKeptCount] = useState(0);
+  // Rows dropped by Let the rest go. Non-zero shows the permission line (#711).
+  const [letGoCount, setLetGoCount] = useState(0);
   const [busy, setBusy] = useState(false);
 
   const text = (key: string, vars?: Record<string, string | number>) => registryText(key, language, vars);
@@ -68,9 +70,11 @@ export function FadeSweepModal({
     if (busy || remaining.length === 0) return;
     setBusy(true);
     try {
+      const count = remaining.length;
       await onLetRestGo(remaining);
       await onSwept();
-      onClose();
+      setLetGoCount(count);
+      setRemaining([]);
     } finally {
       setBusy(false);
     }
@@ -103,9 +107,11 @@ export function FadeSweepModal({
             <div className="flex flex-col items-center justify-center gap-2 px-6 py-14 text-center">
               <CheckCircle2 className="h-8 w-8 text-[var(--text-muted)]" />
               <p className="text-sm font-medium text-[var(--text-primary)]">
-                {text(keptCount > 0 ? "You kept everything." : "No faded tasks to check.")}
+                {letGoCount > 0
+                  ? text(SURFACES_CATALOG.fadeSweep.letGoTitle)
+                  : text(keptCount > 0 ? "You kept everything." : "No faded tasks to check.")}
               </p>
-              {keptCount > 0 && (
+              {keptCount > 0 && letGoCount === 0 && (
                 <p className="text-xs text-[var(--text-muted)]">
                   {text("Kept tasks are back in their lists.")}
                 </p>

@@ -65,6 +65,8 @@ data class TaskListItem(
     /** "Waiting on Anna · 5 days" (registry copy), or null. */
     val waitingText: String? = null,
     val subtitle: String? = null,
+    /** The list [subtitle] names, as a group target key (`area:<id>` / `project:<id>`). */
+    val subtitleTargetKey: String? = null,
     val isCompleted: Boolean = false,
     /** True while a just-completed row lingers in place during the standard settle window. */
     val isSettling: Boolean = false,
@@ -487,6 +489,7 @@ fun TaskHomeContent(
                                     hasActiveTexture = hasActiveTexture,
                                     onComplete = onComplete,
                                     onOpenTask = onOpenTask,
+                                    onOpenSubtitle = onOpenGroupTarget,
                                     rowMenuGroups = rowMenuGroups,
                                     rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
                                     selection = selection,
@@ -713,6 +716,7 @@ private fun LazyListScope.taskCardRows(
                     hasActiveTexture = hasActiveTexture,
                     onComplete = onComplete,
                     onOpenTask = onOpenTask,
+                    onOpenSubtitle = onOpenGroupTarget,
                     rowMenuGroups = rowMenuGroups,
                     rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
                     selection = selection,

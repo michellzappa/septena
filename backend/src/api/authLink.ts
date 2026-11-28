@@ -4,6 +4,7 @@ import { logEvent, sha256Base64Url } from "../util.js";
 import { accountStoreFor, type IdentityRow } from "../store/AccountStore.js";
 import { hasUsedTrial, markTrialUsed, startTrialOnce } from "../entitlement/entitlement.js";
 import { emailSignInEnabled, startEmailSignIn, verifyEmailCodeOnly, zEmailAddress, type EmailFailure } from "./emailSignIn.js";
+import { grantBetaAtSignIn } from "./betaGrant.js";
 import { signClaims, verifyClaims } from "./session.js";
 
 // Account identity management, linking, and "no silent linking" collision catch
@@ -95,6 +96,7 @@ export async function resolveProviderLogin(
   const existing = await accounts.resolveIdentity(input.provider, input.subject);
   if (existing) {
     await accounts.resolveOrCreateIdentity(input.provider, input.subject, input.preferredUserId);
+    await grantBetaAtSignIn(env, existing.userId, input.email, input.emailVerified);
     return { outcome: "signed_in", userId: existing.userId, created: false };
   }
 
@@ -151,6 +153,7 @@ export async function resolveProviderLogin(
       for (const m of markers) await markTrialUsed(env, m);
     }
   }
+  await grantBetaAtSignIn(env, userId, input.email, input.emailVerified);
   return { outcome: "signed_in", userId, created };
 }
 

@@ -294,6 +294,15 @@
         "featureId": "agents.connector"
       },
       {
+        "id": "changeNotSaved",
+        "kind": "fork",
+        "title": "A change couldn’t be saved",
+        "message": "One edit was rolled back and is not stored. Anything you typed just now may need retyping. Later changes still save normally.",
+        "confirmTitle": "OK",
+        "options": [],
+        "featureId": "sync.backend"
+      },
+      {
         "id": "agentKeyCreated",
         "kind": "fork",
         "title": "Your agent key",
@@ -1353,6 +1362,7 @@
   },
   "taskDateBoard": {
     "id": "taskDateBoard",
+    "openFocus": "none",
     "overdue": {
       "label": "Overdue"
     },
@@ -1676,8 +1686,6 @@
   },
   "checklistProjects": {
     "id": "checklistProjects",
-    "useAsChecklist": "Use as Checklist",
-    "useForGroceries": "Use for Groceries",
     "addItem": "Add item",
     "addItemToGroup": "Add item to {group}",
     "onList": "On list",
@@ -1685,10 +1693,18 @@
     "chooseGroup": "Choose group",
     "moveToGroup": "Move to group",
     "ungrouped": "Ungrouped",
+    "addTyped": "Add “{title}”",
     "projectType": "Project type",
     "project": "Project",
     "checklist": "Checklist",
-    "groceries": "Groceries"
+    "groups": {
+      "produce": "Produce",
+      "dairy": "Dairy",
+      "bakery": "Bakery",
+      "meatSeafood": "Meat & Seafood",
+      "pantry": "Pantry",
+      "frozen": "Frozen"
+    }
   },
   "listSort": {
     "id": "listSort",
@@ -1697,6 +1713,22 @@
     "icon": "action.sort",
     "sortedBy": "Sorted by {sort}"
   },
+  "topBar": {
+    "id": "topBar",
+    "featureId": "lists.today",
+    "description": "The phone top bar (compact width): the buttons each screen shows, in order. Leading and trailing hold groups; where the system draws Liquid Glass each group is one capsule, elsewhere a group is plain icons side by side. An item shows only when its `when` holds, and a group with no item showing is left out. Search is always a group of its own. Sort By lives inside More, never as its own button. `when`: always; pageActions (the screen has actions for More: Sort By, New Project and the like); openStarred (the list has an open starred task; never on Starred, the Logbook, Recently Deleted or Faded). Wide layouts keep their own toolbars.",
+    "items": [
+      { "button": "settings", "icon": "action.settings", "when": "always" },
+      { "button": "back", "icon": "action.go_back", "when": "always" },
+      { "button": "more", "icon": "action.more", "when": "pageActions" },
+      { "button": "star", "icon": "action.star", "when": "openStarred" },
+      { "button": "search", "icon": "action.search", "when": "always" }
+    ],
+    "screens": [
+      { "screen": "listsHome", "leading": [["settings"]], "trailing": [["more"], ["search"]] },
+      { "screen": "list", "leading": [["back"]], "trailing": [["more", "star"], ["search"]] }
+    ]
+  },
   "fadeSweep": {
     "id": "fadeSweep",
     "featureId": "fade.sweep",
@@ -1704,6 +1736,7 @@
     "dismissTitle": "Not now",
     "intro": "Choose Keep for anything you still need. The rest move to your Logbook as let go, never deleted.",
     "keptAllTitle": "You kept everything.",
+    "letGoTitle": "It can wait. The rest is in your Logbook.",
     "emptyTitle": "No faded tasks to check.",
     "keptAllDetail": "Kept tasks are back in their lists.",
     "remainingOne": "1 task remaining",

@@ -73,7 +73,7 @@ struct StoreHealthSettingsSection: View {
         LabeledContent(
           String(localized: "Writes rolled back",
                  comment: "Store health diagnostics — count of failed saves this launch"),
-          value: "\(state.saveFailures)")
+          value: "\(state.saveFailures + state.refusedWrites)")
         LabeledContent(
           String(localized: "Most recent",
                  comment: "Store health diagnostics — when the last save failed"),

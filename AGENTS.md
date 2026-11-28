@@ -88,7 +88,7 @@ explicitly asks for that download.
 `registry/`, the changelog and the connector's tool list from `main`. When a
 push to `main` touches `registry/**`, `changelog/**`, `tools/changelog.mjs` or
 `backend/src/**`, `.github/workflows/site-rebuild.yml` sends the
-`app-registry-changed` repository_dispatch to `michellzappa/septena-site`. The
+`app-registry-changed` repository_dispatch to `septena/site`. The
 site's workflow then builds against this repo's `main` and deploys. The job
 needs the secret `SITE_DISPATCH_TOKEN` (a fine-grained token with Contents
 read and write on septena-site). Without it, the job skips with a notice.
@@ -172,7 +172,7 @@ Full guide: `docs/VERSIONING.md`. The rules that bite:
   What's New + the auto "What's New" sheet on update, read by `SeptenaCore/
   Changelog.swift` — which hides the Unreleased entry from the launch sheet via
   `latestReleased`) AND mirrored to the website at build time
-  (`../septena-site/scripts/sync-changelog.mjs` → `/changelog`; both surfaces
+  (`../site/scripts/sync-changelog.mjs` → `/changelog`; both surfaces
   show the build number). **Author here, never in two places.** It is NOT
   generated from the runtime DB — that's life-data; release notes come from git.
   A highlight's optional `section` key drives its accent color on both surfaces.
@@ -231,7 +231,7 @@ typically runs 3–5 agent sessions at once, Claude and Gemini/Antigravity both
 single working tree they silently clobber each other's files (no conflict, no
 warning — just lost work).
 
-**Before you edit or commit in `~/Dev/septena` itself, check it is yours.** Run
+**Before you edit or commit in `~/Dev/septena/septena` itself, check it is yours.** Run
 `git status`: the branch must be `main` and no rebase, merge or cherry-pick may
 be in progress. If another agent's operation is in progress, never touch it (no
 `add`, `checkout`, `rebase --continue/--abort`, `stash`). Do your work in a
@@ -243,7 +243,7 @@ per session fixes it structurally: separate working dir (no file collisions) and
 separate path-keyed DerivedData (no build contention). Use the helpers:
 
 ```bash
-scripts/wt-new <name>     # creates ../septena-<name> on a short-lived wt/<name> branch
+scripts/wt-new <name>     # creates ../worktrees/<name> on a short-lived wt/<name> branch
 #  …work the session in that dir, build with scripts/build.sh, commit on the branch…
 scripts/wt-done <name>    # green-gated merge back to main (build the MERGED tree,
                           # finalize + push only if green, else abort), then cleanup
@@ -456,6 +456,10 @@ The product is Septena; the code targets keep the working names `Septask` (iOS),
   `StoreHealthState.failureNotification` and raises the same words as an
   `NSAlert` sheet, guarded against stacking (a wedged context fails every save
   the same way).
+  A write the backend refuses raises the same alert
+  (`StoreHealthState.noteRefusedWrite`, from `TaskSyncEngine.noteRejected`):
+  the repair pull takes the edit back, so it is a lost write too (#617). The
+  copy is the registry prompt `changeNotSaved`, which Android shows as well.
   Related, still open: `deferPush` means a new row is local-only until the
   first title write, so a crash in that window leaves a titleless task.
 - **A stored `@Model` property must not reuse an `NSManagedObject` method
@@ -546,6 +550,11 @@ The product is Septena; the code targets keep the working names `Septask` (iOS),
 
 ## Layout map
 
+- **On disk (mz, 2026-11-27):** `~/Dev/septena/` is a plain folder, not a repo.
+  It holds `septena/` (this repo, `septena/septena`), `site/`
+  (`septena/site`), `orb/` (`septena/orb`, the desk-toy firmware),
+  `worktrees/` (every worktree, made by `scripts/wt-new`) and `_archive/`.
+  Never nest a repo inside this public repo.
 - `SeptenaCore/` — models, SwiftData (`Persistence.swift`), task sync
   (`TaskBackend/`), import, mutators, `SeptenaServices.swift` (process-wide
   runtime singleton).
@@ -559,20 +568,22 @@ The product is Septena; the code targets keep the working names `Septask` (iOS),
   (`docs/WATCH.md`). `SeptaskWidgets/`, `ShareExtension/` — extensions.
 - `android/` — the Android app. `core/` — the shared Rust core. `backend/` — the
   task backend and MCP server. `registry/` — copy, actions and settings.
-- `appstore/` — App Store packaging (iPhone/iPad/Mac/Watch): copy in
-  `docs/APPSTORE.md`, panel visuals in `appstore/panels.config.mjs`, surfaces in
-  `appstore/devices.mjs`. `appstore/capture.sh <device>` shoots raw screens, `npm run all`
-  renders + validates, and the website's `/about/brand#app-store` is the review
-  page (no viewer in this repo), and `appstore/upload.sh` uploads through
-  fastlane deliver. It is outward-facing: run it only when mz asks; never a
-  binary, never a review submission (docs/APPSTORE-SEPTASK.md "Uploading").
+- **Marketing lives in `septena/studio` (private, `~/Dev/septena/studio`,
+  moved out 2026-11-27):** the App Store and Play Store panels, capture,
+  metadata and upload (`appstore/`, `fastlane/`), the store copy docs
+  (`docs/APPSTORE-SEPTASK.md`, `docs/APPSTORE.md`, `docs/PLAYSTORE.md`), the
+  3D, bento and photo studios and the logo galleries. It reads this repo's
+  `registry/` and runs the screenshot UI tests here, so those stay here, with
+  the icon generator (`scripts/dial-svg.mjs`) and the Play Store release
+  notes (`android/playstore/whatsnew/`). Uploading is outward-facing: run it
+  only when mz asks; never a binary, never a review submission.
   The Mac is the macOS platform of the same App Store Connect record as
   iPhone and iPad (one bundle id, universal purchase, mz 2026-11-26), with its
-  own deliver run: `docs/APPSTORE-SEPTASK.md`. The separate record in
-  `docs/APPSTORE.md` is Septena Life.
+  own deliver run (studio `docs/APPSTORE-SEPTASK.md`). The separate record in
+  studio `docs/APPSTORE.md` is Septena Life.
   For generated Photo Studio lifestyle images and device variants, use
-  `docs/photo-studio/SKILL.md`. A device screen in a photo is always a composed
-  PNG, never a generated screen: `docs/photo-composite/SKILL.md`.
+  studio `docs/photo-studio/SKILL.md`. A device screen in a photo is always a
+  composed PNG, never a generated screen: studio `docs/photo-composite/SKILL.md`.
 
 ## Conventions
 
@@ -698,7 +709,7 @@ The product is Septena; the code targets keep the working names `Septask` (iOS),
 - **Planning: start at `docs/README.md`.** It indexes every doc with a status
   and sets the rules: decisions as ADRs in `docs/adr/`, features as specs,
   order in `docs/ROADMAP.md`, work as GitHub issues + milestones on
-  `michellzappa/septena`. Write an ADR before a spec that rests on a
+  `septena/septena`. Write an ADR before a spec that rests on a
   hard-to-reverse decision. Mark a superseded doc with a header; never delete
   or move it. **Septena is leaving iCloud** (ADR 0002): new specs design for
   the own backend only.
@@ -713,7 +724,7 @@ The product is Septena; the code targets keep the working names `Septask` (iOS),
   messaging, the supporter model, the feature catalog and the **book**
   (`/strategy/the-instrument-manifesto`) do NOT belong in this repo. When the
   work is strategy/positioning/book copy, edit it *there*, not here. The copies
-  in `../septena-site/docs/` are older; the workspace wins. App engineering docs
+  in `../site/docs/` are older; the workspace wins. App engineering docs
   (schema, design spec, plans, specs) stay public in this `docs/`;
   `docs/MAKER_IDENTITY.md` stays here too because it sources in-app maker copy.
 - **Feature map of the task app:** Starlings Docs

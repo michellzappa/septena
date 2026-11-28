@@ -23,7 +23,7 @@ private extension Int {
 // left of the count badge.
 
 /// Where the sidebar points the detail pane. Every destination is a task
-/// list. (Septask's Next page was removed on 2026-11-19: it showed life-OS
+/// list. (Septena's Next page was removed on 2026-11-19: it showed life-OS
 /// content, not tasks.)
 enum KitSidebarDestination: Equatable {
   case filter(TaskFilter, title: String)
@@ -61,7 +61,7 @@ enum KitSidebarDestination: Equatable {
   init?(route: Route) {
     switch route {
     case .filter(let f):   self = .filter(f, title: route.title)
-    // Septask has no Next destination; Septena's `Route.next` maps to nothing.
+    // Septena has no Next destination; Septena Life's `Route.next` maps to nothing.
     case .next, .area, .project:  return nil
     }
   }
@@ -398,6 +398,18 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
   func select(key: String) -> Bool {
     selectRow(key: key)
     return selectedKey() == key
+  }
+
+  /// True when `select(key:)` can reach the destination: a row has the key,
+  /// also inside a folded area. Back / Forward (#849) skip a destination
+  /// that fails it, such as a deleted area or project. Review may have no
+  /// row while it is empty; `selectRow` rebuilds it, so it always counts.
+  func hasDestination(key: String) -> Bool {
+    if key == KitSidebarDestination.key(for: .filter(.review)) { return true }
+    func contains(_ nodes: [Node]) -> Bool {
+      nodes.contains { $0.key == key || contains($0.children) }
+    }
+    return contains(roots)
   }
 
   private func selectRow(key: String) {
@@ -814,7 +826,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
   // list). A project dropped among another parent's projects (another area,
   // or the loose zone at the root before the first area), or ON an area row,
   // is RE-PARENTED with `ProjectsMutator.setArea` — the same move the context
-  // menu's "Move to Area" makes. Every structure gesture records undo.
+  // menu's "Move…" picker makes. Every structure gesture records undo.
 
   /// The `roots` index range areas occupy (always the tail of `organize`,
   /// after any loose projects and before `bottomStartIndex`). Empty range at
@@ -1083,6 +1095,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     // unselected content band showing (too small).
     row.extraTopMargin = (item as? Node).map { topLevelAreaOrProjectKeys.contains($0.key) ? 16 : 0 } ?? 0
     row.selectionHighlightStyle = .none
+    row.resetHover()
     row.needsDisplay = true
     return row
   }
@@ -1435,14 +1448,12 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
         case .projectRename: return .init { self.renameSelected() }
         case .projectMarkDone: return .init { self.markSelectedProjectDone() }
         case .projectCancel: return .init { self.cancelSelectedProject() }
+        case .projectMove: return .init { self.presentProjectMovePicker(for: project, row: row) }
         case .projectShare: return .init { SeptaskSharing.present(projectID: project.id) }
         // A shared project ends from its Share screen.
         case .projectDelete: return project.share == nil ? .init { self.deleteSelected() } : nil
         default: return nil
         }
-      }, slot: { [weak self] id in
-        guard let self, id == "moveToAreaDestinations" else { return [] }
-        return self.areaDestinationNodes(for: project)
       })
     case .filter(_, _, _), .none:
       menu = KitRegistryMenu.build(RegistryActions.menu(.sidebarEmpty)) { [weak self] id in
@@ -1528,27 +1539,29 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     SeptaskKitSettingsWindow.show()
   }
 
-  /// "Move to Area ▸" — No Area, then every area; the current parent is
-  /// checked and inert. The same slot the SwiftUI sidebar fills.
-  private func areaDestinationNodes(for project: Project) -> [RegistryMenuNode] {
-    let areas = StructureCache.snapshot(in: context).areas
-    var nodes: [RegistryMenuNode] = [
-      RegistryMenuEntry.slot(
-        id: "area.none",
-        title: String(localized: "No Area", comment: "SeptaskKit: sidebar context menu"),
-        sfSymbol: "tray",
-        isOn: project.area == nil,
-        perform: project.area == nil ? nil : { [weak self] in self?.moveProject(project, toArea: nil) }),
-    ]
-    if !areas.isEmpty { nodes.append(.divider(id: "areas.divider")) }
-    for area in areas {
-      nodes.append(RegistryMenuEntry.slot(
-        id: "area.\(area.id)", title: area.title,
-        listIcon: .area(emoji: area.emoji),
-        isOn: project.area == area.id,
-        perform: project.area == area.id ? nil : { [weak self] in self?.moveProject(project, toArea: area.id) }))
+  /// Project ▸ Move… (`project.move`): the task Move picker
+  /// (`SeptaskKitMovePicker`), limited to No Area and the areas. The current
+  /// parent carries the checkmark; choosing it again does nothing.
+  private lazy var projectMovePicker = SeptaskKitMovePicker { [weak self] destination in
+    guard let self, let project = self.pendingMoveProject else { return }
+    self.pendingMoveProject = nil
+    let target: String?
+    switch destination {
+    case .none: target = nil
+    case .area(let id): target = id
+    case .project: return
     }
-    return nodes
+    guard target != project.area else { return }
+    self.moveProject(project, toArea: target)
+  }
+  private var pendingMoveProject: Project?
+
+  private func presentProjectMovePicker(for project: Project, row: Int) {
+    pendingMoveProject = project
+    let anchor: KitSurfaceAnchor = row >= 0 ? .rect(outlineView.rect(ofRow: row), outlineView) : .window
+    let current: KitMoveMenu.Destination = project.area.map { .area($0) } ?? KitMoveMenu.Destination.none
+    projectMovePicker.show(current: current, title: RegistryActions.title(.projectMove, .short),
+                           anchor: anchor, areasOnly: true)
   }
 
   private func moveProject(_ project: Project, toArea area: String?) {
@@ -1639,16 +1652,15 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
   /// rename-in-place the sidebar's own New Project does.
   func newProject(inArea areaId: String) { newProject(inArea: areaId, atIndex: nil) }
 
-  private func newProject(inArea areaId: String?, atIndex index: Int?, mode: ProjectChecklistMode? = nil) {
+  private func newProject(inArea areaId: String?, atIndex index: Int?) {
     if let areaId { setCollapsed(false, forKey: "area:\(areaId)") }
     let snapshot = StructureCache.snapshot(in: context)
     let beforeSiblings = projectOrder(inArea: areaId, snapshot: snapshot)
     Task { [weak self] in
       guard let self,
             let project = try? await self.projectsMutator.create(
-              title: mode.map { $0 == .groceries ? RegistrySurfaces.groceriesProjectTitle : RegistrySurfaces.checklistProjectTitle }
-                ?? RegistryActions.title(.sidebarNewProject),
-              area: areaId, checklistMode: mode)
+              title: RegistryActions.title(.sidebarNewProject),
+              area: areaId)
       else { return }
       if let index {
         var ids = beforeSiblings.filter { $0 != project.id }
@@ -1759,11 +1771,6 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     magicDropBadge.isHidden = true
   }
 
-  @objc private func newChecklistFromFooter(_ sender: NSMenuItem) {
-    guard let raw = sender.representedObject as? String, let mode = ProjectChecklistMode(rawValue: raw) else { return }
-    newProject(inArea: selectedAreaID, atIndex: nil, mode: mode)
-  }
-
   private func presentMagicPlusMenu(from button: NSView) {
     let menu = NSMenu()
     if let areaId = selectedAreaID, let areaTitle = selectedAreaTitle {
@@ -1785,15 +1792,6 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     looseProject.target = self
     looseProject.image = NSImage(systemSymbolName: "number", accessibilityDescription: nil)
     menu.addItem(looseProject)
-    for (mode, title) in [(ProjectChecklistMode.plain, RegistrySurfaces.checklistProjectTitle),
-                          (.groceries, RegistrySurfaces.groceriesProjectTitle)] {
-      let item = NSMenuItem(title: title, action: #selector(newChecklistFromFooter(_:)), keyEquivalent: "")
-      item.target = self
-      item.representedObject = mode.rawValue
-      item.image = NSImage(systemSymbolName: "checklist", accessibilityDescription: nil)
-      menu.addItem(item)
-    }
-
     let areaItem = NSMenuItem(
       title: RegistryActions.title(.sidebarNewArea),
       action: #selector(newArea),
@@ -1951,9 +1949,6 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     }
   }
 
-  /// Context menu ▸ Move to Area — the keyboard-and-pointer twin of dragging
-  /// a project onto an area row. `representedObject` is the area id, or
-  /// `NSNull` for "No Area".
   /// Matches `SidebarView.projectMenu` and `registry/actions.json` (`sidebar.project`).
   @objc private func markSelectedProjectDone() {
     setSelectedProjectStatus(.done)

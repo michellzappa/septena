@@ -10,7 +10,7 @@ This spec defines the contract between Septena and an agent: the records, their 
 - `https://septena.app/spec/conformance/run.mjs`: a runner for the vectors, with no dependencies.
 - `https://api.septena.app/openapi.json`: the OpenAPI 3.1 document for the `/v1` HTTP API.
 
-The source is `docs/agent-spec/` in the public app repository, `github.com/michellzappa/septena`. The tables in this document, the schema and the OpenAPI document are generated from the code and the registry. CI fails when one of them is out of date.
+The source is `docs/agent-spec/` in the public app repository, `github.com/septena/septena`. The tables in this document, the schema and the OpenAPI document are generated from the code and the registry. CI fails when one of them is out of date.
 
 ## Where an agent connects
 

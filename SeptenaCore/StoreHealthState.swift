@@ -42,7 +42,7 @@ public final class StoreHealthState {
   public private(set) var unreportedFailure: Failure?
 
   /// Posted on every rolled-back save, for surfaces that cannot observe
-  /// `@Observable` state: Septask's Mac shell is pure AppKit
+  /// `@Observable` state: Septena's Mac shell is pure AppKit
   /// (`SeptaskKitWindow`), with no SwiftUI view to hang an alert on. SwiftUI
   /// surfaces use `.storeHealthAlert()` and ignore this.
   public static let failureNotification = Notification.Name("SeptenaStoreHealthSaveFailed")
@@ -69,15 +69,26 @@ public final class StoreHealthState {
   /// What to say to the person whose work just went missing. Deliberately not
   /// the error text: it names SwiftData entities and attributes, which tells
   /// them nothing and reads as a crash. This says what happened to their data
-  /// and what to do, which is all they can act on.
-  public static let alertTitle = String(
-    localized: "A change couldn't be saved",
-    comment: "Store health alert — title shown when a local save was rolled back")
+  /// and what to do, which is all they can act on. The words are the registry
+  /// prompt `changeNotSaved` (`registry/surfaces.json`), which Android shows
+  /// for the same event.
+  public static var alertTitle: String { copy?.title ?? "" }
+  public static var alertMessage: String { copy?.message ?? "" }
+  private static var copy: RegistryPromptCopy? { RegistryPrompts.fixed[.changeNotSaved] }
 
-  public static let alertMessage = String(
-    localized: """
-      One edit was rolled back and is not stored. Anything you typed just now \
-      may need retyping. Later changes still save normally.
-      """,
-    comment: "Store health alert — body shown when a local save was rolled back")
+  /// Writes the backend refused this process (#617): the sync engine took the
+  /// op out of its outbox, and the next pull puts the backend's row back, so
+  /// the edit is gone. Kept apart from `saveFailures`, which counts local
+  /// rollbacks only.
+  public private(set) var refusedWrites = 0
+
+  /// Called from `TaskSyncEngine` when the backend refuses a write. The same
+  /// alert as a rolled-back save: for the user the result is the same.
+  func noteRefusedWrite(_ summary: String) {
+    let failure = Failure(summary: summary, at: Date())
+    refusedWrites += 1
+    lastFailure = failure
+    unreportedFailure = failure
+    NotificationCenter.default.post(name: Self.failureNotification, object: nil)
+  }
 }

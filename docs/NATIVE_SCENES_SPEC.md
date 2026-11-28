@@ -1,10 +1,10 @@
 # Native marketing scenes
 
-> **Superseded 2026-11-22.** ADR 0022 is rejected: the website draws scenes in code from the app's registries, not from native captures. Kept for history. Remaining work: michellzappa/septena-site#10.
+> **Superseded 2026-11-22.** ADR 0022 is rejected: the website draws scenes in code from the app's registries, not from native captures. Kept for history. Remaining work: septena/site#10.
 
 Status: superseded. Owner: mz.
 
-The website explains Septena with scenes: a few app screens in a loop, one caption per step, and a spotlight on the part that the caption names. This spec moves the screens from the website's web copy of the app to real captures from Septask. The website keeps only the explanation layer.
+The website explains Septena with scenes: a few app screens in a loop, one caption per step, and a spotlight on the part that the caption names. This spec moves the screens from the website's web copy of the app to real captures from Septena. The website keeps only the explanation layer.
 
 ## Goal
 
@@ -45,7 +45,7 @@ A second scenario beside `demo` in `SeptenaCore/DemoSeed.swift`, under the same 
 
 ## Identifiers the app must expose
 
-Use `.a11yID(.tasks(…))` / `.a11yID(.sidebar(…))` in SwiftUI and the `kitA11y…` helpers (`setAccessibilityIdentifier`) in the Septask Mac AppKit shell. The same identifier on both platforms.
+Use `.a11yID(.tasks(…))` / `.a11yID(.sidebar(…))` in SwiftUI and the `kitA11y…` helpers (`setAccessibilityIdentifier`) in the Septena Mac AppKit shell. The same identifier on both platforms.
 
 | Identifier | Part |
 |---|---|

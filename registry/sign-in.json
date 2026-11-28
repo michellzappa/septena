@@ -71,7 +71,8 @@
     "subheading": "New here? Your first sign-in creates your account.",
     "terms": "By continuing, you agree to the {terms} and the {privacy}.",
     "termsLabel": "Terms of Use",
-    "privacyLabel": "Privacy Policy"
+    "privacyLabel": "Privacy Policy",
+    "loading": "Loading Septena"
   },
   "email": {
     "emailLabel": "Email",

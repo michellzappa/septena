@@ -142,4 +142,51 @@ describe("admin growth", () => {
     const versions = store.accountSummary(NOW)!.versions!.map((v) => v.version);
     assert.deepEqual(versions, ["0.9.0 (1)", "0.9.0 (2)"]);
   });
+
+  it("counts the appearance of active signed-in accounts only (#859)", async () => {
+    const { appearanceMix, appearanceSnapshot } = await import("../src/admin/metrics.ts");
+    const seen = (at: number) => [{ client: "septask-mac", version: "0.9.0", firstSeen: at, lastSeen: at }];
+    const look = (over: Record<string, unknown> = {}) => ({ accentColor: "colorful", canvasTexture: "none", textureIntensity: 55, textureMotion: "still", ...over });
+    const mix = appearanceMix([
+      row(1, NOW, summary({ devices: seen(NOW), appearance: look() })),
+      row(2, NOW, summary({ devices: seen(NOW - DAY), appearance: look({ accentColor: "persimmon", canvasTexture: "ridges", textureIntensity: 80, textureMotion: "slowDrift" }) })),
+      row(3, NOW, summary({ devices: seen(NOW), appearance: look({ accentColor: "other", canvasTexture: "ridges", textureIntensity: "other" }) })),
+      row(4, NOW, summary({ devices: seen(NOW - 31 * DAY), appearance: look({ accentColor: "yuzu" }) })),
+      row(5, NOW, summary({ devices: seen(NOW) })),
+    ] as never, NOW);
+    assert.equal(mix.accounts, 3, "inactive and summaries without appearance are not counted");
+    assert.deepEqual(mix.accentColor, [{ name: "colorful", n: 1 }, { name: "other", n: 1 }, { name: "persimmon", n: 1 }]);
+    assert.deepEqual(mix.canvasTexture, [{ name: "ridges", n: 2 }, { name: "none", n: 1 }]);
+    assert.deepEqual(mix.textureIntensity, [{ name: "higher", n: 1 }, { name: "other", n: 1 }], "only accounts with a texture");
+    assert.deepEqual(mix.textureMotion, [{ name: "slowDrift", n: 1 }, { name: "still", n: 1 }]);
+    const snap = appearanceSnapshot(mix);
+    assert.equal(snap["appearance.accounts"], 3);
+    assert.equal(snap["appearance.canvasTexture.ridges"], 2);
+    assert.equal(snap["appearance.accentColor.yuzu"], undefined);
+  });
+
+  it("reads appearance from synced settings: defaults, and other for unknown values (#859)", async () => {
+    const { appearanceFromSettings } = await import("../src/store/TaskStore.ts");
+    assert.deepEqual(appearanceFromSettings(() => null), { accentColor: "colorful", canvasTexture: "none", textureIntensity: 55, textureMotion: "still" });
+    const set: Record<string, unknown> = { accentColor: "haskap", canvasTexture: "<b>typed</b>", textureIntensity: 7, textureMotion: "slowDrift" };
+    assert.deepEqual(appearanceFromSettings((k) => set[k] ?? null), { accentColor: "haskap", canvasTexture: "other", textureIntensity: "other", textureMotion: "slowDrift" });
+
+    const { store } = await createTestTaskStore();
+    assert.equal(store.accountSummary(NOW)?.appearance, undefined, "no sign-in, no appearance");
+    ensureSession(store, "sid-1");
+    store.push([{ clientOpId: "op-1", op: "upsert", entity: "setting", id: "accentColor", fields: { value: "yuzu" } }] as never, "app");
+    assert.deepEqual(store.accountSummary(NOW)!.appearance, { accentColor: "yuzu", canvasTexture: "none", textureIntensity: 55, textureMotion: "still" });
+  });
+
+  it("shows the appearance block on the product page (#859)", () => {
+    const seen = [{ client: "septask-mac", version: "0.9.0", firstSeen: NOW, lastSeen: NOW }];
+    const html = renderAdmin("product", {
+      admin: "mz@example.com", accounts: [row(1, NOW, summary({ devices: seen, appearance: { accentColor: "persimmon", canvasTexture: "washiPaper", textureIntensity: 55, textureMotion: "still" } }))] as never,
+      links: [], uses: [], signups: null, query: "", emailSignups: [], emailUserId: null, history: [], releases: [], traffic: { state: "off" }, now: NOW,
+    });
+    assert.match(html, /<h2>Appearance<\/h2>/);
+    assert.match(html, /Persimmon/);
+    assert.match(html, /Washi Paper/);
+    assert.match(html, /without sign-in/);
+  });
 });

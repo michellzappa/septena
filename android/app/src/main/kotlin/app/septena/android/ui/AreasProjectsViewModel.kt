@@ -91,7 +91,7 @@ data class AreasProjectsUiState(
     val areaTasks: List<PlaceTaskRow> = emptyList(),
     val unsectionedTasks: List<PlaceTaskRow> = emptyList(),
     val sections: List<PlaceSectionRow> = emptyList(),
-    val checklistMode: String? = null,
+    val isChecklist: Boolean = false,
     val checklistRows: List<SyncRecord> = emptyList(),
     /** The Sort By choice of this page (docs/LIST_SORT_SPEC.md); Manual is the stored order. */
     val listSort: String = RegistryEntityEnums.ListSort.MANUAL,
@@ -281,33 +281,16 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         }
     }
 
-    fun useAsChecklist(mode: String) {
-        val project = destination.value as? AreasProjectsDestination.Project ?: return
-        mutate {
-            graph.registryEntityMutator.update(
-                RegistryEntityNames.PROJECT,
-                project.id,
-                mapOf(RegistryEntityFields.Project.CHECKLIST_MODE to JsonValue.StringValue(mode)),
-            ) != null
-        }
-    }
-
     fun addChecklistItem(title: String, heading: String?) {
         val project = destination.value as? AreasProjectsDestination.Project ?: return
         val name = title.trim()
         if (name.isEmpty()) return
         mutate {
             val projectRow = graph.taskStore.record(RegistryEntityNames.PROJECT, project.id) ?: return@mutate false
-            val mode = projectRow.fields[RegistryEntityFields.Project.CHECKLIST_MODE].stringValue() ?: return@mutate false
-            val suggested = ProjectChecklistRules.layout(emptyList(), name, mode == RegistryEntityEnums.ChecklistMode.GROCERIES).suggestedGroup
-            val groupName = when (suggested) {
-                "produce" -> "Produce"
-                "dairy" -> "Dairy"
-                "bakery" -> "Bakery"
-                "meatSeafood" -> "Meat & Seafood"
-                "pantry" -> "Pantry"
-                "frozen" -> "Frozen"
-                else -> null
+            if (!isChecklist(projectRow)) return@mutate false
+            val suggested = ProjectChecklistRules.layout(emptyList(), name).suggestedGroup
+            val groupName = suggested?.let {
+                RegistryCatalog.checklistGroupTitle(it, java.util.Locale.getDefault().toLanguageTag())
             }
             val assignment = heading ?: groupName?.let { group ->
                 val id = RecurrenceRules.occurrenceId("checklist:${project.id}", requireNotNull(suggested))
@@ -685,6 +668,7 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                     label = { it.second.title },
                 ).map { it.second }
                 val currentAreaId = container.fields[RegistryEntityFields.Project.AREA].stringValue()?.takeIf(String::isNotBlank)
+                val checklist = isChecklist(container)
                 AreasProjectsUiState(
                     destination = selected,
                     isLoading = false,
@@ -695,8 +679,8 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                     availableAreas = availableAreas,
                     unsectionedTasks = unsectioned,
                     sections = sections,
-                    checklistMode = container.fields[RegistryEntityFields.Project.CHECKLIST_MODE].stringValue(),
-                    checklistRows = if (container.fields[RegistryEntityFields.Project.CHECKLIST_MODE].stringValue() != null) {
+                    isChecklist = checklist,
+                    checklistRows = if (checklist) {
                         allTaskRecords.filter { (_, task) -> task.project == selected.id }
                             .map { it.first }
                             .sortedWith(compareBy<SyncRecord>(
@@ -712,6 +696,13 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                 )
             }
         }
+    }
+
+    private fun isChecklist(project: SyncRecord): Boolean = when (
+        project.fields[RegistryEntityFields.Project.CHECKLIST_MODE].stringValue()
+    ) {
+        RegistryEntityEnums.ChecklistMode.PLAIN, RegistryEntityEnums.ChecklistMode.GROCERIES -> true
+        else -> false
     }
 
     private fun AreasProjectsDestination.entityName(): String = when (this) {

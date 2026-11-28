@@ -4,7 +4,7 @@ import SeptenaSharedCore
 // ─── Natural Language Date Parser ─────────────────────────────────────────────
 
 /// The ONE typed-date parser. Every surface that turns typed text into a day
-/// goes through `parse` — the Septask date popover and anything else — so
+/// goes through `parse` — the Septena date popover and anything else — so
 /// "tom" can't mean tomorrow in one place and nothing in another.
 ///
 /// Relative to the `today` the caller passes, never the wall clock: app

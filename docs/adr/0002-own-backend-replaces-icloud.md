@@ -34,7 +34,7 @@ separately from the feature specs that depend on it.
   and in-app copy (`docs/AI_TASKS_EXPLAINER.md`) must change before release.
 - We run servers and pay for them per user.
 - Docs that rest on iCloud are stale on that point:
-  `docs/NATIVE_PROJECT_SHARING_SPEC.md`, `docs/SEPTASK_ANDROID_PLAN.md`,
+  `docs/NATIVE_PROJECT_SHARING_SPEC.md`, `docs/ANDROID_BRIDGE_PLAN.md`,
   `docs/CloudKitSchema.md` after cutover.
 
 ## Links
