@@ -1,6 +1,6 @@
 # 0064. The beta is by invite code, and the thank-you follows the email
 
-- Status: accepted (2026-11-28)
+- Status: accepted (2026-11-28), amended 2026-11-28 (seeded project, measured use)
 - Date: 2026-11-28
 - Deciders: mz (product), agent (mechanism)
 - Extends: [ADR 0043](0043-plus-links-and-a-counts-only-admin-page.md) (plan links, admin page),
@@ -63,6 +63,33 @@ person typed on the page.
   gets no Pro. The second mail (spec §5) reminds them.
 - Turning the public link off strands nobody: people who already joined keep
   TestFlight access.
+
+## Amendment (2026-11-28): a seeded project, and measured use
+
+mz decided on 2026-11-28:
+
+7. **The checklist is a project.** When a tester's Pro grant first lands on
+   an account, the backend writes one normal project into that account,
+   "Septena beta", with the registry notes and one open task per checklist
+   item (`registry/beta.json`). It is not locked: the tester can edit, move,
+   tick or delete it like any other project. It is written once; a deleted
+   project does not come back. It replaces the Beta screen in Settings.
+8. **Did it, not only ticked it.** The backend measures, from the account's
+   own rows, whether the tester used each part and when they first did. It
+   is content-free: a time per item, counts per week, never task text. It
+   also measures repeat use (active days in weeks 1, 2 and 4), completed
+   agent loops, a normal week's adds, completions and moves to Today, and
+   asks one question on day 7 (how disappointed they would be without
+   Septena).
+9. **mz sees it per tester and in counts.** The Beta card on the admin Plans
+   page shows counts per item (did it, ticked it), the activation funnel per
+   code, repeat use, medians, and the day-7 answers. A lookup by one email
+   (a POST, never a URL) shows one tester. There is still no list of emails.
+
+Consequences of the amendment: the welcome mail says that the beta notes
+which parts a tester used and when, never what they wrote. The app shows a
+Today card that opens the project, and nothing else. The rules for each
+measurement are in the spec, §7.
 
 ## Links
 

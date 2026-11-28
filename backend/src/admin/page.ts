@@ -10,7 +10,8 @@ import {
 import type { Row as TrafficRow, TrafficResult } from "./plausible.js";
 import type { MacRelease } from "./releases.js";
 import { BETA_CHECKLIST, DESIGN_TOKENS, SETTINGS_REGISTRY } from "../generated/registries.js";
-import type { BetaCode } from "../store/betaInvites.js";
+import { BETA_ANSWERS, type BetaAnswer, type BetaCode } from "../store/betaInvites.js";
+import type { BetaTesterStats } from "../store/AccountStore.js";
 
 // The admin pages (docs/ADMIN_CONSOLE_SPEC.md §3). Each page is one HTML
 // document: no script, no external file. Every value goes through `esc`.
@@ -35,7 +36,7 @@ export const PAGE_HEADERS = {
   "Cache-Control": "no-store",
   "Referrer-Policy": "same-origin",
   "X-Robots-Tag": "noindex, nofollow",
-  "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; img-src https://septena.app; frame-src https://plausible.io; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
+  "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; img-src https://septena.app data:; frame-src https://plausible.io; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
 };
 
 export interface AdminView {
@@ -55,15 +56,22 @@ export interface AdminView {
   error?: string;
   now: number;
   /// The beta by invite code (ADR 0064), on the Plans page.
-  beta?: { codes: BetaCode[]; counts: Record<string, { joined: number; granted: number }>; launchAt: number | null; progress: Record<string, number>; newCode?: string };
+  beta?: {
+    codes: BetaCode[]; counts: Record<string, { joined: number; granted: number }>; launchAt: number | null;
+    /// Every invited tester, without the email.
+    testers: BetaTesterStats[];
+    newCode?: string;
+    /// The one tester mz typed the email of (a POST, never a URL).
+    lookup?: { email: string; tester: BetaTesterStats | null };
+  };
 }
 
 const CSS = `
   :root { color-scheme: light dark;
-    --bg: #faf9f7; --card: #fff; --line: #e8e5e0; --text: #26231f; --dim: #74706a; --bad: #c0392b;
+    --bg: #faf9f7; --card: #fff; --field: #f4f2ef; --line: #e8e5e0; --text: #26231f; --dim: #74706a; --bad: #c0392b;
     --accent: ${BRAND.light}; --accent-soft: color-mix(in oklab, var(--accent) 12%, transparent); }
   @media (prefers-color-scheme: dark) { :root {
-    --bg: #1b1a18; --card: #24221f; --line: #34312d; --text: #f4f2ee; --dim: #a29d96; --bad: #ff6b5e;
+    --bg: #1b1a18; --card: #24221f; --field: #2c2a26; --line: #34312d; --text: #f4f2ee; --dim: #a29d96; --bad: #ff6b5e;
     --accent: ${BRAND.dark}; } }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 -apple-system, BlinkMacSystemFont, system-ui, sans-serif; }
@@ -94,9 +102,16 @@ const CSS = `
   tbody tr:hover { background: var(--accent-soft); }
   td.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
   code { font: 12px ui-monospace, Menlo, monospace; overflow-wrap: anywhere; }
-  form { display: inline-flex; flex-wrap: wrap; gap: 8px; align-items: end; margin: 0; }
-  label { display: grid; gap: 3px; font-size: 12px; color: var(--dim); }
-  input, select, button { font: inherit; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--text); }
+  form { display: inline-flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; margin: 0; }
+  label { display: grid; grid-template-rows: auto 40px; gap: 3px; font-size: 12px; line-height: 16px; color: var(--dim); }
+  input, select, button { box-sizing: border-box; height: 40px; font: inherit; font-size: 14px; line-height: 20px; padding: 0 12px;
+    border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--text); }
+  input, select { background: var(--field); }
+  select { appearance: none; -webkit-appearance: none; padding-right: 32px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%2374706a' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 12px center; }
+  input[type=date] { appearance: none; -webkit-appearance: none; min-width: 150px; }
+  input[type=date]::-webkit-date-and-time-value { text-align: left; }
   input:focus, select:focus, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   button { cursor: pointer; } button:hover { border-color: var(--accent); }
   button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
@@ -423,7 +438,9 @@ function productPage(v: AdminView): string {
   return card("Retention by week", retentionSection(v), "The accounts that started each week (Monday, UTC), as they are now.")
     + card("Clients and agents", clientsSection(v), "Devices and versions seen in the last 30 days.")
     + card("Appearance", appearanceSection(v), "Accent color and texture of the signed-in accounts seen in the last 30 days.")
-    + card("Usage", `<div class="tiles">${tile(o.openTasks, "open tasks")}${tile(o.closedTasks, "closed tasks")}${tile(o.files, `files (${size(o.fileBytes)})`)}${tile(o.agentChangesWeek, "agent changes, 7 days")}</div>`, "Counts only, every account.");
+    + card("Usage", `<div class="tiles">${tile(o.openTasks, "open tasks")}${tile(o.closedTasks, "closed tasks")}${tile(o.files, `files (${size(o.fileBytes)})`)}${tile(o.agentChangesWeek, "agent changes, 7 days")}</div>
+<div class="tiles" style="margin-top:8px">${tile(o.agentLoops7d, "agent loops done, 7 days")}${tile(o.userTasksAdded7d, "tasks people added, 7 days")}${tile(o.userTasksDone7d, "tasks people completed, 7 days")}${tile(o.userMovedToday7d, "moved to Today, 7 days")}</div>`,
+      "Counts only, every account. An agent loop: an agent worked a task, asked a question the person answered, and the person accepted its work in Review. People’s counts leave out agents and imports.");
 }
 
 function plansPage(v: AdminView): string {
@@ -447,6 +464,34 @@ function plansPage(v: AdminView): string {
 /// Each tester's plan link carries this label prefix (src/api/beta.ts).
 const BETA_LINK_PREFIX = "beta: ";
 
+const WEEK = 7 * 86_400_000;
+const median = (xs: number[]): number | null => {
+  if (!xs.length) return null;
+  const s = [...xs].sort((a, b) => a - b);
+  const m = Math.floor(s.length / 2);
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+};
+const itemTitle = (title: string) => title.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
+
+/// The activation funnel steps (spec §7). Apple's invite accepted is not
+/// known to us, so it is not a step.
+export const BETA_FUNNEL: { label: string; at: (t: BetaTesterStats) => number | null }[] = [
+  { label: "Joined", at: (t) => t.joinedAt },
+  { label: "Signed in (Pro on an account)", at: (t) => t.grantedAt },
+  { label: "First own task added", at: (t) => t.usage?.firstTaskAt ?? null },
+  { label: "First task completed", at: (t) => t.usage?.firstDoneAt ?? null },
+  { label: "3+ active days in week 1", at: (t) => t.usage?.week1ThirdDayAt ?? null },
+  { label: "Day-7 answer given", at: (t) => t.answeredAt },
+];
+
+/// Counts per funnel step, each step counting only testers who reached
+/// every step before it.
+export function betaFunnel(testers: BetaTesterStats[]): number[] {
+  return BETA_FUNNEL.map((_, i) => testers.filter((t) => BETA_FUNNEL.slice(0, i + 1).every((s) => s.at(t) !== null)).length);
+}
+
+const ANSWER_WORDS: Record<BetaAnswer, string> = { very: "Very disappointed", somewhat: "Somewhat disappointed", not: "Not disappointed" };
+
 function betaCard(b: NonNullable<AdminView["beta"]>, now: number): string {
   const made = b.newCode ? `<div class="note"><b>New beta code</b><p><code>${esc(b.newCode)}</code></p><span class="dim">Send it with the link <code>https://septena.app/beta?code=${esc(b.newCode)}</code>.</span></div>` : "";
   const rows = b.codes.map((c) => {
@@ -460,6 +505,38 @@ function betaCard(b: NonNullable<AdminView["beta"]>, now: number): string {
     ? `<p>Launch day: <b>${day(b.launchAt)}</b>. Every beta Pro grant ends 12 months after it.</p>`
     : `<form method="post" action="/admin/beta/launch"><label>Launch day<input name="day" type="date" required></label>
   <details><summary>Set the launch day</summary><p class="dim">This writes the end date on every beta grant and mails every tester “Your year of Pro has started”. It happens once.</p><button class="primary">Set it and send the mail</button></details></form>`;
+
+  // The funnel, in total and per code.
+  const groups = [{ name: "All", testers: b.testers }, ...b.codes.map((c) => ({ name: c.label, testers: b.testers.filter((t) => t.codeId === c.id) }))];
+  const funnels = groups.map((g) => betaFunnel(g.testers));
+  const funnelRows = BETA_FUNNEL.map((s, i) => `<tr><td>${esc(s.label)}</td>${funnels.map((f) =>
+    `<td class="n">${f[i]}${i > 0 ? `<div class="dim">${f[i - 1] - f[i] > 0 ? `−${f[i - 1] - f[i]}` : "0"}</div>` : ""}</td>`).join("")}</tr>`);
+
+  // Did it (measured) vs ticked (the seeded task is done).
+  const measured = b.testers.filter((t) => t.usage);
+  const itemRows = BETA_CHECKLIST.items.map((i) => `<tr><td>${esc(itemTitle(i.title))}</td>
+    <td class="n">${measured.filter((t) => t.usage!.did[i.id] != null).length}</td><td class="n">${measured.filter((t) => t.usage!.ticked[i.id]).length}</td></tr>`);
+
+  // Repeat use: a week counts once it has ended.
+  const granted = b.testers.filter((t) => t.grantedAt !== null);
+  const weekRows = ([[1, "w1"], [2, "w2"], [4, "w4"]] as const).map(([n, key]) => {
+    const reached = granted.filter((t) => now >= t.joinedAt + n * WEEK);
+    const active = reached.filter((t) => (t.usage?.activeDays[key] ?? 0) >= 3).length;
+    return `<tr><td>Week ${n}</td><td class="n">${reached.length}</td><td class="n">${active}</td></tr>`;
+  });
+
+  // A normal week and the agent loop, medians across granted testers.
+  const depth = granted.filter((t) => t.usage);
+  const med = (pick: (u: NonNullable<BetaTesterStats["usage"]>) => number) => {
+    const m = median(depth.map((t) => pick(t.usage!)));
+    return m === null ? "none yet" : String(m);
+  };
+
+  // The day-7 question (Sean Ellis). The usual bar is 40% "very".
+  const answered = b.testers.filter((t) => t.answer);
+  const per = (a: BetaAnswer) => answered.filter((t) => t.answer === a).length;
+  const share = answered.length ? `${Math.round((per("very") / answered.length) * 100)}%` : "none yet";
+
   return made + card("Beta", `<form method="post" action="/admin/beta/codes">
   <label>Code<input name="code" minlength="8" maxlength="32" required pattern="[A-Za-z0-9]{8,32}" placeholder="FIRSTWAVE"></label>
   <label>Label<input name="label" maxlength="60" required placeholder="Friends, first wave"></label>
@@ -468,9 +545,43 @@ function betaCard(b: NonNullable<AdminView["beta"]>, now: number): string {
   <button class="primary">Make a code</button>
 </form>
 <div style="margin-top:14px">${table(["Code", "Label", "Joined", "Pro on an account", "State", "Ends", "Made", ""], rows, "No codes yet.")}</div>
-<div style="margin-top:14px">${tallyList("Checklist: accounts that ticked it", [...BETA_CHECKLIST.items.map((i) => ({ name: i.title.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1"), n: b.progress[i.id] ?? 0 })), { name: "Used it this week (ever)", n: b.progress._ack ?? 0 }])}</div>
+<h3>Activation</h3>
+${table(["Step", ...groups.map((g) => g.name)], funnelRows, "No testers yet.")}
+<p class="dim">Each step counts the testers who reached every step before it; the small number is the drop from the step above.</p>
+<h3>The checklist</h3>
+${table(["Item", "Did it", "Ticked it"], itemRows, "No items.")}
+<p class="dim">Did it: measured from the tester’s own data. Ticked it: the task in their Septena beta project is done. ${measured.length} of ${b.testers.length} testers measured.</p>
+<div class="grid2">
+<div><h3>Repeat use</h3>${table(["Week", "Testers who reached it", "Active on 3+ days"], weekRows, "")}</div>
+<div><h3>A normal week (last 7 days, median per tester)</h3><div class="tiles">${tile(med((u) => u.week.added), "tasks added")}${tile(med((u) => u.week.done), "tasks completed")}${tile(med((u) => u.week.movedToday), "moved to Today")}${tile(med((u) => u.loops.week), "agent loops")}</div>
+<p class="dim">${depth.filter((t) => t.usage!.loops.total > 0).length} testers completed at least one agent loop.</p></div>
+</div>
+<h3>One question on day 7</h3>
+<div class="tiles">${BETA_ANSWERS.map((a) => tile(per(a), ANSWER_WORDS[a])).join("")}${tile(share, "very disappointed (bar: 40%)")}</div>
+<h3>One tester</h3>
+<form method="post" action="/admin/beta/tester"><label>Tester email<input name="email" type="email" maxlength="254" required></label><button class="primary">Look up</button></form>
+${b.lookup ? betaLookup(b.lookup, now) : ""}
 <div style="margin-top:14px">${launch}</div>`,
-    "A person joins on septena.app/beta with their email and a code. Apple sends the TestFlight invite; Septena sends the welcome mail with their Pro link.");
+    "A person joins on septena.app/beta with their email and a code. Apple sends the TestFlight invite; Septena sends the welcome mail with their Pro link. Counts only: what testers did and when, never what they wrote.");
+}
+
+function betaLookup(l: NonNullable<NonNullable<AdminView["beta"]>["lookup"]>, now: number): string {
+  if (!l.tester) return `<p class="dim">No tester joined with ${esc(l.email)}.</p>`;
+  const t = l.tester;
+  const u = t.usage;
+  const items = BETA_CHECKLIST.items.map((i) => `<tr><td>${esc(itemTitle(i.title))}</td>
+    <td>${u?.did[i.id] != null ? day(u.did[i.id]!) : "no"}</td><td>${u?.ticked[i.id] ? "yes" : "no"}</td></tr>`);
+  const steps = BETA_FUNNEL.map((s) => `<tr><td>${esc(s.label)}</td><td>${s.at(t) !== null ? day(s.at(t)) : "no"}</td></tr>`);
+  const weeks = ([[1, "w1"], [2, "w2"], [4, "w4"]] as const).map(([n, key]) =>
+    `<tr><td>Week ${n}</td><td class="n">${u?.activeDays[key] ?? 0}</td><td>${now >= t.joinedAt + n * WEEK ? "ended" : "not over yet"}</td></tr>`);
+  return `<div class="note"><b>${esc(l.email)}</b> <span class="dim">joined ${day(t.joinedAt)}${u ? "" : ", not measured yet"}</span>
+<div class="grid2" style="margin-top:10px">
+<div>${table(["Item", "Did it", "Ticked it"], items, "")}</div>
+<div>${table(["Step", "Date"], steps, "")}
+<div style="margin-top:10px">${table(["Week", "Active days", ""], weeks, "")}</div>
+<div class="tiles" style="margin-top:10px">${tile(u?.week.added ?? 0, "tasks added, 7 days")}${tile(u?.week.done ?? 0, "completed, 7 days")}${tile(u?.week.movedToday ?? 0, "moved to Today, 7 days")}${tile(`${u?.loops.total ?? 0} (${u?.loops.week ?? 0})`, "agent loops (7 days)")}</div>
+<p>Day-7 answer: <b>${t.answer ? esc(ANSWER_WORDS[t.answer]) : "none"}</b></p></div>
+</div></div>`;
 }
 
 function accountsPage(v: AdminView): string {

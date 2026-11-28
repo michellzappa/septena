@@ -216,6 +216,9 @@ export const ENTITIES = {
       reminderDismissedAt: stamp(),
       source: text(64),
       sourceClient: text(64),
+      // How the task was added (registry enum taskAddedVia, ADR 0064): the
+      // app sends its path; the server writes "agent" for an MCP create.
+      addedVia: { kind: "text", zod: z.enum(ENTITY_ENUMS.taskAddedVia).nullable() },
       acknowledgedAt: stamp(),
       createdAt: stamp(),
       // Fade (docs/TASK_FADE_SPEC.md §3). The app is the only writer: an

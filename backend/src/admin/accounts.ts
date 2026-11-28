@@ -130,6 +130,11 @@ export function overview(rows: AccountIndexRow[], now = Date.now()) {
     twoDevices: count((r) => (r.summary?.devices.length ?? 0) >= 2),
     withAgent: count((r) => (r.summary?.agents.length ?? 0) > 0),
     agentChangesWeek: rows.reduce((n, r) => n + (r.summary?.agentChangesWeek ?? 0), 0),
+    // The last 7 days (ADR 0064 measurement), summed over every account.
+    agentLoops7d: rows.reduce((n, r) => n + (r.summary?.agentLoops7d ?? 0), 0),
+    userTasksAdded7d: rows.reduce((n, r) => n + (r.summary?.userTasksAdded7d ?? 0), 0),
+    userTasksDone7d: rows.reduce((n, r) => n + (r.summary?.userTasksDone7d ?? 0), 0),
+    userMovedToday7d: rows.reduce((n, r) => n + (r.summary?.userMovedToday7d ?? 0), 0),
     trialsStarted: plans.filter((p) => p.hadTrial).length,
     trialsConverted: plans.filter((p) => p.hadTrial && p.customer).length,
     onTrial: plan("trial"),

@@ -41,7 +41,74 @@ export interface BetaTester {
   grantedAt: number | null;
   welcomeSentAt: number | null;
   checkinSentAt: number | null;
+  /// The seeded "Septena beta" project (BETA_ONBOARDING_SPEC §7). Set once,
+  /// when seeding starts: a deleted project never comes back.
+  seededAt: number | null;
+  seedProjectId: string | null;
+  /// JSON: beta item id to the seeded task id.
+  seedTaskIds: string | null;
+  cardDismissedAt: number | null;
+  /// JSON `BetaUsage`: what the account did, measured from its own data.
+  usage: string | null;
+  usageAt: number | null;
+  /// The day-7 question (Sean Ellis): only a hash of the answer link token.
+  questionSentAt: number | null;
+  answerTokenHash: string | null;
+  answer: BetaAnswer | null;
+  answeredAt: number | null;
 }
+
+export const BETA_ANSWERS = ["very", "somewhat", "not"] as const;
+export type BetaAnswer = (typeof BETA_ANSWERS)[number];
+
+/// What a tester did, measured from the account's own rows (TaskStore
+/// `betaUsage`), never what they wrote. Times are ms; null = not yet.
+export interface BetaUsage {
+  did: Record<string, number | null>;
+  ticked: Record<string, boolean>;
+  /// Active days (distinct UTC days with a change by the user) in weeks 1, 2
+  /// and 4 after the join.
+  activeDays: { w1: number; w2: number; w4: number };
+  /// The third active day of week 1, null when there were fewer.
+  week1ThirdDayAt: number | null;
+  /// Completed agent loops (claim or work, a question answered, the hand-off accepted).
+  loops: { total: number; week: number };
+  /// The last 7 days.
+  week: { added: number; done: number; movedToday: number };
+  firstTaskAt: number | null;
+  firstDoneAt: number | null;
+}
+
+/// The earlier time of two, null when both are null.
+const earliest = (a: number | null | undefined, b: number | null | undefined): number | null =>
+  a == null ? (b ?? null) : b == null ? a : Math.min(a, b);
+
+/// A new measurement over the stored one: a first time never moves later and
+/// never goes away (a deleted device or agent still counts), the rest is the
+/// new reading.
+export function mergeUsage(old: BetaUsage | null, next: BetaUsage): BetaUsage {
+  if (!old) return next;
+  const did: Record<string, number | null> = {};
+  for (const id of new Set([...Object.keys(old.did), ...Object.keys(next.did)])) did[id] = earliest(old.did[id], next.did[id]);
+  return {
+    ...next,
+    did,
+    activeDays: {
+      w1: Math.max(old.activeDays.w1, next.activeDays.w1),
+      w2: Math.max(old.activeDays.w2, next.activeDays.w2),
+      w4: Math.max(old.activeDays.w4, next.activeDays.w4),
+    },
+    week1ThirdDayAt: earliest(old.week1ThirdDayAt, next.week1ThirdDayAt),
+    loops: { total: Math.max(old.loops.total, next.loops.total), week: next.loops.week },
+    firstTaskAt: earliest(old.firstTaskAt, next.firstTaskAt),
+    firstDoneAt: earliest(old.firstDoneAt, next.firstDoneAt),
+  };
+}
+
+export const parseUsage = (raw: string | null): BetaUsage | null => {
+  if (!raw) return null;
+  try { return JSON.parse(raw) as BetaUsage; } catch { return null; }
+};
 
 export type BetaJoinStart =
   | { ok: true; state: "new"; codeId: string; codeLabel: string }
@@ -49,7 +116,15 @@ export type BetaJoinStart =
   | { ok: false };
 
 const CODE_COLS = "id, code, label, maxUses, useCount, endsAt, createdAt, closedAt";
-const TESTER_COLS = "email, codeId, joinedAt, ascState, ascTesterId, planLinkId, planLinkHash, grantedUserId, grantedAt, welcomeSentAt, checkinSentAt";
+const TESTER_COLS = "email, codeId, joinedAt, ascState, ascTesterId, planLinkId, planLinkHash, grantedUserId, grantedAt, welcomeSentAt, checkinSentAt, "
+  + "seededAt, seedProjectId, seedTaskIds, cardDismissedAt, usage, usageAt, questionSentAt, answerTokenHash, answer, answeredAt";
+
+/// Columns added after the table shipped (`migrate`).
+const ADDED_TESTER_COLS: [string, string][] = [
+  ["seededAt", "INTEGER"], ["seedProjectId", "TEXT"], ["seedTaskIds", "TEXT"], ["cardDismissedAt", "INTEGER"],
+  ["usage", "TEXT"], ["usageAt", "INTEGER"], ["questionSentAt", "INTEGER"], ["answerTokenHash", "TEXT"],
+  ["answer", "TEXT"], ["answeredAt", "INTEGER"],
+];
 
 export class BetaInvites {
   private sql: SqlStorage;
@@ -80,6 +155,17 @@ export class BetaInvites {
       );
       CREATE INDEX IF NOT EXISTS beta_testers_user ON beta_testers(grantedUserId);
     `);
+    const have = new Set(this.sql.exec<{ name: string }>("PRAGMA table_info(beta_testers)").toArray().map((r) => r.name));
+    for (const [name, type] of ADDED_TESTER_COLS) if (!have.has(name)) this.sql.exec(`ALTER TABLE beta_testers ADD COLUMN ${name} ${type}`);
+    this.sql.exec("CREATE INDEX IF NOT EXISTS beta_testers_answer ON beta_testers(answerTokenHash)");
+    // The in-app checklist screen is gone (the seeded project replaced it).
+    // Its one value that still matters, the closed welcome card, moves to
+    // the tester row; the ticks and "I used it" go.
+    if (!have.has("cardDismissedAt")) {
+      this.sql.exec(`UPDATE beta_testers SET cardDismissedAt = (SELECT at FROM beta_progress p WHERE p.userId = beta_testers.grantedUserId AND p.key = '_card')
+        WHERE grantedUserId IS NOT NULL`);
+    }
+    this.sql.exec("DELETE FROM beta_progress");
   }
 
   private codeRow(column: "id" | "code", value: string): BetaCode | null {
@@ -214,26 +300,80 @@ export class BetaInvites {
     return r ? { ...r } as unknown as BetaTester : null;
   }
 
-  /// The checklist state of one account: item ids, `_ack` (the weekly "I used
-  /// it for real") and `_card` (the welcome card was closed), each with when.
-  progress(userId: string): Record<string, number> {
-    return Object.fromEntries(this.sql.exec<{ key: string; at: number }>("SELECT key, at FROM beta_progress WHERE userId = ?", userId).toArray().map((r) => [r.key, r.at]));
+  /// Starts seeding the account's beta project, once: answers the tester
+  /// when this call took the seed, null when the account is not a tester's
+  /// or was seeded before (even when that project was deleted since).
+  takeSeed(userId: string, now: number): BetaTester | null {
+    const t = this.testerForUser(userId);
+    if (!t || t.seededAt !== null) return null;
+    this.sql.exec("UPDATE beta_testers SET seededAt = ? WHERE email = ? AND seededAt IS NULL", now, t.email);
+    return this.tester(t.email);
   }
 
-  setProgress(userId: string, key: string, on: boolean, now: number): void {
-    if (on) this.sql.exec("INSERT INTO beta_progress (userId, key, at) VALUES (?, ?, ?) ON CONFLICT(userId, key) DO UPDATE SET at = excluded.at", userId, key, now);
-    else this.sql.exec("DELETE FROM beta_progress WHERE userId = ? AND key = ?", userId, key);
+  finishSeed(email: string, projectId: string, taskIds: Record<string, string>): void {
+    this.sql.exec("UPDATE beta_testers SET seedProjectId = ?, seedTaskIds = ? WHERE email = ?", projectId, JSON.stringify(taskIds), email);
   }
 
-  /// Per key: how many accounts set it (the admin page).
-  progressCounts(): Record<string, number> {
-    return Object.fromEntries(this.sql.exec<{ key: string; n: number }>("SELECT key, COUNT(*) AS n FROM beta_progress GROUP BY key").toArray().map((r) => [r.key, r.n]));
+  /// The seed failed before it wrote anything: a later call tries again.
+  dropSeed(email: string): void {
+    this.sql.exec("UPDATE beta_testers SET seededAt = NULL WHERE email = ? AND seedProjectId IS NULL", email);
   }
 
-  /// Account deletion: the grant and the checklist go with the account, the
-  /// tester stays.
+  /// Granted testers whose seed never ran (granted before seeding shipped,
+  /// or a seed that failed).
+  unseeded(limit: number): BetaTester[] {
+    return this.sql.exec(`SELECT ${TESTER_COLS} FROM beta_testers WHERE grantedUserId IS NOT NULL AND seededAt IS NULL ORDER BY grantedAt LIMIT ?`, limit)
+      .toArray().map((r) => ({ ...r }) as unknown as BetaTester);
+  }
+
+  dismissCard(userId: string, now: number): boolean {
+    return this.sql.exec("UPDATE beta_testers SET cardDismissedAt = COALESCE(cardDismissedAt, ?) WHERE grantedUserId = ?", now, userId).rowsWritten > 0;
+  }
+
+  saveUsage(email: string, next: BetaUsage, now: number): BetaUsage {
+    const merged = mergeUsage(parseUsage(this.tester(email)?.usage ?? null), next);
+    this.sql.exec("UPDATE beta_testers SET usage = ?, usageAt = ? WHERE email = ?", JSON.stringify(merged), now, email);
+    return merged;
+  }
+
+  /// Granted testers whose usage is oldest (the hourly refresh).
+  staleUsage(before: number, limit: number): BetaTester[] {
+    return this.sql.exec(
+      `SELECT ${TESTER_COLS} FROM beta_testers WHERE grantedUserId IS NOT NULL AND COALESCE(usageAt, 0) < ? ORDER BY COALESCE(usageAt, 0) LIMIT ?`,
+      before, limit,
+    ).toArray().map((r) => ({ ...r }) as unknown as BetaTester);
+  }
+
+  /// Testers whose day-7 question is due: invited, joined before
+  /// `joinedBefore`, not asked yet.
+  questionsDue(joinedBefore: number, limit = 50): BetaTester[] {
+    return this.sql.exec(
+      `SELECT ${TESTER_COLS} FROM beta_testers WHERE ascState = 'invited' AND questionSentAt IS NULL AND joinedAt < ? ORDER BY joinedAt LIMIT ?`,
+      joinedBefore, limit,
+    ).toArray().map((r) => ({ ...r }) as unknown as BetaTester);
+  }
+
+  /// Marks the question sent with its link's token hash. False when another
+  /// sweep took it first.
+  takeQuestion(email: string, tokenHash: string, now: number): boolean {
+    return this.sql.exec(
+      "UPDATE beta_testers SET questionSentAt = ?, answerTokenHash = ? WHERE email = ? AND questionSentAt IS NULL", now, tokenHash, email,
+    ).rowsWritten > 0;
+  }
+
+  /// Records an answer; a later one replaces it. False for an unknown token.
+  answer(tokenHash: string, answer: BetaAnswer, now: number): boolean {
+    return this.sql.exec("UPDATE beta_testers SET answer = ?, answeredAt = ? WHERE answerTokenHash = ?", answer, now, tokenHash).rowsWritten > 0;
+  }
+
+  hasAnswerToken(tokenHash: string): boolean {
+    return this.sql.exec("SELECT 1 FROM beta_testers WHERE answerTokenHash = ?", tokenHash).toArray().length > 0;
+  }
+
+  /// Account deletion: the grant, the seed and what the account did go
+  /// with the account; the tester and their day-7 answer stay.
   forgetUser(userId: string): void {
-    this.sql.exec("UPDATE beta_testers SET grantedUserId = NULL, grantedAt = NULL WHERE grantedUserId = ?", userId);
-    this.sql.exec("DELETE FROM beta_progress WHERE userId = ?", userId);
+    this.sql.exec(`UPDATE beta_testers SET grantedUserId = NULL, grantedAt = NULL, seededAt = NULL, seedProjectId = NULL,
+      seedTaskIds = NULL, cardDismissedAt = NULL, usage = NULL, usageAt = NULL WHERE grantedUserId = ?`, userId);
   }
 }

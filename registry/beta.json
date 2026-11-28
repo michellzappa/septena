@@ -1,80 +1,100 @@
 {
   "version": 1,
-  "description": "The beta checklist (ADR 0064, docs/BETA_ONBOARDING_SPEC.md §7). The backend serves it to beta testers only (GET /v1/beta), filtered to the items whose features ship on the asking platform. The site's /beta page and the welcome mail read the same items. English only: the beta is English. A title links its key words to the septena.app page that explains them, as Markdown links ([Do](/workflows/do)); the backend strips the links for the apps, the site and the welcome mail draw them.",
+  "description": "The beta checklist (ADR 0064, docs/BETA_ONBOARDING_SPEC.md §7). The backend seeds it once into each tester's account as a normal project (`project`, one open task per item) and measures from the account's own data which items the tester used. GET /v1/beta answers only the Today card copy. The site's /beta page and the welcome mail read the same items. English only: the beta is English. A title links its key words to the septena.app page that explains them, as Markdown links ([Do](/workflows/do)); the seeded task gets the plain words and one reference per link, the site and the welcome mail draw the links.",
   "copy": {
-    "settingsRow": "Beta",
-    "settingsSummary": "{tried} of {total} tried",
-    "title": "Beta",
-    "deal": "Your part: use Septena for real, try what is below, and tell me what you find. My part: a year of Pro when Septena launches.",
-    "intro": "Tick what you tried. When something breaks or confuses you, send a note from that item.",
-    "tried": "I tried it",
-    "note": "Send a note",
-    "noteSubject": "Beta: {item}",
-    "ack": "I used Septena for real this week",
-    "ackDone": "Thanks. You last said so on {date}.",
     "cardTitle": "You’re in the beta",
-    "cardBody": "Thanks for testing Septena. Your checklist is in Settings, under Beta.",
-    "cardOpen": "Open the checklist",
+    "cardBody": "Thanks for testing Septena. Your checklist is the Septena beta project in your list.",
+    "cardOpen": "Open the project",
     "cardDismiss": "Not now"
+  },
+  "project": {
+    "title": "Septena beta",
+    "notes": "Thanks for testing Septena. Each task here is one part of the app I want your notes on, and its notes say what to try. Tick a task when you have tried it. Delete the ones you don't care about: this project is yours, like any other.\n\nWhen something breaks, confuses you or works well, tell me through Support at https://septena.app/support?from=beta. Say what you tried and what you expected.\n\nThe beta notes which of these parts you used and when. It never reads what you wrote."
   },
   "items": [
     {
       "id": "inbox-today",
-      "features": ["lists.inbox"],
+      "features": [
+        "lists.inbox"
+      ],
       "title": "Sort your [Inbox](/workflows/capture) into [Today](/workflows/today)",
       "try": "Capture a few tasks, then move them from the Inbox at the top of Today into Today, an area or a project."
     },
     {
       "id": "do",
-      "features": ["task.do"],
+      "features": [
+        "task.do"
+      ],
       "title": "[Do](/workflows/do) one task",
       "try": "Pick one task to Do and work from it. Check that it stays with you on every screen."
     },
     {
       "id": "second-device",
-      "features": ["sync.backend"],
+      "features": [
+        "sync.backend"
+      ],
       "title": "Use a [second device](/help/sync)",
       "try": "Sign in on another device. Change a task on one and check that the change arrives on the other."
     },
     {
       "id": "fade",
-      "features": ["fade.sweep"],
+      "features": [
+        "fade.sweep"
+      ],
       "title": "Let a few tasks [fade](/workflows/fade)",
       "try": "Leave some tasks alone for a while. They fade, and once a week Septena asks if you still want them."
     },
     {
       "id": "connect-agent",
-      "features": ["agents.connector"],
+      "features": [
+        "agents.connector"
+      ],
       "title": "Connect your [agent](/agents)",
       "try": "Connect Claude or another agent and give it one task you can check."
     },
     {
       "id": "review-stop",
-      "features": ["lists.review", "agents.stop-pause"],
+      "features": [
+        "lists.review",
+        "agents.stop-pause"
+      ],
       "title": "[Review](/workflows/agent-delegation) and [stop](/help/agent-controls) an agent",
       "try": "Answer its question, then Accept or Send back its work in Review. Press Stop on a task, or Pause all agents."
     },
     {
       "id": "discuss",
-      "features": ["ai.discuss"],
+      "features": [
+        "ai.discuss"
+      ],
       "title": "[Discuss](/workflows/discuss) a task",
       "try": "Open a task and press Discuss. Talk it through and see what it suggests."
     },
     {
       "id": "move-in",
-      "features": ["import.things", "import.reminders", "data.import-export"],
+      "features": [
+        "import.things",
+        "import.reminders",
+        "data.import-export"
+      ],
       "title": "[Move in](/moving-in) from another app",
       "try": "Bring your tasks over from the app you use now. Tell me what came across wrong."
     },
     {
       "id": "siri",
-      "features": ["system.shortcuts", "import.reminders"],
+      "features": [
+        "system.shortcuts",
+        "import.reminders"
+      ],
       "title": "Add a task with [Siri or Shortcuts](/help/siri-and-shortcuts)",
       "try": "Add a task with Siri or a Shortcut, or bring your Reminders into the Inbox."
     },
     {
       "id": "capture",
-      "features": ["capture.quick-entry", "capture.share-target", "capture.quick-add"],
+      "features": [
+        "capture.quick-entry",
+        "capture.share-target",
+        "capture.quick-add"
+      ],
       "title": "[Capture](/workflows/capture) from anywhere",
       "try": "Add a task from wherever you are: Quick Entry, Quick Add or the share sheet."
     }
