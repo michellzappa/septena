@@ -2613,14 +2613,19 @@ export function SeptenaApp() {
   const buildTaskRowProps = (item: EvaluatedTask, hideContainerLabel = false): TaskRowItemProps => {
     const { task, membership, opacity, convoProjection, convoState } = item;
     let containerLabel: string | null = null;
+    let containerDestination: ActiveDestination | null = null;
     if (!hideContainerLabel && destination.kind === "smart") {
       if (task.project && projectById.has(task.project)) {
         containerLabel = projectById.get(task.project)!.title;
+        containerDestination = { kind: "project", id: task.project };
       } else if (task.area && areaById.has(task.area)) {
         const a = areaById.get(task.area)!;
         containerLabel = `${a.emoji ? `${a.emoji} ` : ""}${a.title}`;
+        containerDestination = { kind: "area", id: task.area };
       }
     }
+    const containerTarget = containerDestination;
+    const openContainer = containerTarget ? () => navigateTo(containerTarget) : undefined;
 
     const taskShare = shareForTask(task);
     const isDeletedView =
@@ -2637,6 +2642,7 @@ export function SeptenaApp() {
       membership,
       opacity: isDeletedView ? 0.75 : opacity,
       containerLabel,
+      onOpenContainer: openContainer,
       hasPendingOp: pendingTaskIds.has(task.id),
       selected: selectedTaskId === task.id,
       multiSelected: selectedIds.has(task.id),

@@ -4745,7 +4745,13 @@ struct TaskListView: View {
           toggle(task)
         }
       },
-      onTap: nil
+      onTap: nil,
+      // The area / project name opens that list, as its group header does.
+      // Off in touch multi-select, where a tap anywhere picks the row.
+      onOpenList: touchSelectionActive ? nil : { route in
+        if closeActiveEditIfNeeded() { return }
+        nav.go(to: route)
+      }
     )
     // Covers the row ↔ editor swap. The row's own arrival and exit is
     // `rowTransition` on the card slice (`cardedRows`). Both only play inside

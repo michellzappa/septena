@@ -285,6 +285,10 @@ or on-demand when the project is opened).
 - tap **any** box (plain / dashed / dotted / done) → toggle completion.
   Check is check — the box never opens the row or the conversation.
 - tap **sort pill** → file to the suggested destination (ratify).
+- tap the **area / project name** on the row → open that list, the same
+  destination its group header and sidebar row open (#842). Off during touch
+  multi-select. On the Mac AppKit list the name is a title suffix with its
+  own click target; a suffix that truncates away has none.
 - row tap → task detail / conversation (`TaskDetailView` / `ConversationCard`).
 - "Discuss" is **not** a control — it is the dot (signal) + the row tap (open).
 

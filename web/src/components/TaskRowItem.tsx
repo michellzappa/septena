@@ -65,6 +65,8 @@ export interface TaskRowItemProps {
   membership: CoreMembership;
   opacity: number;
   containerLabel?: string | null;
+  /** Opens the list that `containerLabel` names (the row's area or project). */
+  onOpenContainer?: () => void;
   hasPendingOp: boolean;
   selected: boolean;
   multiSelected?: boolean;
@@ -1332,7 +1334,26 @@ export function TaskRowItem(props: TaskRowItemProps) {
 
         {containerLabel && (
           <div className="mt-0.5 truncate text-[12px] leading-tight text-[var(--text-muted)]">
-            {containerLabel}
+            {props.onOpenContainer ? (
+              // Its own target: a click opens the list, the rest of the row opens the task.
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (e.metaKey || e.ctrlKey || e.shiftKey) {
+                    props.onRowClick(e);
+                    return;
+                  }
+                  props.onOpenContainer!();
+                }}
+                onKeyDown={(e) => e.stopPropagation()}
+                className="max-w-full truncate text-left hover:text-[var(--text-secondary)] hover:underline"
+              >
+                {containerLabel}
+              </button>
+            ) : (
+              containerLabel
+            )}
           </div>
         )}
       </div>
