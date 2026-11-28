@@ -743,6 +743,9 @@ The product is Septena; the code targets keep the working names `Septask` (iOS),
   or renamed concept adds its old name to `registry/retired-terms.json`. A
   word a user must understand gets its one-sentence meaning in the registry,
   never only on the site. Help, docs and marketing describe the app as it is.
+  `gen-registries.mjs --check` fails on a shipping capability without
+  `docs`; `scripts/lint-retired-terms.mjs` (run from `lint-design.sh`) fails
+  on a retired term in registry copy, the agent briefs and `skills/`.
 - Match surrounding code: comment density, naming, idiom.
 - **Maker voice & identity** (the "made by mz" story across app, site, support,
   journal) is specified in `docs/MAKER_IDENTITY.md` — pull facts and copy blocks

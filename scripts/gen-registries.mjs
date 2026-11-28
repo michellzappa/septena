@@ -192,7 +192,22 @@ function validateCapabilities(caps) {
       assert(new Set(agent).size === agent.length, `capabilities.json: ${id}.agent names a tool twice`);
       for (const tool of agent) assert(MCP_TOOLS.has(tool), `capabilities.json: ${id}.agent names "${tool}", which the backend does not register (scripts/lib/mcp-tools.mjs)`);
     }
-    const known = new Set(["title", "agent", ...caps.platforms]);
+    // Help follows the feature (ADR 0065): a capability that ships or is
+    // partial on any platform names the septena.app guides that explain it,
+    // or the septena/site issue that will write them.
+    const docs = entry.docs;
+    const live = caps.platforms.some((p) => entry[p] === "ships" || entry[p] === "partial");
+    if (docs === undefined) {
+      assert(!live, `capabilities.json: ${id} ships, so it needs "docs": the septena.app guide slugs that explain it, or { "pending": "https://github.com/septena/site/issues/<n>" } (ADR 0065)`);
+    } else if (Array.isArray(docs)) {
+      assert(docs.length > 0, `capabilities.json: ${id}.docs is empty; name a guide slug or use { "pending": "<septena/site issue URL>" }`);
+      assert(new Set(docs).size === docs.length, `capabilities.json: ${id}.docs names a slug twice`);
+      for (const slug of docs) assert(typeof slug === "string" && /^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug), `capabilities.json: ${id}.docs has "${slug}", which is not a guide slug (lowercase words joined by hyphens)`);
+    } else {
+      assert(docs && typeof docs === "object" && Object.keys(docs).length === 1 && typeof docs.pending === "string" && /^https:\/\/github\.com\/septena\/site\/issues\/\d+$/.test(docs.pending),
+        `capabilities.json: ${id}.docs must be a list of guide slugs or { "pending": "https://github.com/septena/site/issues/<n>" }`);
+    }
+    const known = new Set(["title", "agent", "docs", ...caps.platforms]);
     for (const key of Object.keys(entry)) assert(known.has(key), `capabilities.json: ${id} has unknown field "${key}"`);
   }
 }
@@ -2687,7 +2702,9 @@ function generateTS({ entities, rules, icons, tokens, caps, settings, dests, act
   lines.push(`export const GENERIC_EMPTY_STATE = ${JSON.stringify(dests.genericEmptyState)} as const;`);
   lines.push(`export const ICONS = ${JSON.stringify(icons.icons)} as const;`);
   lines.push(`export const DESIGN_TOKENS = ${JSON.stringify({ accentPolicy: tokens.accentPolicy, fruitAccents: tokens.fruitAccents ?? [], textures: tokens.textures ?? [], selection: tokens.selection, colors: tokens.colors, multicolorGlyphs: tokens.multicolorGlyphs?.glyphs ?? {}, accentPalette: tokens.accentPalette, avatarColors: tokens.avatarColors.colors, radii: tokens.radii, spacing: tokens.spacing, desktopColumn: tokens.desktopColumn, textScale: tokens.textScale, motion: tokens.motion })} as const;`);
-  lines.push(`export const CAPABILITIES = ${JSON.stringify(caps.capabilities)} as const;`);
+  // `docs` names site guides (ADR 0065): the site reads it from the registry; the clients do not.
+  const capsForClients = Object.fromEntries(Object.entries(caps.capabilities).map(([id, { docs, ...rest }]) => [id, rest]));
+  lines.push(`export const CAPABILITIES = ${JSON.stringify(capsForClients)} as const;`);
   lines.push(`export const ACTIONS_CATALOG = ${JSON.stringify({ actions: actions.actions, contextMenus: actions.contextMenus, menuBar: actions.menuBar, shortcutsSheet: actions.shortcutsSheet })} as const;`);
   lines.push(`export const SURFACES_CATALOG = ${JSON.stringify({ notices: surfaces.notices, prompts: surfaces.prompts, toasts: surfaces.toasts, taskAttributes: surfaces.taskAttributes, taskDateBoard: surfaces.taskDateBoard, taskPage: surfaces.taskPage, waiting: surfaces.waiting, sharing: surfaces.sharing, avatar: surfaces.avatar, accountSwitch: surfaces.accountSwitch, deviceSignIn: surfaces.deviceSignIn, quickFind: surfaces.quickFind, checklistProjects: surfaces.checklistProjects, listSort: surfaces.listSort, topBar: surfaces.topBar, support: surfaces.support, fadeSweep: surfaces.fadeSweep })} as const;`);
   lines.push(`export const FIRST_RUN = ${JSON.stringify(surfaces.firstRun)} as const;`);
@@ -3209,6 +3226,11 @@ function generateFeatureMap({ caps }) {
   const CODES = { ships: "ships", partial: "partial", planned: "planned", not_applicable: "-" };
   const rows = Object.entries(caps.capabilities);
   const cell = (text) => String(text).replaceAll("|", "/");
+  const help = (docs) => {
+    if (docs === undefined) return "-";
+    if (Array.isArray(docs)) return docs.map((slug) => `\`${slug}\``).join(", ");
+    return `[pending](${docs.pending})`;
+  };
   const lines = [
     "# Feature map: status per platform",
     "",
@@ -3224,9 +3246,11 @@ function generateFeatureMap({ caps }) {
     "",
     "**Agent** lists the MCP tools at `api.septena.app/mcp` that reach the feature; **none** means an agent cannot reach it.",
     "",
-    `| ID | Feature | ${caps.platforms.map((p) => LABELS[p] ?? p).join(" | ")} | Agent |`,
-    `|---|---|${caps.platforms.map(() => "---").join("|")}|---|`,
-    ...rows.map(([id, c]) => `| \`${id}\` | ${cell(c.title)} | ${caps.platforms.map((p) => CODES[c[p]] ?? c[p]).join(" | ")} | ${c.agent === "none" ? "none" : c.agent.map((t) => `\`${t}\``).join(", ")} |`),
+    "**Help** lists the septena.app guides that explain the feature (ADR 0065); **pending** links the septena/site issue that will write them.",
+    "",
+    `| ID | Feature | ${caps.platforms.map((p) => LABELS[p] ?? p).join(" | ")} | Agent | Help |`,
+    `|---|---|${caps.platforms.map(() => "---").join("|")}|---|---|`,
+    ...rows.map(([id, c]) => `| \`${id}\` | ${cell(c.title)} | ${caps.platforms.map((p) => CODES[c[p]] ?? c[p]).join(" | ")} | ${c.agent === "none" ? "none" : c.agent.map((t) => `\`${t}\``).join(", ")} | ${help(c.docs)} |`),
     "",
   ];
   return lines.join("\n");

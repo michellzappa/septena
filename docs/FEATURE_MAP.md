@@ -15,75 +15,77 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 
 **Agent** lists the MCP tools at `api.septena.app/mcp` that reach the feature; **none** means an agent cannot reach it.
 
-| ID | Feature | iPhone | iPad | Mac | Web | Android | Windows | linux | Watch | Agent |
-|---|---|---|---|---|---|---|---|---|---|---|
-| `lists.inbox` | Inbox band on Today | ships | ships | ships | ships | ships | planned | planned | partial | `tasks_list` |
-| `lists.today` | Today | ships | ships | ships | ships | ships | planned | planned | partial | `tasks_list`, `tasks_move_to_today` |
-| `lists.review` | Review (questions, finished work, agent work in progress, faded tasks) | ships | ships | ships | ships | ships | planned | planned | - | `tasks_list`, `tasks_set_endstate` |
-| `review.waiting` | Waiting: work handed to a person, in Review | ships | ships | ships | ships | ships | planned | planned | - | `tasks_set_waiting`, `tasks_list` |
-| `lists.agent` | Agent work by stage (Working, Queued, Stopped groups in Review) | ships | ships | ships | ships | ships | planned | planned | - | `tasks_pending_reasoning`, `tasks_claim`, `tasks_release`, `tasks_agent_events`, `tasks_set_assignee` |
-| `lists.upcoming` | Upcoming | ships | ships | ships | ships | ships | planned | planned | - | `tasks_list`, `tasks_defer` |
-| `lists.anytime` | Anytime | ships | ships | ships | ships | ships | planned | planned | - | `tasks_list` |
-| `lists.sort` | Sort By | ships | ships | ships | ships | ships | planned | planned | - | none |
-| `lists.repeating` | Repeating | ships | ships | ships | ships | ships | planned | planned | - | none |
-| `lists.logbook` | Logbook | ships | ships | ships | ships | ships | planned | planned | - | `tasks_list`, `tasks_complete` |
-| `lists.faded` | Faded group of Review | ships | ships | ships | ships | ships | planned | planned | - | `tasks_list` |
-| `lists.starred` | Starred list | ships | ships | ships | ships | ships | planned | planned | - | `tasks_create`, `tasks_update` |
-| `lists.recently-deleted` | Recently Deleted (30 days) | ships | ships | ships | ships | ships | planned | planned | - | none |
-| `places.areas` | Areas | ships | ships | ships | ships | ships | planned | planned | - | `tasks_list_areas`, `tasks_area_create`, `tasks_area_update`, `tasks_notes_log`, `tasks_notes_propose` |
-| `places.projects` | Projects | ships | ships | ships | ships | ships | planned | planned | - | `tasks_list_projects`, `tasks_project_get`, `tasks_project_create`, `tasks_project_update`, `tasks_notes_log`, `tasks_notes_write`, `tasks_notes_propose`, `tasks_notes_history` |
-| `places.sections` | Sections (headings) | ships | ships | ships | ships | ships | planned | planned | - | `tasks_project_get`, `tasks_heading_create` |
-| `task.when-deadline` | When and Deadline as separate dates | ships | ships | ships | ships | ships | planned | planned | - | `tasks_create`, `tasks_update`, `tasks_defer` |
-| `task.repeat` | Repeat from schedule or after completion, pause | ships | ships | ships | ships | ships | planned | planned | - | `tasks_create`, `tasks_update`, `tasks_complete` |
-| `task.notes` | Notes | ships | ships | ships | ships | ships | planned | planned | - | `tasks_get`, `tasks_create`, `tasks_update` |
-| `task.attachments` | Attachments | ships | ships | ships | ships | ships | planned | planned | - | `tasks_get`, `tasks_attachment_add` |
-| `task.do` | Do: one task now, on every screen | ships | ships | ships | planned | ships | planned | planned | planned | none |
-| `task.references` | References: the email, link, issue or task that a task is about | ships | ships | ships | ships | ships | planned | planned | - | `tasks_find_by_ref`, `tasks_create`, `tasks_update` |
-| `task.history` | Per-task change history | ships | ships | ships | ships | ships | planned | planned | - | `tasks_history`, `tasks_activity` |
-| `task.provenance` | Who added a task: you or a named agent, on the row and the task page | ships | ships | ships | ships | ships | planned | planned | - | `tasks_create`, `tasks_get` |
-| `task.aging` | Aging fade across open lists | ships | ships | ships | ships | ships | planned | planned | - | none |
-| `task.checklists` | Checklists inside a task | ships | ships | ships | ships | ships | planned | planned | - | `tasks_checklist_add`, `tasks_checklist_update`, `tasks_checklist_delete` |
-| `task.tags` | Tags | ships | ships | ships | ships | ships | planned | planned | - | `tasks_list_tags`, `tasks_create`, `tasks_update` |
-| `task.share` | Share a task (title and notes) through the system share sheet | ships | ships | ships | ships | ships | planned | planned | - | none |
-| `task.alerts` | Timed reminders | ships | ships | ships | ships | ships | planned | planned | - | `tasks_create`, `tasks_update` |
-| `fade.sweep` | Fade pass, Faded pile and weekly sweep | ships | ships | ships | ships | ships | planned | planned | - | none |
-| `capture.quick-add` | Quick Add sheet | ships | ships | - | ships | ships | - | - | - | none |
-| `sharing.projects` | Share a project with other people (invite link, members, assign) | ships | ships | ships | planned | ships | planned | planned | - | none |
-| `capture.share-target` | Share into Inbox | ships | ships | - | ships | ships | planned | planned | - | none |
-| `capture.quick-entry` | Quick Entry global panel | - | - | ships | - | - | planned | planned | - | none |
-| `edit.filing-suggestion` | On-device filing suggestion | ships | ships | ships | - | ships | planned | planned | - | none |
-| `edit.undo` | Shared undo history | ships | ships | ships | ships | ships | planned | planned | - | none |
-| `edit.multi-select` | Select multiple tasks | ships | ships | ships | ships | ships | planned | planned | - | none |
-| `find.quick-find` | Quick Find | ships | ships | ships | ships | ships | planned | planned | - | `tasks_search` |
-| `task.page` | Task page (ADR 0029) | partial | partial | partial | partial | partial | planned | planned | partial | `tasks_get`, `tasks_thread_get` |
-| `mac.keyboard` | Keyboard-first shortcuts | - | ships | ships | ships | ships | planned | planned | - | none |
-| `mac.updates` | In-app updates (Sparkle) | - | - | ships | - | - | planned | planned | - | none |
-| `calendar.events` | Calendar events in Today and Upcoming | ships | ships | ships | planned | ships | planned | planned | - | none |
-| `import.reminders` | Apple Reminders into Inbox | ships | ships | ships | - | - | - | - | - | none |
-| `import.things` | One-time Things import | ships | ships | ships | - | - | - | - | - | none |
-| `ai.discuss` | Discuss: conversation on one task | ships | ships | ships | ships | partial | planned | planned | - | `tasks_thread_get`, `tasks_thread_append`, `tasks_set_acceptance`, `tasks_set_artifact`, `tasks_set_handoff` |
-| `ai.reach-dial` | Where AI runs | ships | ships | ships | ships | ships | planned | planned | - | none |
-| `agents.connector` | Official MCP connector at api.septena.app/mcp | ships | ships | ships | ships | ships | planned | planned | - | `tasks_orientation` |
-| `onboarding.first-run` | First run: welcome, account, move in, connect Claude | ships | ships | ships | ships | ships | planned | planned | - | none |
-| `agents.stop-pause` | Stop one task, pause all agents | ships | ships | ships | ships | ships | planned | planned | - | `tasks_agent_events` |
-| `sync.backend` | Sync through api.septena.app | ships | ships | ships | ships | ships | planned | planned | planned | none |
-| `account.delete` | Delete account | ships | ships | ships | ships | ships | planned | planned | - | none |
-| `account.avatar` | Edit your avatar: a photo, an emoji, or initials with a color | ships | ships | ships | ships | ships | planned | planned | - | none |
-| `account.sign-in-apple` | Sign in with Apple (creates an account) | ships | ships | ships | planned | planned | planned | planned | - | none |
-| `account.sign-in-google` | Sign in with Google (creates an account) | planned | planned | planned | planned | planned | planned | planned | - | none |
-| `account.sign-in-microsoft` | Sign in with Microsoft (creates an account) | planned | planned | planned | planned | planned | planned | planned | - | none |
-| `account.sign-in-email` | Sign in with an email code (creates an account) | ships | ships | ships | ships | ships | planned | planned | - | none |
-| `account.sign-in-device` | Sign in by approval from another signed-in device | ships | ships | ships | ships | ships | planned | planned | - | none |
-| `task.times` | Start time and duration on a task | ships | ships | ships | ships | ships | planned | planned | - | `tasks_create`, `tasks_update` |
-| `calendar.feed` | Private read-only calendar feed (.ics) | ships | ships | ships | ships | ships | planned | planned | - | none |
-| `widgets.tasks` | Today and Upcoming widgets | ships | ships | ships | - | ships | planned | planned | - | none |
-| `system.shortcuts` | Siri and Shortcuts actions | ships | ships | ships | - | - | - | - | - | none |
-| `watch.app` | Apple Watch app | - | - | - | - | - | - | - | ships | none |
-| `data.import-export` | Export as JSON, Markdown or CSV; import JSON with a preview | ships | ships | ships | ships | ships | planned | planned | - | none |
-| `agents.list` | Connected agents: list, name, disconnect | ships | ships | ships | ships | ships | planned | planned | - | none |
-| `settings.display` | Display, badge and privacy preferences | ships | ships | ships | ships | ships | planned | planned | - | none |
-| `support.contact` | Contact Support: a native form, with replies in the app | ships | ships | ships | ships | ships | planned | planned | - | none |
-| `appearance.accents` | Accent colors (Colorful and the fruit accents) | ships | ships | ships | ships | ships | planned | planned | - | none |
-| `appearance.textures` | Header textures with intensity and slow drift | ships | ships | ships | ships | ships | planned | planned | - | none |
-| `appearance.mode` | Light, dark or system appearance | ships | ships | ships | ships | ships | planned | planned | - | none |
-| `appearance.text-size` | Text size | ships | ships | ships | ships | ships | planned | planned | - | none |
+**Help** lists the septena.app guides that explain the feature (ADR 0065); **pending** links the septena/site issue that will write them.
+
+| ID | Feature | iPhone | iPad | Mac | Web | Android | Windows | linux | Watch | Agent | Help |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| `lists.inbox` | Inbox band on Today | ships | ships | ships | ships | ships | planned | planned | partial | `tasks_list` | `capture` |
+| `lists.today` | Today | ships | ships | ships | ships | ships | planned | planned | partial | `tasks_list`, `tasks_move_to_today` | `today` |
+| `lists.review` | Review (questions, finished work, agent work in progress, faded tasks) | ships | ships | ships | ships | ships | planned | planned | - | `tasks_list`, `tasks_set_endstate` | `agent-delegation` |
+| `review.waiting` | Waiting: work handed to a person, in Review | ships | ships | ships | ships | ships | planned | planned | - | `tasks_set_waiting`, `tasks_list` | [pending](https://github.com/septena/site/issues/85) |
+| `lists.agent` | Agent work by stage (Working, Queued, Stopped groups in Review) | ships | ships | ships | ships | ships | planned | planned | - | `tasks_pending_reasoning`, `tasks_claim`, `tasks_release`, `tasks_agent_events`, `tasks_set_assignee` | [pending](https://github.com/septena/site/issues/85) |
+| `lists.upcoming` | Upcoming | ships | ships | ships | ships | ships | planned | planned | - | `tasks_list`, `tasks_defer` | [pending](https://github.com/septena/site/issues/85) |
+| `lists.anytime` | Anytime | ships | ships | ships | ships | ships | planned | planned | - | `tasks_list` | [pending](https://github.com/septena/site/issues/85) |
+| `lists.sort` | Sort By | ships | ships | ships | ships | ships | planned | planned | - | none | [pending](https://github.com/septena/site/issues/85) |
+| `lists.repeating` | Repeating | ships | ships | ships | ships | ships | planned | planned | - | none | [pending](https://github.com/septena/site/issues/85) |
+| `lists.logbook` | Logbook | ships | ships | ships | ships | ships | planned | planned | - | `tasks_list`, `tasks_complete` | [pending](https://github.com/septena/site/issues/85) |
+| `lists.faded` | Faded group of Review | ships | ships | ships | ships | ships | planned | planned | - | `tasks_list` | `fade` |
+| `lists.starred` | Starred list | ships | ships | ships | ships | ships | planned | planned | - | `tasks_create`, `tasks_update` | `tags-and-checklists` |
+| `lists.recently-deleted` | Recently Deleted (30 days) | ships | ships | ships | ships | ships | planned | planned | - | none | `undo-and-history`, `what-to-expect` |
+| `places.areas` | Areas | ships | ships | ships | ships | ships | planned | planned | - | `tasks_list_areas`, `tasks_area_create`, `tasks_area_update`, `tasks_notes_log`, `tasks_notes_propose` | `projects` |
+| `places.projects` | Projects | ships | ships | ships | ships | ships | planned | planned | - | `tasks_list_projects`, `tasks_project_get`, `tasks_project_create`, `tasks_project_update`, `tasks_notes_log`, `tasks_notes_write`, `tasks_notes_propose`, `tasks_notes_history` | `projects` |
+| `places.sections` | Sections (headings) | ships | ships | ships | ships | ships | planned | planned | - | `tasks_project_get`, `tasks_heading_create` | `projects` |
+| `task.when-deadline` | When and Deadline as separate dates | ships | ships | ships | ships | ships | planned | planned | - | `tasks_create`, `tasks_update`, `tasks_defer` | `dates` |
+| `task.repeat` | Repeat from schedule or after completion, pause | ships | ships | ships | ships | ships | planned | planned | - | `tasks_create`, `tasks_update`, `tasks_complete` | `repeating-tasks`, `what-to-expect` |
+| `task.notes` | Notes | ships | ships | ships | ships | ships | planned | planned | - | `tasks_get`, `tasks_create`, `tasks_update` | `notes-and-files` |
+| `task.attachments` | Attachments | ships | ships | ships | ships | ships | planned | planned | - | `tasks_get`, `tasks_attachment_add` | `notes-and-files` |
+| `task.do` | Do: one task now, on every screen | ships | ships | ships | planned | ships | planned | planned | planned | none | `do` |
+| `task.references` | References: the email, link, issue or task that a task is about | ships | ships | ships | ships | ships | planned | planned | - | `tasks_find_by_ref`, `tasks_create`, `tasks_update` | `references` |
+| `task.history` | Per-task change history | ships | ships | ships | ships | ships | planned | planned | - | `tasks_history`, `tasks_activity` | `undo-and-history` |
+| `task.provenance` | Who added a task: you or a named agent, on the row and the task page | ships | ships | ships | ships | ships | planned | planned | - | `tasks_create`, `tasks_get` | [pending](https://github.com/septena/site/issues/85) |
+| `task.aging` | Aging fade across open lists | ships | ships | ships | ships | ships | planned | planned | - | none | `fade`, `what-to-expect` |
+| `task.checklists` | Checklists inside a task | ships | ships | ships | ships | ships | planned | planned | - | `tasks_checklist_add`, `tasks_checklist_update`, `tasks_checklist_delete` | `tags-and-checklists` |
+| `task.tags` | Tags | ships | ships | ships | ships | ships | planned | planned | - | `tasks_list_tags`, `tasks_create`, `tasks_update` | `tags-and-checklists` |
+| `task.share` | Share a task (title and notes) through the system share sheet | ships | ships | ships | ships | ships | planned | planned | - | none | [pending](https://github.com/septena/site/issues/85) |
+| `task.alerts` | Timed reminders | ships | ships | ships | ships | ships | planned | planned | - | `tasks_create`, `tasks_update` | `dates` |
+| `fade.sweep` | Fade pass, Faded pile and weekly sweep | ships | ships | ships | ships | ships | planned | planned | - | none | `fade` |
+| `capture.quick-add` | Quick Add sheet | ships | ships | - | ships | ships | - | - | - | none | `capture` |
+| `sharing.projects` | Share a project with other people (invite link, members, assign) | ships | ships | ships | planned | ships | planned | planned | - | none | [pending](https://github.com/septena/site/issues/85) |
+| `capture.share-target` | Share into Inbox | ships | ships | - | ships | ships | planned | planned | - | none | `capture` |
+| `capture.quick-entry` | Quick Entry global panel | - | - | ships | - | - | planned | planned | - | none | `capture` |
+| `edit.filing-suggestion` | On-device filing suggestion | ships | ships | ships | - | ships | planned | planned | - | none | [pending](https://github.com/septena/site/issues/85) |
+| `edit.undo` | Shared undo history | ships | ships | ships | ships | ships | planned | planned | - | none | `undo-and-history` |
+| `edit.multi-select` | Select multiple tasks | ships | ships | ships | ships | ships | planned | planned | - | none | `undo-and-history` |
+| `find.quick-find` | Quick Find | ships | ships | ships | ships | ships | planned | planned | - | `tasks_search` | `find` |
+| `task.page` | Task page (ADR 0029) | partial | partial | partial | partial | partial | planned | planned | partial | `tasks_get`, `tasks_thread_get` | [pending](https://github.com/septena/site/issues/85) |
+| `mac.keyboard` | Keyboard-first shortcuts | - | ships | ships | ships | ships | planned | planned | - | none | [pending](https://github.com/septena/site/issues/85) |
+| `mac.updates` | In-app updates (Sparkle) | - | - | ships | - | - | planned | planned | - | none | [pending](https://github.com/septena/site/issues/85) |
+| `calendar.events` | Calendar events in Today and Upcoming | ships | ships | ships | planned | ships | planned | planned | - | none | `calendar` |
+| `import.reminders` | Apple Reminders into Inbox | ships | ships | ships | - | - | - | - | - | none | [pending](https://github.com/septena/site/issues/85) |
+| `import.things` | One-time Things import | ships | ships | ships | - | - | - | - | - | none | [pending](https://github.com/septena/site/issues/85) |
+| `ai.discuss` | Discuss: conversation on one task | ships | ships | ships | ships | partial | planned | planned | - | `tasks_thread_get`, `tasks_thread_append`, `tasks_set_acceptance`, `tasks_set_artifact`, `tasks_set_handoff` | `discuss` |
+| `ai.reach-dial` | Where AI runs | ships | ships | ships | ships | ships | planned | planned | - | none | [pending](https://github.com/septena/site/issues/85) |
+| `agents.connector` | Official MCP connector at api.septena.app/mcp | ships | ships | ships | ships | ships | planned | planned | - | `tasks_orientation` | `agent-delegation`, `what-to-expect` |
+| `onboarding.first-run` | First run: welcome, account, move in, connect Claude | ships | ships | ships | ships | ships | planned | planned | - | none | [pending](https://github.com/septena/site/issues/85) |
+| `agents.stop-pause` | Stop one task, pause all agents | ships | ships | ships | ships | ships | planned | planned | - | `tasks_agent_events` | `agent-delegation` |
+| `sync.backend` | Sync through api.septena.app | ships | ships | ships | ships | ships | planned | planned | planned | none | `what-to-expect` |
+| `account.delete` | Delete account | ships | ships | ships | ships | ships | planned | planned | - | none | [pending](https://github.com/septena/site/issues/85) |
+| `account.avatar` | Edit your avatar: a photo, an emoji, or initials with a color | ships | ships | ships | ships | ships | planned | planned | - | none | [pending](https://github.com/septena/site/issues/85) |
+| `account.sign-in-apple` | Sign in with Apple (creates an account) | ships | ships | ships | planned | planned | planned | planned | - | none | [pending](https://github.com/septena/site/issues/85) |
+| `account.sign-in-google` | Sign in with Google (creates an account) | planned | planned | planned | planned | planned | planned | planned | - | none | - |
+| `account.sign-in-microsoft` | Sign in with Microsoft (creates an account) | planned | planned | planned | planned | planned | planned | planned | - | none | - |
+| `account.sign-in-email` | Sign in with an email code (creates an account) | ships | ships | ships | ships | ships | planned | planned | - | none | [pending](https://github.com/septena/site/issues/85) |
+| `account.sign-in-device` | Sign in by approval from another signed-in device | ships | ships | ships | ships | ships | planned | planned | - | none | [pending](https://github.com/septena/site/issues/85) |
+| `task.times` | Start time and duration on a task | ships | ships | ships | ships | ships | planned | planned | - | `tasks_create`, `tasks_update` | [pending](https://github.com/septena/site/issues/85) |
+| `calendar.feed` | Private read-only calendar feed (.ics) | ships | ships | ships | ships | ships | planned | planned | - | none | `calendar` |
+| `widgets.tasks` | Today and Upcoming widgets | ships | ships | ships | - | ships | planned | planned | - | none | `widgets-and-watch` |
+| `system.shortcuts` | Siri and Shortcuts actions | ships | ships | ships | - | - | - | - | - | none | [pending](https://github.com/septena/site/issues/85) |
+| `watch.app` | Apple Watch app | - | - | - | - | - | - | - | ships | none | `widgets-and-watch` |
+| `data.import-export` | Export as JSON, Markdown or CSV; import JSON with a preview | ships | ships | ships | ships | ships | planned | planned | - | none | [pending](https://github.com/septena/site/issues/85) |
+| `agents.list` | Connected agents: list, name, disconnect | ships | ships | ships | ships | ships | planned | planned | - | none | [pending](https://github.com/septena/site/issues/85) |
+| `settings.display` | Display, badge and privacy preferences | ships | ships | ships | ships | ships | planned | planned | - | none | [pending](https://github.com/septena/site/issues/85) |
+| `support.contact` | Contact Support: a native form, with replies in the app | ships | ships | ships | ships | ships | planned | planned | - | none | [pending](https://github.com/septena/site/issues/85) |
+| `appearance.accents` | Accent colors (Colorful and the fruit accents) | ships | ships | ships | ships | ships | planned | planned | - | none | `appearance` |
+| `appearance.textures` | Header textures with intensity and slow drift | ships | ships | ships | ships | ships | planned | planned | - | none | `appearance` |
+| `appearance.mode` | Light, dark or system appearance | ships | ships | ships | ships | ships | planned | planned | - | none | `appearance` |
+| `appearance.text-size` | Text size | ships | ships | ships | ships | ships | planned | planned | - | none | `appearance` |

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Canonical capability parity ledger keyed by Feature ID (Starlings /product/feature-map-septena-task-app, ADR 0013, ADR 0015). Every registry entry references an ID here. `agent` lists the MCP tools at api.septena.app/mcp that reach the capability, or \"none\" (ADR 0050, AS7). scripts/gen-registries.mjs checks each name against the tools the backend registers.",
+  "description": "Canonical capability parity ledger keyed by Feature ID (Starlings /product/feature-map-septena-task-app, ADR 0013, ADR 0015). Every registry entry references an ID here. `agent` lists the MCP tools at api.septena.app/mcp that reach the capability, or \"none\" (ADR 0050, AS7). scripts/gen-registries.mjs checks each name against the tools the backend registers. `docs` names the septena.app guide slugs that explain the capability, or {\"pending\": \"<septena/site issue URL>\"} while the help is not written; every capability that ships or is partial on a platform needs it (ADR 0065).",
   "platforms": [
     "ios",
     "ipados",
@@ -23,6 +23,9 @@
       "agent": [
         "tasks_list"
       ],
+      "docs": [
+        "capture"
+      ],
       "ios": "ships",
       "ipados": "ships",
       "macos": "ships",
@@ -37,6 +40,9 @@
       "agent": [
         "tasks_list",
         "tasks_move_to_today"
+      ],
+      "docs": [
+        "today"
       ],
       "ios": "ships",
       "ipados": "ships",
@@ -53,6 +59,9 @@
         "tasks_list",
         "tasks_set_endstate"
       ],
+      "docs": [
+        "agent-delegation"
+      ],
       "ios": "ships",
       "ipados": "ships",
       "macos": "ships",
@@ -68,6 +77,9 @@
         "tasks_set_waiting",
         "tasks_list"
       ],
+      "docs": {
+        "pending": "https://github.com/septena/site/issues/85"
+      },
       "ios": "ships",
       "ipados": "ships",
       "macos": "ships",
@@ -86,6 +98,9 @@
         "tasks_agent_events",
         "tasks_set_assignee"
       ],
+      "docs": {
+        "pending": "https://github.com/septena/site/issues/85"
+      },
       "ios": "ships",
       "ipados": "ships",
       "macos": "ships",
@@ -101,6 +116,9 @@
         "tasks_list",
         "tasks_defer"
       ],
+      "docs": {
+        "pending": "https://github.com/septena/site/issues/85"
+      },
       "ios": "ships",
       "ipados": "ships",
       "macos": "ships",
@@ -115,6 +133,9 @@
       "agent": [
         "tasks_list"
       ],
+      "docs": {
+        "pending": "https://github.com/septena/site/issues/85"
+      },
       "ios": "ships",
       "ipados": "ships",
       "macos": "ships",
@@ -127,6 +148,9 @@
     "lists.sort": {
       "title": "Sort By",
       "agent": "none",
+      "docs": {
+        "pending": "https://github.com/septena/site/issues/85"
+      },
       "ios": "ships",
       "ipados": "ships",
       "macos": "ships",
@@ -139,6 +163,9 @@
     "lists.repeating": {
       "title": "Repeating",
       "agent": "none",
+      "docs": {
+        "pending": "https://github.com/septena/site/issues/85"
+      },
       "ios": "ships",
       "ipados": "ships",
       "macos": "ships",
@@ -154,6 +181,9 @@
         "tasks_list",
         "tasks_complete"
       ],
+      "docs": {
+        "pending": "https://github.com/septena/site/issues/85"
+      },
       "ios": "ships",
       "ipados": "ships",
       "macos": "ships",
@@ -167,6 +197,9 @@
       "title": "Faded group of Review",
       "agent": [
         "tasks_list"
+      ],
+      "docs": [
+        "fade"
       ],
       "ios": "ships",
       "ipados": "ships",
@@ -183,6 +216,9 @@
         "tasks_create",
         "tasks_update"
       ],
+      "docs": [
+        "tags-and-checklists"
+      ],
       "ios": "ships",
       "ipados": "ships",
       "macos": "ships",
@@ -195,6 +231,10 @@
     "lists.recently-deleted": {
       "title": "Recently Deleted (30 days)",
       "agent": "none",
+      "docs": [
+        "undo-and-history",
+        "what-to-expect"
+      ],
       "ios": "ships",
       "ipados": "ships",
       "macos": "ships",
@@ -212,6 +252,9 @@
         "tasks_area_update",
         "tasks_notes_log",
         "tasks_notes_propose"
+      ],
+      "docs": [
+        "projects"
       ],
       "ios": "ships",
       "ipados": "ships",
@@ -234,6 +277,9 @@
         "tasks_notes_propose",
         "tasks_notes_history"
       ],
+      "docs": [
+        "projects"
+      ],
       "ios": "ships",
       "ipados": "ships",
       "macos": "ships",
@@ -248,6 +294,9 @@
       "agent": [
         "tasks_project_get",
         "tasks_heading_create"
+      ],
+      "docs": [
+        "projects"
       ],
       "ios": "ships",
       "ipados": "ships",
@@ -265,6 +314,9 @@
         "tasks_update",
         "tasks_defer"
       ],
+      "docs": [
+        "dates"
+      ],
       "ios": "ships",
       "ipados": "ships",
       "macos": "ships",
@@ -280,6 +332,10 @@
         "tasks_create",
         "tasks_update",
         "tasks_complete"
+      ],
+      "docs": [
+        "repeating-tasks",
+        "what-to-expect"
       ],
       "ios": "ships",
       "ipados": "ships",
@@ -297,6 +353,9 @@
         "tasks_create",
         "tasks_update"
       ],
+      "docs": [
+        "notes-and-files"
+      ],
       "ios": "ships",
       "ipados": "ships",
       "macos": "ships",
@@ -312,6 +371,9 @@
         "tasks_get",
         "tasks_attachment_add"
       ],
+      "docs": [
+        "notes-and-files"
+      ],
       "ios": "ships",
       "ipados": "ships",
       "macos": "ships",
@@ -324,6 +386,9 @@
     "task.do": {
       "title": "Do: one task now, on every screen",
       "agent": "none",
+      "docs": [
+        "do"
+      ],
       "ios": "ships",
       "ipados": "ships",
       "macos": "ships",
@@ -340,6 +405,9 @@
         "tasks_create",
         "tasks_update"
       ],
+      "docs": [
+        "references"
+      ],
       "ios": "ships",
       "ipados": "ships",
       "macos": "ships",
@@ -354,6 +422,9 @@
       "agent": [
         "tasks_history",
         "tasks_activity"
+      ],
+      "docs": [
+        "undo-and-history"
       ],
       "ios": "ships",
       "ipados": "ships",
@@ -370,6 +441,9 @@
         "tasks_create",
         "tasks_get"
       ],
+      "docs": {
+        "pending": "https://github.com/septena/site/issues/85"
+      },
       "ios": "ships",
       "ipados": "ships",
       "macos": "ships",
@@ -382,6 +456,10 @@
     "task.aging": {
       "title": "Aging fade across open lists",
       "agent": "none",
+      "docs": [
+        "fade",
+        "what-to-expect"
+      ],
       "ios": "ships",
       "ipados": "ships",
       "macos": "ships",
@@ -397,6 +475,9 @@
         "tasks_checklist_add",
         "tasks_checklist_update",
         "tasks_checklist_delete"
+      ],
+      "docs": [
+        "tags-and-checklists"
       ],
       "ios": "ships",
       "ipados": "ships",
@@ -414,6 +495,9 @@
         "tasks_create",
         "tasks_update"
       ],
+      "docs": [
+        "tags-and-checklists"
+      ],
       "ios": "ships",
       "ipados": "ships",
       "macos": "ships",
@@ -426,6 +510,9 @@
     "task.share": {
       "title": "Share a task (title and notes) through the system share sheet",
       "agent": "none",
+      "docs": {
+        "pending": "https://github.com/septena/site/issues/85"
+      },
       "ios": "ships",
       "ipados": "ships",
       "macos": "ships",
@@ -441,6 +528,9 @@
         "tasks_create",
         "tasks_update"
       ],
+      "docs": [
+        "dates"
+      ],
       "ios": "ships",
       "ipados": "ships",
       "macos": "ships",
@@ -453,6 +543,9 @@
     "fade.sweep": {
       "title": "Fade pass, Faded pile and weekly sweep",
       "agent": "none",
+      "docs": [
+        "fade"
+      ],
       "ios": "ships",
       "ipados": "ships",
       "macos": "ships",
@@ -465,6 +558,9 @@
     "capture.quick-add": {
       "title": "Quick Add sheet",
       "agent": "none",
+      "docs": [
+        "capture"
+      ],
       "ios": "ships",
       "ipados": "ships",
       "macos": "not_applicable",
@@ -477,6 +573,9 @@
     "sharing.projects": {
       "title": "Share a project with other people (invite link, members, assign)",
       "agent": "none",
+      "docs": {
+        "pending": "https://github.com/septena/site/issues/85"
+      },
       "ios": "ships",
       "ipados": "ships",
       "macos": "ships",
@@ -489,6 +588,9 @@
     "capture.share-target": {
       "title": "Share into Inbox",
       "agent": "none",
+      "docs": [
+        "capture"
+      ],
       "ios": "ships",
       "ipados": "ships",
       "macos": "not_applicable",
@@ -501,6 +603,9 @@
     "capture.quick-entry": {
       "title": "Quick Entry global panel",
       "agent": "none",
+      "docs": [
+        "capture"
+      ],
       "ios": "not_applicable",
       "ipados": "not_applicable",
       "macos": "ships",
@@ -513,6 +618,9 @@
     "edit.filing-suggestion": {
       "title": "On-device filing suggestion",
       "agent": "none",
+      "docs": {
+        "pending": "https://github.com/septena/site/issues/85"
+      },
       "ios": "ships",
       "ipados": "ships",
       "macos": "ships",
@@ -525,6 +633,9 @@
     "edit.undo": {
       "title": "Shared undo history",
       "agent": "none",
+      "docs": [
+        "undo-and-history"
+      ],
       "ios": "ships",
       "ipados": "ships",
       "macos": "ships",
@@ -537,6 +648,9 @@
     "edit.multi-select": {
       "title": "Select multiple tasks",
       "agent": "none",
+      "docs": [
+        "undo-and-history"
+      ],
       "ios": "ships",
       "ipados": "ships",
       "macos": "ships",
@@ -550,6 +664,9 @@
       "title": "Quick Find",
       "agent": [
         "tasks_search"
+      ],
+      "docs": [
+        "find"
       ],
       "ios": "ships",
       "ipados": "ships",
@@ -566,6 +683,9 @@
         "tasks_get",
         "tasks_thread_get"
       ],
+      "docs": {
+        "pending": "https://github.com/septena/site/issues/85"
+      },
       "ios": "partial",
       "ipados": "partial",
       "macos": "partial",
@@ -578,6 +698,9 @@
     "mac.keyboard": {
       "title": "Keyboard-first shortcuts",
       "agent": "none",
+      "docs": {
+        "pending": "https://github.com/septena/site/issues/85"
+      },
       "ios": "not_applicable",
       "ipados": "ships",
       "macos": "ships",
@@ -590,6 +713,9 @@
     "mac.updates": {
       "title": "In-app updates (Sparkle)",
       "agent": "none",
+      "docs": {
+        "pending": "https://github.com/septena/site/issues/85"
+      },
       "ios": "not_applicable",
       "ipados": "not_applicable",
       "macos": "ships",
@@ -602,6 +728,9 @@
     "calendar.events": {
       "title": "Calendar events in Today and Upcoming",
       "agent": "none",
+      "docs": [
+        "calendar"
+      ],
       "ios": "ships",
       "ipados": "ships",
       "macos": "ships",
@@ -614,6 +743,9 @@
     "import.reminders": {
       "title": "Apple Reminders into Inbox",
       "agent": "none",
+      "docs": {
+        "pending": "https://github.com/septena/site/issues/85"
+      },
       "ios": "ships",
       "ipados": "ships",
       "macos": "ships",
@@ -626,6 +758,9 @@
     "import.things": {
       "title": "One-time Things import",
       "agent": "none",
+      "docs": {
+        "pending": "https://github.com/septena/site/issues/85"
+      },
       "ios": "ships",
       "ipados": "ships",
       "macos": "ships",
@@ -644,6 +779,9 @@
         "tasks_set_artifact",
         "tasks_set_handoff"
       ],
+      "docs": [
+        "discuss"
+      ],
       "ios": "ships",
       "ipados": "ships",
       "macos": "ships",
@@ -656,6 +794,9 @@
     "ai.reach-dial": {
       "title": "Where AI runs",
       "agent": "none",
+      "docs": {
+        "pending": "https://github.com/septena/site/issues/85"
+      },
       "ios": "ships",
       "ipados": "ships",
       "macos": "ships",
@@ -670,6 +811,10 @@
       "agent": [
         "tasks_orientation"
       ],
+      "docs": [
+        "agent-delegation",
+        "what-to-expect"
+      ],
       "ios": "ships",
       "ipados": "ships",
       "macos": "ships",
@@ -682,6 +827,9 @@
     "onboarding.first-run": {
       "title": "First run: welcome, account, move in, connect Claude",
       "agent": "none",
+      "docs": {
+        "pending": "https://github.com/septena/site/issues/85"
+      },
       "ios": "ships",
       "ipados": "ships",
       "macos": "ships",
@@ -696,6 +844,9 @@
       "agent": [
         "tasks_agent_events"
       ],
+      "docs": [
+        "agent-delegation"
+      ],
       "ios": "ships",
       "ipados": "ships",
       "macos": "ships",
@@ -708,6 +859,9 @@
     "sync.backend": {
       "title": "Sync through api.septena.app",
       "agent": "none",
+      "docs": [
+        "what-to-expect"
+      ],
       "ios": "ships",
       "ipados": "ships",
       "macos": "ships",
@@ -720,6 +874,9 @@
     "account.delete": {
       "title": "Delete account",
       "agent": "none",
+      "docs": {
+        "pending": "https://github.com/septena/site/issues/85"
+      },
       "ios": "ships",
       "ipados": "ships",
       "macos": "ships",
@@ -732,6 +889,9 @@
     "account.avatar": {
       "title": "Edit your avatar: a photo, an emoji, or initials with a color",
       "agent": "none",
+      "docs": {
+        "pending": "https://github.com/septena/site/issues/85"
+      },
       "ios": "ships",
       "ipados": "ships",
       "macos": "ships",
@@ -744,6 +904,9 @@
     "account.sign-in-apple": {
       "title": "Sign in with Apple (creates an account)",
       "agent": "none",
+      "docs": {
+        "pending": "https://github.com/septena/site/issues/85"
+      },
       "ios": "ships",
       "ipados": "ships",
       "macos": "ships",
@@ -780,6 +943,9 @@
     "account.sign-in-email": {
       "title": "Sign in with an email code (creates an account)",
       "agent": "none",
+      "docs": {
+        "pending": "https://github.com/septena/site/issues/85"
+      },
       "ios": "ships",
       "ipados": "ships",
       "macos": "ships",
@@ -792,6 +958,9 @@
     "account.sign-in-device": {
       "title": "Sign in by approval from another signed-in device",
       "agent": "none",
+      "docs": {
+        "pending": "https://github.com/septena/site/issues/85"
+      },
       "ios": "ships",
       "ipados": "ships",
       "macos": "ships",
@@ -807,6 +976,9 @@
         "tasks_create",
         "tasks_update"
       ],
+      "docs": {
+        "pending": "https://github.com/septena/site/issues/85"
+      },
       "ios": "ships",
       "ipados": "ships",
       "macos": "ships",
@@ -819,6 +991,9 @@
     "calendar.feed": {
       "title": "Private read-only calendar feed (.ics)",
       "agent": "none",
+      "docs": [
+        "calendar"
+      ],
       "ios": "ships",
       "ipados": "ships",
       "macos": "ships",
@@ -831,6 +1006,9 @@
     "widgets.tasks": {
       "title": "Today and Upcoming widgets",
       "agent": "none",
+      "docs": [
+        "widgets-and-watch"
+      ],
       "ios": "ships",
       "ipados": "ships",
       "macos": "ships",
@@ -843,6 +1021,9 @@
     "system.shortcuts": {
       "title": "Siri and Shortcuts actions",
       "agent": "none",
+      "docs": {
+        "pending": "https://github.com/septena/site/issues/85"
+      },
       "ios": "ships",
       "ipados": "ships",
       "macos": "ships",
@@ -855,6 +1036,9 @@
     "watch.app": {
       "title": "Apple Watch app",
       "agent": "none",
+      "docs": [
+        "widgets-and-watch"
+      ],
       "ios": "not_applicable",
       "ipados": "not_applicable",
       "macos": "not_applicable",
@@ -867,6 +1051,9 @@
     "data.import-export": {
       "title": "Export as JSON, Markdown or CSV; import JSON with a preview",
       "agent": "none",
+      "docs": {
+        "pending": "https://github.com/septena/site/issues/85"
+      },
       "ios": "ships",
       "ipados": "ships",
       "macos": "ships",
@@ -879,6 +1066,9 @@
     "agents.list": {
       "title": "Connected agents: list, name, disconnect",
       "agent": "none",
+      "docs": {
+        "pending": "https://github.com/septena/site/issues/85"
+      },
       "ios": "ships",
       "ipados": "ships",
       "macos": "ships",
@@ -891,6 +1081,9 @@
     "settings.display": {
       "title": "Display, badge and privacy preferences",
       "agent": "none",
+      "docs": {
+        "pending": "https://github.com/septena/site/issues/85"
+      },
       "ios": "ships",
       "ipados": "ships",
       "macos": "ships",
@@ -903,6 +1096,9 @@
     "support.contact": {
       "title": "Contact Support: a native form, with replies in the app",
       "agent": "none",
+      "docs": {
+        "pending": "https://github.com/septena/site/issues/85"
+      },
       "ios": "ships",
       "ipados": "ships",
       "macos": "ships",
@@ -915,6 +1111,9 @@
     "appearance.accents": {
       "title": "Accent colors (Colorful and the fruit accents)",
       "agent": "none",
+      "docs": [
+        "appearance"
+      ],
       "ios": "ships",
       "ipados": "ships",
       "macos": "ships",
@@ -927,6 +1126,9 @@
     "appearance.textures": {
       "title": "Header textures with intensity and slow drift",
       "agent": "none",
+      "docs": [
+        "appearance"
+      ],
       "ios": "ships",
       "ipados": "ships",
       "macos": "ships",
@@ -939,6 +1141,9 @@
     "appearance.mode": {
       "title": "Light, dark or system appearance",
       "agent": "none",
+      "docs": [
+        "appearance"
+      ],
       "ios": "ships",
       "ipados": "ships",
       "macos": "ships",
@@ -951,6 +1156,9 @@
     "appearance.text-size": {
       "title": "Text size",
       "agent": "none",
+      "docs": [
+        "appearance"
+      ],
       "ios": "ships",
       "ipados": "ships",
       "macos": "ships",
