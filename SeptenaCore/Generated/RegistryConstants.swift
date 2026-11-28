@@ -316,7 +316,7 @@ enum RegistryTokens {
     static let unemphasizedAlphaLight: Double = 0.1
     static let unemphasizedAlphaDark: Double = 0.14
     static let chipSelectedFillOpacity: Double = 0.22
-    static let pointerHoverOpacity: Double = 0.012
+    static let pointerHoverOpacity: Double = 0.05
   }
   enum Radii {
     static let card: Double = 22

@@ -624,6 +624,13 @@ export function SeptenaApp() {
     document.documentElement.style.setProperty("--accent", accentHex);
     document.documentElement.style.setProperty("--accent-check", accentCheckHex);
     document.documentElement.style.setProperty("--bg-selected", hexWithAlpha(accentHex, selAlpha));
+    // Pointer hover wash: primary ink at the shared token, the same value
+    // iPad, Mac and Android use (#851).
+    const hoverInk = isDark ? "255, 255, 255" : "0, 0, 0";
+    document.documentElement.style.setProperty(
+      "--bg-hover",
+      `rgba(${hoverInk}, ${DESIGN_TOKENS.selection.pointerHoverOpacity})`,
+    );
     // The premium language's brand and benefit colors (docs/PREMIUM_LANGUAGE.md).
     for (const [name, value] of Object.entries(planColors(activeFruit, isDark))) {
       document.documentElement.style.setProperty(name, value);

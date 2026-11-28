@@ -164,6 +164,8 @@ function validateTokens(tokens) {
       assert(/^#[0-9a-fA-F]{6}$/.test(tokens.colors?.[role] ?? ""), `tokens.json: multicolorGlyphs "${icon}" role "${role}" must name a hex in colors`);
     }
   }
+  const hover = tokens.selection?.pointerHoverOpacity;
+  assert(typeof hover === "number" && hover > 0 && hover < 0.2, "tokens.json: selection.pointerHoverOpacity must be a number in (0, 0.2)");
   assert(Array.isArray(tokens.textScale?.steps) && tokens.textScale.steps.length === 5, "tokens.json: textScale must have 5 steps");
   const cm = tokens.motion?.completion;
   assert(cm && typeof cm === "object", "tokens.json: missing motion.completion");
@@ -2744,6 +2746,11 @@ function generateKotlinCore(bundle) {
     const literal = Number.isInteger(value) ? `${value}L` : `${value}`;
     lines.push(`    const val ${kotlinConstName(key)}: ${type} = ${literal}`);
   }
+  lines.push("}");
+  lines.push("");
+  lines.push("/** Pointer hover wash: primary ink at this opacity (`registry/tokens.json` `selection.pointerHoverOpacity`, #851). */");
+  lines.push("object RegistryPointerHover {");
+  lines.push(`    const val OPACITY: Float = ${Number(tokens.selection.pointerHoverOpacity)}f`);
   lines.push("}");
   lines.push("");
   lines.push("/** Standard task-completion settle and checkbox motion (`registry/tokens.json` `motion.completion`). */");
