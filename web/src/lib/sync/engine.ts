@@ -43,6 +43,7 @@ import type {
   NotSyncedItem,
   OrdinalWeekday,
   OutboxOp,
+  ProjectChecklistMode,
   ProjectRow,
   StoreSnapshot,
   SyncedEntity,
@@ -1619,7 +1620,7 @@ export class WebSyncEngine {
     );
   }
 
-  async createProject(title: string, areaId: string | null = null): Promise<ProjectRow> {
+  async createProject(title: string, areaId: string | null = null, checklistMode: ProjectChecklistMode | null = null): Promise<ProjectRow> {
     const trimmed = title.trim();
     if (!trimmed) throw new Error("Project title is required");
     const id = newId("proj");
@@ -1631,10 +1632,11 @@ export class WebSyncEngine {
       title: trimmed,
       status: "active",
       area: areaId,
+      ...(checklistMode ? { checklistMode } : {}),
       created: localTodayYMD(),
       position,
     };
-    const row: ProjectRow = { id, title: trimmed, status: "active", area: areaId, position };
+    const row: ProjectRow = { id, title: trimmed, status: "active", area: areaId, position, checklistMode };
     await this.commit(
       [{ entity: "project", action: "put", id, row }],
       [{ clientOpId: newClientOpId(), op: "upsert", entity: "project", id, fields, queuedAt: Date.now() }],
