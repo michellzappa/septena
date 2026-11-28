@@ -8,6 +8,7 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.CalendarContract
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -579,6 +580,7 @@ fun TaskHomeScreen(
         // Consumed at either end too, so the key never types into a field.
         true
     }
+    val backDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
     val hardwareShortcutModifier = Modifier.onPreviewKeyEvent { event ->
         if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
         val primary = event.isCtrlPressed || event.isMetaPressed
@@ -634,9 +636,15 @@ fun TaskHomeScreen(
                 quickFindOpen -> { quickFindOpen = false; true }
                 settingsOpen -> { settingsOpen = false; true }
                 openedTaskId != null -> {
-                    openedTaskId = null
-                    openedTaskAttribute = null
-                    openedTaskSendBack = false
+                    // Escape takes Back's path, so the detail saves the text
+                    // the user typed before it closes, as Back does.
+                    if (backDispatcher != null) {
+                        backDispatcher.onBackPressed()
+                    } else {
+                        openedTaskId = null
+                        openedTaskAttribute = null
+                        openedTaskSendBack = false
+                    }
                     true
                 }
                 expandedTaskId != null -> {

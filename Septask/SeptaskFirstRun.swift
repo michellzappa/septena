@@ -458,6 +458,7 @@ struct SeptaskFirstRunView: View {
               showingThings = false
               showingReminders = false
             }
+              .keyboardShortcut(.cancelAction)
           }
         }
     }

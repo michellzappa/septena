@@ -67,7 +67,9 @@ enum KitPrompt {
     alert.messageText = copy.title
     alert.informativeText = copy.message
     for option in copy.options { alert.addButton(withTitle: option.title) }
-    alert.addButton(withTitle: RegistryPrompts.cancelTitle)
+    // Escape cancels whatever the registry calls the button: AppKit only
+    // gives Escape to a button whose title is its own "Cancel".
+    alert.addButton(withTitle: RegistryPrompts.cancelTitle).keyEquivalent = "\u{1b}"
     let chosen = alert.runModal().rawValue - NSApplication.ModalResponse.alertFirstButtonReturn.rawValue
     guard chosen >= 0, chosen < copy.options.count else { return nil }
     return copy.options[chosen].id

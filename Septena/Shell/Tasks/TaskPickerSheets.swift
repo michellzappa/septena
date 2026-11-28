@@ -1146,6 +1146,7 @@ struct TagPickerSheet: View {
               onDone?()
               dismiss()
             }
+              .keyboardShortcut(.cancelAction)
           }
         }
         .sheet(isPresented: $showingManageTags, onDismiss: reload) {
@@ -1385,6 +1386,7 @@ struct ManageTagsSheet: View {
       .toolbar {
         ToolbarItem(placement: .confirmationAction) {
           Button("Done") { dismiss() }
+            .keyboardShortcut(.cancelAction)
         }
       }
       .alert("Rename Tag", isPresented: Binding(

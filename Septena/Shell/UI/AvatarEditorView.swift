@@ -52,6 +52,7 @@ struct AvatarEditorSheet: View {
       .toolbar {
         ToolbarItem(placement: .cancellationAction) {
           Button(RegistryAvatar.cancel) { dismiss() }
+            .keyboardShortcut(.cancelAction)
         }
         ToolbarItem(placement: .confirmationAction) {
           Button(RegistryAvatar.save, action: save)

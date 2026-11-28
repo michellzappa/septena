@@ -79,6 +79,7 @@ struct SeptaskPlusSheet: View {
         .toolbar {
           ToolbarItem(placement: .cancellationAction) {
             Button(RegistryPlans.Action.notNow) { close() }
+              .keyboardShortcut(.cancelAction)
           }
         }
     }
