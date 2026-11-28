@@ -143,8 +143,17 @@ therefore valid for its own account only.
   Sharing or Leave.
 - New menu ▸ Join a Shared Project…, and the invite link.
 - A shared project has a people mark (`project.shared`) in the project list and
-  the sidebar. Its page shows the members' initials (3, then "+n") at the end of
+  the sidebar. Its page shows the members' avatars (3, then "+n") at the end of
   the title; they open Share Project…, which is also in the page's menu.
+- **Member avatars** (#857): each member in the `share` column carries the
+  account's avatar (`members[].avatar`: initials or one emoji on a palette
+  color, or a photo). The Worker writes it to every ProjectStore of the
+  account when the avatar changes, and when the account shares or joins. A
+  member without `avatar` (a project shared before #857, until that member
+  edits the avatar) shows initials on the neutral fill. A photo reads from
+  `GET /v1/shares/:id/members/:member/avatar`, which answers only a current
+  member of that project. The `share` column never holds a user id or an R2
+  key, only `photoId`.
 - Task row menu ▸ Assign To, and an inline Assign To control on the task page
   for tasks in a shared project. Inside a shared project, rows show an assignee
   pill for every assigned task (including your own, so Mine vs. Unassigned is
@@ -194,3 +203,4 @@ therefore valid for its own account only.
 | Others' tasks in personal lists | Hidden from Anytime; shared deadline suppressed from Today/Upcoming unless personal When/Today is set (mz, 2026-11-27) |
 | Incoming assignment | Stays simple (project + Anytime; push in S2) (mz, 2026-11-27) |
 | Got It Back on shared wait | Takes task back (`assignedTo = me`) (mz, 2026-11-27) |
+| Members' avatars | Shown to every member of the project; photos only to members (mz, 2026-11-28, #857) |
