@@ -654,6 +654,32 @@ function validateSurfaces(surfaces, icons, caps, plans) {
 }
 
 // Project and area notes on the page (docs/PROJECT_NOTES_SPEC.md §6).
+// The phone top bar (surfaces.json `topBar`): which buttons each screen shows, in order.
+const TOP_BAR_WHEN = new Set(["always", "pageActions", "openStarred"]);
+const TOP_BAR_SCREENS = ["listsHome", "list"];
+function validateTopBar(surfaces, icons, caps) {
+  const t = surfaces.topBar;
+  assert(t && t.id === "topBar" && t.featureId in caps.capabilities, "surfaces.json: topBar needs id topBar and a known featureId");
+  const items = new Map();
+  for (const item of t.items) {
+    assert(!items.has(item.button), `surfaces.json: topBar duplicate item ${item.button}`);
+    assert(item.icon in icons.icons, `surfaces.json: topBar item ${item.button} unknown icon "${item.icon}"`);
+    assert(TOP_BAR_WHEN.has(item.when), `surfaces.json: topBar item ${item.button} unknown when "${item.when}"`);
+    items.set(item.button, item);
+  }
+  assert(t.screens.map((screen) => screen.screen).join() === TOP_BAR_SCREENS.join(), `surfaces.json: topBar screens must be ${TOP_BAR_SCREENS.join(", ")}`);
+  for (const screen of t.screens) {
+    const placed = [...screen.leading, ...screen.trailing].flat();
+    for (const id of placed) assert(items.has(id), `surfaces.json: topBar ${screen.screen} unknown item "${id}"`);
+    assert(new Set(placed).size === placed.length, `surfaces.json: topBar ${screen.screen} places an item twice`);
+    assert([...screen.leading, ...screen.trailing].every((group) => Array.isArray(group) && group.length > 0), `surfaces.json: topBar ${screen.screen} has an empty group`);
+    const search = screen.trailing.find((group) => group.includes("search"));
+    assert(search && search.length === 1, `surfaces.json: topBar ${screen.screen}: Search is a trailing group of its own`);
+    // The Apple shell draws at most two trailing capsules (SeptenaPage.swift).
+    assert(screen.trailing.length <= 2 && screen.leading.length === 1, `surfaces.json: topBar ${screen.screen}: one leading group and at most two trailing groups`);
+  }
+}
+
 function validatePlaceNotes(surfaces, caps) {
   const t = surfaces.placeNotes;
   assert(t && t.featureId in caps.capabilities, "surfaces.json: placeNotes needs a known featureId");
@@ -2156,6 +2182,27 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("}");
   lines.push("");
 
+  // 8a. The phone top bar (surfaces.json `topBar`)
+  const topBar = surfaces.topBar;
+  lines.push("/// A button of the phone top bar (`registry/surfaces.json` `topBar`).");
+  lines.push("enum RegistryTopBarItem: String {");
+  lines.push(`  case ${topBar.items.map((item) => item.button).join(", ")}`);
+  lines.push("}");
+  lines.push("");
+  lines.push("/// The phone top bar: the buttons each screen shows, in order, as groups (`registry/surfaces.json` `topBar`).");
+  lines.push("enum RegistryTopBar {");
+  lines.push("  enum Screen { case " + topBar.screens.map((screen) => screen.screen).join(", ") + " }");
+  const groups = (list) => `[${list.map((group) => `[${group.map((id) => `.${id}`).join(", ")}]`).join(", ")}]`;
+  for (const side of ["leading", "trailing"]) {
+    lines.push(`  static func ${side}(_ screen: Screen) -> [[RegistryTopBarItem]] {`);
+    lines.push("    switch screen {");
+    for (const screen of topBar.screens) lines.push(`    case .${screen.screen}: return ${groups(screen[side])}`);
+    lines.push("    }");
+    lines.push("  }");
+  }
+  lines.push("}");
+  lines.push("");
+
   // 8a. Shared projects (surfaces.json `sharing`, docs/PROJECT_SHARING_SPEC.md)
   const sharing = surfaces.sharing;
   lines.push("/// Shared projects (`registry/surfaces.json` `sharing`).");
@@ -2587,7 +2634,7 @@ function generateTS({ entities, rules, icons, tokens, caps, settings, dests, act
   lines.push(`export const DESIGN_TOKENS = ${JSON.stringify({ accentPolicy: tokens.accentPolicy, fruitAccents: tokens.fruitAccents ?? [], textures: tokens.textures ?? [], selection: tokens.selection, colors: tokens.colors, multicolorGlyphs: tokens.multicolorGlyphs?.glyphs ?? {}, accentPalette: tokens.accentPalette, radii: tokens.radii, spacing: tokens.spacing, desktopColumn: tokens.desktopColumn, textScale: tokens.textScale, motion: tokens.motion })} as const;`);
   lines.push(`export const CAPABILITIES = ${JSON.stringify(caps.capabilities)} as const;`);
   lines.push(`export const ACTIONS_CATALOG = ${JSON.stringify({ actions: actions.actions, contextMenus: actions.contextMenus, menuBar: actions.menuBar, shortcutsSheet: actions.shortcutsSheet })} as const;`);
-  lines.push(`export const SURFACES_CATALOG = ${JSON.stringify({ notices: surfaces.notices, prompts: surfaces.prompts, toasts: surfaces.toasts, taskAttributes: surfaces.taskAttributes, taskDateBoard: surfaces.taskDateBoard, taskPage: surfaces.taskPage, waiting: surfaces.waiting, sharing: surfaces.sharing, accountSwitch: surfaces.accountSwitch, deviceSignIn: surfaces.deviceSignIn, quickFind: surfaces.quickFind, checklistProjects: surfaces.checklistProjects, listSort: surfaces.listSort, support: surfaces.support, fadeSweep: surfaces.fadeSweep })} as const;`);
+  lines.push(`export const SURFACES_CATALOG = ${JSON.stringify({ notices: surfaces.notices, prompts: surfaces.prompts, toasts: surfaces.toasts, taskAttributes: surfaces.taskAttributes, taskDateBoard: surfaces.taskDateBoard, taskPage: surfaces.taskPage, waiting: surfaces.waiting, sharing: surfaces.sharing, accountSwitch: surfaces.accountSwitch, deviceSignIn: surfaces.deviceSignIn, quickFind: surfaces.quickFind, checklistProjects: surfaces.checklistProjects, listSort: surfaces.listSort, topBar: surfaces.topBar, support: surfaces.support, fadeSweep: surfaces.fadeSweep })} as const;`);
   lines.push(`export const FIRST_RUN = ${JSON.stringify(surfaces.firstRun)} as const;`);
   lines.push("/** Plan limits (registry/plans.json). The server's plan table: every gate reads these, never a plan name. */");
   lines.push(`export const PLAN_LIMITS = ${JSON.stringify(plans.limits)} as const;`);
@@ -3049,6 +3096,7 @@ validateSurfaces(surfaces, icons, caps, plans);
 validateTaskReferences(surfaces, icons, caps, entities);
 validateWaiting(surfaces, caps);
 validatePlaceNotes(surfaces, caps);
+validateTopBar(surfaces, icons, caps);
 validateDoing(surfaces, caps, entities);
 checkOpensAttribute({ actions, surfaces });
 checkTaskDateBoard({ surfaces, icons, caps, actions });

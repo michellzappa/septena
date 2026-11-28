@@ -76,6 +76,7 @@
     "action.go_back": { "sfSymbol": "chevron.backward", "material": "arrow_back", "lucide": "arrow-left" },
     "action.go_forward": { "sfSymbol": "chevron.forward", "material": "arrow_forward", "lucide": "arrow-right" },
     "action.search": { "sfSymbol": "magnifyingglass", "material": "search", "lucide": "search" },
+    "action.settings": { "sfSymbol": "gearshape", "material": "settings", "lucide": "settings" },
     "action.sidebar": { "sfSymbol": "sidebar.leading", "material": "side_navigation", "lucide": "panel-left" },
     "action.notes": { "sfSymbol": "text.alignleft", "material": "notes", "lucide": "align-left" },
     "action.discuss": { "sfSymbol": "bubble.left.and.bubble.right", "material": "forum", "lucide": "message-square" },

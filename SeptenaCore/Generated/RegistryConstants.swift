@@ -190,6 +190,7 @@ enum RegistryIcons {
     "action.go_back": "chevron.backward",
     "action.go_forward": "chevron.forward",
     "action.search": "magnifyingglass",
+    "action.settings": "gearshape",
     "action.sidebar": "sidebar.leading",
     "action.notes": "text.alignleft",
     "action.discuss": "bubble.left.and.bubble.right",
@@ -2303,6 +2304,28 @@ enum RegistryPlaceNotes {
   static let previewLines = 3
   static let showMoreTitle: String = RegistryL10n.t("Show more")
   static let showLessTitle: String = RegistryL10n.t("Show less")
+}
+
+/// A button of the phone top bar (`registry/surfaces.json` `topBar`).
+enum RegistryTopBarItem: String {
+  case settings, back, more, star, search
+}
+
+/// The phone top bar: the buttons each screen shows, in order, as groups (`registry/surfaces.json` `topBar`).
+enum RegistryTopBar {
+  enum Screen { case listsHome, list }
+  static func leading(_ screen: Screen) -> [[RegistryTopBarItem]] {
+    switch screen {
+    case .listsHome: return [[.settings]]
+    case .list: return [[.back]]
+    }
+  }
+  static func trailing(_ screen: Screen) -> [[RegistryTopBarItem]] {
+    switch screen {
+    case .listsHome: return [[.more], [.search]]
+    case .list: return [[.more, .star], [.search]]
+    }
+  }
 }
 
 /// Shared projects (`registry/surfaces.json` `sharing`).

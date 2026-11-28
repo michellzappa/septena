@@ -70,6 +70,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import app.septena.core.TopBar
 import app.septena.core.JsonValue
 import app.septena.core.RegistryActionContext
 import app.septena.core.RegistryActionResolver
@@ -182,22 +183,31 @@ internal fun ListsHomePage(
                             scrolledContainerColor = Color.Transparent,
                         ),
                         title = {},
-                        actions = {
-                            IconButton(
-                                onClick = onQuickFind,
-                                modifier = Modifier.semantics { contentDescription = quickFindTitle },
-                            ) {
-                                SearchGlyph(tint = MaterialTheme.colorScheme.onSurface)
+                        // The phone top bar from the registry (surfaces.json `topBar`, screen
+                        // `listsHome`): Settings leading, Search trailing, as on every platform.
+                        navigationIcon = {
+                            if (TopBar.order(TopBar.Screen.LISTS_HOME, "leading").contains(TopBar.Button.SETTINGS)) {
+                                IconButton(
+                                    onClick = onOpenSettings,
+                                    modifier = Modifier.semantics { contentDescription = settingsTitle },
+                                ) {
+                                    SeptenaGlyph(
+                                        kind = SeptenaIconKind.Settings,
+                                        tint = MaterialTheme.colorScheme.onSurface,
+                                        size = 21.dp,
+                                    )
+                                }
                             }
-                            IconButton(
-                                onClick = onOpenSettings,
-                                modifier = Modifier.semantics { contentDescription = settingsTitle },
-                            ) {
-                                SeptenaGlyph(
-                                    kind = SeptenaIconKind.Settings,
-                                    tint = MaterialTheme.colorScheme.onSurface,
-                                    size = 21.dp,
-                                )
+                        },
+                        actions = {
+                            // More has no rows here yet: this screen's actions sit in its content.
+                            if (TopBar.order(TopBar.Screen.LISTS_HOME, "trailing").contains(TopBar.Button.SEARCH)) {
+                                IconButton(
+                                    onClick = onQuickFind,
+                                    modifier = Modifier.semantics { contentDescription = quickFindTitle },
+                                ) {
+                                    SearchGlyph(tint = MaterialTheme.colorScheme.onSurface)
+                                }
                             }
                         },
                     )
