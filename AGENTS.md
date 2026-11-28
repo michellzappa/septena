@@ -533,7 +533,7 @@ The product is Septena; the code targets keep the working names `Septask` (iOS),
     (`StructureOrder.nextAppendPosition` / `nextStructurePosition`) so a new
     item never jumps ahead of existing `0` rows.
   - **List-grouped views:** Today (when `todayGroupByList` is on), Anytime, and
-    Favorites all group in exact sidebar order (unfiled → each area's direct
+    Starred all group in exact sidebar order (unfiled → each area's direct
     tasks then its projects → standalone projects) via `TaskListOrder.byList`
     (Apple), `groupTasksByList` (Web), and `groupByAreaAndProject` (Android).
 

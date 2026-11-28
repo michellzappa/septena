@@ -28,7 +28,7 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 | `lists.repeating` | Repeating | ships | ships | ships | ships | ships | planned | planned | - | none |
 | `lists.logbook` | Logbook | ships | ships | ships | ships | ships | planned | planned | - | `tasks_list`, `tasks_complete` |
 | `lists.faded` | Faded group of Review | ships | ships | ships | ships | ships | planned | planned | - | `tasks_list` |
-| `lists.starred` | Favorites list | ships | ships | ships | ships | ships | planned | planned | - | `tasks_create`, `tasks_update` |
+| `lists.starred` | Starred list | ships | ships | ships | ships | ships | planned | planned | - | `tasks_create`, `tasks_update` |
 | `lists.recently-deleted` | Recently Deleted (30 days) | ships | ships | ships | ships | ships | planned | planned | - | none |
 | `places.areas` | Areas | ships | ships | ships | ships | ships | planned | planned | - | `tasks_list_areas`, `tasks_area_create`, `tasks_area_update`, `tasks_notes_log`, `tasks_notes_propose` |
 | `places.projects` | Projects | ships | ships | ships | ships | ships | planned | planned | - | `tasks_list_projects`, `tasks_project_get`, `tasks_project_create`, `tasks_project_update`, `tasks_notes_log`, `tasks_notes_write`, `tasks_notes_propose`, `tasks_notes_history` |

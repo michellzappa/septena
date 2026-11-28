@@ -18,7 +18,7 @@ describe("web URL routing", () => {
       ["/upcoming", "upcoming", "completed"],
       ["/repeating", "repeating", "completed"],
       ["/anytime", "anytime", "completed"],
-      ["/favorites", "starred", "completed"],
+      ["/starred", "starred", "completed"],
       ["/logbook", "logbook", "completed"],
       ["/logbook/deleted", "logbook", "deleted"],
     ];
@@ -64,7 +64,7 @@ describe("web URL routing", () => {
 
     const starred = parseWebRoute("/starred");
     assert.deepEqual(starred.destination, { kind: "smart", id: "starred" });
-    assert.equal(starred.canonicalize, true);
+    assert.equal(starred.canonicalize, false);
 
     const faded = parseWebRoute("/faded");
     assert.deepEqual(faded.destination, { kind: "smart", id: "review" });

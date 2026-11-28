@@ -4035,8 +4035,8 @@ struct TaskListView: View {
     whenSheet = WhenSheet(taskIds: ids, kind: .deadline)
   }
 
-  /// ⌥⌘S — favorite the selected rows, or unfavorite them when all are
-  /// favorites. The same write and undo entry as the row menu's item.
+  /// ⌥⌘S — star the selected rows, or unstar them when all are
+  /// starred. The same write and undo entry as the row menu's item.
   private func toggleStarForSelected() {
     let ids = orderedActionIDs()
     let tasks = ids.compactMap { currentTask(id: $0) }

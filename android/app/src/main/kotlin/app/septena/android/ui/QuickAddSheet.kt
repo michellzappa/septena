@@ -54,7 +54,7 @@ import java.time.LocalDate
 /**
  * The Quick Add sheet: title, notes, then the registry's draft attributes
  * (`taskAttributes` that are not editOnly) that Android can edit here: When,
- * deadline, Favorite and list. Tags are editOnly, so they stay on the task
+ * deadline, Star and list. Tags are editOnly, so they stay on the task
  * page, as on iPhone. An empty list files to the Inbox.
  */
 @Composable

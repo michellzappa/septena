@@ -44,8 +44,8 @@ Constraints on Tier 3 emoji:
 - **No fallback emoji.** If a value is missing, render the section's SF Symbol or nothing — never a "default" emoji like 💪 or 🏋️.
 - **No emoji baked into formatted strings.** `"💧 \(ml) ml"` is wrong; the glyph is a separate view.
 - **No emoji in system chrome** — toolbars, headers, empty states, log lines, comments-as-UI.
-- **A control that is on shows its filled symbol.** An on/off control (Favorite, a filter toggle) draws the outline symbol while off and the filled variant while on: `star` → `star.fill`. The filled variant is data: `sfSymbolOn` in `registry/icons.json`, read through `RegistryIcons.sfSymbol(for:on:)` or `RegistryTaskAttribute.sfSymbol(on:)`. A task attribute marked `"toggle": true` in `surfaces.json` must name an icon with `sfSymbolOn` (the generator fails otherwise). Never hard-code `isOn ? "x.fill" : "x"` at a call site.
-- **The verb is Favorite.** A task you mark is a favorite: "Favorite" / "Unfavorite", never "Star". The star symbol stays.
+- **A control that is on shows its filled symbol.** An on/off control (Star, a filter toggle) draws the outline symbol while off and the filled variant while on: `star` → `star.fill`. The filled variant is data: `sfSymbolOn` in `registry/icons.json`, read through `RegistryIcons.sfSymbol(for:on:)` or `RegistryTaskAttribute.sfSymbol(on:)`. A task attribute marked `"toggle": true` in `surfaces.json` must name an icon with `sfSymbolOn` (the generator fails otherwise). Never hard-code `isOn ? "x.fill" : "x"` at a call site.
+- **The verb is Star.** A task you mark is starred: "Star" / "Unstar".
 
 ## 3. List row anatomy
 

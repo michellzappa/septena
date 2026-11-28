@@ -251,7 +251,7 @@ export function QuickAddModal({
                   ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
                   : "bg-[var(--bg-hover)] text-[var(--text-secondary)]"
               }`}
-              title="Favorite"
+              title="Star"
             >
               <Star
                 className="h-3.5 w-3.5"

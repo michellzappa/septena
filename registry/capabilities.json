@@ -178,7 +178,7 @@
       "watchos": "not_applicable"
     },
     "lists.starred": {
-      "title": "Favorites list",
+      "title": "Starred list",
       "agent": [
         "tasks_create",
         "tasks_update"

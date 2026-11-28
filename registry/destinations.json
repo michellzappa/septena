@@ -189,7 +189,7 @@
       "id": "starred",
       "navigationKey": "starred",
       "serverView": "all",
-      "title": "Favorites",
+      "title": "Starred",
       "icon": "list.starred",
       "sidebarOrder": 7,
       "sidebarSection": "top",
@@ -205,7 +205,7 @@
       "newTaskTarget": "today",
       "dropBehavior": "none",
       "featureId": "lists.starred",
-      "emptyState": { "title": "No Favorites", "detail": "Favorite important tasks to keep them one tap away." }
+      "emptyState": { "title": "No starred tasks", "detail": "Star tasks to keep them one tap away." }
     },
     {
       "id": "faded",

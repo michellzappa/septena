@@ -458,9 +458,9 @@ internal class TaskHistoryText(
         if (has(RegistryEntityFields.Task.STARRED)) {
             lines += control(
                 if (after(RegistryEntityFields.Task.STARRED) == JsonValue.BooleanValue(true)) {
-                    RegistryTaskDetail.Controls.HISTORY_FAVORITED
+                    RegistryTaskDetail.Controls.HISTORY_STARRED
                 } else {
-                    RegistryTaskDetail.Controls.HISTORY_UNFAVORITED
+                    RegistryTaskDetail.Controls.HISTORY_UNSTARRED
                 },
             )
         }

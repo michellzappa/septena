@@ -253,7 +253,7 @@ object TaskViewRules {
                     !isHeading && !isDeleted && !TaskFadeRules.isFaded(task.fadedAt) &&
                     task.recurrenceUnit in recurrenceUnits
 
-            // Favorites: open starred tasks, as iOS.
+            // Starred: open starred tasks, as iOS.
             RegistryDestinationIds.STARRED ->
                 task.status == RegistryEntityEnums.TaskStatus.OPEN &&
                     !isHeading && !isDeleted && !TaskFadeRules.isFaded(task.fadedAt) && task.starred
