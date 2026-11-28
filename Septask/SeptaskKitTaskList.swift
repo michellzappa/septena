@@ -2609,10 +2609,12 @@ final class SeptaskKitTaskListController: NSViewController {
       return !headingIds.contains(h)
     }
     var result: [Row] = unheaded.map(unchipped)
-    // A Checklist hides a heading with no active rows (core `projectChecklist`
-    // groups); the heading row stays.
+    // A Checklist hides a heading whose rows are all checked (core
+    // `projectChecklist` groups); the heading row stays. The core needs the
+    // checked rows too, so a new empty heading still shows.
     let activeHeadings = checklistMode(projectId) == nil ? nil
-      : ProjectChecklist.layout(rows: headings + open).map { Set($0.groups.map(\.id)) }
+      : ProjectChecklist.layout(rows: headings + LocalCache.tasks(in: context, filter: .project(projectId)))
+        .map { Set($0.groups.map(\.id)) }
     for heading in headings where activeHeadings?.contains(heading.id) ?? true {
       result.append(.task(heading, chip: nil, suggestion: nil))
       let members = open.filter { $0.heading == heading.id }

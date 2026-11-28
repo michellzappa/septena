@@ -19,7 +19,7 @@
       },
       "expected": {
         "ungrouped": ["bread"],
-        "groups": [{ "id": "dairy", "items": ["milk"] }],
+        "groups": [{ "id": "dairy", "items": ["milk"] }, { "id": "pantry", "items": [] }],
         "checked": ["yogurt"],
         "matches": ["yogurt"],
         "suggestedGroup": null
@@ -41,6 +41,24 @@
         "checked": ["regular"],
         "matches": ["regular", "large"],
         "suggestedGroup": "produce"
+      }
+    },
+    {
+      "name": "a heading whose rows are all checked leaves the active list, a new empty heading stays",
+      "input": {
+        "rows": [
+          { "id": "frozen", "title": "Frozen", "status": "open", "kind": "heading" },
+          { "id": "snacks", "title": "Snacks", "status": "open", "kind": "heading" },
+          { "id": "peas", "title": "Frozen peas", "status": "checklistChecked", "heading": "frozen" }
+        ],
+        "query": ""
+      },
+      "expected": {
+        "ungrouped": [],
+        "groups": [{ "id": "snacks", "items": [] }],
+        "checked": ["peas"],
+        "matches": [],
+        "suggestedGroup": null
       }
     },
     {

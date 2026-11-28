@@ -17,6 +17,7 @@ pub(crate) fn project_checklist(input: &Value) -> Result<Value, CoreError> {
     let mut headings = Vec::new();
     let mut active = Vec::new();
     let mut checked = Vec::new();
+    let mut checked_headings = Vec::new();
     let mut exact = Vec::new();
     let mut prefix = Vec::new();
     let query = input["query"].as_str().map(search_key).unwrap_or_default();
@@ -30,6 +31,7 @@ pub(crate) fn project_checklist(input: &Value) -> Result<Value, CoreError> {
         } else if row["status"] == task_status::OPEN || row["status"] == CHECKED {
             if row["status"] == CHECKED {
                 checked.push(&row["id"]);
+                checked_headings.push(&row["heading"]);
             } else {
                 active.push(row);
             }
@@ -56,7 +58,11 @@ pub(crate) fn project_checklist(input: &Value) -> Result<Value, CoreError> {
             .filter(|row| row["heading"] == heading["id"])
             .map(|row| &row["id"])
             .collect();
-        if !items.is_empty() {
+        // A heading shows while it has active rows, and also while it has no
+        // rows at all (a section the user just made). Only a heading whose
+        // rows are all checked (an aisle that is done) leaves the active list.
+        let all_checked = items.is_empty() && checked_headings.iter().any(|h| **h == heading["id"]);
+        if !all_checked {
             groups.push(json!({ "id": heading["id"], "items": items }));
         }
     }
