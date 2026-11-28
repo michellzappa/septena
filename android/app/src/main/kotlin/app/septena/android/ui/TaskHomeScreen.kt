@@ -1236,6 +1236,11 @@ private fun TaskHomeScaffold(
     val appearance = LocalAppearance.current
     val selecting = state.selectedIds.isNotEmpty()
     val destinationId = (state.location as? TaskHomeLocation.SmartList)?.destinationId
+    val betaSignedIn by graph.credentials.signedIn.collectAsStateWithLifecycle()
+    // The beta card (docs/BETA_ONBOARDING_SPEC.md §7) reads the checklist each time Today opens.
+    LaunchedEffect(destinationId == RegistryDestinationIds.TODAY, betaSignedIn) {
+        if (destinationId == RegistryDestinationIds.TODAY) graph.beta.refresh(betaSignedIn)
+    }
     val showStarFilterButton = destinationId != RegistryDestinationIds.STARRED &&
         destinationId != RegistryDestinationIds.RECENTLY_DELETED &&
         !(destinationId == RegistryDestinationIds.LOGBOOK && logbookShowingDeleted)
@@ -1452,6 +1457,15 @@ private fun TaskHomeScaffold(
                     end = TaskCardMetrics.Margin,
                     bottom = 10.dp,
                 ),
+            )
+        }
+        if (destinationId == RegistryDestinationIds.TODAY) {
+            BetaTodayCard(
+                graph = graph,
+                languageTag = languageTag,
+                isDark = isDark,
+                hasActiveTexture = appearance.hasActiveTexture,
+                modifier = Modifier.padding(bottom = 10.dp),
             )
         }
         val noticedDo = doing.current?.takeIf { doing.showsNotice }
