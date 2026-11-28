@@ -1945,7 +1945,7 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push(`  static let quickFindEmptyDetail: String = ${L(qf.emptyState.detail, qf.emptyState, "detail")}`);
   lines.push(`  static let quickFindCompletedLabel: String = ${L(qf.completed.label, qf.completed, "label")}`);
   const checklist = surfaces.checklistProjects;
-  for (const field of ["useAsChecklist", "addItem", "onList", "checked", "projectType", "moveToGroup", "ungrouped"]) {
+  for (const field of ["addItem", "onList", "checked", "projectType", "moveToGroup", "ungrouped"]) {
     const swiftName = "checklist" + field[0].toUpperCase() + field.slice(1);
     lines.push(`  static let ${swiftName}: String = ${L(checklist[field], checklist, field)}`);
   }

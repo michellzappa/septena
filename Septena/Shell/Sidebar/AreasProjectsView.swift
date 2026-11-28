@@ -900,7 +900,7 @@ struct ProjectDetailView: View {
         Label(RegistryActions.title(.sectionNew), systemImage: "rectangle.split.1x2")
       }
       if project.checklistMode == nil {
-        Button(RegistrySurfaces.checklistUseAsChecklist) {
+        Button(RegistryActions.title(.projectUseAsChecklist)) {
           Task { try await projectsMutator.useAsChecklist(id: project.id) }
         }
       }

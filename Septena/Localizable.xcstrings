@@ -42239,7 +42239,7 @@
       "extractionState" : "manual"
     },
     "Use as Checklist" : {
-      "comment" : "Generated from registry surfaces.checklistProjects.useAsChecklist. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "comment" : "Generated from registry actions.actions.project.useAsChecklist.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
     "Use default" : {

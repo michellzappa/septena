@@ -5372,14 +5372,10 @@ final class SeptaskKitTaskListController: NSViewController {
   /// Project header `…` overflow menu: New Section + New Task, built from
   /// canonical registry titles so the Mac project header mirrors iOS's `…`.
   private func buildProjectOverflowMenu(_ projectID: String) -> NSMenu {
-    var checklistOptions: [RegistryMenuNode] = []
-    if checklistMode(projectID) == nil {
-      checklistOptions.append(RegistryMenuEntry.slot(id: "project.checklist.plain",
-                                                     title: RegistrySurfaces.checklistUseAsChecklist,
-                                                     sfSymbol: "checklist") {
-        Task { try await SeptenaServices.shared.projectsMutator.useAsChecklist(id: projectID) }
-      })
-    }
+    let checklistOptions = RegistryMenuResolver.resolve(RegistryActions.menu(.sidebarProject), bind: { action in
+      guard action == .projectUseAsChecklist, checklistMode(projectID) == nil else { return nil }
+      return .init { Task { try await SeptenaServices.shared.projectsMutator.useAsChecklist(id: projectID) } }
+    })
     return KitRegistryMenu.build(checklistOptions + [
       RegistryMenuEntry.slot(
         id: "project.newSection",

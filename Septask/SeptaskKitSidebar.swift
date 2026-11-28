@@ -1433,6 +1433,10 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
         guard let self else { return nil }
         switch id {
         case .projectRename: return .init { self.renameSelected() }
+        case .projectUseAsChecklist:
+          return project.checklistMode == nil ? .init {
+            Task { try await self.projectsMutator.useAsChecklist(id: project.id) }
+          } : nil
         case .projectMarkDone: return .init { self.markSelectedProjectDone() }
         case .projectCancel: return .init { self.cancelSelectedProject() }
         case .projectShare: return .init { SeptaskSharing.present(projectID: project.id) }

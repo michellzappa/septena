@@ -5005,7 +5005,7 @@
   "Use as Checklist": {
     "text": "Use as Checklist",
     "paths": [
-      "surfaces.checklistProjects.useAsChecklist"
+      "actions.actions.project.useAsChecklist.title"
     ]
   },
   "Use default": {
