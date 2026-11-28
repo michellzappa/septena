@@ -3,7 +3,7 @@ package app.septena.core
 import app.septena.core.generated.RegistryEntityFields
 import app.septena.core.generated.RegistryEntityNames
 
-/** One person in a shared project. [avatar] is null when the server sent none: initials on the neutral fill. */
+/** One person in a shared project. [avatar] is null when the server sent none: initials on the default color. */
 data class ShareMember(val id: String, val name: String, val isOwner: Boolean, val avatar: Avatar? = null)
 
 /**

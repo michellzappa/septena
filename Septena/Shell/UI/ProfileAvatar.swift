@@ -6,23 +6,18 @@ import SwiftUI
 // the whole Settings pane file. Pure presentation, no business logic.
 
 /// One avatar circle (#857): a photo clipped to the circle, one emoji on
-/// the palette color, or initials (white on the palette color). No avatar or
-/// an unknown color: initials over the neutral fill, as before avatars. A
+/// the palette color, or initials in the color's ink. No avatar or an
+/// unknown color: the default color (Persimmon). A
 /// photo that has not loaded draws the initials until it does.
 struct AvatarCircle: View {
   let avatar: AccountAvatar?
   let name: String
   var photo: CGImage?
   var size: CGFloat
-  /// Ink for initials on the neutral fill.
-  var neutralInk: Color = .primary
 
-  private var palette: RegistryAvatarColor? { avatar?.palette }
-
-  private var fill: Color {
-    if let palette { return AdaptiveColor.dual(light: palette.lightHex, dark: palette.darkHex) }
-    return Color.secondary.opacity(0.18)
-  }
+  private var palette: RegistryAvatarColor { RegistryAvatarColor.resolve(avatar?.color) }
+  private var fill: Color { AdaptiveColor.dual(light: palette.lightHex, dark: palette.darkHex) }
+  private var ink: Color { AdaptiveColor.dual(light: palette.inkLightHex, dark: palette.inkDarkHex) }
 
   private var letters: String { avatar?.letters(for: name) ?? PersonInitials.of(name) }
 
@@ -41,11 +36,11 @@ struct AvatarCircle: View {
       } else if letters.isEmpty {
         Image(systemName: "person.fill")
           .font(.system(size: size * 0.46))
-          .foregroundStyle(palette == nil ? Color.secondary : Color.white)
+          .foregroundStyle(ink)
       } else {
         Text(letters)
           .font(.system(size: size * 0.4, weight: .semibold))
-          .foregroundStyle(palette == nil ? neutralInk : .white)
+          .foregroundStyle(ink)
           .minimumScaleFactor(0.6)
           .lineLimit(1)
       }
@@ -120,8 +115,7 @@ struct MemberAvatarCircle: View {
     AvatarCircle(avatar: member.avatar,
                  name: member.name,
                  photo: photoId.flatMap { AvatarStore.shared.memberPhotos[$0] },
-                 size: size,
-                 neutralInk: Theme.inkSecondary)
+                 size: size)
       .task(id: photoId) {
         guard photoId != nil else { return }
         await AvatarStore.shared.loadMemberPhoto(shareID: shareID, member: member)

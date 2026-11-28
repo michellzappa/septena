@@ -150,7 +150,7 @@ therefore valid for its own account only.
   color, or a photo). The Worker writes it to every ProjectStore of the
   account when the avatar changes, and when the account shares or joins. A
   member without `avatar` (a project shared before #857, until that member
-  edits the avatar) shows initials on the neutral fill. A photo reads from
+  edits the avatar) shows initials on Persimmon, the default color. A photo reads from
   `GET /v1/shares/:id/members/:member/avatar`, which answers only a current
   member of that project. The `share` column never holds a user id or an R2
   key, only `photoId`.

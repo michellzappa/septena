@@ -695,6 +695,14 @@ function validateTopBar(surfaces, icons, caps) {
   }
 }
 
+// The avatar fills (#857): the single-color fruit accents, with their check
+// ink for the initials and the emoji. Every platform reads this one list.
+function avatarColorList(tokens) {
+  return (tokens.fruitAccents ?? [])
+    .filter((a) => !a.multicolor)
+    .map((a) => ({ id: a.id, name: a.name, light: a.light, dark: a.dark, inkLight: a.checkLight, inkDark: a.checkDark }));
+}
+
 // The avatar editor (#857): the kinds, the photo limits and the copy. The
 // backend and every client read the same numbers.
 function validateAvatar(surfaces, tokens, caps) {
@@ -709,15 +717,15 @@ function validateAvatar(surfaces, tokens, caps) {
     ids.add(e.id);
     assert(typeof e.label === "string" && e.label.length > 0 && !/[–—]/.test(e.label), `surfaces.json: avatar.copy ${e.id} needs a label without dashes`);
   }
-  const colors = tokens.avatarColors?.colors;
-  assert(Array.isArray(colors) && colors.length >= 8 && colors.length <= 10, "tokens.json: avatarColors.colors has 8 to 10 colors");
-  const colorIds = new Set();
-  for (const c of colors) {
-    assert(/^[a-z]+$/.test(c.id) && !colorIds.has(c.id), `tokens.json: avatar color id "${c.id}" is not a unique lowercase id`);
-    colorIds.add(c.id);
-    assert(typeof c.name === "string" && c.name.length > 0, `tokens.json: avatar color ${c.id} needs a name`);
-    for (const h of [c.light, c.dark]) assert(/^#[0-9a-fA-F]{6}$/.test(h), `tokens.json: avatar color ${c.id} invalid hex "${h}"`);
-  }
+  const ac = tokens.avatarColors;
+  assert(ac && ac.source === "fruitAccents", "tokens.json: avatarColors.source is fruitAccents (one palette, ADR 0019)");
+  const colors = avatarColorList(tokens);
+  assert(colors.length >= 5, "tokens.json: the avatar palette needs at least 5 fruit accents without multicolor");
+  assert(colors.some((c) => c.id === ac.default), `tokens.json: avatarColors.default "${ac.default}" is not a fruit accent`);
+  for (const c of colors) assert(/^[a-z]+$/.test(c.id), `tokens.json: avatar color id "${c.id}" is not a lowercase id`);
+  const tc = tokens.tagColors;
+  assert(tc && tc.source === "fruitAccents", "tokens.json: tagColors.source is fruitAccents (one palette, ADR 0019)");
+  for (const [from, to] of Object.entries(tc.legacy ?? {})) assert(colors.some((c) => c.id === to), `tokens.json: tagColors.legacy ${from} -> "${to}" is not a fruit accent`);
 }
 
 function validatePlaceNotes(surfaces, caps) {
@@ -1249,12 +1257,15 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  let multicolor: Bool");
   lines.push("}");
   lines.push("");
-  lines.push("/// One avatar fill (`registry/tokens.json` `avatarColors`, #857).");
+  lines.push("/// One avatar fill: a single-color fruit accent (`registry/tokens.json` `avatarColors`, #857).");
   lines.push("struct RegistryAvatarColor: Sendable, Hashable, Identifiable {");
   lines.push("  let id: String");
   lines.push("  let name: String");
   lines.push("  let lightHex: String");
   lines.push("  let darkHex: String");
+  lines.push("  /// Ink for initials on the fill.");
+  lines.push("  let inkLightHex: String");
+  lines.push("  let inkDarkHex: String");
   lines.push("}");
   lines.push("");
   lines.push("/// Procedural header-wash texture descriptor (`registry/tokens.json`, ADR 0019).");
@@ -1302,10 +1313,14 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  }");
   lines.push(`  static let accentPalette: [String] = [${tokens.accentPalette.map(swiftStr).join(", ")}]`);
   lines.push("  static let avatarColors: [RegistryAvatarColor] = [");
-  for (const c of tokens.avatarColors.colors) {
-    lines.push(`    RegistryAvatarColor(id: ${swiftStr(c.id)}, name: ${L(c.name, c, "name")}, lightHex: ${swiftStr(c.light)}, darkHex: ${swiftStr(c.dark)}),`);
+  for (const c of avatarColorList(tokens)) {
+    lines.push(`    RegistryAvatarColor(id: ${swiftStr(c.id)}, name: ${L(c.name, c, "name")}, lightHex: ${swiftStr(c.light)}, darkHex: ${swiftStr(c.dark)}, inkLightHex: ${swiftStr(c.inkLight)}, inkDarkHex: ${swiftStr(c.inkDark)}),`);
   }
   lines.push("  ]");
+  lines.push(`  /// The fill of an account that never picked one, and of a member without an avatar.`);
+  lines.push(`  static let avatarDefaultColorId = ${swiftStr(tokens.avatarColors.default)}`);
+  lines.push("  /// Tag colors stored before the fruit palette, read as the nearest fruit (`tokens.json` `tagColors.legacy`).");
+  lines.push(`  static let tagColorLegacy: [String: String] = [${Object.entries(tokens.tagColors.legacy).map(([k, v]) => `${swiftStr(k)}: ${swiftStr(v)}`).join(", ")}]`);
   lines.push("  static let fruitAccents: [RegistryFruitAccent] = [");
   for (const a of tokens.fruitAccents ?? []) {
     lines.push(`    RegistryFruitAccent(id: ${swiftStr(a.id)}, name: ${L(a.name, a, "name")}, origin: ${swiftStr(a.origin)}, lightHex: ${swiftStr(a.light)}, darkHex: ${swiftStr(a.dark)}, checkLightHex: ${swiftStr(a.checkLight)}, checkDarkHex: ${swiftStr(a.checkDark)}, multicolor: ${Boolean(a.multicolor)}),`);
@@ -2703,7 +2718,7 @@ function generateTS({ entities, rules, icons, tokens, caps, settings, dests, act
   lines.push(`export const DESTINATIONS = ${JSON.stringify(dests.destinations)} as const;`);
   lines.push(`export const GENERIC_EMPTY_STATE = ${JSON.stringify(dests.genericEmptyState)} as const;`);
   lines.push(`export const ICONS = ${JSON.stringify(icons.icons)} as const;`);
-  lines.push(`export const DESIGN_TOKENS = ${JSON.stringify({ accentPolicy: tokens.accentPolicy, fruitAccents: tokens.fruitAccents ?? [], textures: tokens.textures ?? [], selection: tokens.selection, colors: tokens.colors, multicolorGlyphs: tokens.multicolorGlyphs?.glyphs ?? {}, accentPalette: tokens.accentPalette, avatarColors: tokens.avatarColors.colors, radii: tokens.radii, spacing: tokens.spacing, desktopColumn: tokens.desktopColumn, textScale: tokens.textScale, motion: tokens.motion })} as const;`);
+  lines.push(`export const DESIGN_TOKENS = ${JSON.stringify({ accentPolicy: tokens.accentPolicy, fruitAccents: tokens.fruitAccents ?? [], textures: tokens.textures ?? [], selection: tokens.selection, colors: tokens.colors, multicolorGlyphs: tokens.multicolorGlyphs?.glyphs ?? {}, accentPalette: tokens.accentPalette, avatarColors: avatarColorList(tokens), avatarDefaultColor: tokens.avatarColors.default, tagColorLegacy: tokens.tagColors.legacy, radii: tokens.radii, spacing: tokens.spacing, desktopColumn: tokens.desktopColumn, textScale: tokens.textScale, motion: tokens.motion })} as const;`);
   // `docs` names site guides (ADR 0065): the site reads it from the registry; the clients do not.
   const capsForClients = Object.fromEntries(Object.entries(caps.capabilities).map(([id, { docs, ...rest }]) => [id, rest]));
   lines.push(`export const CAPABILITIES = ${JSON.stringify(capsForClients)} as const;`);

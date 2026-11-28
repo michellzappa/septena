@@ -179,7 +179,7 @@ export const ROUTES: RouteDoc[] = [
   { method: "POST", path: "/entitlement/apple", tag: "account", auth: "app", summary: "Record a signed App Store transaction.", body: zEntitlementAppleBody, ok: { 200: "The entitlement it gives." } },
   { method: "GET", path: "/account", tag: "account", auth: "app", summary: "The account id and its avatar.", ok: { 200: "The account." } },
   { method: "PATCH", path: "/account/avatar", tag: "account", auth: "app", summary: "Set the avatar to initials or one emoji, with a color from the palette. A change older than the stored one changes nothing (`applied: false`).", body: zAvatarPatchBody, ok: { 200: "The avatar." } },
-  { method: "PUT", path: "/account/avatar", tag: "account", auth: "app", summary: "Set a photo as the avatar: a square JPEG, PNG or HEIC up to 5 MB. The photo before it is deleted.", binaryBody: true, ok: { 200: "The avatar." } },
+  { method: "PUT", path: "/account/avatar", tag: "account", auth: "app", summary: "Set a photo as the avatar: a square JPEG, PNG or HEIC up to 256 KB. The photo before it is deleted.", binaryBody: true, ok: { 200: "The avatar." } },
   { method: "DELETE", path: "/account/avatar", tag: "account", auth: "app", summary: "Go back to initials. The photo is deleted.", ok: { 200: "The avatar." } },
   { method: "GET", path: "/account/avatar/photo", tag: "account", auth: "app", summary: "The account's own avatar photo.", stream: "bytes", ok: { 200: "The photo." } },
   { method: "DELETE", path: "/account", tag: "account", auth: "app", summary: "Delete the account and everything in it.", ok: { 204: "Deleted." } },

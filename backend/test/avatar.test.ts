@@ -9,7 +9,7 @@ installWorkerTestHooks();
 
 const { api } = await import("../src/api/routes.ts");
 const { signAccessToken } = await import("../src/api/session.ts");
-const { AVATAR_COLOR_IDS, MAX_AVATAR_PHOTO_BYTES, defaultAvatarColor, isOneEmoji, isInitials, zAvatarPatchBody } = await import("../src/store/avatar.ts");
+const { AVATAR_COLOR_IDS, MAX_AVATAR_PHOTO_BYTES, DEFAULT_AVATAR_COLOR, avatarColor, isOneEmoji, isInitials, zAvatarPatchBody } = await import("../src/store/avatar.ts");
 
 const ANN = `u_${"a".repeat(24)}`;
 const BEN = `u_${"b".repeat(24)}`;
@@ -83,20 +83,21 @@ describe("avatar validation", () => {
     assert.ok(!zAvatarPatchBody.safeParse({ kind: "emoji", emoji: "🙂", extra: 1 }).success);
   });
 
-  it("derives a stable palette color from the user id", () => {
-    assert.equal(defaultAvatarColor(ANN), defaultAvatarColor(ANN));
-    assert.ok(AVATAR_COLOR_IDS.includes(defaultAvatarColor(ANN)));
-    const spread = new Set(Array.from({ length: 50 }, (_, i) => defaultAvatarColor(`u_${String(i).padStart(24, "x")}`)));
-    assert.ok(spread.size > 3);
+  it("uses the fruit accents, Persimmon by default, and reads an old color as the default", () => {
+    assert.equal(DEFAULT_AVATAR_COLOR, "persimmon");
+    assert.ok(AVATAR_COLOR_IDS.includes("persimmon"));
+    assert.ok(!AVATAR_COLOR_IDS.includes("colorful"));
+    assert.equal(avatarColor("orange"), "persimmon");
+    assert.equal(avatarColor("haskap"), "haskap");
   });
 });
 
 describe("avatar routes", () => {
-  it("starts as initials on the derived color", async () => {
+  it("starts as initials on the default color", async () => {
     const h = await harness();
     const res = await h.call(ANN, "GET", "/account");
     assert.equal(res.status, 200);
-    assert.deepEqual(await res.json(), { userId: ANN, avatar: { kind: "initials", color: defaultAvatarColor(ANN), updatedAt: 0 } });
+    assert.deepEqual(await res.json(), { userId: ANN, avatar: { kind: "initials", color: DEFAULT_AVATAR_COLOR, updatedAt: 0 } });
   });
 
   it("saves initials and an emoji, and refuses bad input", async () => {
@@ -163,7 +164,7 @@ describe("avatar routes", () => {
     assert.equal(h.r2.size, 0);
   });
 
-  it("refuses a photo over 5 MB, an empty body and other file types", async () => {
+  it("refuses a photo over the limit, an empty body and other file types", async () => {
     const h = await harness();
     const big = new Uint8Array(MAX_AVATAR_PHOTO_BYTES + 1);
     big.set(JPEG);

@@ -707,8 +707,8 @@ enum KitGlyph {
   /// images only on a structure reload — its project rings kept the
   /// light-mode `secondaryLabelColor` (near-black) on the dark sidebar.
   /// The members of a shared project as avatars (#857). AppKit twin of
-  /// `MemberAvatars`: a photo clipped to the circle, an emoji or white
-  /// initials on the palette color, else initials on the neutral fill. A
+  /// `MemberAvatars`: a photo clipped to the circle, else an emoji or the
+  /// initials on the palette color (Persimmon when the member has none). A
   /// photo not loaded yet draws the initials and starts the load; the title
   /// cell draws again on `AvatarStore.memberPhotosChanged`.
   static func members(_ share: ProjectShare, size: CGFloat = 24) -> NSImage {
@@ -716,13 +716,16 @@ enum KitGlyph {
       var text: String
       var isEmoji = false
       var fill: NSColor?
+      var ink: NSColor?
       var photo: CGImage?
     }
     let store = AvatarStore.shared
     var chips: [Chip] = share.members.prefix(MemberAvatars.limit).map { member in
       let avatar = member.avatar
-      let palette: RegistryAvatarColor? = avatar?.palette
-      var chip = Chip(text: member.initials, fill: palette.map { avatarFill($0) })
+      let palette = RegistryAvatarColor.resolve(avatar?.color)
+      var chip = Chip(text: member.initials,
+                      fill: adaptive(light: palette.lightHex, dark: palette.darkHex),
+                      ink: adaptive(light: palette.inkLightHex, dark: palette.inkDarkHex))
       switch avatar?.kind {
       case .emoji?:
         chip.text = avatar?.emoji ?? chip.text
@@ -760,7 +763,7 @@ enum KitGlyph {
           .font: chip.isEmoji
             ? NSFont.systemFont(ofSize: size * 0.52)
             : NSFont.systemFont(ofSize: size * 0.4, weight: .semibold),
-          .foregroundColor: chip.fill == nil ? SeptaskKitTheme.inkSecondary : NSColor.white,
+          .foregroundColor: chip.ink ?? SeptaskKitTheme.inkSecondary,
         ])
         let bounds = label.size()
         label.draw(at: NSPoint(x: circle.midX - bounds.width / 2, y: circle.midY - bounds.height / 2))
@@ -768,10 +771,10 @@ enum KitGlyph {
     }
   }
 
-  /// The palette color, light or dark by the drawing appearance.
-  private static func avatarFill(_ palette: RegistryAvatarColor) -> NSColor {
-    let light = RGBTriple.fromHex(palette.lightHex)
-    let dark = RGBTriple.fromHex(palette.darkHex)
+  /// A palette color, light or dark by the drawing appearance.
+  private static func adaptive(light lightHex: String, dark darkHex: String) -> NSColor {
+    let light = RGBTriple.fromHex(lightHex)
+    let dark = RGBTriple.fromHex(darkHex)
     return NSColor(name: nil) { appearance in
       let c = appearance.bestMatch(from: [.darkAqua, .vibrantDark]) != nil ? dark : light
       return NSColor(srgbRed: c.r, green: c.g, blue: c.b, alpha: 1)

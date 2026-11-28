@@ -7,6 +7,7 @@ import { registryText } from "@/lib/generated/registries";
 import {
   AVATAR_COLORS,
   AVATAR_SURFACE,
+  avatarColor,
   AccountAvatarStore,
   avatarCopy,
   avatarFill,
@@ -21,7 +22,7 @@ import type { Avatar as AvatarModel, ProjectShareInfo, ShareMember } from "@/lib
 
 // The avatar (#857): initials in white on the palette color, one emoji on the
 // color, or a photo in a circle (initials on the color while it loads or
-// fails). An avatar without a known color draws the neutral fill of before.
+// fails). No avatar or an unknown color draws the default color (Persimmon).
 
 interface AvatarViewProps {
   avatar: AvatarModel | null | undefined;
@@ -39,18 +40,17 @@ interface AvatarViewProps {
 export function AvatarView({ avatar, name, isDark, size, photoUrl, fallbackInitials, className = "" }: AvatarViewProps) {
   const [failed, setFailed] = useState(false);
   useEffect(() => setFailed(false), [photoUrl]);
-  const fill = avatar ? avatarFill(avatar.color, isDark) : null;
+  const { fill, ink } = avatarFill(avatar?.color, isDark);
   const showPhoto = avatar?.kind === "photo" && photoUrl && !failed;
   const showEmoji = avatar?.kind === "emoji" && avatar.emoji;
   const style: React.CSSProperties = { width: size, height: size, fontSize: Math.round(size * (showEmoji ? 0.55 : 0.38)) };
-  if (fill) style.backgroundColor = fill;
+  style.backgroundColor = fill;
+  style.color = ink;
   return (
     <span
       aria-hidden
       style={style}
-      className={`relative inline-flex shrink-0 select-none items-center justify-center overflow-hidden rounded-full font-semibold leading-none ${
-        fill ? "text-white" : "border border-[var(--border-subtle)] bg-[var(--bg-elevated)] text-[var(--text-primary)]"
-      } ${className}`}
+      className={`relative inline-flex shrink-0 select-none items-center justify-center overflow-hidden rounded-full font-semibold leading-none ${className}`}
     >
       {showPhoto ? (
         <img src={photoUrl} alt="" className="h-full w-full object-cover" onError={() => setFailed(true)} />
@@ -297,7 +297,7 @@ export function AvatarEditor({ api, controller, name, isDark, lang, onClose }: A
     state.pendingPhotoUrl || current?.kind === "photo" ? "photo" : current?.kind === "emoji" ? "emoji" : "initials";
   const [kind, setKind] = useState<AvatarKind>(startKind);
   const [color, setColor] = useState<string>(
-    AVATAR_COLORS.some((c) => c.id === current?.color) ? current!.color : AVATAR_COLORS[0].id,
+    avatarColor(current?.color).id,
   );
   const [emoji, setEmoji] = useState(current?.emoji ?? "");
   const [initials, setInitials] = useState(current?.initials ?? "");
@@ -417,8 +417,8 @@ export function AvatarEditor({ api, controller, name, isDark, lang, onClose }: A
               }`}
             >
               <span
-                className="flex h-6 w-6 items-center justify-center rounded-full text-white"
-                style={{ backgroundColor: isDark ? c.dark : c.light }}
+                className="flex h-6 w-6 items-center justify-center rounded-full"
+                style={isDark ? { backgroundColor: c.dark, color: c.inkDark } : { backgroundColor: c.light, color: c.inkLight }}
               >
                 {selected && <Check className="h-3.5 w-3.5" />}
               </span>

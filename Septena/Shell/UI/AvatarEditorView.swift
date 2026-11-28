@@ -30,7 +30,7 @@ struct AvatarEditorSheet: View {
     self.isPlus = isPlus
     let current = AvatarStore.shared.avatar
     _kind = State(initialValue: current?.kind ?? .initials)
-    _color = State(initialValue: current?.color)
+    _color = State(initialValue: RegistryAvatarColor.resolve(current?.color).id)
     _initials = State(initialValue: current?.initials ?? "")
     _emoji = State(initialValue: current?.kind == .emoji ? (current?.emoji ?? "") : "")
     _problem = State(initialValue: AvatarStore.shared.photoProblem)

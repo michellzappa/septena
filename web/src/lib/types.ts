@@ -278,7 +278,7 @@ export interface AreaRow {
 /**
  * An account's avatar (#857, backend/src/store/avatar.ts). Decode it with
  * `normalizeAvatar` (lib/avatar.ts): an unknown kind draws initials, an
- * unknown color draws the neutral fill.
+ * unknown color draws the default color (Persimmon).
  */
 export interface Avatar {
   kind: "initials" | "emoji" | "photo" | string;
@@ -297,7 +297,7 @@ export interface ShareMember {
   id: string;
   name: string;
   role: string;
-  /** Absent on rows from before #857: the member draws initials on the neutral fill. */
+  /** Absent on rows from before #857: the member draws initials on the default color. */
   avatar?: Avatar | null;
 }
 

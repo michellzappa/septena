@@ -1022,6 +1022,10 @@ struct MovePickerSheet: View {
 
 // MARK: - Tag colors, picker & Manage Tags sheet (docs/TAGS_SPEC.md)
 
+/// Tag colors are the single-color fruit accents, the app's one palette
+/// (`registry/tokens.json` `tagColors`, ADR 0019). A tag stores the fruit
+/// id. A color name stored before the fruit palette reads as the nearest
+/// fruit (`RegistryTokens.tagColorLegacy`).
 enum TagColorPalette {
   struct Swatch: Identifiable, Hashable {
     let id: String
@@ -1030,33 +1034,30 @@ enum TagColorPalette {
     let color: Color
   }
 
-  static let swatches: [Swatch] = [
-    Swatch(id: "neutral", label: "Default", token: nil, color: Theme.inkSecondary),
-    Swatch(id: "blue", label: "Blue", token: "blue", color: .blue),
-    Swatch(id: "amber", label: "Amber", token: "amber", color: .orange),
-    Swatch(id: "green", label: "Green", token: "green", color: .green),
-    Swatch(id: "red", label: "Red", token: "red", color: .red),
-    Swatch(id: "purple", label: "Purple", token: "purple", color: .purple),
-    Swatch(id: "teal", label: "Teal", token: "teal", color: .teal),
-    Swatch(id: "pink", label: "Pink", token: "pink", color: .pink),
-  ]
+  static let swatches: [Swatch] =
+    [Swatch(id: "neutral", label: "Default", token: nil, color: Theme.inkSecondary)]
+    + RegistryTokens.fruitAccents.filter { !$0.multicolor }.map { fruit in
+      Swatch(id: fruit.id, label: fruit.name, token: fruit.id,
+             color: AdaptiveColor.dual(light: fruit.lightHex, dark: fruit.darkHex))
+    }
+
+  /// The fruit id for a stored token: the token itself, or the fruit an old
+  /// color name maps to. Nil for no color or an unknown token.
+  static func fruitID(for token: String?) -> String? {
+    guard let token else { return nil }
+    let id = RegistryTokens.tagColorLegacy[token] ?? token
+    return swatches.contains { $0.token == id } ? id : nil
+  }
 
   static func color(for token: String?) -> Color {
-    swatches.first { $0.token == token }?.color ?? Theme.inkSecondary
+    let id = fruitID(for: token)
+    return swatches.first { $0.token == id && id != nil }?.color ?? Theme.inkSecondary
   }
 
   #if os(macOS)
   static func nsColor(for token: String?) -> NSColor {
-    switch token {
-    case "blue":   return .systemBlue
-    case "amber":  return .systemOrange
-    case "green":  return .systemGreen
-    case "red":    return .systemRed
-    case "purple": return .systemPurple
-    case "teal":   return .systemTeal
-    case "pink":   return .systemPink
-    default:       return .secondaryLabelColor
-    }
+    guard fruitID(for: token) != nil else { return .secondaryLabelColor }
+    return NSColor(color(for: token))
   }
   #endif
 }
@@ -1329,7 +1330,7 @@ struct ManageTagsSheet: View {
                       } label: {
                         HStack {
                           Text(swatch.label)
-                          if tag.color == swatch.token {
+                          if TagColorPalette.fruitID(for: tag.color) == swatch.token {
                             Image(systemName: "checkmark")
                           }
                         }

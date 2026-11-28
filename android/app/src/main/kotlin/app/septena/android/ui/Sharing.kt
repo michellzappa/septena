@@ -475,7 +475,7 @@ internal fun ShareMembersRow(
                 onClick { onClick(); true }
             },
     ) {
-        // Each member's avatar (#857): initials, emoji or photo on their color; no avatar draws the neutral fill.
+        // Each member's avatar (#857): initials, emoji or photo on their color; no avatar draws the default color.
         shown.forEach { MemberAvatar(share, it, MEMBER_AVATAR_SIZE) }
         if (more > 0) MemberCircle("+$more")
     }
