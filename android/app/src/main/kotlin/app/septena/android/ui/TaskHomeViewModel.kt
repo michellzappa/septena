@@ -396,7 +396,6 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         title: String,
         areaId: String? = null,
         insertIndex: Int? = null,
-        checklistMode: String? = null,
         onCreated: (TaskHomeLocation.Project) -> Unit = {},
     ) {
         val trimmed = title.trim()
@@ -421,7 +420,6 @@ class TaskHomeViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                     val fields = buildMap<String, JsonValue> {
                         put(RegistryEntityFields.Project.TITLE, JsonValue.StringValue(trimmed))
                         put(RegistryEntityFields.Project.STATUS, JsonValue.StringValue(RegistryEntityEnums.ProjectStatus.ACTIVE))
-                        checklistMode?.let { put(RegistryEntityFields.Project.CHECKLIST_MODE, JsonValue.StringValue(it)) }
                         put(RegistryEntityFields.Project.POSITION, JsonValue.IntegerValue(appendPos))
                         areaId?.let { put(RegistryEntityFields.Project.AREA, JsonValue.StringValue(it)) }
                     }
