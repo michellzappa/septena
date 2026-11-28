@@ -600,6 +600,7 @@
   "Back": {
     "text": "Back",
     "paths": [
+      "actions.actions.app.goBack.title",
       "surfaces.firstRun.chrome.back.label"
     ]
   },
@@ -1811,6 +1812,12 @@
     "text": "For people who hand a lot of work to agents.",
     "paths": [
       "plans.cards.pro.detail"
+    ]
+  },
+  "Forward": {
+    "text": "Forward",
+    "paths": [
+      "actions.actions.app.goForward.title"
     ]
   },
   "Found {areas} areas, {projects} projects, and {tasks} tasks.": {

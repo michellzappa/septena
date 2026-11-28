@@ -400,6 +400,18 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     return selectedKey() == key
   }
 
+  /// True when `select(key:)` can reach the destination: a row has the key,
+  /// also inside a folded area. Back / Forward (#849) skip a destination
+  /// that fails it, such as a deleted area or project. Review may have no
+  /// row while it is empty; `selectRow` rebuilds it, so it always counts.
+  func hasDestination(key: String) -> Bool {
+    if key == KitSidebarDestination.key(for: .filter(.review)) { return true }
+    func contains(_ nodes: [Node]) -> Bool {
+      nodes.contains { $0.key == key || contains($0.children) }
+    }
+    return contains(roots)
+  }
+
   private func selectRow(key: String) {
     // A project inside a FOLDED area has no row at all (its parent reports
     // zero children), so unfold just THAT area — not every one of them. A

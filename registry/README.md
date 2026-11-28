@@ -11,6 +11,7 @@ iOS, iPadOS, macOS, Backend/MCP, Web, Android, and Windows. See
 | `registry/entities.json` | Sync wire schema: entity columns, required/updatable fields, regexes, size limits, canonical enums | R0 (`#141`) |
 | `registry/rules.json` | Domain thresholds and retention/timing constants | R0 (`#141`) |
 | `registry/conformance/*.json` | Language-neutral golden test vectors run by Swift, TypeScript, Kotlin and the Rust core (`sync-engine.json` is run by the Rust core first, ADR 0025) | R0 (`#141`) |
+| `registry/shell-conformance/*.json` | Golden vectors for shell state the core does not own (navigation history, #849), run by the Swift and Kotlin unit tests | — |
 | `registry/settings.json` | Synced + device-local task settings schema, defaults, and flattened Settings taxonomy | R1 (`#142`) |
 | `registry/actions.json` | Actions, context menus, menu bar, platform-neutral shortcuts, shortcuts sheet | R2 (`#143`) |
 | `registry/destinations.json` | Smart lists, aliases, sidebar order, visibility, digit shortcuts (⌘1, ⌘2, … count the `always` lists the user has enabled, in sidebar order), drop rules, empty states | R3 (`#144`) |

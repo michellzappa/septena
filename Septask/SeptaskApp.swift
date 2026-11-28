@@ -259,7 +259,24 @@ private struct SeptaskMainWindow: View {
       showQuickFind: { navigation.showQuickFind = true },
       showQuickAdd: { navigation.presentAddInfo() },
       showSettings: { navigation.showSettings = true },
-      showKeyboardShortcuts: { navigation.showKeyboardShortcuts = true }
+      showKeyboardShortcuts: { navigation.showKeyboardShortcuts = true },
+      canGoBack: navigation.canGoBack,
+      canGoForward: navigation.canGoForward,
+      goBack: { navigation.goBack(exists: routeExists) },
+      goForward: { navigation.goForward(exists: routeExists) }
     )
+  }
+
+  /// Back / Forward skip an area or project that was deleted since the visit.
+  private func routeExists(_ route: Route) -> Bool {
+    let structure = StructureCache.snapshot(in: localStore.container.mainContext)
+    switch route {
+    case .area(let id), .filter(.area(let id)):
+      return structure.areas.contains { $0.id == id }
+    case .project(let id), .filter(.project(let id)):
+      return structure.projects.contains { $0.id == id }
+    case .filter, .next:
+      return true
+    }
   }
 }

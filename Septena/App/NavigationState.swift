@@ -120,7 +120,35 @@ enum TaskDestinations {
 @MainActor
 @Observable
 final class NavigationState {
-  var path: [Route] = []
+  /// Every change of the list on screen goes through here (sidebar rows, the
+  /// title dropdown, Quick Find, deep links, the iPhone back swipe), so the
+  /// Back / Forward history records it once, here.
+  var path: [Route] = [] {
+    didSet {
+      guard let last = path.last, last != oldValue.last else { return }
+      history.visit(last)
+    }
+  }
+
+  /// Back / Forward through the lists this window showed (⌘[ / ⌘], #849).
+  /// One `NavigationState` per window, so one history per window.
+  private(set) var history = NavigationHistory<Route>()
+  var canGoBack: Bool { history.canGoBack }
+  var canGoForward: Bool { history.canGoForward }
+
+  /// ⌘[ — the previous list. `exists` says whether an area or project is
+  /// still there; a deleted one is skipped. The step replaces the path, like
+  /// any destination tap, and does not push onto the history.
+  func goBack(exists: (Route) -> Bool) {
+    guard let route = history.goBack(exists: exists) else { return }
+    go(to: route)
+  }
+
+  /// ⌘] — the list Back left.
+  func goForward(exists: (Route) -> Bool) {
+    guard let route = history.goForward(exists: exists) else { return }
+    go(to: route)
+  }
 
   /// One-shot request from task search or App Intents. The receiving task list
   /// waits until it has loaded the matching route, then reveals the exact row

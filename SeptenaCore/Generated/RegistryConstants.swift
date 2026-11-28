@@ -110,6 +110,7 @@ enum RegistryRules {
   static let deleteGraceSeconds: Int = 120
   static let doStaleHours: Int = 4
   static let doLapseHours: Int = 24
+  static let navigationHistoryLimit: Int = 50
 }
 
 /// Semantic icon ID → SF Symbol lookup (`registry/icons.json`).
@@ -186,6 +187,8 @@ enum RegistryIcons {
     "action.move_up": "chevron.up",
     "action.move_down": "chevron.down",
     "action.add": "plus",
+    "action.go_back": "chevron.backward",
+    "action.go_forward": "chevron.forward",
     "action.search": "magnifyingglass",
     "action.sidebar": "sidebar.leading",
     "action.notes": "text.alignleft",
@@ -1092,6 +1095,8 @@ enum RegistryActionID: String, CaseIterable, Hashable, Sendable {
   case appShareCaptureAdd = "app.shareCapture.add"
   case appQuickEntry = "app.quickEntry"
   case appQuickFind = "app.quickFind"
+  case appGoBack = "app.goBack"
+  case appGoForward = "app.goForward"
   case appPauseAgents = "app.pauseAgents"
   case taskConversationStop = "task.conversation.stop"
   case taskConversationOther = "task.conversation.other"
@@ -1269,6 +1274,8 @@ enum RegistryActions {
     .appShareCaptureAdd: RegistryL10n.t("Add"),
     .appQuickEntry: RegistryL10n.t("Quick Entry"),
     .appQuickFind: RegistryL10n.t("Quick Find…"),
+    .appGoBack: RegistryL10n.t("Back"),
+    .appGoForward: RegistryL10n.t("Forward"),
     .appPauseAgents: RegistryL10n.t("Pause all agents"),
     .taskConversationStop: RegistryL10n.t("Stop"),
     .taskConversationOther: RegistryL10n.t("Other…"),
@@ -1370,6 +1377,8 @@ enum RegistryActions {
     .appShareCaptureAdd: "plus",
     .appQuickEntry: "plus",
     .appQuickFind: "magnifyingglass",
+    .appGoBack: "chevron.backward",
+    .appGoForward: "chevron.forward",
     .appPauseAgents: "cpu",
     .taskConversationStop: "xmark.circle",
     .taskConversationOther: "info.circle",
@@ -1443,6 +1452,8 @@ enum RegistryActions {
     .appQuickAdd: RegistryShortcut(key: "i", modifiers: ["primary"], keycaps: ["⌘", "I"], excludePlatforms: []),
     .appQuickEntry: RegistryShortcut(key: "space", modifiers: ["ctrl", "alt"], keycaps: ["⌃", "⌥", "space"], excludePlatforms: []),
     .appQuickFind: RegistryShortcut(key: "k", modifiers: ["primary"], keycaps: ["⌘", "K"], excludePlatforms: [], alternates: [RegistryShortcut(key: "f", modifiers: ["primary", "shift"], keycaps: ["⇧", "⌘", "F"], excludePlatforms: [])]),
+    .appGoBack: RegistryShortcut(key: "[", modifiers: ["primary"], keycaps: ["⌘", "["], excludePlatforms: []),
+    .appGoForward: RegistryShortcut(key: "]", modifiers: ["primary"], keycaps: ["⌘", "]"], excludePlatforms: []),
     .appToggleSidebar: RegistryShortcut(key: "s", modifiers: ["ctrl", "primary"], keycaps: ["⌃", "⌘", "S"], excludePlatforms: ["ios", "ipados"]),
     .appSettings: RegistryShortcut(key: ",", modifiers: ["primary"], keycaps: ["⌘", ","], excludePlatforms: []),
     .appKeyboardShortcuts: RegistryShortcut(key: "/", modifiers: ["primary", "shift"], keycaps: ["⇧", "⌘", "/"], excludePlatforms: []),
@@ -1562,6 +1573,8 @@ enum RegistryActions {
     .appShareCaptureAdd: RegistryActionAvailability(selection: "none", platforms: ["android"], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "capture.share-target"),
     .appQuickEntry: RegistryActionAvailability(selection: "none", platforms: ["macos", "windows", "linux"], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "capture.quick-entry"),
     .appQuickFind: RegistryActionAvailability(selection: "none", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "find.quick-find"),
+    .appGoBack: RegistryActionAvailability(selection: "none", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "mac.keyboard"),
+    .appGoForward: RegistryActionAvailability(selection: "none", platforms: [], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "mac.keyboard"),
     .appPauseAgents: RegistryActionAvailability(selection: "none", platforms: ["android"], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "agents.stop-pause"),
     .taskConversationStop: RegistryActionAvailability(selection: "single", platforms: ["android"], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "agents.stop-pause"),
     .taskConversationOther: RegistryActionAvailability(selection: "single", platforms: ["android"], excludeDestinations: [], onlyDestinations: [], requiresRecurrence: false, featureId: "ai.discuss"),
@@ -1693,10 +1706,13 @@ enum RegistryActions {
       RegistryMenuItem(kind: "submenu", id: "textSize", actionId: nil, title: RegistryL10n.t("Text Size"), sfSymbol: "textformat.size", items: [RegistryMenuItem(kind: "slot", id: "textSizeSteps", actionId: nil, title: nil, sfSymbol: nil, items: []), RegistryMenuItem(kind: "divider", id: "divider.1", actionId: nil, title: nil, sfSymbol: nil, items: []), RegistryMenuItem(kind: "action", id: "app.textSizeIncrease", actionId: .appTextSizeIncrease, title: RegistryL10n.t("Increase Text Size"), sfSymbol: "textformat.size", items: []), RegistryMenuItem(kind: "action", id: "app.textSizeDecrease", actionId: .appTextSizeDecrease, title: RegistryL10n.t("Decrease Text Size"), sfSymbol: "textformat.size", items: []), RegistryMenuItem(kind: "action", id: "app.textSizeReset", actionId: .appTextSizeReset, title: RegistryL10n.t("Reset Text Size"), sfSymbol: "textformat.size", items: [])]),
     ]),
     RegistryMenu(id: .go, title: RegistryL10n.t("Go"), system: nil, items: [
+      RegistryMenuItem(kind: "action", id: "app.goBack", actionId: .appGoBack, title: RegistryL10n.t("Back"), sfSymbol: "chevron.backward", items: []),
+      RegistryMenuItem(kind: "action", id: "app.goForward", actionId: .appGoForward, title: RegistryL10n.t("Forward"), sfSymbol: "chevron.forward", items: []),
+      RegistryMenuItem(kind: "divider", id: "divider.2", actionId: nil, title: nil, sfSymbol: nil, items: []),
       RegistryMenuItem(kind: "slot", id: "smartLists", actionId: nil, title: nil, sfSymbol: nil, items: []),
-      RegistryMenuItem(kind: "divider", id: "divider.1", actionId: nil, title: nil, sfSymbol: nil, items: []),
+      RegistryMenuItem(kind: "divider", id: "divider.4", actionId: nil, title: nil, sfSymbol: nil, items: []),
       RegistryMenuItem(kind: "action", id: "app.quickFind", actionId: .appQuickFind, title: RegistryL10n.t("Quick Find…"), sfSymbol: "magnifyingglass", items: []),
-      RegistryMenuItem(kind: "divider", id: "divider.3", actionId: nil, title: nil, sfSymbol: nil, items: []),
+      RegistryMenuItem(kind: "divider", id: "divider.6", actionId: nil, title: nil, sfSymbol: nil, items: []),
       RegistryMenuItem(kind: "action", id: "app.septenaWindow", actionId: .appSeptenaWindow, title: RegistryL10n.t("Septena Window"), sfSymbol: "macwindow", items: []),
       RegistryMenuItem(kind: "action", id: "app.classicWindow", actionId: .appClassicWindow, title: RegistryL10n.t("Classic Window"), sfSymbol: "macwindow", items: []),
       RegistryMenuItem(kind: "action", id: "app.quickEntry", actionId: .appQuickEntry, title: RegistryL10n.t("Quick Entry"), sfSymbol: "plus", items: []),
@@ -1743,6 +1759,8 @@ enum RegistryActions {
     RegistryShortcutEntry(id: "app.quickAdd", actionId: .appQuickAdd, label: RegistryL10n.t("Quick Add…"), keycaps: ["⌘", "I"], excludePlatforms: []),
     RegistryShortcutEntry(id: "app.quickFind", actionId: .appQuickFind, label: RegistryL10n.t("Quick Find…"), keycaps: ["⌘", "K"], excludePlatforms: []),
     RegistryShortcutEntry(id: "app.quickFind.alt0", actionId: .appQuickFind, label: RegistryL10n.t("Quick Find…"), keycaps: ["⇧", "⌘", "F"], excludePlatforms: []),
+    RegistryShortcutEntry(id: "app.goBack", actionId: .appGoBack, label: RegistryL10n.t("Back"), keycaps: ["⌘", "["], excludePlatforms: []),
+    RegistryShortcutEntry(id: "app.goForward", actionId: .appGoForward, label: RegistryL10n.t("Forward"), keycaps: ["⌘", "]"], excludePlatforms: []),
     RegistryShortcutEntry(id: "app.toggleSidebar", actionId: .appToggleSidebar, label: RegistryL10n.t("Show / Hide Sidebar"), keycaps: ["⌃", "⌘", "S"], excludePlatforms: ["ios", "ipados"]),
     RegistryShortcutEntry(id: "app.settings", actionId: .appSettings, label: RegistryL10n.t("Settings…"), keycaps: ["⌘", ","], excludePlatforms: []),
     RegistryShortcutEntry(id: "app.keyboardShortcuts", actionId: .appKeyboardShortcuts, label: RegistryL10n.t("Keyboard Shortcuts"), keycaps: ["⇧", "⌘", "/"], excludePlatforms: []),

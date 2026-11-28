@@ -16,5 +16,6 @@
   "changeLogTtlDays": 365,
   "deleteGraceSeconds": 120,
   "doStaleHours": 4,
-  "doLapseHours": 24
+  "doLapseHours": 24,
+  "navigationHistoryLimit": 50
 }

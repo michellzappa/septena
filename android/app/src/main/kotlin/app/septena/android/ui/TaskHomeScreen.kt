@@ -72,6 +72,7 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
@@ -563,6 +564,20 @@ fun TaskHomeScreen(
     val smartListNavOrder = remember(state.topSmartLists, state.bottomSmartLists) {
         (state.topSmartLists + state.bottomSmartLists).map { it.location }
     }
+    // app.goBack / app.goForward (#849): the keys come from the registry shortcut.
+    val goBackKey = remember { registryShortcutKey(RegistryActionIds.APP_GO_BACK) }
+    val goForwardKey = remember { registryShortcutKey(RegistryActionIds.APP_GO_FORWARD) }
+    val stepHistory: (TaskHomeLocation?) -> Boolean = { target ->
+        if (target != null) {
+            settingsOpen = false
+            quickFindOpen = false
+            openedTaskId = null
+            expandedTaskId = null
+            selectHomeLocation(target)
+        }
+        // Consumed at either end too, so the key never types into a field.
+        true
+    }
     val hardwareShortcutModifier = Modifier.onPreviewKeyEvent { event ->
         if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
         val primary = event.isCtrlPressed || event.isMetaPressed
@@ -602,6 +617,8 @@ fun TaskHomeScreen(
                 }
                 true
             }
+            primary && !event.isShiftPressed && event.key == goBackKey -> stepHistory(homeViewModel.historyBack())
+            primary && !event.isShiftPressed && event.key == goForwardKey -> stepHistory(homeViewModel.historyForward())
             primary && event.key in KEYBOARD_LIST_INDEX -> {
                 val index = KEYBOARD_LIST_INDEX.getValue(event.key)
                 val target = smartListNavOrder.getOrNull(index) ?: return@onPreviewKeyEvent false
@@ -2233,6 +2250,14 @@ private fun actionMenuIcon(actionId: String): TaskMenuActionIcon = when (actionI
     RegistryActionIds.TASK_GOT_IT_BACK -> TaskMenuActionIcon.Restore
     else -> TaskMenuActionIcon.None
 }
+
+/** A registry shortcut key as a Compose [Key]; null for a key this screen does not bind. */
+private fun registryShortcutKey(actionId: String): Key? =
+    when (RegistryCatalog.actionShortcutKey(actionId)) {
+        "[" -> Key.LeftBracket
+        "]" -> Key.RightBracket
+        else -> null
+    }
 
 private val KEYBOARD_LIST_INDEX: Map<Key, Int> = mapOf(
     Key.One to 0,
