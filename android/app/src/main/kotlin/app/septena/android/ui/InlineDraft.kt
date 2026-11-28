@@ -2,6 +2,9 @@ package app.septena.android.ui
 
 import app.septena.android.AndroidAppGraph
 import app.septena.core.JsonValue
+import app.septena.core.ProjectChecklistRules
+import app.septena.core.RegistryCatalog
+import app.septena.core.SyncRecord
 import app.septena.core.asSyncRecord
 import app.septena.core.booleanValue
 import app.septena.core.generated.RegistryEntityEnums
@@ -139,9 +142,51 @@ internal suspend fun AndroidAppGraph.commitInlineDraft(
         parsed.areaId != null -> taskMutator.moveToList(taskId, area = parsed.areaId, project = null)
     }
     if (parsed.today) taskMutator.setToday(taskId, enabled = true)
+    // A new Checklist item with no heading joins the core's suggested group (#860).
+    taskMutator.placeChecklistItem(taskId, parsed.title) { group ->
+        RegistryCatalog.checklistGroupTitle(group, Locale.getDefault().toLanguageTag())
+    }
     taskStore.record(RegistryEntityNames.TASK, taskId)?.let { taskUndoHistory.recordCreated(it) }
     return InlineDraftCommit.Saved
 }
+
+/** One add-field suggestion of a Checklist draft (#860): a checked row to reopen, or an active row. */
+internal data class ChecklistSuggestion(val taskId: String, val label: String, val isChecked: Boolean)
+
+/**
+ * The core's matches for [query] in Checklist project [projectId] (exact
+ * title first), labelled "Greek yogurt · Dairy" for a checked row and
+ * "Milk · On list" for an active one. Null when [projectId] is not a Checklist.
+ */
+internal suspend fun AndroidAppGraph.checklistSuggestions(
+    projectId: String,
+    query: String,
+    languageTag: String,
+): List<ChecklistSuggestion>? {
+    val project = taskStore.record(RegistryEntityNames.PROJECT, projectId) ?: return null
+    if (project.deletedAt != null || project.fields[RegistryEntityFields.Project.CHECKLIST_MODE].stringValue() == null) return null
+    val typed = query.trim()
+    if (typed.isEmpty()) return emptyList()
+    val rows: List<SyncRecord> = taskStore.records(RegistryEntityNames.TASK)
+        .filter { it.deletedAt == null && it.fields[RegistryEntityFields.Task.PROJECT].stringValue() == projectId }
+        .sortedBy { it.fields[RegistryEntityFields.Task.POSITION].positionValue() ?: Double.MAX_VALUE }
+    val byId = rows.associateBy(SyncRecord::id)
+    val onList = checklistCopy("onList", languageTag)
+    return ProjectChecklistRules.layout(rows, typed).matches.mapNotNull { id ->
+        val row = byId[id] ?: return@mapNotNull null
+        val title = row.fields[RegistryEntityFields.Task.TITLE].stringValue().orEmpty()
+        val checked = row.fields[RegistryEntityFields.Task.STATUS].stringValue() ==
+            RegistryEntityEnums.TaskStatus.CHECKLIST_CHECKED
+        val group = row.fields[RegistryEntityFields.Task.HEADING].stringValue()
+            ?.let { byId[it]?.fields?.get(RegistryEntityFields.Task.TITLE).stringValue() }
+        val detail = if (checked) group else onList
+        ChecklistSuggestion(id, detail?.let { "$title · $it" } ?: title, checked)
+    }
+}
+
+/** The last suggestion: Add "<typed text>" (registry `checklistProjects.addTyped`). */
+internal fun checklistAddTyped(typed: String, languageTag: String): String =
+    checklistCopy("addTyped", languageTag).replace("{title}", typed)
 
 /**
  * Purges draft [taskId] when it folded with nothing typed. The caller has

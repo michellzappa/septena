@@ -10,7 +10,6 @@ import app.septena.core.ListSortRules
 import app.septena.core.NotesBase
 import app.septena.core.ProjectChecklistRules
 import app.septena.core.ProjectShare
-import app.septena.core.RecurrenceRules
 import app.septena.core.SyncRecord
 import app.septena.core.RegistryCatalog
 import app.septena.core.StructureOrder
@@ -92,7 +91,8 @@ data class AreasProjectsUiState(
     val unsectionedTasks: List<PlaceTaskRow> = emptyList(),
     val sections: List<PlaceSectionRow> = emptyList(),
     val isChecklist: Boolean = false,
-    val checklistRows: List<SyncRecord> = emptyList(),
+    /** A Checklist's checked rows (#860), shown as one Checked group after the active rows. */
+    val checkedTasks: List<PlaceTaskRow> = emptyList(),
     /** The Sort By choice of this page (docs/LIST_SORT_SPEC.md); Manual is the stored order. */
     val listSort: String = RegistryEntityEnums.ListSort.MANUAL,
     /** The rows the core sorts, by id. Empty under Manual. */
@@ -281,57 +281,14 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
         }
     }
 
-    fun addChecklistItem(title: String, heading: String?) {
+    fun useAsChecklist() {
         val project = destination.value as? AreasProjectsDestination.Project ?: return
-        val name = title.trim()
-        if (name.isEmpty()) return
         mutate {
-            val projectRow = graph.taskStore.record(RegistryEntityNames.PROJECT, project.id) ?: return@mutate false
-            if (!isChecklist(projectRow)) return@mutate false
-            val suggested = ProjectChecklistRules.layout(emptyList(), name).suggestedGroup
-            val groupName = suggested?.let {
-                RegistryCatalog.checklistGroupTitle(it, java.util.Locale.getDefault().toLanguageTag())
-            }
-            val assignment = heading ?: groupName?.let { group ->
-                val id = RecurrenceRules.occurrenceId("checklist:${project.id}", requireNotNull(suggested))
-                graph.taskStore.records(RegistryEntityNames.TASK).firstOrNull { row ->
-                    row.deletedAt == null &&
-                        row.fields[RegistryEntityFields.Task.PROJECT].stringValue() == project.id &&
-                        row.fields[RegistryEntityFields.Task.KIND].stringValue() == RegistryEntityEnums.TaskKind.HEADING &&
-                        (row.id == id || row.fields[RegistryEntityFields.Task.TITLE].stringValue() == group)
-                }?.id ?: graph.taskMutator.createHeading(group, project.id, id = id)
-                    .takeIf { it.deletedAt == null }?.id
-            }
-            val item = graph.taskMutator.create(name, project = project.id, heading = assignment)
-            graph.taskUndoHistory.recordCreatedEntity(
-                SyncRecord(RegistryEntityNames.TASK, item.id, item.fields, item.revision, item.updatedAt, item.deletedAt),
-            )
-            true
-        }
-    }
-
-    fun toggleChecklistItem(id: String) {
-        mutate {
-            graph.captureTaskEdit(id, touches = false) { graph.taskMutator.toggleProjectChecklist(id) }
-            true
-        }
-    }
-
-    fun moveChecklistItem(id: String, heading: String?) {
-        mutate {
-            graph.captureTaskEdit(id) {
-                graph.taskMutator.updateFields(
-                    id, mapOf(RegistryEntityFields.Task.HEADING to JsonValue.stringOrNull(heading)),
-                )
-            }
-            true
-        }
-    }
-
-    fun deleteChecklistItem(id: String) {
-        mutate {
-            graph.captureTaskEdit(id, touches = false) { graph.taskMutator.delete(id) }
-            true
+            graph.registryEntityMutator.update(
+                RegistryEntityNames.PROJECT,
+                project.id,
+                mapOf(RegistryEntityFields.Project.CHECKLIST_MODE to JsonValue.StringValue(RegistryEntityEnums.ChecklistMode.PLAIN)),
+            ) != null
         }
     }
 
@@ -642,7 +599,16 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                 val unsectioned = visibleTasks.filter { it.headingId !in headingIds }
                     .sortedWith(compareBy({ it.position ?: Double.MAX_VALUE }, { it.row.title.lowercase() }))
                     .map(ProjectTask::row)
-                val sections = headings.map { heading ->
+                val checklist = isChecklist(container)
+                val projectRecords = if (checklist) {
+                    allTaskRecords.filter { (_, task) -> task.project == selected.id }.map { it.first }
+                } else emptyList()
+                // A Checklist hides a heading with no active rows (core `projectChecklist`
+                // groups); the heading row stays.
+                val activeHeadingIds = if (checklist) {
+                    ProjectChecklistRules.layout(projectRecords).groups.mapTo(mutableSetOf()) { it.id }
+                } else null
+                val sections = headings.filter { activeHeadingIds?.contains(it.recordId) ?: true }.map { heading ->
                     PlaceSectionRow(
                         id = heading.recordId,
                         title = heading.row.title,
@@ -668,7 +634,20 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                     label = { it.second.title },
                 ).map { it.second }
                 val currentAreaId = container.fields[RegistryEntityFields.Project.AREA].stringValue()?.takeIf(String::isNotBlank)
-                val checklist = isChecklist(container)
+                val checkedTasks = if (checklist) {
+                    allTaskRecords.asSequence()
+                        .filter { (_, task) ->
+                            task.project == selected.id && task.id !in settle.entries &&
+                                task.status == RegistryEntityEnums.TaskStatus.CHECKLIST_CHECKED
+                        }
+                        .map { (record, task) ->
+                            val pos = record.fields[RegistryEntityFields.Task.POSITION].numberValue()
+                            PositionedPlaceTask(placeRow(record, task, pos), pos)
+                        }
+                        .sortedWith(PLACE_TASK_ORDER)
+                        .map { it.task }
+                        .toList()
+                } else emptyList()
                 AreasProjectsUiState(
                     destination = selected,
                     isLoading = false,
@@ -680,15 +659,7 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
                     unsectionedTasks = unsectioned,
                     sections = sections,
                     isChecklist = checklist,
-                    checklistRows = if (checklist) {
-                        allTaskRecords.filter { (_, task) -> task.project == selected.id }
-                            .map { it.first }
-                            .sortedWith(compareBy<SyncRecord>(
-                                { it.fields[RegistryEntityFields.Task.POSITION].numberValue() ?: Double.MAX_VALUE },
-                                { it.fields[RegistryEntityFields.Task.TITLE].stringValue()?.lowercase().orEmpty() },
-                                { it.id },
-                            ))
-                    } else emptyList(),
+                    checkedTasks = checkedTasks,
                     listSort = listSort,
                     sortSnapshots = sortSnapshots(
                         (unsectioned + sections.flatMap(PlaceSectionRow::tasks)).mapTo(HashSet(), PlaceTaskRow::id),
