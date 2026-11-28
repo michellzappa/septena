@@ -6687,28 +6687,10 @@
     },
     "Amber" : {
       "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Âmbar"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Amber"
-          }
-        },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bernstein"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ambre"
           }
         },
         "es" : {
@@ -6717,10 +6699,28 @@
             "value" : "Ámbar"
           }
         },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ambre"
+          }
+        },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ambra"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Amber"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Âmbar"
           }
         }
       }
@@ -7784,6 +7784,10 @@
         }
       }
     },
+    "Avatar" : {
+      "comment" : "Generated from registry surfaces.avatar.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "avg %@" : {
       "localizations" : {
         "nl" : {
@@ -8384,28 +8388,10 @@
     },
     "Blue" : {
       "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Azul"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Blauw"
-          }
-        },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Blau"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bleu"
           }
         },
         "es" : {
@@ -8414,10 +8400,28 @@
             "value" : "Azul"
           }
         },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bleu"
+          }
+        },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Blu"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Blauw"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Azul"
           }
         }
       }
@@ -9372,6 +9376,10 @@
         }
       }
     },
+    "Choose a Photo" : {
+      "comment" : "Generated from registry surfaces.avatar.copy.choosePhoto.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Choose a plan" : {
       "comment" : "Generated from registry plans.paywall.choosePlan. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
@@ -10257,6 +10265,10 @@
           }
         }
       }
+    },
+    "Color" : {
+      "comment" : "Generated from registry surfaces.avatar.copy.color.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Colorful" : {
       "comment" : "Generated from registry tokens.fruitAccents.colorful.name. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -14527,6 +14539,10 @@
         }
       }
     },
+    "Drag and zoom to fit the photo in the circle." : {
+      "comment" : "Generated from registry surfaces.avatar.copy.cropHint.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Drawer" : {
       "localizations" : {
         "pt-BR" : {
@@ -14999,6 +15015,10 @@
         }
       }
     },
+    "Edit Avatar" : {
+      "comment" : "Generated from registry surfaces.avatar.copy.edit.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Edit Details…" : {
       "comment" : "Generated from registry actions.actions.task.editDetails.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -15204,6 +15224,10 @@
           }
         }
       }
+    },
+    "Emoji" : {
+      "comment" : "Generated from registry surfaces.avatar.copy.emoji.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Empty Trash" : {
       "comment" : "Generated from registry actions.actions.task.emptyTrash.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -18083,9 +18107,31 @@
         }
       }
     },
+    "Graphite" : {
+      "comment" : "Generated from registry tokens.avatarColors.colors.graphite.name. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Green" : {
       "localizations" : {
-        "pt-BR" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grün"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verde"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vert"
+          }
+        },
+        "it" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Verde"
@@ -18097,25 +18143,7 @@
             "value" : "Groen"
           }
         },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Grün"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vert"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Verde"
-          }
-        },
-        "it" : {
+        "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Verde"
@@ -20299,22 +20327,16 @@
     },
     "Indigo" : {
       "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Índigo"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Indigo"
-          }
-        },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Indigo"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Índigo"
           }
         },
         "fr" : {
@@ -20323,7 +20345,13 @@
             "value" : "Indigo"
           }
         },
-        "es" : {
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Indigo"
+          }
+        },
+        "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Índigo"
@@ -20372,6 +20400,10 @@
           }
         }
       }
+    },
+    "Initials" : {
+      "comment" : "Generated from registry surfaces.avatar.copy.initials.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Insights" : {
       "localizations" : {
@@ -28157,25 +28189,7 @@
     },
     "Orange" : {
       "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Laranja"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Oranje"
-          }
-        },
         "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Orange"
-          }
-        },
-        "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Orange"
@@ -28185,6 +28199,24 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Naranja"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Orange"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Oranje"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Laranja"
           }
         }
       }
@@ -28823,6 +28855,10 @@
         }
       }
     },
+    "Photo" : {
+      "comment" : "Generated from registry surfaces.avatar.copy.photo.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Pick another date" : {
       "localizations" : {
         "de" : {
@@ -28905,9 +28941,31 @@
         }
       }
     },
+    "Pick one emoji." : {
+      "comment" : "Generated from registry surfaces.avatar.copy.emojiHint.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Pink" : {
       "localizations" : {
-        "pt-BR" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pink"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rosa"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rose"
+          }
+        },
+        "it" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Rosa"
@@ -28919,25 +28977,7 @@
             "value" : "Roze"
           }
         },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pink"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Rose"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Rosa"
-          }
-        },
-        "it" : {
+        "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Rosa"
@@ -30216,28 +30256,10 @@
     },
     "Purple" : {
       "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Roxo"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Paars"
-          }
-        },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Lila"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Violet"
           }
         },
         "es" : {
@@ -30246,10 +30268,28 @@
             "value" : "Morado"
           }
         },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Violet"
+          }
+        },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Viola"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paars"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Roxo"
           }
         }
       }
@@ -30919,28 +30959,10 @@
     },
     "Red" : {
       "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vermelho"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Rood"
-          }
-        },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Rot"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Rouge"
           }
         },
         "es" : {
@@ -30949,10 +30971,28 @@
             "value" : "Rojo"
           }
         },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rouge"
+          }
+        },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Rosso"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rood"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vermelho"
           }
         }
       }
@@ -31331,6 +31371,10 @@
           }
         }
       }
+    },
+    "Remove Photo" : {
+      "comment" : "Generated from registry surfaces.avatar.copy.removePhoto.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Rename" : {
       "comment" : "SeptaskKit localization pass 2026-08-09",
@@ -39382,28 +39426,10 @@
     },
     "Teal" : {
       "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Azul-petróleo"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Groenblauw"
-          }
-        },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Blaugrün"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sarcelle"
           }
         },
         "es" : {
@@ -39412,10 +39438,28 @@
             "value" : "Verde azulado"
           }
         },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sarcelle"
+          }
+        },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Verde acqua"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Groenblauw"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Azul-petróleo"
           }
         }
       }
@@ -39903,6 +39947,14 @@
           }
         }
       }
+    },
+    "The photo did not upload. Try again." : {
+      "comment" : "Generated from registry surfaces.avatar.copy.photoFailed.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "The photo uploads when this device is online." : {
+      "comment" : "Generated from registry surfaces.avatar.copy.photoPending.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "The project leaves your account. Everyone else keeps it." : {
       "comment" : "Generated from registry surfaces.sharing.copy.leaveDetail.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -40632,6 +40684,10 @@
           }
         }
       }
+    },
+    "This photo is too big. Pick one under 5 MB." : {
+      "comment" : "Generated from registry surfaces.avatar.copy.photoTooLarge.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "This project has no room for another member or invite." : {
       "comment" : "Generated from registry surfaces.sharing.copy.full.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -42226,6 +42282,10 @@
         }
       }
     },
+    "Up to 3 letters" : {
+      "comment" : "Generated from registry surfaces.avatar.copy.initialsHint.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Upcoming" : {
       "localizations" : {
         "de" : {
@@ -42483,6 +42543,10 @@
           }
         }
       }
+    },
+    "Use Photo" : {
+      "comment" : "Generated from registry surfaces.avatar.copy.usePhoto.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Values" : {
       "localizations" : {

@@ -792,6 +792,80 @@
       }
     ]
   },
+  "avatar": {
+    "featureId": "account.avatar",
+    "title": "Avatar",
+    "kinds": ["photo", "emoji", "initials"],
+    "maxPhotoBytes": 5242880,
+    "photoSize": 512,
+    "maxInitials": 3,
+    "copy": [
+      {
+        "id": "edit",
+        "label": "Edit Avatar"
+      },
+      {
+        "id": "photo",
+        "label": "Photo"
+      },
+      {
+        "id": "emoji",
+        "label": "Emoji"
+      },
+      {
+        "id": "initials",
+        "label": "Initials"
+      },
+      {
+        "id": "color",
+        "label": "Color"
+      },
+      {
+        "id": "choosePhoto",
+        "label": "Choose a Photo"
+      },
+      {
+        "id": "usePhoto",
+        "label": "Use Photo"
+      },
+      {
+        "id": "removePhoto",
+        "label": "Remove Photo"
+      },
+      {
+        "id": "cropHint",
+        "label": "Drag and zoom to fit the photo in the circle."
+      },
+      {
+        "id": "emojiHint",
+        "label": "Pick one emoji."
+      },
+      {
+        "id": "initialsHint",
+        "label": "Up to 3 letters"
+      },
+      {
+        "id": "save",
+        "label": "Save"
+      },
+      {
+        "id": "cancel",
+        "label": "Cancel"
+      },
+      {
+        "id": "photoPending",
+        "label": "The photo uploads when this device is online."
+      },
+      {
+        "id": "photoTooLarge",
+        "label": "This photo is too big. Pick one under 5 MB."
+      },
+      {
+        "id": "photoFailed",
+        "label": "The photo did not upload. Try again."
+      }
+    ]
+  },
   "deviceSignIn": {
     "featureId": "sync.backend",
     "title": "Sign in to Septena",

@@ -1,3 +1,4 @@
+import type { Avatar } from "./avatar.js";
 import { randomId } from "../util.js";
 import { ENTITIES } from "./columns.js";
 
@@ -71,6 +72,9 @@ export interface ShareMember {
   id: string;
   name: string;
   role: "owner" | "editor";
+  /// The member's avatar (#857). Absent until the account shows it here;
+  /// a photo reads from `GET /v1/shares/:id/members/:member/avatar`.
+  avatar?: Avatar;
 }
 
 /// What the project row carries in its `share` column, so every client can

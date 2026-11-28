@@ -4,6 +4,7 @@ import { logEvent, randomId, sha256Base64Url } from "../util.js";
 import { storeFor } from "../api/session.js";
 import { ENTITY_LIMITS } from "../generated/registries.js";
 import { mergeNotes } from "./mergeText.js";
+import type { Avatar } from "./avatar.js";
 import {
   INVITE_TTL_MS,
   MAX_MEMBERS,
@@ -79,7 +80,7 @@ export class ProjectStore extends DurableObject<Env> {
         userId TEXT PRIMARY KEY, memberId TEXT NOT NULL, name TEXT NOT NULL, role TEXT NOT NULL,
         joinedAt INTEGER NOT NULL, endedAt INTEGER, keepCopy INTEGER NOT NULL DEFAULT 0,
         deliveredRev INTEGER NOT NULL DEFAULT 0, deliveredInfo INTEGER NOT NULL DEFAULT 0,
-        delivered INTEGER NOT NULL DEFAULT 0
+        delivered INTEGER NOT NULL DEFAULT 0, avatar TEXT
       );
       CREATE TABLE IF NOT EXISTS invites (
         id TEXT PRIMARY KEY, hash TEXT NOT NULL UNIQUE, createdAt INTEGER NOT NULL, expiresAt INTEGER NOT NULL,
@@ -121,9 +122,24 @@ export class ProjectStore extends DurableObject<Env> {
   }
 
   private members(): ShareMember[] {
-    return this.sql.exec<{ memberId: string; name: string; role: "owner" | "editor" }>(
-      "SELECT memberId, name, role FROM members WHERE endedAt IS NULL ORDER BY joinedAt, memberId",
-    ).toArray().map((m) => ({ id: m.memberId, name: m.name, role: m.role }));
+    // `SELECT *`: a store made before avatars (#857) has no avatar column
+    // until a member sets one.
+    return this.sql.exec<{ memberId: string; name: string; role: "owner" | "editor"; avatar?: string | null }>(
+      "SELECT * FROM members WHERE endedAt IS NULL ORDER BY joinedAt, memberId",
+    ).toArray().map((m) => {
+      const out: ShareMember = { id: m.memberId, name: m.name, role: m.role };
+      if (m.avatar) out.avatar = JSON.parse(m.avatar) as Avatar;
+      return out;
+    });
+  }
+
+  private hasAvatarColumn = false;
+
+  private ensureAvatarColumn(): void {
+    if (this.hasAvatarColumn) return;
+    const cols = this.sql.exec<{ name: string }>("PRAGMA table_info(members)").toArray();
+    if (!cols.some((c) => c.name === "avatar")) this.sql.exec("ALTER TABLE members ADD COLUMN avatar TEXT");
+    this.hasAvatarColumn = true;
   }
 
   private infoFor(m: MemberRow): ShareInfo {
@@ -241,6 +257,32 @@ export class ProjectStore extends DurableObject<Env> {
   }
 
   // ---- members ----
+
+  /// Shows a member's avatar to everyone in the project (#857). The Worker
+  /// calls it when the account changes its avatar, joins or shares.
+  async setMemberAvatar(userId: string, avatar: Avatar): Promise<boolean> {
+    const changed = this.ctx.storage.transactionSync(() => {
+      if (!this.member(userId)) return false;
+      this.ensureAvatarColumn();
+      const json = JSON.stringify(avatar);
+      const before = this.sql.exec<{ avatar: string | null }>("SELECT avatar FROM members WHERE userId = ?", userId).toArray()[0]?.avatar;
+      if (before === json) return false;
+      this.sql.exec("UPDATE members SET avatar = ? WHERE userId = ?", json, userId);
+      this.bump("info");
+      return true;
+    });
+    if (changed) await this.deliver();
+    return changed;
+  }
+
+  /// The account behind a member id, for the caller to read that member's
+  /// photo. Null unless both are members now.
+  memberUserId(callerUserId: string, memberId: string): string | null {
+    if (!this.member(callerUserId)) return null;
+    return this.sql.exec<{ userId: string }>(
+      "SELECT userId FROM members WHERE memberId = ? AND endedAt IS NULL", memberId,
+    ).toArray()[0]?.userId ?? null;
+  }
 
   /// Ends one membership. The owner removes anyone else; anyone else only
   /// themself.
@@ -495,7 +537,7 @@ type Remote<M extends keyof ProjectStore> = {
 /// The calls other objects make. Named here because the stub's own type is
 /// too deep for the compiler on recursive JSON values.
 export type ProjectRpc = Remote<
-  "create" | "details" | "invite" | "revokeInvite" | "preview" | "join" | "endMembership" | "close" | "accountDeleted" | "push" | "rows"
+  "create" | "details" | "invite" | "revokeInvite" | "preview" | "join" | "endMembership" | "close" | "accountDeleted" | "push" | "rows" | "setMemberAvatar" | "memberUserId"
 >;
 
 export function projectStoreFor(env: Env, shareId: string): ProjectRpc {

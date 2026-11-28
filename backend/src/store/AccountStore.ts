@@ -4,6 +4,7 @@ import { randomId, sha256Base64Url } from "../util.js";
 import type { AccountSummary } from "./TaskStore.js";
 import { PlusLinks, type PlusLink, type PlusLinkClaim, type PlusLinkInput, type PlusLinkUse } from "./plusLinks.js";
 import { BetaInvites, type BetaCode, type BetaCodeInput, type BetaJoinStart, type BetaTester } from "./betaInvites.js";
+import { defaultAvatar, type StoredAvatar } from "./avatar.js";
 
 // AccountStore — global Durable Object (SQLite) holding the identity table
 // (ADR 0016, issue #168). Maps `provider:subject` (e.g. `apple:<sub>`,
@@ -164,6 +165,11 @@ export class AccountStore extends DurableObject<Env> {
       CREATE TABLE IF NOT EXISTS metric_days (
         day  TEXT PRIMARY KEY,
         data TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS avatars (
+        userId    TEXT PRIMARY KEY,
+        data      TEXT NOT NULL,
+        updatedAt INTEGER NOT NULL
       );
     `);
     this.links.migrate();
@@ -404,6 +410,7 @@ export class AccountStore extends DurableObject<Env> {
   deleteIdentitiesForUser(userId: string): number {
     return this.ctx.storage.transactionSync(() => {
       this.sql.exec("DELETE FROM account_index WHERE userId = ?", userId);
+      this.sql.exec("DELETE FROM avatars WHERE userId = ?", userId);
       this.links.forgetUser(userId);
       this.beta.forgetUser(userId);
       this.sql.exec(
@@ -411,6 +418,35 @@ export class AccountStore extends DurableObject<Env> {
         userId,
       );
       return this.sql.exec("DELETE FROM identities WHERE userId = ?", userId).rowsWritten;
+    });
+  }
+
+  // ---- the avatar (#857, src/store/avatar.ts, src/api/avatar.ts) ----
+
+  /// The account's avatar, or the default one when it never set one.
+  getAvatar(userId: string): StoredAvatar {
+    const row = this.sql.exec<{ data: string }>("SELECT data FROM avatars WHERE userId = ?", userId).toArray()[0];
+    return row ? JSON.parse(row.data) as StoredAvatar : defaultAvatar(userId);
+  }
+
+  /// Writes the avatar unless a newer one is stored (an edit made offline
+  /// that arrives late). `replacedPhotoKey` is the photo the write let go,
+  /// for the caller to delete from R2; it is never the photo now in use.
+  setAvatar(userId: string, next: StoredAvatar): { avatar: StoredAvatar; applied: boolean; replacedPhotoKey: string | null } {
+    if (!USER_ID_RE.test(userId)) throw new Error("invalid userId");
+    return this.ctx.storage.transactionSync(() => {
+      const current = this.getAvatar(userId);
+      if (next.updatedAt < current.updatedAt) {
+        // A photo that lost the race is not in use either.
+        const lost = next.photoKey && next.photoKey !== current.photoKey ? next.photoKey : null;
+        return { avatar: current, applied: false, replacedPhotoKey: lost };
+      }
+      this.sql.exec(
+        "INSERT INTO avatars (userId, data, updatedAt) VALUES (?, ?, ?) ON CONFLICT(userId) DO UPDATE SET data = excluded.data, updatedAt = excluded.updatedAt",
+        userId, JSON.stringify(next), next.updatedAt,
+      );
+      const replaced = current.photoKey && current.photoKey !== next.photoKey ? current.photoKey : null;
+      return { avatar: next, applied: true, replacedPhotoKey: replaced };
     });
   }
 

@@ -680,6 +680,31 @@ function validateTopBar(surfaces, icons, caps) {
   }
 }
 
+// The avatar editor (#857): the kinds, the photo limits and the copy. The
+// backend and every client read the same numbers.
+function validateAvatar(surfaces, tokens, caps) {
+  const a = surfaces.avatar;
+  assert(a && a.featureId in caps.capabilities, "surfaces.json: avatar needs a known featureId");
+  assert(JSON.stringify(a.kinds) === JSON.stringify(["photo", "emoji", "initials"]), "surfaces.json: avatar.kinds is photo, emoji, initials");
+  for (const k of ["maxPhotoBytes", "photoSize", "maxInitials"]) assert(Number.isInteger(a[k]) && a[k] > 0, `surfaces.json: avatar.${k} is not a positive integer`);
+  assert(Array.isArray(a.copy) && a.copy.length > 0, "surfaces.json: avatar.copy is empty");
+  const ids = new Set();
+  for (const e of a.copy) {
+    assert(/^[a-z][A-Za-z]*$/.test(e.id) && !ids.has(e.id), `surfaces.json: avatar.copy id "${e.id}" is not a unique camelCase id`);
+    ids.add(e.id);
+    assert(typeof e.label === "string" && e.label.length > 0 && !/[–—]/.test(e.label), `surfaces.json: avatar.copy ${e.id} needs a label without dashes`);
+  }
+  const colors = tokens.avatarColors?.colors;
+  assert(Array.isArray(colors) && colors.length >= 8 && colors.length <= 10, "tokens.json: avatarColors.colors has 8 to 10 colors");
+  const colorIds = new Set();
+  for (const c of colors) {
+    assert(/^[a-z]+$/.test(c.id) && !colorIds.has(c.id), `tokens.json: avatar color id "${c.id}" is not a unique lowercase id`);
+    colorIds.add(c.id);
+    assert(typeof c.name === "string" && c.name.length > 0, `tokens.json: avatar color ${c.id} needs a name`);
+    for (const h of [c.light, c.dark]) assert(/^#[0-9a-fA-F]{6}$/.test(h), `tokens.json: avatar color ${c.id} invalid hex "${h}"`);
+  }
+}
+
 function validatePlaceNotes(surfaces, caps) {
   const t = surfaces.placeNotes;
   assert(t && t.featureId in caps.capabilities, "surfaces.json: placeNotes needs a known featureId");
@@ -1204,6 +1229,14 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  let multicolor: Bool");
   lines.push("}");
   lines.push("");
+  lines.push("/// One avatar fill (`registry/tokens.json` `avatarColors`, #857).");
+  lines.push("struct RegistryAvatarColor: Sendable, Hashable, Identifiable {");
+  lines.push("  let id: String");
+  lines.push("  let name: String");
+  lines.push("  let lightHex: String");
+  lines.push("  let darkHex: String");
+  lines.push("}");
+  lines.push("");
   lines.push("/// Procedural header-wash texture descriptor (`registry/tokens.json`, ADR 0019).");
   lines.push("struct RegistryTextureOption: Sendable, Hashable, Identifiable {");
   lines.push("  let id: String");
@@ -1248,6 +1281,11 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push(`    static let pulseRingMs: Int = ${tokens.motion.completion.pulseRingMs}`);
   lines.push("  }");
   lines.push(`  static let accentPalette: [String] = [${tokens.accentPalette.map(swiftStr).join(", ")}]`);
+  lines.push("  static let avatarColors: [RegistryAvatarColor] = [");
+  for (const c of tokens.avatarColors.colors) {
+    lines.push(`    RegistryAvatarColor(id: ${swiftStr(c.id)}, name: ${L(c.name, c, "name")}, lightHex: ${swiftStr(c.light)}, darkHex: ${swiftStr(c.dark)}),`);
+  }
+  lines.push("  ]");
   lines.push("  static let fruitAccents: [RegistryFruitAccent] = [");
   for (const a of tokens.fruitAccents ?? []) {
     lines.push(`    RegistryFruitAccent(id: ${swiftStr(a.id)}, name: ${L(a.name, a, "name")}, origin: ${swiftStr(a.origin)}, lightHex: ${swiftStr(a.light)}, darkHex: ${swiftStr(a.dark)}, checkLightHex: ${swiftStr(a.checkLight)}, checkDarkHex: ${swiftStr(a.checkDark)}, multicolor: ${Boolean(a.multicolor)}),`);
@@ -2214,6 +2252,18 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("}");
   lines.push("");
 
+  // 8a. The avatar editor (surfaces.json `avatar`, #857)
+  const avatar = surfaces.avatar;
+  lines.push("/// The avatar editor (`registry/surfaces.json` `avatar`, #857).");
+  lines.push("enum RegistryAvatar {");
+  lines.push(`  static let title: String = ${L(avatar.title, avatar, "title")}`);
+  lines.push(`  static let maxPhotoBytes = ${avatar.maxPhotoBytes}`);
+  lines.push(`  static let photoSize = ${avatar.photoSize}`);
+  lines.push(`  static let maxInitials = ${avatar.maxInitials}`);
+  for (const e of avatar.copy) lines.push(`  static let ${e.id}: String = ${L(e.label, e, "label")}`);
+  lines.push("}");
+  lines.push("");
+
   // 8a. Sign-in by device approval (surfaces.json `deviceSignIn`, ADR 0016)
   const deviceSignIn = surfaces.deviceSignIn;
   lines.push("/// Sign-in by device approval (`registry/surfaces.json` `deviceSignIn`).");
@@ -2633,10 +2683,10 @@ function generateTS({ entities, rules, icons, tokens, caps, settings, dests, act
   lines.push(`export const DESTINATIONS = ${JSON.stringify(dests.destinations)} as const;`);
   lines.push(`export const GENERIC_EMPTY_STATE = ${JSON.stringify(dests.genericEmptyState)} as const;`);
   lines.push(`export const ICONS = ${JSON.stringify(icons.icons)} as const;`);
-  lines.push(`export const DESIGN_TOKENS = ${JSON.stringify({ accentPolicy: tokens.accentPolicy, fruitAccents: tokens.fruitAccents ?? [], textures: tokens.textures ?? [], selection: tokens.selection, colors: tokens.colors, multicolorGlyphs: tokens.multicolorGlyphs?.glyphs ?? {}, accentPalette: tokens.accentPalette, radii: tokens.radii, spacing: tokens.spacing, desktopColumn: tokens.desktopColumn, textScale: tokens.textScale, motion: tokens.motion })} as const;`);
+  lines.push(`export const DESIGN_TOKENS = ${JSON.stringify({ accentPolicy: tokens.accentPolicy, fruitAccents: tokens.fruitAccents ?? [], textures: tokens.textures ?? [], selection: tokens.selection, colors: tokens.colors, multicolorGlyphs: tokens.multicolorGlyphs?.glyphs ?? {}, accentPalette: tokens.accentPalette, avatarColors: tokens.avatarColors.colors, radii: tokens.radii, spacing: tokens.spacing, desktopColumn: tokens.desktopColumn, textScale: tokens.textScale, motion: tokens.motion })} as const;`);
   lines.push(`export const CAPABILITIES = ${JSON.stringify(caps.capabilities)} as const;`);
   lines.push(`export const ACTIONS_CATALOG = ${JSON.stringify({ actions: actions.actions, contextMenus: actions.contextMenus, menuBar: actions.menuBar, shortcutsSheet: actions.shortcutsSheet })} as const;`);
-  lines.push(`export const SURFACES_CATALOG = ${JSON.stringify({ notices: surfaces.notices, prompts: surfaces.prompts, toasts: surfaces.toasts, taskAttributes: surfaces.taskAttributes, taskDateBoard: surfaces.taskDateBoard, taskPage: surfaces.taskPage, waiting: surfaces.waiting, sharing: surfaces.sharing, accountSwitch: surfaces.accountSwitch, deviceSignIn: surfaces.deviceSignIn, quickFind: surfaces.quickFind, checklistProjects: surfaces.checklistProjects, listSort: surfaces.listSort, topBar: surfaces.topBar, support: surfaces.support, fadeSweep: surfaces.fadeSweep })} as const;`);
+  lines.push(`export const SURFACES_CATALOG = ${JSON.stringify({ notices: surfaces.notices, prompts: surfaces.prompts, toasts: surfaces.toasts, taskAttributes: surfaces.taskAttributes, taskDateBoard: surfaces.taskDateBoard, taskPage: surfaces.taskPage, waiting: surfaces.waiting, sharing: surfaces.sharing, avatar: surfaces.avatar, accountSwitch: surfaces.accountSwitch, deviceSignIn: surfaces.deviceSignIn, quickFind: surfaces.quickFind, checklistProjects: surfaces.checklistProjects, listSort: surfaces.listSort, topBar: surfaces.topBar, support: surfaces.support, fadeSweep: surfaces.fadeSweep })} as const;`);
   lines.push(`export const FIRST_RUN = ${JSON.stringify(surfaces.firstRun)} as const;`);
   lines.push("/** Plan limits (registry/plans.json). The server's plan table: every gate reads these, never a plan name. */");
   lines.push(`export const PLAN_LIMITS = ${JSON.stringify(plans.limits)} as const;`);
@@ -3098,6 +3148,7 @@ validateSurfaces(surfaces, icons, caps, plans);
 validateTaskReferences(surfaces, icons, caps, entities);
 validateWaiting(surfaces, caps);
 validatePlaceNotes(surfaces, caps);
+validateAvatar(surfaces, tokens, caps);
 validateTopBar(surfaces, icons, caps);
 validateDoing(surfaces, caps, entities);
 checkOpensAttribute({ actions, surfaces });
