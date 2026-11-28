@@ -55,7 +55,7 @@ jobs:
           set -euo pipefail
           in=dist-in
           out="$RUNNER_TEMP/assets"
-          mkdir -p "$out" "$RUNNER_TEMP/jvm/linux-x86-64" "$RUNNER_TEMP/jvm/win32-x86-64"
+          mkdir -p "$out" "$RUNNER_TEMP/jvm/linux-x86-64" "$RUNNER_TEMP/jvm/linux-aarch64" "$RUNNER_TEMP/jvm/win32-x86-64"
           ls -R "$in" | head -60
 
           # Apple: the XCFramework zip that SwiftPM's binaryTarget takes, and the Swift bindings.
@@ -70,8 +70,9 @@ jobs:
           # Android: the stripped .so per ABI, in Gradle's jniLibs layout.
           (cd "$in/core-dist-android-jnilibs" && zip -qr "$out/septena-core-android-jnilibs-$VERSION.zip" .)
 
-          # JVM (Windows app, ADR 0013): natives in JNA's resource layout, as a jar.
+          # JVM (Windows and Linux apps, ADR 0013, ADR 0062): natives in JNA's resource layout, as a jar.
           cp "$in/core-dist-jvm-ubuntu-latest/libseptena_core.so" "$RUNNER_TEMP/jvm/linux-x86-64/"
+          cp "$in/core-dist-jvm-ubuntu-arm64/libseptena_core.so" "$RUNNER_TEMP/jvm/linux-aarch64/"
           cp "$in/core-dist-jvm-windows-latest/septena_core.dll" "$RUNNER_TEMP/jvm/win32-x86-64/"
           (cd "$RUNNER_TEMP/jvm" && zip -qr "$out/septena-core-jvm-natives-$VERSION.jar" .)
 
