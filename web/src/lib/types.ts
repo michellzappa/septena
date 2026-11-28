@@ -269,10 +269,30 @@ export interface AreaRow {
   [key: string]: unknown;
 }
 
+/**
+ * An account's avatar (#857, backend/src/store/avatar.ts). Decode it with
+ * `normalizeAvatar` (lib/avatar.ts): an unknown kind draws initials, an
+ * unknown color draws the neutral fill.
+ */
+export interface Avatar {
+  kind: "initials" | "emoji" | "photo" | string;
+  /** An id from tokens.json `avatarColors`. */
+  color: string;
+  /** 1 to 3 letters the person typed. Absent: derive them from the name. */
+  initials?: string;
+  emoji?: string;
+  /** Changes with every new photo: the cache key and the `?v=` of the photo URL. */
+  photoId?: string;
+  /** Ms since epoch. 0: the default avatar that nobody set. */
+  updatedAt: number;
+}
+
 export interface ShareMember {
   id: string;
   name: string;
   role: string;
+  /** Absent on rows from before #857: the member draws initials on the neutral fill. */
+  avatar?: Avatar | null;
 }
 
 export interface ProjectShareInfo {

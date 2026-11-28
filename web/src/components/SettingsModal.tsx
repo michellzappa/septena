@@ -82,6 +82,8 @@ import { HeaderWashPreview } from "./HeaderWash";
 import { PlanBenefitRow, PlanHead, PlanMark, PlanPriceLine, PlanSheet } from "./PlanLanguage";
 import { SignInMethodsSection } from "./SignInMethodsSection";
 import { betaSummary } from "./BetaModal";
+import { AccountAvatar, AvatarEditor, type AccountAvatarController } from "./Avatar";
+import { avatarCopy } from "@/lib/avatar";
 import type { BetaMember } from "@/lib/types";
 
 export type SettingsTab = (typeof SETTINGS_REGISTRY.desktopTabs)[number]["id"];
@@ -116,6 +118,8 @@ interface SettingsModalProps {
   initialTab?: SettingsTab;
   /** Called when the user switches tabs inside Settings so the URL stays in sync. */
   onTabChange?: (tab: SettingsTab) => void;
+  /** The account avatar (#857). */
+  accountAvatar: AccountAvatarController;
 }
 
 interface RegistryItem {
@@ -276,8 +280,10 @@ export function SettingsModal({
   onOpenBeta,
   initialTab,
   onTabChange,
+  accountAvatar,
 }: SettingsModalProps) {
   const [tab, setTab] = useState<SettingsTab>("general");
+  const [avatarEditorOpen, setAvatarEditorOpen] = useState(false);
   const [pageStack, setPageStack] = useState<string[]>([]);
   const [access, setAccess] = useState<AccessSummary | null>(null);
   const [accessError, setAccessError] = useState<string | null>(null);
@@ -399,10 +405,11 @@ export function SettingsModal({
     if (tab === "account" || tab === "agents" || activePageId === "devices_access" || activePageId === "agents") {
       void loadAccess();
     }
+    if (tab === "account") void accountAvatar.store.refresh();
     if (tab === "connections" || activePageId === "calendar") {
       void loadIcal();
     }
-  }, [activePageId, loadAccess, loadEntitlement, loadIcal, open, tab]);
+  }, [accountAvatar.store, activePageId, loadAccess, loadEntitlement, loadIcal, open, tab]);
 
   if (!open) return null;
 
@@ -861,6 +868,33 @@ export function SettingsModal({
       case "account_profile_editor":
         return (
           <div className="py-2">
+            {signedIn && (
+              <div className="mb-3 flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setAvatarEditorOpen(true)}
+                  aria-label={avatarCopy("edit", lang)}
+                  title={avatarCopy("edit", lang)}
+                  className="rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+                >
+                  <AccountAvatar api={api} state={accountAvatar.state} name={welcomeName} isDark={isDark} size={56} />
+                </button>
+                <div className="min-w-0">
+                  <button
+                    type="button"
+                    onClick={() => setAvatarEditorOpen(true)}
+                    className="text-xs font-medium text-[var(--accent)] hover:underline"
+                  >
+                    {avatarCopy("edit", lang)}
+                  </button>
+                  {accountAvatar.state.photoProblem && (
+                    <p className="mt-0.5 text-[11px] text-[var(--text-muted)]">
+                      {avatarCopy(accountAvatar.state.photoProblem, lang)}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
             <label className="block text-xs font-medium text-[var(--text-primary)]">
               {registryText(item.label ?? "Your name", lang)}
             </label>
@@ -2280,12 +2314,6 @@ export function SettingsModal({
       ? registryText(PAGE_BY_ID.get(pageStack[pageStack.length - 2])?.title ?? currentTabTitle, lang)
       : currentTabTitle;
 
-  const initials = (welcomeName || "S")
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? "")
-    .join("");
-
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4"
@@ -2310,9 +2338,7 @@ export function SettingsModal({
                     : "hover:bg-[var(--bg-hover)]"
                 }`}
               >
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[var(--bg-elevated)] text-xs font-semibold text-[var(--text-primary)]">
-                  {initials}
-                </span>
+                <AccountAvatar api={api} state={accountAvatar.state} name={welcomeName} isDark={isDark} size={36} />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-xs font-semibold text-[var(--text-primary)]">
                     {welcomeName || settingsCopy("account_profile_card", "yourProfile", lang)}
@@ -2429,6 +2455,16 @@ export function SettingsModal({
           </div>
         </div>
       </div>
+      {avatarEditorOpen && (
+        <AvatarEditor
+          api={api}
+          controller={accountAvatar}
+          name={welcomeName}
+          isDark={isDark}
+          lang={lang}
+          onClose={() => setAvatarEditorOpen(false)}
+        />
+      )}
       <PlanSheet
         open={planSheet !== null}
         onClose={() => setPlanSheet(null)}
