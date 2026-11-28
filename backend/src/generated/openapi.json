@@ -4068,8 +4068,8 @@
                                       "type": "string",
                                       "enum": [
                                         "typed",
-                                        "quick-entry",
-                                        "quick-add",
+                                        "quick_entry",
+                                        "quick_add",
                                         "share",
                                         "shortcut",
                                         "import",

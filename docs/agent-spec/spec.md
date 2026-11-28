@@ -253,7 +253,7 @@ One step of a task's conversation, in its `thread`. Turns are appended, never ch
 | `taskStatus` | `open`, `done`, `cancelled`, `checklistChecked` |
 | `checklistMode` | `plain`, `groceries` |
 | `taskSource` | `app`, `mcp` |
-| `taskAddedVia` | `typed`, `quick-entry`, `quick-add`, `share`, `shortcut`, `import`, `agent`, `api` |
+| `taskAddedVia` | `typed`, `quick_entry`, `quick_add`, `share`, `shortcut`, `import`, `agent`, `api` |
 | `projectStatus` | `active`, `done`, `cancelled` |
 | `taskKind` | `heading` |
 | `listSort` | `manual`, `when`, `deadline`, `title`, `created` |
