@@ -252,6 +252,7 @@ pub(crate) fn membership_json(m: &TaskViewMembership) -> Value {
         "deadlineRed": m.deadline_red,
         "upcomingDay": m.upcoming_day,
         "arrivedOnOwn": m.arrived_on_own,
+        "isTracked": m.is_tracked,
     })
 }
 

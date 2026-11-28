@@ -53,6 +53,11 @@ pub struct TaskSnapshot {
     /// it into personal Today or Upcoming unless the user sets a personal When
     /// or Today pin (`docs/PROJECT_SHARING_SPEC.md` §8).
     pub assigned_to_other: bool,
+    /// The conversation's end state. `decomposed` on an open task means the
+    /// work goes on elsewhere: the task is tracked (ADR 0066) and leaves the
+    /// working lists.
+    #[cfg_attr(feature = "ffi", uniffi(default = None))]
+    pub end_state: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -79,6 +84,11 @@ pub struct TaskViewMembership {
     pub upcoming_day: Option<String>,
     /// R8: the task landed on Today this morning by its own date.
     pub arrived_on_own: bool,
+    /// An open task whose work goes on elsewhere (`endState = decomposed`,
+    /// ADR 0066). It is in Review > Tracked and in no working list: not in
+    /// Upcoming, Anytime or an area or project list, and on Today only when
+    /// its deadline is due today or past.
+    pub is_tracked: bool,
 }
 
 /// The values the date actions and the read model share.
@@ -132,6 +142,15 @@ pub fn task_view_membership(task: TaskSnapshot, today: String, now: String) -> R
         holding_deadline,
         is_on_today,
     } = date_facts(&task, today);
+    let is_tracked = is_tracked(&task);
+    // ADR 0066: a tracked task is on Today only by its own deadline. The
+    // user's deadline wins over the work going on elsewhere.
+    let deadline_due = holding_deadline.is_some_and(|d| d <= today);
+    let is_on_today = if is_tracked {
+        active && deadline_due
+    } else {
+        is_on_today
+    };
     let unfiled = task.area.is_none() && task.project.is_none();
     let has_date = scheduled.is_some() || deadline.is_some();
     let is_inbox = active && unfiled;
@@ -143,6 +162,7 @@ pub fn task_view_membership(task: TaskSnapshot, today: String, now: String) -> R
             .and_then(parse_instant_ms)
             .is_some_and(|created| now - created < rules::CUE_DECAY_DAYS * MS_PER_DAY);
     let in_triage_band = is_inbox
+        && !is_tracked
         && if is_mcp {
             fresh_proposal
                 && if task.today || has_date {
@@ -162,7 +182,7 @@ pub fn task_view_membership(task: TaskSnapshot, today: String, now: String) -> R
         Some(d) if active && d == today => Some(DUE_TODAY.to_string()),
         _ => None,
     };
-    let upcoming_day = if active && !is_on_today {
+    let upcoming_day = if active && !is_on_today && !is_tracked {
         let personal_deadline = (!task.assigned_to_other).then_some(deadline).flatten();
         [scheduled, personal_deadline]
             .into_iter()
@@ -177,7 +197,7 @@ pub fn task_view_membership(task: TaskSnapshot, today: String, now: String) -> R
         && !task.today
         && !is_mcp
         && created_before_today
-        && (scheduled == Some(today) || holding_deadline == Some(today));
+        && ((scheduled == Some(today) && !is_tracked) || holding_deadline == Some(today));
 
     Ok(TaskViewMembership {
         is_unfiled: unfiled,
@@ -189,12 +209,22 @@ pub fn task_view_membership(task: TaskSnapshot, today: String, now: String) -> R
         matches_today: active && (is_on_today || in_triage_band),
         matches_inbox: in_today_inbox,
         matches_upcoming: upcoming_day.is_some(),
-        matches_anytime: active && !task.today && !has_date && !task.assigned_to_other,
+        matches_anytime: active && !task.today && !has_date && !task.assigned_to_other && !is_tracked,
         deadline_red: due_state.is_some(),
         due_state,
         upcoming_day: upcoming_day.map(|d| d.to_string()),
         arrived_on_own,
+        is_tracked,
     })
+}
+
+/// ADR 0066: an open task whose conversation ended as `decomposed` (the work
+/// goes on as an issue or smaller tasks). Faded or not, it is tracked.
+pub(crate) fn is_tracked(task: &TaskSnapshot) -> bool {
+    task.status == enums::task_status::OPEN
+        && task.kind.as_deref() != Some(enums::task_kind::HEADING)
+        && task.deleted_at.is_none()
+        && task.end_state.as_deref() == Some(enums::convo_end_state::DECOMPOSED)
 }
 
 /// R3 values of `TaskViewMembership::due_state`.
@@ -247,6 +277,46 @@ mod tests {
             assigned_to_other: true,
             ..Default::default()
         }
+    }
+
+    fn tracked_task() -> TaskSnapshot {
+        TaskSnapshot {
+            id: "d1".into(),
+            title: "Ship the export".into(),
+            status: "open".into(),
+            area: Some("a1".into()),
+            source: Some("app".into()),
+            created: Some("2026-11-15".into()),
+            end_state: Some("decomposed".into()),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn tracked_leaves_the_working_lists() {
+        let m = task_view_membership(tracked_task(), "2026-11-21".into(), "2026-11-21T12:00:00Z".into()).unwrap();
+        assert!(m.is_tracked);
+        assert!(!m.matches_anytime && !m.matches_today && !m.matches_upcoming && !m.matches_inbox);
+
+        let mut pinned = tracked_task();
+        pinned.today = true;
+        pinned.scheduled = Some("2026-11-20".into());
+        let m = task_view_membership(pinned, "2026-11-21".into(), "2026-11-21T12:00:00Z".into()).unwrap();
+        assert!(!m.matches_today && !m.is_on_today && m.days_on_today == 0);
+    }
+
+    #[test]
+    fn tracked_with_a_due_deadline_stays_on_today() {
+        let mut due = tracked_task();
+        due.deadline = Some("2026-11-21".into());
+        let m = task_view_membership(due, "2026-11-21".into(), "2026-11-21T12:00:00Z".into()).unwrap();
+        assert!(m.is_tracked && m.matches_today && m.is_on_today);
+        assert!(!m.matches_upcoming && !m.matches_anytime);
+
+        let mut later = tracked_task();
+        later.deadline = Some("2026-11-25".into());
+        let m = task_view_membership(later, "2026-11-21".into(), "2026-11-21T12:00:00Z".into()).unwrap();
+        assert!(!m.matches_today && !m.matches_upcoming && m.upcoming_day.is_none());
     }
 
     #[test]

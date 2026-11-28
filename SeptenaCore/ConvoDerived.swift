@@ -122,10 +122,16 @@ extension TaskConvo {
 /// everything about your agent and what waits on you (ADR 0046).
 enum ReviewGroup: String, CaseIterable, Sendable {
   /// `waiting`: the open task waits on a person (`waitingOn`, docs/REVIEW_SPEC.md §6).
-  case questions, finished, waiting, working, queued, stopped, faded
+  /// `tracked`: the work goes on elsewhere (`endState = decomposed`, ADR 0066).
+  case questions, finished, waiting, working, queued, stopped, tracked, faded
 
   /// Device-local: whether the Faded group is open. It starts closed.
   static let fadedExpandedKey = "septena.tasks.reviewFadedExpanded"
+  /// Device-local: whether the Tracked group is open. It starts closed, like Faded.
+  static let trackedExpandedKey = "septena.tasks.reviewTrackedExpanded"
+
+  /// The groups that start collapsed behind a footer: Tracked and Faded.
+  var collapses: Bool { self == .tracked || self == .faded }
 
   /// Registry title + symbol for this group's section header.
   var group: RegistryDestinationGroup? {
@@ -133,7 +139,7 @@ enum ReviewGroup: String, CaseIterable, Sendable {
   }
 
   /// True for the groups that wait on the user. Only they count in the
-  /// Review badge; Waiting, agent work in progress and Faded do not.
+  /// Review badge; Waiting, agent work in progress, Tracked and Faded do not.
   var countsInBadge: Bool { self == .questions || self == .finished }
 }
 

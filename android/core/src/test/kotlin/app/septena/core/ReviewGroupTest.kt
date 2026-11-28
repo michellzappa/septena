@@ -30,4 +30,14 @@ class ReviewGroupTest {
         // Waiting is not in the badge.
         assertTrue(ReviewGroupIds.WAITING !in ReviewGroupIds.BADGE, "Waiting counts in the badge")
     }
+
+    /** Tracked (ADR 0066): the core's group comes first, before a wait, and it is not in the badge. */
+    fun trackedOrder() {
+        assertEquals(ReviewGroupIds.TRACKED, TaskViewRules.reviewGroup(waiting, ReviewGroupIds.TRACKED, null))
+        assertEquals(ReviewGroupIds.TRACKED, TaskViewRules.reviewGroup(open.copy(fadedAt = "2026-11-25T00:00:00Z"), ReviewGroupIds.TRACKED, null))
+        assertEquals(null, TaskViewRules.reviewGroup(open.copy(status = RegistryEntityEnums.TaskStatus.DONE), ReviewGroupIds.TRACKED, null))
+        assertTrue(ReviewGroupIds.TRACKED !in ReviewGroupIds.BADGE, "Tracked counts in the badge")
+        // An open task with no conversation end state is never tracked; the core is not asked.
+        assertEquals(false, TaskViewRules.isTracked(open, java.time.LocalDate.parse("2026-11-28"), java.time.Instant.parse("2026-11-28T12:00:00Z")))
+    }
 }

@@ -9,7 +9,7 @@ const task = (fields: Partial<TaskRow> = {}): TaskRow => ({ id: "t", title: "Tas
 test("Faded and Agent are groups of Review, not sidebar lists", () => {
   assert.deepEqual(
     destinationGroups("review").map((g) => g.id),
-    ["questions", "finished", "waiting", "working", "queued", "stopped", "faded"],
+    ["questions", "finished", "waiting", "working", "queued", "stopped", "tracked", "faded"],
   );
   assert.deepEqual([...BADGE_GROUP_IDS], ["questions", "finished"]);
   const ids = SIDEBAR_DESTINATIONS.map((d) => d.id as string);
@@ -24,6 +24,9 @@ test("a task is in one Review group", () => {
   // The first group that fits wins (docs/REVIEW_SPEC.md §1): a question beats Faded.
   assert.equal(reviewGroupOf(task({ fadedAt: "2026-11-20T10:00:00Z" }), { reviewGroup: "questions", agentStage: null }), "questions");
   assert.equal(reviewGroupOf(task(), null), null);
+  // Tracked (ADR 0066) is the core's group: it beats Waiting and Faded, and is not in the badge.
+  assert.equal(reviewGroupOf(task({ waitingOn: "Ana", fadedAt: "2026-11-20T10:00:00Z" }), { reviewGroup: "tracked", agentStage: "done" }), "tracked");
+  assert.ok(!BADGE_GROUP_IDS.has("tracked"));
   for (const out of [{ status: "done" }, { deletedAt: "2026-11-20T10:00:00Z" }, { kind: "heading" }] as Partial<TaskRow>[]) {
     assert.equal(reviewGroupOf(task({ ...out, fadedAt: "2026-11-20T10:00:00Z" }), { reviewGroup: "finished", agentStage: null }), null);
   }

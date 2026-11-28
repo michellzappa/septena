@@ -363,8 +363,9 @@ final class TaskEntity {
   /// Inbox member: open, not deleted, not faded, not a heading, unfiled. The
   /// one Inbox rule lives in `TaskInbox`; mirror of `SeptenaTask.isInInbox`.
   var isInInbox: Bool {
+    // A tracked task (ADR 0066) is in no working list: the core's answer.
     TaskInbox.contains(status: status, isHeading: isHeading, isDeleted: deletedAt != nil,
-                       isFaded: isFaded, area: area, project: project)
+                       isFaded: isFaded, area: area, project: project) && !isTracked
   }
 
   /// The triage band: Inbox members not yet ratified — the layer rendered
@@ -1292,9 +1293,11 @@ enum LocalCache {
           && e.project != nil && e.kind != "heading"
       }
     )
-    // Only the three columns the counters read: the rest of each row
-    // (notes, conversation JSON, recurrence) stays a fault.
-    descriptor.propertiesToFetch = [\.project, \.statusRaw, \.fadedAt]
+    // Only the columns the counters read: the rest of each row (notes,
+    // recurrence) stays a fault.
+    // The conversation column only tells a tracked task (ADR 0066) apart;
+    // rows without one never reach the core.
+    descriptor.propertiesToFetch = [\.project, \.statusRaw, \.fadedAt, \.conversationJSON]
     let rows = StoreHealth.fetch(context, descriptor)
     var done: [String: Int] = [:]
     var total: [String: Int] = [:]
@@ -1306,7 +1309,8 @@ enum LocalCache {
         done[project, default: 0] += 1
         total[project, default: 0] += 1
       case .open:
-        guard row.fadedAt == nil else { continue }
+        // Faded and tracked (ADR 0066) tasks leave the project's list and count.
+        guard row.fadedAt == nil, !row.isTracked else { continue }
         total[project, default: 0] += 1
         open[project, default: 0] += 1
       case .cancelled, .checklistChecked:
@@ -1578,10 +1582,11 @@ enum LocalCache {
       guard e.status == .done || e.status == .cancelled else { return nil }
       return SeptenaTask(e)
     case .project(let pid):
-      guard e.project == pid else { return nil }
+      // A tracked task (ADR 0066) leaves its area and project lists.
+      guard e.project == pid, !e.isTracked else { return nil }
       return SeptenaTask(e)
     case .area(let aid):
-      guard e.area == aid else { return nil }
+      guard e.area == aid, !e.isTracked else { return nil }
       return SeptenaTask(e)
     case .faded, .recentlyDeleted:
       // Handled by the early-returns above; unreachable here.

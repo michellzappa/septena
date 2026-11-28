@@ -751,8 +751,9 @@ public struct ConversationState {
      */
     public var agentStage: String?
     /**
-     * The Review group this conversation puts an open task in: `questions`,
-     * `finished`, or none (`docs/REVIEW_SPEC.md` §1).
+     * The Review group this conversation puts an open task in: `finished`,
+     * `questions`, `tracked` (`decomposed`, ADR 0065), or none
+     * (`docs/REVIEW_SPEC.md` §1).
      */
     public var reviewGroup: String?
 
@@ -774,8 +775,9 @@ public struct ConversationState {
          * `review`, `done`), or none when the task is not agent work.
          */agentStage: String?, 
         /**
-         * The Review group this conversation puts an open task in: `questions`,
-         * `finished`, or none (`docs/REVIEW_SPEC.md` §1).
+         * The Review group this conversation puts an open task in: `finished`,
+         * `questions`, `tracked` (`decomposed`, ADR 0065), or none
+         * (`docs/REVIEW_SPEC.md` §1).
          */reviewGroup: String?) {
         self.isTerminal = isTerminal
         self.needsHumanReview = needsHumanReview
@@ -995,13 +997,22 @@ public struct FadeInput {
     public var now: String
     public var today: String
     public var utcOffsetSeconds: Int32
+    /**
+     * The conversation's end state. A tracked task (`decomposed`, ADR 0065)
+     * is in no working list, so it never fades.
+     */
+    public var endState: String?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
     public init(isOpen: Bool, isHeading: Bool, isDeleted: Bool, isFaded: Bool, deadline: String?, scheduled: String?, hasRecurrence: Bool, isAgentTurn: Bool, isAssignedToClaude: Bool, isAwaitingHuman: Bool, showsAgentCue: Bool, 
         /**
          * An agent added the task and the user has not accepted it (ADR 0039).
-         */isProposal: Bool, touchedAt: String?, createdAt: String?, created: String?, now: String, today: String, utcOffsetSeconds: Int32) {
+         */isProposal: Bool, touchedAt: String?, createdAt: String?, created: String?, now: String, today: String, utcOffsetSeconds: Int32, 
+        /**
+         * The conversation's end state. A tracked task (`decomposed`, ADR 0065)
+         * is in no working list, so it never fades.
+         */endState: String? = nil) {
         self.isOpen = isOpen
         self.isHeading = isHeading
         self.isDeleted = isDeleted
@@ -1020,6 +1031,7 @@ public struct FadeInput {
         self.now = now
         self.today = today
         self.utcOffsetSeconds = utcOffsetSeconds
+        self.endState = endState
     }
 }
 
@@ -1084,6 +1096,9 @@ extension FadeInput: Equatable, Hashable {
         if lhs.utcOffsetSeconds != rhs.utcOffsetSeconds {
             return false
         }
+        if lhs.endState != rhs.endState {
+            return false
+        }
         return true
     }
 
@@ -1106,6 +1121,7 @@ extension FadeInput: Equatable, Hashable {
         hasher.combine(now)
         hasher.combine(today)
         hasher.combine(utcOffsetSeconds)
+        hasher.combine(endState)
     }
 }
 
@@ -1135,7 +1151,8 @@ public struct FfiConverterTypeFadeInput: FfiConverterRustBuffer {
                 created: FfiConverterOptionString.read(from: &buf), 
                 now: FfiConverterString.read(from: &buf), 
                 today: FfiConverterString.read(from: &buf), 
-                utcOffsetSeconds: FfiConverterInt32.read(from: &buf)
+                utcOffsetSeconds: FfiConverterInt32.read(from: &buf), 
+                endState: FfiConverterOptionString.read(from: &buf)
         )
     }
 
@@ -1158,6 +1175,7 @@ public struct FfiConverterTypeFadeInput: FfiConverterRustBuffer {
         FfiConverterString.write(value.now, into: &buf)
         FfiConverterString.write(value.today, into: &buf)
         FfiConverterInt32.write(value.utcOffsetSeconds, into: &buf)
+        FfiConverterOptionString.write(value.endState, into: &buf)
     }
 }
 
@@ -2082,6 +2100,12 @@ public struct TaskSnapshot {
      * or Today pin (`docs/PROJECT_SHARING_SPEC.md` §8).
      */
     public var assignedToOther: Bool
+    /**
+     * The conversation's end state. `decomposed` on an open task means the
+     * work goes on elsewhere: the task is tracked (ADR 0065) and leaves the
+     * working lists.
+     */
+    public var endState: String?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -2104,7 +2128,12 @@ public struct TaskSnapshot {
          * task out of personal Anytime, and keeps its shared deadline from pulling
          * it into personal Today or Upcoming unless the user sets a personal When
          * or Today pin (`docs/PROJECT_SHARING_SPEC.md` §8).
-         */assignedToOther: Bool) {
+         */assignedToOther: Bool, 
+        /**
+         * The conversation's end state. `decomposed` on an open task means the
+         * work goes on elsewhere: the task is tracked (ADR 0065) and leaves the
+         * working lists.
+         */endState: String? = nil) {
         self.id = id
         self.title = title
         self.status = status
@@ -2133,6 +2162,7 @@ public struct TaskSnapshot {
         self.recurrenceAfterCompletion = recurrenceAfterCompletion
         self.recurrenceAnchorDate = recurrenceAnchorDate
         self.assignedToOther = assignedToOther
+        self.endState = endState
     }
 }
 
@@ -2227,6 +2257,9 @@ extension TaskSnapshot: Equatable, Hashable {
         if lhs.assignedToOther != rhs.assignedToOther {
             return false
         }
+        if lhs.endState != rhs.endState {
+            return false
+        }
         return true
     }
 
@@ -2259,6 +2292,7 @@ extension TaskSnapshot: Equatable, Hashable {
         hasher.combine(recurrenceAfterCompletion)
         hasher.combine(recurrenceAnchorDate)
         hasher.combine(assignedToOther)
+        hasher.combine(endState)
     }
 }
 
@@ -2298,7 +2332,8 @@ public struct FfiConverterTypeTaskSnapshot: FfiConverterRustBuffer {
                 reminderDismissedAt: FfiConverterOptionString.read(from: &buf), 
                 recurrenceAfterCompletion: FfiConverterOptionBool.read(from: &buf), 
                 recurrenceAnchorDate: FfiConverterOptionString.read(from: &buf), 
-                assignedToOther: FfiConverterBool.read(from: &buf)
+                assignedToOther: FfiConverterBool.read(from: &buf), 
+                endState: FfiConverterOptionString.read(from: &buf)
         )
     }
 
@@ -2331,6 +2366,7 @@ public struct FfiConverterTypeTaskSnapshot: FfiConverterRustBuffer {
         FfiConverterOptionBool.write(value.recurrenceAfterCompletion, into: &buf)
         FfiConverterOptionString.write(value.recurrenceAnchorDate, into: &buf)
         FfiConverterBool.write(value.assignedToOther, into: &buf)
+        FfiConverterOptionString.write(value.endState, into: &buf)
     }
 }
 
@@ -2381,6 +2417,13 @@ public struct TaskViewMembership {
      * R8: the task landed on Today this morning by its own date.
      */
     public var arrivedOnOwn: Bool
+    /**
+     * An open task whose work goes on elsewhere (`endState = decomposed`,
+     * ADR 0065). It is in Review > Tracked and in no working list: not in
+     * Upcoming, Anytime or an area or project list, and on Today only when
+     * its deadline is due today or past.
+     */
+    public var isTracked: Bool
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -2400,7 +2443,13 @@ public struct TaskViewMembership {
          */upcomingDay: String?, 
         /**
          * R8: the task landed on Today this morning by its own date.
-         */arrivedOnOwn: Bool) {
+         */arrivedOnOwn: Bool, 
+        /**
+         * An open task whose work goes on elsewhere (`endState = decomposed`,
+         * ADR 0065). It is in Review > Tracked and in no working list: not in
+         * Upcoming, Anytime or an area or project list, and on Today only when
+         * its deadline is due today or past.
+         */isTracked: Bool) {
         self.isUnfiled = isUnfiled
         self.isInboxMember = isInboxMember
         self.inTriageBand = inTriageBand
@@ -2415,6 +2464,7 @@ public struct TaskViewMembership {
         self.deadlineRed = deadlineRed
         self.upcomingDay = upcomingDay
         self.arrivedOnOwn = arrivedOnOwn
+        self.isTracked = isTracked
     }
 }
 
@@ -2467,6 +2517,9 @@ extension TaskViewMembership: Equatable, Hashable {
         if lhs.arrivedOnOwn != rhs.arrivedOnOwn {
             return false
         }
+        if lhs.isTracked != rhs.isTracked {
+            return false
+        }
         return true
     }
 
@@ -2485,6 +2538,7 @@ extension TaskViewMembership: Equatable, Hashable {
         hasher.combine(deadlineRed)
         hasher.combine(upcomingDay)
         hasher.combine(arrivedOnOwn)
+        hasher.combine(isTracked)
     }
 }
 
@@ -2510,7 +2564,8 @@ public struct FfiConverterTypeTaskViewMembership: FfiConverterRustBuffer {
                 dueState: FfiConverterOptionString.read(from: &buf), 
                 deadlineRed: FfiConverterBool.read(from: &buf), 
                 upcomingDay: FfiConverterOptionString.read(from: &buf), 
-                arrivedOnOwn: FfiConverterBool.read(from: &buf)
+                arrivedOnOwn: FfiConverterBool.read(from: &buf), 
+                isTracked: FfiConverterBool.read(from: &buf)
         )
     }
 
@@ -2529,6 +2584,7 @@ public struct FfiConverterTypeTaskViewMembership: FfiConverterRustBuffer {
         FfiConverterBool.write(value.deadlineRed, into: &buf)
         FfiConverterOptionString.write(value.upcomingDay, into: &buf)
         FfiConverterBool.write(value.arrivedOnOwn, into: &buf)
+        FfiConverterBool.write(value.isTracked, into: &buf)
     }
 }
 

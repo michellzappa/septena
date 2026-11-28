@@ -246,7 +246,8 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
       createdAt: createdAt,
       created: created,
       now: now,
-      today: today
+      today: today,
+      endState: conversationEndState
     )
   }
 
@@ -433,8 +434,9 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
   /// Inbox member — see `TaskInbox.contains`. DTO mirror of
   /// `TaskEntity.isInInbox`.
   var isInInbox: Bool {
+    // A tracked task (ADR 0066) is in no working list: the core's answer.
     TaskInbox.contains(status: status, isHeading: isHeading, isDeleted: deletedAt != nil,
-                       isFaded: isFaded, area: area, project: project)
+                       isFaded: isFaded, area: area, project: project) && !isTracked
   }
 
   /// Whether this task sits in the **triage band**: the Inbox members not yet

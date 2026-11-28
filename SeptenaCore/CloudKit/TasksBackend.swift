@@ -1739,7 +1739,8 @@ final class CloudKitTasksBackend {
         createdAt: entity.createdAt,
         created: entity.created,
         now: now,
-        today: today
+        today: today,
+        endState: convo.endState?.rawValue
       ) else { continue }
       entity.fadedAt = now
       entity.pendingSync = true

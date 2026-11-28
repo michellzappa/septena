@@ -316,6 +316,25 @@ extension LocalCache {
     issueRow(taskRefs(forTaskID: taskID, in: context).filter { $0.kind == "issue" })
   }
 
+  /// The link of every tracked task (Review > Tracked, ADR 0066): the newest
+  /// `issue` reference, else the first reference that opens a URL. A task
+  /// with neither has no entry.
+  @MainActor
+  static func trackedLinkRefs(in context: ModelContext) -> [String: TaskRefRow] {
+    let rows = StoreHealth.fetch(context, FetchDescriptor<TaskEntity>(
+      predicate: #Predicate { e in
+        e.deletedAt == nil && !e.pendingDeletion && e.statusRaw == "open" && e.conversationJSON != nil
+      }))
+    var links: [String: TaskRefRow] = [:]
+    for e in rows where e.isTracked {
+      let issue = newestIssueRef(forTaskID: e.id, in: context).flatMap { $0.link == nil ? nil : $0 }
+      if let link = issue ?? taskRefRows(forTaskID: e.id, in: context).first(where: { $0.link != nil }) {
+        links[e.id] = link
+      }
+    }
+    return links
+  }
+
   /// The newest `issue` reference of every task that has one (Review rows).
   @MainActor
   static func newestIssueRefs(in context: ModelContext) -> [String: TaskRefRow] {

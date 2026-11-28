@@ -20,6 +20,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalUriHandler
 import kotlin.math.hypot
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -872,6 +873,49 @@ fun TaskCardRow(
                                 lineHeight = 14.sp,
                                 color = mutedInk,
                                 modifier = Modifier.align(Alignment.CenterVertically),
+                            )
+                        }
+                    }
+                }
+
+                // Review ▸ Tracked (ADR 0066): the end-state note, then the issue link, which opens
+                // in the browser. Off while selecting: a tap there picks the row.
+                if (task.trackedNote != null || task.trackedLinkUrl != null) {
+                    val startPad = if (hasLeadingSlot) {
+                        TaskCardMetrics.LeadingColumnWidth + TaskCardMetrics.IconTextGap
+                    } else {
+                        0.dp
+                    }
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(2.dp),
+                        modifier = Modifier.fillMaxWidth().padding(start = startPad, top = 3.dp),
+                    ) {
+                        task.trackedNote?.let { note ->
+                            Text(
+                                text = note,
+                                fontSize = 13.sp,
+                                lineHeight = 18.sp,
+                                color = mutedInk,
+                                maxLines = 3,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        task.trackedLinkUrl?.let { url ->
+                            val uriHandler = LocalUriHandler.current
+                            val openLink = if (!selecting) {
+                                Modifier.clickable(role = Role.Button) { runCatching { uriHandler.openUri(url) } }
+                            } else {
+                                Modifier
+                            }
+                            Text(
+                                text = task.trackedLinkTitle?.takeIf(String::isNotBlank) ?: url,
+                                fontSize = 13.sp,
+                                lineHeight = 18.sp,
+                                color = MaterialTheme.colorScheme.primary,
+                                textDecoration = TextDecoration.Underline,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = openLink,
                             )
                         }
                     }

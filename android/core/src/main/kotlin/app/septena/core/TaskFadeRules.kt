@@ -71,10 +71,13 @@ object TaskFadeRules {
         isAwaitingHuman: Boolean = false,
         isProposal: Boolean = false,
         zone: ZoneId = ZoneId.systemDefault(),
+        /** The conversation's `endState`: a decomposed (Tracked) task never fades (ADR 0066). */
+        endState: String? = null,
     ): Boolean = coreShouldFade(
         input(
             isOpen, isHeading, isDeleted, isFaded, deadline, scheduled, hasRecurrence, isAgentTurn,
             isAssignedToClaude, isAwaitingHuman, false, isProposal, touchedAt, createdAt, created, now, today, zone,
+            endState,
         ),
     )
 
@@ -97,11 +100,13 @@ object TaskFadeRules {
         isAwaitingHuman: Boolean = false,
         isProposal: Boolean = false,
         zone: ZoneId = ZoneId.systemDefault(),
+        /** The conversation's `endState`: a decomposed (Tracked) task never fades (ADR 0066). */
+        endState: String? = null,
     ): Double? = coreFadeFill(
         input(
             isOpen, isHeading, isDeleted, isFaded, deadline, scheduled, hasRecurrence, isAgentTurn,
             isAssignedToClaude, isAwaitingHuman, showsAgentCue, isProposal, touchedAt, createdAt, created, now, today,
-            zone,
+            zone, endState,
         ),
     )
 
@@ -124,6 +129,7 @@ object TaskFadeRules {
         now: Instant,
         today: String,
         zone: ZoneId,
+        endState: String?,
     ) = FadeInput(
         isOpen = isOpen,
         isHeading = isHeading,
@@ -144,5 +150,6 @@ object TaskFadeRules {
         today = today,
         // A date-only `created` is midnight on the device's clock.
         utcOffsetSeconds = zone.rules.getOffset(now).totalSeconds,
+        endState = endState,
     )
 }

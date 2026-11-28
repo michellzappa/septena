@@ -89,6 +89,22 @@
       "linux": "planned",
       "watchos": "not_applicable"
     },
+    "review.tracked": {
+      "title": "Tracked: tasks whose work goes on elsewhere, in Review",
+      "docs": { "pending": "https://github.com/septena/site/issues/84" },
+      "agent": [
+        "tasks_set_endstate",
+        "tasks_list"
+      ],
+      "ios": "ships",
+      "ipados": "ships",
+      "macos": "ships",
+      "web": "ships",
+      "android": "ships",
+      "windows": "planned",
+      "linux": "planned",
+      "watchos": "not_applicable"
+    },
     "lists.agent": {
       "title": "Agent work by stage (Working, Queued, Stopped groups in Review)",
       "agent": [

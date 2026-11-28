@@ -114,6 +114,12 @@ data class TaskListItem(
     val reviewNote: String? = null,
     /** Single-line Review metadata (`Area › Project · asked {ago} · artifact`). */
     val reviewMeta: String? = null,
+    /** Review ▸ Tracked (ADR 0066): the conversation's `endStateNote`, the row's context line. */
+    val trackedNote: String? = null,
+    /** Review ▸ Tracked: the title of the issue link ([trackedLinkUrl]). */
+    val trackedLinkTitle: String? = null,
+    /** Review ▸ Tracked: the web URL of the issue the work went to; it opens in the browser. */
+    val trackedLinkUrl: String? = null,
 )
 
 /**
@@ -193,7 +199,7 @@ data class TaskRowMenuAction(
             (task.isWaiting || !needsWaiting)
 }
 
-/** The last group of a list, which the user folds (Review's Faded). Its rows carry no group header. */
+/** A group at the end of a list, which the user folds (Review's Tracked and Faded). Its rows carry no group header. */
 data class CollapsibleTaskGroup(
     val header: TaskGroupHeader,
     val tasks: List<TaskListItem>,
@@ -201,6 +207,10 @@ data class CollapsibleTaskGroup(
     val onToggle: () -> Unit,
     /** Shown above the rows while the group is open. */
     val banner: (@Composable () -> Unit)? = null,
+    /** The row menu of this group's rows (Tracked: `task.tracked`); null uses the list's menu. */
+    val rowMenuGroups: List<List<TaskRowMenuAction>>? = null,
+    /** Opens a row of this group; null uses the list's collapsible-row open. */
+    val onOpenTask: ((String) -> Unit)? = null,
 )
 
 /** Portable task-list surface. Platform hosts provide registry copy and bind actions to their mutators. */
@@ -256,7 +266,8 @@ fun TaskHomeContent(
     reviewSendBackTitle: String = "",
     onAcceptReview: ((String) -> Unit)? = null,
     onSendBackReview: ((String) -> Unit)? = null,
-    collapsibleGroup: CollapsibleTaskGroup? = null,
+    /** Folded groups drawn after the rows, in order (Review: Tracked, then Faded). */
+    collapsibleGroups: List<CollapsibleTaskGroup> = emptyList(),
     onOpenCollapsibleTask: ((String) -> Unit)? = null,
     expandedTaskId: String? = null,
     expandedTaskContent: (@Composable (task: TaskListItem, position: TaskCardPosition, modifier: Modifier) -> Unit)? = null,
@@ -371,7 +382,7 @@ fun TaskHomeContent(
             }
 
             val hasUpcomingAgenda = isUpcoming && calendarEvents.isNotEmpty()
-            if (hasLoaded && tasks.isEmpty() && inboxTasks.isEmpty() && collapsibleGroup == null &&
+            if (hasLoaded && tasks.isEmpty() && inboxTasks.isEmpty() && collapsibleGroups.isEmpty() &&
                 !hasUpcomingAgenda && emptyTitle.isNotBlank()
             ) {
                 item(key = "empty-state") {
@@ -551,7 +562,7 @@ fun TaskHomeContent(
                 )
             }
 
-            collapsibleGroup?.let { group ->
+            for (group in collapsibleGroups) {
                 item(key = "collapsible-header:${group.header.key}") {
                     TaskGroupHeaderRow(
                         header = group.header,
@@ -576,8 +587,8 @@ fun TaskHomeContent(
                         isDark = isDarkTheme,
                         hasActiveTexture = hasActiveTexture,
                         onComplete = onComplete,
-                        onOpenTask = onOpenCollapsibleTask ?: onOpenTask,
-                        rowMenuGroups = rowMenuGroups,
+                        onOpenTask = group.onOpenTask ?: onOpenCollapsibleTask ?: onOpenTask,
+                        rowMenuGroups = group.rowMenuGroups ?: rowMenuGroups,
                         rowMenuAccessibilityLabel = rowMenuAccessibilityLabel,
                         selection = selection,
                         onTaskAction = onTaskAction,

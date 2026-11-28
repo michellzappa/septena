@@ -8,10 +8,10 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 
 | Status | iPhone | iPad | Mac | Web | Android | Windows | linux | Watch |
 |---|---|---|---|---|---|---|---|---|
-| ships | 63 | 64 | 64 | 55 | 59 | 0 | 0 | 1 |
+| ships | 64 | 65 | 65 | 56 | 60 | 0 | 0 | 1 |
 | partial | 1 | 1 | 1 | 1 | 2 | 0 | 0 | 3 |
-| planned | 2 | 2 | 2 | 6 | 3 | 65 | 65 | 2 |
-| - | 4 | 3 | 3 | 8 | 6 | 5 | 5 | 64 |
+| planned | 2 | 2 | 2 | 6 | 3 | 66 | 66 | 2 |
+| - | 4 | 3 | 3 | 8 | 6 | 5 | 5 | 65 |
 
 **Agent** lists the MCP tools at `api.septena.app/mcp` that reach the feature; **none** means an agent cannot reach it.
 
@@ -23,6 +23,7 @@ The ledger says what is in the code on `main`, not what a store has released. Ho
 | `lists.today` | Today | ships | ships | ships | ships | ships | planned | planned | partial | `tasks_list`, `tasks_move_to_today` | `today` |
 | `lists.review` | Review (questions, finished work, agent work in progress, faded tasks) | ships | ships | ships | ships | ships | planned | planned | - | `tasks_list`, `tasks_set_endstate` | `agent-delegation` |
 | `review.waiting` | Waiting: work handed to a person, in Review | ships | ships | ships | ships | ships | planned | planned | - | `tasks_set_waiting`, `tasks_list` | [pending](https://github.com/septena/site/issues/85) |
+| `review.tracked` | Tracked: tasks whose work goes on elsewhere, in Review | ships | ships | ships | ships | ships | planned | planned | - | `tasks_set_endstate`, `tasks_list` | [pending](https://github.com/septena/site/issues/84) |
 | `lists.agent` | Agent work by stage (Working, Queued, Stopped groups in Review) | ships | ships | ships | ships | ships | planned | planned | - | `tasks_pending_reasoning`, `tasks_claim`, `tasks_release`, `tasks_agent_events`, `tasks_set_assignee` | [pending](https://github.com/septena/site/issues/85) |
 | `lists.upcoming` | Upcoming | ships | ships | ships | ships | ships | planned | planned | - | `tasks_list`, `tasks_defer` | [pending](https://github.com/septena/site/issues/85) |
 | `lists.anytime` | Anytime | ships | ships | ships | ships | ships | planned | planned | - | `tasks_list` | [pending](https://github.com/septena/site/issues/85) |

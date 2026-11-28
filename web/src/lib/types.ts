@@ -241,6 +241,8 @@ export interface TaskRow {
   assignedAt?: string | null;
   /** Derived input for core view membership; never stored or pushed. */
   assignedToOther?: boolean;
+  /** Derived input for core view membership: the conversation's end state (ADR 0066); never stored or pushed. */
+  endState?: string | null;
   effort?: string | null;
   deletedAt?: string | null;
   updatedAt?: string | null;

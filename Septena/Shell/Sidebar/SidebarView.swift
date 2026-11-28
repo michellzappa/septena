@@ -1595,13 +1595,17 @@ struct SidebarRootView: View {
       // Faded open tasks leave every count and project ratio (docs/TASK_FADE_SPEC.md §4).
       if t.isFaded { faded += 1; continue }
       if t.status == .open { open += 1 }
+      // A tracked task (ADR 0066) leaves its area and project lists, so it
+      // leaves their counts and the project ring too (as on the Mac sidebar).
+      let tracked = t.status == .open && t.isTracked
       if let pid = t.project {
         switch t.status {
         case .done:                 done[pid, default: 0] += 1; total[pid, default: 0] += 1
+        case .open where tracked:   break
         case .open:                 total[pid, default: 0] += 1; projOpen[pid, default: 0] += 1
         case .cancelled, .checklistChecked: break
         }
-      } else if let aid = t.area, t.status == .open {
+      } else if let aid = t.area, t.status == .open, !tracked {
         areaDirectOpen[aid, default: 0] += 1
       }
       guard t.status == .open else { continue }

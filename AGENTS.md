@@ -80,9 +80,13 @@ remote-build "xcodegen generate && SEPTENA_NO_SIGNING=1 ./scripts/build.sh Septa
 `.github/workflows/android.yml` on `ubuntu-latest`, using Temurin JDK 17 and
 the checked-in `android/gradlew` wrapper. The workflow uploads a short-lived
 debug APK artifact for the user to install on a connected device with `adb`.
-It does not run tests or launch the app. The mini currently has no Java runtime,
-so do not use `remote-build` for Android or install toolchains unless the user
-explicitly asks for that download.
+It does not run tests or launch the app. The mini has no Java on its default
+path, but it has JDK 17 at `~/opt/jdk-17/Contents/Home` and an Android SDK at
+`~/Library/Android/sdk`. An Android compile there:
+`remote-build 'cd android && ANDROID_HOME=$HOME/Library/Android/sdk JAVA_HOME=$HOME/opt/jdk-17/Contents/Home ./gradlew -Porg.gradle.java.installations.paths=$HOME/opt/jdk-17/Contents/Home -Porg.gradle.java.installations.auto-download=false :core:compileTestKotlin :app:compileDebugKotlin --no-daemon'`.
+The core conformance tests (`:core:test`) do not run on the mini: the core
+release ships JVM natives for Linux and Windows only. Never install toolchains
+unless the user explicitly asks for that download.
 
 **The website rebuilds on a registry change.** septena.app copies
 `registry/`, the changelog and the connector's tool list from `main`. When a

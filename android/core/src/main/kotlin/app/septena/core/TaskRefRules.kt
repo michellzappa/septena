@@ -25,6 +25,8 @@ data class TaskRefRecord(
     val rawId: String?,
     val account: String?,
     val position: Double?,
+    /** When the reference was added (`taskRef.createdAt`), or null. */
+    val createdAt: String? = null,
 ) {
     /** The part of `key` after `<kind>:`. */
     val keyId: String
@@ -91,6 +93,7 @@ data class TaskRefRecord(
                 rawId = snapshotObj["rawId"].stringValue(),
                 account = snapshotObj["account"].stringValue(),
                 position = pos,
+                createdAt = fields[RegistryEntityFields.TaskRef.CREATED_AT].stringValue(),
             )
         }
     }
@@ -112,6 +115,22 @@ object TaskRefResolver {
         val uri = runCatching { URI(trimmed) }.getOrNull() ?: return false
         val scheme = uri.scheme?.lowercase() ?: return false
         return (scheme == "http" || scheme == "https") && !uri.host.isNullOrBlank()
+    }
+
+    /**
+     * The link a Review ▸ Tracked row shows (docs/REVIEW_SPEC.md §2, ADR 0066): the newest `issue`
+     * reference that opens in the browser, else the first reference (in list order) that does.
+     * Returns the reference and its web URL, or null.
+     */
+    fun trackedLink(refs: List<TaskRefRecord>): Pair<TaskRefRecord, String>? {
+        fun webUrl(ref: TaskRefRecord): String? = (target(ref) { false } as? TaskRefTarget.Url)?.url
+        val issue = refs.asSequence()
+            .filter { it.kind == "issue" }
+            .sortedWith(compareByDescending<TaskRefRecord> { it.createdAt.orEmpty() }.thenByDescending { it.position ?: 0.0 })
+            .firstNotNullOfOrNull { ref -> webUrl(ref)?.let { ref to it } }
+        if (issue != null) return issue
+        return refs.sortedWith(compareBy<TaskRefRecord>({ it.position ?: Double.MAX_VALUE }, { it.id }))
+            .firstNotNullOfOrNull { ref -> webUrl(ref)?.let { ref to it } }
     }
 
     fun target(ref: TaskRefRecord, hasTask: (String) -> Boolean): TaskRefTarget? {
