@@ -70,6 +70,7 @@ enum RegistryEntityEnums {
   static let taskStatus: [String] = ["open", "done", "cancelled", "checklistChecked"]
   static let checklistMode: [String] = ["plain", "groceries"]
   static let taskSource: [String] = ["app", "mcp"]
+  static let taskAddedVia: [String] = ["typed", "quick-entry", "quick-add", "share", "shortcut", "import", "agent", "api"]
   static let projectStatus: [String] = ["active", "done", "cancelled"]
   static let taskKind: [String] = ["heading"]
   static let listSort: [String] = ["manual", "when", "deadline", "title", "created"]
