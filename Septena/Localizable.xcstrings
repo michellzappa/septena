@@ -4086,6 +4086,10 @@
         }
       }
     },
+    "A change couldn’t be saved" : {
+      "comment" : "Generated from registry surfaces.prompts.items.changeNotSaved.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "A free account connects one agent. Plus connects three. Pro has no limit." : {
       "comment" : "Generated from registry plans.upsells.agents_full.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
@@ -27626,6 +27630,10 @@
           }
         }
       }
+    },
+    "One edit was rolled back and is not stored. Anything you typed just now may need retyping. Later changes still save normally." : {
+      "comment" : "Generated from registry surfaces.prompts.items.changeNotSaved.message. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Only approve a code you started yourself. Septena never asks for a code by email, text or phone call." : {
       "comment" : "Generated from registry settings.copy.sign_in_approval.safetyFooter.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",

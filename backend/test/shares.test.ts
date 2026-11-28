@@ -1,6 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createTestProjectStore, createTestTaskStore } from "./taskStoreHarness.ts";
+import { createTestProjectStore, createTestTaskStore, installWorkerTestHooks } from "./taskStoreHarness.ts";
+
+installWorkerTestHooks();
+const { zPushBody } = await import("../src/store/ops.ts");
 import type { Op } from "../src/store/ops.ts";
 
 // Shared projects across real stores (docs/PROJECT_SHARING_SPEC.md): two or
@@ -345,6 +348,40 @@ test("two members edit the same notes at once: both keep their words", async () 
   const notes = w.row("ann", "projects", "id = ?", "home")!.notes as string;
   assert.deepEqual(notes.split("\n").sort(), ["ann", "ben", "brief"]);
   assert.equal(w.row("ben", "projects", "title = ? AND deletedAt IS NULL", "Home")!.notes, notes);
+});
+
+// #617: project notes typed in the app, sent through /v1/sync/push as the
+// app sends them (the Worker's schema first, then the store).
+test("project notes the app pushes save for the owner and for a member, and both read them", async () => {
+  // A first random byte of 0xff: every base64url id starts with "_".
+  const real = crypto.getRandomValues.bind(crypto);
+  crypto.getRandomValues = (<T extends ArrayBufferView | null>(a: T): T => {
+    real(a as ArrayBufferView);
+    if (a && a.byteLength) new Uint8Array(a.buffer, a.byteOffset, a.byteLength)[0] = 0xff;
+    return a;
+  }) as typeof crypto.getRandomValues;
+  try {
+    const { w, join } = await shared();
+    await join("ben", "Ben");
+    const benProject = w.row("ben", "projects", "title = ? AND deletedAt IS NULL", "Home")!.id as string;
+    let n = 0;
+    const appPush = (u: string, id: string, notes: string, base: string | null) => {
+      const body = { ops: [{ clientOpId: `app-${u}-${String(++n).padStart(6, "0")}`, op: "upsert", entity: "project", id, fields: { notes }, base: { notes: base } }] };
+      const parsed = zPushBody.safeParse(body);
+      assert.ok(parsed.success, `the Worker refuses ${u}'s push: ${parsed.success ? "" : JSON.stringify(parsed.error.issues)}`);
+      return w.store(u).push(parsed.data.ops as Op[], "app:test").result.results[0];
+    };
+    assert.equal(appPush("ann", "home", "brief\nowner line", "brief").status, "applied");
+    await w.settle();
+    for (const [u, id] of [["ann", "home"], ["ben", benProject]]) assert.equal(w.row(u, "projects", "id = ?", id)!.notes, "brief\nowner line", u);
+    assert.equal(appPush("ben", benProject, "brief\nowner line\nmember line", "brief\nowner line").status, "applied");
+    await w.settle();
+    for (const [u, id] of [["ann", "home"], ["ben", benProject]]) {
+      assert.equal(w.row(u, "projects", "id = ?", id)!.notes, "brief\nowner line\nmember line", u);
+    }
+  } finally {
+    crypto.getRandomValues = real;
+  }
 });
 
 test("a device that was offline sends the notes it started from: nothing is overwritten", async () => {

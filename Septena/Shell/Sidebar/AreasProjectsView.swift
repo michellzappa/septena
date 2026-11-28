@@ -172,6 +172,7 @@ struct AreaDetailView: View {
   @Environment(DayClock.self) private var clock
   @Environment(NavigationState.self) private var nav
   @Environment(\.usesPushNavigation) private var usesPushNavigation
+  @Environment(\.scenePhase) private var scenePhase
   @Environment(AreasMutator.self) private var areasMutator
   @Environment(ProjectsMutator.self) private var projectsMutator
   @Environment(TaskMutator.self) private var taskMutator
@@ -341,6 +342,13 @@ struct AreaDetailView: View {
     }
     .septenaToastOverlay(store: toastStore)
     .septenaInlineTitle()
+    // A blur is not the only way out of the notes field. Leaving the page
+    // (Back, a swipe, a sidebar tap) or the app can end the field with no
+    // blur, and the draft then never reached the store (#617).
+    .onDisappear { commitNotes() }
+    .onChange(of: scenePhase) { _, phase in
+      if phase != .active { commitNotes() }
+    }
     #if os(iOS)
     .toolbar {
       ToolbarItem(placement: usesPushNavigation ? .primaryAction : .topBarTrailing) {
@@ -620,11 +628,12 @@ struct AreaDetailView: View {
 
   private func commitNotes() {
     guard draftNotes != originalNotes else { return }
-    originalNotes = draftNotes
+    let value = draftNotes
+    originalNotes = value
     Task {
       do {
         try await areasMutator.setContext(id: area.id,
-                                          context: draftNotes.isEmpty ? nil : draftNotes)
+                                          context: value.isEmpty ? nil : value)
       } catch {
         errorMessage = error.localizedDescription
       }
@@ -712,6 +721,7 @@ struct ProjectDetailView: View {
   @Environment(\.dismiss) private var dismiss
   @Environment(\.modelContext) private var modelContext
   @Environment(\.usesPushNavigation) private var usesPushNavigation
+  @Environment(\.scenePhase) private var scenePhase
 
   @State private var draftName: String
   @State private var draftNotes: String
@@ -838,6 +848,13 @@ struct ProjectDetailView: View {
       }
     }
     .septenaInlineTitle()
+    // A blur is not the only way out of the notes field. Leaving the page
+    // (Back, a swipe, a sidebar tap) or the app can end the field with no
+    // blur, and the draft then never reached the store (#617).
+    .onDisappear { commitNotes() }
+    .onChange(of: scenePhase) { _, phase in
+      if phase != .active { commitNotes() }
+    }
     .toolbar { projectDetailToolbar }
     .sheet(isPresented: $showingMoveToArea) {
       AreaPickerSheet(areas: areas, currentAreaId: project.area) { newAreaId in
@@ -1047,11 +1064,13 @@ struct ProjectDetailView: View {
   }
 
   private func commitNotes() {
-    guard draftNotes != originalNotes else { return }
+    // A template nobody typed into is not notes (the blur clears it too).
+    let value = ContainerNotes.isUntouchedTemplate(draftNotes) ? "" : draftNotes
+    guard value != originalNotes else { return }
     let from = originalNotes
-    originalNotes = draftNotes
+    originalNotes = value
     Task {
-      do { try await projectsMutator.setNotes(id: project.id, notes: draftNotes, from: from) }
+      do { try await projectsMutator.setNotes(id: project.id, notes: value, from: from) }
       catch { errorMessage = error.localizedDescription }
     }
   }

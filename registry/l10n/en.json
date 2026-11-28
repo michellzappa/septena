@@ -88,6 +88,12 @@
       "plans.outcomes.nothing_lost.rows.files.cells.pro"
     ]
   },
+  "A change couldn’t be saved": {
+    "text": "A change couldn’t be saved",
+    "paths": [
+      "surfaces.prompts.items.changeNotSaved.title"
+    ]
+  },
   "A free account connects one agent. Plus connects three. Pro has no limit.": {
     "text": "A free account connects one agent. Plus connects three. Pro has no limit.",
     "paths": [
@@ -2879,6 +2885,7 @@
   "OK": {
     "text": "OK",
     "paths": [
+      "surfaces.prompts.items.changeNotSaved.confirmTitle",
       "surfaces.prompts.error.confirmTitle"
     ]
   },
@@ -2970,6 +2977,12 @@
     "text": "One",
     "paths": [
       "settings.keys.tasksTitleLines.options.0.title"
+    ]
+  },
+  "One edit was rolled back and is not stored. Anything you typed just now may need retyping. Later changes still save normally.": {
+    "text": "One edit was rolled back and is not stored. Anything you typed just now may need retyping. Later changes still save normally.",
+    "paths": [
+      "surfaces.prompts.items.changeNotSaved.message"
     ]
   },
   "Only This Task": {

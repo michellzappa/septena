@@ -112,6 +112,18 @@ class SyncController(
         if (again.get()) requestSync()
     }
 
+    /**
+     * True when a sync could not save a write and the user has not been told yet. The
+     * home screen shows the `changeNotSaved` prompt (Apple: `StoreHealthState`), then
+     * calls [acknowledgeRefusedWrite]. The write itself stays under Settings, Not synced.
+     */
+    private val _refusedWrite = MutableStateFlow(false)
+    val refusedWrite: StateFlow<Boolean> = _refusedWrite.asStateFlow()
+
+    fun acknowledgeRefusedWrite() {
+        _refusedWrite.value = false
+    }
+
     /** Local writes change the store without a sync; screens reload on this too. */
     fun noteLocalChange() {
         _dataVersion.value += 1
@@ -120,7 +132,7 @@ class SyncController(
     private suspend fun runOnce() {
         _state.value = SyncState.Syncing
         _state.value = try {
-            engine.sync()
+            if (engine.sync().rejectedOperations > 0) _refusedWrite.value = true
             // A failed follow-up never marks the sync itself as failed: it retries next sync.
             if (runCatching { afterSync() }.getOrDefault(false)) again.set(true)
             SyncState.Synced(Instant.now())

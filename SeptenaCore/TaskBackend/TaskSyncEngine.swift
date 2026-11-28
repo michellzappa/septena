@@ -1041,12 +1041,18 @@ final class TaskSyncEngine {
   /// instead (`settingsRefused`), because the likely cause is a server that
   /// predates settings, and a repair pull would then repeat on every sync.
   /// Its shadow goes, so the next launch sends the value again.
-  private func noteRejected(_ entity: BackendEntity, id: String, store: TaskSyncStore) {
+  ///
+  /// Any other row: the repair pull puts the backend's row back, so the edit
+  /// is gone on this device. It never goes silently (#617): the user gets the
+  /// same alert as a rolled-back save (`StoreHealthState`), a shared project's
+  /// rule included.
+  private func noteRejected(_ entity: BackendEntity, id: String, reason: String?, store: TaskSyncStore) {
     if entity == .setting {
       settingsRefused = true
       store.removeShadow("setting:\(id)")
     } else {
       needsRepairPull = true
+      StoreHealthState.shared.noteRefusedWrite("\(entity.rawValue) \(id): refused by the backend (\(reason ?? "no reason"))")
     }
   }
 
@@ -1194,8 +1200,9 @@ final class TaskSyncEngine {
         }
         store.remove(op)
         if result.reason?.hasPrefix("shared_") == true {
-          // A rule of a shared project, not a fault: the pull puts the row back.
-          noteRejected(entity, id: op.rowID, store: store)
+          // A rule of a shared project, not a fault: the pull puts the row
+          // back. Not a sync issue, but the user still hears of it.
+          noteRejected(entity, id: op.rowID, reason: result.reason, store: store)
           continue
         }
         addIssue(entity, op.rowID, "rejected by the backend: \(result.reason ?? "no reason")")
@@ -1204,7 +1211,7 @@ final class TaskSyncEngine {
             store.remove(upload)
           }
         }
-        noteRejected(entity, id: op.rowID, store: store)
+        noteRejected(entity, id: op.rowID, reason: result.reason, store: store)
       }
     }
     for (entity, id) in dropped { handleDropped(entity, id, store: store) }
@@ -1231,7 +1238,7 @@ final class TaskSyncEngine {
         return
       }
       addIssue(entity, op.rowID, "refused by the backend: \(why)")
-      noteRejected(entity, id: op.rowID, store: store)
+      noteRejected(entity, id: op.rowID, reason: why, store: store)
     }
     if !bad.isEmpty {
       for i in bad.sorted() { reject(batch[i], message) }
