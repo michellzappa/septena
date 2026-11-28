@@ -214,3 +214,30 @@ Decided 2026-11-28 (mz took the defaults; overrule any of them):
 4. Site: the page in §3, the join form, the three-step drawing, Codex’s
    Support form changes.
 5. mz: turn off the public TestFlight link, make the first code, send §4.1.
+
+## 7. The checklist in the app
+
+mz, 2026-11-28: the beta asks for feedback on ten parts of the app, and the
+app knows who is a tester. Only an account that holds a tester's Pro grant
+sees any of this. No badges, no reminders.
+
+- **The items** live in `registry/beta.json`: inbox-today, do,
+  second-device, fade, connect-agent, review-stop, discuss, move-in, siri,
+  capture. Each names its features; `GET /v1/beta?platform=…` lists only the
+  items whose features ship on that platform.
+- **The contract** is the `deal` line at the top of the Beta screen: what the
+  tester does, and the year of Pro in return. The tester ticks “I tried it”
+  per item and can say “I used Septena for real this week” (`_ack`, with its
+  date). Nothing asks for either.
+- **Where it shows:** a Beta row in Settings (“4 of 10 tried”) opens the
+  Beta screen. The first time the app sees a tester, one card on Today
+  (`cardTitle`, `cardBody`) opens the screen or closes for good (`_card`).
+- **Send a note** on an item opens Contact Support with the subject
+  “Beta: {item}”.
+- **Admin:** the Beta card counts accounts per ticked item.
+
+API: `GET /v1/beta?platform=ios|ipados|macos|web|android|windows|linux`
+answers `{ member: false }`, or `{ member: true, joinedAt, copy, items: [{ id,
+title, try }], tried: { id: at }, ackAt, cardDismissedAt, feedbackURL }`.
+`POST /v1/beta/progress` takes one of `{ item, tried }`, `{ ack: true }` or
+`{ dismissCard: true }` and answers 204, or 404 for a non-tester.

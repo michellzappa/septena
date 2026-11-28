@@ -9,7 +9,7 @@ import {
 } from "./metrics.js";
 import type { Row as TrafficRow, TrafficResult } from "./plausible.js";
 import type { MacRelease } from "./releases.js";
-import { DESIGN_TOKENS, SETTINGS_REGISTRY } from "../generated/registries.js";
+import { BETA_CHECKLIST, DESIGN_TOKENS, SETTINGS_REGISTRY } from "../generated/registries.js";
 import type { BetaCode } from "../store/betaInvites.js";
 
 // The admin pages (docs/ADMIN_CONSOLE_SPEC.md §3). Each page is one HTML
@@ -55,7 +55,7 @@ export interface AdminView {
   error?: string;
   now: number;
   /// The beta by invite code (ADR 0064), on the Plans page.
-  beta?: { codes: BetaCode[]; counts: Record<string, { joined: number; granted: number }>; launchAt: number | null; newCode?: string };
+  beta?: { codes: BetaCode[]; counts: Record<string, { joined: number; granted: number }>; launchAt: number | null; progress: Record<string, number>; newCode?: string };
 }
 
 const CSS = `
@@ -468,6 +468,7 @@ function betaCard(b: NonNullable<AdminView["beta"]>, now: number): string {
   <button class="primary">Make a code</button>
 </form>
 <div style="margin-top:14px">${table(["Code", "Label", "Joined", "Pro on an account", "State", "Ends", "Made", ""], rows, "No codes yet.")}</div>
+<div style="margin-top:14px">${tallyList("Checklist: accounts that ticked it", [...BETA_CHECKLIST.items.map((i) => ({ name: i.title, n: b.progress[i.id] ?? 0 })), { name: "Used it this week (ever)", n: b.progress._ack ?? 0 }])}</div>
 <div style="margin-top:14px">${launch}</div>`,
     "A person joins on septena.app/beta with their email and a code. Apple sends the TestFlight invite; Septena sends the welcome mail with their Pro link.");
 }

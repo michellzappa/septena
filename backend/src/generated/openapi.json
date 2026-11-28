@@ -2513,6 +2513,211 @@
         }
       }
     },
+    "/v1/beta": {
+      "get": {
+        "operationId": "get_beta",
+        "tags": [
+          "account"
+        ],
+        "summary": "The beta checklist for this platform. `member: false` for an account that is not a beta tester's.",
+        "security": [
+          {
+            "appSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "platform",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ios",
+                "ipados",
+                "macos",
+                "web",
+                "android",
+                "windows",
+                "linux"
+              ]
+            }
+          },
+          {
+            "$ref": "#/components/parameters/ErrorFormat"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The checklist, or member false.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The credential is missing, expired or revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/beta/progress": {
+      "post": {
+        "operationId": "post_beta_progress",
+        "tags": [
+          "account"
+        ],
+        "summary": "Tick or untick a checklist item, say you used Septena this week, or close the welcome card.",
+        "security": [
+          {
+            "appSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ErrorFormat"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "item": {
+                        "type": "string",
+                        "enum": [
+                          "inbox-today",
+                          "do",
+                          "second-device",
+                          "fade",
+                          "connect-agent",
+                          "review-stop",
+                          "discuss",
+                          "move-in",
+                          "siri",
+                          "capture"
+                        ]
+                      },
+                      "tried": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "item",
+                      "tried"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "ack": {
+                        "const": true
+                      }
+                    },
+                    "required": [
+                      "ack"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "dismissCard": {
+                        "const": true
+                      }
+                    },
+                    "required": [
+                      "dismissCard"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Saved."
+          },
+          "400": {
+            "description": "The request is not valid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The credential is missing, expired or revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The account is not a beta tester's.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/auth/identities": {
       "get": {
         "operationId": "get_auth_identities",

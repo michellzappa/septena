@@ -156,19 +156,21 @@ internal fun ContactSupportRow(label: String?, env: SettingsSurfaceEnv, language
     }
 }
 
+/** The Contact Support form. [initialText] starts the message, as the beta's "Send a note" does. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ContactSupportScreen(
+internal fun ContactSupportScreen(
     graph: AndroidAppGraph,
     signedIn: Boolean,
     syncState: SyncState,
     languageTag: String,
     onClose: () -> Unit,
+    initialText: String = "",
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var messages by remember { mutableStateOf<List<SupportMessage>>(emptyList()) }
-    var text by rememberSaveable { mutableStateOf("") }
+    var text by rememberSaveable { mutableStateOf(initialText) }
     var email by rememberSaveable { mutableStateOf("") }
     var includeDiagnostics by rememberSaveable { mutableStateOf(false) }
     var sendState by remember { mutableStateOf<SendState>(SendState.Idle) }

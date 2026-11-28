@@ -1,5 +1,8 @@
 import {
   zAccessSummary,
+  zBetaState,
+  type BetaProgress,
+  type BetaState,
   zEntitlement,
   type Entitlement,
   zAuthMethodsResponse,
@@ -564,6 +567,31 @@ export class SeptenaApiClient {
       throw new ApiError(res.status, err.error ?? "entitlement_failed", err.message, raw);
     }
     return zEntitlement.parse(await res.json());
+  }
+
+  /** The beta checklist (GET /v1/beta, docs/BETA_ONBOARDING_SPEC.md §7). */
+  async getBeta(): Promise<BetaState> {
+    const res = await this.authedFetch("/v1/beta?platform=web", { method: "GET" });
+    if (!res.ok) {
+      const raw = await res.text().catch(() => "");
+      const err = parseErr(raw);
+      throw new ApiError(res.status, err.error ?? "beta_failed", err.message, raw);
+    }
+    return zBetaState.parse(await res.json());
+  }
+
+  /** One checklist change (POST /v1/beta/progress). 404: not a tester. */
+  async postBetaProgress(body: BetaProgress): Promise<void> {
+    const res = await this.authedFetch("/v1/beta/progress", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (res.status !== 204 && !res.ok) {
+      const raw = await res.text().catch(() => "");
+      const err = parseErr(raw);
+      throw new ApiError(res.status, err.error ?? "beta_progress_failed", err.message, raw);
+    }
   }
 
   async revokeDevice(sid: string): Promise<void> {

@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "description": "The beta checklist (ADR 0064, docs/BETA_ONBOARDING_SPEC.md §7). The backend serves it to beta testers only (GET /v1/beta), filtered to the items whose features ship on the asking platform. The site's /beta page and the welcome mail read the same items. English only: the beta is English.",
+  "copy": {
+    "settingsRow": "Beta",
+    "settingsSummary": "{tried} of {total} tried",
+    "title": "Beta",
+    "deal": "Your part: use Septena for real, try what is below, and tell me what you find. My part: a year of Pro when Septena launches.",
+    "intro": "Tick what you tried. When something breaks or confuses you, send a note from that item.",
+    "tried": "I tried it",
+    "note": "Send a note",
+    "noteSubject": "Beta: {item}",
+    "ack": "I used Septena for real this week",
+    "ackDone": "Thanks. You last said so on {date}.",
+    "cardTitle": "You’re in the beta",
+    "cardBody": "Thanks for testing Septena. Your checklist is in Settings, under Beta.",
+    "cardOpen": "Open the checklist",
+    "cardDismiss": "Not now"
+  },
+  "items": [
+    {
+      "id": "inbox-today",
+      "features": ["lists.inbox"],
+      "title": "Sort your Inbox into Today",
+      "try": "Capture a few tasks, then move them from the Inbox at the top of Today into Today, an area or a project."
+    },
+    {
+      "id": "do",
+      "features": ["task.do"],
+      "title": "Do one task",
+      "try": "Pick one task to Do and work from it. Check that it stays with you on every screen."
+    },
+    {
+      "id": "second-device",
+      "features": ["sync.backend"],
+      "title": "Use a second device",
+      "try": "Sign in on another device. Change a task on one and check that the change arrives on the other."
+    },
+    {
+      "id": "fade",
+      "features": ["fade.sweep"],
+      "title": "Let a few tasks fade",
+      "try": "Leave some tasks alone for a while. They fade, and once a week Septena asks if you still want them."
+    },
+    {
+      "id": "connect-agent",
+      "features": ["agents.connector"],
+      "title": "Connect your agent",
+      "try": "Connect Claude or another agent and give it one task you can check."
+    },
+    {
+      "id": "review-stop",
+      "features": ["lists.review", "agents.stop-pause"],
+      "title": "Review and stop an agent",
+      "try": "Answer its question, then Accept or Send back its work in Review. Press Stop on a task, or Pause all agents."
+    },
+    {
+      "id": "discuss",
+      "features": ["ai.discuss"],
+      "title": "Discuss a task",
+      "try": "Open a task and press Discuss. Talk it through and see what it suggests."
+    },
+    {
+      "id": "move-in",
+      "features": ["import.things", "import.reminders", "data.import-export"],
+      "title": "Move in from another app",
+      "try": "Bring your tasks over from the app you use now. Tell me what came across wrong."
+    },
+    {
+      "id": "siri",
+      "features": ["system.shortcuts", "import.reminders"],
+      "title": "Add a task with Siri or Shortcuts",
+      "try": "Add a task with Siri or a Shortcut, or bring your Reminders into the Inbox."
+    },
+    {
+      "id": "capture",
+      "features": ["capture.quick-entry", "capture.share-target", "capture.quick-add"],
+      "title": "Capture from anywhere",
+      "try": "Add a task from wherever you are: Quick Entry, Quick Add or the share sheet."
+    }
+  ]
+}

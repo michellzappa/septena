@@ -520,3 +520,38 @@ export type ActiveDestination =
   | { kind: "smart"; id: SmartDestination }
   | { kind: "area"; id: string }
   | { kind: "project"; id: string };
+
+// GET /v1/beta?platform=web (docs/BETA_ONBOARDING_SPEC.md §7). Every word on
+// the Beta screen and the Today card comes from `copy`; a non-tester gets
+// `{ member: false }` and the app shows nothing.
+export const zBetaCopy = z.object({
+  settingsRow: z.string(),
+  settingsSummary: z.string(),
+  title: z.string(),
+  deal: z.string(),
+  intro: z.string(),
+  tried: z.string(),
+  note: z.string(),
+  noteSubject: z.string(),
+  ack: z.string(),
+  ackDone: z.string(),
+  cardTitle: z.string(),
+  cardBody: z.string(),
+  cardOpen: z.string(),
+  cardDismiss: z.string(),
+});
+export const zBetaMember = z.object({
+  member: z.literal(true),
+  joinedAt: z.number().nullable().optional(),
+  copy: zBetaCopy,
+  items: z.array(z.object({ id: z.string(), title: z.string(), try: z.string() })),
+  tried: z.record(z.string(), z.number()),
+  ackAt: z.number().nullable(),
+  cardDismissedAt: z.number().nullable(),
+  feedbackURL: z.string().optional(),
+});
+export const zBetaState = z.discriminatedUnion("member", [z.object({ member: z.literal(false) }), zBetaMember]);
+export type BetaMember = z.infer<typeof zBetaMember>;
+export type BetaState = z.infer<typeof zBetaState>;
+/** POST /v1/beta/progress: exactly one of these. */
+export type BetaProgress = { item: string; tried: boolean } | { ack: true } | { dismissCard: true };
