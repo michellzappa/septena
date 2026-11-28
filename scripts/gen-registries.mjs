@@ -713,6 +713,7 @@ function checkTaskDateBoard({ surfaces, icons, caps, actions }) {
   const groups = surfaces.taskDateBoard?.groups ?? [];
   assert(groups.length === DATE_BOARD_GROUPS.length && groups.every((g, i) => g === DATE_BOARD_GROUPS[i]), `surfaces.json: taskDateBoard.groups must be ${JSON.stringify(DATE_BOARD_GROUPS)}`);
   assert(typeof surfaces.taskDateBoard?.tomorrow?.label === "string", "surfaces.json: taskDateBoard.tomorrow.label is missing");
+  assert(DATE_BOARD_OPEN_FOCUS.has(surfaces.taskDateBoard?.openFocus), `surfaces.json: taskDateBoard.openFocus must be one of ${JSON.stringify([...DATE_BOARD_OPEN_FOCUS])}`);
   let lastGroup = 0;
   for (const r of rows) {
     const g = groups.indexOf(r.group);
@@ -737,6 +738,12 @@ function checkTaskDateBoard({ surfaces, icons, caps, actions }) {
 }
 const DATE_BOARD_ROW_KINDS = new Set(["calendar", "time", "repeatRule", "clear"]);
 const DATE_BOARD_GROUPS = ["pick", "refine", "remove"];
+// Which cell holds keyboard focus when the board opens (#847). "none": no
+// cell; the first arrow key focuses the cell that holds the task's value
+// (the day, or Pick another date for a date past the strip), else Today.
+// "currentValue": that cell from the start. The task's value keeps its
+// current-value ground either way.
+const DATE_BOARD_OPEN_FOCUS = new Set(["none", "currentValue"]);
 const DATE_BOARD_ATTRIBUTES = new Set(["when", "deadline"]);
 
 // One picker per attribute (ADR 0029): every popover attribute is opened by
@@ -1917,6 +1924,9 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("  static func dateBoardRows(for attribute: RegistryDateBoardAttribute, on platform: String) -> [RegistryDateBoardRow] {");
   lines.push("    dateBoardRows.filter { $0.applies(to: attribute, on: platform) }");
   lines.push("  }");
+  lines.push("  /// The date board opens with the start cell focused (`taskDateBoard.openFocus`).");
+  lines.push("  /// False: no cell is focused until the first arrow key or the pointer.");
+  lines.push(`  static let dateBoardFocusesOnOpen: Bool = ${surfaces.taskDateBoard.openFocus === "currentValue"}`);
   lines.push(`  static let taskDateBoardOverdueLabel: String = ${L(surfaces.taskDateBoard.overdue.label, surfaces.taskDateBoard.overdue, "label")}`);
   const cal = surfaces.taskDateBoard.rows.find((r) => r.kind === "calendar");
   lines.push("  /// The calendar row when the task has a date past the day strip.");
