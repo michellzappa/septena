@@ -39,7 +39,7 @@
   ],
   "projects": [
     {
-      "title": "Orchard co-op rebrand",
+      "title": "Orchard rebrand",
       "area": "Clients"
     },
     {
@@ -57,9 +57,9 @@
     {
       "id": "pitch",
       "plot": "The orchard co-op wants the rebrand proposal on Friday, and the school fair needs a stall.",
-      "project": "Orchard co-op rebrand",
+      "project": "Orchard rebrand",
       "order": [
-        "Orchard co-op rebrand",
+        "Orchard rebrand",
         "Studio",
         "Money",
         "School fair"
@@ -69,14 +69,14 @@
         {
           "id": "proposal",
           "title": "Finish the co-op proposal",
-          "group": "Orchard co-op rebrand",
+          "group": "Orchard rebrand",
           "today": true,
           "notes": "Three routes, one price each. Baptiste thinks two routes is braver."
         },
         {
           "id": "workshop",
           "title": "Plan the workshop with the growers",
-          "group": "Orchard co-op rebrand",
+          "group": "Orchard rebrand",
           "today": true,
           "unread": true,
           "notes": "Half of them pick apples until noon. Afternoon, in the packing shed."
@@ -84,18 +84,18 @@
         {
           "id": "labels",
           "title": "Pull the old labels from the archive",
-          "group": "Orchard co-op rebrand",
+          "group": "Orchard rebrand",
           "today": true
         },
         {
           "id": "scope",
           "title": "Write what the price does not cover",
-          "group": "Orchard co-op rebrand"
+          "group": "Orchard rebrand"
         },
         {
           "id": "kickoff",
           "title": "Kickoff call with the co-op board",
-          "group": "Orchard co-op rebrand",
+          "group": "Orchard rebrand",
           "done": true
         },
         {
@@ -133,7 +133,7 @@
       ],
       "capture": {
         "title": "Send Baptiste the cider photos",
-        "group": "Orchard co-op rebrand"
+        "group": "Orchard rebrand"
       },
       "anytime": [
         "proposal",
@@ -258,7 +258,7 @@
       },
       "discuss": {
         "title": "Answer the co-op about the budget",
-        "group": "Orchard co-op rebrand",
+        "group": "Orchard rebrand",
         "notes": "They asked if we can do it for less. Ines says yes to less work, never to a lower rate.",
         "question": "What do you want to offer?",
         "options": [
@@ -284,7 +284,7 @@
       "review": [
         {
           "title": "Turn the workshop notes into three routes",
-          "group": "Orchard co-op rebrand",
+          "group": "Orchard rebrand",
           "note": "Three routes, each with the grower quote it came from.",
           "artifact": "Three routes from the workshop"
         },
