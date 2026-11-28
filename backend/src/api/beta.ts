@@ -281,7 +281,7 @@ export function welcomeMail(email: string, linkUrl: string): Mail {
     { p: "Thanks for testing Septena." },
     { p: `Apple sends its own mail from TestFlight. Open it on your phone or tablet to install. On a Mac, [download the app here](${MAC}).` },
     { p: "These are the parts I most want your notes on. Once you sign in with this address, the app keeps the same list in Settings, under Beta, and you tick what you tried." },
-    { ol: BETA_CHECKLIST.items.map((i) => `**${i.title}.** ${i.try}`) },
+    { ol: BETA_CHECKLIST.items.map((i) => `**[${i.title}](${SITE}${i.help}).** ${i.try}`) },
     { p: `For the agent items, [the agents page](${AGENTS}) shows how to connect yours.` },
     { p: "When something breaks, confuses you or works well, tell me. Say what you tried and what you expected. If an agent was involved, add the prompt." },
     { button: "Send a note", href: FEEDBACK },
