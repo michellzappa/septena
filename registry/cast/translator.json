@@ -2,7 +2,7 @@
   "version": 1, "id": "translator",
   "who": "Translates novels from Japanese and is slowly repairing an old wooden house in the mountains.",
   "people": ["Kenji", "Hana"],
-  "look": { "accent": "haskap", "texture": "washiPaper", "appearance": "light" },
+  "look": { "accent": "colorful", "texture": "topography", "appearance": "light" },
   "areas": [{ "title": "Translation", "emoji": "📖" }, { "title": "House", "emoji": "🏚️" }, { "title": "Village", "emoji": "🍵" }],
   "projects": [{ "title": "The ferry novel", "area": "Translation" }, { "title": "Roof", "area": "House", "progress": 0.65 }, { "title": "Bathroom floor", "area": "House", "progress": 0.1 }],
   "moments": [{
