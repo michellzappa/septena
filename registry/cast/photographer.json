@@ -1,6 +1,7 @@
 {
   "version": 1, "id": "photographer",
   "who": "Photographs weddings from May to October and spends the winter editing, invoicing and catching up.",
+  "icp": { "core": false, "cohort": "thingsUsers" },
   "people": ["Paloma", "Yusuf"],
   "look": { "accent": "pitaya", "texture": "washiPaper", "appearance": "light" },
   "areas": [{ "title": "Couples", "emoji": "💐" }, { "title": "Gear", "emoji": "📷" }, { "title": "Money", "emoji": "🪙" }, { "title": "Life", "emoji": "🌊" }],

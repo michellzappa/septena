@@ -1,0 +1,311 @@
+{
+  "version": 1,
+  "id": "manager",
+  "who": "Manages two engineering teams, nine people in all. Hands the reading before every one-to-one to an agent. Coaches the under-tens at weekends.",
+  "icp": {
+    "core": true,
+    "cohort": "dailyAI"
+  },
+  "people": [
+    "Priya",
+    "Jonas"
+  ],
+  "look": {
+    "accent": "carambola",
+    "texture": "washiPaper",
+    "appearance": "light"
+  },
+  "areas": [
+    {
+      "title": "Teams",
+      "emoji": "🧭"
+    },
+    {
+      "title": "Hiring",
+      "emoji": "🔎"
+    },
+    {
+      "title": "Me",
+      "emoji": "🌱"
+    },
+    {
+      "title": "Home",
+      "emoji": "🏠"
+    },
+    {
+      "title": "Club",
+      "emoji": "⚽️"
+    }
+  ],
+  "projects": [
+    {
+      "title": "Team split",
+      "area": "Teams"
+    },
+    {
+      "title": "Senior hire",
+      "area": "Hiring",
+      "progress": 0.3
+    },
+    {
+      "title": "Spring season",
+      "area": "Club",
+      "progress": 0.1
+    }
+  ],
+  "moments": [
+    {
+      "id": "split",
+      "plot": "One team becomes two next month, and Priya and Jonas both want the new lead role.",
+      "project": "Team split",
+      "order": [
+        "Team split",
+        "Teams",
+        "Senior hire",
+        "Spring season"
+      ],
+      "rolledIn": 1,
+      "tasks": [
+        {
+          "id": "map",
+          "title": "Draw who goes to which team",
+          "group": "Team split",
+          "today": true,
+          "notes": "Keep the pairs that work. Jonas and the new graduate stay together."
+        },
+        {
+          "id": "role-note",
+          "title": "Write the role note for the new lead",
+          "group": "Team split",
+          "today": true,
+          "unread": true,
+          "notes": "What the lead decides, and what stays with me. Priya asked for it in writing."
+        },
+        {
+          "id": "standups",
+          "title": "Pick a stand-up time for both teams",
+          "group": "Team split",
+          "today": true
+        },
+        {
+          "id": "tell",
+          "title": "Plan how to tell the teams",
+          "group": "Team split"
+        },
+        {
+          "id": "budget",
+          "title": "Get the second team budget signed",
+          "group": "Team split",
+          "done": true
+        },
+        {
+          "id": "room",
+          "title": "Book a room for the split meeting",
+          "group": "Inbox",
+          "today": true,
+          "proposal": true
+        },
+        {
+          "id": "pager",
+          "title": "pager rota",
+          "group": "Inbox",
+          "today": true,
+          "muted": true
+        },
+        {
+          "id": "one-to-one",
+          "title": "Prep the one-to-one with Priya",
+          "group": "Teams",
+          "today": true
+        },
+        {
+          "id": "take-home",
+          "title": "Score the take-home task",
+          "group": "Senior hire",
+          "today": true
+        },
+        {
+          "id": "bibs",
+          "title": "Wash the bibs",
+          "group": "Spring season",
+          "today": true
+        }
+      ],
+      "capture": {
+        "title": "Ask Jonas which repos he wants",
+        "group": "Team split"
+      },
+      "anytime": [
+        "map",
+        "role-note",
+        "standups",
+        "take-home",
+        "bibs"
+      ],
+      "picked": [
+        "map",
+        "bibs"
+      ],
+      "open": [
+        "map",
+        "role-note"
+      ],
+      "file": {
+        "title": "Check the move with the director",
+        "notes": "She agreed in principle. Get it in a message before the meeting.",
+        "with": [
+          "map",
+          "one-to-one",
+          "take-home"
+        ]
+      },
+      "dated": {
+        "title": "Announce the new teams",
+        "notes": "Both teams in one room, then a note to the rest. Priya and Jonas hear it from me first.",
+        "when": 4,
+        "due": 5
+      },
+      "repeating": {
+        "title": "One-to-one with Jonas",
+        "group": "Teams",
+        "notes": "His list first. Ask about the on-call week.",
+        "repeat": "Every {weekday}",
+        "with": [
+          "map",
+          "take-home"
+        ]
+      },
+      "attachments": {
+        "task": "standups",
+        "notes": "Two time zones. The people in Lagos start an hour later.",
+        "files": [
+          "team-calendars.png",
+          "standup-options.pdf"
+        ]
+      },
+      "upcoming": [
+        {
+          "in": 1,
+          "tasks": [
+            {
+              "id": "cones",
+              "title": "Collect the cones from the shed",
+              "group": "Spring season"
+            }
+          ]
+        },
+        {
+          "in": 2,
+          "tasks": [
+            {
+              "ref": "take-home",
+              "due": 3
+            }
+          ]
+        },
+        {
+          "in": 4,
+          "tasks": [
+            {
+              "id": "debrief",
+              "title": "Hiring debrief with the panel",
+              "group": "Senior hire"
+            }
+          ]
+        },
+        {
+          "in": 6,
+          "tasks": [
+            {
+              "id": "expenses",
+              "title": "Approve the team expenses",
+              "group": "Me",
+              "repeat": "Every month"
+            }
+          ]
+        },
+        {
+          "in": 7,
+          "tasks": [
+            "repeating"
+          ]
+        }
+      ],
+      "agent": {
+        "title": "Summarise what each team owns",
+        "notes": "Read the service list and the last two months of incidents. Where do the edges blur?",
+        "due": 4,
+        "question": "How should I split the shared services?",
+        "options": [
+          "By who fixes them now",
+          "By who uses them most"
+        ],
+        "artifact": "Who owns what",
+        "bodies": [
+          "Eleven services go to the team that already fixes them. Two have no clear owner: the billing jobs and the search index.",
+          "Nine services follow their heaviest users. The billing jobs move to the new team, which means a handover for Jonas."
+        ],
+        "otherBody": "Every service has an owner in this draft. Split your way: {answer}",
+        "otherAnswer": "Keep anything risky with the older team",
+        "handoff": "Read the ownership list",
+        "acceptance": "Every service has one owning team."
+      },
+      "discuss": {
+        "title": "Answer Priya about the lead role",
+        "group": "Team split",
+        "notes": "She asked if the role is hers. It is open to both of them, and she knows Jonas applied.",
+        "question": "What should the reply do?",
+        "options": [
+          "Explain how we decide",
+          "Offer to talk in person"
+        ],
+        "artifact": "Reply to Priya",
+        "bodies": [
+          "Thank you for asking me straight. Both of you can apply, and the director and I decide by the end of the month, from the same three questions.",
+          "Thank you for asking me straight. I would rather answer this face to face. Can we take thirty minutes before the end of the week?"
+        ],
+        "otherBody": "Thank you for asking me straight. Here is where things are: {answer}",
+        "otherAnswer": "Tell her what the role needs first",
+        "draftHandoff": "Read the reply",
+        "handoff": "Your next step: send it before her stand-up",
+        "acceptance": "Priya knows how the lead is chosen.",
+        "with": [
+          "map",
+          "one-to-one",
+          "take-home"
+        ]
+      },
+      "review": [
+        {
+          "title": "Summarise what each team owns",
+          "group": "Team split",
+          "note": "Thirteen services, the owner of each, and two that nobody owns.",
+          "artifact": "Who owns what"
+        },
+        {
+          "title": "Collect the panel’s interview notes",
+          "group": "Senior hire",
+          "note": "Four interviewers, one page each, scores at the top.",
+          "artifact": "Panel notes"
+        }
+      ],
+      "faded": [
+        "Write a team handbook",
+        "Learn to say no in fewer words",
+        "Read the staff engineer book",
+        "Start a reading group",
+        "Rename the team channel",
+        "Try afternoons without calls",
+        "Make the on-call map pretty",
+        "Visit the Lagos office",
+        "Buy a standing desk",
+        "Write up the database move",
+        "Sort the old design docs",
+        "Learn the new query language",
+        "Plan a team offsite",
+        "Clean the desk drawer",
+        "Shadow a support shift"
+      ]
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 {
   "version": 1, "id": "translator",
   "who": "Translates novels from Japanese and is slowly repairing an old wooden house in the mountains.",
+  "icp": { "core": false, "cohort": "thingsUsers" },
   "people": ["Kenji", "Hana"],
   "look": { "accent": "colorful", "texture": "topography", "appearance": "light" },
   "areas": [{ "title": "Translation", "emoji": "📖" }, { "title": "House", "emoji": "🏚️" }, { "title": "Village", "emoji": "🍵" }],
