@@ -17,10 +17,17 @@ export function avatarCopy(id: string, lang: string): string {
   return entry ? registryText(entry.label, lang) : id;
 }
 
-/** The fill for a palette id, or null (neutral fill) for an unknown id. */
-export function avatarFill(color: string | undefined, isDark: boolean): string | null {
-  const c = AVATAR_COLORS.find((x) => x.id === color);
-  return c ? (isDark ? c.dark : c.light) : null;
+export const AVATAR_DEFAULT_COLOR: string = DESIGN_TOKENS.avatarDefaultColor;
+
+/** The palette entry for an id. A missing or unknown id is the default (Persimmon). */
+export function avatarColor(color: string | undefined) {
+  return AVATAR_COLORS.find((x) => x.id === color) ?? AVATAR_COLORS.find((x) => x.id === AVATAR_DEFAULT_COLOR) ?? AVATAR_COLORS[0];
+}
+
+/** The fill and the ink of the initials for a palette id. */
+export function avatarFill(color: string | undefined, isDark: boolean): { fill: string; ink: string } {
+  const c = avatarColor(color);
+  return isDark ? { fill: c.dark, ink: c.inkDark } : { fill: c.light, ink: c.inkLight };
 }
 
 /** Lenient decode: anything without a string kind and color is no avatar. */

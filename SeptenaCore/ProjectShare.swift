@@ -13,7 +13,7 @@ struct ProjectShare: Codable, Hashable, Sendable {
     /// still decodes.
     let role: String
     /// The member's avatar (#857). Absent from older rows and servers: the
-    /// member then draws as initials on the neutral fill.
+    /// member then draws as initials on the default color.
     let avatar: AccountAvatar?
 
     var isOwner: Bool { role == "owner" }

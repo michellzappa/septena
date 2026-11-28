@@ -4182,6 +4182,10 @@
       "comment" : "Generated from registry plans.benefits.plus.history.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
+    "ABC" : {
+      "comment" : "Generated from registry surfaces.avatar.copy.initialsHint.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "ABCD-EFGH" : {
       "comment" : "Generated from registry settings.copy.sign_in_approval.codePlaceholder.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",

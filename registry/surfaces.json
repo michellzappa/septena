@@ -796,8 +796,8 @@
     "featureId": "account.avatar",
     "title": "Avatar",
     "kinds": ["photo", "emoji", "initials"],
-    "maxPhotoBytes": 5242880,
-    "photoSize": 512,
+    "maxPhotoBytes": 262144,
+    "photoSize": 256,
     "maxInitials": 3,
     "copy": [
       {
@@ -842,7 +842,7 @@
       },
       {
         "id": "initialsHint",
-        "label": "Up to 3 letters"
+        "label": "ABC"
       },
       {
         "id": "save",

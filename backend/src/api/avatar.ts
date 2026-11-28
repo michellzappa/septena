@@ -6,6 +6,7 @@ import { projectStoreFor } from "../store/ProjectStore.js";
 import {
   MAX_AVATAR_PHOTO_BYTES,
   avatarPhotoKey,
+  avatarColor,
   defaultAvatar,
   publicAvatar,
   sniffAvatarImage,
@@ -81,7 +82,7 @@ export async function patchAvatar(c: Ctx) {
   return save(c, next);
 }
 
-/// A photo: the bytes are the body, JPEG, PNG or HEIC, up to 5 MB.
+/// A photo: the bytes are the body, JPEG, PNG or HEIC, up to 256 KB.
 export async function putAvatarPhoto(c: Ctx) {
   const declared = c.req.header("Content-Length");
   if (declared !== undefined && Number(declared) > MAX_AVATAR_PHOTO_BYTES) {
@@ -105,7 +106,7 @@ export async function putAvatarPhoto(c: Ctx) {
 export async function deleteAvatar(c: Ctx) {
   const userId = c.get("userId");
   const current = await accounts(c).getAvatar(userId);
-  const next: StoredAvatar = { ...defaultAvatar(userId), color: current.color, updatedAt: Date.now() };
+  const next: StoredAvatar = { ...defaultAvatar(), color: avatarColor(current.color), updatedAt: Date.now() };
   if (current.initials) next.initials = current.initials;
   return save(c, next);
 }

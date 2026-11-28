@@ -8164,7 +8164,7 @@
         "tags": [
           "account"
         ],
-        "summary": "Set a photo as the avatar: a square JPEG, PNG or HEIC up to 5 MB. The photo before it is deleted.",
+        "summary": "Set a photo as the avatar: a square JPEG, PNG or HEIC up to 256 KB. The photo before it is deleted.",
         "security": [
           {
             "appSession": []

@@ -3,8 +3,8 @@ import { DESIGN_TOKENS, SURFACES_CATALOG } from "../generated/registries.js";
 
 // The account's avatar (#857): a photo, one emoji, or initials on a color.
 // AccountStore keeps one row per account. Without a row the avatar is
-// initials on a color derived from the user id, so an account that never
-// edits it still has one stable color on every device.
+// initials on the default color (Persimmon, tokens.json `avatarColors`).
+// The colors are the single-color fruit accents, the app's one palette.
 //
 // The R2 key of a photo (`photoKey`) names the user id, so it stays on the
 // server. Clients and other members see `photoId`, the last part of the key,
@@ -42,22 +42,21 @@ export function avatarPhotoKey(userId: string, id: string): string {
   return `u/${userId}/avatar/${id}`;
 }
 
-/// The color an account has until it picks one: a stable hash of the id.
-export function defaultAvatarColor(userId: string): string {
-  let h = 2166136261;
-  for (let i = 0; i < userId.length; i++) {
-    h ^= userId.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return AVATAR_COLOR_IDS[(h >>> 0) % AVATAR_COLOR_IDS.length];
+/// The color of an account that never picked one.
+export const DEFAULT_AVATAR_COLOR: string = DESIGN_TOKENS.avatarDefaultColor;
+
+/// A stored color that is no longer in the palette (the first release had
+/// its own ten colors) reads as the default.
+export function avatarColor(color: string): string {
+  return AVATAR_COLOR_IDS.includes(color) ? color : DEFAULT_AVATAR_COLOR;
 }
 
-export function defaultAvatar(userId: string): StoredAvatar {
-  return { kind: "initials", color: defaultAvatarColor(userId), updatedAt: 0 };
+export function defaultAvatar(): StoredAvatar {
+  return { kind: "initials", color: DEFAULT_AVATAR_COLOR, updatedAt: 0 };
 }
 
 export function publicAvatar(a: StoredAvatar): Avatar {
-  const out: Avatar = { kind: a.kind, color: a.color, updatedAt: a.updatedAt };
+  const out: Avatar = { kind: a.kind, color: avatarColor(a.color), updatedAt: a.updatedAt };
   if (a.initials) out.initials = a.initials;
   if (a.kind === "emoji" && a.emoji) out.emoji = a.emoji;
   if (a.kind === "photo" && a.photoKey) out.photoId = a.photoKey.slice(a.photoKey.lastIndexOf("/") + 1);

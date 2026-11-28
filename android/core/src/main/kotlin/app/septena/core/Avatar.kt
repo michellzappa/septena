@@ -4,12 +4,12 @@ package app.septena.core
  * A person's avatar (#857, backend `src/store/avatar.ts`): initials, one emoji or a photo, on a fill
  * from tokens.json `avatarColors`. The account's comes from `GET /v1/account`; a member's arrives in
  * the project row's `share` column. Read leniently: an unknown kind draws initials, an unknown color
- * draws the neutral fill.
+ * draws the default color (Persimmon).
  */
 data class Avatar(
     /** `initials`, `emoji` or `photo`; anything else draws as initials. */
     val kind: String,
-    /** An id of tokens.json `avatarColors.colors`; empty or unknown draws the neutral fill. */
+    /** A fruit accent id (tokens.json `avatarColors`); empty or unknown draws the default color. */
     val color: String,
     /** The 1 to 3 letters the person typed; null derives them from the name. */
     val initials: String? = null,

@@ -426,7 +426,7 @@ export class AccountStore extends DurableObject<Env> {
   /// The account's avatar, or the default one when it never set one.
   getAvatar(userId: string): StoredAvatar {
     const row = this.sql.exec<{ data: string }>("SELECT data FROM avatars WHERE userId = ?", userId).toArray()[0];
-    return row ? JSON.parse(row.data) as StoredAvatar : defaultAvatar(userId);
+    return row ? JSON.parse(row.data) as StoredAvatar : defaultAvatar();
   }
 
   /// Writes the avatar unless a newer one is stored (an edit made offline

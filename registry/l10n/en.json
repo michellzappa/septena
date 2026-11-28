@@ -118,6 +118,12 @@
       "plans.benefits.plus.history.title"
     ]
   },
+  "ABC": {
+    "text": "ABC",
+    "paths": [
+      "surfaces.avatar.copy.initialsHint.label"
+    ]
+  },
   "ABCD-EFGH": {
     "text": "ABCD-EFGH",
     "paths": [
@@ -455,12 +461,6 @@
       "settings.copy.smart_lists_editor.alwaysShown.label"
     ]
   },
-  "Amber": {
-    "text": "Amber",
-    "paths": [
-      "tokens.avatarColors.colors.amber.name"
-    ]
-  },
   "An agent below": {
     "text": "An agent below",
     "paths": [
@@ -653,12 +653,6 @@
     "text": "Blocked by",
     "paths": [
       "surfaces.taskReferences.roles.blocked_by.label"
-    ]
-  },
-  "Blue": {
-    "text": "Blue",
-    "paths": [
-      "tokens.avatarColors.colors.blue.name"
     ]
   },
   "Bring in your tasks": {
@@ -1950,18 +1944,6 @@
       "actions.actions.task.gotItBack.title"
     ]
   },
-  "Graphite": {
-    "text": "Graphite",
-    "paths": [
-      "tokens.avatarColors.colors.graphite.name"
-    ]
-  },
-  "Green": {
-    "text": "Green",
-    "paths": [
-      "tokens.avatarColors.colors.green.name"
-    ]
-  },
   "Group Today by list": {
     "text": "Group Today by list",
     "paths": [
@@ -2193,12 +2175,6 @@
     "text": "Increase Text Size",
     "paths": [
       "actions.actions.app.textSizeIncrease.title"
-    ]
-  },
-  "Indigo": {
-    "text": "Indigo",
-    "paths": [
-      "tokens.avatarColors.colors.indigo.name"
     ]
   },
   "Industrial": {
@@ -3153,12 +3129,6 @@
       "surfaces.notices.items.getStarted.steps.addTask.platformDetails.0.detail"
     ]
   },
-  "Orange": {
-    "text": "Orange",
-    "paths": [
-      "tokens.avatarColors.colors.orange.name"
-    ]
-  },
   "Ordinal": {
     "text": "Ordinal",
     "paths": [
@@ -3276,12 +3246,6 @@
     "text": "Pick one emoji.",
     "paths": [
       "surfaces.avatar.copy.emojiHint.label"
-    ]
-  },
-  "Pink": {
-    "text": "Pink",
-    "paths": [
-      "tokens.avatarColors.colors.pink.name"
     ]
   },
   "Pitaya": {
@@ -3504,12 +3468,6 @@
       "tokens.textures.none.name"
     ]
   },
-  "Purple": {
-    "text": "Purple",
-    "paths": [
-      "tokens.avatarColors.colors.purple.name"
-    ]
-  },
   "Questions": {
     "text": "Questions",
     "paths": [
@@ -3568,12 +3526,6 @@
     "text": "Recently Deleted",
     "paths": [
       "plans.outcomes.nothing_lost.rows.deleted.label"
-    ]
-  },
-  "Red": {
-    "text": "Red",
-    "paths": [
-      "tokens.avatarColors.colors.red.name"
     ]
   },
   "Reference": {
@@ -4738,12 +4690,6 @@
       "plans.promises.core_free.detail"
     ]
   },
-  "Teal": {
-    "text": "Teal",
-    "paths": [
-      "tokens.avatarColors.colors.teal.name"
-    ]
-  },
   "Terms of Use": {
     "text": "Terms of Use",
     "paths": [
@@ -5196,12 +5142,6 @@
     "text": "Unused invites",
     "paths": [
       "surfaces.sharing.copy.invites.label"
-    ]
-  },
-  "Up to 3 letters": {
-    "text": "Up to 3 letters",
-    "paths": [
-      "surfaces.avatar.copy.initialsHint.label"
     ]
   },
   "Upcoming": {

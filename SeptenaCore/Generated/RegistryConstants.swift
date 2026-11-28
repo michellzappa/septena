@@ -302,12 +302,15 @@ struct RegistryFruitAccent: Sendable, Hashable, Identifiable {
   let multicolor: Bool
 }
 
-/// One avatar fill (`registry/tokens.json` `avatarColors`, #857).
+/// One avatar fill: a single-color fruit accent (`registry/tokens.json` `avatarColors`, #857).
 struct RegistryAvatarColor: Sendable, Hashable, Identifiable {
   let id: String
   let name: String
   let lightHex: String
   let darkHex: String
+  /// Ink for initials on the fill.
+  let inkLightHex: String
+  let inkDarkHex: String
 }
 
 /// Procedural header-wash texture descriptor (`registry/tokens.json`, ADR 0019).
@@ -355,17 +358,17 @@ enum RegistryTokens {
   }
   static let accentPalette: [String] = ["#ef4444", "#f97316", "#f59e0b", "#eab308", "#84cc16", "#22c55e", "#10b981", "#14b8a6", "#06b6d4", "#0ea5e9", "#3b82f6", "#6366f1", "#8b5cf6", "#a855f7", "#ec4899", "#f43f5e"]
   static let avatarColors: [RegistryAvatarColor] = [
-    RegistryAvatarColor(id: "red", name: RegistryL10n.t("Red"), lightHex: "#DC2626", darkHex: "#EF4444"),
-    RegistryAvatarColor(id: "orange", name: RegistryL10n.t("Orange"), lightHex: "#EA580C", darkHex: "#F97316"),
-    RegistryAvatarColor(id: "amber", name: RegistryL10n.t("Amber"), lightHex: "#B45309", darkHex: "#D97706"),
-    RegistryAvatarColor(id: "green", name: RegistryL10n.t("Green"), lightHex: "#15803D", darkHex: "#16A34A"),
-    RegistryAvatarColor(id: "teal", name: RegistryL10n.t("Teal"), lightHex: "#0F766E", darkHex: "#0D9488"),
-    RegistryAvatarColor(id: "blue", name: RegistryL10n.t("Blue"), lightHex: "#2563EB", darkHex: "#3B82F6"),
-    RegistryAvatarColor(id: "indigo", name: RegistryL10n.t("Indigo"), lightHex: "#4F46E5", darkHex: "#6366F1"),
-    RegistryAvatarColor(id: "purple", name: RegistryL10n.t("Purple"), lightHex: "#9333EA", darkHex: "#A855F7"),
-    RegistryAvatarColor(id: "pink", name: RegistryL10n.t("Pink"), lightHex: "#DB2777", darkHex: "#EC4899"),
-    RegistryAvatarColor(id: "graphite", name: RegistryL10n.t("Graphite"), lightHex: "#475569", darkHex: "#64748B"),
+    RegistryAvatarColor(id: "tamarillo", name: RegistryL10n.t("Tamarillo"), lightHex: "#D6333F", darkHex: "#FF5C67", inkLightHex: "#FFFFFF", inkDarkHex: "#FFFFFF"),
+    RegistryAvatarColor(id: "persimmon", name: RegistryL10n.t("Persimmon"), lightHex: "#E05212", darkHex: "#FF7738", inkLightHex: "#FFFFFF", inkDarkHex: "#FFFFFF"),
+    RegistryAvatarColor(id: "yuzu", name: RegistryL10n.t("Yuzu"), lightHex: "#C28500", darkHex: "#F2BF2C", inkLightHex: "#FFFFFF", inkDarkHex: "#141518"),
+    RegistryAvatarColor(id: "carambola", name: RegistryL10n.t("Carambola"), lightHex: "#5B8C00", darkHex: "#9EE034", inkLightHex: "#FFFFFF", inkDarkHex: "#141518"),
+    RegistryAvatarColor(id: "haskap", name: RegistryL10n.t("Haskap"), lightHex: "#1D63DC", darkHex: "#4E94FF", inkLightHex: "#FFFFFF", inkDarkHex: "#FFFFFF"),
+    RegistryAvatarColor(id: "acai", name: RegistryL10n.t("Açaí"), lightHex: "#6544D6", darkHex: "#9B82FF", inkLightHex: "#FFFFFF", inkDarkHex: "#FFFFFF"),
+    RegistryAvatarColor(id: "pitaya", name: RegistryL10n.t("Pitaya"), lightHex: "#D4266C", darkHex: "#FF5C9B", inkLightHex: "#FFFFFF", inkDarkHex: "#FFFFFF"),
+    RegistryAvatarColor(id: "jabuticaba", name: RegistryL10n.t("Jabuticaba"), lightHex: "#27272E", darkHex: "#E4E4EA", inkLightHex: "#FFFFFF", inkDarkHex: "#141518"),
   ]
+  /// The fill of an account that never picked one, and of a member without an avatar.
+  static let avatarDefaultColorId = "persimmon"
   static let fruitAccents: [RegistryFruitAccent] = [
     RegistryFruitAccent(id: "colorful", name: RegistryL10n.t("Colorful"), origin: "Default · Blue + semantic", lightHex: "#007AFF", darkHex: "#0A84FF", checkLightHex: "#FFFFFF", checkDarkHex: "#FFFFFF", multicolor: true),
     RegistryFruitAccent(id: "tamarillo", name: RegistryL10n.t("Tamarillo"), origin: "Andes · Crimson", lightHex: "#D6333F", darkHex: "#FF5C67", checkLightHex: "#FFFFFF", checkDarkHex: "#FFFFFF", multicolor: false),
@@ -2379,8 +2382,8 @@ enum RegistrySharing {
 /// The avatar editor (`registry/surfaces.json` `avatar`, #857).
 enum RegistryAvatar {
   static let title: String = RegistryL10n.t("Avatar")
-  static let maxPhotoBytes = 5242880
-  static let photoSize = 512
+  static let maxPhotoBytes = 262144
+  static let photoSize = 256
   static let maxInitials = 3
   static let edit: String = RegistryL10n.t("Edit Avatar")
   static let photo: String = RegistryL10n.t("Photo")
@@ -2392,7 +2395,7 @@ enum RegistryAvatar {
   static let removePhoto: String = RegistryL10n.t("Remove Photo")
   static let cropHint: String = RegistryL10n.t("Drag and zoom to fit the photo in the circle.")
   static let emojiHint: String = RegistryL10n.t("Pick one emoji.")
-  static let initialsHint: String = RegistryL10n.t("Up to 3 letters")
+  static let initialsHint: String = RegistryL10n.t("ABC")
   static let save: String = RegistryL10n.t("Save")
   static let cancel: String = RegistryL10n.t("Cancel")
   static let photoPending: String = RegistryL10n.t("The photo uploads when this device is online.")

@@ -6,9 +6,20 @@ import Foundation
 // rides on every member of a shared project (`ProjectShare.Member.avatar`).
 //
 // Decoding is lenient on purpose: an unknown kind draws initials, an unknown
-// color draws the neutral fill, and a missing field takes its default. A
+// color draws the default color (Persimmon), and a missing field takes its default. A
 // newer server must never make an avatar (or the share row that carries it)
 // fail to decode.
+
+extension RegistryAvatarColor {
+  /// The palette entry for an id. A missing or unknown id is the default
+  /// color (Persimmon, `tokens.json` `avatarColors.default`).
+  static func resolve(_ id: String?) -> RegistryAvatarColor {
+    let all = RegistryTokens.avatarColors
+    return all.first { $0.id == id }
+      ?? all.first { $0.id == RegistryTokens.avatarDefaultColorId }
+      ?? all[0]
+  }
+}
 
 struct AccountAvatar: Codable, Hashable, Sendable {
   enum Kind: String, Sendable, CaseIterable {
@@ -47,12 +58,8 @@ struct AccountAvatar: Codable, Hashable, Sendable {
     }
   }
 
-  /// The palette entry for `color`. Nil for an unknown or missing id: the
-  /// neutral fill.
-  var palette: RegistryAvatarColor? {
-    guard let color else { return nil }
-    return RegistryTokens.avatarColors.first { $0.id == color }
-  }
+  /// The palette entry for `color`. An unknown or missing id is the default.
+  var palette: RegistryAvatarColor { RegistryAvatarColor.resolve(color) }
 
   /// The letters to draw: the typed initials, else the ones from the name.
   func letters(for name: String) -> String {

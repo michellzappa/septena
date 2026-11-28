@@ -144,37 +144,59 @@ private fun avatarKinds(): List<String> =
 private fun avatarNumber(key: String, fallback: Long): Long =
     avatarSurface?.fields?.get(key).longValue() ?: fallback
 
-private val maxPhotoBytes: Long get() = avatarNumber("maxPhotoBytes", 5_242_880L)
-private val photoSize: Int get() = avatarNumber("photoSize", 512L).toInt()
+private val maxPhotoBytes: Long get() = avatarNumber("maxPhotoBytes", 262_144L)
+private val photoSize: Int get() = avatarNumber("photoSize", 256L).toInt()
 private val maxInitials: Int get() = avatarNumber("maxInitials", 3L).toInt()
 
-/** One fill of tokens.json `avatarColors.colors`. */
-internal data class AvatarColor(val id: String, val name: String, val light: Color, val dark: Color) {
+/** One avatar fill: a single-color fruit accent of tokens.json, with its check ink for the initials. */
+internal data class AvatarColor(
+    val id: String,
+    val name: String,
+    val light: Color,
+    val dark: Color,
+    val inkLight: Color,
+    val inkDark: Color,
+) {
     fun fill(dark: Boolean): Color = if (dark) this.dark else light
+    fun ink(dark: Boolean): Color = if (dark) inkDark else inkLight
 }
 
 internal object AvatarColors {
+    /** tokens.json `avatarColors`: the fruit accents without the multicolor one (ADR 0019). */
     val all: List<AvatarColor> by lazy {
-        val palette = RegistryCatalog.document("tokens").fields["avatarColors"] as? JsonValue.ObjectValue
-        (palette?.fields?.get("colors") as? JsonValue.ArrayValue)?.values.orEmpty().mapNotNull { raw ->
+        val tokens = RegistryCatalog.document("tokens").fields
+        (tokens["fruitAccents"] as? JsonValue.ArrayValue)?.values.orEmpty().mapNotNull { raw ->
             val color = (raw as? JsonValue.ObjectValue)?.fields ?: return@mapNotNull null
+            if ((color["multicolor"] as? JsonValue.BooleanValue)?.value == true) return@mapNotNull null
             runCatching {
                 AvatarColor(
                     id = color["id"].stringValue() ?: return@mapNotNull null,
                     name = color["name"].stringValue().orEmpty(),
                     light = registryColor(color["light"]),
                     dark = registryColor(color["dark"]),
+                    inkLight = registryColor(color["checkLight"]),
+                    inkDark = registryColor(color["checkDark"]),
                 )
             }.getOrNull()
         }
     }
+
+    /** The fill of an account that never picked one, and of a member without an avatar. */
+    val default: AvatarColor? by lazy {
+        val id = ((RegistryCatalog.document("tokens").fields["avatarColors"] as? JsonValue.ObjectValue)
+            ?.fields?.get("default")).stringValue()
+        all.firstOrNull { it.id == id } ?: all.firstOrNull()
+    }
+
+    /** The palette entry for an id. A missing or unknown id is the default. */
+    fun resolve(id: String?): AvatarColor? = byId(id) ?: default
 
     fun byId(id: String?): AvatarColor? = all.firstOrNull { it.id == id }
 }
 
 /**
  * One avatar circle: a photo clipped to the circle, else the emoji or initials in white on the palette
- * color. No avatar or an unknown color draws today's look: initials on the neutral fill.
+ * color. No avatar or an unknown color draws the default color (Persimmon).
  */
 @Composable
 internal fun AvatarCircle(
@@ -185,8 +207,9 @@ internal fun AvatarCircle(
     modifier: Modifier = Modifier,
 ) {
     val dark = LocalSeptenaDarkTheme.current
-    val fill = AvatarColors.byId(avatar?.color)?.fill(dark)
-    val ink = if (fill != null) Color.White else MaterialTheme.colorScheme.onSurface
+    val palette = AvatarColors.resolve(avatar?.color)
+    val fill = palette?.fill(dark)
+    val ink = palette?.ink(dark) ?: MaterialTheme.colorScheme.onSurface
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
@@ -310,7 +333,7 @@ internal fun AvatarEditorDialog(graph: AndroidAppGraph, name: String, languageTa
     val start = remember { current }
     var kind by remember { mutableStateOf(start?.kind?.takeIf { it in kinds } ?: Avatar.KIND_INITIALS) }
     var color by remember {
-        mutableStateOf(AvatarColors.byId(start?.color)?.id ?: AvatarColors.all.firstOrNull()?.id.orEmpty())
+        mutableStateOf(AvatarColors.resolve(start?.color)?.id.orEmpty())
     }
     var emoji by remember { mutableStateOf(start?.emoji.orEmpty()) }
     var initials by remember { mutableStateOf(start?.initials.orEmpty()) }
