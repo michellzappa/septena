@@ -702,6 +702,8 @@ private struct SeptaskAccountPane: View {
   @AppStorage(SettingsKey.welcomeName) private var welcomeName: String =
     RegistrySettings.Defaults.welcomeName
 
+  @State private var editingAvatar = false
+
   private static let page = RegistrySettings.pageById[RegistrySettings.PageID.account]
 
   var body: some View {
@@ -713,6 +715,11 @@ private struct SeptaskAccountPane: View {
     }
     .formStyle(.grouped)
     .task { await PlanStatus.shared.refresh() }
+    // The avatar is read again each time Account opens (#857).
+    .task { await AvatarStore.shared.refresh() }
+    .sheet(isPresented: $editingAvatar) {
+      AvatarEditorSheet(name: welcomeName, isPlus: PlanStatus.shared.isPlus)
+    }
     .navigationTitle(RegistrySettings.pageById[RegistrySettings.PageID.account]?.title ?? "")
     #if os(iOS)
     .navigationBarTitleDisplayMode(.inline)
@@ -725,7 +732,15 @@ private struct SeptaskAccountPane: View {
     case "profile":
       Section {
         HStack(spacing: 16) {
-          ProfileAvatar(name: welcomeName, isPlus: PlanStatus.shared.isPlus, size: 64)
+          // The avatar belongs to the account, so it is editable once signed in.
+          Button { editingAvatar = true } label: {
+            ProfileAvatar(name: welcomeName, isPlus: PlanStatus.shared.isPlus, size: 64)
+              .contentShape(Circle())
+          }
+          .buttonStyle(.plain)
+          .disabled(!TaskSyncEngine.shared.signedIn)
+          .accessibilityLabel(RegistryAvatar.edit)
+          .help(RegistryAvatar.edit)
           VStack(alignment: .leading, spacing: 4) {
             TextField(RegistrySettings.label(surface: "account_profile_editor"), text: $welcomeName)
               .font(.title2.weight(.semibold))
@@ -741,6 +756,11 @@ private struct SeptaskAccountPane: View {
                 SeptenaPlusBadge(isPro: PlanStatus.shared.isPro)
               } else {
                 FreeAccountBadge()
+              }
+              if let problem = AvatarStore.shared.photoProblem {
+                Text(problem.message)
+                  .font(.caption)
+                  .foregroundStyle(.secondary)
               }
             } else {
               Text("On this device")

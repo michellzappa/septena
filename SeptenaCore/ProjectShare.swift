@@ -12,9 +12,12 @@ struct ProjectShare: Codable, Hashable, Sendable {
     /// `"owner"` or `"editor"`. Text, so a role this build does not know
     /// still decodes.
     let role: String
+    /// The member's avatar (#857). Absent from older rows and servers: the
+    /// member then draws as initials on the neutral fill.
+    let avatar: AccountAvatar?
 
     var isOwner: Bool { role == "owner" }
-    var initials: String { PersonInitials.of(name) }
+    var initials: String { avatar?.letters(for: name) ?? PersonInitials.of(name) }
   }
 
   /// "Members: Ann, Ben", for the marks that show no names.

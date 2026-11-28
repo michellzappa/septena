@@ -587,6 +587,65 @@ actor TaskBackendClient {
     return try decode(CreatedAgentKey.self, from: data, what: "agent key")
   }
 
+  // MARK: - Account avatar (#857, backend/src/api/avatar.ts)
+
+  func getAccount() async throws -> BackendAccount {
+    let (data, status) = try await authed(path: "/v1/account", method: "GET", body: nil)
+    guard status == 200 else { throw Self.httpError(status, data) }
+    return try decode(BackendAccount.self, from: data, what: "account")
+  }
+
+  /// Initials or an emoji. A late offline edit older than the stored one
+  /// answers `applied: false` with the stored avatar.
+  func patchAvatar(_ patch: AccountAvatarPatch) async throws -> BackendAvatarReply {
+    let body = try JSONEncoder().encode(patch)
+    let (data, status) = try await authed(path: "/v1/account/avatar", method: "PATCH", body: body)
+    guard status == 200 else { throw Self.httpError(status, data) }
+    return try decode(BackendAvatarReply.self, from: data, what: "avatar")
+  }
+
+  /// A square JPEG (`RegistryAvatar.photoSize`). 413 when it is over
+  /// `RegistryAvatar.maxPhotoBytes`, 415 when it is not an image.
+  func putAvatarPhoto(_ jpeg: Data) async throws -> BackendAvatarReply {
+    let (data, status) = try await authed(path: "/v1/account/avatar", method: "PUT", body: jpeg,
+                                          contentType: "image/jpeg")
+    guard status == 200 else { throw Self.httpError(status, data) }
+    return try decode(BackendAvatarReply.self, from: data, what: "avatar")
+  }
+
+  /// Back to initials. The server keeps the color and typed initials and
+  /// deletes the photo.
+  func deleteAvatar() async throws -> AccountAvatar {
+    let (data, status) = try await authed(path: "/v1/account/avatar", method: "DELETE", body: nil)
+    guard status == 200 else { throw Self.httpError(status, data) }
+    return try decode(BackendAvatarReply.self, from: data, what: "avatar").avatar
+  }
+
+  /// This account's photo bytes.
+  func avatarPhoto(photoId: String) async throws -> Data {
+    try await photoBytes(path: "/v1/account/avatar/photo?v=\(Self.queryValue(photoId))")
+  }
+
+  /// A member's photo bytes. 404 unless this account is a member of the share.
+  func memberAvatarPhoto(shareID: String, memberID: String, photoId: String) async throws -> Data {
+    let share = shareID.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? shareID
+    let member = memberID.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? memberID
+    return try await photoBytes(path: "/v1/shares/\(share)/members/\(member)/avatar?v=\(Self.queryValue(photoId))")
+  }
+
+  private func photoBytes(path: String) async throws -> Data {
+    let (data, status) = try await authed(path: path, method: "GET", body: nil)
+    guard status == 200 else { throw Self.httpError(status, data) }
+    guard !data.isEmpty else { throw TaskBackendError.badResponse("photo") }
+    return data
+  }
+
+  private static func queryValue(_ value: String) -> String {
+    var allowed = CharacterSet.urlQueryAllowed
+    allowed.remove(charactersIn: "&=+?#")
+    return value.addingPercentEncoding(withAllowedCharacters: allowed) ?? value
+  }
+
   // MARK: - Shared projects (docs/PROJECT_SHARING_SPEC.md)
 
   func createShare(projectID: String, name: String) async throws -> ProjectShare {

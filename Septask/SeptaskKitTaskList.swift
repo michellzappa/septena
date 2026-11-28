@@ -7666,6 +7666,10 @@ final class KitScreenTitleCell: NSTableCellView {
   private let moreButton = NSButton()
   /// The members of a shared project. Opens Share Project.
   private let membersButton = NSButton()
+  /// The share the members button draws, kept to draw it again when a
+  /// member photo arrives (#857).
+  private var share: ProjectShare?
+  private var avatarObserver: NSObjectProtocol?
   var onOpenMembers: (() -> Void)?
   private var moreTrailingConstraint: NSLayoutConstraint!
 
@@ -7729,6 +7733,15 @@ final class KitScreenTitleCell: NSTableCellView {
     moreButton.toolTip = RegistryActions.title(.sectionNew)
     moreButton.setAccessibilityLabel(RegistryActions.title(.sectionNew))
 
+    avatarObserver = NotificationCenter.default.addObserver(
+      forName: AvatarStore.memberPhotosChanged, object: nil, queue: .main
+    ) { [weak self] _ in
+      MainActor.assumeIsolated {
+        guard let self, let share = self.share else { return }
+        self.membersButton.image = KitGlyph.members(share)
+      }
+    }
+
     membersButton.translatesAutoresizingMaskIntoConstraints = false
     membersButton.isBordered = false
     membersButton.title = ""
@@ -7788,6 +7801,10 @@ final class KitScreenTitleCell: NSTableCellView {
   }
 
   required init?(coder: NSCoder) { fatalError("KitScreenTitleCell is code-only") }
+
+  deinit {
+    if let avatarObserver { NotificationCenter.default.removeObserver(avatarObserver) }
+  }
 
   @objc private func pickGlyph() {
     onPickGlyph?(glyphButton)
@@ -7853,6 +7870,7 @@ final class KitScreenTitleCell: NSTableCellView {
                  share: ProjectShare? = nil,
                  showsNavMenu: Bool) {
     membersButton.isHidden = share == nil
+    self.share = share
     membersButton.image = share.map { KitGlyph.members($0) }
     membersButton.toolTip = share?.membersLabel
     membersButton.setAccessibilityLabel(share?.membersLabel ?? "")

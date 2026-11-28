@@ -2,6 +2,66 @@
   "description": "Known registry-owned literals in shared shell files (scripts/lint-registry-literals.py). Each entry names why it is still a literal and the issue that removes it. An entry that no longer matches fails the lint, so this list only shrinks.",
   "entries": [
     {
+      "file": "Septena/Shell/Sidebar/AreasProjectsView.swift",
+      "literal": "Emoji",
+      "reason": "Area emoji picker label; the registry string is the avatar editor's segment.",
+      "issue": "#894"
+    },
+    {
+      "file": "Septena/Shell/UI/EmojiPicker.swift",
+      "literal": "Emoji",
+      "reason": "Area emoji picker label; the registry string is the avatar editor's segment.",
+      "issue": "#894"
+    },
+    {
+      "file": "Septena/Shell/Tasks/TaskPickerSheets.swift",
+      "literal": "Color",
+      "reason": "Tag color picker label; the registry string is the avatar editor's.",
+      "issue": "#894"
+    },
+    {
+      "file": "Septena/Shell/Tasks/TaskPickerSheets.swift",
+      "literal": "Blue",
+      "reason": "Tag color name; the registry name belongs to the avatar palette.",
+      "issue": "#894"
+    },
+    {
+      "file": "Septena/Shell/Tasks/TaskPickerSheets.swift",
+      "literal": "Amber",
+      "reason": "Tag color name; the registry name belongs to the avatar palette.",
+      "issue": "#894"
+    },
+    {
+      "file": "Septena/Shell/Tasks/TaskPickerSheets.swift",
+      "literal": "Green",
+      "reason": "Tag color name; the registry name belongs to the avatar palette.",
+      "issue": "#894"
+    },
+    {
+      "file": "Septena/Shell/Tasks/TaskPickerSheets.swift",
+      "literal": "Red",
+      "reason": "Tag color name; the registry name belongs to the avatar palette.",
+      "issue": "#894"
+    },
+    {
+      "file": "Septena/Shell/Tasks/TaskPickerSheets.swift",
+      "literal": "Purple",
+      "reason": "Tag color name; the registry name belongs to the avatar palette.",
+      "issue": "#894"
+    },
+    {
+      "file": "Septena/Shell/Tasks/TaskPickerSheets.swift",
+      "literal": "Teal",
+      "reason": "Tag color name; the registry name belongs to the avatar palette.",
+      "issue": "#894"
+    },
+    {
+      "file": "Septena/Shell/Tasks/TaskPickerSheets.swift",
+      "literal": "Pink",
+      "reason": "Tag color name; the registry name belongs to the avatar palette.",
+      "issue": "#894"
+    },
+    {
       "file": "Septask/SeptaskKitComposer.swift",
       "literal": "Today",
       "reason": "Relative date or quick pick; the registry has no datePickers block yet.",
