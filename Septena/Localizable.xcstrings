@@ -4714,6 +4714,10 @@
         }
       }
     },
+    "Add “%@”" : {
+      "comment" : "Generated from registry surfaces.checklistProjects.addTyped. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Add %@" : {
       "comment" : "Generated from registry signIn.manage.addProvider. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
@@ -7963,6 +7967,10 @@
           }
         }
       }
+    },
+    "Bakery" : {
+      "comment" : "Generated from registry surfaces.checklistProjects.groups.bakery. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Balanced" : {
       "comment" : "Generated from registry settings.keys.pccReasoning.options.1.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
@@ -12364,6 +12372,10 @@
     },
     "Daily digest" : {
       "comment" : "Generated from registry settings.keys.agentCommentNotifications.options.2.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
+    "Dairy" : {
+      "comment" : "Generated from registry surfaces.checklistProjects.groups.dairy. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual"
     },
     "Dark" : {
@@ -17587,6 +17599,10 @@
         }
       }
     },
+    "Frozen" : {
+      "comment" : "Generated from registry surfaces.checklistProjects.groups.frozen. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Full Septena tasks, areas, projects, and checklists (importable)" : {
       "comment" : "Generated from registry settings.copy.import_export.exportJsonDetail.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -22559,6 +22575,10 @@
           }
         }
       }
+    },
+    "Meat & Seafood" : {
+      "comment" : "Generated from registry surfaces.checklistProjects.groups.meatSeafood. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Medium" : {
       "extractionState" : "manual",
@@ -28419,6 +28439,10 @@
         }
       }
     },
+    "Pantry" : {
+      "comment" : "Generated from registry surfaces.checklistProjects.groups.pantry. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
+    },
     "Parameters" : {
       "localizations" : {
         "pt-BR" : {
@@ -29976,6 +30000,10 @@
           }
         }
       }
+    },
+    "Produce" : {
+      "comment" : "Generated from registry surfaces.checklistProjects.groups.produce. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual"
     },
     "Project" : {
       "localizations" : {

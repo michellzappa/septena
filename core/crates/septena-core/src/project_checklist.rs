@@ -5,6 +5,7 @@ use serde_json::{Value, json};
 
 use crate::error::CoreError;
 use crate::nfc::{nfc, strip_marks};
+use crate::recurrence::occurrence_id;
 use crate::registry::enums::{task_kind, task_status};
 
 pub const CHECKED: &str = "checklistChecked";
@@ -78,22 +79,73 @@ fn search_key(text: &str) -> String {
     strip_marks(&nfc(text.trim())).to_ascii_lowercase()
 }
 
+/// The offline grocery vocabulary. The keys are the registry's
+/// `checklistProjects.groups`, which hold the heading titles.
+const GROCERY_GROUPS: [(&str, &str); 6] = [
+    (
+        "produce",
+        "apple|apples|avocado|banana|bananas|carrots|garlic|lettuce|onions|potatoes|spinach|tomato|tomatoes",
+    ),
+    ("dairy", "butter|cheese|eggs|greek yogurt|milk|oat milk|yogurt"),
+    ("bakery", "bagels|bread|buns|rolls"),
+    ("meatSeafood", "beef|chicken|pork|salmon|shrimp"),
+    ("pantry", "coffee|flour|oats|olive oil|pasta|rice|salt|sugar|tea"),
+    ("frozen", "frozen berries|frozen peas|frozen pizza|ice cream"),
+];
+
 fn grocery_group(item: &str) -> Option<&'static str> {
-    const GROUPS: [(&str, &str); 6] = [
-        (
-            "produce",
-            "apple|apples|avocado|banana|bananas|carrots|garlic|lettuce|onions|potatoes|spinach|tomato|tomatoes",
-        ),
-        ("dairy", "butter|cheese|eggs|greek yogurt|milk|oat milk|yogurt"),
-        ("bakery", "bagels|bread|buns|rolls"),
-        ("meatSeafood", "beef|chicken|pork|salmon|shrimp"),
-        ("pantry", "coffee|flour|oats|olive oil|pasta|rice|salt|sugar|tea"),
-        ("frozen", "frozen berries|frozen peas|frozen pizza|ice cream"),
-    ];
-    GROUPS
+    GROCERY_GROUPS
         .iter()
         .find(|(_, items)| items.split('|').any(|word| word == item))
         .map(|(group, _)| *group)
+}
+
+/// The stable id of a suggested group heading in one project. Two offline
+/// devices that add the same grocery create the same heading row.
+pub(crate) fn checklist_heading_id(project_id: &str, group: &str) -> String {
+    occurrence_id(format!("checklist:{project_id}"), group.to_string())
+}
+
+/// Decides which heading a new row joins for a suggested group. The host
+/// passes the project's rows (deleted rows included) and the localized title
+/// of the group. Returns `{ heading, create }`:
+/// 1. a live heading with the stable id, else a live heading with the same
+///    title (case- and accent-insensitive): reuse it;
+/// 2. a deleted heading with the stable id or the same title: the user
+///    removed that group, so the row stays ungrouped;
+/// 3. else: create a heading with the stable id and the title.
+pub(crate) fn checklist_heading(input: &Value) -> Result<Value, CoreError> {
+    let none = json!({ "heading": null, "create": false });
+    let project = input["projectId"].as_str().unwrap_or("");
+    let group = input["group"].as_str().unwrap_or("");
+    let title = search_key(input["title"].as_str().unwrap_or(""));
+    if project.is_empty() || group.is_empty() || title.is_empty() {
+        return Ok(none);
+    }
+    let rows = input["rows"]
+        .as_array()
+        .ok_or_else(|| CoreError::invalid("checklistHeading requires rows"))?;
+    let id = checklist_heading_id(project, group);
+    let headings: Vec<&Value> = rows
+        .iter()
+        .filter(|row| row["kind"] == task_kind::HEADING)
+        .filter(|row| row["project"].is_null() || row["project"] == project)
+        .collect();
+    let has_id = |row: &Value| row["id"] == id.as_str();
+    let has_title = |row: &Value| search_key(row["title"].as_str().unwrap_or("")) == title;
+    let live = |row: &Value| row["deletedAt"].is_null();
+    let reuse = headings
+        .iter()
+        .copied()
+        .find(|row| live(row) && has_id(row))
+        .or_else(|| headings.iter().copied().find(|row| live(row) && has_title(row)));
+    if let Some(row) = reuse {
+        return Ok(json!({ "heading": row["id"], "create": false }));
+    }
+    if headings.iter().any(|row| !live(row) && (has_id(row) || has_title(row))) {
+        return Ok(none);
+    }
+    Ok(json!({ "heading": id, "create": true }))
 }
 
 pub(crate) fn checklist_check_patch(checked: bool) -> Value {
@@ -120,4 +172,16 @@ pub(crate) fn checklist_check_patch(checked: bool) -> Value {
     patch.insert("status".into(), Value::String(CHECKED.into()));
     patch.insert("today".into(), Value::Bool(false));
     Value::Object(patch)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::registry::checklist_groups;
+
+    #[test]
+    fn grocery_keys_match_the_registry() {
+        let keys: Vec<_> = GROCERY_GROUPS.iter().map(|(key, _)| *key).collect();
+        assert_eq!(keys, checklist_groups::KEYS);
+    }
 }

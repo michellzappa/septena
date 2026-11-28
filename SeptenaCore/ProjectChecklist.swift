@@ -66,17 +66,7 @@ extension ProjectChecklist {
     guard !title.isEmpty else { return }
     var heading = explicitHeading
     if heading == nil, let key = layout(rows: [], query: title)?.suggestedGroup {
-      let name: String?
-      switch key {
-      case "produce": name = String(localized: "Produce")
-      case "dairy": name = String(localized: "Dairy")
-      case "bakery": name = String(localized: "Bakery")
-      case "meatSeafood": name = String(localized: "Meat & Seafood")
-      case "pantry": name = String(localized: "Pantry")
-      case "frozen": name = String(localized: "Frozen")
-      default: name = nil
-      }
-      if let name {
+      if let name = RegistrySurfaces.checklistGroupTitle(key) {
         // A category created offline on two devices has the same row id.
         let id = Recurrence.occurrenceID(sourceTaskID: "checklist:\(project)", scheduled: key)
         heading = headings.first { $0.id == id || $0.title == name }?.id

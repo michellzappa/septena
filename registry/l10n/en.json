@@ -340,6 +340,15 @@
       "signIn.manage.addProvider"
     ]
   },
+  "Add “{title}”": {
+    "text": "Add “{title}”",
+    "placeholders": [
+      "title"
+    ],
+    "paths": [
+      "surfaces.checklistProjects.addTyped"
+    ]
+  },
   "Added by": {
     "text": "Added by",
     "paths": [
@@ -600,6 +609,12 @@
       "plans.outcomes.everywhere.rows.backup.label"
     ]
   },
+  "Bakery": {
+    "text": "Bakery",
+    "paths": [
+      "surfaces.checklistProjects.groups.bakery"
+    ]
+  },
   "Balanced": {
     "text": "Balanced",
     "paths": [
@@ -776,7 +791,8 @@
   "Checklist": {
     "text": "Checklist",
     "paths": [
-      "surfaces.taskAttributes.checklist.label"
+      "surfaces.taskAttributes.checklist.label",
+      "surfaces.checklistProjects.checklist"
     ]
   },
   "Choose a plan": {
@@ -1169,6 +1185,12 @@
     "text": "Daily digest",
     "paths": [
       "settings.keys.agentCommentNotifications.options.2.title"
+    ]
+  },
+  "Dairy": {
+    "text": "Dairy",
+    "paths": [
+      "surfaces.checklistProjects.groups.dairy"
     ]
   },
   "Dark": {
@@ -1828,6 +1850,12 @@
       "surfaces.taskDetail.calendarWeekdays.5.title"
     ]
   },
+  "Frozen": {
+    "text": "Frozen",
+    "paths": [
+      "surfaces.checklistProjects.groups.frozen"
+    ]
+  },
   "Full Septena tasks, areas, projects, and checklists (importable)": {
     "text": "Full Septena tasks, areas, projects, and checklists (importable)",
     "paths": [
@@ -2394,6 +2422,12 @@
     "text": "Mark as Not Done",
     "paths": [
       "actions.actions.notice.toggleStep.activeTitle"
+    ]
+  },
+  "Meat & Seafood": {
+    "text": "Meat & Seafood",
+    "paths": [
+      "surfaces.checklistProjects.groups.meatSeafood"
     ]
   },
   "Medium": {
@@ -3093,6 +3127,12 @@
       "surfaces.sharing.copy.owner.label"
     ]
   },
+  "Pantry": {
+    "text": "Pantry",
+    "paths": [
+      "surfaces.checklistProjects.groups.pantry"
+    ]
+  },
   "Paste": {
     "text": "Paste",
     "paths": [
@@ -3333,10 +3373,17 @@
       "plans.status.proThrough"
     ]
   },
+  "Produce": {
+    "text": "Produce",
+    "paths": [
+      "surfaces.checklistProjects.groups.produce"
+    ]
+  },
   "Project": {
     "text": "Project",
     "paths": [
-      "surfaces.prompts.items.deleteProject.untitledName"
+      "surfaces.prompts.items.deleteProject.untitledName",
+      "surfaces.checklistProjects.project"
     ]
   },
   "Project name": {
@@ -3344,6 +3391,12 @@
     "paths": [
       "surfaces.prompts.text.newProject.placeholder",
       "surfaces.prompts.text.renameProject.placeholder"
+    ]
+  },
+  "Project type": {
+    "text": "Project type",
+    "paths": [
+      "surfaces.checklistProjects.projectType"
     ]
   },
   "Projects": {
@@ -5011,6 +5064,12 @@
     "text": "Use a different email",
     "paths": [
       "signIn.email.differentEmail"
+    ]
+  },
+  "Use as Checklist": {
+    "text": "Use as Checklist",
+    "paths": [
+      "actions.actions.project.useAsChecklist.title"
     ]
   },
   "Use default": {

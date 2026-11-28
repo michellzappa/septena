@@ -289,14 +289,8 @@ class AreasProjectsViewModel(private val graph: AndroidAppGraph) : ViewModel() {
             val projectRow = graph.taskStore.record(RegistryEntityNames.PROJECT, project.id) ?: return@mutate false
             if (!isChecklist(projectRow)) return@mutate false
             val suggested = ProjectChecklistRules.layout(emptyList(), name).suggestedGroup
-            val groupName = when (suggested) {
-                "produce" -> "Produce"
-                "dairy" -> "Dairy"
-                "bakery" -> "Bakery"
-                "meatSeafood" -> "Meat & Seafood"
-                "pantry" -> "Pantry"
-                "frozen" -> "Frozen"
-                else -> null
+            val groupName = suggested?.let {
+                RegistryCatalog.checklistGroupTitle(it, java.util.Locale.getDefault().toLanguageTag())
             }
             val assignment = heading ?: groupName?.let { group ->
                 val id = RecurrenceRules.occurrenceId("checklist:${project.id}", requireNotNull(suggested))

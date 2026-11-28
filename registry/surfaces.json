@@ -1692,7 +1692,19 @@
     "checked": "Checked",
     "chooseGroup": "Choose group",
     "moveToGroup": "Move to group",
-    "ungrouped": "Ungrouped"
+    "ungrouped": "Ungrouped",
+    "addTyped": "Add “{title}”",
+    "projectType": "Project type",
+    "project": "Project",
+    "checklist": "Checklist",
+    "groups": {
+      "produce": "Produce",
+      "dairy": "Dairy",
+      "bakery": "Bakery",
+      "meatSeafood": "Meat & Seafood",
+      "pantry": "Pantry",
+      "frozen": "Frozen"
+    }
   },
   "listSort": {
     "id": "listSort",

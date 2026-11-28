@@ -7,7 +7,7 @@ use serde_json::{Value, json};
 
 use crate::do_session::{do_end_wins, resolve_do_sessions};
 use crate::error::CoreError;
-use crate::project_checklist::{checklist_check_patch, project_checklist};
+use crate::project_checklist::{checklist_check_patch, checklist_heading, project_checklist};
 use crate::recurrence::recurrence_window;
 use crate::task_dates::patch_json;
 use crate::{
@@ -29,6 +29,7 @@ pub const JSON_FUNCTIONS: &[&str] = &[
     "sortTasks",
     "projectChecklist",
     "checklistCheckPatch",
+    "checklistHeading",
     "applyDateAction",
     "normalizeTaskDates",
     "nextOccurrenceDates",
@@ -96,6 +97,7 @@ pub(crate) fn invoke_value(function: &str, input: Value) -> Result<Value, CoreEr
                 .ok_or_else(|| parse("checked must be a boolean"))?;
             Ok(checklist_check_patch(checked))
         }
+        "checklistHeading" => checklist_heading(&input),
         "taskViewMembership" => {
             let args: ViewArgs = decode(input).map_err(|e| parse(&e))?;
             Ok(membership_json(&task_view_membership(args.task, args.today, args.now)?))

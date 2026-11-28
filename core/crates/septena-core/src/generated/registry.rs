@@ -1,5 +1,5 @@
 // GENERATED FILE — DO NOT EDIT BY HAND.
-// Sources: registry/entities.json, registry/rules.json, registry/destinations.json
+// Sources: registry/entities.json, registry/rules.json, registry/destinations.json, registry/surfaces.json
 // Regenerate: node scripts/gen-registries.mjs
 #![allow(dead_code)]
 
@@ -256,4 +256,9 @@ pub mod destination_ids {
     pub const STARRED: &str = "starred";
     pub const FADED: &str = "faded";
     pub const RECENTLY_DELETED: &str = "recentlyDeleted";
+}
+
+/// Checklist group keys (`registry/surfaces.json` `checklistProjects.groups`).
+pub mod checklist_groups {
+    pub const KEYS: &[&str] = &["produce", "dairy", "bakery", "meatSeafood", "pantry", "frozen"];
 }

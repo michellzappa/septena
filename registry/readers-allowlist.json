@@ -60,6 +60,22 @@
     "RegistryRules.doLapseHours": {
       "reason": "The shared core applies it (resolve_do_sessions).",
       "issue": "#517"
+    },
+    "RegistrySurfaces.checklistAddTyped": {
+      "reason": "Phase 0 of #860 adds this Checklist copy to the registry; the Apple phase of #860 reads it.",
+      "issue": "#860"
+    },
+    "RegistrySurfaces.checklistProjectType": {
+      "reason": "Phase 0 of #860 adds this Checklist copy to the registry; the Apple phase of #860 reads it.",
+      "issue": "#860"
+    },
+    "RegistrySurfaces.standardProjectTitle": {
+      "reason": "Phase 0 of #860 adds this Checklist copy to the registry; the Apple phase of #860 reads it.",
+      "issue": "#860"
+    },
+    "RegistrySurfaces.checklistProjectTitle": {
+      "reason": "Phase 0 of #860 adds this Checklist copy to the registry; the Apple phase of #860 reads it.",
+      "issue": "#860"
     }
   },
   "ts": {
@@ -448,6 +464,10 @@
     "RegistryActionIds.APP_CONTACT_SUPPORT": {
       "reason": "Android has no Help menu; Contact Support opens from Settings (ADR 0054)",
       "issue": "#676"
+    },
+    "RegistryActionIds.PROJECT_USE_AS_CHECKLIST": {
+      "reason": "Phase 0 of #860 restores the Use as Checklist action; the Android phase of #860 binds it.",
+      "issue": "#860"
     }
   },
   "ships": {

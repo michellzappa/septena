@@ -81,7 +81,7 @@ function collectFile(fileId, json) {
     for (const [k, v] of Object.entries(node)) {
       const here = `${p}.${k}`;
       if (k === "description" || k === "l10nKeys") continue;
-      const checklistCopy = p === "surfaces.checklistProjects" && k !== "id";
+      const checklistCopy = (p === "surfaces.checklistProjects" || p === "surfaces.checklistProjects.groups") && k !== "id";
       if ((fields.has(k) || checklistCopy) && !SKIP_PATHS.some((re) => re.test(here))) {
         const key = node.l10nKeys?.[k];
         if (typeof v === "string") {
