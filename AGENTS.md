@@ -736,6 +736,13 @@ The product is Septena; the code targets keep the working names `Septask` (iOS),
   platform is generated from `registry/capabilities.json` into
   `docs/FEATURE_MAP.md`; edit the JSON, then run the generator.
   (`/strategy/feature-catalog` is the older Septena Life catalog.)
+- **Help follows the feature (ADR 0065, mz 2026-11-28).** A PR that ships,
+  changes, renames or removes something a user sees also updates its help.
+  In `registry/capabilities.json` each shipping capability names its site
+  guides in `docs`, or `{ "pending": "<septena/site issue URL>" }`. A removed
+  or renamed concept adds its old name to `registry/retired-terms.json`. A
+  word a user must understand gets its one-sentence meaning in the registry,
+  never only on the site. Help, docs and marketing describe the app as it is.
 - Match surrounding code: comment density, naming, idiom.
 - **Maker voice & identity** (the "made by mz" story across app, site, support,
   journal) is specified in `docs/MAKER_IDENTITY.md` — pull facts and copy blocks
