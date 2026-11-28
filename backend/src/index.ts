@@ -7,7 +7,7 @@ import { admin } from "./admin/routes.js";
 import { sweepAccounts } from "./admin/accounts.js";
 import { recordMetrics } from "./admin/metrics.js";
 import { sweepSupport } from "./support/routes.js";
-import { sweepBeta } from "./api/beta.js";
+import { betaAnswerPage, betaAnswerSave, sweepBeta } from "./api/beta.js";
 import * as oauth from "./shadow/oauth.js";
 import * as agentSignup from "./shadow/agentSignup.js";
 import { previewMcpHandler } from "./shadow/mcp.js";
@@ -105,6 +105,9 @@ app.get("/join/:token", joinLanding);
 app.get("/plus/:token", plusLanding);
 app.post("/plus/:token/start", plusStart);
 app.get("/plus/:token/continue", plusContinue);
+// The day-7 beta question (src/api/beta.ts): GET shows, POST answers.
+app.get("/beta/answer/:token", betaAnswerPage);
+app.post("/beta/answer/:token", betaAnswerSave);
 app.post("/oauth/token", oauth.token);
 app.post("/oauth/revoke", oauth.revoke);
 

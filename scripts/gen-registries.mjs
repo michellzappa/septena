@@ -878,7 +878,9 @@ function validateImportSources(file, caps) {
 function validateBeta(beta, caps) {
   assert(beta.version === 1, "beta.json: version must be 1");
   for (const [k, v] of Object.entries(beta.copy)) assert(typeof v === "string" && v.length > 0, `beta.json: copy.${k} missing`);
-  for (const k of ["settingsRow", "settingsSummary", "title", "deal", "intro", "tried", "note", "noteSubject", "ack", "ackDone", "cardTitle", "cardBody", "cardOpen", "cardDismiss"]) assert(beta.copy[k], `beta.json: copy.${k} missing`);
+  for (const k of ["cardTitle", "cardBody", "cardOpen", "cardDismiss"]) assert(beta.copy[k], `beta.json: copy.${k} missing`);
+  assert(beta.project && typeof beta.project.title === "string" && beta.project.title.trim(), "beta.json: project.title missing");
+  assert(typeof beta.project.notes === "string" && beta.project.notes.trim(), "beta.json: project.notes missing");
   const ids = new Set();
   for (const item of beta.items) {
     assert(/^[a-z][a-z-]*$/.test(item.id) && !ids.has(item.id), `beta.json: bad or duplicate id "${item.id}"`);
@@ -2723,7 +2725,7 @@ function generateTS({ entities, rules, icons, tokens, caps, settings, dests, act
   lines.push("/** Sign-in methods, order per platform and screen copy (registry/sign-in.json, ADR 0047). Copy is English; localize with registryText(). GET /v1/auth/methods says which methods are on. */");
   lines.push(`export const SIGN_IN = ${JSON.stringify({ platforms: bundle.signIn.platforms, methods: bundle.signIn.methods.map(({ notes, ...m }) => m), order: bundle.signIn.order, copy: bundle.signIn.copy, email: bundle.signIn.email, errors: bundle.signIn.errors, existingAccount: bundle.signIn.existingAccount, manage: bundle.signIn.manage, legal: plans.legal })} as const;`);
   lines.push("/** The beta checklist (registry/beta.json, ADR 0064). English. The backend serves it to testers; apps render what GET /v1/beta answers. */");
-  lines.push(`export const BETA_CHECKLIST = ${JSON.stringify({ copy: bundle.beta.copy, items: bundle.beta.items })} as const;`);
+  lines.push(`export const BETA_CHECKLIST = ${JSON.stringify({ copy: bundle.beta.copy, project: bundle.beta.project, items: bundle.beta.items })} as const;`);
   lines.push("");
   lines.push("// Localized registry copy (ADR 0020). Keys are the English text.");
   lines.push(L10N.tsTables(BY_KEY, TRANSLATIONS));

@@ -158,6 +158,10 @@ Subject: **You’re in the Septena beta**
 > 3. While an agent works on a task, press Stop, or Pause all agents, and see
 >    what happens.
 >
+> (As sent, the list is the ten items of `registry/beta.json`, and the mail
+> adds: “The beta notes which of these parts you used and when, never what
+> you wrote.”)
+>
 > When something breaks, confuses you or works well, tell me here:
 > {feedback link}. Say what you tried and what you expected. If an agent was
 > involved, add the prompt.
@@ -217,27 +221,137 @@ Decided 2026-11-28 (mz took the defaults; overrule any of them):
 
 ## 7. The checklist in the app
 
-mz, 2026-11-28: the beta asks for feedback on ten parts of the app, and the
-app knows who is a tester. Only an account that holds a tester's Pro grant
-sees any of this. No badges, no reminders.
+mz, 2026-11-28 (ADR 0064 amendment): the beta asks for feedback on ten
+parts of the app. The checklist is a normal project in the tester's list,
+and the backend measures which parts the tester really used. Only an account
+that holds a tester's Pro grant gets any of this. No badges, no reminders.
+
+### 7.1 The seeded project
 
 - **The items** live in `registry/beta.json`: inbox-today, do,
   second-device, fade, connect-agent, review-stop, discuss, move-in, siri,
-  capture. Each names its features; `GET /v1/beta?platform=…` lists only the
-  items whose features ship on that platform.
-- **The contract** is the `deal` line at the top of the Beta screen: what the
-  tester does, and the year of Pro in return. The tester ticks “I tried it”
-  per item and can say “I used Septena for real this week” (`_ack`, with its
-  date). Nothing asks for either.
-- **Where it shows:** a Beta row in Settings (“4 of 10 tried”) opens the
-  Beta screen. The first time the app sees a tester, one card on Today
-  (`cardTitle`, `cardBody`) opens the screen or closes for good (`_card`).
-- **Send a note** on an item opens Contact Support with the subject
-  “Beta: {item}”.
-- **Admin:** the Beta card counts accounts per ticked item.
+  capture. The `project` block holds the project's title and notes.
+- **When:** the first time a tester's grant lands on an account
+  (`claimPlusLink`, which the sign-in grant also runs), `GET /v1/beta` for a
+  tester who has none yet (testers granted before seeding shipped), and the
+  hourly sweep. The tester row records `seededAt` when seeding starts, so it
+  runs once per account, even when the tester deletes the project. A seed
+  that fails before it writes anything clears `seededAt` and runs again.
+  Seeding never fails a sign-in or a claim.
+- **What:** one project, "Septena beta", with no area and the registry
+  notes. One open task per item, in registry order: title = the item title
+  without its Markdown links, notes = the `try` line. Each link in the title
+  becomes one `about` reference (a URL key on `https://septena.app` + path,
+  snapshot title = the link words). `source` is `app`, `addedVia` is null.
+- **How:** one push through `TaskStore.push`, checked against the push
+  schema, with the actor `system:beta`. It syncs to every device like any
+  other write. The tester row keeps `seedProjectId` and `seedTaskIds`
+  (item id to task id).
+- **The Today card:** the first time the app sees a tester, one card
+  (`cardTitle`, `cardBody`) opens the project (`cardOpen`) or closes for good
+  (`cardDismiss`).
 
-API: `GET /v1/beta?platform=ios|ipados|macos|web|android|windows|linux`
-answers `{ member: false }`, or `{ member: true, joinedAt, copy, items: [{ id,
-title, try }], tried: { id: at }, ackAt, cardDismissedAt, feedbackURL }`.
-`POST /v1/beta/progress` takes one of `{ item, tried }`, `{ ack: true }` or
-`{ dismissCard: true }` and answers 204, or 404 for a non-tester.
+### 7.2 What the backend measures
+
+Content-free: times and counts, never task text. A **user write** is a change
+by an app session (`app:` actor). Agents (`mcp:`), the server (`system:`)
+and other members of a shared project (`member:`) are not the user. The
+seeded project and its tasks never count. Readings come from the account's
+own tables (`TaskStore.betaUsage`); the tester row stores the result, and a
+first time never moves later and never goes away (a device that signed out
+or an agent that was disconnected still counts).
+
+| Item | Did it, first at |
+|---|---|
+| inbox-today | A task whose insert had no area, no project and no Today, that a later user write gave Today, an area or a project (change log). |
+| do | The earliest `do_sessions.startedAt`. |
+| second-device | The `firstSeen` of the second device (devices row with a live session). A new sign-in on the same device is a new session, so it counts too. |
+| fade | `fadeSweptAt` set (the weekly question answered), or a task dropped with `dropReason` "faded". |
+| connect-agent | The earliest `connections.createdAt`. |
+| review-stop | A user write that moves a conversation's `endState` off `needs_verify` (Accept or Send back), or sets `stoppedAt`, or turns `agentsPaused` on; or a conversation with `stoppedAt` set. |
+| discuss | The earliest user turn in a thread that has a provider turn whose provider is not `claude`: the app's own model ran it. A thread with only a connected agent's turns does not count. |
+| move-in | A task with `addedVia` "import". |
+| siri | A task with `addedVia` "shortcut". |
+| capture | A task with `addedVia` "quick-entry", "quick-add" or "share". |
+
+**Ticked** = the seeded task for the item is done.
+
+`addedVia` (registry enum `taskAddedVia`) comes from the app push. The
+server writes "agent" on a task an MCP connector creates (agent keys
+included: they work over MCP). No REST path creates a task for an agent
+key, so the server writes no "api" today. The watch's REST create sends no
+`addedVia`.
+
+Further readings, all per tester and content-free:
+
+- **Repeat use.** Active days = distinct UTC days with at least one user
+  write, settings and the seeded rows left out, and so are writes of the fade
+  clock alone (`fadedAt`, `touchedAt`), which the app makes by itself. Week n
+  after `joinedAt` = days [7(n−1), 7n). The backend keeps weeks 1, 2 and 4,
+  and the time of the third active day of week 1.
+- **Agent loops.** One task where an agent worked (any `mcp:` change on the
+  task, its conversation or its turns, a claim included), a provider turn
+  with a question has a later user turn, and a user write set a done end
+  state (`agent_done`, `human_done`, `agent_assisted_done`; Accept in Review
+  writes `agent_assisted_done`). Counted in total and in the last 7 days.
+- **A normal week** (last 7 days): tasks the user added (inserts by a user
+  write; headings and imports left out), tasks the user completed (status
+  to done), tasks the user moved to Today (`today` to true).
+- **The funnel:** joined, signed in (grant on an account), first own task
+  added, first task completed, 3+ active days in week 1, day-7 answer given.
+  Apple's invite accepted is unknown to us, so it is not a step.
+
+The account summary (ADR 0043/0058) carries the product-wide versions of
+the last two for every account (`agentLoops7d`, `userTasksAdded7d`,
+`userTasksDone7d`, `userMovedToday7d`), so the Product page and the daily
+snapshot show them with history.
+
+The measurement runs on `GET /v1/beta`, on the admin lookup, and in the
+hourly sweep for the testers whose reading is older than 6 hours.
+
+### 7.3 The day-7 question
+
+Once, on day 7 after the join (hourly sweep, as the day-4 check-in, which
+stays):
+
+Subject: **One question about Septena**
+
+> You have had Septena for a week now. I have one question, and one tap
+> answers it.
+>
+> **How would you feel if you could no longer use Septena?**
+>
+> [Very disappointed] [Somewhat disappointed] [Not disappointed]
+>
+> You can change your answer later with the same buttons.
+>
+> Michell
+
+Each button links to `api.septena.app/beta/answer/<token>?a=very|somewhat|not`.
+The token is random per tester; only its hash is stored. GET shows the
+answer with a button and stores nothing, so a mail scanner answers nothing.
+POST stores `answer` and `answeredAt` on the tester row; a later answer
+replaces it. The thanks page offers the feedback link.
+
+### 7.4 Admin
+
+The Beta card on the Plans page: the codes; the funnel per code and in
+total, with the drop between steps; per item, testers who did it and who
+ticked it; per week (1, 2, 4), testers whose week has ended and those active
+on 3+ days in it; medians of a normal week and of agent loops; the day-7
+answers and the share of "very" among them (the usual bar is 40%). A lookup
+by one email (a POST form, never in a URL) shows that tester's items (did:
+date or no, ticked: yes or no), funnel dates, active days per week, week
+counts, loops and answer. No list of emails anywhere.
+
+### 7.5 API
+
+`GET /v1/beta?platform=ios|ipados|macos|web|android|windows|linux`
+answers `{ member: false }`, or `{ member: true, projectId, cardDismissedAt,
+copy: { cardTitle, cardBody, cardOpen, cardDismiss } }`. `projectId` is null
+only while the seed has not run. `platform` is still required; the answer no
+longer depends on it.
+
+`POST /v1/beta/progress` takes only `{ dismissCard: true }` and answers 204,
+or 404 for a non-tester. The item ticks, “I tried it” and “I used it this
+week” are gone: ticking is the task's own checkbox.
