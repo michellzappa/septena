@@ -14,6 +14,8 @@ import { signupView, signupsByEmail, signupsCsv } from "./signups.js";
 import { SERIES_DAYS, dayKey, recordMetrics } from "./metrics.js";
 import { forgetTraffic, trafficView } from "./plausible.js";
 import { macReleases } from "./releases.js";
+import { BETA_CODE_MAX_USES, BETA_CODE_RE, normalizeBetaCode } from "../store/betaInvites.js";
+import { setBetaLaunch } from "../api/beta.js";
 
 // The admin page, https://api.septena.app/admin (ADR 0043, #198). It shows
 // counts, dates and plans, never content. Its only writes are plans:
@@ -53,7 +55,7 @@ const NEEDS: Record<AdminPage, { accounts?: true; links?: true; signups?: true; 
   signups: { signups: true },
 };
 
-async function renderPage(c: Ctx, page: AdminPage, opts: { query?: string; newUrl?: string; error?: string } = {}): Promise<Response> {
+async function renderPage(c: Ctx, page: AdminPage, opts: { query?: string; newUrl?: string; newCode?: string; error?: string } = {}): Promise<Response> {
   const accounts = accountStoreFor(c.env);
   if (!accounts) return c.notFound();
   const need = NEEDS[page];
@@ -70,9 +72,10 @@ async function renderPage(c: Ctx, page: AdminPage, opts: { query?: string; newUr
     need.traffic ? trafficView(c.env) : { state: "off" as const },
     need.releases ? macReleases(c.env) : [],
   ]);
+  const beta = need.links ? { ...(await accounts.listBetaCodes()), newCode: opts.newCode } : undefined;
   const view: AdminView = {
     admin: c.get("email"), accounts: list, links: plus.links, uses: plus.uses, signups, query, history, traffic, releases,
-    emailSignups: found, emailUserId: identity?.userId ?? null, newUrl: opts.newUrl, error: opts.error, now,
+    emailSignups: found, emailUserId: identity?.userId ?? null, newUrl: opts.newUrl, error: opts.error, now, beta,
   };
   return new Response(renderAdmin(page, view), { status: opts.error ? 400 : 200, headers: PAGE_HEADERS });
 }
@@ -130,6 +133,37 @@ admin.post("/links/:id/revoke", async (c) => {
   const users = await revokePlusLink(c.env, c.req.param("id"), who === "all" ? null : who);
   if (!users) return c.notFound();
   await refreshAccounts(c.env, users);
+  return back(c, "plans");
+});
+
+// ---- the beta by invite code (ADR 0064) ----
+
+const zDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).transform((d) => Date.parse(`${d}T00:00:00Z`)).refine((n) => Number.isFinite(n));
+
+const zBetaCode = z.object({
+  code: z.string().transform(normalizeBetaCode).pipe(z.string().regex(BETA_CODE_RE)),
+  label: z.string().trim().min(1).max(60),
+  maxUses: z.coerce.number().int().min(1).max(BETA_CODE_MAX_USES),
+  ends: z.literal("").transform(() => null).or(zDay).optional(),
+});
+
+admin.post("/beta/codes", async (c) => {
+  const input = zBetaCode.safeParse(await c.req.parseBody());
+  if (!input.success) return renderPage(c, "plans", { error: "A beta code needs 8 to 32 letters or digits, a label and a number of people." });
+  const { code, label, maxUses, ends } = input.data;
+  const made = await accountStoreFor(c.env)?.createBetaCode({ code, label, maxUses, endsAt: ends ?? null });
+  if (!made) return renderPage(c, "plans", { error: `The code ${code} exists already. Pick another.` });
+  logEvent("beta_code_created", { codeId: made.id, maxUses });
+  return renderPage(c, "plans", { newCode: made.code });
+});
+
+admin.post("/beta/codes/:id/close", async (c) =>
+  await accountStoreFor(c.env)?.closeBetaCode(c.req.param("id")) ? back(c, "plans") : c.notFound());
+
+admin.post("/beta/launch", async (c) => {
+  const input = z.object({ day: zDay }).safeParse(await c.req.parseBody());
+  if (!input.success) return renderPage(c, "plans", { error: "Pick the launch day." });
+  if (!(await setBetaLaunch(c.env, input.data.day))) return renderPage(c, "plans", { error: "The launch day is set already." });
   return back(c, "plans");
 });
 

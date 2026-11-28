@@ -68,6 +68,7 @@ a new ADR and set the old one to `superseded by NNNN`.
 | [0061](0061-seven-year-plus-pass.md) | Offer a 7-year one-time Plus pass at half the annual rate (amends 0023, 0060) | accepted |
 | [0062](0062-native-linux-app-shares-the-desktop-shell.md) | Build the native Linux app on the shared Compose desktop shell (extends 0013, 0025) | accepted |
 | [0063](0063-user-stats-are-content-free-daily-counts.md) | User stats are content-free daily counts, never streaks (extends 0006, 0025, 0043, 0058) | proposed |
+| [0064](0064-beta-by-invite-code-tied-to-email.md) | The beta is by invite code, and the thank-you follows the email (extends 0043, 0045, 0047) | accepted |
 
 ## Template
 

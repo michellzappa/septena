@@ -7,6 +7,7 @@ import { admin } from "./admin/routes.js";
 import { sweepAccounts } from "./admin/accounts.js";
 import { recordMetrics } from "./admin/metrics.js";
 import { sweepSupport } from "./support/routes.js";
+import { sweepBeta } from "./api/beta.js";
 import * as oauth from "./shadow/oauth.js";
 import * as agentSignup from "./shadow/agentSignup.js";
 import { previewMcpHandler } from "./shadow/mcp.js";
@@ -131,6 +132,7 @@ export default {
       await sweepAccounts(env);
       await recordMetrics(env);
       await sweepSupport(env);
+      await sweepBeta(env);
     }
   },
 } satisfies ExportedHandler<Env>;

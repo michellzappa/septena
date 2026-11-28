@@ -5,7 +5,7 @@ import { escapeHtml, logEvent, randomId, sha256Base64Url } from "../util.js";
 import { refreshAccounts } from "../admin/accounts.js";
 import { accountStoreFor } from "../store/AccountStore.js";
 import { grantRow, type PaidPlanId } from "../entitlement/entitlement.js";
-import { plusLinkGrantId, type PlusLink, type PlusLinkInput } from "../store/plusLinks.js";
+import { addMonths, plusLinkGrantId, type PlusLink, type PlusLinkInput } from "../store/plusLinks.js";
 import { PAGE_CSS, PAIR_TTL_MS, normalizePairCode, openApprovalCode, pairingFor } from "../shadow/oauth.js";
 import { pairApproveUrl, pairQrSvg } from "../shadow/pairQr.js";
 import { storeFor } from "./session.js";
@@ -28,6 +28,10 @@ const SECRET_RE = /^[A-Za-z0-9_-]{20,64}$/;
 /// What the approving app shows: "Sign in on Septena plan link?".
 const APPROVAL_NAME = "Septena plan link";
 
+/// The beta grant ends this many months after the public launch (ADR 0064).
+export const BETA_PRO_MONTHS_AFTER_LAUNCH = 12;
+export const betaGrantEnd = (launchAt: number) => addMonths(launchAt, BETA_PRO_MONTHS_AFTER_LAUNCH);
+
 /// Makes a link. The URL is shown once: only a hash of the token is stored.
 export async function createPlusLink(env: Env, input: PlusLinkInput): Promise<{ link: PlusLink; url: string } | null> {
   const accounts = accountStoreFor(env);
@@ -40,12 +44,16 @@ export async function createPlusLink(env: Env, input: PlusLinkInput): Promise<{ 
 
 /// Gives the account the link's plan. Null when the link does not work (any
 /// more). Repeats safely with the same account.
-export async function claimPlusLink(env: Env, tokenHash: string, userId: string): Promise<{ linkId: string; plan: PaidPlanId; expiresAt: number | null } | null> {
+/// `atSignIn`: the claim runs inside a sign-in (the beta email grant, ADR
+/// 0064), before the session exists, for an account that was just resolved.
+export async function claimPlusLink(
+  env: Env, tokenHash: string, userId: string, opts: { atSignIn?: boolean } = {},
+): Promise<{ linkId: string; plan: PaidPlanId; expiresAt: number | null } | null> {
   const accounts = accountStoreFor(env);
   if (!accounts) return null;
   const store = storeFor(env, userId);
   // A code approved just before the account was deleted must not bring it back.
-  if (!(await store.hasAppSession())) return null;
+  if (!opts.atSignIn && !(await store.hasAppSession())) return null;
   const claim = await accounts.claimPlusLink(tokenHash, userId);
   if (!claim.ok) {
     logEvent("plus_link_refused", { userId });
@@ -58,6 +66,14 @@ export async function claimPlusLink(env: Env, tokenHash: string, userId: string)
     return null;
   }
   logEvent("plus_link_claimed", { linkId: claim.linkId, userId });
+  // A beta tester's link (ADR 0064): note the account, and after launch the
+  // grant ends a year after the launch date.
+  const beta = await accounts.betaLinkClaimed(claim.linkId, userId);
+  if (beta?.launchAt) {
+    const expiresAt = betaGrantEnd(beta.launchAt);
+    await store.putEntitlement(grantRow(plusLinkGrantId(claim.linkId), claim.plan, expiresAt, "beta"), "admin");
+    return { linkId: claim.linkId, plan: claim.plan, expiresAt };
+  }
   return { linkId: claim.linkId, plan: claim.plan, expiresAt: claim.expiresAt };
 }
 
