@@ -523,7 +523,8 @@ public struct AddTaskIntent: AppIntent {
       scheduled: effectiveScheduled,
       deadline: nil,
       today: effectiveToday,
-      notes: cleanNotes
+      notes: cleanNotes,
+      addedVia: .shortcut
     )
 
     TasksWidgetSnapshotPublisher.shared.publishNow()

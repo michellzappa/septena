@@ -207,6 +207,10 @@ enum TaskBackendMapping {
       "reminderDismissedAt": c.stamp("reminderDismissedAt", t.reminderDismissedAt),
       "source": c.text("source", t.source, max: 64),
       "sourceClient": c.text("sourceClient", t.sourceClient, max: 64),
+      // How the task was added (ADR 0064). A value the registry does not list
+      // goes as null instead of blocking the row. The engine sends it with
+      // the insert only (TaskSyncEngine drops it from later patches).
+      "addedVia": TaskAddedVia.wireValue(t.addedVia).map { .string($0) } ?? .null,
       "acknowledgedAt": t.acknowledgedAt.map { .string(stamp($0)) } ?? .null,
       // `.distantPast` marks a row from before the field existed: unknown.
       "createdAt": t.createdAt == .distantPast ? .null : .string(stamp(t.createdAt)),

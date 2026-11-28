@@ -131,7 +131,8 @@ enum SharedTaskCaptureImporter {
       guard !title.isEmpty else { SharedTaskCaptureQueue.finish(claimedURL); continue }
       let notes = capture.notes.trimmingCharacters(in: .whitespacesAndNewlines)
       let task = mutator.create(title: title, today: capture.today,
-                                notes: notes.isEmpty ? nil : notes, source: "share_extension")
+                                notes: notes.isEmpty ? nil : notes, source: "share_extension",
+                                addedVia: .share)
       if let url = capture.sourceURL {
         _ = mutator.addTaskRef(taskID: task.id, input: url.absoluteString, role: .from)
       }

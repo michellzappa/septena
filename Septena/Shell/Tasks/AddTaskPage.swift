@@ -194,12 +194,13 @@ struct AddTaskPage: View {
     working = true
     var draft = TaskDraft(filter: taskFilter)
     draft.title = title
-    let created = draft.create(via: mutator)
+    // This page is the iPhone/iPad Quick Add sheet (ADR 0064 `quick-add`).
+    let created = draft.create(via: mutator, addedVia: .quickAdd)
     let saved = draft
     TaskUndo.recordCreate(
       name: RegistryActions.title(.appNewTask),
       ids: [created.id], mutator: mutator,
-      rebuild: { [mutator] in [saved.create(via: mutator).id] })
+      rebuild: { [mutator] in [saved.create(via: mutator, addedVia: .quickAdd).id] })
     Haptics.commit()
     dismiss()
     if thenDo { DoStore.shared.begin(taskID: created.id) }

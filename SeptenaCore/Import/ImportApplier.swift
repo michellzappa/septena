@@ -103,7 +103,8 @@ enum ImportApplier {
           deadline: task.deadline,
           today: task.today,
           notes: task.notes,
-          source: source)
+          source: source,
+          addedVia: .import)
         taskMutator.reorder(id: created.id, toPosition: task.position)
         if let heading = task.headingSourceId.flatMap({ headingIDBySource[$0] }) ?? task.existingHeadingID {
           taskMutator.setHeading(id: created.id, heading: heading)

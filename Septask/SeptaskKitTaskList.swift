@@ -1735,12 +1735,16 @@ final class SeptaskKitTaskListController: NSViewController {
     reload()
   }
 
-  /// The beta card's open button: the Beta screen in Settings. Opening it
-  /// closes the card for good, as "Not now" does.
-  private func openBetaChecklist() {
+  /// The beta card's open button: the beta project the server seeded in the
+  /// tester's list. Opening it closes the card for good, as "Not now" does.
+  /// Without a project it only closes the card.
+  private func openBetaProject() {
+    let projectID = BetaCenter.shared.projectID
     dismissNotice(.beta)
-    SeptaskSettingsLink.request(BetaCenter.surfaceID)
-    SeptaskKitSettingsWindow.show()
+    guard let projectID else { return }
+    let title = LocalCache.projects(in: context).first(where: { $0.id == projectID })?.title
+      ?? TaskFilter.project(projectID).title
+    onNavigate?(.filter(.project(projectID), title: title))
   }
 
   /// ⌘K on selected notices: dismisses each one, the same as its close
@@ -1766,7 +1770,7 @@ final class SeptaskKitTaskListController: NSViewController {
     switch id {
     case .signIn: return { SeptaskSignInWindow.present() }
     case .weeklySweep: return { [weak self] in self?.presentWeeklySweepSheet() }
-    case .beta: return { [weak self] in self?.openBetaChecklist() }
+    case .beta: return { [weak self] in self?.openBetaProject() }
     case .trialEnd, .secondDevice:
       guard let upsell = id.registryID.flatMap({ RegistryNotices.byId[$0] })?.upsellId else { return nil }
       return { [weak self] in self?.presentPlusSheet(upsellID: upsell) }
@@ -2001,7 +2005,7 @@ final class SeptaskKitTaskListController: NSViewController {
     reload()
     let created = mutator.create(title: pair.view.title,
                                  deadline: pair.view.dueDate,
-                                 notes: pair.view.notes)
+                                 notes: pair.view.notes, addedVia: .import)
     try? RemindersBridge.shared.delete([pair.reminder])
     reminderPairs.removeAll { $0.view.id == id }
     importingReminderID = nil
@@ -2016,7 +2020,7 @@ final class SeptaskKitTaskListController: NSViewController {
       rebuild: { [mutator] in
         [mutator.create(title: pair.view.title,
                         deadline: pair.view.dueDate,
-                        notes: pair.view.notes).id]
+                        notes: pair.view.notes, addedVia: .import).id]
       })
     showRemindersImported(ids: [created.id])
     reload()
@@ -2032,7 +2036,7 @@ final class SeptaskKitTaskListController: NSViewController {
     for pair in pairs {
       createdIDs.append(mutator.create(title: pair.view.title,
                                        deadline: pair.view.dueDate,
-                                       notes: pair.view.notes).id)
+                                       notes: pair.view.notes, addedVia: .import).id)
     }
     try? RemindersBridge.shared.delete(pairs.map(\.reminder))
     reminderPairs = []
@@ -2045,7 +2049,7 @@ final class SeptaskKitTaskListController: NSViewController {
         pairs.map { pair in
           mutator.create(title: pair.view.title,
                          deadline: pair.view.dueDate,
-                         notes: pair.view.notes).id
+                         notes: pair.view.notes, addedVia: .import).id
         }
       })
     showRemindersImported(ids: createdIDs)
