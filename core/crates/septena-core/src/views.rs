@@ -146,7 +146,11 @@ pub fn task_view_membership(task: TaskSnapshot, today: String, now: String) -> R
     // ADR 0065: a tracked task is on Today only by its own deadline. The
     // user's deadline wins over the work going on elsewhere.
     let deadline_due = holding_deadline.is_some_and(|d| d <= today);
-    let is_on_today = if is_tracked { active && deadline_due } else { is_on_today };
+    let is_on_today = if is_tracked {
+        active && deadline_due
+    } else {
+        is_on_today
+    };
     let unfiled = task.area.is_none() && task.project.is_none();
     let has_date = scheduled.is_some() || deadline.is_some();
     let is_inbox = active && unfiled;
