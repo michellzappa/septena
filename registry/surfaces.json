@@ -1720,6 +1720,7 @@
     "dismissTitle": "Not now",
     "intro": "Choose Keep for anything you still need. The rest move to your Logbook as let go, never deleted.",
     "keptAllTitle": "You kept everything.",
+    "letGoTitle": "It can wait. The rest is in your Logbook.",
     "emptyTitle": "No faded tasks to check.",
     "keptAllDetail": "Kept tasks are back in their lists.",
     "remainingOne": "1 task remaining",
