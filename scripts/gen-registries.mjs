@@ -844,7 +844,10 @@ function validateBeta(beta, caps) {
     assert(/^[a-z][a-z-]*$/.test(item.id) && !ids.has(item.id), `beta.json: bad or duplicate id "${item.id}"`);
     ids.add(item.id);
     assert(item.title && item.try, `beta.json: ${item.id} needs title and try`);
-    assert(/^\/[a-z0-9/-]+$/.test(item.help ?? ""), `beta.json: ${item.id} needs help, a septena.app path`);
+    const links = [...item.title.matchAll(/\[([^\]]+)\]\(([^)]+)\)/g)];
+    assert(links.length > 0, `beta.json: ${item.id} title needs at least one link to its septena.app page`);
+    for (const [, label, href] of links) assert(label && /^\/[a-z0-9/-]+$/.test(href), `beta.json: ${item.id} link "${label}" needs a septena.app path`);
+    assert(!/[[\]()]/.test(item.title.replace(/\[([^\]]+)\]\(([^)]+)\)/g, "$1")), `beta.json: ${item.id} title has a stray bracket`);
     assert(Array.isArray(item.features) && item.features.length > 0, `beta.json: ${item.id} needs features`);
     for (const f of item.features) assert(f in caps.capabilities, `beta.json: ${item.id} unknown feature "${f}"`);
     assert(item.features.some((f) => caps.platforms.some((p) => caps.capabilities[f][p] === "ships")), `beta.json: ${item.id} ships on no platform`);

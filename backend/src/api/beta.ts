@@ -281,7 +281,7 @@ export function welcomeMail(email: string, linkUrl: string): Mail {
     { p: "Thanks for testing Septena." },
     { p: `Apple sends its own mail from TestFlight. Open it on your phone or tablet to install. On a Mac, [download the app here](${MAC}).` },
     { p: "These are the parts I most want your notes on. Once you sign in with this address, the app keeps the same list in Settings, under Beta, and you tick what you tried." },
-    { ol: BETA_CHECKLIST.items.map((i) => `**[${i.title}](${SITE}${i.help}).** ${i.try}`) },
+    { ol: BETA_CHECKLIST.items.map((i) => `**${absoluteLinks(i.title)}.** ${i.try}`) },
     { p: `For the agent items, [the agents page](${AGENTS}) shows how to connect yours.` },
     { p: "When something breaks, confuses you or works well, tell me. Say what you tried and what you expected. If an agent was involved, add the prompt." },
     { button: "Send a note", href: FEEDBACK },
@@ -308,6 +308,12 @@ export function launchMail(expiresAt: number, unclaimed: boolean): Mail {
 }
 
 // ---- the checklist in the app (registry/beta.json) ----
+
+const LINK = /\[([^\]]+)\]\(([^)]+)\)/g;
+/// A title links its key words to their septena.app page in Markdown. The
+/// apps draw text, so they get the words alone.
+export const plainTitle = (title: string) => title.replace(LINK, "$1");
+const absoluteLinks = (title: string) => title.replace(LINK, (_m, label, href) => `[${label}](${SITE}${href})`);
 
 export const BETA_PLATFORMS = ["ios", "ipados", "macos", "web", "android", "windows", "linux"] as const;
 type BetaPlatform = (typeof BETA_PLATFORMS)[number];
@@ -341,7 +347,7 @@ export async function betaState(env: Env, userId: string, platform: BetaPlatform
     member: true as const,
     joinedAt: state.joinedAt,
     copy: BETA_CHECKLIST.copy,
-    items: items.map(({ id, title, try: tryText }) => ({ id, title, try: tryText })),
+    items: items.map(({ id, title, try: tryText }) => ({ id, title: plainTitle(title), try: tryText })),
     tried,
     ackAt: state.progress._ack ?? null,
     cardDismissedAt: state.progress._card ?? null,
